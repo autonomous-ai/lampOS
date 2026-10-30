@@ -1050,6 +1050,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 pattern: None,
                 keep: false,
                 until_ends: false,
+                no_brighter: false,
             },
             "light",
         ),
@@ -2341,6 +2342,7 @@ fn a_light_files_pattern_is_loaded_and_held_to_its_bounds() {
             }),
             keep: false,
             until_ends: false,
+            no_brighter: false,
         }
     );
     let candle = with_light(
@@ -2414,6 +2416,7 @@ fn present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_rest
                 pattern: None,
                 keep: false,
                 until_ends: false,
+                no_brighter: false,
             }
         ]
     );
@@ -6435,6 +6438,7 @@ fn a_colour_until_it_ends_is_loaded_and_refused_with_a_for_or_keep() {
         pattern: None,
         keep: false,
         until_ends: true,
+        no_brighter: false,
     };
     assert!(held.held_until_ends());
     assert_eq!(

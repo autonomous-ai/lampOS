@@ -2301,9 +2301,10 @@ fn start(
         ended
     });
     std::thread::spawn(move || {
-        // A light relative to the person's is made from the light shown as
-        // the run began (#1672), at least a level from it; with that light
-        // off or not known, nothing is shown, and the journal says why.
+        // A light relative to the person's, or never brighter than it, is
+        // made from the light shown as the run began (#1672, #3691); with
+        // that light off, or not known for a relative one, nothing is shown,
+        // and the journal says why.
         let calls: Vec<Call> = calls
             .into_iter()
             .filter_map(
@@ -3823,6 +3824,7 @@ fn show(
             pattern: frame.pattern,
             keep: false,
             until_ends: false,
+            no_brighter: false,
         };
         let made = match glow {
             Some(glow) => glow.ask(&light),
@@ -5006,6 +5008,7 @@ mod tests {
             pattern: None,
             keep: false,
             until_ends: false,
+            no_brighter: false,
         }
     }
 

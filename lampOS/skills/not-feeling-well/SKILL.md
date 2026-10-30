@@ -8,7 +8,9 @@ description: When a part of the lamp has failed for half a minute, or a part tha
 When the lamp's own health has said that something in it failed (`error`:
 a part the self-test found broken, the body, the eyes, the voice) for half
 a minute, the lamp droops once, slowly and sleepily, and its light goes
-pale and low and breathes slowly, about every ten seconds. It does the same
+pale and low and breathes slowly, about every ten seconds. It is never
+brighter than the light the person chose: at their dimmest it is a steady
+pale light at that level, and with their light off it only droops. It does the same
 when a part that came up well this time has not been heard from for five
 minutes: a part that crashed and did not come back. Its own light comes
 back when the error ends or the part is heard again, or when the lamp's

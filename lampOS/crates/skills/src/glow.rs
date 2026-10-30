@@ -51,13 +51,33 @@ pub const LEVELS: u8 = 5;
 /// never the colour", and at 21:18 "down, never up"): a warmth that is
 /// already as warm as it goes is no change a person sees, so the level is
 /// what shows the glow. At level 1 there is none under it, and nothing is
-/// asked: someone at their dimmest light is already resting.
+/// asked: someone at their dimmest light is already resting. A call with
+/// `warm_at_dimmest` (Glad's and Lively's, #3691) asks the warmth alone
+/// there, steady at level 1, when the colour can still warm; when it is
+/// already warm, nothing.
+///
+/// A [`Call::Light`] with `no_brighter` is made never brighter than the
+/// person's light (#3691: Not feeling well's pale breath over a person at
+/// level 1): its level at most theirs, a breath's low under that, and
+/// steady at level 1, where no breath goes lower. Over a light that is off
+/// nothing is asked; with the light not known, it is asked as written.
+/// Any other call is as it was.
 pub fn relative(now: Option<&Light>, call: &Call) -> Result<Call, &'static str> {
+    if let Call::Light {
+        level: Some(asked),
+        pattern,
+        no_brighter: true,
+        ..
+    } = call
+    {
+        return no_brighter(now, call, *asked, *pattern);
+    }
     let Call::Relative {
         warmer,
         dimmer,
         lasting,
         breathe_ms,
+        warm_at_dimmest,
     } = call
     else {
         return Ok(call.clone());
@@ -75,6 +95,19 @@ pub fn relative(now: Option<&Light>, call: &Call) -> Result<Call, &'static str> 
     // At least one level down, whatever `dimmer` says; never up.
     let low = now.level.saturating_sub((*dimmer).max(1)).max(1);
     if low == now.level {
+        // No level under it: the warmth alone, steady, if it is asked for
+        // and the colour has a step left (#3691).
+        if *warm_at_dimmest && colour != now.colour {
+            return Ok(Call::Light {
+                colour: colour.into(),
+                level: Some(now.level),
+                lasting: lasting.clone(),
+                pattern: None,
+                keep: false,
+                until_ends: false,
+                no_brighter: false,
+            });
+        }
         return Err("the person's light is at its dimmest: no evening glow");
     }
     // With a breath, it stays at the person's level and breathes down the
@@ -97,6 +130,52 @@ pub fn relative(now: Option<&Light>, call: &Call) -> Result<Call, &'static str> 
         pattern,
         keep: false,
         until_ends: false,
+        no_brighter: false,
+    })
+}
+
+/// A `no_brighter` light over `now`: its level at most the person's, and a
+/// breath's low under it; a breath with no level under it is steady.
+fn no_brighter(
+    now: Option<&Light>,
+    call: &Call,
+    asked: u8,
+    pattern: Option<LightPattern>,
+) -> Result<Call, &'static str> {
+    let Call::Light {
+        colour,
+        lasting,
+        keep,
+        until_ends,
+        ..
+    } = call
+    else {
+        return Ok(call.clone());
+    };
+    let level = match now {
+        // Not known: as written, a light checked on a lamp at that level.
+        None => asked,
+        Some(now) if !now.on => {
+            return Err("the light is off: no light brighter than the person's");
+        }
+        Some(now) => asked.min(now.level.max(1)),
+    };
+    let pattern = pattern.and_then(|pattern| match pattern.kind {
+        PatternKind::Breathe if level > 1 => Some(LightPattern {
+            low: pattern.low.min(level - 1),
+            ..pattern
+        }),
+        PatternKind::Breathe => None,
+        _ => pattern.check(level).is_ok().then_some(pattern),
+    });
+    Ok(Call::Light {
+        colour: colour.clone(),
+        level: Some(level),
+        lasting: lasting.clone(),
+        pattern,
+        keep: *keep,
+        until_ends: *until_ends,
+        no_brighter: false,
     })
 }
 
@@ -458,6 +537,7 @@ mod tests {
             pattern: None,
             keep: false,
             until_ends: false,
+            no_brighter: false,
         }
     }
 
@@ -632,6 +712,7 @@ mod tests {
             }),
             keep: false,
             until_ends: false,
+            no_brighter: false,
         };
         let mut glow = Glow::new(&glows, "calm", None);
         assert_eq!(
@@ -747,6 +828,19 @@ mod tests {
             dimmer: 1,
             lasting: Some("20s".into()),
             breathe_ms,
+            warm_at_dimmest: false,
+        }
+    }
+
+    /// Glad's and Lively's light (#3691): the evening's, and the warmth
+    /// alone at the dimmest level.
+    fn feeling(breathe_ms: Option<u32>) -> Call {
+        Call::Relative {
+            warmer: 1,
+            dimmer: 1,
+            lasting: Some("12s".into()),
+            breathe_ms,
+            warm_at_dimmest: true,
         }
     }
 
@@ -804,7 +898,8 @@ mod tests {
     /// steady under it. A dimmer of 0 still moves a level.
     #[test]
     fn every_evening_ask_is_at_least_one_level_under_the_persons_light() {
-        for dimmer in [0, 1, 4] {
+        for (dimmer, warm_at_dimmest) in [0, 1, 4].into_iter().flat_map(|d| [(d, false), (d, true)])
+        {
             for level in 2..=LEVELS {
                 for breathe_ms in [Some(10_000), None] {
                     let now = light(true, "warm", level);
@@ -813,6 +908,7 @@ mod tests {
                         dimmer,
                         lasting: Some("20s".into()),
                         breathe_ms,
+                        warm_at_dimmest,
                     };
                     let Ok(Call::Light {
                         colour,
@@ -868,6 +964,7 @@ mod tests {
             lasting,
             keep,
             until_ends,
+            no_brighter: false,
         }) = relative(Some(&light(true, "white", 4)), &evening(Some(10_000)))
         else {
             panic!("a light");
@@ -899,5 +996,143 @@ mod tests {
             panic!("a light");
         };
         assert_eq!((colour.as_str(), level), ("blue", Some(2)));
+    }
+
+    /// Glad and Lively at level 1 (#3691, D): with the colour still white,
+    /// the warmth alone, steady at 1, never a level up; already warm, or a
+    /// colour the person chose, nothing, as the evening.
+    #[test]
+    fn at_the_dimmest_level_a_feeling_asks_the_warmth_alone_while_the_colour_is_white() {
+        for breathe in [Some(6_000), None] {
+            assert_eq!(
+                relative(Some(&light(true, "white", 1)), &feeling(breathe)),
+                Ok(Call::Light {
+                    colour: "warm".into(),
+                    level: Some(1),
+                    lasting: Some("12s".into()),
+                    pattern: None,
+                    keep: false,
+                    until_ends: false,
+                    no_brighter: false,
+                }),
+                "{breathe:?}"
+            );
+            for colour in ["warm", "orange"] {
+                assert_eq!(
+                    relative(Some(&light(true, colour, 1)), &feeling(breathe)),
+                    Err("the person's light is at its dimmest: no evening glow"),
+                    "{colour}"
+                );
+            }
+        }
+    }
+
+    /// Above level 1 a feeling's light is the evening's, warmth and all.
+    #[test]
+    fn above_the_dimmest_level_a_feeling_is_the_evening_glow() {
+        for colour in ["white", "warm", "blue"] {
+            for level in 2..=LEVELS {
+                for breathe in [Some(6_000), None] {
+                    let now = light(true, colour, level);
+                    let mut asked = relative(Some(&now), &feeling(breathe)).unwrap();
+                    let mut evening = relative(Some(&now), &evening(breathe)).unwrap();
+                    for call in [&mut asked, &mut evening] {
+                        if let Call::Light { lasting, .. } = call {
+                            *lasting = None;
+                        }
+                    }
+                    assert_eq!(asked, evening, "{colour} {level} {breathe:?}");
+                }
+            }
+        }
+    }
+
+    fn unwell() -> Call {
+        Call::Light {
+            colour: "white".into(),
+            level: Some(2),
+            lasting: None,
+            pattern: Some(LightPattern {
+                kind: PatternKind::Breathe,
+                period_ms: 10_000,
+                low: 1,
+            }),
+            keep: false,
+            until_ends: true,
+            no_brighter: true,
+        }
+    }
+
+    /// Not feeling well's pale breath (#3691, E) is never brighter than the
+    /// person's light: over level 1 it is a steady white 1; at 2 and up it
+    /// is as written, white 2 breathing down to 1.
+    #[test]
+    fn a_no_brighter_light_is_at_most_the_persons_level() {
+        for colour in ["warm", "white"] {
+            let Ok(Call::Light {
+                colour: asked,
+                level,
+                pattern,
+                until_ends,
+                no_brighter,
+                ..
+            }) = relative(Some(&light(true, colour, 1)), &unwell())
+            else {
+                panic!("a light over {colour} 1");
+            };
+            assert_eq!((asked.as_str(), level, pattern), ("white", Some(1), None));
+            assert!(until_ends && !no_brighter);
+            for level in 2..=LEVELS {
+                let Ok(Call::Light {
+                    level: asked,
+                    pattern,
+                    ..
+                }) = relative(Some(&light(true, colour, level)), &unwell())
+                else {
+                    panic!("a light over {colour} {level}");
+                };
+                assert_eq!(asked, Some(2));
+                let pattern = pattern.unwrap();
+                assert_eq!((pattern.kind, pattern.low), (PatternKind::Breathe, 1));
+                assert!(pattern.check(2).is_ok());
+            }
+        }
+        // A brighter ask over a person at 3: their 3, breathing down to 2.
+        let mut bright = unwell();
+        if let Call::Light { level, pattern, .. } = &mut bright {
+            *level = Some(5);
+            if let Some(pattern) = pattern {
+                pattern.low = 4;
+            }
+        }
+        let Ok(Call::Light { level, pattern, .. }) =
+            relative(Some(&light(true, "warm", 3)), &bright)
+        else {
+            panic!("a light");
+        };
+        assert_eq!(
+            (level, pattern.map(|pattern| pattern.low)),
+            (Some(3), Some(2))
+        );
+    }
+
+    /// Over a light that is off, nothing; not known, as written.
+    #[test]
+    fn a_no_brighter_light_over_a_light_off_asks_nothing_and_unknown_asks_as_written() {
+        assert!(relative(Some(&light(false, "warm", 3)), &unwell()).is_err());
+        let Ok(Call::Light {
+            level,
+            pattern,
+            no_brighter,
+            ..
+        }) = relative(None, &unwell())
+        else {
+            panic!("a light");
+        };
+        assert_eq!(
+            (level, pattern.map(|pattern| pattern.low)),
+            (Some(2), Some(1))
+        );
+        assert!(!no_brighter);
     }
 }

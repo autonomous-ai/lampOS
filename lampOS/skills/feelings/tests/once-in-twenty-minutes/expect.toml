@@ -12,7 +12,7 @@ args = { move = "glad-lift" }
 at = "40s"
 within = "1s"
 call = "light"
-args = { relative = { warmer = 1, dimmer = 1 }, for = "12s", breathe_ms = 6000 }
+args = { relative = { warmer = 1, dimmer = 1, warm_at_dimmest = true }, for = "12s", breathe_ms = 6000 }
 
 [[expect]]
 at = "1300s"
@@ -24,4 +24,4 @@ args = { move = "glad-lift" }
 at = "1300s"
 within = "1s"
 call = "light"
-args = { relative = { warmer = 1, dimmer = 1 }, for = "12s", breathe_ms = 6000 }
+args = { relative = { warmer = 1, dimmer = 1, warm_at_dimmest = true }, for = "12s", breathe_ms = 6000 }
