@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,6 +9,20 @@ description = "One paired lampOS lamp as MCP tools, for an agent on your own com
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+keywords = ["lampos", "lamp", "mcp", "agent", "robot"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Home Automation",
+    "Topic :: Software Development :: Libraries",
+    "Framework :: AsyncIO",
+]
 # The MCP SDK's 1.x line: 2.x renamed FastMCP and changed its API.
 # 1.22 at least: 1.21 and older don't import with today's pydantic (2.14,
 # `eval_type_backport`), and lamp-mcp's tests pass on 1.22 and 1.30 (El's P3
@@ -20,3 +34,9 @@ test = ["pytest>=8", "jsonschema>=4.20"]
 
 [project.scripts]
 lamp-mcp = "lamp_mcp.server:main"
+
+[project.urls]
+Homepage = "https://github.com/autonomous-ai/lampOS"
+Documentation = "https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/develop.md"
+Source = "https://github.com/autonomous-ai/lampOS/tree/lamp-voice/lampOS/sdk/mcp"
+Issues = "https://github.com/autonomous-ai/lampOS/issues"

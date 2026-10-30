@@ -6,7 +6,7 @@ messages in
 [control.schema.json](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.schema.json)).
 It runs on your computer, never on a lamp.
 
-**New here?** [docs/develop.md](../../docs/develop.md) is the 10-minute quick-start: the fake lamp, a first program, pairing, lamp-mcp and skills.
+**New here?** [docs/develop.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/develop.md) is the 10-minute quick-start: the fake lamp, a first program, pairing, lamp-mcp and skills.
 
 **Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
 (#3504). Until then, try it with the fake lamp below.
@@ -184,7 +184,7 @@ doesn't know, such as one from a newer lamp, is printed as `<not shown>`.
 ## Check a skill folder
 
 A skill is a folder the lamp runs without code: its rules in `skill.toml`
-([the skill format, version 1](../../docs/skill-format.md)). Check one
+([the skill format, version 1](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/skill-format.md)). Check one
 before it goes to a lamp or the Store:
 
 ```sh
@@ -214,7 +214,7 @@ here can still be refused there, with its reason.
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
-[control.md](../../docs/control.md) and the schema. Every event comes **by
+[control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md) and the schema. Every event comes **by
 edge**: when something changes, never once per sensor reading. Each event
 carries `at`, a UTC time ending `Z`, besides the fields below. Subscribe with
 `on(event, …)`. An event your pairing lacks the grant for is refused at
@@ -264,7 +264,7 @@ face's place in the picture is a share of it, never the picture.
 
 Every public call and `lamp` command, with what the lamp takes. The ranges are
 what lamp-control and the ring refuse past, read from
-[control.md](../../docs/control.md) and their code. The SDK checks names
+[control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md) and their code. The SDK checks names
 against the schema before sending, and the lamp checks the rest. A test keeps
 every public method named here.
 

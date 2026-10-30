@@ -7,7 +7,7 @@ messages in
 Same names as the Python SDK, in camelCase, with promises. It runs on your
 computer, never on a lamp. Node 20.11 or later.
 
-**New here?** [docs/develop.md](../../docs/develop.md) is the 10-minute quick-start: the fake lamp, a first program, pairing, lamp-mcp and skills.
+**New here?** [docs/develop.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/develop.md) is the 10-minute quick-start: the fake lamp, a first program, pairing, lamp-mcp and skills.
 
 **Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
 (#3504). Until then, try it with the fake lamp below.
@@ -178,7 +178,7 @@ Tests: `npm test`.
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
-[control.md](../../docs/control.md) and the schema. Every event comes **by
+[control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md) and the schema. Every event comes **by
 edge**: when something changes, never once per sensor reading. Each event
 carries `at`, a UTC time ending `Z`, besides the fields below. Subscribe with
 `on(event, …)`. An event your pairing lacks the grant for is refused at
@@ -228,7 +228,7 @@ face's place in the picture is a share of it, never the picture.
 
 Every public call and `lamp` command, with what the lamp takes. The ranges are
 what lamp-control and the ring refuse past, read from
-[control.md](../../docs/control.md) and their code. The SDK checks names
+[control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md) and their code. The SDK checks names
 against the schema before sending, and the lamp checks the rest. A test keeps
 every public method named here.
 
@@ -253,7 +253,7 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 
 | call | parameters | grant |
 |---|---|---|
-| `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`; their fields and grants are [control.md](../../docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
+| `lamp.on(event, handler, { phrases })` | `event`: one of the schema's events (`person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `hand`, `phrase.heard`, `name.heard`, `sound.heard`, `touch`, `button`, `time`, `lamp.changed`; their fields and grants are [control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md)'s Events), or `lease` or `done`. `handler(event)`: a function, or async. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Rejects with the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | an array of events | each event's |
 | `lamp.get(...states)` | `presence` (needs `look`), `light`, `mood`, `lamp` | the states asked, by those names |
