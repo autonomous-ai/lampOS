@@ -949,3 +949,15 @@ test('the camera stream asks up to 30 a second, and 31 is refused before sending
   assert.ok('fps_now' in started);
   await assert.rejects(lamp.cameraStream(true, 31), LampError);
 }));
+
+test('a fast binary frame is its header and the JPEG as data', async () => {
+  const { binaryFrame } = await import('../src/client.js');
+  const header = Buffer.from(JSON.stringify({ ev: 'camera.frame', bytes: 4, width: 640, height: 480, fps_now: 24.8 }));
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(header.length);
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  const frame = binaryFrame(Buffer.concat([length, header, jpeg]));
+  assert.equal(frame.ev, 'camera.frame');
+  assert.equal(frame.width, 640);
+  assert.deepEqual([...frame.data], [...jpeg]);
+});

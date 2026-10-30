@@ -115,6 +115,15 @@ def _check(op: str, fields: dict) -> None:
             raise LampError(f"no part {value!r}", code="bad_request")
 
 
+def binary_frame(message: bytes) -> dict:
+    """A fast stream's binary `camera.frame`: its header, with the JPEG as
+    `data` (bytes)."""
+    length = int.from_bytes(message[:4], "big")
+    frame = json.loads(message[4 : 4 + length])
+    frame["data"] = message[4 + length :]
+    return frame
+
+
 # Events that come with a request, never subscribed to: a camera stream's.
 CAMERA_EVENTS = ("camera.frame", "camera.ended")
 
@@ -503,6 +512,11 @@ class Lamp:
     async def _frames(self) -> None:
         try:
             async for text in self._ws:
+                if isinstance(text, bytes):
+                    # A fast camera frame: the header's length, the header,
+                    # then the JPEG, given as `data` (bytes).
+                    self._event(binary_frame(text))
+                    continue
                 frame = json.loads(text)
                 debug.frame("<-", frame)
                 if "re" in frame and "ok" in frame:
@@ -666,13 +680,19 @@ class Lamp:
         reply = await self.request("camera.snapshot")
         return base64.b64decode(reply["jpeg"])
 
-    async def camera_stream(self, on: bool = True, fps: int | None = None) -> dict:
-        """Pictures as `camera.frame` events (`lamp.on("camera.frame", ...)`,
-        each with its `jpeg` in base64), `fps` a second at most (1 to 30; each new frame once as it comes, about 1 to 2 a second today: the answer and each frame carry `fps_now`), until
-        `camera_stream(False)`, `stop`, or a `camera.ended` event."""
+    async def camera_stream(self, on: bool = True, fps: int | None = None, size: str | None = None) -> dict:
+        """Pictures as `camera.frame` events (`lamp.on("camera.frame", ...)`), at
+        most `fps` a second (1 to 30), until `camera_stream(False)`, `stop`, or
+        a `camera.ended` event. Where the eyes serve every frame (the answer's
+        `fast: true`), each comes as the camera made it, `size` `640x480` (the
+        default) or `1280x720`, with the JPEG as `data` (bytes); otherwise the
+        eyes' newest frame, about 1 to 2 a second, with `jpeg` in base64. Each
+        frame and the answer carry `fps_now`."""
         fields: dict[str, Any] = {"on": on}
         if fps is not None:
             fields["fps"] = fps
+        if size is not None:
+            fields["size"] = size
         return await self.request("camera.stream", **fields)
 
     async def sound(self, name: str) -> dict:

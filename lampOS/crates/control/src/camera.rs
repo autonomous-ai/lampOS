@@ -14,6 +14,8 @@
 //! file holds. The voice stops the eyes' camera then too, so the file goes,
 //! but the door doesn't wait on that.
 use std::collections::HashMap;
+use std::io::{Read as _, Write as _};
+use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -92,6 +94,38 @@ impl Rate {
 
 /// Whether the lamp is private now.
 pub type Private = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// Where the fast stream's binary frames go, once the server has given it.
+pub type Sink = Arc<std::sync::OnceLock<crate::parts::Binary>>;
+/// The fast stream's sizes: the camera's own 25 fps MJPEG modes, as the eyes
+/// serve them (`lamp_eyes::tap`). The first is the default: a quarter of
+/// the bytes, for a link over a tunnel.
+pub const SIZES: [&str; 2] = ["640x480", "1280x720"];
+/// A camera frame larger than this is not sent.
+pub const CAMERA_FRAME_MAX: usize = 512 * 1024;
+/// How long the fast stream waits to connect to the eyes, and for a frame
+/// before it looks again.
+const FAST_WAIT: Duration = Duration::from_millis(500);
+
+/// A size asked for, if it's one of [`SIZES`], as width and height.
+pub fn size_of(size: &str) -> Option<(u32, u32)> {
+    if !SIZES.contains(&size) {
+        return None;
+    }
+    let (width, height) = size.split_once('x')?;
+    Some((width.parse().ok()?, height.parse().ok()?))
+}
+
+/// One fast frame as it goes on the WebSocket, binary: the header's length
+/// (4 bytes, big-endian), the header (JSON: `ev` `camera.frame`, `bytes`,
+/// `width`, `height`, `fps_now`), then the JPEG.
+pub fn binary_frame(header: &Value, jpeg: &[u8]) -> Vec<u8> {
+    let header = header.to_string().into_bytes();
+    let length = u32::try_from(header.len())
+        .unwrap_or(u32::MAX)
+        .to_be_bytes();
+    [&length[..], &header, jpeg].concat()
+}
 
 /// Asks the ring for its mark (`light/mark`, `lamp_msgs::RingMark`) for a
 /// client: `blink` once for a snapshot, else held [`MARK_HOLDS`] ahead.
@@ -175,6 +209,8 @@ pub struct Camera {
     /// The ring's mark; none, no camera at all (it is never seen unmarked).
     mark: Option<Mark>,
     rate: Arc<Rate>,
+    /// The eyes' frames socket and where its frames go: the fast stream.
+    fast: Option<(PathBuf, Sink)>,
 }
 
 impl Camera {
@@ -185,7 +221,15 @@ impl Camera {
             streams: HashMap::new(),
             mark: None,
             rate: Arc::default(),
+            fast: None,
         }
+    }
+
+    /// The fast stream: every frame the camera makes, from the eyes' frames
+    /// socket, as binary frames through `sink`.
+    pub fn fast(mut self, socket: PathBuf, sink: Sink) -> Self {
+        self.fast = Some((socket, sink));
+        self
     }
 
     /// The ring's mark while it is seen through.
@@ -222,6 +266,7 @@ impl Camera {
         client: &str,
         on: bool,
         fps: Option<u8>,
+        size: Option<&str>,
         events: Events,
     ) -> Result<Value, Error> {
         self.end(client);
@@ -238,6 +283,20 @@ impl Camera {
         let (sight, private, client) =
             (self.sight.clone(), self.private.clone(), client.to_owned());
         let rate = self.rate.clone();
+        // The fast stream when the eyes serve their frames: every frame the
+        // camera makes, at the size asked. Else the eyes' newest frame.
+        let asked = size.unwrap_or(SIZES[0]);
+        let fast = self.fast.as_ref().and_then(|(socket, sink)| {
+            let sink = sink.get()?.clone();
+            let size = size_of(asked)?;
+            let mut reader = UnixStream::connect(socket).ok()?;
+            reader.set_write_timeout(Some(FAST_WAIT)).ok()?;
+            reader
+                .write_all(format!("{}x{}\n", size.0, size.1).as_bytes())
+                .ok()?;
+            Some((reader, sink, size))
+        });
+        let fast_size = fast.as_ref().map(|(_, _, _)| asked.to_owned());
         std::thread::spawn(move || {
             let marked = |at: &mut Option<std::time::Instant>| {
                 if at.is_none_or(|at| at.elapsed() >= MARK_EVERY) {
@@ -245,11 +304,32 @@ impl Camera {
                     *at = Some(std::time::Instant::now());
                 }
             };
-            run(&sight, fps, &running, &private, &marked, &rate, &|event| {
-                events(&client, event)
-            });
+            match fast {
+                Some((reader, sink, size)) => {
+                    let send = |frame: &[u8]| sink(&client, frame);
+                    run_fast(
+                        reader,
+                        size,
+                        fps,
+                        &running,
+                        &private,
+                        &marked,
+                        &rate,
+                        &send,
+                        &|event| events(&client, event),
+                    );
+                }
+                None => run(&sight, fps, &running, &private, &marked, &rate, &|event| {
+                    events(&client, event)
+                }),
+            }
         });
-        Ok(json!({"stream": "on", "fps": fps, "fps_now": self.rate.now()}))
+        Ok(match fast_size {
+            Some(size) => json!({
+                "stream": "on", "fps": fps, "fps_now": self.rate.now(), "fast": true, "size": size,
+            }),
+            None => json!({"stream": "on", "fps": fps, "fps_now": self.rate.now()}),
+        })
     }
 
     /// Ends `client`'s stream, if any, without an event: its own `off`,
@@ -313,6 +393,72 @@ fn run(
             Err(_) => {}
         }
         std::thread::sleep(LOOK_EVERY);
+    }
+}
+
+/// One fast stream, on its own thread: each frame the eyes pass on, at most
+/// `fps` a second, as a binary frame through `send`, the mark asked before
+/// each. Ends when `running` is cleared, the lamp turns private, the eyes
+/// let it go (the camera closed), or no frame comes for [`GONE_AFTER`].
+#[allow(clippy::too_many_arguments)]
+fn run_fast(
+    mut reader: UnixStream,
+    (width, height): (u32, u32),
+    fps: u8,
+    running: &AtomicBool,
+    private: &Private,
+    marked: &dyn Fn(&mut Option<std::time::Instant>),
+    rate: &Rate,
+    send: &dyn Fn(&[u8]),
+    tell: &dyn Fn(Value),
+) {
+    let _ = reader.set_read_timeout(Some(FAST_WAIT));
+    let least_gap = Duration::from_millis(1_000 / u64::from(fps));
+    let (mut sent_at, mut marked_at) = (None::<std::time::Instant>, None);
+    let mut fresh_at = std::time::Instant::now();
+    let ended = |why: &str| {
+        running.store(false, Ordering::SeqCst);
+        tell(json!({"ev": "camera.ended", "why": why}));
+    };
+    while running.load(Ordering::SeqCst) {
+        if private() {
+            return ended("the lamp is private");
+        }
+        let mut length = [0u8; 4];
+        match reader.read_exact(&mut length) {
+            Ok(()) => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                if fresh_at.elapsed() >= GONE_AFTER {
+                    return ended("the camera is closed");
+                }
+                continue;
+            }
+            Err(_) => return ended("the camera is closed"),
+        }
+        let length = u32::from_be_bytes(length) as usize;
+        let mut jpeg = vec![0u8; length];
+        if reader.read_exact(&mut jpeg).is_err() {
+            return ended("the camera is closed");
+        }
+        let now = std::time::Instant::now();
+        fresh_at = now;
+        rate.saw(SystemTime::now(), now);
+        if length > CAMERA_FRAME_MAX || sent_at.is_some_and(|at| at.elapsed() < least_gap) {
+            continue;
+        }
+        // The mark is on the ring before the picture leaves.
+        marked(&mut marked_at);
+        sent_at = Some(now);
+        let header = json!({
+            "ev": "camera.frame", "bytes": length, "width": width, "height": height,
+            "fps_now": rate.now(),
+        });
+        send(&binary_frame(&header, &jpeg));
     }
 }
 
@@ -380,7 +526,7 @@ mod tests {
         camera.snapshot("c_1").unwrap();
         assert_eq!(*asked.lock().unwrap(), [("c_1".to_owned(), true)]);
         let events: Events = Arc::new(|_, _| {});
-        camera.stream("c_2", true, Some(5), events).unwrap();
+        camera.stream("c_2", true, Some(5), None, events).unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert!(
             asked.lock().unwrap().contains(&("c_2".to_owned(), false)),
@@ -410,12 +556,14 @@ mod tests {
         // Before two frames were seen, none.
         assert_eq!(
             camera
-                .stream("c_1", true, Some(30), events.clone())
+                .stream("c_1", true, Some(30), None, events.clone())
                 .unwrap()["fps_now"],
             Value::Null
         );
         // A second computer, and a slow one: neither doubles nor halves it.
-        camera.stream("c_2", true, Some(1), events.clone()).unwrap();
+        camera
+            .stream("c_2", true, Some(1), None, events.clone())
+            .unwrap();
         // The eyes write a new frame every 100 ms for 1.5 s: 10 a second.
         for _ in 0..15 {
             std::thread::sleep(Duration::from_millis(100));
@@ -435,6 +583,58 @@ mod tests {
     }
 
     #[test]
+    fn the_fast_stream_sends_each_eyes_frame_as_a_binary_frame_at_the_size_asked() {
+        let folder = dir();
+        let (sight, socket) = (folder.join("sight.jpg"), folder.join("frames.sock"));
+        std::fs::write(&sight, JPEG).unwrap();
+        // The eyes' side: says nothing back, writes 10 frames 20 ms apart.
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let eyes = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut asked = [0u8; 8];
+            stream.read_exact(&mut asked).unwrap();
+            for _ in 0..10 {
+                stream
+                    .write_all(&(JPEG.len() as u32).to_be_bytes())
+                    .unwrap();
+                stream.write_all(JPEG).unwrap();
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            String::from_utf8(asked.to_vec()).unwrap()
+        });
+        let got: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
+        let into = got.clone();
+        let sink: Sink = Arc::default();
+        let _ = sink.set(Arc::new(move |client: &str, frame: &[u8]| {
+            assert_eq!(client, "c_1");
+            into.lock().unwrap().push(frame.to_vec());
+        }));
+        let mut camera = Camera::new(sight, Arc::new(|| false))
+            .marking(Arc::new(|_, _| {}))
+            .fast(socket, sink);
+        let events: Events = Arc::new(|_, _| {});
+        let answer = camera.stream("c_1", true, Some(30), None, events).unwrap();
+        assert_eq!(
+            (answer["fast"].as_bool(), answer["size"].as_str()),
+            (Some(true), Some("640x480"))
+        );
+        assert_eq!(eyes.join().unwrap(), "640x480\n");
+        std::thread::sleep(Duration::from_millis(200));
+        camera.end("c_1");
+        let got = got.lock().unwrap();
+        assert!(got.len() >= 5, "{}", got.len());
+        // Each: the header's length, the header, the JPEG.
+        let frame = &got[0];
+        let length = u32::from_be_bytes(frame[..4].try_into().unwrap()) as usize;
+        let header: Value = serde_json::from_slice(&frame[4..4 + length]).unwrap();
+        assert_eq!(
+            (header["ev"].as_str(), header["width"].as_u64()),
+            (Some("camera.frame"), Some(640))
+        );
+        assert_eq!(&frame[4 + length..], JPEG);
+    }
+
+    #[test]
     fn nothing_is_seen_while_private() {
         let sight = dir().join("sight.jpg");
         std::fs::write(&sight, JPEG).unwrap();
@@ -442,7 +642,10 @@ mod tests {
         assert_eq!(camera.snapshot("c_1").unwrap_err().code, ErrorCode::Private);
         let events: Events = Arc::new(|_, _| {});
         assert_eq!(
-            camera.stream("c_1", true, None, events).unwrap_err().code,
+            camera
+                .stream("c_1", true, None, None, events)
+                .unwrap_err()
+                .code,
             ErrorCode::Private
         );
     }
@@ -464,7 +667,7 @@ mod tests {
             into.lock().unwrap().push((client.to_owned(), event));
         });
         assert_eq!(
-            camera.stream("c_1", true, Some(5), events).unwrap(),
+            camera.stream("c_1", true, Some(5), None, events).unwrap(),
             json!({"stream": "on", "fps": 5, "fps_now": null})
         );
         std::thread::sleep(Duration::from_millis(500));
@@ -495,10 +698,12 @@ mod tests {
         let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
         let into = seen.clone();
         let events: Events = Arc::new(move |_, event| into.lock().unwrap().push(event));
-        camera.stream("c_1", true, Some(5), events.clone()).unwrap();
+        camera
+            .stream("c_1", true, Some(5), None, events.clone())
+            .unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert_eq!(
-            camera.stream("c_1", false, None, events).unwrap(),
+            camera.stream("c_1", false, None, None, events).unwrap(),
             json!({"stream": "off"})
         );
         let before = seen.lock().unwrap().len();

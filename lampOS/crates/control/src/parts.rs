@@ -58,6 +58,8 @@ pub const SAY_ANSWER_WITHIN: Duration = Duration::from_secs(90);
 /// Where the events of actions that end later go: the client, and the
 /// event (`done`).
 pub type Events = Arc<dyn Fn(&str, Value) + Send + Sync>;
+/// Where a client's binary camera frames go (`crate::camera`'s fast stream).
+pub type Binary = Arc<dyn Fn(&str, &[u8]) + Send + Sync>;
 
 /// Something a light request can be published on: the bus, or a test's
 /// list.
@@ -144,6 +146,13 @@ impl Lamp {
     /// never while `watch` says the lamp is private: after [`Self::watching`],
     /// whose watch it reads. Without a watch nothing tells the door the lamp
     /// is private, so the camera is refused.
+    /// The camera's fast stream from the eyes' frames socket, its frames
+    /// sent through `sink` once the server has set it.
+    pub fn fast_frames(mut self, socket: PathBuf, sink: crate::camera::Sink) -> Self {
+        self.camera = self.camera.map(|camera| camera.fast(socket, sink));
+        self
+    }
+
     pub fn seeing(mut self, sight: PathBuf, mark: crate::camera::Mark) -> Self {
         let watch = self.watch.clone();
         let private: crate::camera::Private = Arc::new(move || {
@@ -510,12 +519,12 @@ impl Parts for Lamp {
                 .as_ref()
                 .ok_or_else(|| not_here("the camera"))?
                 .snapshot(client),
-            Op::CameraStream { on, fps } => {
+            Op::CameraStream { on, fps, size } => {
                 let events = self.events.clone();
                 self.camera
                     .as_mut()
                     .ok_or_else(|| not_here("the camera"))?
-                    .stream(client, *on, *fps, events)
+                    .stream(client, *on, *fps, size.as_deref(), events)
             }
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
             // Only the hum today (protocol.rs refuses any other name).

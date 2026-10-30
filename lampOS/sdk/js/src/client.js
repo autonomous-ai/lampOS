@@ -12,6 +12,14 @@ import * as schema from './schema.js';
 import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
 
+/** A fast stream's binary `camera.frame`: its header, with the JPEG as `data`. */
+export function binaryFrame(message) {
+  const length = message.readUInt32BE(0);
+  const frame = JSON.parse(message.subarray(4, 4 + length).toString());
+  frame.data = message.subarray(4 + length);
+  return frame;
+}
+
 // Events that come with a request, never subscribed to: a camera stream's.
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
 
@@ -250,7 +258,10 @@ export class Lamp {
     this.leases = new Map();
     ws.removeAllListeners('message');
     for (const frame of frames.splice(0)) this.frame(frame);
-    ws.on('message', (data) => {
+    ws.on('message', (data, isBinary) => {
+      // A fast camera frame: the header's length, the header, then the JPEG,
+      // given as `data` (a Buffer).
+      if (isBinary) return this.frame(binaryFrame(data));
       const frame = JSON.parse(data.toString());
       debug.frame('<-', frame);
       this.frame(frame);
@@ -494,8 +505,11 @@ export class Lamp {
   /** Pictures as `camera.frame` events (`lamp.on('camera.frame', ...)`, each
    * with its `jpeg` in base64), `fps` a second at most (1 to 30; each new frame once as it comes, about 1 to 2 a second today: the answer and each frame carry `fps_now`), until
    * `cameraStream(false)`, `stop`, or a `camera.ended` event. */
-  cameraStream(on = true, fps = undefined) {
-    return this.request('camera.stream', fps === undefined ? { on } : { on, fps });
+  cameraStream(on = true, fps = undefined, size = undefined) {
+    const fields = { on };
+    if (fps !== undefined) fields.fps = fps;
+    if (size !== undefined) fields.size = size;
+    return this.request('camera.stream', fields);
   }
   sound(name) { return this.act('sound', { name }); }
   async stop() {

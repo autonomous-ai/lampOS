@@ -1416,3 +1416,13 @@ def test_the_camera_stream_asks_up_to_30_a_second_and_31_is_refused_before_sendi
                     await lamp.camera_stream(fps=31)
 
     run(go())
+
+
+def test_a_fast_binary_frame_is_its_header_and_the_jpeg_as_data():
+    from lampos.client import binary_frame
+
+    header = json.dumps({"ev": "camera.frame", "bytes": 4, "width": 640, "height": 480, "fps_now": 24.8}).encode()
+    jpeg = bytes([0xFF, 0xD8, 0xFF, 0xD9])
+    frame = binary_frame(len(header).to_bytes(4, "big") + header + jpeg)
+    assert (frame["ev"], frame["width"], frame["fps_now"]) == ("camera.frame", 640, 24.8)
+    assert frame["data"] == jpeg

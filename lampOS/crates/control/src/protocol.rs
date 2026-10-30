@@ -370,6 +370,9 @@ pub enum Op {
         on: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         fps: Option<u8>,
+        /// The fast stream's size, `640x480` (the default) or `1280x720`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size: Option<String>,
     },
 }
 
@@ -517,9 +520,15 @@ impl Op {
                 }
             }
             Self::SkillRemove { name } => skill_name(name)?,
-            Self::CameraStream { fps: Some(fps), .. } => {
-                if !(1..=crate::camera::FPS_MOST).contains(fps) {
+            Self::CameraStream { fps, size, .. } => {
+                if fps.is_some_and(|fps| !(1..=crate::camera::FPS_MOST).contains(&fps)) {
                     return Err(format!("fps: 1 to {}", crate::camera::FPS_MOST));
+                }
+                if size
+                    .as_deref()
+                    .is_some_and(|size| crate::camera::size_of(size).is_none())
+                {
+                    return Err("size: 640x480 or 1280x720".to_owned());
                 }
             }
             Self::Unsubscribe { events } => {
@@ -659,10 +668,7 @@ impl Op {
                     return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
                 }
             }
-            Self::Stop {}
-            | Self::SkillList {}
-            | Self::CameraSnapshot {}
-            | Self::CameraStream { fps: None, .. } => {}
+            Self::Stop {} | Self::SkillList {} | Self::CameraSnapshot {} => {}
         }
         Ok(())
     }

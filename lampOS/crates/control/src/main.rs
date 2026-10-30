@@ -3,7 +3,7 @@
 //! ```text
 //! lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
 //!                    [--mood-socket PATH] [--say-socket PATH] [--bus-root DIR] [--boot-id ID]
-//!                    [--sight-file PATH|off] [--remote on|off]
+//!                    [--sight-file PATH|off] [--frames-socket PATH|off] [--remote on|off]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
@@ -37,6 +37,9 @@ const LISTEN: &str = "0.0.0.0:7731";
 const ADMIN: &str = "/run/lampos-control/admin.sock";
 /// Where the eyes keep their newest frame (`lamp-eyes --sight-file`).
 const SIGHT: &str = "/run/lampos-eyes/sight.jpg";
+/// Where the eyes serve every frame to one reader (`lamp-eyes
+/// --frames-socket`): the camera's fast stream.
+const FRAMES: &str = "/run/lampos-eyes/frames.sock";
 /// `--remote on` from the environment, when the flag isn't given.
 const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
 
@@ -237,6 +240,15 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         _ => None,
     };
     let sight = sight.zip(mark);
+    // The fast stream from the eyes' frames socket, when they serve one; its
+    // frames go out once the server below has a way to send them.
+    let frames = match option(arguments, "--frames-socket").as_deref() {
+        Some("off") => None,
+        Some(path) => Some(PathBuf::from(path)),
+        None => Some(PathBuf::from(FRAMES)),
+    };
+    let sink: lamp_control::camera::Sink = Arc::default();
+    let sink_for_lamp = sink.clone();
     // The body's own lease, with `--lease-socket` only (lamp-body
     // --lease-socket): a computer's `look` on it, and the follower set by a
     // `look` at `hand`, told to the body with each hold.
@@ -247,7 +259,10 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
         let lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
         let lamp = match sight {
-            Some((sight, mark)) => lamp.seeing(sight, mark),
+            Some((sight, mark)) => match frames {
+                Some(frames) => lamp.seeing(sight, mark).fast_frames(frames, sink_for_lamp),
+                None => lamp.seeing(sight, mark),
+            },
             None => lamp,
         };
         Box::new(match on_lease {
@@ -258,6 +273,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
     }
+    let _ = sink.set(shared.binary());
     let remote = match option(arguments, "--remote")
         .or_else(|| std::env::var(REMOTE_ENVIRONMENT).ok())
         .as_deref()
