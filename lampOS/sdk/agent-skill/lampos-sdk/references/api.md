@@ -27,6 +27,7 @@ naming every public call, tool, event and error code they have.
 | stop hearing | `lamp.off(event, handler)` | `lamp.off(event, handler)` | — |
 | subscribe by hand | `await lamp.subscribe(events, phrases)`, `await lamp.unsubscribe(events)` | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | — |
 | read state | `await lamp.get("presence", "light", "mood", "lamp")` | `await lamp.get('presence', 'light')` | `lamp_state(which)`, `lamp://state/<name>` |
+| the room's air, the lamp's own computer | `await lamp.air()`, `await lamp.device()` | `await lamp.air()`, `await lamp.device()` | `lamp_state(["air", "device"])`, `lamp://state/air` |
 | recent events | — | — | `lamp://events/recent` |
 | every event, as it comes | `lamp.on(...)` for each | `lamp.on(...)` for each | `lamp_events(since, wait_s)`, or subscribe to `lamp://events` (each new event sends `notifications/resources/updated`) |
 
@@ -45,6 +46,7 @@ naming every public call, tool, event and error code they have.
 | `touch` | `kind`: `tap` or `pet` | a tap or a pet |
 | `button` | `press`: `long_press` | the button is held |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` | one of them changes |
+| `air.changed` (air) | `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`); a value the sensor doesn't know is left out | the first reading, then a value moves by its step (particles 5, CO2 50 ppm, humidity 3, temperature 0.5 °C) or `feel` changes; at most every 5 s |
 | `time` | your schedule | accepted, not produced yet |
 | `lease` (unasked) | `lease`, `state` (`held`, `suspended`, `lost`), `why` | the lamp takes your lease back, or gives it again |
 | `done` (unasked) | `re`, `how` (`finished`, `cut_short`, `dropped`), `why` | an action that ends later has ended (`say`, a `look` at an angle) |
@@ -52,8 +54,11 @@ naming every public call, tool, event and error code they have.
 **State** with `get`: `presence` (`count`, `near`, `facing`; needs look),
 `light` (the person's own `on`, `colour`, `level`, and `shows`: what the ring
 draws now), `mood` (`energy`, `warmth`, `awake`, `asleep`), `lamp`
-(`talking`, `paused`, `private`, `asleep`). `light` and `mood` are `null`
-until the lamp has heard them.
+(`talking`, `paused`, `private`, `asleep`), `air` (the newest reading as
+`air.changed` gives it; needs air), `device` (`cpu_load`, `memory_used`,
+`disk_free`, `uptime_s`, `temperature_c`; needs device). `light` and `mood`
+are `null` until the lamp has heard them; `air` and `device` are
+`{"known": false}` with no reading in 15 s.
 
 ## Leases
 
