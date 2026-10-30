@@ -278,16 +278,20 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         if named:
             fields["lease"] = lease
         sent: dict = {}
-        # The request's id, known before it's sent (`request` takes the next
-        # id before it first yields): a `done` can come before its answer is
-        # read here, as the fake's `play` does.
+        # The request's id, told before it's sent (`request`'s `on_id`): a
+        # `done` can come before its answer is read here, as the fake's `play`
+        # does.
         asked: int | None = None
+
+        def note(id_: int) -> None:
+            nonlocal asked
+            asked = id_
+
         lamp.on("lease", follow)
         lamp.on("done", follow)
         try:
             try:
-                asked = lamp._next_id
-                sent.update(await lamp.request(op, **fields))
+                sent.update(await lamp.request(op, on_id=note, **fields))
             except LampError as error:
                 # The action was refused: its lease is let go of at once.
                 if not ended.done():

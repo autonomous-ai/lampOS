@@ -67,9 +67,13 @@ in the validator's words. `serverInfo.version` is lamp-mcp's own.
 `joints` is left out: a 20 Hz stream isn't something an agent drives turn by
 turn. `play` and `sound` need a skill package.
 
-**Leases** are taken for you: `lamp_look` and `lamp_move` take a 10 s body lease,
-never renewed. It is let go at the action's `done`, or left to lapse if `done`
-doesn't come. A lease another computer holds, or one the lamp suspends because
+**Leases** are taken for you: a body tool (`lamp_look`, `lamp_move`,
+`lamp_play`, `lamp_joints`) takes a 10 s body lease, or renews the one this
+server still holds, so tools called one after another aren't refused `busy`.
+It is let go at the action's `done`, or left to lapse 10 s after the last body
+tool if `done` doesn't come: while an agent keeps calling body tools, the
+lamp's own life (its rest glance, its feelings' small moves) stands back, and
+it comes back about 10 s after the agent goes idle. A lease another computer holds, or one the lamp suspends because
 someone is talking to it, comes back as the tool's error, never retried.
 
 **Refusals** come back as the tool's error, with the lamp's code and words:
