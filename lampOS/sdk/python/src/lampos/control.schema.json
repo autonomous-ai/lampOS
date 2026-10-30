@@ -1725,9 +1725,12 @@
                 "minimum": 0
               },
               "fps_now": {
-                "type": "number",
+                "type": [
+                  "number",
+                  "null"
+                ],
                 "minimum": 0,
-                "description": "The rate new frames have come at over the last 2 s."
+                "description": "The eyes' rate of new frames over the last 2 s; null before two were seen."
               }
             },
             "required": [

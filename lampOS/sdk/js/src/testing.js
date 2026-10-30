@@ -531,7 +531,7 @@ export class FakeLamp {
         }
         if (!request.on) return this.ok(ws, id, { stream: 'off' });
         this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
-        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0, fps_now: 0 }));
+        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0, fps_now: null }));
         return undefined;
       case 'stop':
         // The holder's stop ends its following, as any of its actions.
