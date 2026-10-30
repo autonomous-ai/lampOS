@@ -1342,6 +1342,26 @@ pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember s
 /// finds answers the question, never more (rule 8).
 pub(crate) const RECALL_BEFORE_NOT_KNOWING: &str = " Before you say you don't know or don't remember something about their own life (their plans, the people in it, their work, or what you talked about earlier), call recall first, and say you don't remember only if it finds nothing. Use what it finds only to answer what they asked.";
 
+/// Told after the character's notes with `LAMP_SECOND_SAY_WITH_CALL=on`
+/// ([`crate::second_provider::SAY_WITH_CALL_ENVIRONMENT`], #2135): the few
+/// words for a call that changes something go in the same reply as the
+/// call, so they are said at the first round's pace. The next round is told
+/// they were heard (`LAMP_SECOND_SAID_ONCE`) and adds only what the results
+/// or the rest of the request call for, so another ask in the same line
+/// ("dim the light and tell me a joke") is still answered.
+pub(crate) const SAY_WITH_CALL_NOTE: &str = " When you call a function that changes something for them (your light, how loud you are, a timer or a reminder, or keeping what they asked you to remember), say your few words in the same reply as the call, such as \"Warmer it is.\" or \"Ten minutes, starting now.\", not after it.";
+
+/// The spoken character with [`SAY_WITH_CALL_NOTE`] after it when `on`:
+/// `LAMP_SECOND_SAY_WITH_CALL` together with `LAMP_SECOND_SAID_ONCE`, which
+/// keeps the next round from saying the words again.
+pub(crate) fn saying_with_calls(character: String, on: bool) -> String {
+    if on {
+        format!("{character}{SAY_WITH_CALL_NOTE}")
+    } else {
+        character
+    }
+}
+
 /// Whether a hearing of the name at `at_us` with `score` is one since
 /// `from_us`, as the rule takes a hearing for a line.
 fn name_counts(score: f32, at_us: u64, from_us: u64) -> bool {
@@ -2250,6 +2270,26 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let character = spoken_character(&character, look_by_call, tools.memory.is_some());
+    // The words for a call that changes something said with the call
+    // (`LAMP_SECOND_SAY_WITH_CALL`, #2135), only beside
+    // `LAMP_SECOND_SAID_ONCE`, which tells the next round they were heard.
+    let on = |name: &str| std::env::var(name).ok().as_deref() == Some("on");
+    let say_with_call = on(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT);
+    if say_with_call {
+        if on(crate::second_provider::SAID_ONCE_ENVIRONMENT) {
+            eprintln!(
+                "lamp-voice second: a call that changes something is asked to carry its few words, said at the first round's pace (LAMP_SECOND_SAY_WITH_CALL)"
+            );
+        } else {
+            eprintln!(
+                "lamp-voice second: LAMP_SECOND_SAY_WITH_CALL needs LAMP_SECOND_SAID_ONCE, which is off; not asked"
+            );
+        }
+    }
+    let character = saying_with_calls(
+        character,
+        say_with_call && on(crate::second_provider::SAID_ONCE_ENVIRONMENT),
+    );
     let character = if speech_tags == Some(true) {
         format!("{character}{}", crate::second_provider::speech_tags::NOTE)
     } else {
@@ -24284,6 +24324,19 @@ mod tests {
 
     /// #1712: spoken turns are told how to take what they heard; the
     /// character comes first, unchanged.
+    /// #2135: with `LAMP_SECOND_SAY_WITH_CALL` (and `LAMP_SECOND_SAID_ONCE`)
+    /// the character ends asking for a changing call's words in the same
+    /// reply; off, it is as it was, byte for byte.
+    #[test]
+    fn a_changing_calls_words_are_asked_with_the_call_only_when_on() {
+        let spoken = super::spoken_character("CHARACTER", false, true);
+        assert_eq!(super::saying_with_calls(spoken.clone(), false), spoken);
+        let asked = super::saying_with_calls(spoken.clone(), true);
+        assert_eq!(asked, format!("{spoken}{}", super::SAY_WITH_CALL_NOTE));
+        assert!(super::SAY_WITH_CALL_NOTE.contains("in the same reply as the call"));
+        assert!(super::SAY_WITH_CALL_NOTE.starts_with(' '));
+    }
+
     #[test]
     fn spoken_turns_are_told_to_answer_the_likeliest_meaning() {
         let told = super::spoken_character("CHARACTER", false, false);

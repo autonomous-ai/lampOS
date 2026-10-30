@@ -753,6 +753,22 @@ order is kept. A written turn is the same from the chat on.
   words before its calls: the next round is told they were heard`. The
   check is on the lamp: the day lines' timer and reminder at 4 of 4 runs,
   one confirmation each.
+- **With `LAMP_SECOND_SAY_WITH_CALL=on`, a call that changes something
+  carries its words** (off unless set, and only beside
+  `LAMP_SECOND_SAID_ONCE`; #2135, the first builder's yes at 22:13 on 30 Oct).
+  On lamp-4ace on 30 Oct (8999), `light_warmer`, `remember` and `set_timer`
+  said nothing until their second chat round: round 1 took about 1.0–1.5 s
+  to the call, and round 2 another 1.0–1.2 s, so 2.4–3.3 s to the first
+  sound, against 1.54–1.62 s for plain answers. With the switch, the spoken
+  character ends asking for the few words of a call that changes something
+  (the light, how loud the lamp is, a timer or a reminder, a keep) in the
+  same reply as the call (`worker::SAY_WITH_CALL_NOTE`). The round's words
+  are said as they come, before the call runs, as any round's are, and
+  `LAMP_SECOND_SAID_ONCE` tells the next round they were heard. The next
+  round still runs, so a failure, the time a timer is set for, or another
+  ask in the same line ("dim the light and tell me a joke") is still said
+  (the Reviewer-lead's P2 on #2930). Without `LAMP_SECOND_SAID_ONCE` the
+  switch asks nothing, and the journal says so at start.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
