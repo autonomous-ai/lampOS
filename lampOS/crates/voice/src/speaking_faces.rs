@@ -521,6 +521,20 @@ impl SpeakingFaces {
             })
     }
 
+    /// Whether the eyes made any look of their own from `from` to `to`,
+    /// whoever it tracked: a line carried past silent faces
+    /// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`, #4339) needs the eyes to
+    /// have looked through it, so no face seen speaking it means one was
+    /// watched for. The eyes stalled or the camera covered is not.
+    pub fn looked_between(&self, from: Instant, to: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            looks
+                .kept
+                .iter()
+                .any(|look| look.at >= from && look.at <= to && !look.boot.is_empty())
+        })
+    }
+
     /// Whether the face `face` (`boot/f3`, [`Self::known_with_boot`]; none:
     /// never) was tracked in any of the eyes' own looks from `since` to
     /// `to`: for a line carried with no face seen speaking it, their face in
@@ -975,6 +989,13 @@ mod tests {
             !eyes.no_other_face_in_view(Some("b/f1"), from, Instant::now()),
             "f2 too"
         );
+        // Looked through, whoever was tracked; not before any look.
+        assert!(
+            eyes.looked_between(from, Instant::now()),
+            "two faces looked at"
+        );
+        let after = Instant::now();
+        assert!(!eyes.looked_between(after, Instant::now()), "no look since");
     }
 
     #[test]

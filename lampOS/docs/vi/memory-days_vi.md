@@ -313,6 +313,54 @@ người ngoài khung hình, không có dấu hiệu nào khác, được trả 
 chuyện đang diễn ra và nghe được những gì đã nói trong đó; họ không chạm được
 ký ức đã lưu của người kia.
 
+**Một khuôn mặt im lặng không tính** (`LAMP_CONVERSATION_CARRIES_PAST_SILENT=on`,
+#4339, quyết định của người phụ trách trí nhớ ngày 30/10): trên lamp-3e83 ngày
+30/10 (bản 8899), khuôn mặt quen ở trong khung hình ở các câu bị rơi nhưng hầu
+như không bao giờ một mình (30 lần nhìn, không lần nào chỉ một mặt, mặt quen có
+trong cả 30), nên quy tắc trên chỉ giữ được 4 câu và một cuộc trò chuyện bị chia
+từng câu vào luồng của người đó hoặc của căn phòng. Bật công tắc này, «không có
+mặt nào khác trong khung hình» trở thành **không thấy mặt nào khác nói câu ấy,
+và không có giọng nào khác trong cuộc trò chuyện**: mắt vẫn phải nhìn qua câu
+ấy (`SpeakingFaces::looked_between`), và giọng khác là dấu hiệu người thứ hai
+của chính quy tắc nghe, dấu hiệu mà việc nối lời bị cắt giữ
+(`Heeding::another_person`: một câu bằng giọng khác giọng cuộc trò chuyện, một
+dấu giọng dưới `same_voice::DIFFERENT_BELOW`, hoặc hai mặt được thấy nói một
+câu). Nó được đọc khi nghe câu và một lần nữa sau khi quy tắc đã xét giọng của
+chính câu ấy; nếu đã có giọng khác, câu thuộc về căn phòng trước khi kể gì. Một câu
+mà quy tắc bỏ qua (bị giữ lại vì là tiếng ngắn, rỗng, hoặc là tiếng vọng của
+chính đèn) không được xét giọng, nên dấu hiệu là của câu trước: câu ấy không
+được giữ, thuộc về căn phòng trước khi kể hay lưu gì. Chỉ có tác dụng khi quy
+tắc giữ dấu hiệu đó (`LAMP_JOIN_CUT_WORDS` hoặc `LAMP_SECOND_NAME_CARRIES`, cả
+hai đều bật trong sản phẩm) và việc kiểm tra cùng giọng đang chạy (bộ lấy dấu
+giọng đã khởi động, đèn là giọng duy nhất, và một trong `LAMP_SPOKEN_TO`,
+`LAMP_QUIET_GOING_ON_SAME_ONE`, `LAMP_GOING_ON_NOT_OWN`,
+`LAMP_MEMORY_FOLLOWS_FACE` bật): thiếu một trong hai, không gì có thể cho thấy
+giọng khác, nên công tắc không làm gì, mặt khác trong khung hình vẫn giữ câu
+cho căn phòng như trước, và nhật ký ghi một lần lúc khởi động là thiếu gì
+(`Engine::carrying_past_silent_where_heard`). Phần còn lại giữ nguyên. Rủi ro đã chấp nhận: **một vị khách im lặng ngồi bên nghe được luồng
+của người đó ở một câu được giữ** (không bao giờ là ký ức đã lưu của họ).
+
+**Các câu của căn phòng trong cùng cuộc trò chuyện**
+(`LAMP_CONVERSATION_ROOM_LINES_TOLD=on`, #4339): một câu vẫn bị tách sang luồng
+của căn phòng thì lượt sau của người đó không biết (lamp-3e83, 30/10: một tìm
+kiếm trên mạng được trả lời trong luồng của căn phòng, rồi «I've lost the
+thread» cho chính câu hỏi của họ về nó). Bật công tắc này, lượt của một người
+quen được đưa cả các lượt trao đổi của căn phòng trong cùng cuộc trò chuyện,
+câu của người nói được đánh dấu `(said in the room)`
+(`Thread::recent_with_room_lines`): cùng cuộc trò chuyện là đi ngược từ bây giờ
+qua các lượt của họ và của căn phòng, mỗi lượt cách lượt sau không quá 45 giây,
+dừng ở lượt của người khác, và chỉ tính các lượt của căn phòng từ lượt đầu tiên
+của họ trong đó; trong cửa sổ 12 lượt và 600 giây của cuộc chat. Chỉ một chiều:
+lượt của căn phòng hay của một giọng chưa nhận ra (#4196/#4207) không bao giờ
+được đưa câu của một người, và lượt của một người không bao giờ được đưa câu của
+người khác. Bản tóm tắt chạy và ghi chú cuộc trò chuyện vẫn theo từng phạm vi.
+Mọi lệnh quên đều bỏ chúng. Tất cả trong bộ nhớ, không thêm I/O trên đường trả
+lời. Thuộc rủi ro «đã nói thành tiếng» được chấp nhận: một câu bị thu về căn
+phòng vì một giọng khác đã nói nó (`Heeding::another_person`, hoặc lần xét lại
+sau quy tắc) vẫn đến lượt của người đó, đánh dấu `(said in the room)`: lời của
+một vị khách, nói thành tiếng bên cạnh họ, được kể cho lượt của họ; không bao
+giờ vào bản tóm tắt chạy, ghi chú hay ký ức đã lưu của họ.
+
 **Điều một câu được giữ yêu cầu lưu phải chờ lời «có» của họ**
 (`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, thay đổi quy tắc riêng tư được
 duyệt ngày 30/10, cùng quyết định của người xây dựng đầu tiên trên #4508):

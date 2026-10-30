@@ -1706,6 +1706,8 @@ fn second_route_worker_environment(
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
         crate::person::BY_DEFAULT_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
@@ -1864,6 +1866,8 @@ mod tests {
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -2512,6 +2516,8 @@ mod tests {
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
@@ -2600,6 +2606,8 @@ mod tests {
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
                     "LAMP_CONVERSATION_CARRIES=on",
+                    "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
+                    "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
                     "LAMP_DECLINE_SILENT=on",
                     "LAMP_EYES_SPEAKING=on",
