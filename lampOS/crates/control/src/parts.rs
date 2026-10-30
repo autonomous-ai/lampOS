@@ -326,8 +326,10 @@ impl Lamp {
     }
 
     /// `joints`: the head's `yaw` and `pitch`, in degrees from home, go as
-    /// the holder's look on the body's lease socket (the same degrees, cut
-    /// to the same reach; its `done` says where the head got to). A joint
+    /// the holder's look on the body's lease socket, said `"from":"home"`:
+    /// the body takes its pose's offset off, so a standing lamp's stand pose
+    /// doesn't move the frame (its `done` says where the head got to, from
+    /// home too). A joint
     /// not named stays where it is now, as `get` `body` says it. `roll`,
     /// `shoulder` and `elbow` wait for the body's own goal stream.
     fn joints(
@@ -357,7 +359,24 @@ impl Lamp {
                 "name both yaw and pitch until the body has said where it is (get body)",
             ));
         };
-        self.look(client, re, &LookAt::Angles(Angles { yaw, pitch }))
+        let Some(looks) = &self.looks else {
+            return Err(Error::new(
+                ErrorCode::Refused,
+                "the body's lease socket is not on here",
+            ));
+        };
+        looks
+            .send(crate::body_lease::Look {
+                client: client.to_owned(),
+                re,
+                line: json!({"look": {"yaw": yaw, "pitch": pitch, "from": "home"}}).to_string(),
+            })
+            .map_err(|_| not_here("the body's lease"))?;
+        // As any look taken: a hand-follow ends.
+        if let Some(follow) = &self.follow {
+            *follow.lock().expect("follower") = None;
+        }
+        Ok(json!({"to": "body"}))
     }
 
     fn ask_ring(
@@ -1044,7 +1063,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(&looked.try_recv().unwrap().line).unwrap(),
-            json!({"look": {"yaw": -10.0, "pitch": 5.0}})
+            json!({"look": {"yaw": -10.0, "pitch": 5.0, "from": "home"}})
         );
         // Only yaw, before the body has said where it is: refused.
         let error = lamp
@@ -1077,7 +1096,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(&looked.try_recv().unwrap().line).unwrap(),
-            json!({"look": {"yaw": 4.0, "pitch": 3.0}})
+            json!({"look": {"yaw": 4.0, "pitch": 3.0, "from": "home"}})
         );
         let error = lamp
             .act(

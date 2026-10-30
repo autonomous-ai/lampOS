@@ -2164,6 +2164,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                aim_from_home: false,
             };
             // Read all the same, so that nothing kept from before the pause
             // is acted on after it.
@@ -2234,6 +2235,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                             expression: None,
                             held: true,
                             aim: door.aim(now),
+                            aim_from_home: door.looking.from_home(),
                             ..asked
                         }
                     } else {

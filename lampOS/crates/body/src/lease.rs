@@ -263,6 +263,12 @@ enum LookValue {
 struct Angles {
     yaw: f32,
     pitch: f32,
+    /// `"home"`: the angles are from where the head and base were found
+    /// at start (`get` `body`'s frame, a computer's `joints`), not from the
+    /// pose's own direction (`look`'s, the gaze's). The body takes the
+    /// pose's offset off (`body::aim_from_home`).
+    #[serde(default)]
+    from: Option<String>,
 }
 
 /// A look asked and not yet answered.
@@ -283,6 +289,8 @@ struct Owed {
 #[derive(Debug, Default)]
 pub struct Looking {
     aim: Option<[f32; 2]>,
+    /// Whether `aim` is counted from the found home, not the pose.
+    from_home: bool,
     asked: Option<Owed>,
 }
 
@@ -297,13 +305,18 @@ impl Looking {
     /// A look from the holder ([`Looking::is_look`]): its answer now, if one
     /// is due now (a refusal, or the look it replaces cut short).
     pub fn ask(&mut self, line: &[u8], held: bool, reach: Reach, now: Instant) -> Option<String> {
-        let at = match serde_json::from_slice::<LookLine>(line) {
+        let (at, from_home) = match serde_json::from_slice::<LookLine>(line) {
             Ok(LookLine {
-                look: LookValue::Angles(Angles { yaw, pitch }),
-            }) if yaw.is_finite() && pitch.is_finite() => [yaw, pitch],
+                look: LookValue::Angles(Angles { yaw, pitch, from }),
+            }) if yaw.is_finite()
+                && pitch.is_finite()
+                && from.as_deref().is_none_or(|from| from == "home") =>
+            {
+                ([yaw, pitch], from.is_some())
+            }
             Ok(LookLine {
                 look: LookValue::Word(word),
-            }) if word == "ahead" => [0.0, 0.0],
+            }) if word == "ahead" => ([0.0, 0.0], false),
             _ => {
                 return Some(refused(
                     "a look is {\"yaw\":Y,\"pitch\":P} in degrees, or \"ahead\"",
@@ -324,6 +337,7 @@ impl Looking {
         let degrees = [yaw / COUNTS_PER_DEGREE, -pitch / COUNTS_PER_DEGREE];
         let clamped = (degrees[0] - at[0]).abs() > 0.05 || (degrees[1] - at[1]).abs() > 0.05;
         self.aim = Some([yaw, pitch]);
+        self.from_home = from_home;
         self.asked = Some(Owed {
             since: now,
             degrees,
@@ -338,6 +352,11 @@ impl Looking {
     /// Where the head is asked to look, as the body's `Asked::aim` takes it.
     pub fn aim(&self) -> Option<[f32; 2]> {
         self.aim
+    }
+
+    /// Whether [`Self::aim`] is counted from the found home (`"from":"home"`).
+    pub fn from_home(&self) -> bool {
+        self.from_home
     }
 
     /// The body's own word on the look it applies this step, after every
@@ -443,6 +462,37 @@ fn refused(why: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_look_from_home_is_taken_and_any_other_from_is_refused() {
+        let now = Instant::now();
+        let mut looking = Looking::default();
+        assert!(
+            looking
+                .ask(
+                    br#"{"look":{"yaw":5,"pitch":3,"from":"home"}}"#,
+                    true,
+                    REACH,
+                    now
+                )
+                .is_none()
+        );
+        assert!(looking.from_home());
+        assert!(looking.aim().is_some());
+        let refused = looking
+            .ask(
+                br#"{"look":{"yaw":5,"pitch":3,"from":"pose"}}"#,
+                true,
+                REACH,
+                now,
+            )
+            .unwrap();
+        assert!(refused.contains("refused"), "{refused}");
+        // A plain look is the gaze's frame again.
+        looking.ask(br#"{"look":{"yaw":5,"pitch":3}}"#, true, REACH, now);
+        assert!(!looking.from_home());
+    }
+
     use super::*;
 
     const QUIET: Around = Around {

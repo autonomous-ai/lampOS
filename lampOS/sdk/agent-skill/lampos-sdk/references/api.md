@@ -27,6 +27,7 @@ naming every public call, tool, event and error code they have.
 | stop hearing | `lamp.off(event, handler)` | `lamp.off(event, handler)` | — |
 | subscribe by hand | `await lamp.subscribe(events, phrases)`, `await lamp.unsubscribe(events)` | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | — |
 | read state | `await lamp.get("presence", "light", "mood", "lamp")` | `await lamp.get('presence', 'light')` | `lamp_state(which)`, `lamp://state/<name>` |
+| the body: each joint's place and bounds, the caps | `await lamp.body_info()` | `await lamp.bodyInfo()` | `lamp_state(["body"])` |
 | recent events | — | — | `lamp://events/recent` |
 | every event, as it comes | `lamp.on(...)` for each | `lamp.on(...)` for each | `lamp_events(since, wait_s)`, or subscribe to `lamp://events` (each new event sends `notifications/resources/updated`) |
 
@@ -52,8 +53,11 @@ naming every public call, tool, event and error code they have.
 **State** with `get`: `presence` (`count`, `near`, `facing`; needs look),
 `light` (the person's own `on`, `colour`, `level`, and `shows`: what the ring
 draws now), `mood` (`energy`, `warmth`, `awake`, `asleep`), `lamp`
-(`talking`, `paused`, `private`, `asleep`). `light` and `mood` are `null`
-until the lamp has heard them.
+(`talking`, `paused`, `private`, `asleep`), `body` (needs body: `yaw`,
+`pitch`, `roll`, `shoulder`, `elbow`, each with `deg` from its home,
+`min_deg` and `max_deg`; the speed, load and heat caps). `light` and `mood`
+are `null` until the lamp has heard them, and `body` until the body has
+found home.
 
 ## Leases
 
