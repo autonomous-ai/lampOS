@@ -2992,6 +2992,19 @@ pub fn serve(
         );
     }
     engine = engine.waiting_for_written(written_wait);
+    // Round 1 not begun soon is asked once more on a fresh connection
+    // (`LAMP_SECOND_CHAT_AGAIN=on`; the first builder's 01:36 on #2602).
+    let chat_again = std::env::var(crate::second_provider::CHAT_AGAIN_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if chat_again {
+        eprintln!(
+            "lamp-voice second: a chat round 1 not begun in {} ms is asked once more on a fresh connection (LAMP_SECOND_CHAT_AGAIN)",
+            crate::second_provider::CHAT_AGAIN_AFTER.as_millis()
+        );
+    }
+    engine = engine.chatting_again(chat_again);
     // A line lost on the network is asked once more when a service host
     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
     // first builder's 00:02 on #1722). As the only voice, with its hosts.

@@ -1,7 +1,7 @@
 //! A streamed OpenAI-compatible chat completion with function tools: text
 //! as it is written, then the tool calls the model asked for. The caller
 //! runs the tools and sends their results back as `tool` messages.
-use super::{Error, Result, chat_client, chunk, openai_base, post};
+use super::{Error, Result, chat_client, chunk, http_client, openai_base, post};
 use crate::second_config::SecondConfig;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -541,6 +541,32 @@ impl Chat {
         only: Option<&[&str]>,
         without: &[&str],
     ) -> Result<ChatStream> {
+        self.send_on(&self.client, false, messages, only, without)
+            .await
+    }
+
+    /// [`Self::send_without`] on a connection of its own, never one from
+    /// the client's pool (`LAMP_SECOND_CHAT_AGAIN`, #2602): a round that
+    /// hasn't begun may be stuck on a pooled connection the service has
+    /// dropped, and asking again there would wait on it too.
+    pub async fn send_fresh(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+    ) -> Result<ChatStream> {
+        let client = http_client()?;
+        self.send_on(&client, true, messages, only, without).await
+    }
+
+    async fn send_on(
+        &self,
+        client: &reqwest::Client,
+        fresh: bool,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+    ) -> Result<ChatStream> {
         let body = self.body_without(messages, only, without);
         let asked = std::time::Instant::now();
         let before = self
@@ -548,19 +574,23 @@ impl Chat {
             .lock()
             .ok()
             .and_then(|mut last| last.replace(asked));
+        // As it's attempted, before any answer (#2602, Backend's 02:09: three
+        // round 1s that never began never reached the relay). It proves an
+        // attempt only, not that anything was sent: with no answer's line
+        // after it, the attempt failed or hung somewhere (a connection, its
+        // TLS, a reused connection, the service); with no line at all, the
+        // request was never attempted (Second's and reviewer-two's P3s).
+        eprintln!(
+            "lamp-voice second: {}",
+            going_out_told(fresh, before.map(|at| asked.duration_since(at)))
+        );
         let prefix = Prefix::of(&body);
         let prefix_before = self
             .last_prefix
             .lock()
             .ok()
             .and_then(|mut last| last.replace(prefix));
-        let response = post(
-            &self.client,
-            &self.url,
-            ("authorization", &self.auth),
-            &body,
-        )
-        .await?;
+        let response = post(client, &self.url, ("authorization", &self.auth), &body).await?;
         // What was asked and how soon the service began to answer, without
         // words (#1712, the first builder at 18:26: the chat's first event
         // came in 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe).
@@ -582,6 +612,23 @@ impl Chat {
             first: None,
         })
     }
+}
+
+/// A chat request as it goes out, in the journal's words: on the client's
+/// pool or a connection of its own, and how long before it the last request
+/// went (a pooled connection idle long may be one the service has dropped).
+fn going_out_told(fresh: bool, since_last: Option<std::time::Duration>) -> String {
+    format!(
+        "chat request going out on {}; {}",
+        if fresh {
+            "a connection of its own"
+        } else {
+            "the client's pool"
+        },
+        since_last.map_or("the first request of this client".to_owned(), |since| {
+            format!("the last request {} s before", since.as_secs())
+        })
+    )
 }
 
 /// A chat request in the journal's words: its size, its messages and tools,
@@ -957,6 +1004,20 @@ mod tests {
         // Just warmed: not asked again.
         assert!(chat.warm().await.is_none());
         server.await.unwrap();
+    }
+
+    /// #2602: a chat request is journaled as it goes out, before any answer,
+    /// with where it goes and the gap since the last; never its words.
+    #[test]
+    fn a_chat_request_going_out_is_journaled() {
+        assert_eq!(
+            going_out_told(false, Some(std::time::Duration::from_secs(95))),
+            "chat request going out on the client's pool; the last request 95 s before"
+        );
+        assert_eq!(
+            going_out_told(true, None),
+            "chat request going out on a connection of its own; the first request of this client"
+        );
     }
 
     /// #1712, the first builder at 18:26: a chat request is journaled by its
@@ -1705,6 +1766,88 @@ data: [DONE]
             3
         );
         assert_eq!(connections(None).await, 2);
+    }
+
+    /// #2602 (`LAMP_SECOND_CHAT_AGAIN`): a relay that keeps a pooled
+    /// connection open but stops answering on it. `send` reuses that
+    /// connection and waits; `send_fresh` opens a connection of its own,
+    /// which the relay answers, so a stalled round asked again begins.
+    #[tokio::test]
+    async fn a_fresh_send_skips_a_pooled_connection_that_stopped_answering() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let connections = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let accepted = connections.clone();
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let number = accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                tokio::spawn(async move {
+                    let mut buffer = [0; 8192];
+                    let mut answered = 0;
+                    loop {
+                        let Ok(n) = socket.read(&mut buffer).await else {
+                            return;
+                        };
+                        if n == 0 {
+                            return;
+                        }
+                        let head = String::from_utf8_lossy(&buffer[..n]).to_string();
+                        // The first connection answers its warming GET, kept
+                        // alive, and then nothing more: the stall.
+                        if number == 1 && answered > 0 {
+                            continue;
+                        }
+                        answered += 1;
+                        let reply = if head.starts_with("GET") {
+                            let body = r#"{"data":[]}"#;
+                            format!(
+                                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+                                body.len()
+                            )
+                        } else {
+                            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n\
+                             data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n"
+                                .to_owned()
+                        };
+                        if socket.write_all(reply.as_bytes()).await.is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+        let chat = Chat::with(
+            &format!("http://{address}/v1"),
+            "m",
+            "k",
+            Arc::new(Vec::new),
+        )
+        .unwrap();
+        // A connection in the pool, as a warmed or recent chat leaves one.
+        chat.warm().await.expect("warmed");
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let asked = [Message::user("hello")];
+        let pooled =
+            tokio::time::timeout(std::time::Duration::from_millis(500), chat.send(&asked)).await;
+        assert!(
+            pooled.is_err(),
+            "the pooled connection was reused and stalled"
+        );
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let mut fresh = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            chat.send_fresh(&asked, None, &[]),
+        )
+        .await
+        .expect("a fresh connection answers")
+        .unwrap();
+        assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(
+            fresh.next().await.unwrap(),
+            Some(ChatEvent::Text("Hi".into()))
+        );
     }
 
     /// A local plain HTTP server sends a recorded stream in two pieces.

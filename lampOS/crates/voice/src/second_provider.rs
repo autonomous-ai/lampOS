@@ -623,6 +623,18 @@ pub const SKILL_LOOK_ENVIRONMENT: &str = "LAMP_SECOND_SKILL_LOOK";
 /// nothing else (#1854's follow-up, the first builder at 18:28 on #1722).
 pub const WRITTEN_WAIT_ENVIRONMENT: &str = "LAMP_SECOND_WRITTEN_WAIT";
 
+/// A turn's chat round 1 that hasn't begun [`CHAT_AGAIN_AFTER`] after the
+/// words is asked once more on a connection of its own, and the first of the
+/// two to begin is the one said; the other is dropped unread, so nothing is
+/// said twice ([`Engine::chatting_again`]): `on`, and nothing else (#2602, the
+/// first builder's 01:36 on 23 Oct: on lamp-4ace 3 of about 570 chats had not
+/// begun in 4.5 s and ended unanswered). Not for a look's round, whose
+/// picture makes a slow start usual. The give-up's bound stays as it was.
+pub const CHAT_AGAIN_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_AGAIN";
+/// How long round 1 may take to begin before it is asked again
+/// ([`CHAT_AGAIN_ENVIRONMENT`]).
+pub const CHAT_AGAIN_AFTER: Duration = Duration::from_millis(2_500);
+
 /// Where the worker and the coordinator read whether a look's turn whose
 /// answer called nothing is told so (`LookNoCall`), so that a skill's
 /// search the model left after one look gets one note to go on
@@ -944,6 +956,9 @@ struct Shared {
     /// The lamp's own written turns may begin as late as
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
+    /// [`Engine::chatting_again`]: round 1 not begun in [`CHAT_AGAIN_AFTER`]
+    /// is asked once more on a fresh connection.
+    chat_again: bool,
     /// [`Engine::resending`]: a spoken line whose chat was lost on the
     /// network is asked once more when the link is back.
     resend: Option<LinkBack>,
@@ -2408,6 +2423,7 @@ impl Engine {
                 short_done: false,
                 no_words_again: false,
                 written_wait: false,
+                chat_again: false,
                 resend: None,
                 hearing: None,
                 line_heard: None,
@@ -3135,6 +3151,17 @@ impl Engine {
     pub fn waiting_for_written(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.written_wait = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_CHAT_AGAIN=on` ([`CHAT_AGAIN_ENVIRONMENT`]): a turn's
+    /// chat round 1 not begun [`CHAT_AGAIN_AFTER`] after the words is asked
+    /// once more on a fresh connection, and the first to begin is said.
+    /// Before any turn only.
+    pub fn chatting_again(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.chat_again = on;
         }
         self
     }
@@ -7835,6 +7862,81 @@ fn chat_for(
     }
 }
 
+/// `first`, round 1's chat, and once `after` passes with nothing from it,
+/// `again`'s ask beside it ([`CHAT_AGAIN_ENVIRONMENT`]): the first of the two
+/// to begin, its first event any chat event (a word, a call, an end or a
+/// search), is the stream that goes on, and
+/// the other is dropped, its connection closed. One that fails while the
+/// other is still out is not a beginning: the other is waited for, and only
+/// if both fail is the later failure the stream's. Nothing from the dropped
+/// one is ever read past its failure, so nothing is said twice.
+fn asked_again(
+    first: futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>,
+    after: tokio::time::Instant,
+    again: impl FnOnce() -> Option<futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>>
+    + Send
+    + 'static,
+    request: u64,
+) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+    use futures_util::stream;
+    type Chat = futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>;
+    stream::once(async move {
+        let mut first = first;
+        tokio::select! {
+            item = first.next() => return (item, first),
+            () = tokio::time::sleep_until(after) => {}
+        }
+        // Its scope checked as it goes: a request is never sent with a
+        // context revoked since (Second's P2 on #3107).
+        let Some(second) = again() else {
+            eprintln!(
+                "lamp-voice second: request {request} chat round 1 had not begun in {} ms; not asked again: its scope has lapsed",
+                CHAT_AGAIN_AFTER.as_millis()
+            );
+            return (first.next().await, first);
+        };
+        eprintln!(
+            "lamp-voice second: request {request} chat round 1 had not begun in {} ms; asked once more on a fresh connection",
+            CHAT_AGAIN_AFTER.as_millis()
+        );
+        let (mut first_out, mut second_out): (Option<Chat>, Option<Chat>) =
+            (Some(first), Some(second));
+        let mut failed = None;
+        loop {
+            let (item, which) = match (&mut first_out, &mut second_out) {
+                (Some(one), Some(two)) => tokio::select! {
+                    item = one.next() => (item, 1),
+                    item = two.next() => (item, 2),
+                },
+                (Some(one), None) => (one.next().await, 1),
+                (None, Some(two)) => (two.next().await, 2),
+                (None, None) => return (failed, stream::empty().boxed()),
+            };
+            let who = if which == 1 { "the first ask" } else { "the ask again" };
+            match item {
+                Some(Ok(event)) => {
+                    eprintln!("lamp-voice second: request {request} chat round 1 begun on {who}");
+                    let winner = if which == 1 { first_out } else { second_out };
+                    return (Some(Ok(event)), winner.expect("the stream that answered"));
+                }
+                other => {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round 1's {who} ended before it began"
+                    );
+                    failed = other.or(failed);
+                    if which == 1 {
+                        first_out = None;
+                    } else {
+                        second_out = None;
+                    }
+                }
+            }
+        }
+    })
+    .flat_map(|(item, rest)| stream::iter(item).chain(rest))
+    .boxed()
+}
+
 /// The functions [`chat_for`] leaves out for this scope.
 fn withheld(scope: Option<&crate::memory_scope::ScopeLease>) -> &'static [&'static str] {
     if held_by_gap(scope) {
@@ -8539,6 +8641,27 @@ async fn answer(
                 }
                 _ => chat_for(shared, scope.as_ref(), messages.clone()),
             };
+            // Round 1 not begun soon is asked once more on a connection of
+            // its own (`LAMP_SECOND_CHAT_AGAIN`, #2602); a look's is not.
+            if round == 1 && shared.chat_again && !looking {
+                let services = Arc::clone(&shared.services);
+                let again = messages.clone();
+                let only = quoted.then_some(&[][..]);
+                let without = withheld(scope.as_ref());
+                let lease = scope.clone();
+                stream = asked_again(
+                    stream,
+                    from + CHAT_AGAIN_AFTER,
+                    move || {
+                        // A request sent later checks its scope as it goes.
+                        if lease.as_ref().is_some_and(|lease| !lease.is_current()) {
+                            return None;
+                        }
+                        Some(services.chat_again(again, only, without))
+                    },
+                    request,
+                );
+            }
             let mut first = true;
             let mut split = Sentences::default();
             let mut text = String::new();

@@ -43,6 +43,13 @@ struct Script {
     /// Each of a chat's events waits this long (on the test's clock), as a
     /// streamed reply's pieces come apart.
     piece_gap: Option<Duration>,
+    /// Each chat's own wait for its first event, in the order asked, in
+    /// place of `first_event_after` while any are left.
+    chat_after: Mutex<VecDeque<Duration>>,
+    /// Chats asked again on a fresh connection (`LAMP_SECOND_CHAT_AGAIN`).
+    asked_again: AtomicUsize,
+    /// Chats whose stream was dropped before its first event.
+    chats_dropped: Arc<AtomicUsize>,
     /// Speech of this sentence starts late.
     slow: Option<&'static str>,
     /// This sentence's first audio waits for the test to release it.
@@ -199,12 +206,21 @@ impl Services for Script {
         }
         let events = self.chats.lock().unwrap().pop_front().unwrap();
         let token = self.token.clone();
-        let delay = self.first_event_after;
+        let delay = self
+            .chat_after
+            .lock()
+            .unwrap()
+            .pop_front()
+            .or(self.first_event_after);
+        // Counted when dropped before it began: a chat that lost the race.
+        let dropped = Dropped(Some(self.chats_dropped.clone()));
         let gap = self.piece_gap;
         let scripted = stream::once(async move {
+            let mut dropped = dropped;
             if let Some(delay) = delay {
                 tokio::time::sleep(delay).await;
             }
+            dropped.0 = None;
         })
         .filter_map(|()| async { None })
         .chain(stream::iter(events).then(move |event| async move {
@@ -232,6 +248,20 @@ impl Services for Script {
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         self.told_only.lock().unwrap().push(only);
         self.chat(messages)
+    }
+
+    fn chat_again(
+        &self,
+        messages: Vec<Message>,
+        only: Option<&'static [&'static str]>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.asked_again.fetch_add(1, Ordering::Relaxed);
+        match only {
+            Some(only) => self.chat_only(messages, only),
+            None if !without.is_empty() => self.chat_without(messages, without),
+            None => self.chat(messages),
+        }
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
@@ -296,6 +326,16 @@ impl Services for Script {
 
     fn open_speech_ahead(&self, request: u64) {
         self.sockets_asked.lock().unwrap().push(request);
+    }
+}
+
+/// Counts one drop unless it was taken out first, at the stream's end.
+struct Dropped(Option<Arc<AtomicUsize>>);
+impl Drop for Dropped {
+    fn drop(&mut self) {
+        if let Some(count) = self.0.take() {
+            count.fetch_add(1, Ordering::Relaxed);
+        }
     }
 }
 
@@ -4597,6 +4637,275 @@ async fn with_its_switch_a_written_turn_waits_seven_seconds_to_begin() {
         after >= WRITTEN_BEGIN_WITHIN && after < WRITTEN_BEGIN_WITHIN + Duration::from_millis(100),
         "{after:?}"
     );
+}
+
+/// #2602 (the first builder's 01:36 on 23 Oct): with
+/// `LAMP_SECOND_CHAT_AGAIN=on` a chat round 1 not begun 2.5 s after the
+/// words is asked once more on a fresh connection, and the first to begin is
+/// said. A first ask that stalls is answered by the second, inside the 3 s
+/// give-up; when both answer, the one that began first is said once and the
+/// other is dropped unread; one that begins before 2.5 s is never asked
+/// again. Without the switch, the stalled one ends unanswered as before.
+#[tokio::test(start_paused = true)]
+async fn with_its_switch_a_chat_not_begun_in_two_and_a_half_seconds_is_asked_again() {
+    struct Ran {
+        said: Vec<String>,
+        failed: bool,
+        took: Duration,
+        again: usize,
+        dropped: usize,
+    }
+    async fn ran(on: bool, afters: &[u64], chats: Vec<Vec<net::Result<ChatEvent>>>) -> Ran {
+        let script = Arc::new(Script {
+            chats: Mutex::new(chats.into()),
+            chat_after: Mutex::new(afters.iter().map(|ms| Duration::from_millis(*ms)).collect()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.chatting_again(on);
+        engine.submit(written(1, "What's the weather like?"));
+        let begun = tokio::time::Instant::now();
+        let mut said = Vec::new();
+        let failed = loop {
+            match engine.next().await {
+                ProviderOutput::Transcript {
+                    request: Some(_),
+                    text,
+                    ..
+                } if !text.is_empty() => said.push(text),
+                ProviderOutput::TurnComplete { .. } => break false,
+                ProviderOutput::TurnFailed { .. } => break true,
+                _ => {}
+            }
+        };
+        Ran {
+            said,
+            failed,
+            took: begun.elapsed(),
+            again: script.asked_again.load(Ordering::Relaxed),
+            dropped: script.chats_dropped.load(Ordering::Relaxed),
+        }
+    }
+    let answer = |words: &str| vec![text(words), Ok(ChatEvent::Done)];
+
+    // The first ask stalls; the second, asked at 2.5 s, answers at once.
+    let stalled = ran(
+        true,
+        &[60_000, 0],
+        vec![answer("Sunny."), answer("Rain later.")],
+    )
+    .await;
+    assert_eq!(stalled.said, ["Rain later."]);
+    assert!(!stalled.failed);
+    assert_eq!(stalled.again, 1);
+    assert_eq!(stalled.dropped, 1, "the stalled ask is dropped");
+    assert!(
+        stalled.took >= CHAT_AGAIN_AFTER && stalled.took < BEGIN_WITHIN,
+        "{:?}",
+        stalled.took
+    );
+
+    // Both answer: the first ask begins at 2.6 s, before the second's 0.3 s
+    // (2.8 s); only it is said, once, and the second is dropped unread.
+    let both = ran(
+        true,
+        &[2_600, 300],
+        vec![answer("Sunny."), answer("Rain later.")],
+    )
+    .await;
+    assert_eq!(both.said, ["Sunny."]);
+    assert_eq!(both.again, 1);
+    assert_eq!(both.dropped, 1);
+    // And the other way round: the second begins first and is the one said.
+    let second = ran(
+        true,
+        &[2_900, 100],
+        vec![answer("Sunny."), answer("Rain later.")],
+    )
+    .await;
+    assert_eq!(second.said, ["Rain later."]);
+    assert_eq!(second.dropped, 1);
+
+    // Begun before 2.5 s: never asked again.
+    let soon = ran(true, &[2_000], vec![answer("Sunny.")]).await;
+    assert_eq!(soon.said, ["Sunny."]);
+    assert_eq!(soon.again, 0);
+
+    // Both stall: given up at the same 3 s as without the switch.
+    let never = ran(
+        true,
+        &[60_000, 60_000],
+        vec![answer("Sunny."), answer("Rain later.")],
+    )
+    .await;
+    let answered = |said: &[String]| {
+        said.iter()
+            .any(|t| t.contains("Sunny") || t.contains("Rain"))
+    };
+    assert!(!answered(&never.said), "{:?}", never.said);
+    assert_eq!(never.again, 1);
+    assert!(never.took >= BEGIN_WITHIN && never.took < BEGIN_WITHIN + Duration::from_millis(100));
+
+    // The first ask fails at once after 2.5 s: the second is still waited for.
+    let failed_first = ran(
+        true,
+        &[2_550, 200],
+        vec![
+            vec![Err(net::Error::Transport("request"))],
+            answer("Rain later."),
+        ],
+    )
+    .await;
+    assert_eq!(failed_first.said, ["Rain later."]);
+
+    // A quoted line's ask again is told the same functions as its first
+    // ask, none (El's P3 on #3107).
+    let script = Arc::new(Script {
+        chats: Mutex::new([answer("Sunny."), answer("Rain later.")].into()),
+        chat_after: Mutex::new([Duration::from_secs(60), Duration::ZERO].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.chatting_again(true);
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 1,
+        session: 1,
+        privacy_generation: 1,
+        text: "\"What's the weather like?\"".into(),
+        look: false,
+        quoted: true,
+    });
+    loop {
+        if let ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } =
+            engine.next().await
+        {
+            break;
+        }
+    }
+    assert_eq!(script.asked_again.load(Ordering::Relaxed), 1);
+    let told: &[&[&str]] = &[&[], &[]];
+    assert_eq!(*script.told_only.lock().unwrap(), told);
+
+    // Off: the stalled one ends unanswered, and nothing is asked again.
+    let off = ran(false, &[60_000], vec![answer("Sunny.")]).await;
+    assert!(!answered(&off.said), "{:?}", off.said);
+    assert!(off.took >= BEGIN_WITHIN && off.took < BEGIN_WITHIN + Duration::from_millis(100));
+    assert_eq!(off.again, 0);
+}
+
+/// #3107, Second's P2 and their test (02:25): a camera change revokes
+/// personal context without retiring the microphone owner. The ask again is
+/// a new request, so it checks that context as it goes: revoked, no second
+/// request is sent, and the turn goes on as the first ask leaves it.
+#[tokio::test(start_paused = true)]
+async fn an_ask_again_never_sends_a_personal_context_revoked_before_it() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+
+    const PERSONAL_NOTE: &str = "SYNTHETIC PERSONAL CONTEXT FOR THIS REQUEST";
+    for revoke_camera in [false, true] {
+        let began = Arc::new(tokio::sync::Notify::new());
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Lamp, what is the weather like?".to_owned())].into()),
+            chats: Mutex::new([vec![Ok(ChatEvent::Done)], vec![Ok(ChatEvent::Done)]].into()),
+            chat_after: Mutex::new([Duration::from_secs(60); 2].into()),
+            chat_began: Some(began.clone()),
+            ..Script::default()
+        });
+        let cache = Arc::new(FaceCache::default());
+        let (engine, _, _) = scripted(script.clone());
+        let runner: ScopedToolRunner = Arc::new(|_, _, _, _, _: ScopeLease| {
+            Box::pin(async { panic!("this fixture never calls a tool") })
+        });
+        let mut engine = engine
+            .with_memory_scope(
+                lamp_turn_owner::BootId::new([31; 16]).unwrap(),
+                cache.clone(),
+                runner,
+                Some(Arc::new(|lease: &ScopeLease| {
+                    assert_eq!(
+                        lease.scope().unwrap().person(),
+                        Some(crate::remember::person_id("fixture-person").as_str())
+                    );
+                    Told::from(PERSONAL_NOTE.to_owned())
+                })),
+            )
+            .announcing(false)
+            .chatting_again(true);
+        engine.memory_camera(true, 1);
+        // The existing memory-scope fixture's real observation path. Remove
+        // the file after parsing; the admitted cache owns its observation.
+        let path = std::env::temp_dir().join(format!(
+            "chat-hedge-camera-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&path, "fixture-person").unwrap();
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+        std::fs::remove_file(&path).unwrap();
+        engine.submit(start(1));
+        let lease = engine.memory_lease().expect("an admitted scope");
+        assert!(lease.is_current());
+        assert!(lease.scope().unwrap().person().is_some());
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        tokio::time::timeout(Duration::from_secs(1), began.notified())
+            .await
+            .expect("the first request was actually handed to Services");
+        {
+            let asked = script.asked.lock().unwrap();
+            assert_eq!(asked.len(), 1);
+            assert!(asked[0].contains(&Message::system(PERSONAL_NOTE)));
+        }
+
+        // Paused runtime time, not a wall-clock sleep. The original stream
+        // remains pending, and the 2.5-second hedge has not begun yet.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        assert_eq!(script.asked_again.load(Ordering::Relaxed), 0);
+        if revoke_camera {
+            // The same call Gate::install makes for a camera close, while
+            // the existing microphone owner is still request 1. Do not
+            // retire the turn: that would hide the missing RPC scope check.
+            engine.memory_camera(false, 2);
+        }
+        assert_eq!(lease.is_current(), !revoke_camera);
+        assert_eq!(engine.turn.as_ref().unwrap().request, 1);
+        assert_eq!(engine.retired_through, 0);
+        assert!(!engine.turn.as_ref().unwrap().task.is_finished());
+
+        // Await the real turn's existing first-event deadline, so the hedge
+        // timer must actually be polled; a single yield is not evidence.
+        // Drain its bounded output queue while waiting for completion.
+        let task = &mut engine.turn.as_mut().unwrap().task;
+        let output = &mut engine.output;
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                tokio::select! {
+                    result = &mut *task => break result,
+                    event = output.recv() => assert!(event.is_some()),
+                }
+            }
+        })
+        .await
+        .expect("the existing first-event bound ends the stalled turn")
+        .expect("the turn task did not panic");
+        let expected_hedges = usize::from(!revoke_camera);
+        assert_eq!(
+            script.asked_again.load(Ordering::Relaxed),
+            expected_hedges,
+            "camera revoked {revoke_camera}: a new request needs current scope"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 1 + expected_hedges);
+        assert!(
+            asked
+                .iter()
+                .all(|messages| messages.contains(&Message::system(PERSONAL_NOTE)))
+        );
+    }
 }
 
 /// The first builder, 21:25: a look's first round may take 5 s, not 3 s;

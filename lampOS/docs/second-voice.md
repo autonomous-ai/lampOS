@@ -412,6 +412,40 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   end one (#1712, the first builder at 16:04). A round after a tool ran is
   not bounded: what was done (a timer set, the light changed) has to be
   said, or it is asked for and done again.
+  With `LAMP_SECOND_CHAT_AGAIN=on` (off unless set; #2602, the first
+  builder's 01:36 on 23 Oct), a first round not begun 2.5 s after the words
+  (`CHAT_AGAIN_AFTER`) is asked once more, the same request on a connection
+  of its own (`Chat::send_fresh`, never one from the client's pool, where a
+  connection the service stopped answering would hold the second ask too).
+  The first of the two to begin, by any first event (a word, a call, or
+  an end or search event), is the round; the
+  other is dropped unread and its connection closed, so nothing is said
+  twice. One that fails while the other is out is no beginning, and the
+  other is still waited for. The give-up's bound is unchanged, so with the
+  wait sound the second ask has 2 s to begin, and without it only 0.5 s,
+  less than a fresh connection's handshake plus the relay's usual first
+  byte: there it mostly costs and seldom helps (El's P3 on #3107). A
+  look's round is never asked again. The ask again **checks the request's
+  scope as it goes**: one revoked since the first ask (a camera change, say)
+  sends no second request, and the turn goes on as the first ask leaves it
+  (Second's P2). It goes the way the first ask went: near first, and a
+  person's own key that is refused falls back to the relay, the refusal
+  told (El's P2). Journal: each request as it's attempted, `chat request
+  going out on the client's pool` or `on a connection of its own`, with the
+  gap since the last. It proves an attempt, not that the request was sent:
+  with no `its answer began` line after it, the attempt failed or hung
+  somewhere on the way (connecting, TLS, a reused connection, the service),
+  and with no line at all it was never attempted. Then `chat round 1 had not begun in 2500 ms; asked once
+  more on a fresh connection` (or `not asked again: its scope has lapsed`),
+  then `begun on the first ask` or `begun on the ask again`. On lamp-4ace on
+  22 Oct, 3 of about 570 chats had not begun in 4.5 s, and none of the three
+  reached the relay (Backend's 02:09 on #2602), which fits a request written
+  onto a pooled connection that was already gone, though that isn't shown. **What an ask again costs:** a
+  second full prompt, about 10k tokens, mostly a cached prefix, against the
+  relay's daily allowance, or against the person's own account when their
+  key is in use; the dropped ask may be billed for its input too. Before it
+  goes on in the product, `asked once more` lines are counted over a day on
+  lamp-4ace (the first builder's P3).
   A look's first round may take 5 s (`LOOK_BEGIN_WITHIN`): a picture is
   slower to read, and on lamp-52e6 one of two real looks went past 3 s.
   Past it the lamp says "I couldn't get a good look." (`COULD_NOT_LOOK`;
