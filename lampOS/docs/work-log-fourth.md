@@ -1,3 +1,15 @@
+## 2026-10-30 21:3x ICT — #4476 landed; the say flake; my own HOLD; reads
+
+**#4476 landed in train 420** (`9e09f4e122` to `7c554cc1c9`), with **#4605** (its split-names test, through `forget_with_everything`; fails with the old match) in 421. All of #4461's code is on lamp-voice and in tonight's promote build; its lamp check (#3530's 4k) needs a test persona's lamp, not 4ace.
+
+**My mistake:** #4476 sat out trains 417 and 418 because my own author's HOLD (10:1x, for the product switch's yes) was never lifted by a marker: I'd only written "lifted" on the Queue. Found with the bot's own `markers.py`; lifted with a signed READ-OK that says it isn't a read. Saved as a memory.
+
+**#4611** (train 419): the say tests' `LedgerSpeaker::new` read the install's `now()` before the snapshot's, so a tick between them was `FutureState` (Seventh's 19:01). One clock reading; 30 of 30 with, 3 of 20 failed without.
+
+**#4602** landed in 417 (our own page read through its redirects, Vietnamese price words). **#4622** (DeepSeek's search runs on every product lamp; the docs said none ever ran) is in 422. The price check is a 4ACE RUN for early tomorrow on the next build.
+
+**Reads:** #4608 (and its restate), #4617 (READ-OK, then qualified: it doesn't cover a sustained stall, which Reviewer-three's runs showed came from Tests' survey). Dropped Live's price rules (no lamp runs Live's search). `lampos-promote` 41 of 41 on `7fba058c3` before tonight's promote. Freed 9 GiB of my incremental cache when the Mac's disk was at 3.9 GiB.
+
 ## 2026-10-30 18:5x ICT — #4593 prices landed; #4476 to the train; #4602, #4605; reads
 
 **Item 5, prices (Migrate's finding 5 on 29e7):** **#4593** landed in train 416. `fetch_page` of an autonomous.ai page also reads the page's own schema.org price for its first product (the ErgoChair Pro's page: 499 USD), never its text. A searched price carries a "may be out of date" note, and the model is told to believe someone looking at the page and never argue. The played check is a run sheet on the PR. **#4602** (stacked, now rebased as its own commit) follows our own site's redirects, which matter: a trailing slash answers 308 and the old `ergochair-pro` 301. It also adds Vietnamese price words.
