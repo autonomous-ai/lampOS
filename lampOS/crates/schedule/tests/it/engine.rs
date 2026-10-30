@@ -1288,7 +1288,7 @@ const ANN: &str = "p-0123456789abcdef";
 const BO: &str = "p-fedcba9876543210";
 
 /// A reminder `person` set, due at 08:10, 600 s after [`WALL`]: a
-/// reminder, since every line sees a timer.
+/// reminder, since every line sees the room's timers.
 fn set_by(engine: &mut Engine<Disk>, at: &ClockSample, text: &str, person: Option<&str>) -> u64 {
     set_when(
         engine,
@@ -1461,26 +1461,40 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
     assert_eq!(listed(&mut e, &due_at, None), ["Ann's pills"]);
 }
 
-/// A timer is the room's (option 1 on #4656's after-merge P2): a line with
-/// no face seen, at the stove, hears and cancels the timer it set, and
-/// another person's too, but still no one's reminder.
+/// The room's timers (option 1 on #4656's after-merge P2, bounded by
+/// Reviewer-three's P1 and Third's line on #4668): a line with no face
+/// seen, at the stove, hears and cancels a timer set by nobody for two hours
+/// at most. It never hears a person's timer, a reminder, or a relative
+/// reminder set further out, a person's or nobody's.
 #[test]
-fn every_line_hears_and_cancels_a_timer_but_never_anothers_reminder() {
+fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one() {
     let at = now(0);
     let mut e = open(Disk::default(), &at);
+    let weeks = || When::After {
+        seconds: 21 * 86_400,
+    };
     let pasta = timer_by(&mut e, &at, "Pasta", None);
-    timer_by(&mut e, &at, "Tea", Some(ANN));
+    let tea = timer_by(&mut e, &at, "Tea", Some(ANN));
     let pills = set_by(&mut e, &at, "Ann's pills", Some(ANN));
-    set_by(&mut e, &at, "Water the plant", None);
+    set_when(&mut e, &at, "Ann's prescription", Some(ANN), weeks());
+    set_when(&mut e, &at, "Renew the visa", None, weeks());
+    // At the bound and just past it.
+    set_when(&mut e, &at, "Roast", None, When::After { seconds: 7_200 });
+    set_when(&mut e, &at, "Bread", None, When::After { seconds: 7_201 });
     let room = asker(None, false);
-    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Pasta", "Tea"]);
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Pasta", "Roast"]);
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(BO), false))),
-        ["Pasta", "Tea"]
+        ["Pasta", "Roast"]
     );
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), false))),
-        ["Pasta", "Tea", "Ann's pills"]
+        ["Pasta", "Tea", "Ann's pills", "Ann's prescription", "Roast"]
+    );
+    // The owner's line hears every one set by nobody, as before.
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(None, true))),
+        ["Pasta", "Renew the visa", "Roast", "Bread"]
     );
     let cancel = |e: &mut Engine<Disk>, id: u64| {
         e.answer(
@@ -1492,10 +1506,12 @@ fn every_line_hears_and_cancels_a_timer_but_never_anothers_reminder() {
             &at,
         )
     };
-    assert_eq!(cancel(&mut e, pills).unwrap_err().code, "not_found");
+    for id in [tea, pills] {
+        assert_eq!(cancel(&mut e, id).unwrap_err().code, "not_found", "{id}");
+    }
     cancel(&mut e, pasta).unwrap();
-    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Tea"]);
-    // It keeps its setter: Ann's forget takes her timer with her reminder.
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Roast"]);
+    // A person's timer keeps its setter: Ann's forget takes it with hers.
     let forgot = e
         .answer(
             Request::Forget {
@@ -1505,8 +1521,11 @@ fn every_line_hears_and_cancels_a_timer_but_never_anothers_reminder() {
             &at,
         )
         .unwrap();
-    assert_eq!(forgot["forgotten"], 2);
-    assert_eq!(listed(&mut e, &at, None), ["Water the plant"]);
+    assert_eq!(forgot["forgotten"], 3);
+    assert_eq!(
+        listed(&mut e, &at, None),
+        ["Renew the visa", "Roast", "Bread"]
+    );
 }
 
 #[test]
@@ -1553,7 +1572,7 @@ fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_se
     let at = now(0);
     let disk = Disk::default();
     let mut e = open(disk.clone(), &at);
-    // A reminder: a timer is every line's.
+    // A reminder: a short timer set by nobody is every line's.
     set_by(&mut e, &at, "Call Maria", None);
     set_by(&mut e, &at, "Ann's pills", Some(ANN));
     drop(e);

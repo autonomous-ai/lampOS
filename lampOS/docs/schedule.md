@@ -152,8 +152,8 @@ process with the same UID.
 When provisioning, First must register this private data directory in the
 personal-data reset manifest and arrange owner shutdown before its removal.
 The store contains personal reminder text, each person's own: every item
-keeps who set it, and a voice line hears only its own reminders, and every
-timer ("Whose reminders a line hears" below). No deployment, reset manifest, or reset-owner code is
+keeps who set it, and a voice line hears only its own, and the room's
+short timers ("Whose reminders a line hears" below). No deployment, reset manifest, or reset-owner code is
 changed by this task.
 
 A new database is prepared as `.schedule.sqlite3.init`, synced, and published
@@ -579,7 +579,7 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `set_timer` | `text`, `seconds` | none | `Set` with `After` |
 | `set_reminder` | `text`, `time` | `day`, `zone`, `fold` | `Set` with `At` |
 | `repeat_reminder` | `text`, `time`, `every` | `weekday` (required for weekly), `zone` | `Set` with `Daily` or `Weekly` |
-| `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own reminders and every timer |
+| `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own, and the room's short timers |
 | `cancel_reminder` | `id` | none | `Cancel` of the selected whole item/series, only the line's own |
 | `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, only the line's own |
 
@@ -682,20 +682,22 @@ dropping the field (its items then are no one's, which only narrows).
   room hears none of anyone's reminders. Its `not_yet_due` is the line's
   own count, told beside a `pending_only` list in place of `Status`'
   whole-store one.
-- **A timer is the room's** (option 1 on #4656's after-merge P2). Every
-  line hears, cancels and snoozes every timer (`set_timer`, a duration
-  from now: an item whose deadline keeps an elapsed clock, the `kind`
-  `list` says), whoever set it. Without it, a person at the stove with
+- **A timer set with nobody sure is the room's** (option 1 on #4656's
+  after-merge P2). Every line hears, cancels and snoozes a timer set as
+  no one's for two hours at most (`ROOM_TIMER_MS`). A timer is
+  `set_timer`'s duration from now: an item whose deadline keeps an elapsed
+  clock, the `kind` `list` says. Without it, a person at the stove with
   their back to the lamp set a timer as no one's, and then "how long's
-  left?" found no timer and "cancel the timer" was `not_found`. A timer
-  is set for minutes or hours, and when it's due it's said aloud to
-  whoever is there. It still keeps its setter, so a person's forget
-  cancels their timers with their reminders.
+  left?" found no timer and "cancel the timer" was `not_found`. When it's
+  due it's said aloud to whoever is there. A timer a person set stays
+  theirs, and so does a longer one: `set_timer` also sets relative
+  reminders, up to a year out ("in three weeks, renew my prescription",
+  Reviewer-three's P1 and Third's line on #4668).
 - **`cancel_reminder` and `snooze_reminder` by id** act only on an item the
   line may see: `Cancel` and `Snooze` with an `asker` answer someone else's
   reminder as `not_found`, never as someone else's, and a snooze says that
   before "not due". A guest can't cancel the owner's reminder by its id,
-  but can cancel a timer.
+  but can cancel the room's timer.
 - **The voice sends its line's caller.** Beside each schedule call on the
   executive's socket the voice adds `caller`
   (`{"asker":{"person","owner"},"setter"}`, `lamp_actions::schedule::Caller`);

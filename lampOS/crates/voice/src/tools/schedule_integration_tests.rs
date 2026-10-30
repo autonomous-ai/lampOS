@@ -439,8 +439,9 @@ fn voice_actions_boundary_rejects_malformed_model_arguments_without_schedule_ipc
 /// #4527's P2 through the voice's own route: each line's caller is its
 /// scope's, so two people each asking "my reminders" hear their own, an
 /// unknown face hears none, and a guest's cancel by the other's id is
-/// refused as no longer active. A timer is every line's (option 1 on #4656's
-/// after-merge P2): the room's line hears and cancels the one it set.
+/// refused as no longer active. A short timer set by nobody is every
+/// line's (option 1 on #4656's after-merge P2): the room's line hears and
+/// cancels the one it set.
 #[test]
 fn voice_lines_hear_and_cancel_only_their_own_reminders() {
     use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
@@ -459,7 +460,8 @@ fn voice_lines_hear_and_cancel_only_their_own_reminders() {
     let ann = line(ScopeSnapshot::of("Ann"), 1);
     let bo = line(ScopeSnapshot::of("Bo"), 2);
     let unknown = line(ScopeSnapshot::room(), 3);
-    // Reminders, at 08:10, 600 s after `WALL`: a timer is every line's.
+    // Reminders, at 08:10, 600 s after `WALL`: a short timer set by nobody
+    // is every line's.
     let set = actions.call_on(
         "set_reminder",
         json!({"text":"Ann's pills","time":"08:10"}),
