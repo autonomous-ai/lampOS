@@ -3836,18 +3836,23 @@ after a take-over, but now for every turn:
     voice's, said while the lamp's words still kept a conversation going
     (the thread's 45 s), renews the window from its verdict as its answer
     would have: the next lines go on from it as from the lamp's words
-    (`Heeding::verdict`, `held_in_conversation_us`). Forgetting the
-    thread's words leaves nothing for it to renew;
+    (`Heeding::verdict`, `held_in_conversation_us`), never more than
+    `HELD_KEEPS_FOR` (90 s) after the lamp's own last words, however many
+    are held. Forgetting the thread's words, or a new person at the lamp,
+    leaves nothing for it to renew;
   - the line right after a held remark, let out only as the conversation
-    going on, not found in the conversation's own voice and answering no
-    question of the lamp's, is held as carrying that talk on to someone
-    else ("It's from the office, they're testing it.";
+    going on, not found in the conversation's own voice, answering no
+    question of the lamp's and asking it nothing (`remarks::asks_in` by
+    clause: "Anyway, set a timer." goes on), is held as carrying that talk
+    on to someone else ("It's from the office, they're testing it.";
     `remark_about_it::AFTER_A_REMARK`);
   - someone else's line ends nothing of the conversation: one held as
     another voice's no longer counts as talk past the lamp for the next
     line, which goes on when it is in the conversation's own voice; and a
-    print come after its answer, another's, is said and ends nothing
-    (`voice_going_on_in`).
+    print come after its answer, another's, ends nothing for a line that
+    asks the lamp a question or calls it (`voice_going_on_in`); a statement
+    then ("Yes, give me five minutes.", to the colleague) is held as
+    without the switch.
   Without a voice model nothing tells d11 and d12's lines from the owner's:
   let out as the conversation going on, they are answered as without the
   switch. Tests (`worker.rs`: `on_the_product_unit_the_owners_lines_after_a_held_remark_are_answered`,
