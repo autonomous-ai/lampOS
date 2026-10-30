@@ -40,7 +40,7 @@ EnvironmentFile=/etc/lampOS/body/lamp.env
 # arm 376,488/396,488; the strain bounds (pitch/roll/yaw 240/150/220 for six 20 ms steps in a row, arm 560 under
 # --force-limit 600) eased and retreated nothing at 300. The factory's first stand (deploy/factory/steps.sh) stays at
 # 120.
-ExecStart=/opt/lampOS/body/current/lamp-body --device /dev/ttyACM0 --unit-id %H --lock-directory /run/lampos-locks/motor --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock --reach 150,15,1,250 --speed 300 --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on $BODY_POSES
+ExecStart=/opt/lampOS/body/current/lamp-body --device /dev/ttyACM0 --unit-id %H --lock-directory /run/lampos-locks/motor --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock --lease-socket /run/lampos-body/lease.sock --reach 150,15,1,250 --speed 300 --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on $BODY_POSES
 Restart=on-failure
 RestartSec=15s
 KillMode=mixed
