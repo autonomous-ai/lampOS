@@ -1169,6 +1169,11 @@ thread_local! {
     /// (#3747). Unset, no walk, as before.
     static RIG_ONBOARDING: RefCell<Option<(crate::onboarding::storage::ServiceStorage, PathBuf)>> =
         const { RefCell::new(None) };
+    /// From this time, on the scenario clock, the sleep line is rendered
+    /// into this speech cache, as the warm thread would after the loop
+    /// started (#3748, the reviewer on #4478). Unset, nothing, as before.
+    static SPEECH_CACHE_WARMS_AT: RefCell<Option<(u64, std::sync::Arc<crate::say::tts_cache::TtsCache>)>> =
+        const { RefCell::new(None) };
 }
 
 struct SourcePeer {
@@ -1312,6 +1317,17 @@ impl SteppedPeer {
                 Control::ProviderOutputCapacity { .. } => {}
                 other => panic!("unexpected command to a head-touch fixture worker: {other:?}"),
             }
+        }
+        if self.privacy
+            && let Some(cache) = SPEECH_CACHE_WARMS_AT.with(|warms| {
+                let mut warms = warms.borrow_mut();
+                let due = warms.as_ref().is_some_and(|(at, _)| monotonic_us() >= *at);
+                due.then(|| warms.take().unwrap().1)
+            })
+        {
+            cache
+                .warm(&[lamp_msgs::SLEEP_LINE])
+                .map_err(io::Error::other)?;
         }
         if self.privacy
             && self.keeping
@@ -2972,6 +2988,18 @@ fn held_run_with(
     fresh_us: u64,
     sleep_line: Option<Option<Vec<i16>>>,
 ) -> (Ran, u64) {
+    held_run_kept_at(held_us, lifted_us, fresh_us, sleep_line, None)
+}
+
+/// As [`held_run_with`], the line rendered into the speech cache only
+/// `kept_after_us` into the loop when given, not before it starts.
+fn held_run_kept_at(
+    held_us: u64,
+    lifted_us: u64,
+    fresh_us: u64,
+    sleep_line: Option<Option<Vec<i16>>>,
+    kept_after_us: Option<u64>,
+) -> (Ran, u64) {
     use std::os::unix::fs::PermissionsExt;
     RIG_SPEAKER_PLAYS.with(|plays| plays.set(sleep_line.is_some()));
     // One folder each: the stepped tests share their scenario clock's start.
@@ -2991,8 +3019,11 @@ fn held_run_with(
             "en",
             Box::new(move |_: &str| Ok(rendered.clone())),
         );
-        cache.warm(&[lamp_msgs::SLEEP_LINE]).unwrap();
-        TEST_SPEECH_CACHE.with(|given| *given.borrow_mut() = Some(std::sync::Arc::new(cache)));
+        let cache = std::sync::Arc::new(cache);
+        if kept_after_us.is_none() {
+            cache.warm(&[lamp_msgs::SLEEP_LINE]).unwrap();
+        }
+        TEST_SPEECH_CACHE.with(|given| *given.borrow_mut() = Some(cache));
     }
     let record = directory.join("mute.json");
     let sleeps_at = std::cell::Cell::new(0);
@@ -3005,6 +3036,13 @@ fn held_run_with(
             // as on a lamp, or its turn's lease lapses (#3748).
             if sleep_line.is_some() {
                 WAKE_CAPTURE_FROM.with(|from| from.set(Some(now)));
+            }
+            if let Some(after) = kept_after_us {
+                let cache = TEST_SPEECH_CACHE
+                    .with(|given| given.borrow().clone())
+                    .unwrap();
+                SPEECH_CACHE_WARMS_AT
+                    .with(|warms| *warms.borrow_mut() = Some((now + after, cache)));
             }
             let mut controls =
                 HandControls::with_test_hold("test-hand-clock", now, held_us, lifted_us, &record)
@@ -3020,6 +3058,7 @@ fn held_run_with(
     RIG_SPEAKER_PLAYS.with(|plays| plays.set(false));
     WAKE_CAPTURE_FROM.with(|from| from.set(None));
     TEST_SPEECH_CACHE.with(|given| given.borrow_mut().take());
+    SPEECH_CACHE_WARMS_AT.with(|warms| warms.borrow_mut().take());
     let _ = fs::remove_dir_all(&directory);
     (ran, sleeps_at.get())
 }
@@ -3184,6 +3223,29 @@ fn with_the_sleep_line_a_hold_says_it_and_sleeps_once_it_has_played() {
             .any(|row| row["kind"] == "turn_finished" && row["outcome"] != "head_sleep"),
         "the line's turn ended on its own"
     );
+}
+
+/// #3748 (the reviewer on #4478): the speech cache has no sleep line when
+/// the loop starts, and the warm thread renders it 300 ms later: the hold
+/// that comes after says the line, read at the hold, not the breath.
+#[test]
+fn with_the_sleep_line_kept_after_the_loop_started_the_next_hold_says_it() {
+    let line = sleep_line(2);
+    let (ran, _) = held_run_kept_at(
+        1_500_000,
+        9_000_000,
+        4_000_000,
+        Some(Some(line.clone())),
+        Some(300_000),
+    );
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_sleep_line");
+    assert_eq!(played(&ran), line, "the whole line: {}", ran.error);
+    slept_owed(&ran);
 }
 
 /// #3748: a hand let go at 2.5 s, before the Hold, cuts the line at once,
