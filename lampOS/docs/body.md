@@ -2066,8 +2066,8 @@ held, the body takes no shift at rest and nothing from Expression (its
 offsets and the rest glance), and a standing lamp stays up past its
 `--awake-seconds`, as with someone in front of it. A hold never stands a
 folded lamp up by itself: a gesture asked does that, as any gesture does.
-Gestures and moves still come on the mood socket, at the caps above. No
-product unit passes it yet.
+Gestures and moves still come on the mood socket, at the caps above. The
+product unit passes it (`/run/lampos-body/lease.sock`, #4568).
 
 The holder read-budget fixture queues more than 4 KiB with one nonblocking
 write before reading its peer. It checks the line cutoff, the 4 KiB read

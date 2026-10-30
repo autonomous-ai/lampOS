@@ -18,7 +18,7 @@ lamp.
 |---|---|
 | The fake lamp, pairing, the SDKs, `lamp-mcp`, `lamp skill check` | merged |
 | `express`: a feeling as the feelings skill's own move and light | merged: #4020 |
-| `look` at `ahead` or an angle, under a body lease | merged: #4247, on a lamp with `--lease-socket` (no product unit passes it yet) |
+| `look` at `ahead` or an angle, under a body lease | merged: #4247, on a lamp with `--lease-socket` (the product lamp-body unit passes it since #4568; lamp-control's unit with #4526) |
 | `look` at `face` or `name` | not in this release |
 | lamp-control as a product part, off by default | pending: #3876 |
 | The owner's "Add a developer computer" screen in the app | pending: a later piece of #3504 |
@@ -56,8 +56,9 @@ light: `{"to": "body", "move": "glad-lift", "light": true}`), and `say`
 and `sound` (`hum`, the lamp's own short hum) with `{"to": "voice"}` and
 their `done`. `play` and `joints` are refused, in
 lamp-control's own words ("not routed yet: waits for …"), and `look` with "the
-body's lease socket is not on here", as a product lamp refuses it until its
-unit passes `--lease-socket`.
+body's lease socket is not on here", as a product lamp refuses it until
+lamp-control's unit passes `--lease-socket` too (#4526; lamp-body's does,
+#4568).
 `--everything` answers every op instead.
 
 ## 2. Your first program (3 minutes)
@@ -291,7 +292,8 @@ a short body lease of its own, or renews the one it holds, and keeps to what
 hello's `limits` says. A refusal comes back as the tool's error,
 in the lamp's words. `lamp_look` works on a lamp with `--lease-socket` and on
 `lamp fake --everything`; a product lamp refuses it ("the body's lease socket
-is not on here") until its unit passes `--lease-socket`.
+is not on here") until lamp-control's unit passes `--lease-socket` too
+(#4526; lamp-body's does, #4568).
 
 ### Your coding agent knows the SDK: the agent skill
 
