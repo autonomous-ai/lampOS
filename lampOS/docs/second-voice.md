@@ -634,13 +634,16 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     price found may be out of date, that Autonomous's own products are priced
     only from autonomous.ai's own product page, and that someone looking at
     the page is believed, never argued with. A search whose query or results
-    speak of a price (the word, "how much", or an amount with `$ € £ ¥ ₫ ₹`,
-    USD or VND) carries `note` saying the same (`SEARCHED_PRICE_NOTE`), and a
+    speak of a price (the word, "how much", Vietnamese's "giá" or "bao
+    nhiêu", or an amount with `$ € £ ¥ ₫ ₹`, USD or VND) carries `note` saying the same (`SEARCHED_PRICE_NOTE`), and a
     result on autonomous.ai carries its `url`, so `fetch_page` can read it.
     `fetch_page` of an autonomous.ai page (`autonomous.ai` or
     `www.autonomous.ai`, no port; never the relay's `campaign-api`) also
     reads the page itself, `GET https://www.autonomous.ai<path>`, beside the
-    fetch and within the same 3 s, at most 2 MiB: the price is from the
+    fetch and within the same 3 s, at most 2 MiB, following at most two
+    redirects and only while they stay on autonomous.ai (on 30 Oct a
+    trailing slash answered 308 and an old product name,
+    `office-chairs/ergochair-pro`, 301, both to the page): the price is from the
     page's own schema.org data, the first `Product` or `ProductGroup`'s
     `Offer`s (`AggregateOffer`'s low and high too), never a related
     product's and never the page's text, as `price: {product, currency,
