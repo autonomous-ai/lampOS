@@ -283,7 +283,31 @@ pub struct Interruption {
     /// The speech in the clear of the yield in force is talk well under the
     /// person the lamp is answering ([`Self::quiet_talk`], #3967).
     quiet_talk: bool,
+    /// `LAMP_CUT_IN_LATE_YIELD=on`: see [`Self::commit_late_yields`].
+    commits_late: bool,
+    /// One flag per block of the last [`LATE_YIELD_WINDOW_BLOCKS`]: whether
+    /// it was heard as a person over the lamp while it had something to
+    /// yield. A ring, written at `over_at`, with `over_count` flags set.
+    over_window: [u64; 3],
+    over_at: u8,
+    over_count: u8,
+    /// The yield in force, or the last one, was made late in a person's
+    /// speech over the lamp ([`LATE_YIELD_OVER_BLOCKS`]).
+    late: bool,
 }
+
+/// Blocks heard as a person over the lamp, in the last
+/// [`LATE_YIELD_WINDOW_BLOCKS`] up to and including the one that made a
+/// yield, with which the yield was made late in their speech
+/// (`LAMP_CUT_IN_LATE_YIELD=on`, [`Interruption::commit_late_yields`]).
+/// On lamp-c0a4, 31 Oct, every cut-in switch off: a question over a story
+/// yielded to late counted 12-23 (three of them were dropped); the lamp's
+/// own voice 7-8, the onset run alone; a side remark at most 11.
+pub const LATE_YIELD_OVER_BLOCKS: u8 = 14;
+/// The blocks [`LATE_YIELD_OVER_BLOCKS`] are counted in: 1.5 s, the most
+/// of a short question that can come before the yield.
+pub const LATE_YIELD_WINDOW_BLOCKS: u8 = 150;
+const _: () = assert!(LATE_YIELD_WINDOW_BLOCKS as usize <= 3 * 64);
 
 /// How long a yield's commit is held for its words once they have been
 /// asked for (#2939): 500 ms, for the speech-to-text's answer, about
@@ -319,7 +343,62 @@ impl Interruption {
             speech_at_ask: None,
             held: 0,
             quiet_talk: false,
+            commits_late: false,
+            over_window: [0; 3],
+            over_at: 0,
+            over_count: 0,
+            late: false,
         }
+    }
+
+    /// `LAMP_CUT_IN_LATE_YIELD=on`: a yield made late in a person's speech
+    /// over the lamp ([`LATE_YIELD_OVER_BLOCKS`]) commits on stillness
+    /// instead of resuming. Most of a plain question over the lamp's voice
+    /// can be heard as under the detector's threshold, so the run that
+    /// makes the yield comes as the question ends, and nothing is left of
+    /// it to hear in the clear once the lamp's sound has died away
+    /// (lamp-c0a4, 31 Oct: 3 of 27 played cut-ins dropped so). The deadline
+    /// still resumes, and so does talk well under the asker
+    /// ([`Self::quiet_talk`], #3967); a yield awaiting or holding its words
+    /// is left to them.
+    pub fn commit_late_yields(&mut self) {
+        self.commits_late = true;
+    }
+
+    /// The yield in force, or the last one, was made late in a person's
+    /// speech over the lamp ([`LATE_YIELD_OVER_BLOCKS`]), with the switch
+    /// or without it.
+    pub fn yield_was_late(&self) -> bool {
+        self.late
+    }
+
+    /// The window of [`LATE_YIELD_OVER_BLOCKS`] starts over: with nothing
+    /// to yield, and once a yield is settled, so a second remark soon
+    /// after a first is not counted with it.
+    fn clear_over(&mut self) {
+        self.over_window = [0; 3];
+        self.over_at = 0;
+        self.over_count = 0;
+    }
+
+    /// One block into the window of [`LATE_YIELD_OVER_BLOCKS`]; with
+    /// nothing to yield it starts over.
+    fn note_over(&mut self, speaking: bool, over: bool) {
+        if !speaking {
+            self.clear_over();
+            return;
+        }
+        let (word, bit) = (usize::from(self.over_at / 64), self.over_at % 64);
+        let was = self.over_window[word] >> bit & 1 == 1;
+        if was != over {
+            self.over_window[word] ^= 1 << bit;
+            if over {
+                self.over_count += 1;
+            } else {
+                self.over_count -= 1;
+            }
+        }
+        self.over_at = (self.over_at + 1) % LATE_YIELD_WINDOW_BLOCKS;
     }
 
     /// `LAMP_BACKCHANNEL_HOLDS=on` (#2939): while a yield's words are
@@ -459,6 +538,7 @@ impl Interruption {
         } else {
             0
         };
+        self.note_over(speaking, speaking && heard == Heard::Over);
         let needed = self.onset_needed();
         let forced = std::mem::take(&mut self.forced) && speaking;
         match &mut self.state {
@@ -493,6 +573,7 @@ impl Interruption {
                 self.speech_at_words = 0;
                 self.speech_at_ask = None;
                 self.held = 0;
+                self.late = self.over_count >= LATE_YIELD_OVER_BLOCKS;
                 Step::Yield
             }
             State::Yielded {
@@ -525,6 +606,18 @@ impl Interruption {
                 // Talk well under the asker commits nothing (#3967): the
                 // room behind them, not someone cutting in.
                 let room_behind = self.quiet_talk && !self.forced_yield;
+                // A yield made late in a person's speech over the lamp ends
+                // in stillness as a cut-in, not as one that came to nothing:
+                // what was left of the question went under the lamp's dying
+                // sound (lamp-c0a4, 31 Oct). Not at the deadline, not for
+                // the room behind the asker, and not while words are
+                // awaited, which decide it.
+                let late_commit = self.commits_late
+                    && self.late
+                    && !room_behind
+                    && quiet
+                    && !self.words_pending
+                    && *blocks < self.rule.deadline_blocks;
                 let due = self.stop_heard
                     || (!room_behind
                         && if self.holds_backchannels && self.backchannel == Some(true) {
@@ -562,11 +655,12 @@ impl Interruption {
                 if held {
                     self.held += 1;
                     Step::Carry
-                } else if due && !wordless {
+                } else if (due && !wordless) || late_commit {
                     self.state = LISTENING;
                     self.words_pending = false;
                     self.stop_heard = false;
                     self.commits += 1;
+                    self.clear_over();
                     Step::Commit
                 } else if due
                     || (quiet && !self.words_pending)
@@ -576,6 +670,7 @@ impl Interruption {
                     self.words_pending = false;
                     self.stop_heard = false;
                     self.resumes += 1;
+                    self.clear_over();
                     // Going on after a pause is a beginning again.
                     self.spoken = 0;
                     Step::Resume
@@ -910,6 +1005,116 @@ mod tests {
         room.quiet_talk(true);
         yielded(&mut room);
         assert_eq!(run(&mut room, &[(Heard::Clear, 6)]), [(5, Step::Commit)]);
+    }
+
+    /// 150 blocks of the lamp's reply with `over` single blocks heard over
+    /// it among blocks under, the last of them 8 blocks before the end, then
+    /// the 7 consecutive blocks over it that make the lamp yield.
+    fn late_yield(interruption: &mut Interruption, over: usize) {
+        let mut blocks = Vec::new();
+        for _ in 0..150 - 8 * over {
+            blocks.push((Heard::Under, 1));
+        }
+        for _ in 0..over {
+            blocks.extend([(Heard::Over, 1), (Heard::Under, 7)]);
+        }
+        blocks.push((Heard::Over, LATE));
+        assert_eq!(run(interruption, &blocks), [(149 + LATE, Step::Yield)]);
+    }
+
+    /// The lamp's sound dying away after the yield, then stillness: the
+    /// question's end over the lamp on lamp-c0a4 at 04:06, 31 Oct.
+    const DYING_AWAY: [(Heard, usize); 3] =
+        [(Heard::Own, 2), (Heard::Under, 18), (Heard::Still, 44)];
+
+    /// `LAMP_CUT_IN_LATE_YIELD=on`: a question over a story, most of it
+    /// heard as under the lamp, made the yield only as it ended (lamp-c0a4,
+    /// 31 Oct, 17 blocks over it in the 150 before the onset run). With the
+    /// switch its stillness commits; without it the story goes on.
+    #[test]
+    fn a_yield_late_in_a_question_commits_on_stillness_with_the_switch() {
+        for (switch, step) in [(true, Step::Commit), (false, Step::Resume)] {
+            let mut interruption = Interruption::new(Confirmation::EVALUATED);
+            if switch {
+                interruption.commit_late_yields();
+            }
+            late_yield(&mut interruption, 17);
+            assert!(interruption.yield_was_late());
+            assert_eq!(run(&mut interruption, &DYING_AWAY), [(59, step)]);
+            assert!(!interruption.yielded());
+        }
+    }
+
+    /// With the switch, a yield that is not late resumes as before: the
+    /// lamp's own voice, its onset run alone over it, and a side remark
+    /// with 11 blocks over the lamp, the most heard for one on lamp-c0a4.
+    #[test]
+    fn a_yield_not_late_in_speech_resumes_with_the_switch() {
+        for over in [0, 4] {
+            let mut interruption = Interruption::new(Confirmation::EVALUATED);
+            interruption.commit_late_yields();
+            late_yield(&mut interruption, over);
+            assert!(!interruption.yield_was_late(), "{over}");
+            assert_eq!(run(&mut interruption, &DYING_AWAY), [(59, Step::Resume)]);
+        }
+        // The window starts over when there is nothing to yield: 10 blocks
+        // over the lamp, then the onset run of its first second.
+        for (pause, late) in [(false, true), (true, false)] {
+            let mut interruption = Interruption::new(Confirmation::EVALUATED);
+            interruption.commit_late_yields();
+            let scattered = [(Heard::Over, 1), (Heard::Under, 2)].repeat(10);
+            assert_eq!(run(&mut interruption, &scattered), []);
+            if pause {
+                interruption.block(Heard::Still, false);
+            }
+            assert_eq!(
+                run(&mut interruption, &[(Heard::Over, ONSET)]),
+                [(ONSET - 1, Step::Yield)]
+            );
+            assert_eq!(interruption.yield_was_late(), late, "{pause}");
+        }
+        // Nor is a remark soon after one that yielded counted with it: the
+        // window starts over once a yield is settled. A first remark (4
+        // blocks over the lamp and its onset run) resumed, then a second
+        // one's onset run 0.3 s on: 21 together, 10 on their own.
+        let mut interruption = Interruption::new(Confirmation::EVALUATED);
+        interruption.commit_late_yields();
+        late_yield(&mut interruption, 4);
+        assert_eq!(run(&mut interruption, &DYING_AWAY), [(59, Step::Resume)]);
+        assert_eq!(run(&mut interruption, &[(Heard::Under, 30)]), []);
+        assert_eq!(
+            run(&mut interruption, &[(Heard::Over, ONSET)]),
+            [(ONSET - 1, Step::Yield)]
+        );
+        assert!(!interruption.yield_was_late());
+    }
+
+    /// With the switch, a late yield with no stillness still resumes at its
+    /// deadline, and one whose talk is the room behind the asker (#3967)
+    /// resumes on stillness.
+    #[test]
+    fn a_late_yield_resumes_at_its_deadline_and_for_the_room_behind_the_asker() {
+        let mut deadline = Interruption::new(Confirmation::EVALUATED);
+        deadline.commit_late_yields();
+        late_yield(&mut deadline, 17);
+        let steps = run(&mut deadline, &[(Heard::Under, 60), (Heard::Unknown, 60)]);
+        assert_eq!(steps, [(109, Step::Resume)]);
+        let mut room = Interruption::new(Confirmation::EVALUATED);
+        room.commit_late_yields();
+        late_yield(&mut room, 17);
+        let mut steps = Vec::new();
+        let dying_away = DYING_AWAY
+            .iter()
+            .flat_map(|&(heard, count)| vec![heard; count])
+            .collect::<Vec<_>>();
+        for (index, &heard) in dying_away.iter().enumerate() {
+            room.quiet_talk(true);
+            match room.block(heard, true) {
+                Step::Carry => {}
+                step => steps.push((index, step)),
+            }
+        }
+        assert_eq!(steps, [(59, Step::Resume)]);
     }
 
     /// #828, step 2: a yield that waits for the words said in it. A short

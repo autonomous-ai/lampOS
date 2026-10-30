@@ -115,6 +115,18 @@ pub fn cut_in_near_asker() -> bool {
     std::env::var(CUT_IN_NEAR_ASKER_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// The voice's environment switch, with `on`, for a yield made late in a
+/// person's speech over the lamp to commit on stillness
+/// ([`Interruption::commit_late_yields`], `LATE_YIELD_OVER_BLOCKS`); off
+/// unless set.
+pub const CUT_IN_LATE_YIELD_ENVIRONMENT: &str = "LAMP_CUT_IN_LATE_YIELD";
+
+/// Whether the voice's environment says `on` for
+/// [`CUT_IN_LATE_YIELD_ENVIRONMENT`].
+pub fn cut_in_late_yield() -> bool {
+    std::env::var(CUT_IN_LATE_YIELD_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
 /// The window is bounded: the consecutive `Over` blocks that made the yield
 /// (its onset run, 7 or 10 blocks) and every block heard while the yield is
@@ -467,6 +479,22 @@ impl PlaybackMask {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.near_asker = true;
         }
+    }
+    /// `LAMP_CUT_IN_LATE_YIELD=on`: a yield made late in a person's speech
+    /// over the lamp commits on stillness. See
+    /// `Interruption::commit_late_yields`. Only with ears.
+    pub fn cut_in_late_yield(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.interruption.commit_late_yields();
+        }
+    }
+    /// For the record of the latest yield's commit or resume: whether it
+    /// was made late in a person's speech over the lamp
+    /// (`Interruption::yield_was_late`).
+    pub fn yield_was_late(&self) -> bool {
+        self.duplex
+            .as_ref()
+            .is_some_and(|duplex| duplex.interruption.yield_was_late())
     }
     /// The level of the person the reply in hand answers, in dBFS before
     /// cancellation, or `None` when none is known: a line the lamp began
@@ -2253,6 +2281,70 @@ mod tests {
         // No asker's level known, or the switch off: as before.
         assert_eq!(cut_in(true, None).0, [Step::Yield, Step::Commit]);
         assert_eq!(cut_in(false, Some(-12.0)).0, [Step::Yield, Step::Commit]);
+    }
+
+    /// `LAMP_CUT_IN_LATE_YIELD=on`: a question over the lamp heard mostly
+    /// as under it (lamp-c0a4, 31 Oct) makes the yield as it ends, 17 blocks
+    /// over the lamp in the 150 before the onset run. With the switch the
+    /// stillness after it commits; without it the reply resumes.
+    #[test]
+    fn a_question_yielded_to_late_commits_with_the_switch() {
+        let cut_in = |switch: bool| {
+            let mut mask = PlaybackMask::duplex();
+            if switch {
+                mask.cut_in_late_yield();
+            }
+            mask.assume_matched();
+            let mut sequence = 1;
+            let mut steps = hear(&mut mask, &mut sequence, 14, 0.1, &evidence(0, OVER), true);
+            for _ in 0..17 {
+                steps.extend(hear(
+                    &mut mask,
+                    &mut sequence,
+                    1,
+                    0.9,
+                    &evidence(0, OVER),
+                    true,
+                ));
+                steps.extend(hear(
+                    &mut mask,
+                    &mut sequence,
+                    7,
+                    0.1,
+                    &evidence(0, OVER),
+                    true,
+                ));
+            }
+            let onset = u64::from(Confirmation::EVALUATED.onset_blocks);
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                onset,
+                0.9,
+                &evidence(0, OVER),
+                true,
+            ));
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                20,
+                0.1,
+                &evidence(10, None),
+                true,
+            ));
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                44,
+                0.1,
+                &evidence(40, None),
+                true,
+            ));
+            assert!(mask.yield_was_late());
+            steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>()
+        };
+        assert_eq!(cut_in(true), [Step::Yield, Step::Commit]);
+        assert_eq!(cut_in(false), [Step::Yield, Step::Resume]);
     }
 
     #[test]
