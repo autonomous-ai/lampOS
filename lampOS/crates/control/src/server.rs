@@ -344,7 +344,9 @@ impl Shared {
     /// lamp's own network: dropped for one whose queue is full.
     fn send_binary_to(&self, client: &str, frame: &[u8]) {
         for open in self.open.lock().expect("open").values() {
-            if open.client.as_deref() == Some(client) {
+            if open.client.as_deref() == Some(client)
+                && open.grants.contains(&crate::protocol::Grant::Camera)
+            {
                 let _ = open.frames.try_send(frame.to_vec());
             }
         }
@@ -365,6 +367,17 @@ impl Shared {
             if open.client.as_deref() == Some(client) {
                 let _ = open.outbox.send(event.clone());
             }
+        }
+        // A stream's end is in the journal with its why, as its start was
+        // (Thirteen's P3 on #4521).
+        if event["ev"] == "camera.ended" {
+            let why = event["why"].as_str().unwrap_or("ended");
+            let now = self.now_us();
+            self.door.lock().expect("door").journal_event(
+                client,
+                &format!("camera.ended ({why})"),
+                now,
+            );
         }
     }
 
@@ -546,23 +559,49 @@ pub fn acceptor(identity: &Identity) -> std::io::Result<tokio_rustls::TlsAccepto
 
 /// Serves the door on `listener` until the task is dropped, and checks the
 /// leases every [`LEASE_TICK`].
-/// Whether `ip` is on the lamp's own network: loopback, a private IPv4
-/// range (10/8, 172.16/12, 192.168/16), link-local, or IPv6's unique-local
-/// (fc00::/7) and link-local (fe80::/10), and an IPv4 address carried in
-/// IPv6 by the same rule. Anything else is the internet, refused: the door
-/// is for computers on the lamp's own network only (docs/control.md, "The
+/// Whether `ip` is local whatever interface it came by: loopback only (the
+/// lamp itself, or an ssh tunnel the owner gave), and an IPv4 address
+/// carried in IPv6 by the same rule. The rest of the lamp's own network is
+/// judged by the interface a connection arrives on ([`is_local_peer`]): a
+/// private range or a link-local address by itself is not local, since a
+/// VPN (WireGuard, a tailnet, ZeroTier) hands out 10/8, fc00::/7 and its
+/// own fe80:: from anywhere (Thirteen's P2s on #4521; docs/control.md, "The
 /// wire").
 pub fn is_local(ip: std::net::IpAddr) -> bool {
     match ip {
-        std::net::IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        std::net::IpAddr::V4(v4) => v4.is_loopback(),
         std::net::IpAddr::V6(v6) => {
             if let Some(v4) = v6.to_ipv4_mapped() {
                 return is_local(std::net::IpAddr::V4(v4));
             }
-            let first = v6.segments()[0];
-            v6.is_loopback() || (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+            v6.is_loopback()
         }
     }
+}
+
+/// Whether network interface `iface` is a physical LAN, Ethernet or
+/// Wi-Fi: Ethernet-type (`/sys/class/net/IFACE/type` 1) with a device
+/// behind it (`/sys/class/net/IFACE/device`). A WireGuard, tun or tailnet
+/// interface has neither; a ZeroTier or other tap, a bridge, docker's and a
+/// veth are Ethernet-type with no device; their names are left out as well.
+pub fn is_physical(iface: &str) -> bool {
+    const VIRTUAL: [&str; 9] = [
+        "lo",
+        "wg",
+        "tun",
+        "tap",
+        "zt",
+        "tailscale",
+        "docker",
+        "veth",
+        "br-",
+    ];
+    if VIRTUAL.iter().any(|name| iface.starts_with(name)) {
+        return false;
+    }
+    let net = std::path::Path::new("/sys/class/net").join(iface);
+    std::fs::read_to_string(net.join("type")).is_ok_and(|kind| kind.trim() == "1")
+        && net.join("device").exists()
 }
 
 /// The subnets the lamp reaches directly, by its routes with no gateway:
@@ -570,8 +609,8 @@ pub fn is_local(ip: std::net::IpAddr) -> bool {
 /// 172.168.20.0/23 (30 Oct), which is none of the private ranges.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct OnLink {
-    v4: Vec<(u32, u32)>,
-    v6: Vec<(u128, u8)>,
+    v4: Vec<(String, u32, u32)>,
+    v6: Vec<(String, u128, u8)>,
 }
 
 impl OnLink {
@@ -579,12 +618,18 @@ impl OnLink {
     /// they can't be read.
     pub fn read() -> Self {
         let text = |path| std::fs::read_to_string(path).unwrap_or_default();
-        Self::parse(&text("/proc/net/route"), &text("/proc/net/ipv6_route"))
+        Self::parse(
+            &text("/proc/net/route"),
+            &text("/proc/net/ipv6_route"),
+            is_physical,
+        )
     }
 
     /// From the two tables' text: an IPv4 route with no gateway and a mask,
-    /// an IPv6 route with no next hop and a prefix, neither on `lo`.
-    pub fn parse(v4: &str, v6: &str) -> Self {
+    /// an IPv6 route with no next hop and a prefix, each on an interface
+    /// `physical` says is a LAN ([`is_physical`]): never `lo`, a VPN's or a
+    /// bridge's.
+    pub fn parse(v4: &str, v6: &str, physical: impl Fn(&str) -> bool) -> Self {
         let hex32 = |word: &str| u32::from_str_radix(word, 16).ok();
         let v4 = v4
             .lines()
@@ -602,7 +647,8 @@ impl OnLink {
                 let address = |word: &str| hex32(word).map(|n| u32::from_be_bytes(n.to_ne_bytes()));
                 let (destination, gateway, mask) =
                     (address(destination)?, hex32(gateway)?, address(mask)?);
-                (*iface != "lo" && gateway == 0 && mask != 0).then_some((destination, mask))
+                (*iface != "lo" && physical(iface) && gateway == 0 && mask != 0)
+                    .then(|| ((*iface).to_owned(), destination, mask))
             })
             .collect();
         let v6 = v6
@@ -618,8 +664,8 @@ impl OnLink {
                 let destination = u128::from_str_radix(destination, 16).ok()?;
                 let length = u8::from_str_radix(length, 16).ok()?;
                 let next_hop = u128::from_str_radix(next_hop, 16).ok()?;
-                (*iface != "lo" && next_hop == 0 && (1..=128).contains(&length))
-                    .then_some((destination, length))
+                (*iface != "lo" && physical(iface) && next_hop == 0 && (1..=128).contains(&length))
+                    .then(|| ((*iface).to_owned(), destination, length))
             })
             .collect();
         Self { v4, v6 }
@@ -627,23 +673,101 @@ impl OnLink {
 
     /// Whether `ip` is in one of the subnets.
     pub fn holds(&self, ip: std::net::IpAddr) -> bool {
+        self.iface_of(ip).is_some()
+    }
+
+    /// The physical interface whose subnet holds `ip`, if one does.
+    pub fn iface_of(&self, ip: std::net::IpAddr) -> Option<&str> {
         match ip {
             std::net::IpAddr::V4(v4) => {
                 let ip = u32::from(v4);
-                self.v4.iter().any(|(net, mask)| ip & mask == net & mask)
+                self.v4
+                    .iter()
+                    .find(|(_, net, mask)| ip & mask == net & mask)
+                    .map(|(iface, _, _)| iface.as_str())
             }
             std::net::IpAddr::V6(v6) => {
                 if let Some(v4) = v6.to_ipv4_mapped() {
-                    return self.holds(std::net::IpAddr::V4(v4));
+                    return self.iface_of(std::net::IpAddr::V4(v4));
                 }
                 let ip = u128::from(v6);
-                self.v6.iter().any(|(net, length)| {
+                self.v6
+                    .iter()
+                    .find(|(_, net, length)| {
+                        let mask = u128::MAX << (128 - u32::from(*length));
+                        ip & mask == net & mask
+                    })
+                    .map(|(iface, _, _)| iface.as_str())
+            }
+        }
+    }
+
+    /// Whether `ip` is in a subnet on `iface`.
+    pub fn holds_on(&self, iface: &str, ip: std::net::IpAddr) -> bool {
+        match ip {
+            std::net::IpAddr::V4(v4) => {
+                let ip = u32::from(v4);
+                self.v4
+                    .iter()
+                    .any(|(on, net, mask)| on == iface && ip & mask == net & mask)
+            }
+            std::net::IpAddr::V6(v6) => {
+                if let Some(v4) = v6.to_ipv4_mapped() {
+                    return self.holds_on(iface, std::net::IpAddr::V4(v4));
+                }
+                let ip = u128::from(v6);
+                self.v6.iter().any(|(on, net, length)| {
                     let mask = u128::MAX << (128 - u32::from(*length));
-                    ip & mask == net & mask
+                    on == iface && ip & mask == net & mask
                 })
             }
         }
     }
+}
+
+/// The name of the network interface with index `index`, by
+/// `/sys/class/net/*/ifindex`: an IPv6 link-local peer's scope.
+pub fn iface_named(index: u32) -> Option<String> {
+    std::fs::read_dir("/sys/class/net")
+        .ok()?
+        .flatten()
+        .find_map(|entry| {
+            let at = std::fs::read_to_string(entry.path().join("ifindex")).ok()?;
+            (at.trim().parse::<u32>().ok()? == index)
+                .then(|| entry.file_name().to_string_lossy().into_owned())
+        })
+}
+
+/// Whether a connection from `peer`, which arrived on the lamp's own
+/// address `local`, is from the lamp's own network: loopback (the lamp
+/// itself, or the owner's ssh tunnel); a link-local peer on a physical
+/// interface, by its scope (`scope_name`, `physical`); or a peer on-link on
+/// the same physical interface the connection came in on (`on_link` holds
+/// only those). Judged by the interface it arrived on, never by the
+/// address alone: ZeroTier's `zt*` has its own link-local addresses, and a
+/// VPN its own private ones (Thirteen's P2s on #4521).
+pub fn is_local_peer(
+    peer: std::net::SocketAddr,
+    local: std::net::SocketAddr,
+    on_link: &OnLink,
+    scope_name: impl Fn(u32) -> Option<String>,
+    physical: impl Fn(&str) -> bool,
+) -> bool {
+    if is_local(peer.ip()) {
+        return true;
+    }
+    if let std::net::SocketAddr::V6(v6) = peer
+        && (v6.ip().segments()[0] & 0xffc0) == 0xfe80
+    {
+        let scope = match (v6.scope_id(), local) {
+            (0, std::net::SocketAddr::V6(local)) => local.scope_id(),
+            (scope, _) => scope,
+        };
+        return scope != 0 && scope_name(scope).is_some_and(|iface| physical(&iface));
+    }
+    on_link
+        .iface_of(local.ip())
+        .is_some_and(|iface| on_link.holds_on(iface, peer.ip()))
 }
 
 pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared: Arc<Shared>) {
@@ -671,7 +795,9 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
         };
         // Only the lamp's own network, unless `--remote on`: anyone else is
         // closed before TLS, and said once in the journal.
-        let remote = !is_local(peer.ip()) && !OnLink::read().holds(peer.ip());
+        let remote = !stream.local_addr().is_ok_and(|local| {
+            is_local_peer(peer, local, &OnLink::read(), iface_named, is_physical)
+        });
         if remote && !shared.remote.load(Ordering::Relaxed) {
             eprintln!(
                 "lamp-control: refused a connection from {}: not on the lamp's own network",
@@ -830,6 +956,15 @@ async fn connection<S>(
                     if remote {
                         continue;
                     }
+                    // Only while its stream still runs: a frame queued
+                    // before an `off`, a `stop`, a re-pairing or an end
+                    // never goes (Thirteen's P3 on #4521).
+                    let streaming = session.client().is_some_and(|client| {
+                        shared.parts.lock().expect("parts").camera_streaming(client)
+                    });
+                    if !streaming {
+                        continue;
+                    }
                     if socket.send(Message::Binary(frame.into())).await.is_err() {
                         break;
                     }
@@ -845,6 +980,11 @@ async fn connection<S>(
                             .is_some_and(|ev| ev.starts_with("camera.") || ev.starts_with("microphone."))
                     {
                         continue;
+                    }
+                    // Ended: the frames still queued for it never go
+                    // (Thirteen's P3 on #4521).
+                    if event["ev"] == "camera.ended" {
+                        while framed.try_recv().is_ok() {}
                     }
                     if socket.send(Message::text(event.to_string())).await.is_err() {
                         break;
@@ -1080,21 +1220,20 @@ mod tests {
     #[test]
     fn only_the_lamps_own_network_may_connect() {
         let local = |text: &str| is_local(text.parse().unwrap());
-        for near in [
-            "127.0.0.1",
+        for near in ["127.0.0.1", "::1", "::ffff:127.0.0.1"] {
+            assert!(local(near), "{near}");
+        }
+        // By its address alone, nothing else is local (Thirteen's P2s on
+        // #4521): a VPN hands out private and link-local ones from
+        // anywhere. The rest is judged by the interface (`is_local_peer`).
+        for far in [
             "10.0.0.7",
             "172.16.4.2",
-            "172.31.255.1",
             "192.168.1.20",
             "169.254.3.3",
-            "::1",
             "fd12:3456::1",
             "fe80::1",
             "::ffff:192.168.1.20",
-        ] {
-            assert!(local(near), "{near}");
-        }
-        for far in [
             "8.8.8.8",
             "172.32.0.1",
             "100.64.0.1",
@@ -1107,6 +1246,64 @@ mod tests {
         }
     }
 
+    /// Thirteen's P2s on #4521: a peer is the lamp's own network by the
+    /// interface its connection came in on, never its address alone. On
+    /// lamp-75c9's Wi-Fi (172.168.20.0/23 on wlan0) the laptop is local; a
+    /// ZeroTier peer (zt0, 10.147.17.0/24, and its own fe80::) is not, nor is
+    /// a peer whose address happens to sit in wlan0's subnet when it came in
+    /// by zt0.
+    #[test]
+    fn a_peer_is_local_by_the_interface_it_came_in_on() {
+        let v4 = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                  wlan0\t0014A8AC\t00000000\t0001\t0\t0\t3006\t00FEFFFF\t0\t0\t0\n\
+                  zt0\t0011930A\t00000000\t0001\t0\t0\t0\t00FFFFFF\t0\t0\t0\n";
+        let physical = |iface: &str| iface == "wlan0";
+        let on_link = OnLink::parse(v4, "", physical);
+        let scope = |index: u32| match index {
+            3 => Some("wlan0".to_owned()),
+            7 => Some("zt0".to_owned()),
+            _ => None,
+        };
+        let local = |peer: &str, at: &str| {
+            is_local_peer(
+                peer.parse().unwrap(),
+                at.parse().unwrap(),
+                &on_link,
+                scope,
+                physical,
+            )
+        };
+        assert!(
+            local("172.168.21.8:50000", "172.168.20.40:7731"),
+            "the laptop on the office Wi-Fi"
+        );
+        assert!(
+            local("127.0.0.1:50000", "127.0.0.1:7731"),
+            "the owner's ssh tunnel"
+        );
+        assert!(
+            !local("10.147.17.9:50000", "10.147.17.2:7731"),
+            "a ZeroTier peer"
+        );
+        assert!(
+            !local("172.168.21.8:50000", "10.147.17.2:7731"),
+            "a wlan0-looking address that came in by zt0"
+        );
+        assert!(
+            local("[fe80::1%3]:50000", "[fe80::2%3]:7731"),
+            "link-local on wlan0"
+        );
+        assert!(
+            !local("[fe80::1%7]:50000", "[fe80::2%7]:7731"),
+            "link-local on zt0"
+        );
+        assert!(
+            !local("[fe80::1]:50000", "[fe80::2]:7731"),
+            "link-local with no scope"
+        );
+        assert!(!local("8.8.8.8:50000", "172.168.20.40:7731"));
+    }
+
     #[test]
     fn the_lamps_own_subnets_are_its_network_whatever_their_addresses() {
         // lamp-75c9, 30 Oct: 172.168.20.0/23 on wlan0, a default route.
@@ -1115,7 +1312,7 @@ mod tests {
                   wlan0\t0014A8AC\t00000000\t0001\t0\t0\t3006\t00FEFFFF\t0\t0\t0\n";
         let v6 = "fd001234000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000001 00000000 00000001 wlan0\n\
                   00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 ffffffff 00000001 00000000 00200200       lo\n";
-        let on_link = OnLink::parse(v4, v6);
+        let on_link = OnLink::parse(v4, v6, |iface| iface == "wlan0");
         let holds = |text: &str| on_link.holds(text.parse().unwrap());
         assert!(holds("172.168.21.8"), "the laptop beside 75c9");
         assert!(holds("172.168.20.1"));
@@ -1124,7 +1321,38 @@ mod tests {
         assert!(holds("fd00:1234::7"));
         assert!(!holds("fd00:1235::7"));
         assert!(!holds("::1"), "lo is left out; loopback is local by itself");
-        assert_eq!(OnLink::parse("", ""), OnLink::default());
+        assert_eq!(OnLink::parse("", "", |_| true), OnLink::default());
+    }
+
+    /// Thirteen's P2 on #4521: wg-quick adds an on-link route on `wg0`
+    /// (no gateway), and a tailnet or ZeroTier one is the same: a peer on it
+    /// may be anywhere, so it is not the lamp's own network, and gets no
+    /// camera with `--remote` off. Only the physical LAN's subnets are.
+    #[test]
+    fn a_vpns_on_link_route_is_not_the_lamps_own_network() {
+        let v4 = "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+                  wlan0\t0014A8AC\t00000000\t0001\t0\t0\t3006\t00FEFFFF\t0\t0\t0\n\
+                  wg0\t0000000A\t00000000\t0001\t0\t0\t0\t000000FF\t0\t0\t0\n\
+                  zt0\t0000C0A8\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0\n";
+        let physical = |iface: &str| iface == "wlan0";
+        let on_link = OnLink::parse(v4, "", physical);
+        let holds = |text: &str| on_link.holds(text.parse().unwrap());
+        assert!(holds("172.168.21.8"), "the physical LAN");
+        assert!(!holds("10.0.0.2"), "a WireGuard peer");
+        assert!(!holds("192.168.4.4"), "a ZeroTier peer");
+        for name in [
+            "lo",
+            "wg0",
+            "tun0",
+            "tailscale0",
+            "zt5u4y6",
+            "tap0",
+            "docker0",
+            "veth1a",
+            "br-0f",
+        ] {
+            assert!(!is_physical(name), "{name}");
+        }
     }
 
     #[test]

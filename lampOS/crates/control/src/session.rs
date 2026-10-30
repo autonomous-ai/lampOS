@@ -35,6 +35,14 @@ pub trait Parts {
     fn state(&self, kind: StateKind) -> Value;
     /// Ends everything `client` asked for that is still going.
     fn stop(&mut self, client: &str, now_us: u64);
+    /// Ends `client`'s camera stream, and nothing else of it: its pairing
+    /// no longer grants the camera (Thirteen's P2 on #4521).
+    fn camera_end(&mut self, _client: &str) {}
+    /// Whether `client` has a camera stream running now: a frame already
+    /// queued for it goes only then (Thirteen's P3 on #4521).
+    fn camera_streaming(&self, _client: &str) -> bool {
+        false
+    }
 }
 
 /// The parts before actions are routed to them: every action is refused
@@ -132,6 +140,9 @@ pub struct Door {
     codes: Codes,
     /// The grants the owner chose with the code out.
     code_grants: BTreeSet<Grant>,
+    /// A computer re-paired without the camera: its stream is ended once
+    /// the pairing is answered.
+    camera_dropped: Option<String>,
     clients: Clients,
     clients_path: Option<PathBuf>,
     leases: Leases,
@@ -247,6 +258,7 @@ impl Door {
             lamp: json!({"id": id, "name": name, "v": VERSION}),
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
+            camera_dropped: None,
             clients,
             clients_path,
             leases: Leases::new(),
@@ -563,7 +575,11 @@ impl Door {
         }
         match &op {
             Op::Pair { name, key, proof } => {
-                return self.pair(session, re, name, key, proof, now_us, wall_s);
+                let outcome = self.pair(session, re, name, key, proof, now_us, wall_s);
+                if let Some(client) = self.camera_dropped.take() {
+                    parts.camera_end(&client);
+                }
+                return outcome;
             }
             Op::Hello { client, sig } => return self.hello(session, re, client, sig),
             _ => {}
@@ -899,6 +915,15 @@ impl Door {
         {
             self.tell_helper_grants(&id, &grants);
         }
+        // Re-paired without the camera: a stream it had going ends now,
+        // not when it next asks (Thirteen's P2 on #4521).
+        if before
+            .as_ref()
+            .is_some_and(|before| before.grants.contains(&Grant::Camera))
+            && !grants.contains(&Grant::Camera)
+        {
+            self.camera_dropped = Some(id.clone());
+        }
         ok(re, json!({"client": id, "grants": grants}))
     }
 
@@ -1116,6 +1141,7 @@ mod tests {
     struct Fake {
         did: Vec<String>,
         stopped: Vec<String>,
+        cameras_ended: Vec<String>,
         refuse_with: Option<Error>,
     }
 
@@ -1135,6 +1161,9 @@ mod tests {
         }
         fn stop(&mut self, client: &str, _: u64) {
             self.stopped.push(client.to_owned());
+        }
+        fn camera_end(&mut self, client: &str) {
+            self.cameras_ended.push(client.to_owned());
         }
     }
 
@@ -1198,6 +1227,40 @@ mod tests {
         );
         assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
         (door, session, fake)
+    }
+
+    /// Thirteen's P2 on #4521: a computer re-paired without the camera has
+    /// its stream ended at once, and nothing else of it; re-paired keeping
+    /// the camera, its stream goes on.
+    #[test]
+    fn a_re_pairing_that_drops_the_camera_ends_its_stream_at_once() {
+        let computer = Computer::new(41);
+        let (mut door, _, mut fake) = paired(&computer, &[Grant::Light, Grant::Camera]);
+        let id = pairing::client_id(&computer.key());
+        // One pairing try a second: each a few seconds after the last.
+        let pair_again = |door: &mut Door, fake: &mut Fake, grants: &[Grant], at: u64| {
+            let code = door.issue_code(grants.iter().copied().collect(), at);
+            let (mut session, welcome) = door.open();
+            let outcome = door.handle(
+                &mut session,
+                &computer.pair_frame(&code, &welcome),
+                fake,
+                at,
+                1,
+            );
+            assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+        };
+        pair_again(&mut door, &mut fake, &[Grant::Light, Grant::Camera], 5 * S);
+        assert!(
+            fake.cameras_ended.is_empty(),
+            "the camera kept, the stream goes on"
+        );
+        pair_again(&mut door, &mut fake, &[Grant::Light], 10 * S);
+        assert_eq!(fake.cameras_ended, [id]);
+        assert!(
+            fake.stopped.is_empty(),
+            "only the camera, not its light or leases"
+        );
     }
 
     /// docs/control.md, "The journal": one line a command, naming the

@@ -704,6 +704,7 @@ const BUS_TOPICS: &[&str] = &[
     "light/command",
     "light/drawn",
     "light/mark",
+    "light/mark_drawn",
     "light/outranked",
     "light/reached",
     "light/request",

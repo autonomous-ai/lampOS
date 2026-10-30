@@ -11,9 +11,11 @@
 //! pixel, steady, never breathing, so it never reads as the mute's dark-red
 //! breath around the whole ring, nor as the lamp's own mood. It goes
 //! when every claim has lapsed, so an asker that stops can't leave it lit.
-//! Never over the shutdown's warning, and nothing at all on a dark ring.
-use lamp_bus::{Bus, Subscriber};
-use lamp_msgs::RingMark;
+//! Never over the shutdown's warning. After each frame shown with it, the
+//! ring says so on `light/mark_drawn` ([`Marks::drew`]): lamp-control sends
+//! no picture without that word.
+use lamp_bus::{Bus, Publisher, Subscriber};
+use lamp_msgs::{RingMark, RingMarkDrawn};
 use lamp_ring::{PIXEL_COUNT, Rgb};
 use std::{io, path::Path, time::Duration};
 
@@ -32,14 +34,18 @@ pub const BLINK_US: u64 = 600_000;
 const LOOK_EVERY_US: u64 = 50_000;
 /// Marks taken in one look at most.
 const MOST_AT_ONCE: usize = 16;
-const SOURCE: &str = "voice_ring_mark";
+const SOURCE: &str = RingMarkDrawn::SOURCE;
 
 /// The marks asked for, on the bus.
 pub struct Marks {
     asked: Subscriber,
+    /// Says each mark the ring drew (`light/mark_drawn`); none, nothing said.
+    drawn: Option<Publisher>,
     clock_id: String,
     /// Each asker's mark, until when (on `clock_id`).
     held: Vec<(String, u64)>,
+    /// When each asker's drawn mark was last said.
+    said: Vec<(String, u64)>,
     looked_at_us: Option<u64>,
 }
 
@@ -49,12 +55,54 @@ impl Marks {
     pub fn on(root: &Path, clock_id: &str) -> io::Result<Self> {
         let bus = Bus::new(root)?;
         let asked = bus.subscribe_typed(RingMark::TOPIC, SOURCE, RingMark::TYPE)?;
+        let drawn =
+            bus.publisher_declared(RingMarkDrawn::TOPIC, &RingMarkDrawn::declaration(), SOURCE)?;
         Ok(Self {
             asked,
+            drawn: Some(drawn),
             clock_id: clock_id.to_owned(),
             held: Vec::new(),
+            said: Vec::new(),
             looked_at_us: None,
         })
+    }
+
+    /// The ring showed a frame with the mark at `now_us`: each asker whose
+    /// mark it was is told (`light/mark_drawn`), at most every
+    /// [`RingMarkDrawn::EVERY_US`] each. Only after a frame is shown: a mark
+    /// asked but never drawn is never said, so the asker stops (lamp-control
+    /// sends no picture without it; Thirteen's P2 on #4521).
+    pub fn drew(&mut self, now_us: u64) {
+        let Some(drawn) = self.drawn.as_mut() else {
+            return;
+        };
+        for (source, until) in &self.held {
+            if now_us >= *until {
+                continue;
+            }
+            let due = self
+                .said
+                .iter()
+                .find(|(asker, _)| asker == source)
+                .is_none_or(|(_, at)| now_us.saturating_sub(*at) >= RingMarkDrawn::EVERY_US);
+            if !due {
+                continue;
+            }
+            let message = RingMarkDrawn {
+                source: source.clone(),
+                clock_id: self.clock_id.clone(),
+                at_us: now_us,
+            };
+            if drawn.publish_json(now_us, &message).is_ok() {
+                match self.said.iter_mut().find(|(asker, _)| asker == source) {
+                    Some(said) => said.1 = now_us,
+                    None => self.said.push((source.clone(), now_us)),
+                }
+            }
+        }
+        let held = &self.held;
+        self.said
+            .retain(|(asker, _)| held.iter().any(|(source, _)| source == asker));
     }
 
     /// Whether the mark is drawn at `now_us`.
@@ -97,6 +145,14 @@ impl Marks {
     }
 }
 
+/// Whether the mark in `pixels`, as the ring writes them under `ceiling`,
+/// is a dot a person can see: not black after the cap. At ceiling 0 (the
+/// cap's first reading not in yet, or the policy at 0) the dot is written
+/// black, and the ring says nothing of it (Thirteen on #4521).
+pub fn visible(pixels: &[Rgb; PIXEL_COUNT], ceiling: lamp_ring::ChannelCeiling) -> bool {
+    pixels[MARK_PIXEL].capped(ceiling) != Rgb::BLACK
+}
+
 /// The mark for this frame: bright on a lit ring, dim on a dark one.
 pub fn mark_for(pixels: &[Rgb; PIXEL_COUNT]) -> Rgb {
     let lit = pixels
@@ -130,6 +186,11 @@ mod tests {
     }
 
     fn marks() -> Marks {
+        marks_at().0
+    }
+
+    /// Marks on a bus of their own, and the bus's root.
+    fn marks_at() -> (Marks, std::path::PathBuf) {
         let root = std::env::temp_dir().join(format!(
             "ring-mark-{}-{}",
             std::process::id(),
@@ -139,7 +200,62 @@ mod tests {
                 .as_nanos()
         ));
         std::fs::create_dir_all(&root).unwrap();
-        Marks::on(&root, "boot").unwrap()
+        (Marks::on(&root, "boot").unwrap(), root)
+    }
+
+    /// Thirteen's re-read on #4521: at ceiling 0 the dot is written black,
+    /// so it is no mark a person sees, and the ring says nothing of it; a
+    /// dark ring's dim dot under a low ceiling still shows.
+    #[test]
+    fn a_mark_capped_to_black_is_not_visible() {
+        let ceiling = |value| lamp_ring::ChannelCeiling::new(value).unwrap();
+        let lit = marked([Rgb::new(100, 100, 100); PIXEL_COUNT]);
+        let dark = marked([Rgb::BLACK; PIXEL_COUNT]);
+        assert!(visible(&lit, ceiling(120)));
+        assert!(
+            visible(&dark, ceiling(40)),
+            "the dim dot at night's ceiling"
+        );
+        assert!(!visible(&lit, ceiling(0)));
+        assert!(!visible(&dark, ceiling(0)));
+        assert!(
+            !visible(&[Rgb::BLACK; PIXEL_COUNT], ceiling(120)),
+            "no dot at all"
+        );
+    }
+
+    /// Thirteen's P2 on #4521: the ring says each mark it drew, for its
+    /// asker, at most every 250 ms each, and nothing for a mark lapsed or
+    /// never drawn, so lamp-control stops the pictures.
+    #[test]
+    fn a_drawn_mark_is_said_for_its_asker_and_an_undrawn_one_never() {
+        let (mut marks, root) = marks_at();
+        let mut heard = Bus::new(&root)
+            .unwrap()
+            .subscribe_typed(RingMarkDrawn::TOPIC, "test", RingMarkDrawn::TYPE)
+            .unwrap();
+        let said = |heard: &mut Subscriber| {
+            let mut sources = Vec::new();
+            while let Ok(Some(message)) = heard.recv(Duration::ZERO) {
+                let drawn = message.parse::<RingMarkDrawn>().unwrap();
+                assert_eq!(drawn.clock_id, "boot");
+                sources.push((drawn.source, drawn.at_us));
+            }
+            sources
+        };
+        // Asked, not drawn yet: nothing said.
+        marks.take(&mark("control:c_1", 12 * S, false), 10 * S);
+        assert!(said(&mut heard).is_empty());
+        marks.drew(10 * S);
+        assert_eq!(said(&mut heard), [("control:c_1".to_owned(), 10 * S)]);
+        // Within 250 ms: not again.
+        marks.drew(10 * S + 200_000);
+        assert!(said(&mut heard).is_empty());
+        marks.drew(10 * S + RingMarkDrawn::EVERY_US);
+        assert_eq!(said(&mut heard).len(), 1);
+        // Lapsed: drawn frames say nothing for it.
+        marks.drew(12 * S);
+        assert!(said(&mut heard).is_empty());
     }
 
     const S: u64 = 1_000_000;

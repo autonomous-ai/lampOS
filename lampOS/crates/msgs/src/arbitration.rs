@@ -280,6 +280,7 @@ pub fn arbitration_topics() -> Vec<(&'static str, Declaration)> {
         (LightReached::TOPIC, LightReached::declaration()),
         (LightOutranked::TOPIC, LightOutranked::declaration()),
         (RingMark::TOPIC, RingMark::declaration()),
+        (RingMarkDrawn::TOPIC, RingMarkDrawn::declaration()),
     ]
 }
 
@@ -326,6 +327,39 @@ impl RingMark {
             return Err(Invalid("a mark holds 3 s ahead at most".to_owned()));
         }
         Ok(())
+    }
+}
+
+/// The ring drew a computer's mark (`light/mark_drawn`): said by the ring
+/// for each asker whose mark ([`RingMark`]) was in a frame it showed, at
+/// most every [`RingMarkDrawn::EVERY_US`] each. lamp-control sends a camera
+/// frame only within a second of one for that asker, so a mark asked but
+/// not drawn (the ring's authority lapsed, its ceiling at 0, the shutdown's
+/// warning, its marks never started) stops the pictures: it fails closed
+/// (Thirteen's P2 on #4521).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RingMarkDrawn {
+    /// The asker, as its mark's claim named it (`control:<client>`).
+    pub source: String,
+    /// The boot's monotonic clock `at_us` is on.
+    pub clock_id: String,
+    pub at_us: u64,
+}
+
+impl RingMarkDrawn {
+    pub const TYPE: &str = "lamp_msgs/RingMarkDrawn";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "light/mark_drawn";
+    /// The ring's name as its publisher: lamp-control hears no other's. A
+    /// bus source is the publisher's own word, not the kernel's, so this
+    /// keeps out a stray or mistaken publisher, not one that lies.
+    pub const SOURCE: &str = "voice_ring_mark";
+    /// One asker's said at most this often.
+    pub const EVERY_US: u64 = 250_000;
+
+    /// Each is a message of its own: one asker's must not hide another's.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
     }
 }
 
