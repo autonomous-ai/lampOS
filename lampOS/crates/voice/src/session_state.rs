@@ -100,7 +100,7 @@ pub(crate) struct SessionState {
     /// The voice mic was waited for at the latest capture start (#1178): the
     /// voice's own, or after a mute or a sleep. Said on the voice's health
     /// until the next capture start.
-    pub(crate) mic_at_start: Option<crate::wire::MicWaited>,
+    pub(crate) mic_at_start: Option<crate::wire::OpenWaited>,
 }
 impl SessionState {
     pub(crate) fn finite() -> Self {

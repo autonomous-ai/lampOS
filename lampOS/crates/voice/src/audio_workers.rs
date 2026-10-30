@@ -1165,7 +1165,13 @@ fn open_speaker(
                 "lamp-voice: speaker: the speaker {device} is busy at start; waiting up to {} s for it, as the microphone waits for its own",
                 SPEAKER_BUSY_AT_START.as_secs()
             );
-            channels.control.send(WorkerEvent::BusyAtStart)?;
+            // A lost word costs only the coordinator's longer wait, so the
+            // open keeps waiting rather than ending on a socket error.
+            if let Err(error) = channels.control.send(WorkerEvent::BusyAtStart) {
+                eprintln!(
+                    "lamp-voice: speaker: could not tell the coordinator the speaker is busy at start: {error}; still waiting for it"
+                );
+            }
             Ok(())
         },
         |until| {

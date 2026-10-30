@@ -15970,7 +15970,7 @@ mod tests {
         let (mut parent, mut child) = pair(&dir, "capture");
         let mut epoch = None;
         let mut trace = SessionState::default();
-        let waited = crate::wire::MicWaited {
+        let waited = crate::wire::OpenWaited {
             gone: true,
             waited_ms: 4_300,
             opened_on_try: 18,
