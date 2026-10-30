@@ -644,7 +644,13 @@ change, refused without echoing them; the quiet wait (45 s resting, 45 s after
 a turn, a conversation that never ends and a voice that says nothing given up
 at the bound); the binary on standard input and output with a journal line
 holding no name; the product's reset wiping the lamp's name and keeping
-the language and the zone, and the units running the helper. Not run on a lamp.
+the language and the zone, and the units running the helper. The three
+tests under lamp-update's lock (the zone's restart, the app's restart and
+shutdown, and a new language) are in `crates/setup/tests/update_lock.rs`, a
+binary of their own: they let go of the lock and take it again at once, and
+on macOS a non-blocking `flock` on a lock nobody held was turned down now and
+then while the `it` binary's other tests were busy with files (#1569). Not run
+on a lamp.
 
 ## The Wi-Fi changed after setup (#1959, built, off unless set)
 
