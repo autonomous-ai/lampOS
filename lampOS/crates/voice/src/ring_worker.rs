@@ -744,6 +744,15 @@ fn service(
                         });
                         match ring.show(&pixels, ceiling, frame.permit) {
                             Ok(write) => {
+                                // The mark was in a frame shown: its askers
+                                // are told, and only now.
+                                if marked
+                                    && warning.is_none()
+                                    && crate::ring_mark::visible(&pixels, ceiling)
+                                    && let Some(marks) = marks.as_mut()
+                                {
+                                    marks.drew(at);
+                                }
                                 if let (Some(unplug), Some(presentation)) =
                                     (unplug.as_mut(), presentation.as_ref())
                                 {
@@ -811,7 +820,8 @@ fn service(
             } else if let (Some(unplug), Some(presentation)) =
                 (unplug.as_mut(), presentation.as_ref())
             {
-                let pixels = if marks.as_mut().is_some_and(|marks| marks.shown(at)) {
+                let marked = marks.as_mut().is_some_and(|marks| marks.shown(at));
+                let pixels = if marked {
                     crate::ring_mark::marked(presentation.pixels)
                 } else {
                     presentation.pixels
@@ -821,6 +831,12 @@ fn service(
                     .map_err(io::Error::other)?
                 {
                     unplug.drew(receipt.finished_at().as_micros(), presentation)?;
+                    if marked
+                        && crate::ring_mark::visible(&pixels, ceiling)
+                        && let Some(marks) = marks.as_mut()
+                    {
+                        marks.drew(at);
+                    }
                 }
             } else {
                 let mut pixels = face.render(Mood::Resting, 0, at, ceiling.get());
@@ -832,11 +848,19 @@ fn service(
                     pixels = crate::ring_night::over(&pixels, share, at);
                 }
                 // A computer's mark over all of it, night included.
-                if marks.as_mut().is_some_and(|marks| marks.shown(at)) {
+                let marked = marks.as_mut().is_some_and(|marks| marks.shown(at));
+                if marked {
                     pixels = crate::ring_mark::marked(pixels);
                 }
                 let own_light = face.rests_on_its_light(at);
-                rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+                let painted = rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+                if painted
+                    && marked
+                    && crate::ring_mark::visible(&pixels, ceiling)
+                    && let Some(marks) = marks.as_mut()
+                {
+                    marks.drew(at);
+                }
             }
         }
         stall_pass.done();
@@ -911,15 +935,19 @@ fn rest<S: FrameSink>(
     ceiling: ChannelCeiling,
     own_light: bool,
     light: Option<&mut RingLight>,
-) -> io::Result<()> {
-    if let Some(receipt) = ring
+) -> io::Result<bool> {
+    let Some(receipt) = ring
         .show_resting(pixels, ceiling)
         .map_err(io::Error::other)?
-        && let Some(light) = light
-    {
+    else {
+        // Nothing painted (a cue up, a turn owning the lamp, a lease
+        // lapsed): no mark was shown either (Thirteen on #4521).
+        return Ok(false);
+    };
+    if let Some(light) = light {
         light.drew(receipt.finished_at().as_micros(), own_light);
     }
-    Ok(())
+    Ok(true)
 }
 
 /// A frame's face at `at_us`. A frame of the head tap's "hm?" starts the

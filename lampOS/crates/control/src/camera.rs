@@ -130,6 +130,34 @@ pub fn binary_frame(header: &Value, jpeg: &[u8]) -> Vec<u8> {
 /// Asks the ring for its mark (`light/mark`, `lamp_msgs::RingMark`) for a
 /// client: `blink` once for a snapshot, else held [`MARK_HOLDS`] ahead.
 pub type Mark = Arc<dyn Fn(&str, bool) + Send + Sync>;
+/// When the ring last drew a client's mark, as it said (`light/mark_drawn`,
+/// `lamp_msgs::RingMarkDrawn`): none, never or not lately.
+pub type Drawn = Arc<dyn Fn(&str) -> Option<std::time::Instant> + Send + Sync>;
+/// A picture goes only while the ring said it drew its client's mark this
+/// recently: a mark asked but not drawn stops the pictures (Thirteen's P2
+/// on #4521). Also how long a stream's first frames and a snapshot wait
+/// for the ring to say so.
+pub const MARK_SHOWN_WITHIN: Duration = Duration::from_secs(1);
+/// Why a stream ends, or a snapshot is refused, with no mark drawn.
+pub const MARK_NOT_SHOWN: &str = "the ring is not showing the camera's mark";
+
+/// Whether a stream may send a picture now, by its client's mark.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Shown {
+    /// Drawn within [`MARK_SHOWN_WITHIN`]: the picture goes.
+    Yes,
+    /// Not drawn yet, inside the first [`MARK_SHOWN_WITHIN`]: held back.
+    NotYet,
+    /// Not drawn for [`MARK_SHOWN_WITHIN`]: the stream ends.
+    Never,
+}
+
+/// Whether `drawn` says `client`'s mark was drawn at or after `since` and
+/// within [`MARK_SHOWN_WITHIN`] of now.
+fn drawn_since(drawn: &Drawn, client: &str, since: std::time::Instant) -> bool {
+    drawn(client).is_some_and(|at| at >= since && at.elapsed() <= MARK_SHOWN_WITHIN)
+}
+
 /// A stream's mark is asked again this often...
 pub const MARK_EVERY: Duration = Duration::from_secs(1);
 /// ...to hold this far ahead, so one lost renewal leaves no gap.
@@ -206,8 +234,9 @@ pub struct Camera {
     sight: PathBuf,
     private: Private,
     streams: HashMap<String, Arc<AtomicBool>>,
-    /// The ring's mark; none, no camera at all (it is never seen unmarked).
-    mark: Option<Mark>,
+    /// The ring's mark, and its word that it drew it; none, no camera at
+    /// all (it is never seen unmarked).
+    mark: Option<(Mark, Drawn)>,
     rate: Arc<Rate>,
     /// The eyes' frames socket and where its frames go: the fast stream.
     fast: Option<(PathBuf, Sink)>,
@@ -232,13 +261,14 @@ impl Camera {
         self
     }
 
-    /// The ring's mark while it is seen through.
-    pub fn marking(mut self, mark: Mark) -> Self {
-        self.mark = Some(mark);
+    /// The ring's mark while it is seen through, and its word that it drew
+    /// it: a picture goes only within [`MARK_SHOWN_WITHIN`] of that word.
+    pub fn marking(mut self, mark: Mark, drawn: Drawn) -> Self {
+        self.mark = Some((mark, drawn));
         self
     }
 
-    fn mark(&self) -> Result<&Mark, Error> {
+    fn mark(&self) -> Result<&(Mark, Drawn), Error> {
         self.mark.as_ref().ok_or_else(|| {
             Error::new(
                 ErrorCode::Refused,
@@ -252,10 +282,22 @@ impl Camera {
         if (self.private)() {
             return Err(Error::new(ErrorCode::Private, "the lamp is private"));
         }
-        let mark = self.mark()?;
+        let (mark, drawn) = self.mark()?;
         let frame = newest(&self.sight, SystemTime::now())
             .map_err(|why| Error::new(ErrorCode::Refused, why))?;
+        // The blink asked, the picture goes once the ring says it drew it,
+        // and not at all if it doesn't within a second.
+        let asked = std::time::Instant::now();
         mark(client, true);
+        while !drawn_since(drawn, client, asked) {
+            if asked.elapsed() >= MARK_SHOWN_WITHIN {
+                return Err(Error::new(ErrorCode::Refused, MARK_NOT_SHOWN));
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if (self.private)() {
+            return Err(Error::new(ErrorCode::Private, "the lamp is private"));
+        }
         Ok(frame.json())
     }
 
@@ -276,7 +318,7 @@ impl Camera {
         if (self.private)() {
             return Err(Error::new(ErrorCode::Private, "the lamp is private"));
         }
-        let mark = self.mark()?.clone();
+        let (mark, drawn) = self.mark()?.clone();
         let fps = fps.unwrap_or(FPS_DEFAULT).clamp(1, FPS_MOST);
         let running = Arc::new(AtomicBool::new(true));
         self.streams.insert(client.to_owned(), running.clone());
@@ -298,10 +340,18 @@ impl Camera {
         });
         let fast_size = fast.as_ref().map(|(_, _, _)| asked.to_owned());
         std::thread::spawn(move || {
+            let started = std::time::Instant::now();
             let marked = |at: &mut Option<std::time::Instant>| {
                 if at.is_none_or(|at| at.elapsed() >= MARK_EVERY) {
                     mark(&client, false);
                     *at = Some(std::time::Instant::now());
+                }
+                if drawn_since(&drawn, &client, started) {
+                    Shown::Yes
+                } else if started.elapsed() < MARK_SHOWN_WITHIN {
+                    Shown::NotYet
+                } else {
+                    Shown::Never
                 }
             };
             match fast {
@@ -332,6 +382,13 @@ impl Camera {
         })
     }
 
+    /// Whether `client`'s stream runs now.
+    pub fn streaming(&self, client: &str) -> bool {
+        self.streams
+            .get(client)
+            .is_some_and(|running| running.load(Ordering::SeqCst))
+    }
+
     /// Ends `client`'s stream, if any, without an event: its own `off`,
     /// `stop` or going.
     pub fn end(&mut self, client: &str) {
@@ -348,7 +405,7 @@ fn run(
     fps: u8,
     running: &AtomicBool,
     private: &Private,
-    marked: &dyn Fn(&mut Option<std::time::Instant>),
+    marked: &dyn Fn(&mut Option<std::time::Instant>) -> Shown,
     rate: &Rate,
     tell: &dyn Fn(Value),
 ) {
@@ -371,10 +428,17 @@ fn run(
                 // Every new frame of the eyes counts toward their rate,
                 // sent here or not.
                 rate.saw(frame.modified, now);
-                // The mark is on the ring before the picture leaves.
-                marked(&mut marked_at);
+                // The mark is on the ring before the picture leaves, as the
+                // ring says: not drawn, no picture.
+                let shown = marked(&mut marked_at);
                 fresh_at = now;
-                if last != Some(frame.modified)
+                if shown == Shown::Never {
+                    running.store(false, Ordering::SeqCst);
+                    tell(json!({"ev": "camera.ended", "why": MARK_NOT_SHOWN}));
+                    return;
+                }
+                if shown == Shown::Yes
+                    && last != Some(frame.modified)
                     && sent_at.is_none_or(|at| at.elapsed() >= least_gap)
                 {
                     last = Some(frame.modified);
@@ -382,6 +446,13 @@ fn run(
                     let mut event = frame.json();
                     event["ev"] = json!("camera.frame");
                     event["fps_now"] = json!(rate.now());
+                    // Private again since the look began: not this one
+                    // either (Thirteen's P3 on #4521).
+                    if private() {
+                        running.store(false, Ordering::SeqCst);
+                        tell(json!({"ev": "camera.ended", "why": "the lamp is private"}));
+                        return;
+                    }
                     tell(event);
                 }
             }
@@ -407,7 +478,7 @@ fn run_fast(
     fps: u8,
     running: &AtomicBool,
     private: &Private,
-    marked: &dyn Fn(&mut Option<std::time::Instant>),
+    marked: &dyn Fn(&mut Option<std::time::Instant>) -> Shown,
     rate: &Rate,
     send: &dyn Fn(&[u8]),
     tell: &dyn Fn(Value),
@@ -451,8 +522,22 @@ fn run_fast(
         if length > CAMERA_FRAME_MAX || sent_at.is_some_and(|at| at.elapsed() < least_gap) {
             continue;
         }
-        // The mark is on the ring before the picture leaves.
-        marked(&mut marked_at);
+        // The mark is on the ring before the picture leaves, as the ring
+        // says: not drawn, no picture.
+        match marked(&mut marked_at) {
+            Shown::Yes => {}
+            Shown::NotYet => continue,
+            Shown::Never => return ended(MARK_NOT_SHOWN),
+        }
+        // Private since the read began (it may wait up to `FAST_WAIT`): not
+        // this frame either (Thirteen's P3 on #4521).
+        if private() {
+            return ended("the lamp is private");
+        }
+        // Ended meanwhile (`off`, `stop`, a re-pairing): not this frame.
+        if !running.load(Ordering::SeqCst) {
+            return;
+        }
         sent_at = Some(now);
         let header = json!({
             "ev": "camera.frame", "bytes": length, "width": width, "height": height,
@@ -468,6 +553,11 @@ mod tests {
     use std::sync::Mutex;
 
     const JPEG: &[u8] = &[0xff, 0xd8, 1, 2, 3, 0xff, 0xd9];
+
+    /// A ring that always says it drew the mark, as one that shows it does.
+    fn drawn_now() -> Drawn {
+        Arc::new(|_| Some(std::time::Instant::now()))
+    }
 
     fn dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -485,7 +575,8 @@ mod tests {
     #[test]
     fn a_snapshot_is_the_newest_whole_fresh_frame() {
         let sight = dir().join("sight.jpg");
-        let camera = Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(|_, _| {}));
+        let camera = Camera::new(sight.clone(), Arc::new(|| false))
+            .marking(Arc::new(|_, _| {}), drawn_now());
         assert_eq!(
             camera.snapshot("c_1").unwrap_err().why,
             "the camera is closed"
@@ -520,9 +611,12 @@ mod tests {
         std::fs::write(&sight, JPEG).unwrap();
         let asked: Arc<Mutex<Vec<(String, bool)>>> = Arc::default();
         let into = asked.clone();
-        let mut camera = Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(
-            move |client: &str, blink| into.lock().unwrap().push((client.to_owned(), blink)),
-        ));
+        let mut camera = Camera::new(sight.clone(), Arc::new(|| false)).marking(
+            Arc::new(move |client: &str, blink| {
+                into.lock().unwrap().push((client.to_owned(), blink))
+            }),
+            drawn_now(),
+        );
         camera.snapshot("c_1").unwrap();
         assert_eq!(*asked.lock().unwrap(), [("c_1".to_owned(), true)]);
         let events: Events = Arc::new(|_, _| {});
@@ -548,8 +642,8 @@ mod tests {
     fn fps_now_is_the_eyes_rate_whoever_streams_and_however_slowly() {
         let sight = dir().join("sight.jpg");
         std::fs::write(&sight, JPEG).unwrap();
-        let mut camera =
-            Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(|_, _| {}));
+        let mut camera = Camera::new(sight.clone(), Arc::new(|| false))
+            .marking(Arc::new(|_, _| {}), drawn_now());
         let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
         let into = seen.clone();
         let events: Events = Arc::new(move |_, event| into.lock().unwrap().push(event));
@@ -571,8 +665,12 @@ mod tests {
             std::fs::write(&next, JPEG).unwrap();
             std::fs::rename(&next, &sight).unwrap();
         }
+        // 10 a second written. Neither doubled by two streams nor halved by
+        // the slow one: under 12 and over 5. The low bound is wide, since a
+        // loaded runner reads 6.3 (the full gate, 3 Nov) as its sleeps
+        // stretch; the bug it guards would read 20 or 1.
         let fps = camera.rate.now().expect("measured");
-        assert!((8.0..=12.0).contains(&fps), "{fps}");
+        assert!((5.0..=12.0).contains(&fps), "{fps}");
         // The first frame each sent said none yet: null, never 0.
         let seen = seen.lock().unwrap();
         assert!(seen.iter().any(|event| event["fps_now"].is_null()));
@@ -610,7 +708,7 @@ mod tests {
             into.lock().unwrap().push(frame.to_vec());
         }));
         let mut camera = Camera::new(sight, Arc::new(|| false))
-            .marking(Arc::new(|_, _| {}))
+            .marking(Arc::new(|_, _| {}), drawn_now())
             .fast(socket, sink);
         let events: Events = Arc::new(|_, _| {});
         let answer = camera.stream("c_1", true, Some(30), None, events).unwrap();
@@ -638,7 +736,8 @@ mod tests {
     fn nothing_is_seen_while_private() {
         let sight = dir().join("sight.jpg");
         std::fs::write(&sight, JPEG).unwrap();
-        let mut camera = Camera::new(sight, Arc::new(|| true)).marking(Arc::new(|_, _| {}));
+        let mut camera =
+            Camera::new(sight, Arc::new(|| true)).marking(Arc::new(|_, _| {}), drawn_now());
         assert_eq!(camera.snapshot("c_1").unwrap_err().code, ErrorCode::Private);
         let events: Events = Arc::new(|_, _| {});
         assert_eq!(
@@ -660,7 +759,7 @@ mod tests {
             sight.clone(),
             Arc::new(move || watching.load(Ordering::SeqCst)),
         )
-        .marking(Arc::new(|_, _| {}));
+        .marking(Arc::new(|_, _| {}), drawn_now());
         let seen: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
         let into = seen.clone();
         let events: Events = Arc::new(move |client, event| {
@@ -689,12 +788,67 @@ mod tests {
         assert!(seen.iter().all(|(client, _)| client == "c_1"));
     }
 
+    /// Thirteen's P2 on #4521: a mark asked that the ring never says it
+    /// drew (its authority lapsed, its ceiling at 0, the shutdown's warning,
+    /// its marks never started) gives no picture. A stream sends nothing in
+    /// its first second and then ends; a snapshot is refused. Once the ring
+    /// says it drew the mark, pictures go.
+    #[test]
+    fn a_mark_the_ring_never_draws_gives_no_picture() {
+        let sight = dir().join("sight.jpg");
+        std::fs::write(&sight, JPEG).unwrap();
+        let drew: Arc<Mutex<Option<std::time::Instant>>> = Arc::default();
+        let told = drew.clone();
+        let drawn: Drawn = Arc::new(move |_| *told.lock().unwrap());
+        let mut camera =
+            Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(|_, _| {}), drawn);
+        let refused = camera.snapshot("c_1").unwrap_err();
+        assert_eq!(refused.why, MARK_NOT_SHOWN);
+        let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
+        let into = seen.clone();
+        let events: Events = Arc::new(move |_, event| into.lock().unwrap().push(event));
+        // Fresh, as the eyes keep it: the snapshot's wait aged the first.
+        let keep_fresh = {
+            let sight = sight.clone();
+            std::thread::spawn(move || {
+                for _ in 0..20 {
+                    std::fs::write(&sight, JPEG).unwrap();
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+            })
+        };
+        camera.stream("c_1", true, Some(5), None, events).unwrap();
+        std::thread::sleep(MARK_SHOWN_WITHIN + Duration::from_millis(600));
+        keep_fresh.join().unwrap();
+        {
+            let seen = seen.lock().unwrap();
+            assert!(
+                seen.iter().all(|event| event["ev"] != "camera.frame"),
+                "{seen:?}"
+            );
+            let last = seen.last().expect("the stream ended");
+            assert_eq!(last["ev"], "camera.ended");
+            assert_eq!(last["why"], MARK_NOT_SHOWN);
+        }
+        // The ring draws it now: a snapshot goes.
+        std::fs::write(&sight, JPEG).unwrap();
+        let drawing = drew.clone();
+        let ring = std::thread::spawn(move || {
+            for _ in 0..40 {
+                *drawing.lock().unwrap() = Some(std::time::Instant::now());
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        });
+        assert!(camera.snapshot("c_1").is_ok());
+        ring.join().unwrap();
+    }
+
     #[test]
     fn off_and_stop_end_a_stream_with_no_more_frames() {
         let sight = dir().join("sight.jpg");
         std::fs::write(&sight, JPEG).unwrap();
-        let mut camera =
-            Camera::new(sight.clone(), Arc::new(|| false)).marking(Arc::new(|_, _| {}));
+        let mut camera = Camera::new(sight.clone(), Arc::new(|| false))
+            .marking(Arc::new(|_, _| {}), drawn_now());
         let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
         let into = seen.clone();
         let events: Events = Arc::new(move |_, event| into.lock().unwrap().push(event));

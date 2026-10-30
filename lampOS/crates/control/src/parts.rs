@@ -153,14 +153,18 @@ impl Lamp {
         self
     }
 
-    pub fn seeing(mut self, sight: PathBuf, mark: crate::camera::Mark) -> Self {
+    pub fn seeing(
+        mut self,
+        sight: PathBuf,
+        (mark, drawn): (crate::camera::Mark, crate::camera::Drawn),
+    ) -> Self {
         let watch = self.watch.clone();
         let private: crate::camera::Private = Arc::new(move || {
             watch
                 .as_ref()
                 .is_none_or(|watch| watch.lock().map_or(true, |watch| watch.private()))
         });
-        self.camera = Some(crate::camera::Camera::new(sight, private).marking(mark));
+        self.camera = Some(crate::camera::Camera::new(sight, private).marking(mark, drawn));
         self
     }
 
@@ -543,6 +547,18 @@ impl Parts for Lamp {
             .as_ref()
             .and_then(|watch| watch.lock().ok().map(|watch| watch.state(kind)))
             .unwrap_or(Value::Null)
+    }
+
+    fn camera_streaming(&self, client: &str) -> bool {
+        self.camera
+            .as_ref()
+            .is_some_and(|camera| camera.streaming(client))
+    }
+
+    fn camera_end(&mut self, client: &str) {
+        if let Some(camera) = &mut self.camera {
+            camera.end(client);
+        }
     }
 
     fn stop(&mut self, client: &str, _: u64) {

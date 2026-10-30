@@ -239,6 +239,20 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         },
         _ => None,
     };
+    // The ring's word that it drew each computer's mark
+    // (`light/mark_drawn`): no word, no picture (Thirteen's P2 on #4521).
+    let mark = match (mark, &bus) {
+        (Some(mark), Some(bus)) => match drawn_on(bus, clock_id.clone()) {
+            Ok(drawn) => Some((mark, drawn)),
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: no camera, since the ring's word on its mark can't be read: {error}"
+                );
+                None
+            }
+        },
+        _ => None,
+    };
     let sight = sight.zip(mark);
     // The fast stream from the eyes' frames socket, when they serve one; its
     // frames go out once the server below has a way to send them.
@@ -342,4 +356,41 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         Ok::<(), String>(())
     })
+}
+
+/// When the ring last drew each computer's mark, as it says on
+/// `light/mark_drawn` (`lamp_msgs::RingMarkDrawn`, its asker's `control:`
+/// source), read on a thread of its own: the camera's word that a picture
+/// may go (`lamp_control::camera::Drawn`). Another boot's is none.
+fn drawn_on(bus: &lamp_bus::Bus, clock_id: String) -> std::io::Result<lamp_control::camera::Drawn> {
+    use lamp_msgs::RingMarkDrawn;
+    let mut said = bus.subscribe_typed(RingMarkDrawn::TOPIC, "control", RingMarkDrawn::TYPE)?;
+    let seen: Arc<Mutex<std::collections::HashMap<String, std::time::Instant>>> = Arc::default();
+    let into = seen.clone();
+    std::thread::spawn(move || {
+        loop {
+            match said.recv(std::time::Duration::from_millis(200)) {
+                Ok(Some(message)) => {
+                    // The ring's word only (Thirteen's P3 on #4521).
+                    if message.header.source == RingMarkDrawn::SOURCE
+                        && let Ok(drawn) = message.parse::<RingMarkDrawn>()
+                        && drawn.clock_id == clock_id
+                        && let Ok(mut seen) = into.lock()
+                    {
+                        seen.insert(drawn.source, std::time::Instant::now());
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    eprintln!("lamp-control: the ring's word on its mark is lost: {error}");
+                    return;
+                }
+            }
+        }
+    });
+    Ok(Arc::new(move |client: &str| {
+        seen.lock()
+            .ok()
+            .and_then(|seen| seen.get(&format!("control:{client}")).copied())
+    }))
 }
