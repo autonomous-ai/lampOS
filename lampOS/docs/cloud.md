@@ -1005,6 +1005,56 @@ key step and the single shared switch to change after it.
 - **Not built:** `skills.catalog` (the signed list the entries come from);
   the voice installing a skill.
 
+## A made skill sent to the Store (fourteen-P13, `skills.share`, `skills.shared`, `skills.unshare`)
+
+Off unless `LAMP_SKILLS_SHARE=on` in `lamp-cloud`'s unit, with the skills
+page (`LAMP_SKILLS_PAGE=on`) and `LAMP_CLOUD`; no product unit sets it.
+`system.info`'s `can` names the three kinds only then, and only with the
+backend's base and the lamp's key at start (`crate::share::Store`). The
+first builder gave it to Fourteen on Queue #3997 (30 Oct 15:5x); the
+Store's side is Backend3's (Queue comment 6516962994), live in production
+since 30 Oct.
+
+- **`skills.share`** (`{"name", "author"?}`): the owner's act from the app
+  only, never by voice. `name` must be a skill made on this lamp (`made:
+  here`, the page's `made_here` group) that is on; else "only a skill made
+  on this lamp can be shared" or "turn the skill on before sharing it".
+  `author`, when given, is a first name: trimmed, at most 32 characters, on
+  one line; empty means none. The skill's folder is copied to a fresh
+  folder in `lamp-cloud`'s own `/tmp` (`PrivateTmp=yes`), without its dot
+  files (`.package.json`) and with `made: here` taken out of `SKILL.md`'s
+  front matter, since on another lamp it was not made there; packed
+  unsigned with `lamp_skills::package::pack` (the same checks as `lamp-skills
+  pack`), and the copy removed whatever happens. The package goes to
+  `POST {base}/api/v1/skills/publish` as `multipart/form-data` (`file`, and
+  `author` when given), with `authorization: Bearer` and the lamp's key, as
+  the ping sends it; `{base}` is the backend's base with a trailing `/v1`
+  cut off, as the ping's. Answered `{"sent": {"id", "name", "version",
+  "review_status": "pending"}}`.
+- **`skills.shared`** (`{}`): `GET {base}/api/v1/skills/mine`, answered
+  `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`
+  (only those fields; `review_status` is the Store's `pending`, `approved`
+  or `rejected`, and `review_note` its reviewer's reason).
+- **`skills.unshare`** (`{"id"}`, 1 to 64 letters, digits, `-` or `_`):
+  `DELETE {base}/api/v1/skills/ID`, answered `{"unshared": ID}`.
+
+**What leaves the lamp:** only the skill's own files (`skill.toml`,
+`SKILL.md` and anything else in its folder that isn't a dot file), and the
+first name the owner typed. No memory, faces, names the lamp knows,
+recordings, pictures or settings. A reviewer at the Store reads it before
+it is listed; only approval signs it with the Store's key
+(`8717ddcdf9ac22fb`), and an unapproved package is never listed.
+
+**Refusals and limits.** The Store's own reason is passed on in plain
+words ("the Skills Store said: …", from its `error`, `message` or
+`error_code`, at most 300 characters); `401` is "the Store didn't know this
+lamp"; no answer is "the Skills Store can't be reached now". The key is
+never in an answer or the journal. The Store holds each lamp to 5 sent a
+day, 3 waiting at once and 20 attempts a day, and each owner to 10 a day
+(Backend3, 30 Oct). Each exchange runs on a thread of its own with its own
+runtime and waits at most 30 s (`share::WITHIN`), as `skills.install`
+waits on the manage helper.
+
 ## Health and crash reports (#1683, step 1)
 
 If something on a lamp breaks in a home, the company should know and fix it

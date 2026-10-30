@@ -108,3 +108,27 @@ Diễn ra như sau:
 - Đăng nhập Harness trên đèn ở nhà.
 
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến cùng với việc cài nó.
+
+## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, tắt)
+
+Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng
+trang kỹ năng và `LAMP_CLOUD`); chưa unit sản phẩm nào bật. Khi bật,
+`lamp-cloud` nhận ba lệnh từ ứng dụng, không bao giờ bằng giọng nói:
+
+- **`skills.share`** (`{"name", "author"?}`): chỉ một kỹ năng tạo trên đèn
+  này (`made: here`) và đang bật. Thư mục của nó được chép vào `/tmp` riêng
+  của `lamp-cloud`, bỏ các tệp chấm (`.package.json`) và bỏ dòng
+  `made: here` khỏi `SKILL.md` (trên đèn khác nó không được tạo ở đó), đóng
+  gói không ký bằng `lamp_skills::package::pack`, rồi xóa bản chép dù thế
+  nào. Gói được gửi tới `POST {base}/api/v1/skills/publish` (`file`, và
+  `author` nếu có: tên gọi, tối đa 32 ký tự, một dòng) bằng khóa của đèn.
+- **`skills.shared`** (`{}`): `GET {base}/api/v1/skills/mine`, trả
+  `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`.
+- **`skills.unshare`** (`{"id"}`): `DELETE {base}/api/v1/skills/ID`.
+
+Chỉ các tệp của chính kỹ năng và tên gọi chủ đèn gõ rời khỏi đèn; không có
+trí nhớ, khuôn mặt, tên đèn biết, bản ghi, ảnh hay cài đặt. Người duyệt
+của Store đọc nó trước khi lên danh sách; chỉ khi được duyệt nó mới được ký
+bằng khóa của Store. Chi tiết, giới hạn và lý do từ chối ở
+[cloud.md](../cloud.md), "A made skill sent to the Store".
+
