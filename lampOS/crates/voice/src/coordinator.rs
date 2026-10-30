@@ -1624,7 +1624,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     health: Option<crate::bus_out::WaitHealth>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
-        &mut dyn FnMut() -> Result<bool>,
+        &mut dyn FnMut(crate::service_privacy_controls::Keep<'_>) -> Result<bool>,
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     muted_wait_pulsing(
@@ -1670,7 +1670,7 @@ fn muted_wait_pulsing<
     light: Option<crate::ring_light::RingLight>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
-        &mut dyn FnMut() -> Result<bool>,
+        &mut dyn FnMut(crate::service_privacy_controls::Keep<'_>) -> Result<bool>,
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     let trace = RefCell::new(trace);
@@ -1684,8 +1684,13 @@ fn muted_wait_pulsing<
     let sleep_face = RefCell::new(sleep_face);
     let owed_since = std::cell::Cell::new(None::<Instant>);
     let light = RefCell::new(light);
+    // With LAMP_STALLS=on, each of the wait's checks of 50 ms or more is a
+    // line of its own, by name (#4332).
+    let calls = RefCell::new(WaitCalls::from_environment());
     let outcome = wait(
         &mut |state, boot, at_us| {
+            let mut calls = calls.borrow_mut();
+            let pass = calls.state.begin();
             slide.set(Some(state));
             // The slide closed: a hand's sleep's face gives the ring to the
             // slide's indication before the wait starts it (#1362, #795).
@@ -1704,19 +1709,45 @@ fn muted_wait_pulsing<
                 json!({"kind":"service_privacy_state", "at_us":at_us,"privacy_worker_session":boot,"state":format!("{state:?}"),"audio_workers_open":false}),
             )?;
             flush_cues(&mut trace, cues);
+            pass.done();
             Ok(())
         },
-        &mut || {
-            if let Some(reminders) = reminders.borrow_mut().as_mut() {
-                reminders.poll(monotonic_us());
+        // `keep` renews the privacy worker's Denied authority, at most each
+        // 50 ms, between these checks, named by the check just done, which
+        // a refused renewal says (#4332): on lamp-06c1's cold boot they
+        // took past its 250 ms lease in all and the voice ended.
+        &mut |keep| {
+            let mut calls = calls.borrow_mut();
+            #[cfg(test)]
+            test_wait_check()?;
+            {
+                let pass = calls.reminders.begin();
+                if let Some(reminders) = reminders.borrow_mut().as_mut() {
+                    reminders.poll(monotonic_us());
+                }
+                pass.done();
             }
+            keep("reminders")?;
+            #[cfg(test)]
+            test_wait_check()?;
             // The say socket answers through the wait; nothing is said
             // while the microphones are closed (#3697).
-            crate::say::Says::refuse_parked("the lamp is muted");
+            {
+                let pass = calls.say.begin();
+                crate::say::Says::refuse_parked("the lamp is muted");
+                pass.done();
+            }
+            keep("say")?;
             // The person's light, said and taken; nothing is drawn (#1816).
             if let Some(light) = light.borrow_mut().as_mut() {
+                let pass = calls.light.begin();
                 light.tick(monotonic_us());
+                pass.done();
+                keep("light")?;
             }
+            #[cfg(test)]
+            test_wait_check()?;
+            let pass = calls.controls.begin();
             let (allowed, asleep, restored) = match &mut *controls.borrow_mut() {
                 None => (true, false, false),
                 Some(controls) => {
@@ -1746,6 +1777,10 @@ fn muted_wait_pulsing<
                     (allowed, observation.asleep, controls.restored_after_fault())
                 }
             };
+            pass.done();
+            keep("controls")?;
+            #[cfg(test)]
+            test_wait_check()?;
             let now = monotonic_us();
             let unreadable = unread_since.get().is_some_and(|since| {
                 now.saturating_sub(since) >= crate::bus_out::WAIT_UNREADABLE_AFTER_US
@@ -1758,10 +1793,12 @@ fn muted_wait_pulsing<
             // it also runs at every start while the switch is first read,
             // and a reminder pending then is no mute's (the reviewer on
             // #1551).
+            let pass = calls.owed.begin();
             let owed = match reminders.borrow_mut().as_mut() {
                 Some(reminders) if waiting.closed() => reminders.owed_while_muted(now),
                 _ => None,
             };
+            pass.done();
             if owed == Some(true) {
                 record(
                     &mut trace.borrow_mut(),
@@ -1786,8 +1823,11 @@ fn muted_wait_pulsing<
             }
             // No session runs while it waits, so the wait says how the
             // voice is: its microphones off, and why (#1371).
+            keep("owed")?;
             if let Some(health) = &mut health {
+                let pass = calls.health.begin();
                 health.report(now, waiting, owed.is_some());
+                pass.done();
             }
             Ok(allowed)
         },
@@ -1814,6 +1854,53 @@ fn muted_wait_pulsing<
         health.report(monotonic_us(), crate::bus_out::Waiting::Opening, false);
     }
     outcome
+}
+
+/// The muted wait's own stall recorders (`LAMP_STALLS=on`, #4332), one a
+/// check, so a slow one is named by its file: `stalls-wait-<check>.log`.
+/// In each, a `work` line is that check; a `gap` line is the rest of the
+/// wait between two of its calls. The wait's looks are `stalls-wait.log`
+/// (`service_privacy_controls`). Off unless set: nothing is started.
+struct WaitCalls {
+    reminders: crate::stalls::Stalls,
+    say: crate::stalls::Stalls,
+    light: crate::stalls::Stalls,
+    controls: crate::stalls::Stalls,
+    owed: crate::stalls::Stalls,
+    health: crate::stalls::Stalls,
+    state: crate::stalls::Stalls,
+}
+
+impl WaitCalls {
+    fn from_environment() -> Self {
+        use crate::stalls::Stalls;
+        Self {
+            reminders: Stalls::from_environment("wait-reminders"),
+            say: Stalls::from_environment("wait-say"),
+            light: Stalls::from_environment("wait-light"),
+            controls: Stalls::from_environment("wait-controls"),
+            owed: Stalls::from_environment("wait-owed"),
+            health: Stalls::from_environment("wait-health"),
+            state: Stalls::from_environment("wait-state"),
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// A wait test's slow checks (#4332): each of the gate's four stretches
+    /// between its renewals first sleeps this long.
+    static TEST_WAIT_CHECK: std::cell::Cell<Duration> =
+        const { std::cell::Cell::new(Duration::ZERO) };
+}
+
+#[cfg(test)]
+fn test_wait_check() -> Result<()> {
+    let slow = TEST_WAIT_CHECK.with(std::cell::Cell::get);
+    if !slow.is_zero() {
+        std::thread::sleep(slow);
+    }
+    Ok(())
 }
 
 /// One look of the muted wait at the head (#711): a tap taken while the
@@ -15364,6 +15451,7 @@ mod tests {
     mod termination;
     mod tool_look;
     mod turn_taking;
+    mod wait_leases;
 
     use super::*;
 
