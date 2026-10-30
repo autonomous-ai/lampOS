@@ -34,8 +34,9 @@ pub const SCHEMA: u32 = 1;
 /// 6: ordinary product service units carried under [`PRODUCT_LAMP`].
 /// 7: a part's templates, sockets and timers under it too
 /// (crate::companion). 8: a product unit the lamp lacks added
-/// (crate::added). 9: a round stops the voice first and starts it last
-/// (#4431), which every product build asks for ([`ORDER_UPDATER`]).
+/// (crate::added). 9: a round stops the voice first and starts it again
+/// after the parts it reads (#4431), which every product build asks for
+/// ([`ORDER_UPDATER`]).
 pub const UPDATER: u64 = 9;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";

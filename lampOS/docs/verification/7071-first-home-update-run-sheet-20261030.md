@@ -43,7 +43,8 @@ the first thing the run notes is the build stable names. Below, 8899 stands for 
      about 2 h if the walk is left unfinished;
    - waits for a **quiet moment**: the lamp resting, nobody heard and nothing
      said for 45 s (`quiet::QUIET`);
-   - stops the voice first and starts it last (#4431), switches every part, and
+   - stops the voice first and starts it again after the parts it reads
+     (#4431), switches every part, and
      watches each for 60 s. A part that restarts, changes process or fails in
      that time puts the whole build back.
 
