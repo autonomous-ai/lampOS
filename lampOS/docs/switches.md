@@ -678,6 +678,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_PRESENCE_FAR` | A still face far from the lamp, like someone behind or a picture, no longer counts as someone at the desk. |
 | `LAMP_WHO_WAS_HERE_KNOWN` | Asking who was here can tell you that someone the lamp knows came by, without saying who. |
 | `LAMP_WHO_WAS_HERE_NAMES` | Asking who was here names visitors who agreed to be named; others stay unnamed. |
+| `LAMP_WINDOW_FROM_START` | A follow-up begun soon after the lamp spoke is answered, however long it goes on. |
 | `LAMP_EYES_YAWN` | The lamp counts your yawns while you sit, only with your okay for face expressions, keeping just the count. |
 | `--mouth-on-heard` | Nothing you'd notice: the lamp studies mouths closely only while it hears speech, saving effort. |
 | `--mouth-runtime` | Nothing you'd notice: the lamp reads mouth shapes with a different, faster engine. |
