@@ -113,10 +113,12 @@ asyncio.run(main())
   `wait=True` on a gesture, move or play returns when it has finished, or,
   where the lamp hands it on and says no more (today `gesture` and `move`,
   answered `{"to": "body"}`), at that answer.
-- **A motion asked while another still plays is refused `busy`**, with
-  `retry_ms`, when it ends (#4209, lamp-control #4494): `lampos.errors.BY_CODE["busy"]`. The body plays
-  one at a time (a gesture or move 2 to 10 s, a feeling's move 2.5 to 7 s),
-  whoever asked. Wait `retry_ms` and ask again.
+- **A new motion cuts the one playing short:** a gesture, move or feeling's
+  move asked while another plays (whoever asked it) replaces it, eased out
+  from where the body is under its own caps. While the person is using the
+  lamp (a conversation, a hand on it), the new one is dropped by the body
+  ("the person is using the lamp"); the door has already answered
+  `{"to":"body"}`.
 - **Leases:** `async with lamp.lease("body"):` holds the body for looks,
   moves and joints, renewed for you, until the block ends or the lamp takes
   it back (a hand on its head, a conversation): `lease.state`,
@@ -331,7 +333,7 @@ line below for its code (`lampos.errors.WHAT_TO_DO`):
 | `no_grant` | Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello. |
 | `no_lease` | Hold a `body` lease first (Python `lamp.lease("body")`, JS `lamp.withLease(['body'], ...)`); `joints` names it. |
 | `lease_lost` | The lamp took the body back; `why` says why (a conversation, a hand, private, a stop). Let it be, and take a new lease later. |
-| `busy` | A motion still plays (a gesture, move or feeling's move, whoever asked): wait `retry_ms` and send it again. Without `retry_ms`, someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
+| `busy` | Someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
 | `refused` | The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again. |
 | `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, by default 22:00 to 07:00): `say` and `sound` wait until they end. A light is still fine. |
 | `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. |

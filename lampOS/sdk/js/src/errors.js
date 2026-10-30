@@ -9,7 +9,7 @@ export const WHAT_TO_DO = Object.freeze({
   no_grant: "Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello.",
   no_lease: "Hold a `body` lease first (Python `lamp.lease(\"body\")`, JS `lamp.withLease(['body'], ...)`); `joints` names it.",
   lease_lost: "The lamp took the body back; `why` says why (a conversation, a hand, private, a stop). Let it be, and take a new lease later.",
-  busy: "A motion still plays (a gesture, move or feeling's move, whoever asked): wait `retry_ms` and send it again. Without `retry_ms`, someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first.",
+  busy: "Someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first.",
   refused: "The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again.",
   quiet_hours: "It's the lamp's quiet hours (`limits.quiet_hours`, by default 22:00 to 07:00): `say` and `sound` wait until they end. A light is still fine.",
   private: "The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false.",

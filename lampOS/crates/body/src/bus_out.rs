@@ -838,6 +838,7 @@ mod tests {
             hand: false,
             tipping: Default::default(),
             gesture_fates: Default::default(),
+            handed_over: None,
             looks_dropped: None,
             toward_refused: None,
             bad_reads: [0; 5],

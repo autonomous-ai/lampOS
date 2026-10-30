@@ -747,12 +747,15 @@ fn gesture_asked(
         gesture: &'a str,
         source: Option<String>,
         priority: Option<lamp_body::moves::Priority>,
+        #[serde(default)]
+        replace: bool,
     }
     let message: Message = serde_json::from_slice(datagram).ok()?;
     let clip = lamp_body::clips::named(message.gesture).or_else(|| moves.named(message.gesture))?;
     let asker = Asker {
         source: message.source,
         priority: message.priority,
+        replace: message.replace,
     };
     Some((clip, asker))
 }
@@ -855,6 +858,7 @@ fn held_to(
         Asker {
             source,
             priority: Some(held),
+            replace: asker.replace,
         },
         cut,
     )
@@ -1174,8 +1178,10 @@ fn heard_asked(
             Asker::default(),
         );
     }
+    // A replace keeps its source in both modes: the body honours it only
+    // from lamp-control (`moves::from_control`), and names it in the journal.
     let weighed = |asker: Asker| {
-        if arbitration {
+        if arbitration || asker.replace {
             asker
         } else {
             Asker {
@@ -1486,6 +1492,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // A gesture asked for on the same socket, and at what priority, until
     // the body takes it; and who asked for the last one, for the journal.
     let gesture_asked = std::cell::Cell::new(None);
+    // Whether the gesture kept this step asked to replace the one playing.
+    let gesture_replace = std::cell::Cell::new(false);
     let asked_by: std::cell::RefCell<Option<(&'static str, String)>> = Default::default();
     // What was dropped as it was read, two asks in one step, to be told on
     // `body/gesture` with the step's news.
@@ -1547,6 +1555,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                                 asker
                             };
                             let asked = (clip, asker.priority());
+                            let replace = asker.replace;
                             let source = asker
                                 .source
                                 .map(|source| source.chars().take(64).collect::<String>());
@@ -1588,6 +1597,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                             // fate said after another ask names no source.
                             if kept == asked {
                                 *asked_by.borrow_mut() = source.map(|source| (clip.name, source));
+                                gesture_replace.set(replace);
                             }
                         }
                         (Heard::Mood(mood, level), _) => {
@@ -1899,7 +1909,22 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 ""
             }
         };
+        // A motion ended for a newer one a paired computer asked: said
+        // once, with the asker's name only (`control:<client>`).
+        if let Some((old, new)) = glimpse.handed_over {
+            let from = match &*asked_by.borrow() {
+                Some((asked, source)) if *asked == new => format!(" from {source}"),
+                _ => String::new(),
+            };
+            eprintln!(
+                "lamp-body: step {} gesture {old} ended for {new}{from}",
+                glimpse.step
+            );
+        }
         for (name, why) in glimpse.gesture_fates {
+            if why == lamp_body::moves::REPLACED {
+                continue;
+            }
             if let Some(line) = fate_said.due(
                 format!("gesture {name} {why}{}{}", source(name), from_test(why)),
                 std::time::Instant::now(),
@@ -2116,6 +2141,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 (None, lamp_body::moves::Priority::Conversation),
                 |(clip, priority)| (Some(clip), priority),
             );
+            let replace = gesture_replace.take() && gesture.is_some();
             let asked = lamp_body::body::Asked {
                 seen: eyes(),
                 gesture,
@@ -2135,6 +2161,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                replace,
             };
             // Read all the same, so that nothing kept from before the pause
             // is acted on after it.
@@ -3024,6 +3051,7 @@ mod tests {
         let asker = |source: Option<&str>, priority| Asker {
             source: source.map(str::to_owned),
             priority,
+            replace: false,
         };
         let skills = caller("lamp-skills.service", 990);
         // A skill claiming the person is held to skill, its own name kept.
@@ -3772,6 +3800,28 @@ mod tests {
         assert_eq!(intake_dropped(true, None, None), (None, None));
     }
 
+    /// `"replace": true` (lamp-control's, for a paired computer) is read on
+    /// a gesture and on a move, with or without arbitration; absent, false.
+    /// Its source is kept in both modes, for the body to honour it only from
+    /// lamp-control (`moves::from_control`) and to name it in the journal.
+    #[test]
+    fn a_replace_mark_is_read_on_a_gesture_and_a_move() {
+        let moves = lamp_body::moves::Loaded::default();
+        let mut sent = lamp_body::moves::Sent::default();
+        for on in [true, false] {
+            let mut heard =
+                |datagram: &str| heard_asked(datagram.as_bytes(), &moves, &mut sent, on).1;
+            let gesture =
+                r#"{"gesture":"nod","replace":true,"source":"control:c_1","priority":"skill"}"#;
+            let asker = heard(gesture);
+            assert!(asker.replace, "{on}");
+            assert_eq!(asker.source.as_deref(), Some("control:c_1"), "{on}");
+            assert!(!heard(r#"{"gesture":"nod","priority":"skill"}"#).replace);
+            let moved = r#"{"move":{"name":"control","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]},"replace":true,"source":"control:c_1","priority":"skill"}"#;
+            assert!(heard(moved).replace, "{on}");
+        }
+    }
+
     /// A gesture or a move may say who asks, and a priority that is not one
     /// of the five refuses it, as does any other field. Only under
     /// --arbitration on is who asks weighed; off it is ignored.
@@ -3785,6 +3835,7 @@ mod tests {
         let skill = Asker {
             source: Some("skill:dance".into()),
             priority: Some(Priority::Skill),
+            replace: false,
         };
         let asked = r#"{"gesture":"nod","source":"skill:dance","priority":"skill"}"#;
         assert_eq!(
@@ -3829,6 +3880,7 @@ mod tests {
         let unnamed = Asker {
             source: None,
             priority: Some(Priority::Skill),
+            replace: false,
         };
         assert_eq!(
             heard(asked, false),

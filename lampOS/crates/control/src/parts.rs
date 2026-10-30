@@ -5,11 +5,12 @@
 //!   them (`lamp_skills::body_ask`), at `skill` priority with the source
 //!   `control:<client>`. The body plays them with its own move check, reach,
 //!   speed and anti-tip limits, or drops them with why in its journal.
-//!   The body plays one at a time, so the door remembers when the last
-//!   motion it sent ends, whoever asked, and refuses a `gesture`, `move` or
-//!   `express` move asked before then as `busy`, with `retry_ms` (#4209):
-//!   the drop the body would make, said to the computer. A length the door
-//!   can't know (a move folder's gesture) holds nothing.
+//!   Each carries `"replace": true`: a computer's new motion interrupts the
+//!   one playing (another computer's, a skill's, the lamp's own), which the
+//!   body ends at once and eases out of from where it is, under its own
+//!   caps, before the new one plays. The person's own use, or the lamp's
+//!   conversation, is never interrupted: the body refuses with why "the
+//!   person is using the lamp".
 //! - `light` → a `light/request` on the bus at `skill` priority, lapsing at
 //!   its `for_ms` unless asked again, the ring's own night caps on top.
 //!   `stop` gives the light back at once.
@@ -101,11 +102,6 @@ pub struct Lamp {
     /// told to it on the lease socket (`crate::body_lease`); none without
     /// one.
     follow: Option<crate::body_lease::Follower>,
-    /// When the last motion sent to the body ends, on the door's clock.
-    /// One for the lamp, since the body plays one at a time whoever asked
-    /// (#4209). A `stop` doesn't free it: the door never stops the body,
-    /// which plays the motion to its end.
-    motion: Option<u64>,
 }
 
 impl Lamp {
@@ -132,7 +128,6 @@ impl Lamp {
                 .ok(),
             clock: lamp_ipc::monotonic_us,
             follow: None,
-            motion: None,
         }
     }
 
@@ -215,45 +210,15 @@ impl Lamp {
         Ok(json!({"to": "ring"}))
     }
 
-    /// Refused as `busy` while the last motion sent still plays, with when
-    /// it ends (#4209).
-    fn free_for_motion(&self, now_us: u64) -> Result<(), Error> {
-        match &self.motion {
-            Some(until_us) if *until_us > now_us => {
-                let left_ms = (until_us - now_us).div_ceil(1_000);
-                let mut error = Error::new(
-                    ErrorCode::Busy,
-                    format!("busy: a motion plays for {left_ms} ms more"),
-                );
-                error.retry_ms = Some(left_ms);
-                Err(error)
-            }
-            _ => Ok(()),
-        }
+    /// Sends a motion to the body marked to replace the one playing: the
+    /// body ends that and eases out of it, unless the person is using the
+    /// lamp, which it refuses with why.
+    fn motion(&mut self, mut ask: Value, client: &str) -> Result<Value, Error> {
+        ask["replace"] = json!(true);
+        self.to_body(ask, client)
     }
 
-    /// Sends a motion to the body when none still plays, and holds the
-    /// slot for its length, if known; a refused one moves nothing.
-    fn motion(
-        &mut self,
-        ask: Value,
-        played_us: Option<u64>,
-        client: &str,
-        now_us: u64,
-    ) -> Result<Value, Error> {
-        self.free_for_motion(now_us)?;
-        let sent = self.to_body(ask, client)?;
-        self.motion = played_us.map(|played_us| now_us + played_us);
-        Ok(sent)
-    }
-
-    fn express(
-        &mut self,
-        client: &str,
-        feeling: &str,
-        strength: f32,
-        now_us: u64,
-    ) -> Result<Value, Error> {
+    fn express(&mut self, client: &str, feeling: &str, strength: f32) -> Result<Value, Error> {
         let feeling =
             feelings::named(feeling).map_err(|why| Error::new(ErrorCode::BadRequest, why))?;
         let mut answer = json!({"to": "body"});
@@ -263,8 +228,7 @@ impl Lamp {
         {
             Some(scaled) => {
                 answer["move"] = json!(scaled.name);
-                let played_us = played_us(scaled.step_ms.into(), scaled.frames.len());
-                self.motion(json!({"move": scaled}), Some(played_us), client, now_us)?;
+                self.motion(json!({"move": scaled}), client)?;
             }
             None => answer["move"] = Value::Null,
         }
@@ -418,12 +382,6 @@ fn outcome(reader: impl std::io::BufRead) -> (&'static str, Option<String>) {
     ("dropped", Some("the voice gave no outcome".to_owned()))
 }
 
-/// How long the body plays a move of these frames: from the first frame
-/// to the last, as its own clips count it (`lamp_body::clips::Clip::duration_us`).
-fn played_us(step_ms: u64, frames: usize) -> u64 {
-    (frames.saturating_sub(1) as u64) * step_ms * 1_000
-}
-
 fn source(client: &str) -> String {
     format!("control:{client}")
 }
@@ -443,21 +401,12 @@ fn waits_for(what: &str) -> Error {
 }
 
 impl Parts for Lamp {
-    fn act(&mut self, client: &str, re: u64, op: &Op, now_us: u64) -> Result<Value, Error> {
+    fn act(&mut self, client: &str, re: u64, op: &Op, _now_us: u64) -> Result<Value, Error> {
         match op {
-            // A built-in clip's own length; a move folder's gesture, which
-            // the door can't see, holds nothing.
-            Op::Gesture { name } => self.motion(
-                json!({"gesture": name}),
-                lamp_body::clips::named(name).map(lamp_body::clips::Clip::duration_us),
-                client,
-                now_us,
-            ),
+            Op::Gesture { name } => self.motion(json!({"gesture": name}), client),
             Op::Move { step_ms, frames } => self.motion(
                 json!({"move": {"name": "control", "step_ms": step_ms, "frames": frames}}),
-                Some(played_us((*step_ms).into(), frames.len())),
                 client,
-                now_us,
             ),
             Op::Light {
                 colour,
@@ -468,7 +417,7 @@ impl Parts for Lamp {
             Op::Say { text } => self.say(client, re, text),
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
-            Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
+            Op::Express { feeling, strength } => self.express(client, feeling, *strength),
             Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
@@ -542,7 +491,7 @@ mod tests {
         let length = body.recv(&mut buffer).unwrap();
         assert_eq!(
             serde_json::from_slice::<Value>(&buffer[..length]).unwrap(),
-            json!({"gesture": "nod", "source": "control:c_1", "priority": "skill"})
+            json!({"gesture": "nod", "replace": true, "source": "control:c_1", "priority": "skill"})
         );
         lamp.act("c_1", 2, &op(r#"{"id":2,"op":"move","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#), 10_000_000).unwrap();
         let length = body.recv(&mut buffer).unwrap();
@@ -671,79 +620,45 @@ mod tests {
         )
     }
 
-    fn sent(body: &UnixDatagram) -> usize {
-        let mut buffer = [0u8; 16 * 1024];
-        std::iter::from_fn(|| body.recv(&mut buffer).ok()).count()
-    }
-
     const NOD: &str = r#"{"id":1,"op":"gesture","name":"nod"}"#;
 
-    /// #4209: a motion asked while the last one sent still plays is refused
-    /// `busy` with when to try again, whoever asks, never sent, and moves
-    /// nothing; once it has played, the next is taken.
+    fn asks(body: &UnixDatagram) -> Vec<Value> {
+        let mut buffer = [0u8; 16 * 1024];
+        std::iter::from_fn(|| {
+            let length = body.recv(&mut buffer).ok()?;
+            Some(serde_json::from_slice(&buffer[..length]).unwrap())
+        })
+        .collect()
+    }
+
+    /// A computer's new motion interrupts the one playing: two gestures
+    /// 100 ms apart, from one computer or two, are both sent, each marked
+    /// to replace; so are a move and an express move asked over them. The
+    /// body decides (it refuses while the person is using the lamp).
     #[test]
-    fn a_motion_asked_while_the_last_still_plays_is_busy_until_it_ends() {
-        let (mut lamp, body, dir) = with_body("busy");
-        let nod_us = lamp_body::clips::NOD.duration_us();
+    fn a_new_motion_is_sent_marked_to_replace_the_one_playing() {
+        let (mut lamp, body, dir) = with_body("replace");
         lamp.act("c_1", 1, &op(NOD), 1_000_000).unwrap();
-        assert_eq!(sent(&body), 1);
-        let error = lamp.act("c_2", 2, &op(NOD), 1_100_000).unwrap_err();
-        assert_eq!(error.code, ErrorCode::Busy);
-        let left_ms = (nod_us - 100_000) / 1_000;
-        assert!(left_ms > 0);
-        assert_eq!(error.retry_ms, Some(left_ms));
-        assert_eq!(
-            error.why,
-            format!("busy: a motion plays for {left_ms} ms more")
-        );
-        assert_eq!(sent(&body), 0, "a refused motion isn't sent");
-        // Refused again just before its end: still the first's end, not
-        // pushed on by the refusals.
-        let error = lamp
-            .act("c_1", 3, &op(NOD), 1_000_000 + nod_us - 1_000)
-            .unwrap_err();
-        assert_eq!(error.retry_ms, Some(1));
-        lamp.act("c_2", 4, &op(NOD), 1_000_000 + nod_us).unwrap();
-        assert_eq!(sent(&body), 1);
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    /// A move holds the slot for its frames at its step, as the body plays
-    /// it: from the first frame to the last; `express` for its own move.
-    #[test]
-    fn a_moves_length_is_its_frames_at_its_step() {
-        let (mut lamp, body, dir) = with_body("busy-move");
+        lamp.act("c_2", 2, &op(NOD), 1_100_000).unwrap();
         let walk = op(
-            r#"{"id":1,"op":"move","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#,
+            r#"{"id":3,"op":"move","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#,
         );
-        lamp.act("c_1", 1, &walk, 0).unwrap();
-        let error = lamp.act("c_1", 2, &walk, 1_499_000).unwrap_err();
-        assert_eq!(error.retry_ms, Some(1));
-        lamp.act("c_1", 3, &walk, 1_500_000).unwrap();
-        assert_eq!(sent(&body), 2);
-        let glad = op(r#"{"id":4,"op":"express","feeling":"glad"}"#);
-        lamp.act("c_1", 4, &glad, 3_000_000).unwrap();
-        let written = crate::feelings::named("glad").unwrap().written();
-        let glad_us = (written.frames.len() as u64 - 1) * u64::from(written.step_ms) * 1_000;
-        let error = lamp.act("c_1", 5, &walk, 3_000_000).unwrap_err();
-        assert_eq!(error.retry_ms, Some(glad_us / 1_000));
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    /// A `stop`, the asker's own or another's, leaves the slot: the door
-    /// never stops the body, which plays the motion to its end.
-    #[test]
-    fn a_stop_leaves_the_motion_slot() {
-        let (mut lamp, body, dir) = with_body("busy-stop");
-        lamp.act("c_1", 1, &op(NOD), 0).unwrap();
-        for client in ["c_2", "c_1"] {
-            lamp.stop(client, 100_000);
-            assert_eq!(
-                lamp.act(client, 2, &op(NOD), 100_000).unwrap_err().code,
-                ErrorCode::Busy
-            );
-        }
-        assert_eq!(sent(&body), 1);
+        lamp.act("c_1", 3, &walk, 1_200_000).unwrap();
+        lamp.act(
+            "c_1",
+            4,
+            &op(r#"{"id":4,"op":"express","feeling":"glad"}"#),
+            1_300_000,
+        )
+        .unwrap();
+        let sent = asks(&body);
+        assert_eq!(sent.len(), 4, "{sent:?}");
+        assert_eq!(
+            sent[1],
+            json!({"gesture": "nod", "replace": true, "source": "control:c_2", "priority": "skill"})
+        );
+        assert!(sent.iter().all(|ask| ask["replace"] == true), "{sent:?}");
+        assert!(sent[2]["move"].is_object() && sent[3]["move"].is_object());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -131,8 +131,9 @@ then `heard: good night lamp` and `lease: held`.
   a minute, but a lamp switching
   feelings every 3 s reads as twitchy, a machine, not a living thing (rule
   8). Ask for a feeling when something happened, and let the move finish:
-  a feeling's move lasts 2.5 to 7 s, and one asked while another plays is
-  refused `busy` with a `retry_ms`, not queued.
+  a feeling's move lasts 2.5 to 7 s, and a new motion asked while one
+  plays cuts it short (smoothly, from where the body is), unless the
+  person is using the lamp.
 - **A body lease** (`lamp.lease("body")`) is needed for `look`, `move`,
   `play` and `joints`. For a gesture it keeps the lamp's own idle life
   back. It is renewed for you every 15 s, lasts at most 10 minutes a take,
