@@ -1,3 +1,15 @@
+## 2026-10-30 18:5x ICT — #4593 prices landed; #4476 to the train; #4602, #4605; reads
+
+**Item 5, prices (Migrate's finding 5 on 29e7):** **#4593** landed in train 416. `fetch_page` of an autonomous.ai page also reads the page's own schema.org price for its first product (the ErgoChair Pro's page: 499 USD), never its text. A searched price carries a "may be out of date" note, and the model is told to believe someone looking at the page and never argue. The played check is a run sheet on the PR. **#4602** (stacked, now rebased as its own commit) follows our own site's redirects, which matter: a trailing slash answers 308 and the old `ergochair-pro` 301. It also adds Vietnamese price words.
+
+**#4476:** Friday's P2 (a typed "Robin Example" kept with their face as "Robin" forgot as "Robin", and the typed name stayed) fixed with `person::owner_ids()`, for the name and the place. READ-OKs from Friday and Reviewer-three (whose 17:56 read I missed and asked for again); NEXT TRAIN. **#4605**, stacked, tests the case through `forget_with_everything`; it fails with the old match.
+
+**#4573** landed in train 413 at its older head; Second's P3s carried as **#4591**, landed in 416 with **#4563** (the head-touch flake).
+
+**Reads:** #4560 (the refusal hold in the product), #4598 (Third's journal table, then its fold), #4606 (its test), #4608 (Tests' body-motion flake). Noted two load-only worker test failures on #1569 for Tests, after a probe passed 20 of 20.
+
+**Corrections:** I called Live's price path one to fix without reading the product's `voice-provider.json`, which has no search; posted and dropped.
+
 ## 2026-10-30 15:2x ICT — #4529/#4543 landed; #4524 in train 410; #4551; reads
 
 **Landed:** #4529 (a leftover "…n't" is a no in onboarding's strict yes/no) in train 406 at its older head, and its left-out P3 commit as #4543 (`336c500e64`).
