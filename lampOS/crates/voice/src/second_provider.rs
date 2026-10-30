@@ -1093,6 +1093,10 @@ struct Shared {
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
     conversation_alone: Option<NameNote>,
+    /// With `LAMP_UNTIED_GOING_ON=on`: whether such a line has no tie to the
+    /// lamp, so the spoken cut-in note is not told beside that note
+    /// ([`Engine::telling_the_untied`]).
+    untied: Option<Busy>,
     /// With `LAMP_TASKS_NAMED_ASK=on`: whom a line's words ask by name
     /// ([`Engine::asking_by_name`]).
     named_ask: Option<NamedAsk>,
@@ -2640,6 +2644,7 @@ impl Engine {
                 note_ahead: None,
                 name_note: None,
                 conversation_alone: None,
+                untied: None,
                 named_ask: None,
                 #[cfg(test)]
                 named_ask_journal: None,
@@ -3717,6 +3722,17 @@ impl Engine {
     pub fn noting_the_conversation_alone(mut self, note: NameNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.conversation_alone = Some(note);
+        }
+        self
+    }
+
+    /// With `LAMP_UNTIED_GOING_ON=on` (#3882): whether a line let out only
+    /// as the conversation going on has no tie to the lamp. Such a line,
+    /// begun over the lamp's answer, is told only the conversation's note,
+    /// not the spoken cut-in's (`LAMP_CUT_IN_TOLD`). Before any turn only.
+    pub fn telling_the_untied(mut self, untied: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.untied = Some(untied);
         }
         self
     }
@@ -6736,6 +6752,26 @@ async fn spoken(
     // words of its last exchanges, not its calls, so the model is told, or a
     // yes is taken as a new hand-over (#1712).
     let waiting = shared.task_waiting.as_ref().and_then(|note| note(request));
+    // Let out only as the conversation going on: it may be people's talk.
+    let alone = shared
+        .conversation_alone
+        .as_ref()
+        .and_then(|note| note(request))
+        .map(str::to_owned);
+    // `LAMP_UNTIED_GOING_ON`: desk talk begun over the lamp's answer, with
+    // no tie to it, is told it may be people's talk, not that it cut in
+    // (#3882).
+    let cut_in = if !cut_in.is_empty()
+        && alone.is_some()
+        && shared.untied.as_ref().is_some_and(|untied| untied(request))
+    {
+        eprintln!(
+            "lamp-voice second: request {request}: it began over the lamp's answer, but has no tie to it: the model is told it may be people's talk, not that it cut in (LAMP_UNTIED_GOING_ON)"
+        );
+        Vec::new()
+    } else {
+        cut_in
+    };
     // The coordinator's marks, told as the Live route tells them (#1712).
     if !cut_in.is_empty() {
         eprintln!(
@@ -6777,12 +6813,6 @@ async fn spoken(
                 .is_some_and(|scope| scope.person().is_some() && !scope.held())
         })
         .and_then(|(note, _)| note(request));
-    // Let out only as the conversation going on: it may be people's talk.
-    let alone = shared
-        .conversation_alone
-        .as_ref()
-        .and_then(|note| note(request))
-        .map(str::to_owned);
     // Said by name: answer it; else it may not be for the lamp. The line let
     // out by a conversation alone has its own note for that.
     let call = alone
