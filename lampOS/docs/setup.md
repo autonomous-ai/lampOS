@@ -1009,8 +1009,10 @@ its only way back once its package carries the unit.
   key already on the lamp (`serve::recovery_key_matches`, compared in
   constant time, before any other check); the owner's signed-in account
   page passes it, as at first setup. Any other gets 403, "this lamp's own
-  key is needed to set its Wi-Fi again", and one journal line without the
-  key; a lamp without its key file refuses every one. Without it, someone
+  key is needed to set its Wi-Fi again". The journal says the first
+  refusal, then at most one line a minute with the count since the last
+  line (`http::Refusals`), never the key, as an open hotspot can be asked
+  many times a second and the journal is in RAM; a lamp without its key file refuses every one. Without it, someone
   in radio range could set **their own** network (the Reviewer-lead on
   #3024). The first builder signs off before `LAMP_WIFI_RECOVERY` goes on
   anywhere.
