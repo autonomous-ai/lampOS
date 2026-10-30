@@ -28,6 +28,10 @@ const DECLARED: &str = "declared: ";
 const LEFT_OUT: &str = "left out: ";
 /// Each function a chat request of the product's voice route is given.
 const CHAT: &str = "chat: ";
+/// What a chat request with those functions is told to say to "I'm
+/// unplugging you" (#4595): `app`, `plug`, or `none` with
+/// `prepare_to_unplug` offered.
+const UNPLUG: &str = "unplug: ";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
@@ -94,9 +98,19 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     // the eyes' look file (#2905); the product sets both (#2791's product half).
     let look = lamp_voice::sight::full_look_file().is_some()
         && std::env::var_os(lamp_voice::sight::LOOK_ENVIRONMENT).is_some();
-    for tool in lamp_voice::second_provider::worker::chat_tools(&settings, &search, look) {
+    let chat = lamp_voice::second_provider::worker::chat_tools(&settings, &search, look);
+    for tool in &chat {
         println!("{CHAT}{}", tool.name);
     }
+    let told = lamp_voice::without_a_tool::for_declared(&chat, settings.shutdown_from_app);
+    let unplug = if told.contains(lamp_voice::without_a_tool::NO_UNPLUG_APP) {
+        "app"
+    } else if told.contains(lamp_voice::without_a_tool::NO_UNPLUG) {
+        "plug"
+    } else {
+        "none"
+    };
+    println!("{UNPLUG}{unplug}");
 }
 
 /// What the product voice declares, run in a process of its own with the
@@ -109,6 +123,7 @@ struct Product {
     declared: Vec<String>,
     left_out: Vec<String>,
     chat: Vec<String>,
+    unplug: Vec<String>,
 }
 
 fn product_with(extra: &[(&str, &str)]) -> Product {
@@ -187,6 +202,7 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         declared: found(DECLARED),
         left_out: found(LEFT_OUT),
         chat: found(CHAT),
+        unplug: found(UNPLUG),
     }
 }
 
@@ -245,6 +261,28 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     ] {
         assert!(chat.iter().any(|told| told == name), "{name}: {chat:?}");
     }
+}
+
+/// Migrate's #4595, option (b), with `LAMP_SHUTDOWN=on` in the product (the
+/// first builder, 22:1x on 30 Oct): a product lamp offers no
+/// `prepare_to_unplug` (`LAMP_UNPLUG` unset), so told "I'm unplugging you"
+/// its chat request is told to say to turn it off from the app first, never
+/// that pulling the plug is the only way.
+#[test]
+fn a_product_lamp_told_it_is_being_unplugged_says_to_turn_it_off_from_the_app() {
+    let Product { chat, unplug, .. } = product_with(&[]);
+    assert!(
+        !chat
+            .iter()
+            .any(|name| name == lamp_voice::without_a_tool::UNPLUG_TOOL),
+        "{chat:?}"
+    );
+    assert_eq!(unplug, ["app"]);
+    // Without the switch, the plug, and no app named.
+    assert_eq!(
+        product_with(&[(lamp_msgs::SHUTDOWN_SWITCH, "off")]).unplug,
+        ["plug"]
+    );
 }
 
 /// A product lamp's chat request (lamp-0c89, 21 Oct: "Lamp. Please dance
