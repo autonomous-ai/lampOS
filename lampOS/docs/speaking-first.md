@@ -445,6 +445,19 @@ open until then:
   asker decides.
 - `{"outcome":"expired"}`.
 
+**The asker's cancel**: while it waits for the outcome, the asker may
+write `{"cancel":true}` on the same connection (`say::CANCEL_LINE`). Still
+waiting, the ask leaves the queue at the voice's next pass; begun, the
+voice cuts that turn alone on its next pass, as a lost unplug authority
+cuts one: the turn cancelled, its queued audio dropped and the speaker's
+authority moved on (trace outcome `asker_stopped`, an expected discard
+like a hand's Stop). Either way it is answered
+`{"outcome":"dropped","why":"stopped by its asker"}`. Only the ask on
+that connection is reached: never another asker's, the person's turn or
+the voice's own words. Any other later line is passed by, and a
+connection closed or half-closed cancels nothing. lamp-control sends it
+for a computer's `stop` ([control.md](control.md)).
+
 **While the model service refuses** (#4265, `LAMP_SECOND_REFUSED_HOLD=on`,
 the lead's call on #1711; [failure-notices.md](failure-notices.md)): while
 turns are held, a `text` is said as the lamp's own line, its words as they

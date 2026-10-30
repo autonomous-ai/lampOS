@@ -206,6 +206,7 @@ impl SharedMetadata {
                             "second_route_failed",
                             "service_stopped",
                             "unplug_authority_lost",
+                            "asker_stopped",
                             "reminder_authority_lost",
                             "privacy_gap",
                             "reminder_deferred",

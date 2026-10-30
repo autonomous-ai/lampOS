@@ -118,8 +118,9 @@ await lamp.closed();
   one at a time (a gesture or move 2 to 10 s, a feeling's move 2.5 to 7 s),
   whoever asked. Wait `retry_ms` and ask again.
 - **Closing gives your light back at once.** When a computer's last
-  connection closes, the lamp gives back the light it asked for and stops a
-  `say` still waiting. A script that lights the ring and exits shows it for a
+  connection closes, the lamp gives back the light it asked for and stops
+  each `say` of yours, waiting or playing, as `stop` does: its `done` comes
+  `dropped`, "dropped: stopped by its asker". A script that lights the ring and exits shows it for a
   moment only: stay connected while it should show (`examples/ci-light.js`).
 - **Leases:** `await lamp.withLease(['body'], async (lease) => ...)` holds
   the body for looks, moves and joints, renewed for you, until the callback

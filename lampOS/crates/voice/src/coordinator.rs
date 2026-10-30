@@ -7417,12 +7417,14 @@ fn conversation_with_gate_inner(
         if let Some(observation) = observation {
             record_hand_pats(trace, observation.pets)?;
         }
-        if reply
+        // The unplug authority lost, or the say's asker cancelled it on its
+        // own connection: only the turn that ticket rides on is cut.
+        if let Some(why) = reply
             .as_ref()
             .and_then(|current| current.say.as_ref())
-            .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+            .and_then(|ticket| ticket.cut_why(monotonic_us()))
         {
-            cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
+            cancel_reply(owner, reply, trace, why)?;
             provider_queue.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
@@ -7780,12 +7782,14 @@ fn conversation_with_gate_inner(
                         rig.publish(snapshot)?;
                         last_publish = monotonic_us();
                     }
-                    if reply
+                    // The unplug authority lost, or the say's asker cancelled it on its
+                    // own connection: only the turn that ticket rides on is cut.
+                    if let Some(why) = reply
                         .as_ref()
                         .and_then(|current| current.say.as_ref())
-                        .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+                        .and_then(|ticket| ticket.cut_why(monotonic_us()))
                     {
-                        cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
+                        cancel_reply(owner, reply, trace, why)?;
                         provider_queue.clear();
                         speaker_pending = None;
                         snapshot = owner.snapshot(now())?;
@@ -10641,12 +10645,14 @@ fn conversation_with_gate_inner(
                     "boundary":"the answer's first block waits for the line the asker rule waits on, until its last chance"}),
             )?;
         }
-        if reply
+        // The unplug authority lost, or the say's asker cancelled it on its
+        // own connection: only the turn that ticket rides on is cut.
+        if let Some(why) = reply
             .as_ref()
             .and_then(|current| current.say.as_ref())
-            .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+            .and_then(|ticket| ticket.cut_why(monotonic_us()))
         {
-            cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
+            cancel_reply(owner, reply, trace, why)?;
             provider_queue.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
@@ -14773,7 +14779,7 @@ fn dispatch_speaker_chunk(
     if current
         .say
         .as_ref()
-        .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
+        .is_some_and(|ticket| ticket.cut_why(monotonic_us()).is_some())
     {
         return Ok(None);
     }
@@ -15213,7 +15219,13 @@ fn record_cancelled_reply(
 ) -> Result<()> {
     let mut current = current;
     if let Some(say) = current.say.take() {
-        say.answer(crate::say::Outcome::Dropped(reason.to_owned()));
+        // A turn its asker cancelled is told so in the asker's words.
+        let why = if reason == crate::say::ASKER_STOPPED {
+            crate::say::STOPPED_BY_ASKER
+        } else {
+            reason
+        };
+        say.answer(crate::say::Outcome::Dropped(why.to_owned()));
     }
     if !current.news.is_empty() {
         eprintln!(
@@ -17082,6 +17094,64 @@ mod tests {
                 .unwrap()
                 .samples,
             vec![123; 240]
+        );
+    }
+
+    /// A say its asker cancelled while it plays hands the speaker nothing
+    /// more, and its cut answers the asker in its words, "stopped by its
+    /// asker"; the speaker's authority moves on, as for the unplug cut.
+    #[test]
+    fn a_say_cancelled_by_its_asker_is_cut_and_answered_so() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut speaker_parent, mut speaker_child) = pair(&dir, "speaker");
+        let (mut owner, mut current, old_permit) = active_reply();
+        let (ticket, answered) = crate::say::cancelled_ticket_for_test("control");
+        let why = ticket.cut_why(monotonic_us());
+        assert_eq!(why, Some(crate::say::ASKER_STOPPED));
+        current.say = Some(ticket);
+        current.pcm.extend(vec![42; 960]);
+        let mut reply = Some(current);
+        let mut pending = None;
+        let mut sequence = 0;
+        let mut snapshot = owner.snapshot(now()).unwrap();
+        dispatch_speaker_chunk(
+            &mut owner,
+            &mut reply,
+            &mut speaker_parent.data,
+            &mut pending,
+            &mut sequence,
+            &mut snapshot,
+            &mut PlaybackMask::new(TurnTaking::VadOnly),
+        )
+        .unwrap();
+        assert!(
+            speaker_child
+                .data
+                .receive::<SpeakerChunk>()
+                .unwrap()
+                .is_none()
+        );
+        cancel_reply(
+            &mut owner,
+            &mut reply,
+            &mut SessionState::default(),
+            why.unwrap(),
+        )
+        .unwrap();
+        assert!(reply.is_none());
+        assert_eq!(
+            answered.try_recv().unwrap(),
+            crate::say::Answer::Done(crate::say::Outcome::Dropped(
+                crate::say::STOPPED_BY_ASKER.into()
+            ))
+        );
+        let snapshot = owner.snapshot(now()).unwrap();
+        let mut boundary = BoundaryGuard::new(snapshot.boot(), now());
+        boundary.install(now(), snapshot).unwrap();
+        assert!(
+            boundary
+                .check(now(), old_permit, OutputKind::Speech)
+                .is_err()
         );
     }
 
