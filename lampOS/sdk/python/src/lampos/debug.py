@@ -32,6 +32,9 @@ SHOWN = frozenset({
     "rates",
     # `say`'s choice of the model's words over the exact ones.
     "rephrase",
+    # `get` `air` and `device`, and `air.changed`: readings, never who.
+    "air", "co2_ppm", "cpu_load", "device", "disk_free", "feel", "humidity", "known", "memory_used", "pm10", "pm1_0",
+    "pm2_5", "pm4_0", "temperature", "temperature_c", "uptime_s",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",

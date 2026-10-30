@@ -4,8 +4,9 @@
 //! does for requests.
 //!
 //! The schema is checked by a small validator for the keywords `event` uses
-//! (`type`, `properties`, `required`, `allOf` with `if`/`then`, `anyOf`,
-//! `const`, `enum`, `minimum`, `maximum`, `$ref`, `format: date-time`); any
+//! (`type`, `properties`, `additionalProperties`, `required`, `allOf` with
+//! `if`/`then`, `anyOf`, `const`, `enum`, `minimum`, `maximum`, `$ref`,
+//! `format: date-time`); any
 //! other keyword it meets on a value fails the test instead of passing it.
 
 use lamp_control::protocol::EventKind;
@@ -137,6 +138,21 @@ fn holds(root: &Value, schema: &Value, value: &Value, at: &str) -> Result<(), St
                 }
             }
             "then" => {}
+            // `false`: no field but those in `properties`; a schema: each
+            // other field holds it.
+            "additionalProperties" => {
+                let named = schema.get("properties").and_then(Value::as_object);
+                for (name, field) in value.as_object().into_iter().flatten() {
+                    if named.is_some_and(|named| named.contains_key(name)) {
+                        continue;
+                    }
+                    match rule {
+                        Value::Bool(false) => return Err(format!("{at}: {name} is not allowed")),
+                        Value::Bool(true) => {}
+                        sub => holds(root, sub, field, &format!("{at}.{name}"))?,
+                    }
+                }
+            }
             other => panic!("{at}: keyword {other} not known to this validator"),
         }
     }
@@ -188,6 +204,12 @@ fn every_event_from_the_bus_validates_against_the_schema() {
             json!({"x": 0.42, "y": 0.61, "size": 0.18, "open": true, "confidence": 0.93, "t": 1}),
             27 * S,
         ),
+        (
+            "air/state",
+            json!({"pm1_0": 3.1f32, "pm2_5": 7.4f32, "pm4_0": null, "pm10": 9.0f32, "humidity": 44.2f32,
+                   "temperature": 28.3f32, "co2_ppm": 912, "feel": "fine"}),
+            28 * S,
+        ),
     ];
     let mut kinds = std::collections::BTreeSet::new();
     let mut outs: Vec<(String, Value, Out)> = Vec::new();
@@ -231,6 +253,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         "button",
         "lamp.changed",
         "hand",
+        "air.changed",
     ] {
         assert!(kinds.contains(kind), "{kind} not seen: {kinds:?}");
     }
@@ -249,4 +272,44 @@ fn the_validator_catches_what_the_reviewer_lead_found() {
     assert!(check(json!({"ev": "hand", "seen": true, "open": true})).is_err());
     assert!(check(json!({"ev": "hand"})).is_err());
     assert!(check(json!({"ev": "hand", "seen": false})).is_ok());
+}
+
+/// `get`'s `air` and `device`, as the door answers them from the bus, hold
+/// the schema's reply `state`, known and not.
+#[test]
+fn get_air_and_device_validate_against_the_schema() {
+    use lamp_control::protocol::StateKind;
+    let root = schema();
+    let state = &root["$defs"]["reply"]["oneOf"][0]["properties"]["state"]["properties"];
+    let mut watch = Watch::new();
+    for (kind, name) in [(StateKind::Air, "air"), (StateKind::Device, "device")] {
+        holds(&root, &state[name], &watch.state(kind), name).unwrap();
+    }
+    watch.take(
+        "air/state",
+        &json!({"pm1_0": 3.1f32, "pm2_5": 7.4f32, "pm4_0": null, "pm10": 9.0f32, "humidity": 44.2f32,
+                "temperature": 28.3f32, "co2_ppm": 912, "feel": "fine"}),
+        S,
+    );
+    watch.take(
+        "board/state",
+        &json!({"temperature_c": {"cpu_thermal": 61.5, "gpu_thermal": 58.0}, "cpu_load": 0.42,
+                "memory_used": 0.55, "disk_free": 0.71, "uptime_s": 3600, "wifi_dbm": -52}),
+        S,
+    );
+    for (kind, name) in [(StateKind::Air, "air"), (StateKind::Device, "device")] {
+        let told = watch.state(kind);
+        assert_eq!(told["known"], json!(true), "{name}");
+        holds(&root, &state[name], &told, name).unwrap();
+    }
+    // A field the schema doesn't name is caught.
+    assert!(
+        holds(
+            &root,
+            &state["device"],
+            &json!({"known": true, "wifi_dbm": -52}),
+            "device"
+        )
+        .is_err()
+    );
 }
