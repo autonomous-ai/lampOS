@@ -47,6 +47,10 @@ pub const BAD_AUTHOR: &str =
 pub const BAD_ID: &str = "that is not a shared skill's id";
 pub const UNKNOWN_LAMP: &str = "the Store didn't know this lamp";
 pub const UNREACHED: &str = "the Skills Store can't be reached now";
+/// A 2xx from the Store with no id, name or state in its `data`.
+pub const UNREAD: &str = "the Skills Store's answer couldn't be read";
+/// The most text a preview gives back, all files together.
+pub const PREVIEW_MOST: usize = 65_536;
 
 /// Whether the switch is on.
 pub fn on_from_environment() -> bool {
@@ -184,19 +188,10 @@ fn copy_skill(from: &Path, to: &Path) -> Result<(), String> {
 /// `scratch` that is removed after, whatever happens. Its file name and
 /// bytes.
 pub fn pack(folder: &Path, scratch: &Path) -> Result<(String, Vec<u8>), String> {
-    let name = folder
-        .file_name()
-        .ok_or_else(|| crate::skills::NOT_A_NAME.to_owned())?;
     let work = scratch.join(format!("lamp-share-{}", std::process::id()));
     let _ = fs::remove_dir_all(&work);
     let packed = (|| {
-        let copy = work.join("skill").join(name);
-        copy_skill(folder, &copy)?;
-        let card = copy.join("SKILL.md");
-        if let Ok(text) = fs::read_to_string(&card) {
-            fs::write(&card, not_made_here(&text))
-                .map_err(|error| format!("the skill could not be read: {error}"))?;
-        }
+        let copy = prepared(folder, &work)?;
         let tar = lamp_skills::package::pack(&copy, &work.join("out"))?;
         let bytes = fs::read(&tar).map_err(|error| format!("the package: {error}"))?;
         let file_name = tar
@@ -207,6 +202,70 @@ pub fn pack(folder: &Path, scratch: &Path) -> Result<(String, Vec<u8>), String> 
     })();
     let _ = fs::remove_dir_all(&work);
     packed
+}
+
+/// The copy of the skill in `folder` as it would be sent, under `work`: its
+/// own files, no dot file, `made: here` taken out of `SKILL.md`.
+fn prepared(folder: &Path, work: &Path) -> Result<PathBuf, String> {
+    let name = folder
+        .file_name()
+        .ok_or_else(|| crate::skills::NOT_A_NAME.to_owned())?;
+    let copy = work.join("skill").join(name);
+    copy_skill(folder, &copy)?;
+    let card = copy.join("SKILL.md");
+    if let Ok(text) = fs::read_to_string(&card) {
+        fs::write(&card, not_made_here(&text))
+            .map_err(|error| format!("the skill could not be read: {error}"))?;
+    }
+    Ok(copy)
+}
+
+/// Every file the package of `folder` would hold, by its path in the
+/// skill, with its text as it would be sent (not text: its size only), at
+/// most [`PREVIEW_MOST`] characters in all. Nothing is sent.
+pub fn preview(folder: &Path, scratch: &Path) -> Result<Vec<Value>, String> {
+    let work = scratch.join(format!("lamp-preview-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&work);
+    let read = (|| {
+        let copy = prepared(folder, &work)?;
+        let mut files = Vec::new();
+        let mut left = PREVIEW_MOST;
+        let mut folders = vec![copy.clone()];
+        while let Some(dir) = folders.pop() {
+            let mut entries: Vec<_> = fs::read_dir(&dir)
+                .map_err(|error| format!("the skill could not be read: {error}"))?
+                .filter_map(Result::ok)
+                .collect();
+            entries.sort_by_key(|entry| entry.file_name());
+            for entry in entries {
+                let path = entry.path();
+                if path.is_dir() {
+                    folders.push(path);
+                    continue;
+                }
+                let shown = path
+                    .strip_prefix(&copy)
+                    .map(|rest| rest.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let bytes = fs::read(&path)
+                    .map_err(|error| format!("the skill could not be read: {error}"))?;
+                match String::from_utf8(bytes) {
+                    Ok(text) => {
+                        let kept: String = text.chars().take(left).collect();
+                        left -= kept.chars().count();
+                        files.push(json!({"path": shown, "text": kept}));
+                    }
+                    Err(not_text) => {
+                        files.push(json!({"path": shown, "bytes": not_text.as_bytes().len()}))
+                    }
+                }
+            }
+        }
+        files.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+        Ok(files)
+    })();
+    let _ = fs::remove_dir_all(&work);
+    read
 }
 
 /// A `multipart/form-data` body: `file` (the package), then `author` when
@@ -395,7 +454,9 @@ fn answered(status: u16, body: &[u8]) -> Result<Value, String> {
 }
 
 /// `skills.share {"name", "author"?}`: `{"sent": {"id", "name", "version",
-/// "review_status"}}`, or why not.
+/// "review_status"}}`, or why not. With `"preview": true`, nothing is sent:
+/// `{"preview": {"name", "files": [{"path", "text"}]}}`, the text exactly as
+/// it would leave, for the app to show before Send.
 pub fn share(
     store: &Store,
     places: &crate::skills::Places,
@@ -405,6 +466,10 @@ pub fn share(
     let name = name(data)?;
     let author = author(data)?;
     let folder = made_here_and_on(places, &name)?;
+    if data.get("preview").and_then(Value::as_bool) == Some(true) {
+        let files = preview(&folder, scratch)?;
+        return Ok(json!({ "preview": {"name": name, "files": files} }));
+    }
     let (file_name, tar) = pack(&folder, scratch)?;
     let (boundary, body) = multipart(&file_name, &tar, author.as_deref());
     let (status, reply) = exchange(
@@ -417,9 +482,8 @@ pub fn share(
     )?;
     let answer = answered(status, &reply)?;
     let sent = answer.get("skill").unwrap_or(&answer);
-    let mut sent = row(sent).unwrap_or_else(
-        || json!({"id": "", "name": name, "version": "", "review_status": "pending"}),
-    );
+    // Sent, but with no id the app could never take it back: say so.
+    let mut sent = row(sent).ok_or_else(|| UNREAD.to_owned())?;
     if sent["name"] != json!(name) {
         sent["name"] = json!(name);
     }
