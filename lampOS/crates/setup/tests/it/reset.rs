@@ -921,6 +921,86 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
     }
 }
 
+/// Every folder the product keeps across a boot, the tmpfiles' `d` and `D`
+/// lines and each product unit's `StateDirectory=`, is the reset's: the
+/// shipped plan wipes it, a folder above it, or what in it is the person's
+/// (its marker and journal count). The rest is on [`KEPT`], each with why. A
+/// new data folder fails this until the plan or the list names it, so it
+/// fails on a Mac, not after a reset on a lamp (Reviewer-three's P3 beside
+/// #4542: `/var/lib/lampOS/skills-dev` on #4514).
+#[test]
+fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
+    const KEPT: [(&str, &str); 4] = [
+        // The factory's self-test record, kept on purpose (install.md).
+        ("/var/lib/lamp-selftest", "the self-test's runs"),
+        // The updater's records: the builds, its state, its lock.
+        ("/var/lib/lampos-update", "the update's records"),
+        // PulseAudio's client setting (#4487), no one's data.
+        ("/etc/pulse", "the image's sound setting"),
+        ("/etc/pulse/client.conf.d", "the image's sound setting"),
+    ];
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut folders: Vec<String> = fs::read_to_string(product.join("lampos.conf"))
+        .unwrap()
+        .lines()
+        .filter_map(|line| line.strip_prefix("d ").or_else(|| line.strip_prefix("D ")))
+        .filter_map(|rest| rest.split_whitespace().next())
+        .filter(|folder| !folder.starts_with("/run/"))
+        .map(String::from)
+        .collect();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|kind| kind != "service") {
+            continue;
+        }
+        for line in fs::read_to_string(&path).unwrap().lines() {
+            if let Some(names) = line.trim().strip_prefix("StateDirectory=") {
+                folders.extend(
+                    names
+                        .split_whitespace()
+                        .map(|name| format!("/var/lib/{name}")),
+                );
+            }
+        }
+    }
+    folders.sort();
+    folders.dedup();
+    assert!(
+        folders
+            .iter()
+            .any(|folder| folder == "/var/lib/lampos-memory"),
+        "the product's folders were read: {folders:?}"
+    );
+    for (kept, why) in KEPT {
+        assert!(
+            folders.iter().any(|folder| folder == kept),
+            "{kept} ({why}) is no longer a product folder: take it off the list"
+        );
+    }
+    let wiped: Vec<&Path> = plan
+        .wipe
+        .iter()
+        .chain([&plan.marker, &plan.journal])
+        .map(PathBuf::as_path)
+        .collect();
+    let unnamed: Vec<&String> = folders
+        .iter()
+        .filter(|folder| {
+            let folder = Path::new(folder.as_str());
+            !wiped
+                .iter()
+                .any(|path| folder.starts_with(path) || path.starts_with(folder))
+        })
+        .filter(|folder| !KEPT.iter().any(|(kept, _)| kept == folder))
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "kept across a boot, neither wiped by the product's reset plan nor on its keep list: {unnamed:?}"
+    );
+}
+
 /// Reset covers the whole private onboarding directory, including unfinished
 /// writes and handoffs, while the installed core skill is software to keep.
 #[test]
