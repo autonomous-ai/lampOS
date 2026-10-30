@@ -168,6 +168,25 @@ pub fn at_start() -> Option<Language> {
     *CHOSEN.get_or_init(from_environment)
 }
 
+/// `config` heard in `language`: its speech to text told the language,
+/// over `stt_language`; English leaves it as it is.
+pub fn heard_in(
+    mut config: crate::second_config::SecondConfig,
+    language: Option<Language>,
+) -> crate::second_config::SecondConfig {
+    if let Some(language) = language {
+        config.stt_language = Some(language.stt().to_owned());
+    }
+    config
+}
+
+/// The second route's file for the coordinator's own streams, the stop
+/// words' and the wait words', heard in the owner's language
+/// ([`heard_in`]).
+pub fn hearing_config_from_env() -> std::io::Result<Option<crate::second_config::SecondConfig>> {
+    Ok(crate::second_config::load_from_env()?.map(|config| heard_in(config, from_environment())))
+}
+
 /// The character told to speak `language`; English leaves it as it is.
 pub fn instruction(character: String, language: Option<Language>) -> String {
     let Some(language) = language else {
@@ -339,6 +358,38 @@ mod tests {
                 instruction("Be kind.".into(), Some(language))
                     .ends_with(&format!("{}, whatever language you hear.", language.rule()))
             );
+        }
+    }
+
+    /// The stop and wait words' streams hear the owner's language; English
+    /// leaves the file's.
+    #[test]
+    fn the_coordinators_streams_hear_the_owners_language() {
+        let dir = scratch("heard");
+        let key = dir.join("llm.key");
+        fs::write(&key, "secret\n").unwrap();
+        let config = dir.join("second.json");
+        fs::write(
+            &config,
+            format!(
+                r#"{{"llm_base_url":"https://llm.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","stt_language":"vi"}}"#,
+                key.display()
+            ),
+        )
+        .unwrap();
+        for path in [&key, &config] {
+            fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(0o600)).unwrap();
+        }
+        let route = || crate::second_config::load_from_path(&config).unwrap();
+        assert_eq!(heard_in(route(), None), route());
+        for language in [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+        ] {
+            let heard = heard_in(route(), Some(language));
+            assert_eq!(heard.stt_language.as_deref(), Some(language.code()));
         }
     }
 
