@@ -1675,4 +1675,37 @@ mod tests {
             "{why}"
         );
     }
+
+    /// docs/updates.md says the updater's level where a reader of a lamp's
+    /// round looks it up: each "`UPDATER` is N" and each "floor to N
+    /// (`manifest::ORDER_UPDATER`)" is today's, so a level raised here
+    /// (#4503's 10) leaves no line behind (one said 8 after 9, #4653).
+    #[test]
+    fn updates_md_gives_todays_updater_levels() {
+        let doc = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/updates.md");
+        let doc = std::fs::read_to_string(doc).unwrap();
+        let levels = |before: &str, after: &str| -> Vec<u64> {
+            doc.match_indices(before)
+                .filter_map(|(at, _)| {
+                    let rest = &doc[at + before.len()..];
+                    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+                    rest[digits.len()..]
+                        .starts_with(after)
+                        .then(|| digits.parse().unwrap())
+                })
+                .collect()
+        };
+        let said = levels("UPDATER` is ", "");
+        assert!(said.len() >= 3, "{said:?}");
+        assert!(
+            said.iter().all(|level| *level == UPDATER),
+            "{said:?} against {UPDATER}"
+        );
+        let floors = levels("raises the floor to ", " (`manifest::ORDER_UPDATER`)");
+        assert!(!floors.is_empty());
+        assert!(
+            floors.iter().all(|level| *level == ORDER_UPDATER),
+            "{floors:?} against {ORDER_UPDATER}"
+        );
+    }
 }
