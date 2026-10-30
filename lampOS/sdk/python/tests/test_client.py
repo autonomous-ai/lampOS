@@ -16,6 +16,7 @@ from lampos import Keyring, Lamp, LampError, NotPaired, Subscription, WrongLamp,
 from lampos.testing import FakeLamp
 
 REPO_SCHEMA = Path(__file__).resolve().parents[3] / "docs" / "control.schema.json"
+REPO_MODEL = REPO_SCHEMA.with_name("lamp.model.json")
 
 
 # A move the body plays (and lamp-control takes): 4 frames of 500 ms, 1.5 s in
@@ -39,6 +40,28 @@ def test_the_packaged_schema_is_the_repositorys():
     if not REPO_SCHEMA.exists():
         pytest.skip("docs/control.schema.json is not beside this copy")
     assert json.loads(REPO_SCHEMA.read_text()) == schema.schema()
+
+
+def test_the_packaged_model_is_the_repositorys_and_names_the_protocols_joints():
+    from lampos import model
+
+    if not REPO_MODEL.exists():
+        pytest.skip("docs/lamp.model.json is not beside this copy")
+    assert json.loads(REPO_MODEL.read_text()) == model()
+    targets = schema.schema()["$defs"]["joints"]["properties"]["targets"]["properties"]
+    assert sorted(joint["name"] for joint in model()["joints"]) == sorted(targets)
+    # A fresh copy each call.
+    model()["joints"].clear()
+    assert len(model()["joints"]) == 5
+
+
+def test_the_packaged_hardware_is_the_repositorys():
+    from lampos import hardware
+
+    repo = REPO_MODEL.with_name("lamp.hardware.json")
+    if not repo.exists():
+        pytest.skip("docs/lamp.hardware.json is not beside this copy")
+    assert json.loads(repo.read_text()) == hardware()
 
 
 def test_proofs_name_what_they_are_for():

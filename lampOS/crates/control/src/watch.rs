@@ -20,7 +20,10 @@
 
 use serde_json::{Value, json};
 
-use crate::protocol::{EventKind, LeaseWhy, Part};
+use crate::{
+    body_state::BodyState,
+    protocol::{EventKind, LeaseWhy, Part},
+};
 
 /// A face counts as arrived after none for this long.
 pub const ABSENT_FOR_US: u64 = 3_000_000;
@@ -134,6 +137,8 @@ pub struct Watch {
     /// The last hand told, none once its going is told, and when.
     hand_told: Option<Hand>,
     hand_told_us: Option<u64>,
+    /// Where the body is, for `body.state`.
+    body: BodyState,
 }
 
 impl Watch {
@@ -220,6 +225,22 @@ impl Watch {
                 };
                 out.push(event);
                 out
+            }
+            "body/joint_states" => {
+                let lamp = json!({
+                    "light": self.shows.clone().unwrap_or_else(|| self.light.clone()),
+                    "talking": self.talking,
+                    "private": self.private,
+                });
+                self.body
+                    .joints(payload, lamp, now_us)
+                    .map(|state| Out::Event(EventKind::BodyState, state))
+                    .into_iter()
+                    .collect()
+            }
+            "diagnostics" => {
+                self.body.report(payload);
+                Vec::new()
             }
             "body/hand" if payload["pushed"] == true => {
                 vec![Out::Lose(Some(Part::Body), LeaseWhy::Hand)]

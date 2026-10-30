@@ -220,7 +220,12 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
             ),
             // A step has run: the start checks are behind it.
             fact(lamp_keeper::STATE, lamp_keeper::PartState::Ready.as_str()),
-        ],
+        ]
+        .into_iter()
+        // Each joint's own, for lamp-control's `body.state`, after the
+        // facts above so that none of theirs moves.
+        .chain(warmth.map(|(joint, reading)| fact(&format!("temperature_{joint}"), reading)))
+        .collect(),
     }
 }
 
@@ -1117,6 +1122,11 @@ mod tests {
                 ("resisted_last_minute", "0"),
                 ("resisted_since_start", "0"),
                 ("state", "ready"),
+                ("temperature_head_pitch", "38"),
+                ("temperature_head_roll", "36"),
+                ("temperature_base_yaw", "41"),
+                ("temperature_shoulder", "44"),
+                ("temperature_elbow", "43"),
             ]
         );
         // One under warm is well, warm is not.

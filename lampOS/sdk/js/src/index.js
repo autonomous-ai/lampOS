@@ -5,3 +5,4 @@ export { Keyring } from './keys.js';
 export { find } from './discovery.js';
 export { fake } from './fake.js';
 export * as schema from './schema.js';
+export { hardware, model } from './model.js';

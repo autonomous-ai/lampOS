@@ -102,6 +102,7 @@ asyncio.run(main())
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
   | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; the door already refuses `say` and `sound` in quiet hours, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
+  | `body.state` | `joints` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`: each `deg`, `counts`, `goal_deg`, `load`, `moving`, `temp_c`) and `lamp` (`light`, `talking`, `private`), at most 25 a second (12.5 today) | `body` |
 
 - **State:** `await lamp.get("presence", "lamp")` returns the states asked,
   by those names, as lamp-control answers them: `{"presence": {...},
@@ -232,6 +233,7 @@ subscribe.
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false). `quiet_hours` is planned, not sent yet | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
 | `hand` | `seen`. When seen: `x`, `y` (the palm's centre, 0–1 from the picture's left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. All to 2 places, never the tracker's clock | `{"ev":"hand","seen":true,"x":0.42,"y":0.55,"size":0.12,"open":true,"confidence":0.91}` and `{"ev":"hand","seen":false}` | a hand is first seen, moves or grows by 0.05, opens or closes, at most 4 a second (the newest kept). `seen: false` once, 1 s after the last. Under 0.5 confidence is no hand | `look` |
+| `body.state` | `joints`: each of `pitch`, `roll`, `yaw`, `shoulder`, `elbow` the body read, with `deg` (from its servo's middle, to a tenth), `counts` (0–4095), `goal_deg`, `load` (0–1), `moving` (5°/s or more) and `temp_c` (from the body's once-a-second report). `lamp`: `light`, `talking`, `private` | `{"ev":"body.state","joints":{"yaw":{"deg":-28.6,"counts":1722,"goal_deg":-22.9,"load":0.1,"moving":true,"temp_c":41}},"lamp":{"light":{"on":true,"colour":"warm","level":3},"talking":false,"private":false}}` | each `body/joint_states` the body sends, at most 25 a second: 12.5 today | `body` |
 
 And two that come by themselves, with no subscription:
 
@@ -249,6 +251,25 @@ And two that come by themselves, with no subscription:
 | `mood` | `energy`, `warmth`, `awake`, `asleep`, the lamp's inner state. `null` until known | `{"energy":0.6,"warmth":0.7,"awake":true,"asleep":false}` | none |
 | `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
 | `air` | the room's air (particles, humidity, temperature, CO2), from the lamp's air part | planned: not a state `get` answers yet | |
+
+### The lamp's model
+
+`lampos.model()` is the lamp's kinematic model, the package's copy of
+[lamp.model.json](../../docs/lamp.model.json), written from the rigged CAD
+(`robots/lamp/hardware/cad/glb/lamp.glb`) by the JS SDK's `tools/lamp-model.js`.
+It needs no lamp. It gives:
+
+- `chain`: the joints from the base out, under the `joints` op's names.
+- Each joint's `bone` in lamp.glb, `parent`, `origin_m`, `rest_quat`, `axis`,
+  `reach_deg` around the lamp's home, and its servo's number and bus name.
+- `measured`: what is still the CAD's. The origins are, and each joint's
+  `zero_deg` and `sign`, the servo's `deg` in `body.state` at the CAD's rest
+  pose, are too, until measured on a lamp.
+
+`lampos.hardware()` is the lamp's parts as data ([lamp.hardware.json](../../docs/lamp.hardware.json), [hardware.md](../../docs/hardware.md)): the board, servos, camera, microphones, speaker, light, touch, buttons, air sensor and power, each with where its facts come from.
+
+With `body.state` it draws the lamp as it stands: turn each bone of lamp.glb
+about its `axis` by `sign * (deg - zero_deg)` after its `rest_quat`.
 
 ### Never readable
 
