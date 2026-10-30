@@ -769,10 +769,7 @@ impl Run<'_, '_> {
         if crate::walk::under_way(self.config)
             && let Some(held) = crate::walk::hold(self.records.folder())
         {
-            return Outcome::NotQuiet(format!(
-                "the setup walk is under way: held, round {held} of {}",
-                crate::walk::MOST_HELD
-            ));
+            return Outcome::NotQuiet(crate::walk::held(held));
         }
         // A template is never active itself, and never restarted: only its
         // instances run.
@@ -1956,12 +1953,15 @@ impl Run<'_, '_> {
 
     /// Waits for `long` of quiet, at most `within`. Ok, or why not. With
     /// `unseen_is_quiet`, a voice whose state cannot be seen is not waited
-    /// for: that is for putting back a build, not for switching to one.
+    /// for: that is for putting back a build, not for switching to one. With
+    /// `walk`, a setup walk under way at any look ends it as
+    /// [`crate::walk::UNDER_WAY`], quiet or not: the switch's own wait.
     fn wait_quiet(
         &mut self,
         long: Duration,
         within: Duration,
         unseen_is_quiet: bool,
+        walk: bool,
     ) -> Result<(), String> {
         let until = self.world.clock.now_ms() + within.as_millis() as u64;
         let mut told = false;
@@ -1974,6 +1974,9 @@ impl Run<'_, '_> {
         loop {
             if !self.voice_running() {
                 return Ok(());
+            }
+            if walk && crate::walk::under_way(self.config) {
+                return Err(crate::walk::UNDER_WAY.to_owned());
             }
             let now = self.world.clock.now_ms();
             if unseen_is_quiet && !self.quiet.seen(now) {
@@ -2229,7 +2232,21 @@ impl Run<'_, '_> {
         changes: Vec<Change>,
         placing: Option<Placing>,
     ) -> Outcome {
-        if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
+        // A walk begun while this round fetched or waited holds it too, at
+        // any look of the wait, before anything is written (crate::walk).
+        // A count that can't be kept holds nothing: the wait goes on as
+        // before, with the walk no longer looked at.
+        let walk = !crate::walk::spent(self.records.folder());
+        let waited = match self.wait_quiet(QUIET, self.config.quiet_wait, false, walk) {
+            Err(why) if walk && why == crate::walk::UNDER_WAY => {
+                if let Some(held) = crate::walk::hold(self.records.folder()) {
+                    return Outcome::NotQuiet(crate::walk::held(held));
+                }
+                self.wait_quiet(QUIET, self.config.quiet_wait, false, false)
+            }
+            waited => waited,
+        };
+        if let Err(why) = waited {
             return Outcome::NotQuiet(why);
         }
         // The product skills' files as they are now, and as they were: kept
@@ -2409,7 +2426,7 @@ impl Run<'_, '_> {
                     .any(|back| back.was_active && !unrestarted.contains(&back.unit)) =>
             {
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
+                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
                 backs[voice_at].restarted = true;
@@ -2442,7 +2459,7 @@ impl Run<'_, '_> {
                 // before marking it restarted or stopping its old process.
                 // A voice stopped first was judged before its stop.
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
+                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
             }
@@ -2678,7 +2695,7 @@ impl Run<'_, '_> {
                 // A voice that is well is not cut off mid-sentence.
                 self.listen(Duration::ZERO);
                 let within = self.config.quiet_wait;
-                if let Err(why) = self.wait_quiet(BETWEEN_TURNS, within, true) {
+                if let Err(why) = self.wait_quiet(BETWEEN_TURNS, within, true, false) {
                     self.say(&format!("the voice is put back all the same: {why}"));
                 }
             }

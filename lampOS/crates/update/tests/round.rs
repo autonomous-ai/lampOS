@@ -88,6 +88,9 @@ struct FakeChannel {
     /// A newer build's envelope, published once the round has read the one
     /// it serves: a promote that lands while a lamp is mid-round.
     promoted: Option<Vec<u8>>,
+    /// A file written on the lamp as the first of a build's files is
+    /// fetched: something the lamp did while the round fetched (#4455).
+    on_fetch: Option<(PathBuf, String)>,
 }
 
 impl Channel for FakeChannel {
@@ -100,6 +103,12 @@ impl Channel for FakeChannel {
                 .is_some_and(|under| url.starts_with(under.as_str()))
         {
             return Err(Fetch::Unreachable("no network".into()));
+        }
+        if !url.ends_with(manifest::ENVELOPE)
+            && let Some((path, text)) = self.on_fetch.take()
+        {
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
         }
         let bytes = self.files.get(url).ok_or(Fetch::Missing)?;
         if bytes.len() as u64 > most {
