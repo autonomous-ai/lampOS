@@ -362,6 +362,55 @@ pub fn bare_call(piece: &str) -> bool {
     })
 }
 
+/// The lamp's functions whose names have no underscore, so
+/// [`names_a_function`] alone can't tell them from a word.
+const PLAIN_NAMES: [&str; 3] = ["remember", "recall", "forget"];
+
+/// Whether a reply so far opens with a call narrated as words, "Calling
+/// not_for_me." or "Calling recall about the vet appointment.": on
+/// lamp-06c1 on 30 October, 13 replies opened so, 8 of them with no call
+/// in their round, and each one said was kept in the thread as the lamp's
+/// own line, which the next replies copied. Case aside, "calling" and then
+/// a function's name: one with an underscore, as [`names_a_function`]
+/// reads one, or one of [`PLAIN_NAMES`]. With `Some(true)`, the byte length
+/// of the narration's sentence, to its first '.', '!', '?' or line end
+/// (the whole text once `ended`), and the name; `Some(false)`: it is no
+/// such opening ("Calling your sister is a good idea."); `None`: not yet
+/// known. `ended`: no more text comes.
+pub fn opens_with_a_call_aloud(text: &str, ended: bool) -> Option<Option<(usize, String)>> {
+    const CALLING: &str = "calling ";
+    let start = text.len() - text.trim_start().len();
+    let rest = &text[start..];
+    let head: String = rest.chars().take(CALLING.len()).collect();
+    if !CALLING.starts_with(&head.to_lowercase()) {
+        return Some(None);
+    }
+    if head.len() < CALLING.len() {
+        return if ended { Some(None) } else { None };
+    }
+    let after = &rest[CALLING.len()..];
+    let name_at = after.len() - after.trim_start().len();
+    let named = &after[name_at..];
+    let name_len = named
+        .find(|c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'))
+        .unwrap_or(named.len());
+    if name_len == named.len() && !ended {
+        return None;
+    }
+    let name = &named[..name_len];
+    let known = PLAIN_NAMES.contains(&name)
+        || (names_a_function(name) && !name.ends_with('_') && !name.starts_with('_'));
+    if !known {
+        return Some(None);
+    }
+    let from = start + CALLING.len() + name_at + name_len;
+    match text[from..].find(['.', '!', '?', '\n']) {
+        Some(end) => Some(Some((from + end + 1, name.to_owned()))),
+        None if ended => Some(Some((text.len(), name.to_owned()))),
+        None => None,
+    }
+}
+
 /// Whether `text` is a call so far: whole, or a name with its arguments
 /// begun and not yet closed (`set_timer{"min`).
 fn a_call_so_far(text: &str) -> bool {
@@ -1473,5 +1522,48 @@ mod tests {
             assert!(scrap(counted, false, None, Some(loud)), "{counted} {loud}");
         }
         assert!(!scrap(SCRAP_BLOCKS, false, None, None));
+    }
+
+    /// A reply opening with a call narrated as words (lamp-06c1, 30 Oct)
+    /// is known as soon as its name is, its sentence measured; ordinary
+    /// words beginning "Calling" are not one.
+    #[test]
+    fn a_call_narrated_as_words_is_known_by_its_opening() {
+        let said = |text: &str| opens_with_a_call_aloud(text, false);
+        assert_eq!(
+            said("Calling not_for_me."),
+            Some(Some((19, "not_for_me".to_owned())))
+        );
+        assert_eq!(
+            opens_with_a_call_aloud(" calling recall about the vet appointment. Monday.", true),
+            Some(Some((42, "recall".to_owned())))
+        );
+        assert_eq!(
+            opens_with_a_call_aloud("Calling remember", true),
+            Some(Some((16, "remember".to_owned())))
+        );
+        // Not yet known: the opening, the name or its sentence still coming.
+        for text in [
+            "",
+            "Cal",
+            "Calling",
+            "Calling ",
+            "Calling not_fo",
+            "Calling recall about",
+        ] {
+            assert_eq!(said(text), None, "{text:?}");
+        }
+        // No such opening.
+        for text in [
+            "Monday at nine.",
+            "Call me later.",
+            "Calling your sister is a good idea.",
+            "Calling Lily now?",
+            "Calling recalled nothing.",
+            "Calling _x.",
+        ] {
+            assert_eq!(said(text), Some(None), "{text:?}");
+        }
+        assert_eq!(opens_with_a_call_aloud("Calli", true), Some(None));
     }
 }

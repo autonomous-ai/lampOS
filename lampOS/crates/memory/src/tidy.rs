@@ -30,6 +30,8 @@ pub const MAX_SOURCES: usize = 64;
 pub const MAX_OBSERVATIONS: usize = 8;
 /// Bytes of the serialized [`Input`], including JSON framing and escaping.
 pub const MAX_INPUT_BYTES: usize = 32 * 1024;
+/// [`validate_input`]'s refusal for an input over [`MAX_INPUT_BYTES`].
+pub const INPUT_TOO_LARGE: &str = "encoded input exceeds 32 KiB";
 /// UTF-8 bytes of a kept fact, previous observation or proposed observation.
 pub const MAX_FACT_BYTES: usize = 300;
 pub const DEFAULT_TIMEOUT_MS: u64 = 30_000;
@@ -227,7 +229,7 @@ pub fn validate_input(input: &Input) -> Result<(), ModelError> {
     // this temporary encoding cannot grow with an unchecked caller value.
     let bytes = serde_json::to_vec(input).map_err(|_| bad("input could not be encoded"))?;
     if bytes.len() > MAX_INPUT_BYTES {
-        return Err(bad("encoded input exceeds 32 KiB"));
+        return Err(bad(INPUT_TOO_LARGE));
     }
     Ok(())
 }

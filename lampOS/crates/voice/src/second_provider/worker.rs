@@ -723,13 +723,12 @@ async fn ask_observations(
     chat: &crate::second_provider::net::Chat,
     input: &serde_json::Value,
 ) -> Option<serde_json::Value> {
+    let mut prompt = crate::remember::observe_prompt(input.get("today").is_some()).into_owned();
+    if input.get("summary").is_some() {
+        prompt.push_str(crate::remember::OBSERVE_SUMMARY);
+    }
     let mut stream = chat
-        .send(&[
-            Message::system(crate::remember::observe_prompt(
-                input.get("today").is_some(),
-            )),
-            Message::user(input.to_string()),
-        ])
+        .send(&[Message::system(prompt), Message::user(input.to_string())])
         .await
         .ok()?;
     let mut text = String::new();
@@ -741,6 +740,70 @@ async fn ask_observations(
         }
     }
     crate::remember::observe_output(&text)
+}
+
+/// The conversation's running summary (`LAMP_CONVERSATION_SUMMARY`,
+/// [`crate::conversation_summary`]): the same DeepSeek model and key as the
+/// chat and the observation pass, thinking off, on the summary's own thread
+/// with a runtime of its own, within
+/// [`crate::conversation_summary::DEADLINE`]; never on a turn's path.
+fn conversation_summarizer(
+    config: &crate::second_config::SecondConfig,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<crate::conversation_summary::Summarizer> {
+    let key = deepseek_key(config, credentials)?;
+    let base = config
+        .hosted
+        .deepseek_base_url
+        .clone()
+        .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
+    summarizer_at(&base, &config.hosted.deepseek_model, key.expose())
+}
+
+/// [`conversation_summarizer`]'s model at `base`.
+pub fn summarizer_at(
+    base: &str,
+    model: &str,
+    key: &str,
+) -> io::Result<crate::conversation_summary::Summarizer> {
+    let chat =
+        crate::second_provider::net::Chat::deepseek_at(base, model, key, Arc::new(Vec::new), false)
+            .map_err(|error| io::Error::other(error.to_string()))?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    Ok(Box::new(move |input| {
+        runtime.block_on(async {
+            tokio::time::timeout(
+                crate::conversation_summary::DEADLINE,
+                ask_summary(&chat, input),
+            )
+            .await
+            .ok()
+            .flatten()
+        })
+    }))
+}
+
+/// One summary: the prompt, the job as quoted data, and the model's whole
+/// answer as text; nothing when the call or its stream failed.
+async fn ask_summary(chat: &crate::second_provider::net::Chat, input: &str) -> Option<String> {
+    let mut stream = chat
+        .send(&[
+            Message::system(crate::conversation_summary::PROMPT.to_owned()),
+            Message::user(input.to_owned()),
+        ])
+        .await
+        .ok()?;
+    let mut text = String::new();
+    while let Some(event) = stream.next().await.ok()? {
+        match event {
+            crate::second_provider::net::ChatEvent::Text(piece) => text.push_str(&piece),
+            crate::second_provider::net::ChatEvent::Done => break,
+            _ => {}
+        }
+    }
+    Some(text)
 }
 
 /// The status the person's own DeepSeek key was last refused with, 0 while
@@ -1642,6 +1705,19 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
 /// (`LAMP_SECOND_SEEMS=on`): a fresh read (within `HumanSeems::LASTS`)
 /// with the time it was said; a FER+ read in `latest`, while both readers
 /// run, breaks the run of Blendshape V2's (`crate::seems_told`).
+/// Memory's forgets (`memory/forgot`, from the app or by voice) reach the
+/// conversation's thread and running summary
+/// ([`crate::conversation_summary::memory_forgot`]), looked at every half
+/// second, off any turn's path (the reviewer-lead's P2 on #4479).
+async fn forgot_task(mut forgot: crate::bus_out::ForgotIn) {
+    let mut every = tokio::time::interval(Duration::from_millis(500));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        every.tick().await;
+        crate::conversation_summary::memory_forgot(&mut forgot, monotonic_us());
+    }
+}
+
 async fn seems_task(bus: lamp_bus::Bus, seems: Arc<Mutex<crate::seems_told::SeemsTold>>) {
     let mut every = tokio::time::interval(Duration::from_secs(1));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -1905,6 +1981,23 @@ pub fn serve(
             }
             Err(error) => eprintln!(
                 "lamp-voice second: no observation pass, the memory keeps only what it is asked to: {error}"
+            ),
+        }
+    }
+    // The conversation's running summary (#1693's long-conversation plan,
+    // step 3), with this route's model.
+    if crate::conversation_summary::on() {
+        match conversation_summarizer(&config, credentials.as_deref()) {
+            Ok(summarizer) => {
+                crate::conversation_summary::summarize_with(summarizer);
+                eprintln!(
+                    "lamp-voice second: the exchanges leaving a conversation's view are summarised by {} {}, off the turn's path (LAMP_CONVERSATION_SUMMARY)",
+                    config.hosted.deepseek_model,
+                    deepseek_where(&config.hosted)
+                );
+            }
+            Err(error) => eprintln!(
+                "lamp-voice second: no conversation summary, a turn is told only the thread: {error}"
             ),
         }
     }
@@ -2638,6 +2731,17 @@ pub fn serve(
             .is_ok_and(|value| value == "on"),
     );
     engine = engine_seeing;
+    // A known person's line no face was seen speaking, in their conversation
+    // going on with no other face in view, is carried as theirs (#4339,
+    // `LAMP_CONVERSATION_CARRIES=on`): only beside the scoping by sight above.
+    if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
+        .is_ok_and(|value| value == "on")
+    {
+        eprintln!(
+            "lamp-voice second: a known person's line no face was seen speaking, in their conversation going on with no other face in view, is told from that conversation, never memory's (LAMP_CONVERSATION_CARRIES)"
+        );
+        engine = engine.carrying_conversations(true);
+    }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
     // The faces seeing who speaks reads, when it is on, or else its own
@@ -3631,6 +3735,17 @@ pub fn serve(
             "lamp-voice second: how a known person seems is told beside what they say (LAMP_SECOND_SEEMS)"
         );
         runtime.spawn(seems_task(bus, told));
+    }
+    // Memory's forgets, with the running summary on and the bus: a forget
+    // from the app drops the conversation's notes as one by voice does.
+    if crate::conversation_summary::on()
+        && let Some(forgot) = files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+            .and_then(|bus| crate::bus_out::ForgotIn::on(&bus).ok())
+    {
+        runtime.spawn(forgot_task(forgot));
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
@@ -10000,6 +10115,15 @@ fn thread_and_history(
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
+    // The scope's own running summary first, within the room, never
+    // another scope's (`LAMP_CONVERSATION_SUMMARY`); a name withheld is
+    // taken out of it as out of the thread.
+    let summary = crate::conversation_summary::told(whose, now, room);
+    let summary = match withheld {
+        Some(name) if !summary.is_empty() => crate::person::without_name(&summary, name),
+        _ => summary,
+    };
+    let room = room.saturating_sub(summary.len());
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
             thread.recall_for(whose, now, room),
@@ -10042,7 +10166,10 @@ fn thread_and_history(
                 .collect(),
         ),
     };
-    (thread, recent.into_iter().flat_map(messages).collect())
+    (
+        summary + &thread,
+        recent.into_iter().flat_map(messages).collect(),
+    )
 }
 
 /// What a text's answer (#1673) is told, and how its functions run. It is
@@ -10180,8 +10307,10 @@ fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
 }
 
 /// Exchanges given to the chat as messages, and for how long since each.
-pub const HISTORY_EXCHANGES: usize = 6;
-pub const HISTORY_WITHIN: Duration = Duration::from_secs(300);
+/// Twelve and ten minutes (#1693, a long talk's quiz rules left the old six
+/// and 300 s); the thread keeps that many ([`crate::thread`]).
+pub const HISTORY_EXCHANGES: usize = 12;
+pub const HISTORY_WITHIN: Duration = Duration::from_secs(600);
 
 /// Keep what a turn's output says in the thread, as the Live route keeps
 /// its transcripts: the person's words, the lamp's (not the announcement),
@@ -10260,6 +10389,11 @@ fn keep_scoped(
                             return;
                         };
                         thread.lamp_for(*request, &text, now, scope.person());
+                        // A held or carried line is told in the thread,
+                        // never folded into a summary or talk note.
+                        if scope.held() {
+                            thread.held_for(*request);
+                        }
                     }
                     None => thread.lamp(*request, &text, now),
                 }
@@ -10283,6 +10417,10 @@ fn keep_scoped(
                 );
             }
             save(file);
+            // After the reply and its save, off the turn's path: the
+            // exchanges about to leave the view go to the summary's own
+            // thread (`LAMP_CONVERSATION_SUMMARY`).
+            crate::conversation_summary::after_turn(now);
         }
         ProviderOutput::TurnFailed { request, .. } => {
             let _ = crate::remember::finished_forgetting_reply(*request);

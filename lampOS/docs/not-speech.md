@@ -643,6 +643,19 @@ A call written as words is kept nowhere, on either route
 - The backup voice: a reply that is `not_for_me…` written as words ends the
   turn in silence, as the call does, with no announcement; any other call
   written as words is left out unsaid, and not run.
+- The second route, a call narrated as words
+  (`not_speech::opens_with_a_call_aloud`; lamp-06c1, 30 Oct: 13 replies
+  opened "Calling not_for_me." or "Calling recall about the vet
+  appointment.", 8 with no call in their round, each kept in the thread as
+  the lamp's line and copied by the next replies): a reply's opening is held
+  only until it can't be "calling " and a function's name (one with an
+  underscore, or remember, recall or forget), so another reply's first piece
+  waits a token at most. One that is has that sentence dropped: never said,
+  never kept in the thread or the next round's messages. With nothing else
+  in its round, a narrated `not_for_me` is the decline (unless the line
+  called the lamp by name to a face, #2191), and any other is asked once
+  more, told to call the function (`CALL_ALOUD_NOTE`). Beside a call or
+  other words, those go on. "Calling your sister is a good idea." is said.
 
 ## Tests
 
