@@ -58,12 +58,13 @@ pub const FILE: &str = "update-alerts.json";
 /// round said, or `models`. A name not in this list is not told.
 pub const REASONS: &[&str] = &UpdateResult::REASONS;
 
-/// Where the alert goes: the backend's base as the account has it, with
-/// `/alert` after it. Unlike the ping, a trailing `/v1` stays: the alert
-/// lives beside the OpenAI-compatible routes. `None` without a base.
+/// Where the alert goes: `/v1/alert` under the backend's base, whether the
+/// account's base ends in `/v1` or not (a setup's account has it without).
+/// `None` without a base.
 pub fn url(account: &Account) -> Option<String> {
     let base = account.llm_base_url.trim().trim_end_matches('/');
-    (!base.is_empty()).then(|| format!("{base}/alert"))
+    let base = base.strip_suffix("/v1").unwrap_or(base);
+    (!base.is_empty()).then(|| format!("{base}/v1/alert"))
 }
 
 /// One stage of a round.
@@ -648,7 +649,7 @@ mod tests {
     }
 
     #[test]
-    fn the_url_is_the_base_with_alert_after_it_and_its_v1_kept() {
+    fn the_url_is_v1_alert_under_the_base_with_or_without_its_v1() {
         let account = |base: &str| Account {
             device_id: "d-42".into(),
             llm_base_url: base.into(),
@@ -659,8 +660,12 @@ mod tests {
             Some("https://api.test/v1/alert")
         );
         assert_eq!(
+            url(&account("https://api.test/api/v1/ai")).as_deref(),
+            Some("https://api.test/api/v1/ai/v1/alert")
+        );
+        assert_eq!(
             url(&account("https://api.test")).as_deref(),
-            Some("https://api.test/alert")
+            Some("https://api.test/v1/alert")
         );
         assert_eq!(url(&account(" ")), None);
     }
