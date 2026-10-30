@@ -636,11 +636,22 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     the page is believed, never argued with. A search whose query or results
     speak of a price (the word, "how much", Vietnamese's "giá" or "bao
     nhiêu", or an amount with `$ € £ ¥ ₫ ₹`, USD or VND) carries `note` saying the same (`SEARCHED_PRICE_NOTE`), and a
-    result on autonomous.ai carries its `url`, so `fetch_page` can read it.
+    result on autonomous.ai carries its `url`. Such a search also reads the
+    first of those pages itself, as below, after the results and within
+    another 3 s, and carries its `price` with `note` to give that price for
+    that product, never one in the results (`SEARCHED_OWN_PRICE_NOTE`), or,
+    with none read, `SEARCHED_PRICE_NOTE` and `OWN_PRICE_UNREAD_NOTE`. The
+    model needn't call `fetch_page` for it: on lamp-4ace on 31 Oct (build
+    9063) "How much is the Autonomous ErgoChair Pro?" was searched, not
+    fetched, and answered "449 euro on Autonomous's own page" from the
+    results' text, where the page said $499 (the first builder on #4593).
     `fetch_page` of an autonomous.ai page (`autonomous.ai` or
     `www.autonomous.ai`, no port; never the relay's `campaign-api`) also
     reads the page itself, `GET https://www.autonomous.ai<path>`, beside the
-    fetch and within the same 3 s, at most 2 MiB, following at most two
+    fetch and within the same 3 s. Either read drops a locale's first
+    segment (`/de-DE/…`, `/en-GB/…`, which give 534.31 EUR and 466.8 GBP for
+    the ErgoChair Pro on 31 Oct) for the default page, takes at most 2 MiB,
+    and follows at most two
     redirects and only while they stay on autonomous.ai (on 30 Oct a
     trailing slash answered 308 and an old product name,
     `office-chairs/ergochair-pro`, 301, both to the page): the price is from the
