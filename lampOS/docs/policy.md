@@ -197,9 +197,12 @@ never pauses is still judged, in parts.
 | `lamp_is_speaking` | Whether the lamp was speaking |
 | `lamp_last_said` | The end of what the lamp had last said: at most its last 200 bytes, begun at a whole character |
 | `seconds_since_lamp_spoke` | How long before the utterance the lamp had last spoken |
+| `name_heard` | The highest score the lamp's name was heard with while it was said; not there when nothing listens for the name (below). Not shown to the model |
+| `like_asker` | How alike its voice is to the voice of the person the lamp is in conversation with, from -1 to 1, as the voice said it for the request; not there when the voice said none ("How alike to the asker", below). Not shown to the model |
 
-The last three are taken when the utterance's first piece comes, not when
-the utterance ends. By its end the lamp may have begun to answer it, and
+`lamp_is_speaking`, `lamp_last_said` and `seconds_since_lamp_spoke` are
+taken when the utterance's first piece comes, not when the utterance
+ends. By its end the lamp may have begun to answer it, and
 whether to answer must not be judged from the answer. The log is what the
 weights are fitted from, and a context that held the lamp's own reaction
 would give away what is to be learned. "Last spoken" is the later of the
@@ -315,6 +318,28 @@ it, and answered what was not for the lamp 7.5 times of 44 against 17; it
 ignored what was for the lamp 5.7 times of 120 against 5. The log now
 holds real hearings beside real decisions, which is what the next fit is
 to be made from.
+
+**How alike to the asker.** Since #4306 the voice can say, for each
+request, how alike its voice is to the voice of the person the lamp is in
+conversation with, the one who said the line that began it
+(`attention/addressed`'s `like_asker`, [attention.md](attention.md)). The
+Policy joins it to the utterance by the request's number, the newest the
+voice said for that number in the last 60 s, and keeps it in the context
+as `like_asker`. It is the cosine of the two lines' voice prints, from -1
+to 1. Both sums have a term for it, added only when it is there:
+
+        + w x (like_asker - 0.70)
+
+0.70 is where the term is nothing: the voice's own bar for two prints
+being one person's. `w` is 0 in both sums today, so every decision is the
+one it was without the sign, to the bit, and a test holds that. It is to
+be fitted once a lamp has run with the sign. On lamp-4ace's played rounds
+of 30 Oct (1,166 lines), inside a conversation the seven answers told
+follow-ups from desk talk badly: `follows_lamp` 0.61 against 0.42,
+`others_business` 0.57 against 0.56. Whose voice it is should. The model
+is not shown the sign. Without the voice's same-voice check, outside a
+conversation, or when a print is not known, the context has no
+`like_asker` and the term adds nothing.
 
 **When no model answers.** The rule that was the baseline decides:
 `answer` if the room is quiet, the lamp is in conversation or its name

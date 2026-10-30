@@ -104,6 +104,7 @@ fn job() -> Job {
             lamp_last_said: None,
             seconds_since_lamp_spoke: None,
             name_heard: Some(0.97),
+            like_asker: None,
         },
         // Someone at the desk, turned to the lamp, as the eyes saw.
         seen: Some(Seen {

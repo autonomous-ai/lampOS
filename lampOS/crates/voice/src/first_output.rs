@@ -538,6 +538,7 @@ mod tests {
             facing_close: Some(true),
             name_score: 0.0,
             addressed: true,
+            like_asker: Some(0.91),
         };
         let path = {
             let mut log = FirstOutputLog::open(&directory).unwrap();

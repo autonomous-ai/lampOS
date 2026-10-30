@@ -83,6 +83,7 @@ fn the_state_with_a_picture_names_it_last_and_six_questions_are_added() {
         lamp_last_said: None,
         seconds_since_lamp_spoke: None,
         name_heard: None,
+        like_asker: None,
     };
     let plain = attention::state_text(&context);
     let pictured = attention::state_text_with_picture(&context, KEY);
@@ -358,5 +359,6 @@ fn job_context() -> Context {
         lamp_last_said: None,
         seconds_since_lamp_spoke: None,
         name_heard: None,
+        like_asker: None,
     }
 }

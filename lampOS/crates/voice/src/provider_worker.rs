@@ -2242,7 +2242,14 @@ async fn serve_with_visual<C: Connect>(
                     && !crate::addressed::judged(addressed_said.as_ref(), &request)
                 {
                     let now = monotonic_us();
-                    let said = crate::addressed::judge(request, &ears_levels, &looks, now);
+                    let mut said = crate::addressed::judge(request, &ears_levels, &looks, now);
+                    // How alike its voice is to the conversation's asker's:
+                    // told to the Policy, read by no rule (#4306).
+                    said.like_asker = crate::addressed::like_asker(
+                        intake.handoff.voices.as_mut(),
+                        said.request,
+                        crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now())),
+                    );
                     attention.set_addressed(said.addressed);
                     if let Some(out) = addressed_out.as_mut()
                         && let Err(error) = out.tell(&said, now)
@@ -3050,7 +3057,12 @@ async fn serve_with_visual<C: Connect>(
                                 && !crate::addressed::judged(addressed_said.as_ref(), &in_hand)
                             {
                                 let now = monotonic_us();
-                                let said = crate::addressed::judge(in_hand, &ears_levels, &looks, now);
+                                let mut said = crate::addressed::judge(in_hand, &ears_levels, &looks, now);
+                                said.like_asker = crate::addressed::like_asker(
+                                    intake.handoff.voices.as_mut(),
+                                    said.request,
+                                    crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now())),
+                                );
                                 attention.set_addressed(said.addressed);
                                 if let Some(out) = addressed_out.as_mut()
                                     && let Err(error) = out.tell(&said, now)
