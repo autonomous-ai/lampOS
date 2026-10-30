@@ -28,6 +28,7 @@ naming every public call, tool, event and error code they have.
 | subscribe by hand | `await lamp.subscribe(events, phrases)`, `await lamp.unsubscribe(events)` | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | — |
 | read state | `await lamp.get("presence", "light", "mood", "lamp")` | `await lamp.get('presence', 'light')` | `lamp_state(which)`, `lamp://state/<name>` |
 | the room's air, the lamp's own computer | `await lamp.air()`, `await lamp.device()` | `await lamp.air()`, `await lamp.device()` | `lamp_state(["air", "device"])`, `lamp://state/air` |
+| the body: each joint's place and bounds, the caps | `await lamp.body_info()` | `await lamp.bodyInfo()` | `lamp_state(["body"])` |
 | recent events | — | — | `lamp://events/recent` |
 | every event, as it comes | `lamp.on(...)` for each | `lamp.on(...)` for each | `lamp_events(since, wait_s)`, or subscribe to `lamp://events` (each new event sends `notifications/resources/updated`) |
 
@@ -58,9 +59,11 @@ draws now), `mood` (`energy`, `warmth`, `awake`, `asleep`), `lamp`
 (`talking`, `paused`, `private`, `asleep`), `air` (the newest reading as
 `air.changed` gives it; needs air), `device` (`cpu_load`, `memory_used`,
 `disk_free`, `uptime_s`, `temperature_c`; needs device), `volume`
-(`level`, `muted`; needs speak). `light`, `mood` and `volume` are `null`
-until the lamp has heard them; `air` and `device` are `{"known": false}`
-with no reading in 15 s.
+(`level`, `muted`; needs speak), `body` (needs body: `yaw`, `pitch`, `roll`,
+`shoulder`, `elbow`, each with `deg` from its home, `min_deg` and `max_deg`;
+the speed, load and heat caps). `light`, `mood` and `volume` are `null` until
+the lamp has heard them; `air` and `device` are `{"known": false}` with no
+reading in 15 s, and `body` until the body has found home.
 
 ## Leases
 

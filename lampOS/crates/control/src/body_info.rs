@@ -31,7 +31,7 @@ fn degrees(counts: f64) -> f64 {
     (counts * 360.0 / COUNTS_A_TURN * 10.0).round() / 10.0
 }
 
-/// The one convention for a joint's degrees, for `get` `body`, `body.state`
+/// The one convention for a joint's degrees, for `get` `body` (and the planned `body.state`)
 /// and `joints`' targets: `counts` from `home` (the found home for the head
 /// and base, the folded pose for the arm), to a tenth of a degree, positive
 /// with more counts for `base_yaw`, `shoulder`, `elbow` and `head_roll`, and
@@ -52,10 +52,11 @@ pub fn protocol_name(bus_name: &str) -> Option<&'static str> {
 }
 
 /// The body's state for `get`, from the last `body/limits` (`limits`) and the
-/// last `body/joint_states` (`joints`), either `Null` when not heard yet.
+/// last `body/joint_states` (`joints`), either `Null` when not heard in
+/// the last 15 s (`crate::watch::READING_STALE_US`).
 pub fn state(limits: &Value, joints: &Value) -> Value {
     let Some(each) = limits["joints"].as_array() else {
-        return json!({"known": false, "why": "the body has not said its limits yet"});
+        return json!({"known": false, "why": "the body has not said its limits in the last 15 s"});
     };
     // Where each joint is now, in counts, by the bus's name.
     let now = |name: &str| -> Option<f64> {

@@ -2285,6 +2285,21 @@ mod tests {
         assert_eq!(code_of(&light), None, "{light:?}");
     }
 
+    /// `get` `body` says where the body is and what it may do: only with
+    /// the body grant.
+    #[test]
+    fn get_body_needs_the_body_grant() {
+        let get = r#"{"id":3,"op":"get","state":["body"]}"#;
+        let computer = Computer::new(1);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Light]);
+        let refused = door.handle(&mut session, get, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&refused), Some("no_grant"));
+        assert_eq!(reply(&refused)["error"]["why"], "not granted: body");
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Body]);
+        let answered = door.handle(&mut session, get, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&answered), None, "{answered:?}");
+    }
+
     #[test]
     fn grants_leases_the_body_holder_and_rates_are_checked_before_the_part() {
         let computer = Computer::new(1);

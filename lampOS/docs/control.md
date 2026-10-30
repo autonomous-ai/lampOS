@@ -100,7 +100,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `look` | `at`: `face`, `hand`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive; any finite number, the body clamps it to its reach). `hand` follows it until `stop`, another look or the lease ends | `ahead` and `{yaw, pitch}`: the body's lease socket `{look}`, eased to and held while the lease is, inside the gaze's reach and the pose's bounds (below); `hand` with the lease socket's hold; `face` and `name` refused, "not in this release: look at a face or a name" | `body` (and `look` for `face` and `hand`) | body |
 | `move` | `step_ms` 40–1,000, `frames` (2 at least; at most the body's 10 s allows, 251 at a 40 ms step) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
-| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees from home; one at least), `within_ms` (any, 0 or more) | **today:** `yaw` and `pitch` go as the holder's look on the body's lease socket, the same degrees from home, cut to the same reach, with the look's `done` (a joint not named stays where `get` `body` says it is; before the body has said its limits, name both). `roll`, `shoulder` and `elbow` are refused until the body's own goal stream, every step through its caps | `body` | body, named |
+| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees from home; one at least), `within_ms` (any, 0 or more) | **today:** `yaw` and `pitch` go as the holder's look on the body's lease socket, said `"from":"home"`: the body takes its pose's offset off, so on a standing lamp too they're the degrees `get` `body` says, cut by the body from its pose as every look is, with the look's `done` in the same frame (a joint not named stays where `get` `body` says it is; before the body has said its limits, name both). `roll`, `shoulder` and `elbow` are refused until the body's own goal stream, every step through its caps. **Not a goal stream yet:** `within_ms` isn't used (the body eases at its own pace), and each `joints` replaces the look before it, whose `done` comes `cut_short`, so send one per move, not 40 a second | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
 | `light` with `rgb` or `pixels` | `rgb` (`#rrggbb`), or `pixels` (one `#rrggbb` per pixel, hello's `limits.ring.pixels` of them), `brightness` 0–100, `fade_ms`, `for_ms` ≤ 30 s | `light/request` with `pixels`, at the same priority and claim as a named light, and the nearest named colour and level beside them for a ring that draws none ("The ring, pixel by pixel") | `light` | no |
 | `say` | `text`: words, at most 900 UTF-8 bytes, the voice's own cap (a longer one is refused at the door, not sent and dropped); optional `rephrase` | `say.sock` with `exact: true`: the words as sent, rendered straight through the voice's speech service (no model, no tools) and played as the lamp's own line once nobody is talking with the lamp (`say::may_play_exact`: it waits while a conversation with the lamp is going on, its speaker is busy, or an answer or reminder is owed, never for speech in the room that nobody addresses to the lamp; the keeper's pause and the privacy switch refuse it; no quiet gap or rarity). With `rephrase: true`, a written turn for the voice's model, through its quiet after a turn, privacy and busy gates, as before | `speak` | no |
@@ -378,14 +378,13 @@ the lamp is private, `air.changed` included, as every event does: privacy
 closes the camera and the microphone, not the readings of the room's air or
 the lamp's own computer. An owner who wants none of what the air shows
 doesn't give `air`.
-`light`, `mood`, `lamp_state` for `lamp`, and `body`.
 
 #### The body's limits: `get` `body`
 
 `body` says what the lamp's body may do, joint by joint, and where each joint
 is now (`crates/control/src/body_info.rs`). It comes from the body's own
 `body/limits`, said once it has found where it is and every 10 s, and its
-`body/joint_states`. It needs the `body` grant, as `body.state` does. Until the body has said its limits, it is `{"known": false, "why": ...}`.
+`body/joint_states`. It needs the `body` grant. Until the body has said its limits, or once it has said none in the last 15 s (lamp-body stopped or restarting), it is `{"known": false, "why": ...}`; a joint with no position in the last 15 s has `counts` and `deg` null. The head's and base's `min_deg` and `max_deg` are a folded lamp's, around the found home: a standing lamp's head can sit outside them, so a client clamping a target to them may cut a reach the body would take. The body holds every look to its own bounds either way.
 
 - `joints`: `yaw`, `pitch`, `roll`, `shoulder` and `elbow`, the names
   `joints` takes. Each has `counts` (where it is, of 4,096 a turn), `deg`
@@ -400,13 +399,22 @@ is now (`crates/control/src/body_info.rs`). It comes from the body's own
   the gaze's yaw if wider), inside the pitch window and never under its floor,
   and the arm's window from folded to stood up. On a lamp that may not stand
   (`stands: false`), the arm has no poses and its whole turn.
+  - The head's and base's `min_deg` and `max_deg` are those of a **folded**
+    lamp, around the found home. Standing, the reach is measured from the
+    stand pose instead (its pitch about 20 degrees up on a lamp-75c9), so
+    what a look reaches moves with it.
+  - The body may cut further than these say: the pitch window, the servos'
+    own stored ranges (`LAMP_BODY_OWN_RANGES`), V1's anti-tip rule and the
+    stand pose's own bounds. A `joints` answer says what was reached and
+    `clamped` when anything cut it.
 - `speed_deg_s` and `acceleration_deg_s2` are the head's and base's caps.
   `load_limit` is the force cap as a share, `null` where each servo keeps its
   own. `heat_stop_c` is where a joint stops.
 - **Nothing here can be raised from outside the body.**
 
-**One convention for every joint's degrees.** `get` `body`, `body.state` and
-`joints`' targets all count degrees the same way, from one function
+**One convention for every joint's degrees.** `get` `body` and `joints`'
+targets count degrees the same way (and so will `body.state`, a planned
+event; nothing sends it yet), from one function
 (`body_info::from_home`): from home (the found home for the head and base,
 the folded pose for the arm), to a tenth of a degree. `yaw`, `shoulder`,
 `elbow` and `roll` are positive with more counts, and `pitch` with fewer, so
