@@ -96,6 +96,8 @@ mod chat;
 pub use chat::*;
 mod presence;
 pub use presence::*;
+mod account;
+pub use account::*;
 mod reports;
 pub use reports::*;
 mod familiar;
@@ -1710,6 +1712,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(chat_topics())
         .chain(presence_topics())
         .chain(reports_topics())
+        .chain(account_topics())
         .chain(familiar_topics())
         .chain(activity_topics())
         .chain(seems_topics())

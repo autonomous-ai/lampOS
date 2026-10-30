@@ -59,6 +59,11 @@ pub trait Lamp {
     /// Whether setup's hotspot opens by itself when the saved network is
     /// gone (#3020, `LAMP_WIFI_RECOVERY=on`), so the app may name it. False:
     /// no field, read as before.
+    /// `signed_out` while the lamp's login is no longer accepted
+    /// (`LAMP_SIGNED_OUT`, "Signed out" in `docs/cloud.md`). None otherwise.
+    fn account(&mut self) -> Option<&'static str> {
+        None
+    }
     fn recovery(&self) -> bool {
         false
     }
@@ -339,6 +344,11 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             if let Some(reset) = lamp.reset() {
                 info["reset"] = json!(reset);
             }
+            // `account` (`LAMP_SIGNED_OUT`): only while signed out, so a
+            // lamp signed in says what it always said.
+            if let Some(account) = lamp.account() {
+                info["account"] = json!(account);
+            }
             some(info)
         }
         "system.version" => some(lamp.versions()),
@@ -355,7 +365,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         "mic.get" => lamp.mic().map(|mic| Some(json!(mic))),
         "mic.set" => Err(MIC_SET_REFUSED.to_owned()),
-        "lamp.health" => lamp.health().map(Some),
+        "lamp.health" => lamp.health().map(|mut health| {
+            if let Some(account) = lamp.account() {
+                health["account"] = json!(account);
+            }
+            Some(health)
+        }),
         // The app's Light row (Fourth on #1396, the first builder's 10:2x on
         // #705): the person's own light, in V1's shape (`crate::light`).
         "led.resting.get" => lamp.light().map(|shown| Some(light::snapshot(&shown))),
@@ -613,6 +628,8 @@ pub mod tests {
         pub update_checks: crate::update::Checks,
         pub restart: bool,
         pub shutdown: bool,
+        /// What `account` says (`LAMP_SIGNED_OUT`).
+        pub account: Option<&'static str>,
         /// What `recovery` says (#3020).
         pub recovery: bool,
         /// What `reset` says (#2937).
@@ -620,6 +637,9 @@ pub mod tests {
     }
 
     impl Lamp for Fake {
+        fn account(&mut self) -> Option<&'static str> {
+            self.account
+        }
         fn recovery(&self) -> bool {
             self.recovery
         }
@@ -779,6 +799,16 @@ pub mod tests {
         assert_eq!(info["host"]["hostname"], "lamp-7f72");
         assert_eq!(info["versions"]["lamp-voice"], "0.1.0+abc");
         assert_eq!(info["network"]["interface"], "wlan0");
+        // `account` only while signed out; a lamp signed in says what it did.
+        assert!(info.get("account").is_none(), "{info}");
+        let mut out = Fake {
+            account: Some("signed_out"),
+            ..Fake::default()
+        };
+        let told = answer(&mut out, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(told["account"], "signed_out");
         // #3020: `recovery` only while it's on.
         assert!(info.get("recovery").is_none(), "{info}");
         let mut recovering = Fake {

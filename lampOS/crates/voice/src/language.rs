@@ -141,6 +141,8 @@ pub const WIFI_LOST: &str = "I can't reach any Wi-Fi. If you changed your Wi-Fi'
 pub const WIFI_RECOVERING: &str =
     "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.";
 
+pub const SIGNED_OUT: &str = "I've been signed out. Please set me up again in the app.";
+
 /// The lamp's fixed lines (#4473 (c)), by their English words, in
 /// Vietnamese, Japanese, Chinese and Korean, in that order: said from the
 /// speech cache in the owner's language, English where a line is not kept.
@@ -206,6 +208,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "Wi-Fiにつながらないから、設定モードにしたよ。アプリでWi-Fiをもう一度設定してね。",
             "我连不上Wi-Fi，已经打开了设置。请在App里重新帮我设置Wi-Fi。",
             "와이파이에 연결할 수 없어서 설정 모드를 열었어요. 앱에서 와이파이를 다시 설정해 주세요.",
+        ],
+    ),
+    (
+        SIGNED_OUT,
+        [
+            "Mình đã bị đăng xuất. Bạn cài đặt lại cho mình trong ứng dụng nhé.",
+            "サインアウトされちゃった。アプリでもう一度設定してね。",
+            "我已经退出登录了。请在App里重新帮我设置。",
+            "로그아웃됐어요. 앱에서 다시 설정해 주세요.",
         ],
     ),
 ];
@@ -514,7 +525,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 7);
+        assert_eq!(FIXED_LINES.len(), 8);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
