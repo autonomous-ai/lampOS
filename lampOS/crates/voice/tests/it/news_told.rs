@@ -179,6 +179,9 @@ impl Place {
         self.closes.lock().unwrap().clone()
     }
 
+    /// A failure names the line that waited (#1569: one failed once in a
+    /// loaded run, and its panic was not kept).
+    #[track_caller]
     fn until(&self, done: impl Fn() -> bool) {
         let begun = Instant::now();
         while !done() {
@@ -189,6 +192,7 @@ impl Place {
 
     /// Handed over as the voice does it (prepared, then the person's yes on
     /// the trusted socket), and its agent's answer read and kept.
+    #[track_caller]
     fn handed_and_read(&self) -> Value {
         let prepared =
             self.ask(json!({"op":"prepare","guard":self.guard(),"text":TASK,"target":"coding"}));
@@ -211,6 +215,7 @@ impl Place {
 
     /// The news of task `id` the voice's reader offers, taken to tell: its
     /// key.
+    #[track_caller]
     fn told(&self, news: &mut TaskNews, id: &Value) -> String {
         let begun = Instant::now();
         let key = loop {
@@ -232,6 +237,7 @@ impl Place {
 
     /// Nothing closed, nor marked told, though by the clock a close would
     /// be due three times over.
+    #[track_caller]
     fn nothing_closed(&self, id: &Value) {
         NOW_MS.fetch_add(3 * CLOSE_RETRY_MS, Ordering::SeqCst);
         thread::sleep(NOTHING_FOR);
@@ -276,7 +282,8 @@ fn news_heard_whole_closes_the_harness_it_was_of() {
 
     news.heard(5, vec![key]);
     place.until(|| !place.closed().is_empty());
-    assert!(place.task(&id)["observations"][0]["told"].is_object());
+    let task = place.task(&id);
+    assert!(task["observations"][0]["told"].is_object(), "{task}");
     place.until(|| place.task(&id)["task"]["close"]["state"] == "closed");
     assert_eq!(place.closed(), [AGENT]);
 }
@@ -305,6 +312,7 @@ fn news_heard_while_the_tasks_part_is_down_is_told_once_it_is_back() {
     place.nothing_closed(&id);
     news.heard(5, vec!["s1:9:hand-over".into()]);
     place.until(|| !place.closed().is_empty());
-    assert!(place.task(&id)["observations"][0]["told"].is_object());
+    let task = place.task(&id);
+    assert!(task["observations"][0]["told"].is_object(), "{task}");
     assert_eq!(place.closed(), [AGENT]);
 }
