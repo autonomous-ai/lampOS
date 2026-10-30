@@ -587,3 +587,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #4175: 4ACE RUN queued by the first builder tonight on 8999 (busy_day, switches on then off).
 - 22:3x: #4625 at `e96717e0a3`: the first builder's READ (the hello by the hard rules alone, never Jev's answer, #4305) as `lamp-policy --hello-by-rule` on the product, template and 4ace units, the judge in shadow only; the Reviewer-lead's HOLD: 4ace's known file, ask-shaped ids, product policy `--zone system`; two P3s kept with reasons. Reply on #4625 (c6526441356).
 - 23:05: #4175's 4ACE RUN on 8999 (the first builder): with the switches on, talk 6/6 (c04–c06 answered); off, 4/6 (c04, c05 held). d09 got through as a split piece read as a call ("Lamp is cute…"); Thirteen's split fix on #3923 comes first, then 3+3 alternating. #4175 queued behind it (c6527379081). #4625: the Reviewer-lead's READ-OK on `69682b3c09`, CI green; waiting for the first builder.
+
+## 31 Oct, 00:1x: #4625 landed
+
+- #4625 landed in train 426 (`6e49e777c6`, `c8ef0d6da6`, `a30a7dae66`). Reviewer-three's after-merge privacy read: no P1/P2; a P3 (stable-id renames share one hour) inert until `LAMP_MEMORY_STABLE_ID` is set. Lamp checks left (afternoon wording, a known face's hour) need lamp-4ace's policy and skills pins replaced; asked the first builder on #3997.
