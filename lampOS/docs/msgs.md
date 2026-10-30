@@ -528,14 +528,19 @@ anything else, and a peak under its quiet.
 `Addressed` lives in `src/attention.rs` and is re-exported at the crate
 root ([attention.md](attention.md), "Said to the lamp from close to it").
 The voice publishes it with `LAMP_ADDRESSED=on`. It carries no sound, no
-words and no picture.
+words and no picture, and no voice print: only how alike two prints are.
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
-| `Addressed` | `attention/addressed` | event | none / none | One request: its session and number, when its sound began and ended (the lamp's monotonic clock), the room microphone's highest rise over the quiet and whether that is near, how many looks of the eyes, the tallest face turned to the lamp, the share of looks with a close face turned to it and whether that is facing, the name's best score, and whether it was said to the lamp from close to it |
+| `Addressed` | `attention/addressed` | event | none / none | One request: its session and number, when its sound began and ended (the lamp's monotonic clock), the room microphone's highest rise over the quiet and whether that is near, how many looks of the eyes, the tallest face turned to the lamp, the share of looks with a close face turned to it and whether that is facing, the name's best score, whether it was said to the lamp from close to it, and, with the same-voice check in a conversation, `like_asker`: how alike its voice is to the conversation's asker's, a cosine from -1 to 1 (#4306) |
+
+`like_asker` was added as an optional field: left out when there is
+none and read as none from an older voice's message, so the type's
+version stays 1, as for the other optional fields added to messages.
 
 `check()` refuses an end before the beginning, a rise outside ±120 dB, a
-face height, share or score outside 0 to 1, a face height without looks
+face height, share or score outside 0 to 1, a `like_asker` that is not a
+number from -1 to 1, a face height without looks
 or looks without one, a share of fewer than two looks, `near` or
 `facing_close` said with no reading under it, and an `addressed` that is
 not exactly near and facing. A sign the ears or

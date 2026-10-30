@@ -56,6 +56,7 @@ fn run(n: usize, seed: u64, models: &[(&str, Answering)]) -> Vec<Value> {
                 lamp_last_said: None,
                 seconds_since_lamp_spoke: None,
                 name_heard: None,
+                like_asker: None,
             };
             let replayed: Vec<(String, Replayed)> = models
                 .iter()

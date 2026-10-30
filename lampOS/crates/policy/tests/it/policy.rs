@@ -2,7 +2,7 @@
 //! a stand-in for the decision model: the test plays the voice, and reads
 //! what the policy publishes, writes down and says about itself.
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{Decision, Diagnostic, Level, NameHeard, Speech, Voice, VoiceState};
+use lamp_msgs::{Addressed, Decision, Diagnostic, Level, NameHeard, Speech, Voice, VoiceState};
 use lamp_policy::{
     attention::{self, Context, Room},
     decide::{Answer, Asked, Connection, Decider, Failed, Question, Usage},
@@ -591,6 +591,7 @@ fn pieces_become_one_utterance_and_one_decision_is_published_and_logged() {
         lamp_last_said: None,
         seconds_since_lamp_spoke: None,
         name_heard: None,
+        like_asker: None,
     };
     assert_eq!(rig.shown(), attention::state(&context));
     // One utterance, one decision, one line.
@@ -931,6 +932,102 @@ fn the_lamps_name_heard_while_someone_spoke_is_joined_to_what_they_said() {
     rig.decision();
     rig.done_with(4);
     assert_eq!(rig.log(4)[3]["context"]["name_heard"], 0.0);
+    rig.stop();
+}
+
+/// #4306: how alike a request's voice was to the conversation's asker's, as
+/// the voice says it on `attention/addressed`, is joined to what was heard
+/// of that request by its number and written down with the decision. The
+/// model is not shown it, and at its weight of 0 the decision is the one
+/// without it.
+#[test]
+fn the_likeness_to_the_asker_said_for_a_request_is_joined_to_what_was_heard_of_it() {
+    let mut rig = Rig::new("asker", |_| Ok(asked(SEVEN)));
+    // The policy subscribes to it beside the voice's own three topics.
+    let started = Instant::now();
+    while !rig
+        .bus
+        .subscribers(Addressed::TOPIC)
+        .unwrap()
+        .iter()
+        .any(|listener| listener.socket.starts_with("policy.") && listener.listening)
+    {
+        assert!(started.elapsed() < WAIT, "the policy did not subscribe");
+        thread::sleep(ms(5));
+    }
+    let mut addressed = rig
+        .bus
+        .publisher_declared(Addressed::TOPIC, &Addressed::declaration(), "voice")
+        .unwrap();
+    let said = |request: u64, like_asker: Option<f32>| Addressed {
+        session: 1,
+        request,
+        began_us: 1_000_000,
+        ended_us: Some(2_000_000),
+        rise_db: None,
+        near: None,
+        looks: 0,
+        facing_height: None,
+        facing_share: None,
+        facing_close: None,
+        name_score: 0.0,
+        addressed: false,
+        like_asker,
+    };
+    // Said for request 7 with no likeness: nothing is written.
+    rig.voice(Voice::Listening);
+    rig.voice(Voice::Thinking);
+    assert_eq!(
+        addressed.publish_json(0, &said(7, None)).unwrap().delivered,
+        1
+    );
+    rig.hear_as("And tomorrow?", true, Some(7));
+    let without = rig.decision();
+    rig.done_with(1);
+    assert!(rig.log(1)[0]["context"].get("like_asker").is_none());
+    rig.voice(Voice::Resting);
+    // Said for request 8, and for 9 before it: 8's own is the one taken.
+    rig.voice(Voice::Listening);
+    rig.voice(Voice::Thinking);
+    for (request, like) in [(9, 0.21), (8, 0.86)] {
+        let sent = addressed
+            .publish_json(0, &said(request, Some(like)))
+            .unwrap();
+        assert_eq!(sent.delivered, 1);
+    }
+    thread::sleep(ms(100));
+    rig.hear_as("And tomorrow?", true, Some(8));
+    let with = rig.decision();
+    rig.done_with(2);
+    let like = rig.log(2)[1]["context"]["like_asker"].as_f64().unwrap();
+    assert!((like - 0.86).abs() < 1e-6, "{like}");
+    // The same answers, the same decision, to the bit.
+    assert_eq!(with.probability.to_bits(), without.probability.to_bits());
+    assert_eq!(with.choice, without.choice);
+    // A request the voice said nothing for has none, though others had.
+    rig.voice(Voice::Resting);
+    rig.voice(Voice::Listening);
+    rig.voice(Voice::Thinking);
+    rig.hear_as("And tomorrow?", true, Some(10));
+    rig.decision();
+    rig.done_with(3);
+    assert!(rig.log(3)[2]["context"].get("like_asker").is_none());
+    // A message that does not add up is passed over.
+    rig.voice(Voice::Resting);
+    rig.voice(Voice::Listening);
+    rig.voice(Voice::Thinking);
+    let sent = addressed.publish_json(0, &said(11, Some(1.5))).unwrap();
+    assert_eq!(sent.delivered, 1);
+    thread::sleep(ms(100));
+    rig.hear_as("And tomorrow?", true, Some(11));
+    rig.decision();
+    rig.done_with(4);
+    assert!(rig.log(4)[3]["context"].get("like_asker").is_none());
+    // The model was never shown it.
+    let shown: Vec<Value> = rig.states.try_iter().collect();
+    assert_eq!(shown.len(), 4);
+    assert!(shown.iter().all(|state| state.get("like_asker").is_none()));
+    assert!(shown.windows(2).all(|two| two[0] == two[1]));
     rig.stop();
 }
 
