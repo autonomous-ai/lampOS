@@ -1752,4 +1752,80 @@ mod tests {
         assert!(cache.is_cold(Instant::now()));
         std::fs::remove_dir_all(&directory).unwrap();
     }
+
+    /// A refresh as the worker runs it: the known file's mark, then its
+    /// observation, both from the file (#4493).
+    fn refresh_from(cache: &FaceCache, known: &std::path::Path) -> bool {
+        let mut token = cache.begin_refresh();
+        let changed = cache.known_file_read(
+            &mut token,
+            crate::known_faces::KnownMark::read(known),
+            Instant::now(),
+        );
+        cache.replace_seen(
+            token,
+            crate::known_faces::FaceObservation::read(known),
+            None,
+        );
+        changed
+    }
+
+    fn known_in(label: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let directory = std::env::temp_dir().join(format!(
+            "known-{label}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let known = directory.join("known");
+        (directory, known)
+    }
+
+    /// #4493's guard: the eyes renewing a held name (its time only, the same
+    /// words) is no change, so the cache stays warm and names them.
+    #[test]
+    fn the_same_words_renewed_keep_the_face_cache_warm() {
+        let (directory, known) = known_in("renewed");
+        std::fs::write(&known, "Alpha\n").unwrap();
+        let cache = FaceCache::default();
+        cache.went_cold(Instant::now());
+        assert!(
+            !refresh_from(&cache, &known),
+            "the first read sets the mark"
+        );
+        assert!(!cache.is_cold(Instant::now()));
+        for _ in 0..10 {
+            std::fs::File::options()
+                .write(true)
+                .open(&known)
+                .unwrap()
+                .set_modified(std::time::SystemTime::now())
+                .unwrap();
+            assert!(!refresh_from(&cache, &known));
+            assert!(!cache.is_cold(Instant::now()));
+            assert!(cache.snapshot(Instant::now()).person().is_some());
+        }
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// #4493's guard: a known file removed (a missed check) names nobody,
+    /// and it and the write back are two changes, each making the cache cold.
+    #[test]
+    fn a_removed_known_file_names_nobody_and_goes_cold_twice() {
+        let (directory, known) = known_in("removed");
+        std::fs::write(&known, "Alpha\n").unwrap();
+        let cache = FaceCache::default();
+        cache.went_cold(Instant::now());
+        assert!(!refresh_from(&cache, &known));
+        assert!(cache.snapshot(Instant::now()).person().is_some());
+        std::fs::remove_file(&known).unwrap();
+        assert!(refresh_from(&cache, &known), "the removal");
+        assert!(cache.is_cold(Instant::now()));
+        assert_eq!(cache.snapshot(Instant::now()), ScopeSnapshot::room());
+        std::fs::write(&known, "Alpha\n").unwrap();
+        assert!(refresh_from(&cache, &known), "the write back");
+        assert!(cache.snapshot(Instant::now()).person().is_some());
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
 }
