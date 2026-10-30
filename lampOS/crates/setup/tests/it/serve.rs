@@ -975,6 +975,23 @@ async fn call(app: &axum::Router, method: &str, path: &str, body: Value) -> (Sta
     (code, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
 }
 
+/// Reviewer-two on #4180: refusals asked many times a second write the
+/// first line, then one a minute later with the count since it.
+#[test]
+fn the_recovery_hotspot_journals_a_refused_key_once_a_minute_with_a_count() {
+    let mut refusals = lamp_setup::http::Refusals::new();
+    let start = Instant::now();
+    let lines: Vec<_> = (0..100)
+        .filter_map(|i| refusals.refused(start + Duration::from_millis(i * 10)))
+        .collect();
+    assert_eq!(lines, ["a request without this lamp's own key was refused"]);
+    assert_eq!(
+        refusals.refused(start + Duration::from_secs(61)).as_deref(),
+        Some("100 requests without this lamp's own key refused since the last line")
+    );
+    assert_eq!(refusals.refused(start + Duration::from_secs(62)), None);
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn the_recovery_hotspot_takes_a_network_only_with_the_lamps_own_key() {
     let (app, status, started, root) = app(false);
