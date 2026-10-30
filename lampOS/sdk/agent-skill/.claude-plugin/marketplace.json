@@ -1,0 +1,7 @@
+{
+  "name": "lampos",
+  "owner": { "name": "lampOS" },
+  "plugins": [
+    { "name": "lampos-sdk", "source": "./", "description": "Program a lampOS lamp: the SDK skill, and lamp-mcp's tools" }
+  ]
+}
