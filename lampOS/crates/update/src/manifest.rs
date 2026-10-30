@@ -1684,11 +1684,28 @@ mod tests {
     fn updates_md_gives_todays_updater_levels() {
         let doc = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/updates.md");
         let doc = std::fs::read_to_string(doc).unwrap();
+        // Each level after `before` (and before `after`), only where
+        // `before` starts the constant's whole name: after a backtick or
+        // `manifest::`, never the end of `ADDS_UPDATER` and the like. An
+        // `UPDATER` with no level after it is named, not taken as one.
         let levels = |before: &str, after: &str| -> Vec<u64> {
             doc.match_indices(before)
+                .filter(|(at, _)| {
+                    !before.starts_with("UPDATER")
+                        || doc[..*at].ends_with('`')
+                        || doc[..*at].ends_with("manifest::")
+                })
                 .filter_map(|(at, _)| {
                     let rest = &doc[at + before.len()..];
                     let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+                    assert!(
+                        !digits.is_empty() || !before.starts_with("UPDATER"),
+                        "updates.md: no level after {before:?}: {:?}",
+                        rest.chars().take(60).collect::<String>()
+                    );
+                    if digits.is_empty() {
+                        return None;
+                    }
                     rest[digits.len()..]
                         .starts_with(after)
                         .then(|| digits.parse().unwrap())
