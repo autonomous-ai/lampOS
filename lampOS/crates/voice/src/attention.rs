@@ -446,27 +446,22 @@ const NAMES_ALSO_WORDS: &[&str] = &[
 /// at its end ("May, what would you do?", not "May, are you coming, Daniel?").
 pub(crate) fn opens_with_a_name_also_a_word(heard: &str) -> bool {
     let words: Vec<&str> = heard.split_whitespace().collect();
-    let opens = words
-        .iter()
-        .find(|word| {
-            !GREETINGS
-                .iter()
-                .any(|greeting| word.trim_end_matches(',').eq_ignore_ascii_case(greeting))
-        })
-        .and_then(|word| word.strip_suffix(','))
-        .is_some_and(|word| {
-            NAMES_ALSO_WORDS
-                .iter()
-                .any(|w| word.eq_ignore_ascii_case(w))
-        });
-    // The rest of the line, read alone, must call nobody else either.
-    let rest = words
-        .iter()
-        .skip_while(|word| !word.ends_with(','))
-        .skip(1)
-        .copied()
-        .collect::<Vec<_>>()
-        .join(" ");
+    let Some(at) = words.iter().position(|word| {
+        !GREETINGS
+            .iter()
+            .any(|greeting| word.trim_end_matches(',').eq_ignore_ascii_case(greeting))
+    }) else {
+        return false;
+    };
+    let opens = words[at].strip_suffix(',').is_some_and(|word| {
+        NAMES_ALSO_WORDS
+            .iter()
+            .any(|w| word.eq_ignore_ascii_case(w))
+    });
+    // The rest of the line after that word, read alone, must call nobody
+    // else either: from the word itself, so a greeting set off before it
+    // ("Hey, May, …") is no other name (the Reviewer-lead's P3 on #4460).
+    let rest = words[at + 1..].join(" ");
     opens && !addresses_someone_else_on(&rest, false)
 }
 
@@ -4030,6 +4025,7 @@ mod tests {
             "Grace, what would you do?",
             "Mark, is that right?",
             "Hey May, what would you do?",
+            "Hey, May, what would you do?",
         ] {
             assert_eq!(
                 judge(heard, Room::Quiet, true, true),
