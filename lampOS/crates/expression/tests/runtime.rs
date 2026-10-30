@@ -200,6 +200,7 @@ fn message(topic: &str, kind: &str, payload: serde_json::Value) -> Message {
             at_us: 987_654_321,
             at_unix_ms: 1_000,
             expires_ms: None,
+            clock: None,
         },
         payload: serde_json::to_vec(&payload).unwrap(),
         gap: 0,

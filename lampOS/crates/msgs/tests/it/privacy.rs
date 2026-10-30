@@ -42,6 +42,7 @@ fn message(value: &MicrophonePrivacy) -> Message {
             at_us: value.stamp.at_us,
             at_unix_ms: 1000,
             expires_ms: Some(50),
+            clock: None,
         },
         payload: serde_json::to_vec(value).unwrap(),
         gap: 0,

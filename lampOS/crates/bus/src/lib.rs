@@ -57,6 +57,7 @@
 //! }
 //! # Ok::<(), std::io::Error>(())
 //! ```
+mod clock;
 mod declare;
 mod live;
 pub mod logging;
@@ -65,12 +66,13 @@ mod publish;
 mod subscribe;
 mod wire;
 
+pub use clock::{BOOT_ID_PATH, kernel_boot_id, monotonic_us};
 pub use declare::Declaration;
 pub use live::Source;
 pub use name::MOST_TOPIC_BYTES;
 pub use publish::{MOST_SUBSCRIBERS, Published, Publisher, SubscriberTotals, Totals};
 pub use subscribe::{Notice, Statistics, Subscriber};
-pub use wire::{EXPIRY_GRACE_MS, Header, JSON, Kind, MOST_BYTES, Message, NONE};
+pub use wire::{EXPIRY_GRACE_MS, Header, JSON, Kind, MOST_BYTES, Message, NONE, Now, StampClock};
 
 use std::{
     env, fs, io,
@@ -106,6 +108,7 @@ pub struct Bus {
     directory_mode: u32,
     rescan_every: Duration,
     lease: Duration,
+    clocks: clock::Clocks,
 }
 
 /// One subscriber's socket as a topic's `subs/` shows it.
@@ -150,6 +153,7 @@ impl Bus {
             directory_mode: 0o770,
             rescan_every: Duration::from_millis(200),
             lease: DEFAULT_LEASE,
+            clocks: clock::Clocks::default(),
         })
     }
 
@@ -184,6 +188,42 @@ impl Bus {
     pub fn lease(mut self, lease: Duration) -> Self {
         self.lease = lease;
         self
+    }
+
+    /// Clocks of the caller's own in place of the host's: the wall clock in
+    /// milliseconds since 1970, and CLOCK_MONOTONIC in microseconds. Every
+    /// publisher and subscriber made from this bus reads them: a publisher
+    /// for `at_unix_ms`, a subscriber for what has expired and what was
+    /// late. For tests and simulators, which play a wall clock that a time
+    /// server sets forward or back.
+    pub fn clocks(
+        mut self,
+        wall_ms: impl Fn() -> u64 + Send + Sync + 'static,
+        monotonic_us: impl Fn() -> u64 + Send + Sync + 'static,
+    ) -> Self {
+        self.clocks.set(wall_ms, monotonic_us);
+        self
+    }
+
+    /// The boot this bus's processes take themselves to be in, in place of
+    /// the kernel's ([`kernel_boot_id`]); `None` for none. For tests and
+    /// simulators.
+    pub fn boot_id(mut self, id: Option<&str>) -> Self {
+        self.clocks.set_boot_id(id);
+        self
+    }
+
+    /// The boot this bus takes itself to be in: what a publisher that
+    /// stamps its monotonic clock says in `clock`, and what a subscriber
+    /// compares a header's `clock` with.
+    pub fn this_boot(&self) -> Option<&str> {
+        self.clocks.boot_id()
+    }
+
+    /// What this bus's clocks say now, to judge a header by
+    /// ([`Header::expired_by`]).
+    pub fn now(&self) -> Now<'_> {
+        self.clocks.now()
     }
 
     pub fn root(&self) -> &Path {
@@ -262,14 +302,15 @@ impl Bus {
     }
 
     /// The topic's current value, if it keeps one. A value that has
-    /// outlived its `expires_ms` is returned all the same, with `expired`
+    /// outlived its `expires_ms`, by the clock its header calls for
+    /// ([`Header::expired_by`]), is returned all the same, with `expired`
     /// set: it is the last thing known, and the caller decides what an old
     /// value is worth.
     pub fn latest(&self, topic: &str) -> io::Result<Option<Message>> {
         name::topic(topic)?;
         let kept = wire::kept(&self.root.join(topic).join("latest"), topic)?;
         Ok(kept.map(|(header, payload)| Message {
-            expired: header.expired_at(wire::unix_ms()),
+            expired: header.expired_by(&self.now()),
             header,
             payload,
             gap: 0,

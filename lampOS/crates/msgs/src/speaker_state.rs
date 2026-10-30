@@ -162,6 +162,7 @@ mod tests {
                 at_us: 10,
                 at_unix_ms: 1000,
                 expires_ms: Some(3000),
+                clock: None,
             },
             payload: serde_json::to_vec(&state).unwrap(),
             gap: 0,

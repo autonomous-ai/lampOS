@@ -88,6 +88,7 @@ fn message(frame: &VoicePlayout) -> Message {
             at_us: 987_654_321,
             at_unix_ms: 1_000,
             expires_ms: Some(200),
+            clock: None,
         },
         payload: serde_json::to_vec(frame).unwrap(),
         gap: 0,

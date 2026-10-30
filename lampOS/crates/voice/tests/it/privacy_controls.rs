@@ -5,7 +5,7 @@ use lamp_voice::{
     privacy::{PrivacyGate, PrivacyState},
     privacy_bus::{
         NO_SLIDE_FLAG, ROOT_FLAG, Route, SwitchFence, refuse_no_slide_without_mute, selected,
-        selected_root, worker_arguments, worker_route,
+        selected_root, unclocked_line, worker_arguments, worker_route,
     },
 };
 
@@ -66,12 +66,107 @@ fn message(value: &ControlsState) -> Message {
             at_us: value.stamp.at_us,
             at_unix_ms: 1000,
             expires_ms: Some(300),
+            clock: None,
         },
         payload: serde_json::to_vec(value).unwrap(),
         gap: 0,
         publisher_restarted: false,
         expired: false,
     }
+}
+
+/// As Controls sends it when its clock is this boot's: the header says the
+/// clock its `at_us` is (queue #3997, C).
+fn clocked(value: &ControlsState) -> Message {
+    let mut message = message(value);
+    message.header.clock = Some(value.stamp.clock_id.clone());
+    message
+}
+
+#[test]
+fn a_wall_step_either_way_neither_expires_nor_refuses_a_clocked_controls_state() {
+    // Sent at wall 30 000 and read a moment later by `at_us`, across chrony's
+    // step of 20 s forward (lamp-06c1, about 46 s into every cold boot) or
+    // back.
+    for read_at_wall in [30_000 + 20_000, 30_000 - 20_000] {
+        for no_slide in [false, true] {
+            let value = if no_slide {
+                marker(100_000, 1)
+            } else {
+                state(100_000, 1, false)
+            };
+            let mut message = clocked(&value);
+            message.header.at_unix_ms = 30_000;
+            let mut fence = if no_slide {
+                SwitchFence::no_slide("boot".into())
+            } else {
+                SwitchFence::new("boot".into())
+            };
+            let observed = fence.observe(&message, 100_001, read_at_wall);
+            assert!(
+                observed.unwrap().is_some(),
+                "wall {read_at_wall} no-slide {no_slide}"
+            );
+            assert_eq!(fence.unclocked(), None);
+            // Said by another clock: expired, whatever the wall says.
+            message.header.clock = Some("another-boot".into());
+            let mut fence = SwitchFence::new("boot".into());
+            assert!(fence.observe(&message, 100_001, 30_000).is_err());
+        }
+    }
+    // Without a clock the wall judges as before: both steps are refused.
+    for read_at_wall in [30_000 + 20_000, 30_000 - 20_000] {
+        let mut message = message(&state(100_000, 1, false));
+        message.header.at_unix_ms = 30_000;
+        assert!(
+            SwitchFence::new("boot".into())
+                .accept(&message, 100_001, read_at_wall)
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn privacy_ask_c_a_controls_state_without_a_clock_is_taken_by_the_wall_and_said_once() {
+    // An update round that mixes builds: a Controls from before it stamped
+    // its clock. Visible, not refused.
+    let mut fence = SwitchFence::new("boot".into());
+    let first = state(100_000, 1, false);
+    assert!(
+        fence
+            .accept(&message(&first), 100_001, 1000)
+            .unwrap()
+            .is_some()
+    );
+    let said = unclocked_line(&first.session_id);
+    assert!(
+        said.contains(&first.session_id) && said.contains("no clock"),
+        "{said}"
+    );
+    assert_eq!(fence.unclocked(), Some(said.as_str()));
+    // Once a fence, not with every state.
+    let second = state(120_000, 2, true);
+    assert!(
+        fence
+            .accept(&message(&second), 120_001, 1000)
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(fence.unclocked(), Some(said.as_str()));
+    // A state that says its clock is said nothing of, on either route.
+    let mut fence = SwitchFence::new("boot".into());
+    assert!(
+        fence
+            .accept(&clocked(&first), 100_001, 1000)
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(fence.unclocked(), None);
+    let mut fence = SwitchFence::no_slide("boot".into());
+    fence
+        .observe(&message(&marker(100_000, 1)), 100_001, 1000)
+        .unwrap();
+    assert!(fence.unclocked().is_some());
 }
 
 #[test]

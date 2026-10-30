@@ -239,6 +239,7 @@ mod tests {
                 at_us: value.stamp.at_us,
                 at_unix_ms: WALL,
                 expires_ms: Some(3_000),
+                clock: None,
             },
             payload: serde_json::to_vec(value).unwrap(),
             gap: 0,

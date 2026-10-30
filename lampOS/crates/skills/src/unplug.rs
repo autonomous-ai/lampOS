@@ -196,6 +196,7 @@ mod tests {
                 at_us: at,
                 at_unix_ms: 1,
                 expires_ms: Some(500),
+                clock: None,
             },
             payload: serde_json::to_vec(&payload).unwrap(),
             expired: false,

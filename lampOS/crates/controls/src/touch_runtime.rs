@@ -257,11 +257,7 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
             eprintln!("lamp-controls: legacy_head ignored: the pins name no head pads");
         }
         let primary = if button.is_some() || legacy_head {
-            let state = bus.publisher_declared(
-                ControlsState::TOPIC,
-                &ControlsState::declaration(),
-                "controls",
-            )?;
+            let state = crate::runtime::state_publisher(bus, clock)?;
             let mut legacy = Engine::new(
                 Config {
                     enabled: config.enabled,
@@ -417,11 +413,7 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
     /// no button or head if the pins give it none.
     fn ensure_primary(&mut self, bus: &Bus, clock: &str) -> io::Result<()> {
         if self.primary.is_none() {
-            let state = bus.publisher_declared(
-                ControlsState::TOPIC,
-                &ControlsState::declaration(),
-                "controls",
-            )?;
+            let state = crate::runtime::state_publisher(bus, clock)?;
             self.primary = Some(Primary {
                 engine: Engine::new(
                     Config {

@@ -321,6 +321,7 @@ mod tests {
                 at_us: seq,
                 at_unix_ms: 1_792_115_940_000 + seq,
                 expires_ms: None,
+                clock: None,
             },
             payload: Vec::new(),
             gap,
