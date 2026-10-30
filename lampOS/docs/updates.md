@@ -1216,6 +1216,68 @@ in its own unit's journal (`journalctl -u lamp-update-back`, lines
 above, `TooOld::why`'s two endings, `walk::held` and the lock's words; the
 confirm line is `self_cli_exec`'s (Linux).
 
+### Every line a round says
+
+Between its first line and its end, a round says what it did and what it
+left, each as `lamp-update: <text>` in `journalctl -u lamp-update`. Here they
+are by the step that says them, with `…` for what changes (`round.rs`'s
+`Round::say`). A line added to the round without a row here fails
+`journal_lines`'s `every_line_a_round_says_has_a_row_in_updates_md`.
+
+| The journal line | Said when |
+|---|---|
+| **The settings writer** (`refresh_writer`, before a build is looked at, in a round that applies) | |
+| `the settings writer is now build …` (with `, but its folder could not be synced` when its folder couldn't be) | `lamp-update-writer.service` refreshed `lamp-update-back` to this lamp-update's build |
+| `the settings writer is not refreshed: …` | the refresh couldn't be asked or didn't run: the writer the lamp has stays |
+| `lamp-update-writer.service ran, and the settings writer is not build …` | the unit ran, but the writer it left isn't this build's |
+| `the settings writer refreshed has proved itself (its back ended well): the copy before is removed` | a refreshed writer's first `back` ended well |
+| `the settings writer refreshed is put back (its back failed): the copy before is the writer again` | a refreshed writer's first `back` failed |
+| `the settings writer could not be put back or proved (…): …` | either of those two asked of the unit, and it failed |
+| `the settings writer's back failed in a run that began before it was refreshed: the next back judges it` | the failed `back` may be the copy before's, so nothing is put back for it |
+| **The journal** (`acting`, at the round's start) | |
+| `the journal could not be read (…): kept as …, and the units are taken as they are` | a `journal.json` it can't parse is set aside, and the round goes on (#1505) |
+| `putting build N back: the switch was cut short (lamp-update stopped, or the lamp lost power)` | a journal left by a switch that didn't finish: that build is put back |
+| **What the build brings** | |
+| `installed … beside …` | each new folder, a self-switch's or a climb's updater too |
+| `fetched … into …` | a model the build pins, fetched into the model store |
+| `kept …: it is not the pinned model` | a model file at a path of its own that isn't the pinned one: the lamp's, kept |
+| `… is not added: it runs as …, which this lamp lacks; lamp-update install makes them` | a product unit the lamp lacks runs as a user or group it doesn't have, which only `install` makes |
+| `skipping pinned … for …: the installed part uses …current` | a unit pinned for this lamp is passed over, because its part runs through its `current` link |
+| **Settings and the image** (`settings_of`) | |
+| `build N's settings are not written (…): LAMP_UPDATE_APPLY=on is not set` | the build has settings, and the switch for writing them is off |
+| `build N's image files are not written: LAMP_UPDATE_IMAGE=on is not set` | the build has image files, and their switch is off |
+| `the image's files are not written: they cannot be read: …` | the image's files in the build can't be read |
+| `the image's files are not written: /etc/autonomous/hardware-profile names no variant` | the lamp's hardware profile says no variant |
+| `the image's files are not written: /etc/autonomous/hardware-profile cannot be read: …` | the hardware profile can't be read |
+| `kept …: …; the build's is not written` | a setting the lamp changed itself is kept, with why |
+| `the image's files were not written (…): this lamp's lamp-update-back is older than them, so install again` | `lamp-update-apply` didn't record them: an older `back` passes them over |
+| `/etc/lampOS/setup/reset-plan.json was not written: this lamp's lamp-update-back is older than it, so install again` | the same for the reset plan (#806) |
+| the second route's settings | `install`'s own lines, as it says them ("The second route's services in a round") |
+| **The product skills** | |
+| `put back …: …; a core skill's files are the build's` | a core skill's file the lamp changed, put back once it's written |
+| `placed N files of the product skills` | the build's skills written: in the switch, or alone when the build changes no part (`place_alone`) |
+| **The switch** (`switch`) | |
+| `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
+| `switching to build N` | the parts' switch begins |
+| `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
+| `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
+| **Putting a build back** | |
+| `putting build N back: …` | before a `put back` end, with why |
+| `the settings need no putting back: lamp-update-apply.service wrote nothing for build N` | the build's settings were never written, so none are put back |
+| `setup is complete; restoring its files needs no restart` | the same for a completed setup, putting back |
+| `the voice is put back all the same: …` | no quiet moment came before the old voice's restart |
+| **lamp-update's own build** (`climb`, `own`, `own_switch`) | |
+| `lamp-update's own build is not switched: …` | a self-switch or climb couldn't be set up: the parts' outcome stands |
+| `lamp-update's own switch waits: the settings writer was refreshed and has not proved itself yet` | a writer not yet proved is a switch's only way back, so the switch waits for it |
+| `lamp-update's build … was put back after a reboot came in its minutes: it is tried once more, and a second put-back is final` | #2810 |
+| `lamp-update switches to its build …; it must confirm itself within 10 min` | before a self-switch's or a climb's end |
+| **The folders kept** (`prune`, after the end) | |
+| `build folders are kept because the installed units cannot be read: …` | nothing is removed |
+| `removed …, which no unit names` | a build folder it made that no unit names now |
+| `removed …, which no kept build names` | a model file no kept build names |
+| `… cannot be removed: …` | either of those two, failing: it's tried again next round |
+| `the state cannot be written: …` | the state after removing them |
+
 ### The second route's services in a round
 
 A round places `/etc/lampOS/voice/second.json` when the build's voice unit
