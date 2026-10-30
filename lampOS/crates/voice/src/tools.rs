@@ -153,6 +153,10 @@ pub struct Settings {
     /// The onboarding file, whose mailbox the model's reports go to
     /// ([`crate::onboarding`]).
     pub onboarding: Option<PathBuf>,
+    /// This lamp's walk offers room sounds / face expressions: only then
+    /// does `setup_step` name them (#3769).
+    pub onboarding_room_sounds: bool,
+    pub onboarding_face_expressions: bool,
     /// The skills are reached through one function, `use_skill`
     /// ([`crate::use_skill`], `LAMP_USE_SKILL=on`), not one each.
     pub use_skill: bool,
@@ -219,6 +223,14 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         flags.push(crate::onboarding::FLAG.to_owned());
         flags.push(file.display().to_string());
+        flags.extend(crate::onboarding::offers_arguments(
+            std::env::var(crate::privacy_bus::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+            std::env::var(crate::onboarding::FACE_EXPRESSIONS_ASK_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ));
     }
     flags.extend(crate::use_skill::arguments(
         std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref(),
@@ -418,6 +430,18 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         }
         settings.onboarding = Some(PathBuf::from(file));
         flags = rest;
+        if let [flag, rest @ ..] = flags
+            && flag == crate::onboarding::ROOM_SOUNDS_FLAG
+        {
+            settings.onboarding_room_sounds = true;
+            flags = rest;
+        }
+        if let [flag, rest @ ..] = flags
+            && flag == crate::onboarding::FACE_EXPRESSIONS_FLAG
+        {
+            settings.onboarding_face_expressions = true;
+            flags = rest;
+        }
     }
     if let [flag, rest @ ..] = flags
         && flag == crate::use_skill::FLAG
@@ -753,7 +777,10 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.push(crate::marked::tool());
     }
     if settings.onboarding.is_some() {
-        tools.extend(crate::onboarding::tools());
+        tools.extend(crate::onboarding::tools(
+            settings.onboarding_room_sounds,
+            settings.onboarding_face_expressions,
+        ));
     }
     // A system function, never a skill (#1683): before the executive's and
     // the skills', so it is never the one cut past 32; a skill cut for it is
@@ -2529,6 +2556,8 @@ mod tests {
             photo_faces: false,
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
+            onboarding_room_sounds: false,
+            onboarding_face_expressions: false,
             reports_stop: true,
         };
         let mut tools = declared(&settings);
@@ -2667,6 +2696,41 @@ mod tests {
         }
     }
 
+    /// lamp-52e6 on 30 Oct (8811, #3769): `LAMP_FACE_EXPRESSIONS_ASK`
+    /// unset, the model was still told of face_expressions by `setup_step`
+    /// and, after the hello, asked "Do you mind if I notice whether you're
+    /// smiling or frowning". The worker's functions name the step only with
+    /// its flag.
+    #[test]
+    fn a_face_expressions_step_that_is_off_is_never_told_to_the_model() {
+        let told = |extra: &[&str]| {
+            let mut flags: Vec<String> = vec![
+                crate::onboarding::FLAG.into(),
+                "/var/lib/onboarding.json".into(),
+            ];
+            flags.extend(extra.iter().map(|flag| flag.to_string()));
+            let (settings, rest) = take(&flags).unwrap();
+            assert!(rest.is_empty(), "{rest:?}");
+            serde_json::to_string(
+                &declared(&settings)
+                    .into_iter()
+                    .map(|tool| json!([tool.name, tool.description, tool.parameters]))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+        };
+        let off = told(&[]);
+        assert!(off.contains(crate::onboarding::STEP), "{off}");
+        for word in ["face", "smil", "frown", "express"] {
+            assert!(!off.contains(word), "{word}: {off}");
+        }
+        let on = told(&["--onboarding-face-expressions"]);
+        assert!(
+            on.contains("face_expressions is done only after a clear yes"),
+            "{on}"
+        );
+    }
+
     #[test]
     fn without_the_onboarding_switch_nothing_changes() {
         let old: Vec<String> = arguments(Some("on"), None, None, None, Some("on"), None);
@@ -2781,6 +2845,8 @@ mod tests {
                 photo_faces: false,
                 mark: None,
                 onboarding: None,
+                onboarding_room_sounds: false,
+                onboarding_face_expressions: false,
                 reports_stop: false,
             }
         );
