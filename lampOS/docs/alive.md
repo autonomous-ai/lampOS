@@ -127,11 +127,13 @@ answered as a call after its 2.5 s wait and the answer woke the lamp.
 Tests: `alive.rs` `with_the_switch_the_nights_sleep_says_it_rests_through_sounds`,
 `name_carries.rs` `asleep_for_the_night_the_lamps_name_alone_is_held_back`
 and `only_expressions_state_says_it_rests_through_sounds`.
-`expression/state` names it `stirring`. The ring is not lifted: the
-voice's ring worker owns the ring at night and reads nothing of
-Expression's (`expression/light` has no reader), so a lift there would
-show nowhere; a ring half is the ring worker's, after a lamp look at the
-head's. Tests in `night_sleep.rs`:
+`expression/state` names it `stirring`, and `stir_settling` beside it
+while it settles back. The ring's half is the voice's ring worker's, which
+owns the ring at night (`expression/light` has no reader): with the same
+switch in `lamp-voice` the resting face lifts a little while `stirring` is
+named alone and eases back with the head
+([ring-choreography.md](ring-choreography.md#a-stir-at-its-name-1672)).
+Tests in `night_sleep.rs`:
 `with_the_switch_a_sound_of_no_words_ending_in_thinking_does_not_wake_the_lamp`,
 `with_the_switch_a_line_not_said_to_the_lamp_does_not_wake_it`,
 `with_the_switch_its_own_answer_wakes_it`,
@@ -142,7 +144,8 @@ the first two fail, and with a counted name waking it, the fourth. In
 `with_the_switch_a_counted_name_stirs_within_half_a_second_and_does_not_wake`,
 `with_the_switch_a_name_with_no_answer_settles_back_and_the_sleep_is_unbroken`,
 `with_the_switch_the_answer_after_a_stir_wakes_it_from_the_stir` and
-`with_the_switch_an_ignored_sleeping_name_does_not_stir`, each red when
+`with_the_switch_an_ignored_sleeping_name_does_not_stir` and
+`with_the_switch_a_stir_says_when_it_settles_back`, each red when
 its part is taken out. A long hold of the base is the mute today and will be Sleep when
 #711 makes it so; it does not wake the lamp. A face seen at night does not
 wake it either: only its name (with the switch, a stir), a touch, a

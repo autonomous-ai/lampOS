@@ -2250,13 +2250,14 @@ fn night_worker_environment(
 }
 
 // Resting through sounds at night (#1672, #4285), the same narrow way: the
-// exact `on`, to the second route only, which holds back its answer to the
-// lamp's name alone while Expression says the night's sleep rests so.
+// exact `on`, to the second route, which holds back its answer to the
+// lamp's name alone while Expression says the night's sleep rests so, and
+// to the ring, which lifts its resting face while Expression stirs (#4641).
 fn rest_through_sounds_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+    (matches!(role, "second" | "ring") && value == Some(std::ffi::OsStr::new("on"))).then_some((
         crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT,
         "on",
     ))
@@ -2728,11 +2729,11 @@ mod tests {
                         ["second"].as_slice(),
                     ),
                     // Resting through sounds at night reaches the second
-                    // route alone (#4285).
+                    // route and the ring alone (#4285, #4641).
                     (
                         rest_through_sounds_worker_environment,
                         "LAMP_REST_THROUGH_SOUNDS",
-                        ["second"].as_slice(),
+                        ["second", "ring"].as_slice(),
                     ),
                     // Rules reach both routes too (twelve-P2).
                     (
@@ -3662,6 +3663,7 @@ mod tests {
                 "ring",
                 vec![
                     "LAMP_NIGHT_ASLEEP_FACE=on",
+                    "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_SHUTDOWN=on",
                     "LAMP_UNPLUG=on",
                 ],
