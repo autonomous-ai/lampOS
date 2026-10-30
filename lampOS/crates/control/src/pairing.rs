@@ -174,15 +174,76 @@ impl Codes {
 
 /// A paired computer, as kept on the lamp.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "StoredClient", into = "StoredClient")]
 pub struct Client {
     pub id: String,
     pub name: String,
     /// Its Ed25519 public key, base64.
     pub key: String,
     pub grants: BTreeSet<Grant>,
+    /// Grants the file names that this build doesn't know: a newer
+    /// lamp-control's, kept here before an update went back. Never granted,
+    /// and written back as they were, so going forward again keeps them.
+    pub unknown_grants: BTreeSet<String>,
     /// Seconds since the epoch, by the lamp's wall clock.
     pub paired_at: u64,
+}
+
+/// [`Client`] as `clients.json` holds it: one `grants` list of names, known
+/// to this build or not. A grant a newer lamp-control added (`air`, say) is
+/// read as not granted rather than stopping lamp-control at its start: an
+/// update gone back must still open the door (harness-reviewer's try on
+/// lamp-a0ae, 30 Oct: an older build exited 2 on `unknown variant "air"`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredClient {
+    id: String,
+    name: String,
+    key: String,
+    grants: Vec<String>,
+    paired_at: u64,
+}
+
+impl From<StoredClient> for Client {
+    fn from(stored: StoredClient) -> Self {
+        let (mut grants, mut unknown_grants) = (BTreeSet::new(), BTreeSet::new());
+        for name in stored.grants {
+            match serde_json::from_value::<Grant>(serde_json::Value::String(name.clone())) {
+                Ok(grant) => {
+                    grants.insert(grant);
+                }
+                Err(_) => {
+                    unknown_grants.insert(name);
+                }
+            }
+        }
+        Self {
+            id: stored.id,
+            name: stored.name,
+            key: stored.key,
+            grants,
+            unknown_grants,
+            paired_at: stored.paired_at,
+        }
+    }
+}
+
+impl From<Client> for StoredClient {
+    fn from(client: Client) -> Self {
+        let known = client.grants.iter().map(|grant| {
+            serde_json::to_value(grant)
+                .ok()
+                .and_then(|name| name.as_str().map(str::to_owned))
+                .expect("a grant is a name")
+        });
+        Self {
+            id: client.id,
+            name: client.name,
+            key: client.key,
+            grants: known.chain(client.unknown_grants).collect(),
+            paired_at: client.paired_at,
+        }
+    }
 }
 
 /// Every paired computer, kept as one JSON file the lamp's root owns
@@ -260,6 +321,7 @@ impl Clients {
             name: name.to_owned(),
             key: STANDARD.encode(key),
             grants,
+            unknown_grants: BTreeSet::new(),
             paired_at,
         });
         Ok((id, before))
@@ -294,6 +356,28 @@ impl Clients {
 mod tests {
     use super::*;
     use ring::signature::KeyPair as _;
+
+    /// A grant this build doesn't know (a newer lamp-control's) is read as
+    /// not granted, never stops the load, and is written back as it was.
+    #[test]
+    fn a_stored_grant_this_build_does_not_know_is_kept_and_not_granted() {
+        let stored = r#"{"clients": [{"id": "c_1", "name": "laptop", "key": "a2V5", "grants": ["light", "telepathy", "body"], "paired_at": 1}]}"#;
+        let clients: Clients = serde_json::from_str(stored).unwrap();
+        let client = &clients.clients[0];
+        assert_eq!(client.grants, BTreeSet::from([Grant::Light, Grant::Body]));
+        assert_eq!(
+            client.unknown_grants,
+            BTreeSet::from(["telepathy".to_owned()])
+        );
+        let again: serde_json::Value = serde_json::to_value(&clients).unwrap();
+        assert_eq!(
+            again["clients"][0]["grants"],
+            serde_json::json!(["body", "light", "telepathy"])
+        );
+        assert_eq!(serde_json::from_value::<Clients>(again).unwrap(), clients);
+        // A field it doesn't know still refuses the file, as before.
+        assert!(serde_json::from_str::<Clients>(r#"{"clients": [{"id": "c_1", "name": "n", "key": "k", "grants": [], "paired_at": 1, "extra": 1}]}"#).is_err());
+    }
 
     const S: u64 = 1_000_000;
 

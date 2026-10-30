@@ -66,6 +66,8 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard` |
 | `sound` | `sound.heard`, by class |
 | `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer") |
+| `air` | `air.changed` and `get` `air`: the air sensor's readings (particles, carbon dioxide, humidity, temperature at the sensor) |
+| `device` | `get` `device`: the lamp's own computer (processor load, memory, disk, its temperatures) |
 
 **Events**, pushed to a client that subscribed:
 
@@ -82,6 +84,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `button` | `press` (`press`, `long_press`) | `controls/gesture` | none |
 | `time` | the client's own schedule | the lamp's clock and zone | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
+| `air.changed` | `pm1_0`, `pm2_5`, `pm4_0`, `pm10` (µg/m³), `co2_ppm`, `humidity` (%), `temperature` (°C at the sensor, inside the base), each to a tenth (carbon dioxide whole) and left out while the sensor doesn't know it; `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`) | `air/state`, every 5 s. Told on the first reading, then when a value moves by its step (particles 5, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C, `watch::AIR_STEPS`), comes or goes, or `feel` changes; at most every 5 s, the newest held back until then | `air` |
 
 lamp-control reads each topic on its own thread. A state topic's message that says nothing new for these, the same privacy, pause, sleep, talking, light or mood as the last one, is passed over on that thread and never handed to the watch that turns the bus into events; a repeat still goes on every 250 ms. `voice/privacy` alone comes a hundred times a second (its lease, renewed every 10 ms), and handing each one on was half of lamp-control's idle CPU on lamp-75c9 (2.1% of a core before, 1.1% after; the rest is that thread reading them). A privacy lease not handed on for 1 s counts as private: every lease is lost with `private` and `lamp.changed` says so, until the lease is heard again. That is later than the voice's own microphone gate, which closes once a lease is 50 ms old; lamp-control says it 0.75 to 1.25 s after the last lease heard (1 s after the last one handed on, which is up to 250 ms older, and then the next 250 ms check), so a running voice, renewing every 10 ms, never reads as private. Each message is timed when its thread receives it, and every message already come is taken before a lapse is judged, so a lamp-control held up by a slow save doesn't read a renewed lease as lapsed. Before the first lease nothing lapses, so a lamp whose voice publishes none is never private for that.
 
@@ -298,7 +301,10 @@ that connection, which pairing's proof and hello's signature cover:
 3. **The lamp** checks the proof, keeps `{key, name, grants, paired_at}` in
    `/var/lib/lampos-control/clients.json` (0600, written whole and renamed
    over, at most 16 computers; the code isn't spent when the lamp is full,
-   and the same key pairing again replaces itself), answers
+   and the same key pairing again replaces itself; a grant the file names
+   that this build doesn't know, a newer lamp-control's, is read as not
+   granted and kept as it was, so an update gone back still starts; a
+   lamp-control from before 30 Oct exits at start on one instead), answers
    `{"re":1,"ok":true,"client":"c_3f9a","grants":["body","light","speak"]}`,
    and gives a small nod with the ring's "someone new paired" cue.
 4. **No pairing without the app's pin.** A code alone, said aloud or typed
@@ -344,7 +350,12 @@ SDK can keep under them. With the rates off, the default, it says `"rates": "off
 
 `phrase.heard` needs `phrases`, the ones to listen for, and `phrases` go
 only with it. A `get` reply carries each state asked for: `presence`,
-`light`, `mood`, and `lamp_state` for `lamp`.
+`light`, `mood`, and `lamp_state` for `lamp`. `air` (the `air` grant) is
+the newest `air/state` reading, as `air.changed` tells it, with `known:
+true`. `device` (the `device` grant) is `board/state`'s `cpu_load`,
+`memory_used`, `disk_free`, `uptime_s` and `temperature_c`, with `known:
+true`. Either is only `{"known": false}` while there is no reading: no
+sensor, its part not running, or none in the last 15 s.
 
 ### Leases
 

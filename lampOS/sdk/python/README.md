@@ -232,6 +232,7 @@ subscribe.
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false). `quiet_hours` is planned, not sent yet | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
 | `hand` | `seen`. When seen: `x`, `y` (the palm's centre, 0–1 from the picture's left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. All to 2 places, never the tracker's clock | `{"ev":"hand","seen":true,"x":0.42,"y":0.55,"size":0.12,"open":true,"confidence":0.91}` and `{"ev":"hand","seen":false}` | a hand is first seen, moves or grows by 0.05, opens or closes, at most 4 a second (the newest kept). `seen: false` once, 1 s after the last. Under 0.5 confidence is no hand | `look` |
+| `air.changed` | the air sensor's reading: `pm1_0`, `pm2_5`, `pm4_0`, `pm10` (µg/m³), `co2_ppm`, `humidity` (%), `temperature` (°C, at the sensor inside the base, so warmer than the room), each to a tenth (carbon dioxide whole) and left out while the sensor doesn't know it; `feel`: `fresh`, `fine`, `stuffy`, `very_stuffy` or `unknown`, from the carbon dioxide | `{"ev":"air.changed","pm2_5":7.4,"co2_ppm":912,"humidity":44.2,"temperature":28.3,"feel":"fine"}` | the first reading, then a value moves by its step (particles 5, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), comes or goes, or `feel` changes; at most once every 5 s, the newest kept | `air` |
 
 And two that come by themselves, with no subscription:
 
@@ -247,6 +248,8 @@ And two that come by themselves, with no subscription:
 | `presence` | `count`, `near` (0–1), `facing`. Counts and how near, never who | `{"count":1,"near":0.31,"facing":true}` | `look` |
 | `light` | the person's own light: `on`, `colour`, `level`. Also `shows`: what the ring draws now, `{on, colour, level}`. `null` until the lamp has said either | `{"on":true,"colour":"warm","level":3,"shows":{"on":true,"colour":"green","level":2}}` | none |
 | `mood` | `energy`, `warmth`, `awake`, `asleep`, the lamp's inner state. `null` until known | `{"energy":0.6,"warmth":0.7,"awake":true,"asleep":false}` | none |
+| `air` | the newest reading, as `air.changed` gives it, and `known: true`; `{"known": false}` with no sensor, its part not running, or no reading in 15 s | `{"pm2_5":7.4,"co2_ppm":912,"feel":"fine","known":true}` | `air` |
+| `device` | the lamp's own computer: `cpu_load` (the last minute's, 1 is every processor busy), `memory_used` and `disk_free` (0–1), `uptime_s`, `temperature_c` (by sensor, °C), and `known: true`; `{"known": false}` with no reading in 15 s | `{"cpu_load":0.42,"memory_used":0.55,"disk_free":0.71,"uptime_s":3600,"temperature_c":{"cpu_thermal":61.5},"known":true}` | `device` |
 | `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
 | `air` | the room's air (particles, humidity, temperature, CO2), from the lamp's air part | planned: not a state `get` answers yet | |
 

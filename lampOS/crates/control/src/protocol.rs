@@ -89,6 +89,12 @@ pub enum Grant {
     /// `skill.remove`), which run on their own after it goes, never beyond
     /// its other grants (docs/control.md, "Skills pushed from a computer").
     Skills,
+    /// The air sensor's readings (`air/state`): particles, carbon dioxide,
+    /// humidity and temperature at the sensor; `get` `air` and `air.changed`.
+    Air,
+    /// The lamp's own computer (`board/state`): processor load, memory,
+    /// disk and its temperatures; `get` `device`.
+    Device,
 }
 
 impl Grant {
@@ -105,6 +111,8 @@ impl Grant {
             Self::Hear => "can hear its own phrases, never the words around them",
             Self::Sound => "can hear kinds of sound, never words",
             Self::Skills => "can put skills on the lamp that run on their own",
+            Self::Air => "can read the air sensor: particles, carbon dioxide, humidity",
+            Self::Device => "can read the lamp's processor, memory, disk and temperature",
         }
     }
 }
@@ -137,6 +145,10 @@ pub enum EventKind {
     Time,
     #[serde(rename = "lamp.changed")]
     LampChanged,
+    /// The air sensor's reading, when a value moved past its step, at most
+    /// once every 5 s (`air/state`).
+    #[serde(rename = "air.changed")]
+    AirChanged,
 }
 
 impl EventKind {
@@ -150,6 +162,7 @@ impl EventKind {
             | Self::Hand => Some(Grant::Look),
             Self::PhraseHeard | Self::NameHeard => Some(Grant::Hear),
             Self::SoundHeard => Some(Grant::Sound),
+            Self::AirChanged => Some(Grant::Air),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
         }
     }
@@ -167,6 +180,11 @@ pub enum StateKind {
     Mood,
     /// Talking, paused, private, asleep, quiet hours, the lease holder.
     Lamp,
+    /// The air sensor's newest reading, or `known: false` (no sensor, or
+    /// none in 15 s).
+    Air,
+    /// The lamp's own computer: processor load, memory, disk, temperatures.
+    Device,
 }
 
 impl StateKind {
@@ -174,6 +192,8 @@ impl StateKind {
     pub fn needs(self) -> Option<Grant> {
         match self {
             Self::Presence => Some(Grant::Look),
+            Self::Air => Some(Grant::Air),
+            Self::Device => Some(Grant::Device),
             Self::Light | Self::Mood | Self::Lamp => None,
         }
     }
@@ -1062,6 +1082,8 @@ mod tests {
             Grant::Hear,
             Grant::Sound,
             Grant::Skills,
+            Grant::Air,
+            Grant::Device,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -1081,6 +1103,14 @@ mod tests {
                 (
                     json!("skills"),
                     "can put skills on the lamp that run on their own"
+                ),
+                (
+                    json!("air"),
+                    "can read the air sensor: particles, carbon dioxide, humidity"
+                ),
+                (
+                    json!("device"),
+                    "can read the lamp's processor, memory, disk and temperature"
                 ),
             ]
         );
