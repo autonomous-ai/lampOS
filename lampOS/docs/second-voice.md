@@ -3925,6 +3925,47 @@ after a take-over, but now for every turn:
   (`called::LEAST_SCORE`, 0.9), which the office's false hearings reach
   (0.93 to 0.997, #829), so a stand-in with a false hearing still counts.
   Narrower than without the switch, not closed.
+- **A repeat of the line before's end is no call by the text**
+  (`LAMP_NAME_REPEAT_NOT_A_CALL=on`; with `--attention`; off in both
+  units). On lamp-4ace on 30 Oct (build 8999, the product unit, a busy
+  room, #3923) d09's "That lamp is cute, where did you get it?", said
+  between colleagues, came as two lines. The first, "That lamp is cute.",
+  was held ("that lamp" is the name in passing). The second was written
+  "Lamp is cute. Where did you get it?": the first line's last words came
+  back again, and its "Lamp", opening a sentence, is a call by the name
+  in passing's reading (`attention::called_by_name_on`), so it was let out
+  as `CALLED_IN_TEXT`, and the conversation it opened answered the next two
+  desk lines. `LAMP_BUSY_CALLED_STRICT`, which would have narrowed it
+  ("Lamp is" is not set off), is off in the product unit. The words most
+  likely came twice because the last 1.5 s of an unanswered line's sound
+  (`KEPT_SAMPLES`) goes into the next line's speech to text first when
+  that line begins within `CARRY_AFTER_END` of its end, or within
+  `KEEP_AFTER_END` when it goes on from it, and the line's own words had
+  not come back yet. With the switch, each line's words are kept as soon as
+  its speech to text writes them (`Engine::telling_words_back` to
+  `Attention::words_back`, before the line waits for anything or is judged),
+  and the line before is read when this line is judged, not when it began:
+  the newest kept line of an earlier request, ended within
+  `attention::REPEAT_WITHIN_US` (2 s, `KEEP_AFTER_END`: no carried sound
+  outlives it) of this line's start. The two lines' tasks run apart, so the
+  first can be judged after the second; its words still count if they came
+  back first. A line going on from a first part (`continued_at`) reads that
+  part, the repeat then at the join.
+  When this line's opening words, the lamp's name first, repeat that line's
+  closing words, two or more of them (compared lower case, punctuation left
+  out), the text's call (`Attention::called_in_text`, so the verdict, the
+  journal's sign and `called_for_itself`) is read without them: "Lamp is
+  cute. Lamp, where did you get it?" still calls. The name alone repeated
+  is not enough: "…I like this lamp." then "Lamp, turn the light on." is a
+  person calling it. The name heard by `lamp-name`, its second signs
+  (`weigh_the_name`), a tap, a face, being addressed, an answer to the
+  lamp's question and a conversation going on are unchanged. The journal
+  says `its words open with "Lamp is cute", the end of the line before it
+  written again (begun N ms after that line ended): its name there is not
+  taken as a call by its text (LAMP_NAME_REPEAT_NOT_A_CALL)`. A person who
+  really repeats the end of their own line and means the lamp ("…fix the
+  lamp. Lamp, fix it" is fine; "…the lamp is on. Lamp is on, turn it off")
+  needs the name heard or a face then. The Live route is unchanged.
 - **A face turned to the lamp but silent is nobody turned to it**
   (`LAMP_TURNED_SPEAKING=on`; with `--attention`). On lamp-4ace on 21 Oct
   from 14:00, someone at the desk sat in the camera's view turned roughly
