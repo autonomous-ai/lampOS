@@ -2284,8 +2284,11 @@ pub fn serve(
             let named_by_default = by_default
                 .as_ref()
                 .and_then(|(typed, bus)| {
+                    // A typed name is read again for each reply: one the
+                    // owner's "forget everything" cleared (#4461) names no
+                    // one from the next reply.
                     let name = match typed {
-                        Some(typed) => typed.clone(),
+                        Some(_) => crate::person::now()?,
                         None => crate::known_faces::owner_now()?,
                     };
                     Some((name, bus))
@@ -2337,10 +2340,12 @@ pub fn serve(
             // person the session is counted for (the reviewer's P2 on #3050:
             // the owner's sticky presence for 30 s after they go), and no
             // lease is no name.
+            // Read again for each reply, as above (#4461).
+            let setup_name_now = setup_name.as_ref().and_then(|_| crate::person::now());
             let told = |character: String| {
                 with_typed_name(
                     character,
-                    setup_name.as_deref(),
+                    setup_name_now.as_deref(),
                     setup_bus.as_ref(),
                     line.as_ref().map(Option::as_deref),
                 )
