@@ -142,6 +142,10 @@ impl<'de> Deserialize<'de> for PrivacyReceipt {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WorkerEvent {
     Ready,
+    /// Before `Ready`, from the speaker only: its device answered busy at
+    /// start and is tried again for up to `open_at_start::SPEAKER_BUSY_AT_START`, so
+    /// the coordinator waits for it that much longer (#4332).
+    BusyAtStart,
     /// Cloud submission state; never grants microphone or playback authority.
     /// This travels independently of credited provider answer packets.
     ProviderLink {

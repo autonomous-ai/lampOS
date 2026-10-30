@@ -331,6 +331,25 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   warning, if the link is down) until the next capture start: the voice's
   own, or the one after a mute or a sleep, which clears it if the microphone
   opened at once.
+- **The speaker busy at start.** On lamp-06c1 on 2026-10-30 (boot
+  `b8c51349`) PulseAudio held the C-Media speaker after a restart: busy from
+  10:17:01, free again at about 10:17:10, some 9 s (`module-suspend-on-idle`
+  lets a card go 5 s after its last use). Two runs in a row ended on the
+  speaker's one open (`EBUSY` at 10:17:01 and 10:17:06) before the third
+  started (#4332). The speaker worker now waits out a busy open as the
+  microphone does, every 50 ms, but for up to 20 s
+  (`SPEAKER_BUSY_AT_START`, in `open_at_start.rs`), not the microphone's
+  8 s, which those 9 s would beat: a wait inside the run is cheap beside a
+  restart, which an update's 60 s watch does not ride out. Off USB, any
+  other open failure, or busy for longer ends the worker as before. It
+  waits before it says it is ready, so no authority has been sent to it and
+  no lease can lapse. At the first busy answer it tells the coordinator
+  (`busy_at_start`), which waits for its readiness up to 20 s longer, once,
+  keeps the other workers' leases renewed meanwhile, and still ends the
+  start on a stop. The journal says `lamp-voice: speaker: the speaker
+  plug:device_speaker is busy at start; waiting up to 20 s for it, as the
+  microphone waits for its own`, then, once open, `the speaker was busy for
+  9.2 s at start; opened on try 185`. Its holder is not looked up.
 - **A worker's first control message older than 100 ms.** A worker sends its
   first control message as soon as its peer is there; at start the
   coordinator may read it only after starting its other workers. lamp-4ace
