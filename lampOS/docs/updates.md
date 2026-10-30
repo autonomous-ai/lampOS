@@ -2023,7 +2023,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 8. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 9. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,
