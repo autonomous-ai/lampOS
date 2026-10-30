@@ -12,8 +12,8 @@ Each of these cost someone a run on a real lamp.
   you. Use `breathe` for repeated attention, or wait a minute.
 - **A light lasts 30 s at most** (`for_ms` up to 30,000). Renew it about
   every 25 s to keep it; when you stop, the person's own light comes back.
-- **Closing the connection ends your light at once** (and a `say` still
-  waiting). A one-shot script must stay connected while the light should
+- **Closing the connection ends your light at once** (and your `say`,
+  waiting or playing, as `stop` does). A one-shot script must stay connected while the light should
   show: `await asyncio.sleep(20)` before leaving `async with`.
 - **`get("light")` has two lights.** `on`, `colour`, `level` are the
   person's own setting; `shows` is what the ring draws right now (yours
