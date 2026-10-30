@@ -1573,6 +1573,7 @@ mod head {
             let value = VoiceMute {
                 muted,
                 reason: asleep.then_some(MuteReason::Sleep),
+                muted_by: None,
             };
             self.send(Input::VoiceMute { stamp, value });
         }

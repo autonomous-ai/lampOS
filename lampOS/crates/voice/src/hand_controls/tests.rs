@@ -692,6 +692,122 @@ fn only_a_mute_left_by_the_restart_guard_reads_as_restored_after_a_fault() {
     assert!(chosen.muted() && !chosen.restored_after_fault());
 }
 
+/// #4332: what the pump says on `voice/mute` names who or what muted the
+/// voice, for `mic.get`'s `muted_by`: a hand's sleep, the person's hold, the
+/// restart guard after a fault, and a record it could not trust. Open says
+/// none. A mute the person chooses after the guard's or an untrusted one is
+/// theirs.
+#[test]
+fn voice_mute_says_who_muted_it() {
+    let said = |owner: &HandControls| {
+        latch_message(owner.shared.latch.load(Ordering::Acquire)).expect("a latch")
+    };
+    let by = |owner: &HandControls| said(owner).muted_by;
+
+    // Open: no one.
+    let directory = Directory::new();
+    let (open, _sender) = fixture(head_options(Some(&directory)));
+    assert_eq!(
+        said(&open),
+        VoiceMute {
+            muted: false,
+            reason: None,
+            muted_by: None,
+        }
+    );
+    drop(open);
+
+    // The person's hold.
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    assert!(record.request_mute(START));
+    let (held, _sender) = from_record(head_options(Some(&directory)), record, START);
+    assert_eq!(by(&held), Some(MutedBy::Button));
+    assert!(said(&held).check().is_ok());
+    drop(held);
+
+    // A hand's sleep.
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    assert!(record.request_sleep(START));
+    let (asleep, _sender) = from_record(head_options(Some(&directory)), record, START);
+    assert_eq!(
+        said(&asleep),
+        VoiceMute {
+            muted: true,
+            reason: Some(MuteReason::Sleep),
+            muted_by: Some(MutedBy::Sleep),
+        }
+    );
+    assert!(said(&asleep).check().is_ok());
+    drop(asleep);
+
+    // The restart guard after a fault, read back as a start does.
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let record = MuteRecord::load(&directory.file(), CLOCK, START).unwrap();
+    let (mut guarded, _sender) = from_record(head_options(Some(&directory)), record, START);
+    guarded.mark_guard = true;
+    guarded.restore_guard_marker(stored_identity(&directory.file()));
+    guarded.share_latch();
+    assert!(guarded.restored_after_fault());
+    assert_eq!(by(&guarded), Some(MutedBy::RestartGuard));
+    assert!(said(&guarded).check().is_ok());
+    // The person's own mute over it is theirs.
+    guarded.mute_chosen().unwrap();
+    guarded.share_latch();
+    assert_eq!(by(&guarded), Some(MutedBy::Button));
+    drop(guarded);
+
+    // A record the voice could not trust: a newer build's (#1505) and an
+    // unfinished write's (#4378), through the start's own path.
+    for cut in [false, true] {
+        let directory = Directory::new();
+        let path = directory.file();
+        if cut {
+            MuteRecord::new(CLOCK).unwrap().save(&path).unwrap();
+            fs::write(directory.0.join(".mute.json.pending"), "cut").unwrap();
+        } else {
+            fs::write(
+                &path,
+                r#"{"version":1,"clock_id":"test-boot","muted":false,"through_us":5,"later":true}"#,
+            )
+            .unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let restored = restored_record(&path, CLOCK, START).unwrap();
+        assert!(restored.unreadable, "cut {cut}");
+        let (_sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+        let mut untrusted = HandControls::with_restored(
+            &head_options(Some(&directory)),
+            CLOCK,
+            restored,
+            input,
+            Arc::new(Shared::default()),
+            START,
+        )
+        .unwrap();
+        assert!(untrusted.unreadable(), "cut {cut}");
+        assert_eq!(by(&untrusted), Some(MutedBy::Unreadable), "cut {cut}");
+        assert!(said(&untrusted).check().is_ok());
+        untrusted.mute_chosen().unwrap();
+        untrusted.share_latch();
+        assert_eq!(by(&untrusted), Some(MutedBy::Button), "cut {cut}");
+    }
+
+    // A record read as it was is trusted.
+    let directory = Directory::new();
+    MuteRecord::new(CLOCK)
+        .unwrap()
+        .save(&directory.file())
+        .unwrap();
+    assert!(
+        !restored_record(&directory.file(), CLOCK, START)
+            .unwrap()
+            .unreadable
+    );
+}
+
 /// A restart as `restore` does it, on the boot `clock`: the identity as
 /// stored, the record loaded on this boot's clock and saved, a guard of an
 /// earlier boot released ([`released_after_power_cut`]), then the marker read.
@@ -705,6 +821,7 @@ fn restart_as_restore(
         stored: stored_identity(&path),
         record: MuteRecord::load(&path, clock, now_us).unwrap(),
         late_sleep: None,
+        unreadable: false,
     };
     restored.record.save(&path).unwrap();
     let released = released_after_power_cut(&path, true, &mut restored).unwrap();
@@ -799,6 +916,7 @@ fn without_the_marker_switch_a_power_cut_keeps_the_mute() {
         stored: stored_identity(&path),
         record: MuteRecord::load(&path, "after-power-cut", 1_000).unwrap(),
         late_sleep: None,
+        unreadable: false,
     };
     assert!(!released_after_power_cut(&path, false, &mut restored).unwrap());
     assert!(restored.record.muted);
@@ -1187,7 +1305,8 @@ fn a_hold_while_onboarding_is_under_way_asks_no_sleep() {
         latch_message(owner.shared.latch.load(Ordering::Acquire)),
         Some(VoiceMute {
             muted: false,
-            reason: None
+            reason: None,
+            muted_by: None,
         }),
         "said open"
     );
@@ -1625,7 +1744,8 @@ fn the_pump_says_the_latch_on_voice_mute_when_it_changes_and_every_second() {
         next(&mut heard),
         VoiceMute {
             muted: false,
-            reason: None
+            reason: None,
+            muted_by: None,
         }
     );
     shared.latch.store(LATCH_ASLEEP, Ordering::Release);

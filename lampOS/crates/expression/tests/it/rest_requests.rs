@@ -525,6 +525,7 @@ fn manual_sleep_is_neither_woken_nor_released_by_a_routine() {
                 value: VoiceMute {
                     muted: true,
                     reason: Some(MuteReason::Sleep),
+                    muted_by: None,
                 },
             },
         )

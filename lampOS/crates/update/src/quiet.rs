@@ -219,6 +219,7 @@ mod tests {
         Heard::Mute(VoiceMute {
             muted: true,
             reason,
+            muted_by: None,
         })
     }
 
@@ -256,6 +257,7 @@ mod tests {
             Heard::Mute(VoiceMute {
                 muted: false,
                 reason: None,
+                muted_by: None,
             }),
             10 * S,
         );
