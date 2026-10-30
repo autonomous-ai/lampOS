@@ -1,3 +1,16 @@
+## 2026-10-31 03:3x ICT — #4562 unstuck; #4278 carried as #4661; switches.md census (#4662, #4665)
+
+**#4562** (El's): sat out trains 425 to 433 with no note. The train bot carries a READ-OK over a rebase only on equal `git patch-id --stable`, and lamp-voice's `LAMP_WINDOW_FROM_START` lines changed its context. A range-diff showed the same patch, ARM64 was green, and it merged cleanly, so I posted a signed rebase read at 03:21. Train 434 took it at 03:29. I told the first builder the bot has no "left out" line for this case.
+
+**#4661** carries Fifth's #4278 (a stand asked by voice, off by default), stalled since 30 Oct 09:2x. Its head is `48e641b2cb`, the commit the Reviewer-lead read at 09:24. It merges cleanly on `a4bee9421b` and waits for that read restated on #4661.
+
+**switches.md against the code:**
+- **#4662:** six rows said "—" or `until` for switches the product units turn on (turn-end ×2, two memory rows, reports, head pet). Friday confirmed the memory rows.
+- **#4665:** three switches the code reads had no row (`LAMP_QUIET_EVIDENCE`, `LAMP_EYES_MOUTH_FULL_LOOK`, `LAMP_FIRST_STAND_SPOKEN`).
+- Clean both ways: every "off in the product" and "on in the product" phrase in docs/ matches the units, and `updates.md`'s constants match the code.
+
+**Waiting:** #4465 on Mobile's 0c89 restart check after 9063's promote, and #4158 on its person row. #4461, #4337 and #4338 wait on lamp checks. No local builds until my build folder is cleared.
+
 ## 2026-10-31 01:1x ICT — #4635 landed; #4158 rebased and fixed; #4465 narrowed; reads
 
 **#2135 step 1 → #4635** (train 427): with `LAMP_SECOND_SAY_WITH_CALL` (off, only beside `LAMP_SECOND_SAID_ONCE`) a call that changes the light or loudness, or sets a timer or reminder, carries its few words, said at round 1's pace; round 2 still runs, so "dim the light and tell me a joke" keeps its joke (I held step 2, ending after round 1, for that). Reviewer-three's P2: my note first asked for a keep's words too, but keeps on a carried line and every forget can wait for the person's yes, so "Forgotten." could be said with the data kept; fixed to never a keep or a forget, with a test. Saved as a memory. The product-unit day lines are Saturday's.
