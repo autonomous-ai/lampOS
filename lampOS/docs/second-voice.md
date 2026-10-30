@@ -662,7 +662,12 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     (`x-api-key`, `query`, `numResults` 3, text cut at 500 characters,
     `search_extra` added). Ready for Exa, whose key the lamp does not have.
 
-  None was run against its service.
+  DeepSeek's runs on every product lamp (`LAMP_SECOND_SEARCH=deepseek` in
+  `deploy/product/lamp-voice.service`): on lamp-4ace from 19 Oct (#1712's
+  last-season Formula One answer, which led to the dated query) and on
+  lamp-29e7 on 30 Oct, where its `web_search` and `fetch_page` gave the
+  searched $399 of Migrate's finding 5 (the price rules above).
+  OpenRouter's and Exa's were never run against their services.
 
 A service's answer becomes the turn's failure reason (`fault`): 401 and 403
 Authentication, 402 QuotaExceeded, 429 RateLimited, 5xx ServerUnavailable,

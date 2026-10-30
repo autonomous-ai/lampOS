@@ -14,8 +14,9 @@
 //!   does not have.
 //!
 //! OpenRouter's web plugin (`LAMP_SECOND_SEARCH=openrouter`) is not here: it
-//! rides on OpenRouter's chat request (`Chat::openrouter`). None of these
-//! was run against its service.
+//! rides on OpenRouter's chat request (`Chat::openrouter`). DeepSeek's runs
+//! on every product lamp (lamp-4ace from 19 Oct, lamp-29e7 on 30 Oct);
+//! OpenRouter's and Exa's were never run against their services.
 use super::{Error, Result, chunk, http_client, post};
 use serde_json::{Value, json};
 use std::time::Duration;
