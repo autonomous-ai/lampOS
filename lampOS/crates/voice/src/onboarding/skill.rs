@@ -26,6 +26,13 @@ const ROOM_SOUNDS_CONSENT: &str = "done only after a clear yes";
 pub(crate) const PREFERENCES_HELLO: &str =
     "(Say only this, nothing before or after it: \"May I say hello when you sit down?\")";
 
+/// "Face expressions"' lines, the walk's own once it hears a plain yes or no
+/// (#3769): the words the model is told to say after its `setup_step`.
+pub(crate) const FACE_EXPRESSIONS_YES: &str =
+    "(Say only this, nothing before or after it: \"Got it, I'll notice how people look.\")";
+pub(crate) const FACE_EXPRESSIONS_NO: &str =
+    "(Say only this, nothing before or after it: \"Okay, I won't.\")";
+
 /// "Preferences"' done line, the walk's own once the step is done.
 pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time.\")";
 
