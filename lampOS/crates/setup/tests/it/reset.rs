@@ -128,6 +128,8 @@ struct Fake {
     fail_start: bool,
     /// Emptying [`reset::VOLATILE`] before the start in place fails.
     fail_clear: bool,
+    /// Every [`reset::FORGET`] command fails (no `wpa_cli` or `journalctl`).
+    fail_forget: bool,
     writes_on_stop: Option<PathBuf>,
     pending: Option<PathBuf>,
 }
@@ -141,6 +143,7 @@ impl Effects for Fake {
         if (self.fail_stop && argv[1] == "stop")
             || (self.fail_reboot && argv[1] == "reboot")
             || (self.fail_start && argv[1] == "start")
+            || (self.fail_forget && (argv[0] == "wpa_cli" || argv[0] == "journalctl"))
         {
             return Err(io::Error::other("refused"));
         }
@@ -1714,10 +1717,29 @@ fn a_product_reset_starts_setup_in_place_instead_of_rebooting() {
             .iter()
             .any(|call| call == "reboot" || call == "force")
     );
-    // Started only after the wipe, the journal's removal and /run emptied
-    // of what a reboot would have cleared (the bus's latest, the photos).
+    // Started only after the wipe, the journal's removal, /run emptied of
+    // what a reboot would have cleared (the bus's latest, the photos), and
+    // the old network and the journal forgotten (#4513's P3s).
     let calls = fake.calls.borrow();
-    assert_eq!(calls[calls.len() - 4..], ["sync", "sync", "clear", "start"]);
+    assert_eq!(
+        calls[calls.len() - 8..],
+        [
+            "sync",
+            "sync",
+            "clear",
+            "-i",
+            "-i",
+            "--rotate",
+            "--vacuum-time=1s",
+            "start"
+        ]
+    );
+    let forgotten = argvs[argvs.len() - 5..argvs.len() - 1].to_vec();
+    let forget: Vec<Vec<String>> = reset::FORGET
+        .iter()
+        .map(|argv| argv.iter().map(|word| (*word).to_owned()).collect())
+        .collect();
+    assert_eq!(forgotten, forget);
 }
 
 /// A start in place that fails reboots, then forces one, as before: a reset
@@ -1849,4 +1871,23 @@ fn what_starting_in_place_empties_is_every_folder_kept_in_run_past_a_stop() {
         .collect();
     named.sort();
     assert_eq!(named, kept);
+}
+
+/// The old network and the journal are forgotten best effort: a lamp
+/// without `wpa_cli` or `journalctl`, or one that refuses, still starts
+/// setup in place, never reboots for it.
+#[test]
+fn forgetting_the_old_network_or_the_journal_never_stops_the_start() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_forget: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    let calls = fake.calls.borrow();
+    assert_eq!(calls.last().map(String::as_str), Some("start"));
+    assert!(!calls.iter().any(|call| call == "reboot" || call == "force"));
 }
