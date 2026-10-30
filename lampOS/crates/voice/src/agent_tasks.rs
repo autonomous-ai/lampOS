@@ -2499,6 +2499,25 @@ fn guard(status: &Value, request_id: String) -> Option<Value> {
     Some(json!({"store_id": store, "revision": revision, "request_id": request_id}))
 }
 
+/// Whether the tasks part in `tasks` has a computer to hand work to: its
+/// `targets` answered `ok` with at least one target within `deadline`.
+/// Unreachable, refused or empty is no (fourteen-P15: the app shows "Make a
+/// skill" only on a lamp whose Harness has a computer).
+pub fn has_a_target(tasks: &Path, deadline: Duration) -> bool {
+    ask(
+        &tasks.join("request.sock"),
+        &json!({"op":"targets"}),
+        deadline,
+    )
+    .is_some_and(|answer| {
+        answer.get("ok") == Some(&json!(true))
+            && answer
+                .get("targets")
+                .and_then(Value::as_array)
+                .is_some_and(|targets| !targets.is_empty())
+    })
+}
+
 fn ask(socket: &Path, line: &Value, deadline: Duration) -> Option<Value> {
     if deadline.is_zero() {
         return None;

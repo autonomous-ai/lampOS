@@ -1849,7 +1849,7 @@ on the lamp. A "My skills" page in the lamp's app (on or off, what each did
 and when) comes once there are more than a handful. The store comes after
 launch.
 
-#### Made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
+#### Made by voice (#1685, `LAMP_MAKE_SKILL=on`, on in the product)
 
 "Lamp, make me a skill that dims the light at 10 pm." With the switch, the
 model is given `make_skill(request)` (`crates/voice/src/made_skill.rs`). What
@@ -1999,7 +1999,7 @@ Tests:
 - `task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out`.
 - `crates/skills/tests/it/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
 
-#### Asked for in the app (#2813, off unless `LAMP_APP_MAKE_SKILL=on`)
+#### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
 The same maker, from words typed in the app; put on only as above, by a
 spoken yes at the lamp (the lead's ruling on #1711; the first builder on
@@ -2027,11 +2027,19 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    or one not 1 to 64 letters, digits, `-`, `_`, `.` or `:`; the words too
    long; an id sent before, of the newest 100; or one still being made: one
    at a time, and one "making" for 30 minutes is let go).
-3. **Told aloud.** The hand-over is never kept as typed
+3. `{"ready": {}}` (fourteen-P15): `{"ready": true}` when the tasks part
+   answers `targets` with at least one target within 1 s
+   (`app_make::READY_WAIT`, `agent_tasks::has_a_target`), else
+   `{"ready": false, "why": "the computer's agent isn't set up for the lamp
+   yet"}`; unreached is no. It reads nothing of the asks. `lamp-cloud` asks
+   it every 60 s and names `skills.make` in `can` only while it is ready,
+   so the app's "Make a skill" shows only on a lamp whose Harness has a
+   computer.
+4. **Told aloud.** The hand-over is never kept as typed
    (`task_news::keep_typed`), so its news ("… Shall I put it on the
    lamp?") is told by the spoken task news at a good moment, with someone
    there, and the ask is dated only when heard whole or played through with
-   a gap (`made_skill::asked`, step 6 above).
+   a gap (`made_skill::asked`, step 6 of "Made by voice" above).
    A spoken yes within 120 s puts it on (`put_on_made_skill`, and the
    manage helper's own check, #2874); a no, a typed yes or silence leaves
    it off. What the tasks part settles is settled here too, by the task's
@@ -2041,7 +2049,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    stopped (by the task's own states), are `not_kept` with why; work it may have
    sent (`uncertain`) stays `making`, so another may start after 30
    minutes.
-4. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
+5. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
    only, never a skill made by voice. `state` is `making`, `kept` (not yet
    asked about aloud), `asked` (the offer a spoken yes would put on now:
    the newest, within its 120 s, `made_skill::waiting`, #2874), `on`,
@@ -2049,7 +2057,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    or why it wasn't handed over; never the agent's text). Once kept:
    `name`, `description`, `version`, `uses` (`light`, `body`, `topics`) and
    `sha256`, what the lamp asks about. `{"state": "none"}` with no ask.
-5. Kept beside the made skills, root's, 0700: `app.json`, the newest five
+6. Kept beside the made skills, root's, 0700: `app.json`, the newest five
    asks, each its request id, when, its task and why it wasn't kept. Never
    the words. Every writer (the socket's admission, the hand-over's thread,
    the task news' reader, the texts' reader in the worker) holds one lock

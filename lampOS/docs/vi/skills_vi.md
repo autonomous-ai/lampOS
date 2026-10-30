@@ -4,7 +4,14 @@ Trang này chỉ dịch phần mới về kỹ năng tạo bằng giọng nói. 
 kế kỹ năng là [skills.md](../skills.md), bằng tiếng Anh; nếu hai trang khác
 nhau, bản tiếng Anh đúng.
 
-## Tạo bằng giọng nói (#1685, tắt trừ khi `LAMP_MAKE_SKILL=on`)
+## Tạo bằng giọng nói (#1685, `LAMP_MAKE_SKILL=on`, bật trong sản phẩm)
+
+Từ fourteen-P15 (first builder đồng ý, 30/10 15:5x), `LAMP_MAKE_SKILL` và
+`LAMP_APP_MAKE_SKILL` bật trong sản phẩm. Nút "Make a skill" của ứng dụng
+chỉ hiện khi Harness của đèn có một máy tính để nhận việc: `lamp-cloud`
+hỏi `{"ready": {}}` mỗi 60 giây và chỉ ghi `skills.make` vào `can` khi câu
+trả lời là `{"ready": true}`. Kỹ năng tạo ra vẫn chỉ được bật bằng một câu
+"có" nói ở đèn.
 
 "Lamp, tạo cho tôi một kỹ năng làm đèn dịu đi lúc 10 giờ tối." Khi bật,
 mô hình có hàm `make_skill(request)` (`crates/voice/src/made_skill.rs`).

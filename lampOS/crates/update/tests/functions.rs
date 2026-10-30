@@ -31,14 +31,15 @@ const CHAT: &str = "chat: ";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 19 (with
-/// onboarding's two and memory's `forget_everything` since 25 Oct, and
-/// reports' `reports_stop` and `reports_state` since #2862), the
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 21 (with
+/// onboarding's two and memory's `forget_everything` since 25 Oct,
+/// reports' `reports_stop` and `reports_state` since #2862, and a made
+/// skill's `make_skill` and `put_on_made_skill` since fourteen-P15), the
 /// actions part's 17 and the skills' 1 (Dance's `dance`), before the search
 /// and the look. The test prints this split. A change to it
 /// is a change to what every session is told: say in its pull request what
 /// is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 37;
+const PRODUCT_FUNCTIONS: usize = 39;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
