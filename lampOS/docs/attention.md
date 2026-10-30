@@ -1774,6 +1774,19 @@ cases are now that person's, with the switch:
   bank.", "Seriously, what time is it?") is the lamp's: times and sentence
   words like these are among the words that are no one's name (`NOT_NAMES`,
   Second on #1090), and a line with no question puts none to anyone.
+  A set-off name that is also a common word (`NAMES_ALSO_WORDS`: May,
+  Will, Grace, Mark, Bill, Hope, Joy, Rose, Faith, Art) at a line's start
+  is no call to someone else inside a conversation going on, in a room not
+  known to be busy, with only one person at the lamp
+  (`Attention::one_person_present`: on the second route, no line in another
+  voice, no face speaking it but the caller's, at most one face in view);
+  nor is the line after it a reply to that someone (#3945, the first
+  builder's call: on lamp 8740's talk_day, "Maybe. What would you do?"
+  came back as "May, what would you do?" with one voice and one face, and
+  was held). With no conversation, in a busy room, with a second person,
+  on the first route (which reads no one-person fact), or with another
+  name at the line's end, it is held as before; so is a name that is no
+  word ("Anna, what would you do?").
 - **In a busy room, a line that follows a question the lamp left
   unanswered** (`AFTER_QUESTION`): within the same 10 s of a line heard as
   a question (ending "?") whose answer was held or never came. Named or
