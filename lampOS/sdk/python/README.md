@@ -256,7 +256,6 @@ And two that come by themselves, with no subscription:
 | `air` | the newest reading, as `air.changed` gives it, and `known: true`; `{"known": false}` with no sensor, its part not running, or no reading in 15 s | `{"pm2_5":7.4,"co2_ppm":912,"feel":"fine","known":true}` | `air` |
 | `device` | the lamp's own computer: `cpu_load` (the last minute's, 1 is every processor busy), `memory_used` and `disk_free` (0–1), `uptime_s`, `temperature_c` (by sensor, °C), and `known: true`; `{"known": false}` with no reading in 15 s | `{"cpu_load":0.42,"memory_used":0.55,"disk_free":0.71,"uptime_s":3600,"temperature_c":{"cpu_thermal":61.5},"known":true}` | `device` |
 | `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
-| `air` | the room's air (particles, humidity, temperature, CO2), from the lamp's air part | planned: not a state `get` answers yet | |
 
 ### Never readable
 
@@ -296,7 +295,9 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 | `lamp.on(event, handler, *, phrases=None)` | `event`: one of the schema's events (below), or `lease` or `done`. `handler(event)`: a function or coroutine. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Returns a `Subscription`: `await` it to get the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `await lamp.subscribe(events, phrases=None)`, `await lamp.unsubscribe(events)` | a list of events | each event's |
-| `await lamp.get(*states)` | `presence` (needs `look`), `light`, `mood`, `lamp` | the states asked, by those names |
+| `await lamp.get(*states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `air` (needs `air`), `device` (needs `device`) | the states asked, by those names |
+| `await lamp.air()` | | the `air` grant: the air sensor's newest reading (`pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel`) and `known`; only `{"known": False}` with no reading. Changes come as `air.changed` |
+| `await lamp.device()` | | the `device` grant: the lamp's own computer (`cpu_load`, `memory_used`, `disk_free`, `uptime_s`, `temperature_c`) and `known` |
 
 Every event and state, with its fields, an example and when it fires, is
 "Everything you can read" above.
