@@ -1726,6 +1726,28 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // Where the joints are and how the body is, for the rest of the lamp,
     // if the unit says so. Offered and never waited for.
     let mut bus = lamp_body::bus_out::BusOut::from_environment(|why| eprintln!("lamp-body: {why}"));
+    // What the body may do, for `body/limits` (a computer's `get` `body`):
+    // the yaw a holder's look may reach, as the lease door has it.
+    if let Some(bus) = bus.as_mut() {
+        let yaw = limits.yaw.max(
+            arguments
+                .gaze
+                .as_ref()
+                .map_or(0.0, |gaze| f32::from(gaze.reach[0])),
+        );
+        let standing = arguments.standing.and_then(|choice| {
+            lamp_body::body::Standing::new(
+                choice.folded,
+                choice.pose,
+                choice.share,
+                choice.seconds,
+                choice.awake,
+                choice.load,
+            )
+            .ok()
+        });
+        bus.limits(Limits { yaw, ..limits }, standing);
+    }
     let notify = lamp_keeper::Notify::from_environment();
     let ready = std::cell::Cell::new(false);
     // What the latched body's evidence last said, and when it was journalled.

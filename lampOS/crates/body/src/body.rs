@@ -1124,6 +1124,10 @@ pub struct Glimpse {
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
     pub waiting: Option<&'static str>,
+    /// Where the head and base were found at start, pitch, roll, yaw: the
+    /// frame a computer's degrees are counted from (`body/limits`). `None`
+    /// before it is found.
+    pub home: Option<[u16; 3]>,
 }
 
 /// The gestures asked from outside that were taken or dropped on one step,
@@ -1634,7 +1638,9 @@ const FIRST_HEAT_REREADS: usize = 3;
 /// The window each arm goal must be inside, shoulder then elbow, for a body
 /// given a pose to stand in: its way between folded and stood up, and
 /// `ARM_WINDOW_MARGIN` either side.
-fn arm_windows(standing: Option<Standing>) -> [(u16, u16); 2] {
+/// The shoulder's and the elbow's windows: from folded to stood up, and a
+/// margin each way; the whole turn on a lamp that may not stand.
+pub fn arm_windows(standing: Option<Standing>) -> [(u16, u16); 2] {
     std::array::from_fn(|index| match standing {
         Some(up) => {
             let (folded, pose) = (up.folded[index], up.pose[3 + index]);
@@ -6532,6 +6538,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 _ => 0,
             },
             waiting: None,
+            home: Some(home),
         };
         if !unplug_latched {
             watch(&glimpse);

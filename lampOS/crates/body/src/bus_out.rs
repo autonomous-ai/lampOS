@@ -11,11 +11,14 @@
 //! step to a thread of this module's own, without waiting, and a step that
 //! thread has no room for is let go.
 use crate::{
-    body::{Glimpse, Stop, Told},
+    body::{Glimpse, Limits, Standing, Stop, Told},
     gesture::Mood,
 };
 use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{BodyGesture, Diagnostic, GestureState, Hand, JointState, KeyValue, Level};
+use lamp_msgs::{
+    BodyGesture, BodyLimits, Diagnostic, GestureState, Hand, JointLimits, JointState, KeyValue,
+    Level,
+};
 use std::{
     f64::consts::TAU,
     io,
@@ -125,6 +128,75 @@ pub fn joint_state(glimpse: &Glimpse, before: Option<(u64, [u16; 5])>) -> JointS
         velocity,
         effort: loads.map(|load| f64::from(load) / FULL_LOAD).to_vec(),
         commanded: goals.map(radians).to_vec(),
+    }
+}
+
+/// `body/limits` is said again this often.
+pub const LIMITS_EVERY: Duration = Duration::from_secs(10);
+
+/// What the body may do, joint by joint, for `body/limits`, from its own
+/// `limits`, its pose to stand in, if any, and `home`, where the head and
+/// base were found (pitch, roll, yaw), in the order of a `JointState`. The
+/// head's pitch is counted up as fewer counts: its least is `pitch_up` above
+/// home, its most `pitch_down` below, both inside its window, and never
+/// under its floor (the servo's own limit is just below it).
+pub fn body_limits(limits: &Limits, standing: Option<&Standing>, home: [u16; 3]) -> BodyLimits {
+    let [pitch, roll, yaw] = home;
+    let around = |at: u16, less: f32, more: f32| {
+        let at = f32::from(at);
+        (
+            (at - less).clamp(0.0, 4_095.0) as u16,
+            (at + more).clamp(0.0, 4_095.0) as u16,
+        )
+    };
+    let (pitch_least, pitch_most) = around(pitch, limits.pitch_up, limits.pitch_down);
+    let pitch_least = pitch_least
+        .max(limits.pitch_window.0)
+        .max(limits.pitch_floor);
+    let pitch_most = pitch_most.min(limits.pitch_window.1).max(pitch_least);
+    let roll_reach = standing.map_or(limits.roll, |_| limits.roll.max(limits.stand_roll));
+    let (roll_least, roll_most) = around(roll, roll_reach, roll_reach);
+    let (yaw_least, yaw_most) = around(yaw, limits.yaw, limits.yaw);
+    let arm = crate::body::arm_windows(standing.copied());
+    let joint = |name: &str, (min, max): (u16, u16), home, folded, stand| JointLimits {
+        name: name.to_owned(),
+        min,
+        max,
+        home,
+        folded,
+        stand,
+    };
+    BodyLimits {
+        joints: vec![
+            joint(JOINTS[0], (yaw_least, yaw_most), Some(yaw), None, None),
+            joint(
+                JOINTS[1],
+                arm[0],
+                None,
+                standing.map(|up| up.folded[0]),
+                standing.map(|up| up.pose[3]),
+            ),
+            joint(
+                JOINTS[2],
+                arm[1],
+                None,
+                standing.map(|up| up.folded[1]),
+                standing.map(|up| up.pose[4]),
+            ),
+            joint(JOINTS[3], (roll_least, roll_most), Some(roll), None, None),
+            joint(
+                JOINTS[4],
+                (pitch_least, pitch_most),
+                Some(pitch),
+                None,
+                None,
+            ),
+        ],
+        speed: f64::from(limits.speed),
+        acceleration: f64::from(limits.acceleration),
+        force: limits.force,
+        heat_stop: limits.temperature,
+        stands: standing.is_some(),
     }
 }
 
@@ -356,6 +428,8 @@ pub fn stopped(stop: &Stop) -> Diagnostic {
 enum Out {
     /// A step, whether the lamp is paused, and when the body saw it.
     Step(Glimpse, bool, Instant),
+    /// The body's limits and pose to stand in, for `body/limits`.
+    Bounds(Box<(Limits, Option<Standing>)>),
     Stopped(Diagnostic),
     Gesture(BodyGesture),
 }
@@ -604,6 +678,10 @@ struct Publishing {
     waiting_sent: Option<(Diagnostic, Instant)>,
     resisted: Vec<Instant>,
     resisted_in_all: u32,
+    /// `body/limits`: the body's own, and when last said.
+    limits: Publisher,
+    bounds: Option<(Limits, Option<Standing>)>,
+    limits_said: Option<Instant>,
 }
 
 impl Publishing {
@@ -617,7 +695,12 @@ impl Publishing {
         hand.expires_after(Some(LASTS));
         let gesture =
             bus.publisher_declared(BodyGesture::TOPIC, &BodyGesture::declaration(), SOURCE)?;
+        let limits =
+            bus.publisher_declared(BodyLimits::TOPIC, &BodyLimits::declaration(), SOURCE)?;
         Ok(Self {
+            limits,
+            bounds: None,
+            limits_said: None,
             joints,
             health,
             gesture,
@@ -638,6 +721,17 @@ impl Publishing {
 
     fn step(&mut self, glimpse: &Glimpse, paused: bool, seen: Instant) {
         let now = Instant::now();
+        if let (Some((limits, standing)), Some(home)) = (&self.bounds, glimpse.home)
+            && self
+                .limits_said
+                .is_none_or(|said| now.duration_since(said) >= LIMITS_EVERY)
+        {
+            let said = body_limits(limits, standing.as_ref(), home);
+            let at_us = self.at_us();
+            if self.limits.publish_json(at_us, &said).is_ok() {
+                self.limits_said = Some(now);
+            }
+        }
         let state = joint_state(glimpse, self.before);
         self.before = Some((glimpse.step, in_order(glimpse).0));
         let at_us = self.at_us();
@@ -723,6 +817,10 @@ impl BusOut {
             for out in offered {
                 match out {
                     Out::Step(glimpse, paused, seen) => publishing.step(&glimpse, paused, seen),
+                    Out::Bounds(bounds) => {
+                        publishing.bounds = Some(*bounds);
+                        publishing.limits_said = None;
+                    }
                     Out::Stopped(report) => {
                         let at_us = publishing.at_us();
                         let _ = publishing.health.publish_json(at_us, &report);
@@ -741,6 +839,14 @@ impl BusOut {
             gestures_let_go: 0,
             paused: false,
         })
+    }
+
+    /// The body's own limits and pose to stand in, said on `body/limits`
+    /// once home is found and every [`LIMITS_EVERY`] after.
+    pub fn limits(&mut self, limits: Limits, standing: Option<Standing>) {
+        let _ = self
+            .steps
+            .try_send(Out::Bounds(Box::new((limits, standing))));
     }
 
     /// What became of a gesture, for `body/gesture`: passed on whatever the
@@ -804,6 +910,63 @@ impl Drop for BusOut {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn the_body_says_each_joints_bounds_and_poses_from_its_own_limits() {
+        // A folded lamp found at pitch 2000, roll 2044, yaw 2015.
+        let limits = Limits::FOLDED;
+        let said = body_limits(&limits, None, [2_000, 2_044, 2_015]);
+        said.check().unwrap();
+        let names: Vec<&str> = said
+            .joints
+            .iter()
+            .map(|joint| joint.name.as_str())
+            .collect();
+        assert_eq!(names, JOINTS);
+        let [yaw, shoulder, _elbow, roll, pitch] = [0, 1, 2, 3, 4].map(|at| &said.joints[at]);
+        assert_eq!((yaw.min, yaw.max, yaw.home), (1_975, 2_055, Some(2_015)));
+        assert_eq!((roll.min, roll.max, roll.home), (2_014, 2_074, Some(2_044)));
+        // Up is fewer counts: 45 up, 15 down, inside the window 1740-2030.
+        assert_eq!(
+            (pitch.min, pitch.max, pitch.home),
+            (1_955, 2_015, Some(2_000))
+        );
+        // Not standing: the arm is not driven, the whole turn, no poses.
+        assert_eq!(
+            (shoulder.min, shoulder.max, shoulder.folded),
+            (0, 4_095, None)
+        );
+        assert!(!said.stands);
+        assert_eq!((said.speed, said.heat_stop, said.force), (50.0, 62, None));
+        // A pitch home near the window's edge is cut to the window.
+        let edge = body_limits(&limits, None, [1_750, 2_044, 2_015]);
+        assert_eq!((edge.joints[4].min, edge.joints[4].max), (1_740, 1_765));
+    }
+
+    #[test]
+    fn a_lamp_that_may_stand_says_its_arm_windows_and_poses() {
+        let standing = Standing::new(
+            [2_050, 2_047],
+            [1_900, 2_044, 2_015, 2_650, 2_600],
+            100,
+            4,
+            60,
+            [950, 950],
+        )
+        .unwrap();
+        let said = body_limits(&Limits::FOLDED, Some(&standing), [2_000, 2_044, 2_015]);
+        said.check().unwrap();
+        assert!(said.stands);
+        let shoulder = &said.joints[1];
+        assert_eq!(
+            (shoulder.folded, shoulder.stand),
+            (Some(2_050), Some(2_650))
+        );
+        assert!(shoulder.min < 2_050 && shoulder.max > 2_650);
+        let elbow = &said.joints[2];
+        assert_eq!((elbow.folded, elbow.stand), (Some(2_047), Some(2_600)));
+    }
+
     use super::*;
     use lamp_msgs::Level;
 
@@ -843,6 +1006,7 @@ mod tests {
             bad_reads: [0; 5],
             retreats: 0,
             resting_s: 0,
+            home: None,
             waiting: None,
         }
     }
