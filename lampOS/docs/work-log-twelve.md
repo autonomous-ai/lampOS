@@ -578,3 +578,10 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 ## 30 Oct, 16:49: Welcome back taken (the first builder's 17:1x, item 3)
 
 - Taken on #3997 (c6519832643); no issue carries it yet. Branch `twelve/welcome-back-once-an-hour`. Wanted: at most once an hour per person; a hello and the name only; the part of the day from the lamp's local time in the note; the Policy's hello gate asked even with `LAMP_SKILLS_ASK=skip`.
+
+## 30 Oct, 21:3x: #4625 up for Welcome back
+
+- #4625 (`fb5f88f16c`): under `LAMP_SKILLS_ASK=skip` the Policy's hello gate is still asked; one hello an hour per person (`greeted_person`); product lamp-policy with `--hello --act hello --gate`; the hello's note told the part of the day from the lamp's clock and to say a hello and the name only. Local gate green (one `news_told` wait under load, passes alone).
+- lamp-c0a4, local build, a face on the Mac's screen at night: `say_now` by the model in 1401 ms, "Hello."; then `greeted_recently`; past 20 minutes, `greeted_person`. Put back at 21:25, speaker 40%.
+- READ ASK on #3997 (c6525333016). Not verified: the afternoon wording aloud, a known face's hour (lamp-4ace).
+- #4175: 4ACE RUN queued by the first builder tonight on 8999 (busy_day, switches on then off).
