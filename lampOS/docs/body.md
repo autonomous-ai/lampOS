@@ -958,9 +958,11 @@ changes. On (`Limits::strain_guard`):
   for nothing, its folded arm is let go once down, the journal says so once,
   and its health holds one warning, `seated: the elbow retreated twice in an
   hour (strained); hold its head a second, or run a health check, to let it
-  stand again` (`Glimpse::seated`). A head pad or a button held a second
-  (read from `controls/state` as the first stand's yes is,
-  `first_stand::Touches`), a self-test started since it was seated
+  stand again` (`Glimpse::seated`). A head pad or the primary button held
+  a second (`first_stand::Touches`, read from `controls/touch_state`'s head
+  and primary sources: the product's head pads are never in
+  `controls/state`, whose `head_active` needs the pins' `legacy_head`), a
+  self-test started since it was seated
   (`lamp/selftest`'s `started`), or a restart lets it stand again
   (`src/unseat_in.rs`). This takes the place of the three-in-half-an-hour
   long rest and of the two long rests' give-up, which do not happen with
