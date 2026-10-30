@@ -51,6 +51,17 @@ pub fn protocol_name(bus_name: &str) -> Option<&'static str> {
         .map(|(_, protocol, _)| *protocol)
 }
 
+/// A joint's home in counts from the body's `body/limits` (`limits`), by the
+/// bus's joint name: the found home for the head and base, the folded pose
+/// for the arm; none before the body has said it.
+pub fn home(limits: &Value, bus_name: &str) -> Option<f64> {
+    let joint = limits["joints"]
+        .as_array()?
+        .iter()
+        .find(|joint| joint["name"].as_str() == Some(bus_name))?;
+    joint["home"].as_f64().or_else(|| joint["folded"].as_f64())
+}
+
 /// The body's state for `get`, from the last `body/limits` (`limits`) and the
 /// last `body/joint_states` (`joints`), either `Null` when not heard in
 /// the last 15 s (`crate::watch::READING_STALE_US`).
@@ -76,8 +87,7 @@ pub fn state(limits: &Value, joints: &Value) -> Value {
             continue;
         };
         let count = |key: &str| joint[key].as_f64();
-        // The arm's home is its folded pose.
-        let home = count("home").or_else(|| count("folded"));
+        let home = home(limits, bus);
         let from_home = |counts: f64| home.and_then(|home| from_home(bus, counts, home));
         let (min, max) = (count("min"), count("max"));
         let (low, high) = match (min.and_then(from_home), max.and_then(from_home)) {

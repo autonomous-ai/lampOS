@@ -26,7 +26,7 @@ use futures_util::{SinkExt as _, StreamExt as _};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::{TcpListener, UnixListener};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
@@ -158,6 +158,10 @@ struct Open {
     phrases: Vec<String>,
     /// Its client's grants, read at its hello.
     grants: BTreeSet<Grant>,
+    /// Its newest `body.state` not yet sent, apart from the outbox: a
+    /// newer one takes its place, so a stalled computer holds one, never a
+    /// queue of 12.5 a second (the Reviewer-lead's P2 on #4564).
+    body_state: watch::Sender<Option<Value>>,
 }
 
 /// What every connection shares.
@@ -464,14 +468,21 @@ impl Shared {
                         let granted = kind
                             .needs()
                             .is_none_or(|grant| open.grants.contains(&grant));
-                        if let Some(client) = &open.client
-                            && granted
-                            && open.events.contains(&kind)
-                            && open.outbox.send(event.clone()).is_ok()
+                        if open.client.is_none() || !granted || !open.events.contains(&kind) {
+                            continue;
+                        }
+                        if kind == EventKind::BodyState {
+                            open.body_state.send_replace(Some(event.clone()));
+                        } else if open.outbox.send(event.clone()).is_ok()
+                            && let Some(client) = &open.client
                         {
                             sent.push(client.clone());
                         }
                     }
+                    // `body.state` is never journaled: at 12.5 a second it
+                    // would spend each computer's lines a second on itself
+                    // and leave its commands out (the Reviewer-lead's P2 on
+                    // #4564).
                     self.journal_events(&sent, &event["ev"], now);
                 }
                 Out::Heard(text) => {
@@ -884,6 +895,9 @@ async fn connection<S>(
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
     let (frames, mut framed) = mpsc::channel::<Vec<u8>>(FRAMES_QUEUED);
+    let (body_state, mut newest_body) = watch::channel::<Option<Value>>(None);
+    // Until its sender goes with the connection's entry.
+    let mut body_open = true;
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
@@ -899,6 +913,7 @@ async fn connection<S>(
             events: BTreeSet::new(),
             phrases: Vec::new(),
             grants: BTreeSet::new(),
+            body_state,
         },
     );
     let (quiet, hello) = {
@@ -1015,6 +1030,18 @@ async fn connection<S>(
                     if event["ev"] == "camera.ended" {
                         while framed.try_recv().is_ok() {}
                     }
+                    if socket.send(Message::text(event.to_string())).await.is_err() {
+                        break;
+                    }
+                }
+                changed = newest_body.changed(), if body_open => {
+                    if changed.is_err() {
+                        body_open = false;
+                        continue;
+                    }
+                    let Some(event) = newest_body.borrow_and_update().clone() else {
+                        continue;
+                    };
                     if socket.send(Message::text(event.to_string())).await.is_err() {
                         break;
                     }
@@ -1221,7 +1248,7 @@ fn wall_ms() -> u64 {
 
 /// The bus topics the door reads, each subscribed on its own thread, every
 /// message handed to `watch` and what it means delivered.
-pub const TOPICS: [&str; 21] = [
+pub const TOPICS: [&str; 22] = [
     "humans/faces/tracked",
     "humans/hands/tracked",
     "room/stood_up",
@@ -1243,6 +1270,7 @@ pub const TOPICS: [&str; 21] = [
     "speaker/volume",
     "body/limits",
     "body/joint_states",
+    "diagnostics",
 ];
 
 /// Subscribes to [`TOPICS`] on the bus at `bus`, and hands every message to
@@ -1340,6 +1368,95 @@ pub fn rfc3339_utc(at: std::time::SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A door whose journal lines go to the list it gives back, and one
+    /// connection on it, hello'd as `c_1` with the body grant, subscribed
+    /// to `body.state` and `touch`, that never reads what is sent it.
+    #[allow(clippy::type_complexity)]
+    fn stalled() -> (
+        Arc<Shared>,
+        Arc<Mutex<Vec<String>>>,
+        mpsc::UnboundedReceiver<Value>,
+        watch::Receiver<Option<Value>>,
+    ) {
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let into = lines.clone();
+        let door = Door::new(
+            "lamp-test",
+            "Lamp",
+            [0; 32],
+            crate::pairing::Clients::default(),
+            None,
+        )
+        .with_journal(crate::journal::Journal::to(move |line| {
+            into.lock().unwrap().push(line.to_owned());
+        }));
+        let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
+        let (outbox, inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, newest) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            1,
+            Open {
+                client: Some("c_1".to_owned()),
+                outbox,
+                frames,
+                events: [EventKind::BodyState, EventKind::Touch].into(),
+                phrases: Vec::new(),
+                grants: [Grant::Body].into(),
+                body_state,
+            },
+        );
+        (shared, lines, inbox, newest)
+    }
+
+    fn body_state(yaw: f64) -> Out {
+        Out::Event(
+            EventKind::BodyState,
+            json!({"joints": {"yaw": {"deg": yaw}}, "lamp": {}}),
+        )
+    }
+
+    /// The Reviewer-lead's P2 on #4564: a stalled computer holds the newest
+    /// `body.state` only, however many the body sent, and none in its
+    /// outbox.
+    #[test]
+    fn a_stalled_computer_holds_one_body_state_the_newest() {
+        let (shared, _, mut inbox, newest) = stalled();
+        for at in 0..200 {
+            shared.deliver(vec![body_state(f64::from(at))]);
+        }
+        assert!(inbox.try_recv().is_err(), "nothing queued in the outbox");
+        let held = newest.borrow().clone().expect("one held");
+        assert_eq!(held["ev"], "body.state");
+        assert_eq!(held["joints"]["yaw"]["deg"], 199.0);
+        // Other events still queue as they did.
+        shared.deliver(vec![Out::Event(EventKind::Touch, json!({"kind": "tap"}))]);
+        assert_eq!(inbox.try_recv().unwrap()["ev"], "touch");
+    }
+
+    /// The Reviewer-lead's P2 on #4564: `body.state` writes no journal line,
+    /// so a computer's lines a second are all left for the rest.
+    #[test]
+    fn body_state_spends_none_of_the_journals_lines() {
+        let (shared, lines, _inbox, _newest) = stalled();
+        for at in 0..50 {
+            shared.deliver(vec![body_state(f64::from(at))]);
+        }
+        for _ in 0..crate::journal::MOST_A_SECOND {
+            shared.deliver(vec![Out::Event(EventKind::Touch, json!({"kind": "tap"}))]);
+        }
+        let lines = lines.lock().unwrap();
+        assert!(
+            !lines.iter().any(|line| line.contains("body.state")),
+            "{lines:?}"
+        );
+        let touches = lines
+            .iter()
+            .filter(|line| line.ends_with("event touch sent"))
+            .count();
+        assert_eq!(touches as u32, crate::journal::MOST_A_SECOND, "{lines:?}");
+    }
 
     #[test]
     fn only_the_lamps_own_network_may_connect() {
