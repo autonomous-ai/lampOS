@@ -5898,8 +5898,10 @@ async fn spoken(
                 &text,
             );
             if let Some(word) = to_a_person {
+                // Never played, so never the lamp's words (Sixth on #4507).
+                let unsaid = unsay_pieces(&shared, request, carried).unwrap_or(0);
                 eprintln!(
-                    "lamp-voice second: request {}'s words, cut short, are let go: they or request {request} open with {word:?}, said to a person (LAMP_NAME_SAID_TO_A_PERSON)",
+                    "lamp-voice second: request {}'s words, cut short, are let go: they or request {request} open with {word:?}, said to a person; their unplayed answers are not kept as the lamp's words ({unsaid} requests, LAMP_NAME_SAID_TO_A_PERSON)",
                     carried.request
                 );
             }
@@ -6359,13 +6361,21 @@ fn says_stop(text: &str) -> bool {
 /// The word said to a person ([`crate::attention::SAID_TO_A_PERSON`]) that
 /// opens words `cut` short, or the line `held` that cut them, when `on`
 /// (`LAMP_NAME_SAID_TO_A_PERSON=on`): they are then let go, not answered in
-/// the held line's place.
+/// the held line's place. Words that call the lamp ([`crate::attention::called`])
+/// are said to it, whoever the held line after them was said to
+/// (Reviewer-three on #4507: "Lamp, what time is it in London right now?"
+/// cut by "Sir, what time is this?").
 fn cut_said_to_a_person(on: bool, cut: &str, held: &str) -> Option<&'static str> {
     if !on {
         return None;
     }
-    crate::attention::said_to_a_person_in_a_cut_line(cut)
-        .or_else(|| crate::attention::said_to_a_person(held))
+    crate::attention::said_to_a_person_in_a_cut_line(cut).or_else(|| {
+        if crate::attention::called(cut) {
+            None
+        } else {
+            crate::attention::said_to_a_person(held)
+        }
+    })
 }
 
 /// Whether `carried` are the lamp's name's words that `request`, the line
@@ -6802,9 +6812,18 @@ async fn joined_with_cut(
 /// "Twenty past eight in…" stays the lamp's words and London is asked again
 /// after it).
 fn unsay_carried(shared: &Shared, request: u64, carried: &Carried) {
-    let Some(unsay) = shared.unsay_joined.as_ref() else {
-        return;
-    };
+    if let Some(unsaid) = unsay_pieces(shared, request, carried) {
+        eprintln!(
+            "lamp-voice second: request {request}: the words answered in its place had none of their answers played; those answers are not kept as the lamp's words ({unsaid} requests, LAMP_JOIN_CUT_WORDS)"
+        );
+    }
+}
+
+/// Unsays `carried`'s pieces other than `request`, newest first: none of
+/// their answers was played ([`Engine::unsaying_joined`]). How many, or
+/// none without the unsaying.
+fn unsay_pieces(shared: &Shared, request: u64, carried: &Carried) -> Option<usize> {
+    let unsay = shared.unsay_joined.as_ref()?;
     let mut unsaid: Vec<u64> = carried
         .parts
         .iter()
@@ -6817,10 +6836,7 @@ fn unsay_carried(shared: &Shared, request: u64, carried: &Carried) {
     for piece in &unsaid {
         unsay(*piece);
     }
-    eprintln!(
-        "lamp-voice second: request {request}: the words answered in its place had none of their answers played; those answers are not kept as the lamp's words ({} requests, LAMP_JOIN_CUT_WORDS)",
-        unsaid.len()
-    );
+    Some(unsaid.len())
 }
 
 /// Opens a listener for the next line under privacy `generation` and keeps

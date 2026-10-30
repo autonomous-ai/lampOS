@@ -18,6 +18,16 @@ const ANSWER: &str = "Here you are.";
 /// request 1's words, cut short, would be answered in its place. With `on`,
 /// the switch. What each chat was asked.
 async fn chats_after(cut: &'static str, held_line: &'static str, on: bool) -> Vec<Vec<Message>> {
+    chats_and_unsaid(cut, held_line, on).await.0
+}
+
+/// As [`chats_after`], with the requests unsaid from the thread
+/// ([`Engine::unsaying_joined`]): a request whose answer was never played.
+async fn chats_and_unsaid(
+    cut: &'static str,
+    held_line: &'static str,
+    on: bool,
+) -> (Vec<Vec<Message>>, Vec<u64>) {
     let (release, hold) = tokio::sync::oneshot::channel();
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(cut.to_owned()), Ok(held_line.to_owned())].into()),
@@ -51,6 +61,11 @@ async fn chats_after(cut: &'static str, held_line: &'static str, on: bool) -> Ve
         Joined::Not("two voices (cosine 0.12)".to_owned())
     }))
     .letting_go_cut_words_said_to_a_person(on);
+    let unsaid = Arc::new(Mutex::new(Vec::new()));
+    let unsaying = unsaid.clone();
+    engine = engine.unsaying_joined(Arc::new(move |request| {
+        unsaying.lock().unwrap().push(request);
+    }));
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -81,7 +96,9 @@ async fn chats_after(cut: &'static str, held_line: &'static str, on: bool) -> Ve
         }
     }
     drop(release);
-    script.asked.lock().unwrap().clone()
+    let chats = script.asked.lock().unwrap().clone();
+    let unsaid = unsaid.lock().unwrap().clone();
+    (chats, unsaid)
 }
 
 /// Cut words said to a person, or cut by a held line said to one, are let
@@ -92,6 +109,12 @@ async fn cut_words_in_talk_between_people_are_not_answered_in_a_held_lines_place
     for (cut, held_line) in [(SALT, SAIGON), (LONDON, SIR), (SALT, SIR)] {
         let chats = chats_after(cut, held_line, true).await;
         assert_eq!(chats.len(), 1, "{cut:?} then {held_line:?}: {chats:?}");
+        // Its answer never played, so it is never the lamp's words either
+        // (Sixth on #4507), as when it is answered in the held line's place.
+        let (_, unsaid) = chats_and_unsaid(cut, held_line, true).await;
+        assert_eq!(unsaid, [1], "{cut:?} then {held_line:?}");
+        let (_, unsaid) = chats_and_unsaid(cut, held_line, false).await;
+        assert_eq!(unsaid, [1], "{cut:?} then {held_line:?}");
         let before = chats_after(cut, held_line, false).await;
         assert_eq!(before.len(), 2, "{cut:?} then {held_line:?}: {before:?}");
         assert_eq!(
@@ -102,15 +125,28 @@ async fn cut_words_in_talk_between_people_are_not_answered_in_a_held_lines_place
     }
 }
 
-/// Neither opening with a word said to a person: the switch changes
-/// nothing, the cut words are answered in the held line's place.
+/// Neither opening with a word said to a person, or the cut words calling
+/// the lamp by name whoever the held line was said to (Reviewer-three on
+/// #4507): the switch changes nothing, the cut words are answered in the
+/// held line's place.
 #[tokio::test]
 async fn other_cut_words_are_still_answered_in_a_held_lines_place() {
-    let chats = chats_after(LONDON, SAIGON, true).await;
-    assert_eq!(chats.len(), 2, "{chats:?}");
-    assert_eq!(
-        chats.last().unwrap().last().unwrap(),
-        &Message::user(LONDON),
-        "{chats:?}"
-    );
+    for (cut, held_line) in [
+        (LONDON, SAIGON),
+        ("Lamp, what time is it in London right now?", SIR),
+        ("Hey Lamp, what time is it in London right now?", SIR),
+        (
+            "Lamp, what time is it in London right now?",
+            "Dad, can you hear me?",
+        ),
+        ("What time is it in London, sir?", SAIGON),
+    ] {
+        let chats = chats_after(cut, held_line, true).await;
+        assert_eq!(chats.len(), 2, "{cut:?} then {held_line:?}: {chats:?}");
+        assert_eq!(
+            chats.last().unwrap().last().unwrap(),
+            &Message::user(cut),
+            "{chats:?}"
+        );
+    }
 }
