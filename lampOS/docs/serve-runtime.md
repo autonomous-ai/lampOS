@@ -363,6 +363,24 @@ the ring worker's SPI write does while the SD/MMC host re-tunes (#911).
 Workers are started with a cleared environment, so the coordinator passes
 `LAMP_STALLS` and `LAMP_STALLS_DIR` on to each.
 
+The second route's worker writes `stalls-second.log` (#4332). Its loop is
+one pass a 2 ms tick, and the stretch from `Ready` to its first tick is one
+more pass, so a tick held up by another task on its single thread shows as
+a `gap`. That alone does not say which task held it, so two more kinds of
+line name it, each by its `task`:
+
+- `poll`: one poll of 50 ms or more of a task on that thread. The worker's
+  startup tasks (`routes`, `air`, `seems`, `texts`, `face_refresh`) and
+  the engine's own (`cues`, `down_line`, `warm`) are wrapped in
+  `stalls::Timed`;
+- `call`: a call made inline that took 50 ms or more: those between
+  `Ready` and the first tick (`ready`, `render_lines`, `link_watch`,
+  `link_ready`), `warm_ahead`, and the texts' bus setup (`texts.bus`,
+  `texts.subscribe`, `texts.publisher`).
+
+`lamp-voice stalls` shows a line's task after its kind. With the switch
+off, a wrapped poll is one branch and reads no clock.
+
 
 ## What each capture stage costs: `LAMP_CAPTURE_STAGES=on`
 

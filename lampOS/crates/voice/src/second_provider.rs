@@ -1940,7 +1940,7 @@ impl Cues {
         }
         let cues = self.clone();
         let services = services.clone();
-        tokio::spawn(async move {
+        tokio::spawn(crate::stalls::timed("cues", async move {
             for words in CUE_WORDS {
                 let mut clip = Vec::new();
                 let mut speech = services.speak(words.to_owned());
@@ -1963,7 +1963,7 @@ impl Cues {
                 );
                 cues.rendering.store(false, Ordering::Release);
             }
-        });
+        }));
     }
 
     /// The next sound, never the one played last; none until rendered.
@@ -1998,7 +1998,7 @@ impl DownLine {
         }
         let line = self.clone();
         let services = services.clone();
-        tokio::spawn(async move {
+        tokio::spawn(crate::stalls::timed("down_line", async move {
             // Each clip rendered until it is kept: one that failed (the
             // short one alone, say) is asked again after the next turn, and
             // the ones kept are not rendered again (Third's P2 on #3771).
@@ -2037,7 +2037,7 @@ impl DownLine {
                 );
                 line.rendering.store(false, Ordering::Release);
             }
-        });
+        }));
     }
 
     /// The line to say now, if rendered, and whether it is
@@ -3125,7 +3125,7 @@ impl Engine {
     /// 3 s and ended unanswered (`no_audio_answer`, #3754). Within a Tokio
     /// runtime; no turn waits for it.
     pub fn warm_ahead(&self) {
-        tokio::spawn(self.shared.services.warm());
+        tokio::spawn(crate::stalls::timed("warm", self.shared.services.warm()));
     }
 
     /// `LAMP_SECOND_WRITTEN_WAIT=on` ([`WRITTEN_WAIT_ENVIRONMENT`]): a turn

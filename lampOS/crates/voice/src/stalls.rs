@@ -198,6 +198,10 @@ enum Kind {
     Work(End),
     /// From the end of one pass's work to the start of the next.
     Gap,
+    /// One poll of a task of the loop's thread ([`Timed`]), by its name.
+    Poll,
+    /// A call made inline on the loop's thread ([`Polls::time`]), by its name.
+    Call,
 }
 
 /// What the loop hands the recorder: a few numbers, no allocation.
@@ -209,6 +213,8 @@ struct Record {
     thread: Thread,
     /// Records the queue had no room for since the last one sent.
     lost_before: u64,
+    /// The task's or the call's name, for a poll's or a call's line.
+    name: Option<&'static str>,
 }
 
 /// One loop's recorder. Dropped when the loop ends, it waits a moment for
@@ -283,6 +289,14 @@ impl<C: Counters> Stalls<C> {
         self.on.is_some()
     }
 
+    /// A handle on this loop's recorder for the tasks that share its thread
+    /// and the calls it makes inline: off when this is.
+    pub fn polls(&self) -> Polls {
+        Polls {
+            sender: self.on.as_ref().and_then(|on| on.sender.clone()),
+        }
+    }
+
     /// The start of a pass; a gap since the last one's work is recorded. The
     /// pass ends when the guard goes: [`Pass::done`] before its wait, or
     /// dropped when it leaves early.
@@ -308,6 +322,7 @@ impl<C: Counters> Stalls<C> {
                     took: gap,
                     thread: thread.since(before),
                     lost_before: 0,
+                    name: None,
                 });
             }
         }
@@ -362,6 +377,129 @@ impl<C: Counters> Stalls<C> {
     }
 }
 
+thread_local! {
+    /// The loop's [`Polls`] on its own thread, while [`Polls::enter`] holds.
+    static CURRENT: std::cell::RefCell<Polls> = std::cell::RefCell::new(Polls::default());
+}
+
+/// What holds a single-threaded loop that is not its own pass: one poll of a
+/// task on its thread, or a call it makes inline, of [`OVER`] or more, is a
+/// `poll` or `call` line by the task's name in the loop's own file (#4332:
+/// the second route's worker read its first control message 1.48 s late on
+/// a cold boot, its loop held by one of its startup tasks). Off, a poll is
+/// one branch and nothing reads the clock.
+#[derive(Clone, Debug, Default)]
+pub struct Polls {
+    sender: Option<SyncSender<Record>>,
+}
+
+/// The [`Polls`] before [`Polls::enter`], back when this goes.
+pub struct Entered(Option<Polls>);
+
+impl Drop for Entered {
+    fn drop(&mut self) {
+        if let Some(before) = self.0.take() {
+            let _ = CURRENT.try_with(|current| *current.borrow_mut() = before);
+        }
+    }
+}
+
+impl Polls {
+    pub fn on(&self) -> bool {
+        self.sender.is_some()
+    }
+
+    /// The polls of this thread's loop: [`timed`] and the engine's own
+    /// spawns find them here. Off on a thread that entered none.
+    pub fn current() -> Polls {
+        CURRENT
+            .try_with(|current| current.borrow().clone())
+            .unwrap_or_default()
+    }
+
+    /// These are this thread's polls until the guard goes.
+    pub fn enter(&self) -> Entered {
+        Entered(
+            CURRENT
+                .try_with(|current| current.replace(self.clone()))
+                .ok(),
+        )
+    }
+
+    /// `call`, timed by `name`: a line when it took [`OVER`] or more.
+    pub fn time<T>(&self, name: &'static str, call: impl FnOnce() -> T) -> T {
+        if !self.on() {
+            return call();
+        }
+        let began = Instant::now();
+        let began_us = lamp_ipc::monotonic_us();
+        let before = Kernel.thread();
+        let made = call();
+        self.over(Kind::Call, name, began, began_us, before);
+        made
+    }
+
+    /// `future`, each of its polls timed by `name`.
+    pub fn timed<F: std::future::Future>(&self, name: &'static str, future: F) -> Timed<F> {
+        Timed {
+            name,
+            polls: self.clone(),
+            future: Box::pin(future),
+        }
+    }
+
+    fn over(&self, kind: Kind, name: &'static str, began: Instant, began_us: u64, before: Thread) {
+        let took = began.elapsed();
+        if took < OVER {
+            return;
+        }
+        if let Some(sender) = &self.sender {
+            // Never waited for: a full queue loses this one.
+            let _ = sender.try_send(Record {
+                kind,
+                began_us,
+                took,
+                thread: Kernel.thread().since(before),
+                lost_before: 0,
+                name: Some(name),
+            });
+        }
+    }
+}
+
+/// `future`, timed by `name` with this thread's [`Polls::current`].
+pub fn timed<F: std::future::Future>(name: &'static str, future: F) -> Timed<F> {
+    Polls::current().timed(name, future)
+}
+
+/// A future whose every poll of [`OVER`] or more is a `poll` line by its
+/// name ([`Polls::timed`]). Nothing else changes.
+pub struct Timed<F> {
+    name: &'static str,
+    polls: Polls,
+    future: std::pin::Pin<Box<F>>,
+}
+
+impl<F: std::future::Future> std::future::Future for Timed<F> {
+    type Output = F::Output;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<F::Output> {
+        if !self.polls.on() {
+            return self.future.as_mut().poll(cx);
+        }
+        let began = Instant::now();
+        let began_us = lamp_ipc::monotonic_us();
+        let before = Kernel.thread();
+        let polled = self.future.as_mut().poll(cx);
+        self.polls
+            .over(Kind::Poll, self.name, began, began_us, before);
+        polled
+    }
+}
+
 /// One pass of a timed loop.
 pub struct Pass<'a, C: Counters = Kernel> {
     stalls: &'a mut Stalls<C>,
@@ -391,6 +529,7 @@ impl<C: Counters> Pass<'_, C> {
                 took,
                 thread: thread.since(before),
                 lost_before: 0,
+                name: None,
             };
             if done {
                 on.send(record);
@@ -498,6 +637,8 @@ fn write_line(
         Kind::Work(End::Skipped) => ("work", Some("skipped")),
         Kind::Work(End::Loop) => ("work", Some("loop")),
         Kind::Gap => ("gap", None),
+        Kind::Poll => ("poll", None),
+        Kind::Call => ("call", None),
     };
     let t = record.thread;
     let _ = write!(
@@ -508,6 +649,9 @@ fn write_line(
     );
     if let Some(end) = end {
         let _ = write!(line, ",\"end\":\"{end}\"");
+    }
+    if let Some(name) = record.name {
+        let _ = write!(line, ",\"task\":\"{name}\"");
     }
     if record.lost_before > 0 {
         let _ = write!(line, ",\"lost_before\":{}", record.lost_before);
@@ -715,6 +859,61 @@ mod tests {
         );
     }
 
+    /// #4332: a task on the loop's thread whose first poll holds it 120 ms
+    /// is one `poll` line by its name, as is an inline call that long; a
+    /// quick task and a quick call are none. Off, nothing is written.
+    #[test]
+    fn a_task_whose_poll_holds_the_loop_is_named_only_with_stalls_on() {
+        let slow = || async {
+            std::thread::sleep(Duration::from_millis(120));
+            tokio::task::yield_now().await;
+        };
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        for (value, dir) in [
+            (Some("on"), folder("polls-on")),
+            (None, folder("polls-off")),
+        ] {
+            let stalls = Stalls::from_value("second", value, &dir, Kernel, Kernel);
+            let polls = stalls.polls();
+            assert_eq!(polls.on(), value.is_some());
+            {
+                let _entered = polls.enter();
+                runtime.block_on(async {
+                    let held = tokio::spawn(timed("held_task", slow()));
+                    let quick = tokio::spawn(timed("quick_task", async {}));
+                    held.await.unwrap();
+                    quick.await.unwrap();
+                });
+                Polls::current().time("held_call", || {
+                    std::thread::sleep(Duration::from_millis(120))
+                });
+                Polls::current().time("quick_call", || ());
+            }
+            // Off again once the guard is gone.
+            assert!(!Polls::current().on());
+            drop(polls);
+            stalls.finish(Duration::from_secs(2));
+            let path = dir.join("stalls-second.log");
+            if value.is_none() {
+                assert!(std::fs::read_dir(&dir).unwrap().next().is_none());
+                continue;
+            }
+            let lines = lines(&path);
+            assert_eq!(lines.len(), 2, "{lines:?}");
+            assert_eq!(lines[0]["kind"], "poll");
+            assert_eq!(lines[0]["task"], "held_task");
+            assert!(lines[0]["ms"].as_f64().unwrap() >= 120.0);
+            assert_eq!(lines[1]["kind"], "call");
+            assert_eq!(lines[1]["task"], "held_call");
+            assert!(lines[1]["ms"].as_f64().unwrap() >= 120.0);
+            let read = summary(&dir, lamp_ipc::monotonic_us(), 60_000_000).unwrap();
+            assert!(read.contains("poll held_task"), "{read}");
+        }
+    }
+
     /// The speaker's and the capture's loops end a pass with
     /// `finish_tick(tick)`, its wait; every one of them, the speaker's six
     /// lapse exits of #1214 among them (the midnight path, #1178), ends the
@@ -839,6 +1038,8 @@ struct Read {
     role: String,
     kind: String,
     end: Option<String>,
+    /// A `poll`'s task or a `call`'s name.
+    task: Option<String>,
     ms: f64,
     at_us: u64,
     thread: [u64; 4],
@@ -856,6 +1057,7 @@ impl Read {
             role: value["role"].as_str()?.to_owned(),
             kind: value["kind"].as_str()?.to_owned(),
             end: value["end"].as_str().map(str::to_owned),
+            task: value["task"].as_str().map(str::to_owned),
             ms: value["ms"].as_f64()?,
             at_us: value["at_us"].as_u64()?,
             thread: [
@@ -875,15 +1077,17 @@ impl Read {
     /// What held it, as far as its counters say (`docs/serve-runtime.md`).
     fn verdict(&self) -> &'static str {
         let [major, _, voluntary, involuntary] = self.thread;
+        // A task's poll or an inline call is the loop's thread's own work.
+        let own = matches!(self.kind.as_str(), "work" | "poll" | "call");
         if major > 0 {
             "memory: its own pages were read back from storage"
-        } else if self.kind == "work" && voluntary > 0 {
+        } else if own && voluntary > 0 {
             "it waited in the kernel (a device, a disk or a lock)"
         } else if involuntary > 0 {
             "the CPU was taken from it"
         } else if !cfg!(target_os = "linux") && self.thread == [0; 4] {
             "no counters (not Linux)"
-        } else if self.kind == "work" {
+        } else if own {
             // A pass that never slept nor lost the CPU: its own code ran that
             // long (a model, a resample), the one case that is the loop's.
             "it ran that long on the CPU (its own work)"
@@ -1004,9 +1208,12 @@ pub fn summary(dir: &Path, now_us: u64, within_us: u64) -> std::io::Result<Strin
             let ago = now_us.saturating_sub(read.at_us) / 1_000_000;
             let _ = write!(
                 out,
-                "  {:>7.1} ms {}{} {}m{:02}s ago: {major} major, {minor} minor faults, {voluntary} voluntary, {involuntary} involuntary switches",
+                "  {:>7.1} ms {}{}{} {}m{:02}s ago: {major} major, {minor} minor faults, {voluntary} voluntary, {involuntary} involuntary switches",
                 read.ms,
                 read.kind,
+                read.task
+                    .as_deref()
+                    .map_or(String::new(), |task| format!(" {task}")),
                 read.end
                     .as_deref()
                     .map_or(String::new(), |end| format!(" ({end})")),
