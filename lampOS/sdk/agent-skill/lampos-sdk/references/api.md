@@ -12,7 +12,7 @@ naming every public call, tool, event and error code they have.
 | what | Python | JavaScript | MCP |
 |---|---|---|---|
 | pair once (owner's code and pin) | `await Lamp.pair(code, host, pin=pin, name=name)` | `await Lamp.pair(code, host, { pin, name })` | run `lamp pair` first |
-| connect, say hello | `await Lamp.connect()` (or `Lamp.connect(lamp_id, host=...)`) | `await Lamp.connect()` | `lamp-mcp` connects at start (`--lamp ID`) |
+| connect, say hello | `await Lamp.connect()` (or `Lamp.connect(lamp_id, host=..., keyring=...)`) | `await Lamp.connect()` (or `Lamp.connect(lampId, { host, keyring })`) | `lamp-mcp` connects at start (`--lamp ID`) |
 | the lamp, grants, limits | `lamp.info`, `lamp.grants`, `lamp.limits` | `lamp.info`, `lamp.grants`, `lamp.limits` | in `lamp_state("lamp")` and the tool list |
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
@@ -76,7 +76,7 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | a move of your own | `await lamp.move(frames, step_ms)` | `lamp.move(frames, stepMs)` | `lamp_move(step_ms, frames)` | body, a body lease |
 | a recorded move | `await lamp.play(name)` | `lamp.play(name)` | — | body, a body lease |
 | aim the joints | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | — | body, the lease named |
-| light | `await lamp.light("green", 3, 10_000, pattern="breathe")` | `lamp.light('green', 3, 10000, 'breathe')` | `lamp_light(colour, level, for_ms, pattern)` | light |
+| light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | say | `await lamp.say("Build passed.")` | `lamp.say('Build passed.')` | `lamp_say(text)` | speak |
 | a sound | `await lamp.sound(name)` | `lamp.sound(name)` | — | speak |
 | stop everything of mine | `await lamp.stop()` | `lamp.stop()` | `lamp_stop()` | none |
