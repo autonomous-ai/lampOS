@@ -93,6 +93,23 @@ pub fn busy(holder: Priority) -> &'static str {
     }
 }
 
+/// Why a `replace` gesture (a paired computer's, through lamp-control) is
+/// refused: what plays is the conversation's or the person's, and the
+/// person always wins.
+pub const PERSON_USING: &str = "dropped: the person is using the lamp";
+
+/// Whether an asker's name is lamp-control's, for a paired computer:
+/// `control:<client>` as it sends it, or `lamp-control/control:<client>`
+/// as `--caller-caps` names it after the unit that sent it. Only such an
+/// ask's `replace` is honoured.
+pub fn from_control(source: &str) -> bool {
+    source.starts_with("control:") || source.starts_with("lamp-control/control:")
+}
+
+/// Why a gesture playing was ended for a `replace` one: it eases out from
+/// where it is, and the new one plays after.
+pub const REPLACED: &str = "ended: replaced by a newer motion";
+
 /// Why a gesture playing was ended for one asked at this priority.
 pub fn ended(by: Priority) -> &'static str {
     match by {
@@ -154,6 +171,9 @@ pub struct Asker {
     /// Free text naming the asker, for the journal (`skill:dance`, `voice`).
     pub source: Option<String>,
     pub priority: Option<Priority>,
+    /// `"replace": true`: ends the motion playing, if it is `skill` or
+    /// lower ([`crate::body::Asked::replace`]). Absent, false.
+    pub replace: bool,
 }
 
 impl Asker {
@@ -176,11 +196,14 @@ fn asked(datagram: &[u8]) -> Option<(serde_json::Value, Asker)> {
         sent: serde_json::Value,
         source: Option<String>,
         priority: Option<Priority>,
+        #[serde(default)]
+        replace: bool,
     }
     let message: Message = serde_json::from_slice(datagram).ok()?;
     let asker = Asker {
         source: message.source,
         priority: message.priority,
+        replace: message.replace,
     };
     Some((message.sent, asker))
 }

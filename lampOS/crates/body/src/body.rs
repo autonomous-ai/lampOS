@@ -676,6 +676,12 @@ pub struct Asked {
     /// not from the pose (`{"look":{…,"from":"home"}}`, a computer's
     /// `joints`): the pose's offset is taken off ([`aim_from_home`]).
     pub aim_from_home: bool,
+    /// The gesture asked replaces the one playing (`"replace": true` on the
+    /// mood socket, sent by `lamp-control` for a paired computer): asked at
+    /// `skill`, it ends one of `skill` or lower at once and eases out of it,
+    /// and is refused with [`crate::moves::PERSON_USING`] over anything
+    /// higher. Without it, a gesture asked over one playing is as before.
+    pub replace: bool,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -715,6 +721,7 @@ impl Asked {
         night: false,
         night_woke: false,
         aim_from_home: false,
+        replace: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -743,6 +750,7 @@ impl Asked {
         night: false,
         night_woke: false,
         aim_from_home: false,
+        replace: false,
     };
 }
 
@@ -1288,6 +1296,9 @@ pub struct Glimpse {
     /// shifts at rest or its glance for a call. One refused by V1's
     /// anti-tip rule is `dropped: it would tip`, and said by [`Tipping`] too.
     pub gesture_fates: Fates,
+    /// A gesture playing ended on this step for one a `replace` asked: the
+    /// one ended and the one that takes its place, for the journal.
+    pub handed_over: Option<(&'static str, &'static str)>,
     /// Why a face the eyes report is not looked at now, for a body with
     /// eyes: paused, folded, or neither listening nor speaking. `None`
     /// while one would be.
@@ -3122,6 +3133,7 @@ fn glimpse_of(template: Glimpse, step: u64, now: &[Sample; 5], goals: [u16; 3]) 
         face: None,
         gesture: None,
         gesture_fates: Fates::default(),
+        handed_over: None,
         ..template
     }
 }
@@ -3997,6 +4009,7 @@ pub(crate) fn run_looking(
         night: false,
         night_woke: false,
         aim_from_home: false,
+        replace: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5189,6 +5202,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // one it opened: a pause gives that one back, so the lamp folds.
     let mut pending_window: Option<(Option<Duration>, Option<Duration>)> = None;
     let mut gesture_fates = Fates::default();
+    let mut handed_over = None;
     let mut gesture_now = [0.0f32; 5];
     let mut gesture_cooling = 0u16;
     // Steps are being cut short by the anti-tip rule.
@@ -5425,6 +5439,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.steps
             );
         }
+        // Only lamp-control's asks (a paired computer's) replace what
+        // plays; any other asker's mark is taken as absent.
+        asked_now.replace &=
+            asked_source.is_some_and(|source| crate::moves::from_control(source.as_str()));
         // A hand from the test input (`--hold-from`) holds through anything
         // that replaces what is asked, as a real hand would.
         let test_held = asked_now.held_by_test;
@@ -5996,20 +6014,39 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 Some(("dropped: it let go and lies where it slumped", None))
             } else if in_hand_now {
                 Some((
-                    if limits.arbitration {
+                    if asked_now.replace {
+                        crate::moves::PERSON_USING
+                    } else if limits.arbitration {
                         "dropped: held by a hand"
                     } else {
                         "dropped: a hand holds it"
                     },
                     None,
                 ))
+            } else if asked_now.replace && (talking || paused.is_some()) {
+                // The person always first: a paired computer's motion never
+                // starts while someone is talking with the lamp (listening,
+                // thinking or speaking), nor over a gesture paused for that
+                // talk, whatever is playing (the Reviewer-lead's P2 on #4618).
+                Some((crate::moves::PERSON_USING, None))
             } else if standing.is_none() {
                 Some(("dropped: it does not stand this run", None))
             } else if !(playing.is_none() || idling) {
                 let by = playing
                     .filter(|(clip, _)| from_outside(clip))
                     .map_or((Priority::Conversation, None), |_| playing_by);
-                if !limits.arbitration {
+                // A replace (a paired computer's, through lamp-control)
+                // ends one of `skill` or lower, with or without
+                // arbitration; over the conversation or the person it is
+                // refused, the person always first.
+                if asked_now.replace && by.0 <= Priority::Skill && asked_by >= by.0 {
+                    None
+                } else if asked_now.replace
+                    && by.0 > Priority::Skill
+                    && !(limits.arbitration && asked_by > by.0)
+                {
+                    Some((crate::moves::PERSON_USING, by.1))
+                } else if !limits.arbitration {
                     Some(("dropped: another gesture plays", None))
                 } else if asked_by > by.0 {
                     None
@@ -6022,7 +6059,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 } else {
                     (Priority::Conversation, None)
                 };
-                (asked_by < by.0).then(|| (crate::moves::busy(by.0), by.1))
+                (asked_by < by.0).then(|| {
+                    if asked_now.replace && by.0 > Priority::Skill {
+                        (crate::moves::PERSON_USING, by.1)
+                    } else {
+                        (crate::moves::busy(by.0), by.1)
+                    }
+                })
             } else {
                 None
             };
@@ -6043,9 +6086,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         by: asked_source,
                     };
                     if let Some((old, _)) = playing.filter(|(old, _)| !idle::is_move(old)) {
+                        if asked_now.replace {
+                            handed_over = Some((old.name, clip.name));
+                        }
                         if from_outside(old) {
                             gesture_fates.push_told(
-                                (old.name, crate::moves::ended(asked_by)),
+                                (
+                                    old.name,
+                                    if asked_now.replace {
+                                        crate::moves::REPLACED
+                                    } else {
+                                        crate::moves::ended(asked_by)
+                                    },
+                                ),
                                 Told {
                                     source: playing_by.1,
                                     ..ender
@@ -7107,6 +7160,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 || test_held,
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
+            handed_over: handed_over.take(),
             looks_dropped,
             toward_refused,
             bad_reads: bus.bad_reads,
