@@ -298,6 +298,54 @@ fn on_this_repository_a_switch_on_by_default_is_not_listed() {
     }
 }
 
+/// The real page and units: a file in `deploy/product` that install never
+/// places turns nothing on, so `LAMP_OWN_KEYS`, set only in the own-keys
+/// drop-in a test lamp gets by hand, is listed as not on yet.
+#[test]
+fn on_this_repository_a_file_install_never_places_turns_nothing_on() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    assert!(lamp_os.join("deploy/product/own-keys-voice.conf").is_file());
+    let files = notes::product_files(&lamp_os).unwrap();
+    for left_out in [
+        "own-keys-voice.conf",
+        "lamp-keeper-restart.socket",
+        "lamp-setup-keys@.service",
+    ] {
+        assert!(!files.contains_key(left_out), "{left_out} is read");
+    }
+    assert!(files.contains_key("exit-note.conf") && files.contains_key("store.conf"));
+    let on = turned_on(&files);
+    assert!(!on.contains_key("LAMP_OWN_KEYS"));
+    assert!(
+        waiting(&page, &on)
+            .iter()
+            .any(|w| w.switch == "LAMP_OWN_KEYS")
+    );
+}
+
+/// The real page and units: no switch a product file turns on is counted
+/// `until` or `now`, which say it waits off for a check, so the page's
+/// counts of what waits are what's off (Reviewer-two's P3 on #4662).
+#[test]
+fn on_this_repository_no_switch_the_product_turns_on_is_counted_waiting() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let counted_waiting: Vec<String> = waiting(&page, &BTreeMap::new())
+        .into_iter()
+        .filter_map(|w| {
+            on.get(&w.switch)
+                .map(|file| format!("{} ({file})", w.switch))
+        })
+        .collect();
+    assert!(
+        counted_waiting.is_empty(),
+        "counted `until` or `now` in docs/switches.md, but on in the product; count them `on`:\n{}",
+        counted_waiting.join("\n")
+    );
+}
+
 /// The real page: every switch the notes list has a plain line in its
 /// [`PLAIN`] table, one short sentence a person can read, with no switch
 /// name, flag or code (the first builder on #3976, 29 Oct 23:4x).
