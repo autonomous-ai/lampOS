@@ -298,3 +298,12 @@ Ready for lamp-voice: yes (#4458, behind `LAMP_DECLINE_SILENT`, off; Part of #39
 - Two tests, each failing under its mutation.
 - Gate on 86a2520d88: voice lib 4159/1, the one being a known timed motor test (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean.
 - Next: "May, what would you do?" held as calling someone else, mid-conversation with one person (the first builder's 07:3x ask).
+
+### #3945, "May, what would you do?" (#4460)
+
+Ready for lamp-voice: yes (#4460, `LAMP_SPOKEN_TO`, on in product; Part of #3945)
+
+- The first builder's 07:3x ask: a set-off name that is also a common word, at a line's start in a conversation with one person, in a room not busy, isn't taken as calling someone else.
+- One test with the line as heard; four mutations each fail it in a different place.
+- Gate on e05bd780f0: voice lib 4158/1, the one being a known timed motor test (#1569); the others 1, 275, 4, 6; clippy, fmt, workspace build clean.
+- c0a4 run of the line as heard to follow.
