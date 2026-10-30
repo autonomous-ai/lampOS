@@ -1,3 +1,11 @@
+## 30 October 2026, 15:03 +07: train 409 carries the reset's bound and the sandbox test
+
+- **#4549** replaces #4539. The train bot couldn't take #4539's branch, because it still carried #4533's commits under their old SHAs. #4549 is the same commit cherry-picked onto lamp-voice, with the same patch id, so the READ-OKs carried. Lesson: after a train lands what my branch is built on, cherry-pick onto lamp-voice. Merging lamp-voice in isn't enough.
+- **#4540**, the sandbox test, plus `updates.md`'s unit paragraph, which had left out the skills folders. Read by Tests.
+- **8899 checked before the promote:** `min_updater` 8, the same as 8811's updater, so beta lamps take it without a climb, and 7071 climbs to the `lamp-update` it carries. The build is 236.5 MB. The reset plan's commands are absolute.
+- **Restated** READ-OK on #4524 after the bot's false HOLD (#4507's red test).
+- **Owed by me:** `updates.md:1075`'s exit 4 once #4524 lands, and the same manifest check on train 409's build.
+
 ## 30 October 2026, 14:14 +07: Harness in the round can't write past lamp-update's sandbox
 
 **#4503 (Eighth, Harness turned on by a build), HOLD with one P2:**
