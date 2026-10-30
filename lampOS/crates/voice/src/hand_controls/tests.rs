@@ -1385,6 +1385,27 @@ fn a_sleep_asked_aloud_is_a_hands_sleep_but_never_during_onboarding() {
     assert!(!seen.mute_changed && seen.muted && seen.asleep, "{seen:?}");
 }
 
+/// #3748 part 3: a sleep asked aloud while the lamp says the cached sleep
+/// line is owed as a hand's hold's is: not while its cue sounds, then once
+/// it no longer does; never without head sleep.
+#[test]
+fn a_sleep_asked_aloud_with_the_sleep_line_waits_for_its_cue() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.owe_sleep(START + 500_000);
+    assert!(owner.hold_owed.is_none(), "no head sleep: nothing owed");
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner.set_sleep_line(true);
+    owner.owe_sleep(START + 1_000_000);
+    owner.sleep_cue_sounding(START + 1_400_000);
+    let seen = owner.poll_at(START + 1_500_000).unwrap();
+    assert!(!seen.mute_changed && !seen.muted, "cue sounding: {seen:?}");
+    let seen = owner.poll_at(START + 3_600_000).unwrap();
+    assert!(seen.mute_changed && seen.muted && seen.asleep, "{seen:?}");
+    assert!(owner.hold_owed.is_none());
+}
+
 /// #3747: a sleeping lamp wakes at a hand kept a second on its head, at the
 /// stroke, not at its letting go, once the clear is saved, so a person who
 /// holds it to bring it back does; and the same hand, kept past three

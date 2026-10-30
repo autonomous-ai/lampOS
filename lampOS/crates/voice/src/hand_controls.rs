@@ -331,12 +331,20 @@ fn head_held(state: &TouchState) -> Option<(u64, u64)> {
 }
 
 /// A hold's owed sleep (#3748): when it was taken, and when its contact
-/// began.
+/// began; or a sleep asked aloud, owed the same way while the lamp says
+/// the cached sleep line. Who owes it and since what, for the journal.
 #[derive(Clone, Copy, Debug)]
 struct OwedHold {
     held_at: u64,
     began_us: u64,
+    who: &'static str,
+    since: &'static str,
 }
+
+/// A hold's journal words: [`OwedHold::who`] and [`OwedHold::since`].
+const BY_HOLD: (&str, &str) = ("a hand's hold", "the hold");
+/// A sleep asked aloud's ([`HandControls::owe_sleep`]).
+const BY_ASK: (&str, &str) = ("a sleep asked aloud", "the ask");
 
 /// The hand has left the head in a touch state: the head read, and no
 /// contact on it, past the pads' short gaps (#3748).
@@ -1075,6 +1083,22 @@ impl HandControls {
         self.sleep_asked = true;
     }
 
+    /// A sleep asked aloud (`go_to_sleep`) while the lamp says the cached
+    /// sleep line (#3748, `LAMP_SLEEP_LINE=on`): owed as a hand's hold's
+    /// is, until that cue is no longer sounding or at [`SLEEP_OWED_CAP_US`]
+    /// ([`Self::land_owed_sleep`]). Only with head sleep: a tap on the head
+    /// is how it is woken. A hold already owed keeps its own.
+    pub fn owe_sleep(&mut self, now_us: u64) {
+        if self.options.head_sleep() && self.hold_owed.is_none() {
+            self.hold_owed = Some(OwedHold {
+                held_at: now_us,
+                began_us: now_us,
+                who: BY_ASK.0,
+                since: BY_ASK.1,
+            });
+        }
+    }
+
     /// `LAMP_SLEEP_LINE=on` (#3748): a hand's hold says the recorded sleep
     /// line, and its sleep waits for the cue.
     pub fn sleep_line(&self) -> bool {
@@ -1388,7 +1412,13 @@ impl HandControls {
     /// head past three seconds. Never while the walk is under way.
     fn land_owed_sleep(&mut self, now_us: u64, observation: &mut Observation) {
         let sounding = std::mem::take(&mut self.cue_sounding);
-        let Some(OwedHold { held_at, began_us }) = self.hold_owed else {
+        let Some(OwedHold {
+            held_at,
+            began_us,
+            who,
+            since,
+        }) = self.hold_owed
+        else {
             return;
         };
         let capped = now_us >= held_at.saturating_add(SLEEP_OWED_CAP_US);
@@ -1398,9 +1428,7 @@ impl HandControls {
         self.hold_owed = None;
         let cue_seen = self.cue_seen_us.take();
         if self.onboarding {
-            eprintln!(
-                "lamp-voice: a hand's hold: its owed sleep is dropped: onboarding is under way"
-            );
+            eprintln!("lamp-voice: {who}: its owed sleep is dropped: onboarding is under way");
             return;
         }
         // When the contact began, for the receiver's fence: a hand that woke
@@ -1414,16 +1442,16 @@ impl HandControls {
                 let after_hold = (now_us - held_at) / 1_000;
                 if capped {
                     eprintln!(
-                        "lamp-voice: a hand's hold: its owed sleep lands at the cap, {after_hold} ms after the hold, its cue still sounding"
+                        "lamp-voice: {who}: its owed sleep lands at the cap, {after_hold} ms after {since}, its cue still sounding"
                     );
                 } else if let Some(seen) = cue_seen.filter(|seen| *seen >= held_at) {
                     eprintln!(
-                        "lamp-voice: a hand's hold: its owed sleep lands {} ms after its cue ended ({after_hold} ms after the hold)",
+                        "lamp-voice: {who}: its owed sleep lands {} ms after its cue ended ({after_hold} ms after {since})",
                         now_us.saturating_sub(seen) / 1_000
                     );
                 } else {
                     eprintln!(
-                        "lamp-voice: a hand's hold: its owed sleep lands {after_hold} ms after the hold, no cue sounding then"
+                        "lamp-voice: {who}: its owed sleep lands {after_hold} ms after {since}, no cue sounding then"
                     );
                 }
             }
@@ -1456,6 +1484,8 @@ impl HandControls {
                     self.hold_owed = Some(OwedHold {
                         held_at: now_us,
                         began_us: event.began_us,
+                        who: BY_HOLD.0,
+                        since: BY_HOLD.1,
                     });
                 }
             }
