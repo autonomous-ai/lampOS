@@ -94,7 +94,7 @@ fn no_walk_is_read_without_setup_done_or_a_readable_file() {
     build_two(&mut bench);
     put(&bench, walk::PROGRESS, TWO_STEPS_IN);
     assert_eq!(bench.round(), Outcome::Switched(2));
-    // No file: before the first step's end, or onboarding off.
+    // No file on a lamp whose voice unit doesn't walk (onboarding off).
     let mut off = Lamp::new();
     build_two(&mut off);
     set_up(&off);
@@ -139,4 +139,50 @@ fn a_walk_begun_while_the_round_fetched_holds_it_at_the_switch() {
     );
     put(&lamp, walk::PROGRESS, &walked());
     assert_eq!(lamp.round(), Outcome::Switched(2));
+}
+
+/// The installed voice unit walks, as the product's does, perhaps keeping
+/// its walk at `file`.
+fn walks(lamp: &Lamp, file: Option<&str>) {
+    let path = lamp.root.join("etc/systemd/system/lamp-voice.service");
+    let mut text = fs::read_to_string(&path).unwrap();
+    text.push_str("Environment=LAMP_ONBOARDING=on\n");
+    if let Some(file) = file {
+        text.push_str(&format!("Environment=LAMP_ONBOARDING_FILE={file}\n"));
+    }
+    fs::write(path, text).unwrap();
+}
+
+/// Tests' and Third's P2 on #4455: the walk's first step has no file yet
+/// (7071 writes it at that step's end), so a voice unit that walks with no
+/// file is a walk under way; and the file is the one its unit names.
+#[test]
+fn a_walk_not_written_yet_holds_when_the_voice_walks() {
+    let mut lamp = Lamp::new();
+    build_two(&mut lamp);
+    set_up(&lamp);
+    walks(&lamp, None);
+    assert_eq!(lamp.round(), held(1));
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    // The first step ends, and later the walk: the switch goes ahead.
+    put(&lamp, walk::PROGRESS, TWO_STEPS_IN);
+    assert_eq!(lamp.round(), held(2));
+    put(&lamp, walk::PROGRESS, &walked());
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+
+    // A unit that keeps its walk elsewhere is read there, not at PROGRESS.
+    let mut elsewhere = Lamp::new();
+    build_two(&mut elsewhere);
+    set_up(&elsewhere);
+    walks(
+        &elsewhere,
+        Some("/var/lib/lampOS/voice/other/progress.json"),
+    );
+    put(&elsewhere, walk::PROGRESS, &walked());
+    put(
+        &elsewhere,
+        "/var/lib/lampOS/voice/other/progress.json",
+        TWO_STEPS_IN,
+    );
+    assert_eq!(elsewhere.round(), held(1));
 }

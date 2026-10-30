@@ -691,12 +691,17 @@ each under the quiet rule. A round
    **The setup walk under way (#3689, `walk.rs`):** a build with changes
    is not fetched while the person is being walked through onboarding.
    Under way means setup is done (`/var/lib/lampos-setup/done`) and the
-   voice's onboarding file (`/var/lib/lampOS/voice/onboarding/progress.json`)
-   has no outcome for one of `lamp_msgs::ONBOARDING_STEPS`, the voice's
-   nine step ids, the same since the 7071 image. A `later` step has an
-   outcome, so a walk left for later is over. No file, or one that isn't
-   the walk's, is no walk: the 7071 voice writes it at the first step's
-   end, and a lamp with onboarding off never does. The round then ends
+   voice's onboarding file has no outcome for one of
+   `lamp_msgs::ONBOARDING_STEPS`, the voice's nine step ids, the same since
+   the 7071 image. The file is the one the installed `lamp-voice.service`
+   names in `LAMP_ONBOARDING_FILE`, else
+   `/var/lib/lampOS/voice/onboarding/progress.json`. A `later` step has an
+   outcome, so a walk left for later is over. No file counts as under way
+   when that unit sets `LAMP_ONBOARDING=on`, as the product's does: the
+   7071 voice writes the file only at the first step's end, so the walk's
+   hello and its wait for the person to sit have none (Tests' and Third's
+   P2 on #4455). Without it, no file is no walk (onboarding off). A file
+   that can't be read, or isn't the walk's, is no walk. The round then ends
    `not switched: the setup walk is under way: held, round N of 8` (status
    4), and the next round looks again. The walk is looked at again at each
    second of the switch's quiet wait (step 7), so a round begun before the

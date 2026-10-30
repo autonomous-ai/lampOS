@@ -9,16 +9,25 @@
 //! switched (Tests' P2 on #4455).
 //!
 //! Under way: setup is done and the voice's onboarding file has no outcome
-//! for one of [`lamp_msgs::ONBOARDING_STEPS`]. No file, or one that can't be
-//! read, is no walk: the 7071 image writes it at the first step's end, and
-//! a lamp with onboarding off never does. Held at most [`MOST_HELD`] rounds
-//! on a lamp, counted in the records and never reset, so a walk left half
-//! done never holds updates for good, and the bound needs no clock (a new
-//! lamp's clock may be set after setup ends).
-use crate::{records, round::Config, setup_lifecycle};
+//! for one of [`lamp_msgs::ONBOARDING_STEPS`], or has not been written yet
+//! while the installed voice unit walks (`LAMP_ONBOARDING=on`): the 7071
+//! image writes it only at the first step's end, so the walk's hello and
+//! its wait for the person to sit have none (Tests' and Third's P2 on
+//! #4455). The file is the one that unit names (`LAMP_ONBOARDING_FILE`).
+//! One that can't be read, or isn't the walk's, is no walk, and so is no
+//! file on a lamp whose voice doesn't walk. Held at most [`MOST_HELD`]
+//! rounds on a lamp, counted in the records and never reset, so a walk
+//! left half done never holds updates for good, and the bound needs no
+//! clock (a new lamp's clock may be set after setup ends).
+use crate::{
+    records,
+    round::{Config, VOICE_UNIT},
+    setup_lifecycle, unit,
+};
 use std::{fs, path::Path};
 
-/// The voice's onboarding file (`LAMP_ONBOARDING_FILE` in the product unit).
+/// The voice's onboarding file when its unit names none: the product
+/// unit's `LAMP_ONBOARDING_FILE`, the same since the 7071 image.
 pub const PROGRESS: &str = "/var/lib/lampOS/voice/onboarding/progress.json";
 /// Rounds a lamp is held for a walk, in all: 2 hours at `serve`'s 900 s.
 pub const MOST_HELD: u32 = 8;
@@ -30,8 +39,14 @@ pub fn under_way(config: &Config) -> bool {
     if !setup_lifecycle::done(&config.root) {
         return false;
     }
-    let Ok(bytes) = fs::read(config.on(PROGRESS)) else {
-        return false;
+    let voice = fs::read_to_string(config.on(&config.units).join(VOICE_UNIT)).unwrap_or_default();
+    let walks = unit::environment(&voice, "LAMP_ONBOARDING").as_deref() == Some("on");
+    let progress =
+        unit::environment(&voice, "LAMP_ONBOARDING_FILE").unwrap_or_else(|| PROGRESS.to_owned());
+    let bytes = match fs::read(config.on(&progress)) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return walks,
+        Err(_) => return false,
     };
     let Ok(file) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
         return false;
