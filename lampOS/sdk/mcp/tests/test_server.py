@@ -17,7 +17,13 @@ from mcp.shared.memory import create_connected_server_and_client_session
 
 from lamp_mcp.server import Limits, build, gestures
 
-ALL = {"lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_light", "lamp_say", "lamp_stop"}
+ALL = {
+    "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
+    "lamp_light", "lamp_say", "lamp_sound", "lamp_stop",
+}
+# The schema's ops a tool doesn't send itself: pairing and hello are the
+# SDK's, before any tool; leases go with each body tool.
+NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release"}
 # Offered only with both body and look.
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
 
@@ -97,9 +103,99 @@ def test_each_tool_sends_its_one_op(tmp_path):
     run(go())
 
 
+def test_every_op_of_the_schema_is_sent_by_a_tool(tmp_path):
+    """A new op in the schema fails here until a tool sends it (or it's
+    named in NOT_A_TOOL), so an agent can do all a computer can."""
+    import inspect
+
+    import lamp_mcp.server as module
+
+    source = inspect.getsource(module)
+    # Sent through the SDK's own calls rather than by name.
+    through = {"get": "lamp.get(", "subscribe": "lamp.on(", "unsubscribe": "lamp.off("}
+    sent = set()
+    for op in schema.ops():
+        if op in NOT_A_TOOL:
+            continue
+        if f'"{op}"' in source or (op in through and through[op] in source):
+            sent.add(op)
+    assert sent == set(schema.ops()) - NOT_A_TOOL, set(schema.ops()) - NOT_A_TOOL - sent
+
+
+def test_play_joints_and_sound_each_send_their_op(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("body", "speak")) as (fake, _, session):
+            assert not (await session.call_tool("lamp_play", {"name": "wave"})).isError
+            assert fake.asked("play") == [{"name": "wave"}]
+            joints = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
+            assert not joints.isError, text(joints)
+            [asked] = fake.asked("joints")
+            # Under a body lease of its own, named in the request.
+            assert asked["targets"] == {"pitch": 10, "elbow": -5} and asked["within_ms"] == 800
+            assert asked["lease"].startswith("l_")
+            none = await session.call_tool("lamp_joints", {"within_ms": 800})
+            assert none.isError and "needs at least one of" in text(none)
+            assert not (await session.call_tool("lamp_sound", {"name": "hum"})).isError
+            assert fake.asked("sound") == [{"name": "hum"}]
+
+    run(go())
+
+
+def test_body_tools_in_a_row_reuse_the_held_lease_rather_than_be_refused_busy(tmp_path):
+    """A move handed to the body leaves its lease to lapse; the next body tool
+    renews and uses it, since the lamp refuses a second take even from its
+    own holder."""
+
+    async def go():
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+            plain = fake._ok
+
+            async def handed(ws, id_, **fields):
+                if any(r["id"] == id_ and r["op"] in ("move", "play") for r in fake.requests):
+                    fields["to"] = "body"
+                await plain(ws, id_, **fields)
+
+            fake._ok = handed
+            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]  # 1.5 s
+            for _ in range(2):
+                moved = await session.call_tool("lamp_move", {"step_ms": 500, "frames": frames})
+                assert not moved.isError, text(moved)
+            played = await session.call_tool("lamp_play", {"name": "wave"})
+            assert not played.isError, text(played)
+            assert len(fake.asked("lease.take")) == 1 and len(fake.asked("lease.renew")) == 2
+
+    run(go())
+
+
+def test_a_done_that_comes_before_its_answer_is_read_still_ends_the_tool(tmp_path):
+    async def go():
+        # The fake says `done` right after its answer.
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            started = asyncio.get_running_loop().time()
+            played = await session.call_tool("lamp_play", {"name": "wave"})
+            assert not played.isError and text(played) == "play finished"
+            assert asyncio.get_running_loop().time() - started < 5
+            assert fake.asked("lease.release") and not fake.leases
+
+    run(go())
+
+
+def test_a_lamp_that_doesnt_route_them_says_so_as_the_tools_error(tmp_path):
+    from lampos.testing import LAMP_CONTROL_REFUSES
+
+    async def go():
+        async with connected(tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES) as (fake, _, session):
+            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 5}), ("lamp_sound", {"name": "hum"})):
+                result = await session.call_tool(tool, arguments)
+                assert result.isError and "refused: not routed yet" in text(result), (tool, text(result))
+
+    run(go())
+
+
 def test_a_look_takes_its_own_lease_and_lets_go_at_done(tmp_path):
     async def go():
-        async with connected(tmp_path) as (fake, _, session):
+        # The test sends the look's `done` itself.
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
             call = asyncio.create_task(session.call_tool("lamp_look", {"yaw": -10, "pitch": 5}))
             await until(lambda: fake.asked("look"))
             (taken,) = fake.asked("lease.take")
@@ -348,7 +444,8 @@ def test_wait_for_gives_the_first_event_then_unsubscribes(tmp_path):
 
 def test_stop_lets_go_of_a_lease_left_to_lapse(tmp_path):
     async def go():
-        async with connected(tmp_path) as (fake, _, session):
+        # No `done` comes, so the look's lease is left held.
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
             call = asyncio.create_task(session.call_tool("lamp_look", {"at": "ahead"}))
             await until(lambda: fake.asked("look"))
             lease = next(iter(fake.leases))
