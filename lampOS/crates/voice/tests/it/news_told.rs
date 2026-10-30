@@ -191,8 +191,8 @@ impl Place {
     }
 
     /// Handed over as the voice does it (prepared, then the person's yes on
-    /// the trusted socket), and its agent's answer read and kept.
-    #[track_caller]
+    /// the trusted socket), and its agent's answer read and kept. Not
+    /// tracked: a timeout names which of its two waits ran out.
     fn handed_and_read(&self) -> Value {
         let prepared =
             self.ask(json!({"op":"prepare","guard":self.guard(),"text":TASK,"target":"coding"}));
