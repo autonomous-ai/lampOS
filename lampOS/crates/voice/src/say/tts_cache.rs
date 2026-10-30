@@ -171,6 +171,14 @@ impl TtsCache {
         read(&self.path(text))
     }
 
+    /// The sleep line (`lamp_msgs::SLEEP_LINE`, #3748) if kept: the owner's
+    /// words when kept, else the English. Never rendered here. The one
+    /// lookup for a hand's hold and a sleep asked aloud alike.
+    pub fn sleep_line(&self) -> Option<Vec<i16>> {
+        self.owners_kept(lamp_msgs::SLEEP_LINE)
+            .or_else(|| self.kept(lamp_msgs::SLEEP_LINE))
+    }
+
     /// Each of `lines` rendered and kept, unless it is already: every one
     /// tried, so one that fails (too long) never keeps the rest from being
     /// kept; the first failure is returned.
