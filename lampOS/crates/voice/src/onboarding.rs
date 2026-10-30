@@ -864,6 +864,29 @@ pub fn fixed_words(note: &str) -> Option<&str> {
     (fixed && !words.trim().is_empty()).then_some(words)
 }
 
+/// What marks one of the walk's own lines ([`own_line`]).
+const OWN_MARK: &str = "(The lamp says this itself.) ";
+
+/// A fixed line the walk says itself, never the model (#3769, lamp-52e6,
+/// 30 Oct 08:22: given `how_you_sound`'s sentence prompt as a note, the
+/// model said its own small talk, and the prompt still counted as played).
+/// The second route says its words as they are and asks no chat
+/// ([`own_words`]); the Live route's model still reads the fixed note after
+/// the mark. A note not of the fixed form (an older file's) is left as it
+/// is, the model's.
+pub(crate) fn own_line(note: String) -> String {
+    if fixed_words(&note).is_some() {
+        format!("{OWN_MARK}{note}")
+    } else {
+        note
+    }
+}
+
+/// The words of a line [`own_line`] marked, said as they are.
+pub fn own_words(note: &str) -> Option<&str> {
+    fixed_words(note.strip_prefix(OWN_MARK)?)
+}
+
 pub fn mailbox_of(file: &Path) -> PathBuf {
     let mut name = file.as_os_str().to_owned();
     name.push(".told");

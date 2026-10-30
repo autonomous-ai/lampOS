@@ -2620,6 +2620,52 @@ async fn an_onboarding_fixed_line_whose_chat_fails_is_said_as_it_is() {
     }
 }
 
+/// lamp-52e6, 30 Oct 08:22 (#3769): given `how_you_sound`'s sentence
+/// prompt as a note, the model said "The mornings are getting cooler now,
+/// wouldn't you say?", and the prompt counted as played. A line the walk
+/// owns is said in its exact words and the chat is never asked, however
+/// ready the model is with words of its own; told as own words, so its
+/// completion ends no refusal.
+#[tokio::test(start_paused = true)]
+async fn a_walk_owned_onboarding_line_is_said_in_its_words_and_never_asked_of_the_model() {
+    let note = crate::onboarding::own_line(crate::onboarding::SENTENCE_FIRST.to_owned());
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [vec![
+                Ok(ChatEvent::Text(
+                    "The mornings are getting cooler now, wouldn't you say?".into(),
+                )),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, calls, _) = scripted(script.clone());
+    engine.submit(written(1, &note));
+    let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+    let said: Vec<_> = labels
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(
+        said,
+        ["said:Now say any sentence to me, the way you'd talk to me."],
+        "{labels:?}"
+    );
+    assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert!(
+        labels.ends_with(&["generated".into(), "complete".into()]),
+        "{labels:?}"
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
+    assert!(calls.lock().unwrap().is_empty());
+}
+
 /// #1712, the first builder at 16:04: a spoken line whose chat the route
 /// gave up, not begun within `BEGIN_WITHIN`, is no talk the lamp left
 /// alone. Two of them don't end the conversation, and the person's next
