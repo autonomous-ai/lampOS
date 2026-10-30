@@ -2089,3 +2089,36 @@ fn every_product_unit_outside_the_target_that_waits_for_setup_is_the_resets() {
         "outside lampos.target, waiting for setup, and neither stopped nor started by a reset in place: {unnamed:?}"
     );
 }
+
+/// An office lamp's `lamp-peek` on port 80 (#4536): a reset in place stops
+/// it with the lamp, as a writer, and never starts it again, so setup's page
+/// has the port; the lamp's next boot starts it once setup is done.
+#[test]
+fn a_reset_in_place_stops_lamp_peek_and_leaves_it_off_for_setup() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = product_lamp();
+    fake.writers
+        .push_str("lamp-peek.service loaded active running Peek\n");
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    let argvs = fake.argvs.borrow();
+    let stop = argvs
+        .iter()
+        .find(|argv| argv[1] == "stop" && argv.iter().any(|word| word == "lampos.target"))
+        .unwrap();
+    assert!(
+        stop.iter().any(|unit| unit == "lamp-peek.service"),
+        "{stop:?}"
+    );
+    let start = argvs.iter().rfind(|argv| argv[1] == "start").unwrap();
+    assert!(
+        !start.iter().any(|unit| unit == "lamp-peek.service"),
+        "{start:?}"
+    );
+    assert!(
+        start.iter().any(|unit| unit == "lamp-setup.service"),
+        "{start:?}"
+    );
+}
