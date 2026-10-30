@@ -177,7 +177,10 @@ impl StateKind {
     pub fn needs(self) -> Option<Grant> {
         match self {
             Self::Presence => Some(Grant::Look),
-            Self::Light | Self::Mood | Self::Lamp | Self::Body => None,
+            // The body's bounds and where it is: as `body.state`, with the
+            // body grant.
+            Self::Body => Some(Grant::Body),
+            Self::Light | Self::Mood | Self::Lamp => None,
         }
     }
 }

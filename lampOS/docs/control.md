@@ -351,8 +351,7 @@ only with it. A `get` reply carries each state asked for: `presence`,
 `body` says what the lamp's body may do, joint by joint, and where each joint
 is now (`crates/control/src/body_info.rs`). It comes from the body's own
 `body/limits`, said once it has found where it is and every 10 s, and its
-`body/joint_states`. It needs no grant: these are the body's bounds, not the
-room's. Until the body has said its limits, it is `{"known": false, "why": ...}`.
+`body/joint_states`. It needs the `body` grant, as `body.state` does. Until the body has said its limits, it is `{"known": false, "why": ...}`.
 
 - `joints`: `yaw`, `pitch`, `roll`, `shoulder` and `elbow`, the names
   `joints` takes. Each has `counts` (where it is, of 4,096 a turn), `deg`
@@ -371,6 +370,15 @@ room's. Until the body has said its limits, it is `{"known": false, "why": ...}`
   `load_limit` is the force cap as a share, `null` where each servo keeps its
   own. `heat_stop_c` is where a joint stops.
 - **Nothing here can be raised from outside the body.**
+
+**One convention for every joint's degrees.** `get` `body`, `body.state` and
+`joints`' targets all count degrees the same way, from one function
+(`body_info::from_home`): from home (the found home for the head and base,
+the folded pose for the arm), to a tenth of a degree. `yaw`, `shoulder`,
+`elbow` and `roll` are positive with more counts, and `pitch` with fewer, so
+up is positive. A `joints` target of `{"yaw": 10}` is 10 degrees right of
+where the base was found, and `{"pitch": 5}` is 5 degrees up from where the
+head was found. Raw counts stay counts.
 
 ### Leases
 

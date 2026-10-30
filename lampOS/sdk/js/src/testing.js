@@ -448,7 +448,10 @@ export class FakeLamp {
 
   needs(op, request) {
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
-    if (op === 'get') return (request.state ?? []).includes('presence') ? ['look'] : [];
+    if (op === 'get') {
+      const asked = request.state ?? [];
+      return [...(asked.includes('presence') ? ['look'] : []), ...(asked.includes('body') ? ['body'] : [])];
+    }
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);

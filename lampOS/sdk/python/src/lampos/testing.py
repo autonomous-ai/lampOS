@@ -538,7 +538,8 @@ class FakeLamp:
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
-            return ["look"] if "presence" in request.get("state", []) else []
+            asked = request.get("state", [])
+            return (["look"] if "presence" in asked else []) + (["body"] if "body" in asked else [])
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") in ("face", "hand") else ["body"]
