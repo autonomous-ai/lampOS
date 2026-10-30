@@ -356,6 +356,35 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   after it keep the 100 ms bound. If nothing fresh is waiting yet, nothing is
   taken and the next look goes on with the run. The bound itself is
   unchanged, and no other channel drops.
+- **Every worker's lease lapsing in the voice's startup prologue.** On a
+  test lamp at build 8545, the voice's first start after boot set itself up
+  for about 0.9 s between starting its workers and its loop's first publish
+  (#4332). `spawn_rig` renews each worker's authority every 20 ms while the
+  workers start, but nothing renewed it in the conversation's setup after
+  that (storage reads, sockets, configuration loads, ~30 bus endpoints). The
+  field timeline puts the last renewal at about 02.00, right after the
+  voice's last configuration line (`asker first …`) and its bus writers, and
+  every 250 ms lease lapsed together at 02.254: the privacy worker ended on
+  `privacy controller lease expired`, fail-closed as it must, the voice
+  exited 1 and came back muted by the restart guard. The setup now renews
+  them as it goes: between its groups it re-sends the controller's current
+  snapshot, freshly timed, to every worker when 50 ms or more have passed
+  since the last renewal, exactly as the loop's first publish does. Nothing
+  is granted there (the microphone stays denied until the loop allows it),
+  and no lease length, expiry rule or fail-closed exit changed: a single
+  setup step held past 250 ms still ends the voice closed. With
+  `LAMP_STALLS=on` the coordinator's stall recorder now starts with the
+  setup, so a slow stretch of it is a gap line in `stalls-coordinator.log`.
+  The privacy worker's observations queue up through the setup, each older
+  than its 50 ms freshness when the loop reads them, so the voice's 1 s start
+  window for a stale one now counts from the loop's start, just before its
+  first publish, not from inside the setup: a setup past a second no longer
+  ends the voice at the loop's first pass. The window's length and the gate
+  are unchanged; the microphone stays denied until the loop allows it.
+  Stepped coordinator tests make the setup take 0.8 s and 1.3 s of logical
+  time and check that no worker's authority lapsed and that the queued
+  observations did not end the voice; they use fixture workers, not the
+  real privacy worker, and were not tried on a lamp.
 - **The first direct capture-ready message while the speaker starts.** On
   build 6963 after setup, lamp-dbda reported `ref.c.speaker` sequence 1
   after 0, aged 143402 us against 100000 us, then restarted muted (#3530).

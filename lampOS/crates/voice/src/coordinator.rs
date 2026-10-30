@@ -3966,6 +3966,63 @@ fn pulse(
     }
     Ok(())
 }
+
+/// How often the conversation's startup prologue renews the workers'
+/// authority ([`PrologueLeases`]): well inside their 250 ms leases.
+const PROLOGUE_RENEW_US: u64 = 50_000;
+
+/// The workers' leases kept renewed through the conversation's startup
+/// prologue (#4332). `spawn_rig` renews them every 20 ms while the workers
+/// start ([`pulse`]); after its last pulse nothing renewed them until the
+/// loop's first publish, and on a cold lamp just after boot the setup in
+/// between took ~0.9 s: every lease lapsed together, the privacy worker
+/// ended on `privacy controller lease expired` (fail-closed, as it must)
+/// and the voice with it. A keep between the prologue's setup groups
+/// re-sends the controller's current snapshot, freshly timed, to every
+/// worker, exactly as the loop's first publish does: no permission is set
+/// or granted here and the leases keep their length, so it only extends
+/// what the workers already hold, the microphone's denial included.
+#[derive(Default)]
+struct PrologueLeases {
+    renewed_us: Option<u64>,
+}
+
+impl PrologueLeases {
+    /// Renews when [`PROLOGUE_RENEW_US`] or more have passed since the last
+    /// renewal (always at the first keep), and ends a pass of the
+    /// coordinator's stall recorder, so a slow stretch of the prologue is a
+    /// gap line with `LAMP_STALLS=on`.
+    /// It does not read the workers' events: what they send meanwhile, the
+    /// privacy worker's observations included, waits for the loop, which
+    /// reads that backlog under the transport's held-up allowance
+    /// (`transport::HELD_UP_US`, 1.5 s).
+    fn keep(
+        &mut self,
+        rig: &mut Rig,
+        owner: &mut Controller,
+        stalls: &mut crate::stalls::Stalls,
+    ) -> Result<()> {
+        // A test's slow setup step: the stretch before this keep took that
+        // many 2 ms steps of the scenario clock, its peers read at each.
+        #[cfg(test)]
+        for _ in 0..TEST_PROLOGUE_STEPS.with(std::cell::Cell::get) {
+            crate::scenario_clock::step(crate::scenario_clock::Phase::Run)?;
+            TEST_PROLOGUE_STEPPED.with(|stepped| stepped.set(stepped.get() + 1));
+        }
+        stalls.begin().done();
+        let at = monotonic_us();
+        if self
+            .renewed_us
+            .is_some_and(|renewed| at.saturating_sub(renewed) < PROLOGUE_RENEW_US)
+        {
+            return Ok(());
+        }
+        rig.publish(owner.snapshot(now())?)?;
+        self.renewed_us = Some(at);
+        Ok(())
+    }
+}
+
 /// Startup workers have denied capture authority. A mute observed here is
 /// persisted and aborts startup; partial-start teardown is not a resumable cycle.
 fn controls_startup(controls: &mut Option<HandControls>) -> io::Result<()> {
@@ -5084,6 +5141,11 @@ thread_local! {
     /// A loop test's eyes, with no eyes' link: each still asked for is
     /// written at once to `TEST_FULL_LOOK`'s file, with its ask's id.
     static TEST_EYES_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's slow startup prologue (#4332): each stretch between
+    /// two of its lease keeps takes this many 2 ms scenario steps.
+    static TEST_PROLOGUE_STEPS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// And how many it took in all.
+    static TEST_PROLOGUE_STEPPED: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// A loop test's `LAMP_UNCLEAR_HUM=on` (#1421), as `TEST_FULL_LOOK`.
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_GAP_RIDE=on` (#2602), as `TEST_FULL_LOOK`.
@@ -5606,6 +5668,15 @@ fn conversation_with_gate_inner(
     #[cfg(test)] host_deadline: Option<Instant>,
     waking: &mut Option<(u64, u64)>,
 ) -> Result<()> {
+    // With LAMP_STALLS=on, a pass or a gap between passes of 50 ms or more
+    // is recorded with what the lamp was doing (#1178); from here, so the
+    // setup before the loop is measured too (#4332).
+    let mut stalls = crate::stalls::Stalls::from_environment("coordinator");
+    // The workers' leases, renewed through the setup below until the loop's
+    // first publish (#4332): before each group that may be slow on a cold
+    // lamp (storage, sockets, configuration) and every few bus endpoints.
+    let mut leases = PrologueLeases::default();
+    leases.keep(rig, owner, &mut stalls)?;
     let mut cloud = startup.cloud;
     let mut output_flow = startup.output_flow;
     let requested_audio =
@@ -5613,6 +5684,7 @@ fn conversation_with_gate_inner(
             eprintln!("lamp-voice: requested audio unavailable: {error}");
             None
         });
+    leases.keep(rig, owner, &mut stalls)?;
     for event in startup.events {
         record(trace, event)?;
     }
@@ -5633,6 +5705,7 @@ fn conversation_with_gate_inner(
     let reach_on =
         offline_voice && std::env::var(REACH_PROBE_ENVIRONMENT).ok().as_deref() == Some("on");
     let mut reach = reach_verdict(reach_on, lamp_bus::Bus::from_environment());
+    leases.keep(rig, owner, &mut stalls)?;
     // With `LAMP_SERVICE_DOWN_LINE=on` too: a link down while the internet
     // answers says the service's line once instead of nothing (#830).
     let service_down_line =
@@ -5641,7 +5714,6 @@ fn conversation_with_gate_inner(
     let mut link_down_since: Option<u64> = None;
     // Since when "I'm back online." is owed, if it is.
     let mut back_owed_since: Option<u64> = None;
-    let privacy_started = session_instant();
     let mut privacy_sequence = 0u64;
     let mut onboarding_privacy_receipt: Option<crate::wire::PrivacyReceipt> = None;
     let mut permitted = false;
@@ -5697,6 +5769,7 @@ fn conversation_with_gate_inner(
     // due, N ms after `listening_ready`; set once, when that is recorded.
     let mut fixture_at_ms = rig.fixture_at_ms;
     let mut fixture_due_us = None;
+    leases.keep(rig, owner, &mut stalls)?;
     // A service that runs all day may also tell a body what it is doing.
     let mut body_link = if lifetime.continuous() {
         crate::body_link::BodyLink::from_environment()
@@ -5758,6 +5831,7 @@ fn conversation_with_gate_inner(
     let mut busy_room_told: Option<u64> = None;
     // When `lamp-name` last heard a stop word beginning, for that.
     let mut stop_began_us: Option<u64> = None;
+    leases.keep(rig, owner, &mut stalls)?;
     let own_line_eyes = (own_line_keeps || own_line_over_talk)
         .then(|| std::sync::Arc::new(crate::speaking_faces::SpeakingFaces::default()));
     let _own_line_reader = own_line_eyes.as_ref().and_then(|eyes| {
@@ -5826,6 +5900,7 @@ fn conversation_with_gate_inner(
         || TEST_MISHEARD_HUM.with(std::cell::Cell::get);
     #[cfg(not(test))]
     let misheard_hum_on = crate::misheard_hum::enabled_from_environment();
+    leases.keep(rig, owner, &mut stalls)?;
     let head_cue = if controls.as_ref().is_some_and(HandControls::head_touch)
         || unclear_hum_on
         || misheard_hum_on
@@ -5901,6 +5976,7 @@ fn conversation_with_gate_inner(
     // audio is what follows them, a wait cue or the down line before them
     // being no answer (`AnswerAudio`).
     let mut answer_audio = AnswerAudio::default();
+    leases.keep(rig, owner, &mut stalls)?;
     // A face added from a photo, asked about once at the lamp
     // (`LAMP_PHOTO_FACES=on`, #1968): the eyes' socket, and when they were
     // last asked whether one is here.
@@ -5923,6 +5999,7 @@ fn conversation_with_gate_inner(
     // played to its end, never one cut off (`LAMP_FOLLOWS_ON=on`, #829, the
     // first builder at 09:01 on 17 October).
     let mut lamp_words_ended_us: Option<u64> = None;
+    leases.keep(rig, owner, &mut stalls)?;
     // The first five minutes with a new person, led by the lamp
     // (`docs/onboarding.md`). Off unless `LAMP_ONBOARDING=on`.
     let mut onboarding = if lifetime.continuous() {
@@ -5947,6 +6024,7 @@ fn conversation_with_gate_inner(
     if let Some(walk) = onboarding.as_mut() {
         walk.poll_storage(monotonic_us());
     }
+    leases.keep(rig, owner, &mut stalls)?;
     let onboarding_epoch = onboarding.as_ref().and_then(|_| {
         lamp_controls::runtime::clock_id(None).ok().map(|clock_id| {
             crate::onboarding::privacy::Epoch {
@@ -5996,6 +6074,7 @@ fn conversation_with_gate_inner(
     );
     #[cfg(test)]
     let news_at_pause = news_at_pause || TEST_NEWS_AT_PAUSE.with(std::cell::Cell::get);
+    leases.keep(rig, owner, &mut stalls)?;
     // What other parts ask the voice to say, skills first (#939,
     // `LAMP_SAY=on`).
     #[cfg(test)]
@@ -6019,6 +6098,7 @@ fn conversation_with_gate_inner(
     if lifetime.continuous() {
         crate::app_make::start_from_environment();
     }
+    leases.keep(rig, owner, &mut stalls)?;
     // The level under which sound is not speech, which may follow the room;
     // the speech blocks of the turn in hand and of the moment before it,
     // until it is known whether they were for the lamp; and the turn they
@@ -6087,6 +6167,7 @@ fn conversation_with_gate_inner(
     let mut reminder_held: Option<(String, u64)> = None;
     let mut news_held: Option<(String, u64)> = None;
     let mut gesture_cue = crate::body_link::Cue::default();
+    leases.keep(rig, owner, &mut stalls)?;
     // What the voice is doing, heard and said, for whoever listens on the
     // lamp's bus. Nothing here waits for a listener.
     let mut bus_out = crate::bus_out::BusOut::from_environment();
@@ -6116,6 +6197,7 @@ fn conversation_with_gate_inner(
     if tone_on && let Some(given) = TEST_FORGOT_IN.with(|slot| slot.borrow_mut().take()) {
         forgot_in = Some(given);
     }
+    leases.keep(rig, owner, &mut stalls)?;
     // The body's pushes (`body/hand`): one ends a skill's search for the
     // voice as lamp-skills ends it for the body (#2904).
     let mut hand_in = crate::search_pushed::HandIn::from_environment();
@@ -6136,6 +6218,7 @@ fn conversation_with_gate_inner(
         .expression_out
         .take()
         .or_else(crate::expression_out::ExpressionOut::from_environment);
+    leases.keep(rig, owner, &mut stalls)?;
     // And, only if someone switched it on, what the microphone hears, for
     // a part of the lamp that listens for itself.
     let mut mic_out = crate::bus_out::MicOut::from_environment(rig.microphone.as_str());
@@ -6159,6 +6242,7 @@ fn conversation_with_gate_inner(
         .is_some()
         .then(|| crate::bus_out::NameIn::from_environment_on(lamp_msgs::NameHeard::RISING_TOPIC))
         .flatten();
+    leases.keep(rig, owner, &mut stalls)?;
     // While an answer is awaited, the person it is for comes first
     // (`LAMP_ASKER_FIRST=on`, #829); the lamp's name as it is said, by
     // anyone, still takes the turn. With `record` it is judged, not done.
@@ -6229,6 +6313,7 @@ fn conversation_with_gate_inner(
             }
         );
     }
+    leases.keep(rig, owner, &mut stalls)?;
     let mut second_look =
         crate::second_look::SecondLook::default().with_the_note(crate::called::on());
     #[cfg(test)]
@@ -6268,6 +6353,7 @@ fn conversation_with_gate_inner(
     let walk_skill = TEST_WALK_SKILL
         .with(|skill| skill.borrow().clone())
         .unwrap_or(walk_skill);
+    leases.keep(rig, owner, &mut stalls)?;
     let policy_detector = match rig.turn_taking {
         // Duplex gates the scores this detector sees; its rule is unchanged.
         TurnTaking::V1Baseline | TurnTaking::Duplex => TurnDetector::v1_baseline(),
@@ -6373,6 +6459,7 @@ fn conversation_with_gate_inner(
     // that is heard while the lamp speaks (`heard-always`): a stop word
     // stops it as a hand Stop does. Off unless set, and without the second
     // voice's configuration.
+    leases.keep(rig, owner, &mut stalls)?;
     let listen = crate::stop_words::listen();
     let always = listen == crate::stop_words::Listen::Always;
     if listen != crate::stop_words::Listen::Off && !duplex {
@@ -6452,6 +6539,7 @@ fn conversation_with_gate_inner(
             }
         })
         .flatten();
+    leases.keep(rig, owner, &mut stalls)?;
     // A waited sound's words (`LAMP_WAIT_KEEPS_ANSWER=words`, #1123 step
     // 2), from a stream of their own through the second voice's
     // speech-to-text. Without its configuration the wait is `on`'s alone.
@@ -6517,6 +6605,7 @@ fn conversation_with_gate_inner(
             );
             false
         };
+    leases.keep(rig, owner, &mut stalls)?;
     let mut admission = InputAdmission::with_hold(hold);
     let mut playback_mask = if duplex {
         record(
@@ -6591,6 +6680,12 @@ fn conversation_with_gate_inner(
     let mut speaker_lapsed: Option<TurnOwner> = None;
     let mut speaker_sequence = 0u64;
     let mut hand_cancelled_through: Option<u64> = None;
+    // The privacy start window (`PRIVACY_START_STALE_US`) counts from here,
+    // the loop's start, not the prologue's: the privacy worker's
+    // observations queue up through the whole prologue, however long it
+    // takes on a cold lamp (#4332). The gate is still closed and nothing is
+    // heard until the loop allows the microphone.
+    let privacy_started = session_instant();
     let mut snapshot = owner.snapshot(now())?;
     let mut highest_known_turn = snapshot.owner().map(|owner| owner.turn());
     rig.publish(snapshot)?;
@@ -6599,9 +6694,7 @@ fn conversation_with_gate_inner(
     // Whether a sound not taken for the pause has been recorded during it:
     // once a pause, not once a block.
     let mut refused_while_paused = false;
-    // With LAMP_STALLS=on, a pass or a gap between passes of 50 ms or more
-    // is recorded with what the lamp was doing (#1178).
-    let mut stalls = crate::stalls::Stalls::from_environment("coordinator");
+    // `stalls`, made at the prologue's start, records the loop's passes.
     // With LAMP_QUIET_PACE=on, a pass every 5 ms rather than 2 while nothing
     // is going on (#705, 08:37: the quiet voice's CPU).
     let pace = crate::quiet_pace::Pace::from_environment();
@@ -15275,6 +15368,7 @@ mod tests {
     mod pilot_faults;
     mod playout_continuity;
     mod playout_start;
+    mod prologue_leases;
     mod provider_pair;
     mod provider_terminal;
     mod reminder_roundtrip;
