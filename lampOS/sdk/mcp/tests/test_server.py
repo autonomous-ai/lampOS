@@ -189,9 +189,12 @@ def test_a_lamp_that_doesnt_route_them_says_so_as_the_tools_error(tmp_path):
 
     async def go():
         async with connected(tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES) as (fake, _, session):
-            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 5}), ("lamp_sound", {"name": "hum"})):
+            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 5})):
                 result = await session.call_tool(tool, arguments)
                 assert result.isError and "refused: not routed yet" in text(result), (tool, text(result))
+            # The hum is routed, as lamp-control's `sound` is (#4228).
+            assert not (await session.call_tool("lamp_sound", {"name": "hum"})).isError
+            assert fake.asked("sound") == [{"name": "hum"}]
 
     run(go())
 

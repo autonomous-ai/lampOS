@@ -506,9 +506,10 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_sound(name: str) -> str:
-            """Play a short sound by its name (lowercase letters, digits, - and _). Like `lamp_say`, not
-            while the lamp is in quiet hours, private or talking. A lamp that doesn't route sound yet
-            says so, as the tool's error."""
+            """Play a short sound by its name (lowercase letters, digits, - and _): `hum`, the lamp's
+            own short hum, is the only one in this release. Like `lamp_say`, not while the lamp is in
+            quiet hours, private or talking. A lamp that doesn't route sound yet says so, as the
+            tool's error."""
             await act("sound", name=name)
             return f"{name} played"
 
