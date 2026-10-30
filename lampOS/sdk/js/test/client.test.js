@@ -974,3 +974,10 @@ test('a say is exact unless rephrase is asked', async () => {
     ]);
   });
 });
+
+test('the camera stream asks up to 30 a second, and 31 is refused before sending', () => withLamp({ grants: ['light', 'camera'] }, async (lamp) => {
+  const started = await lamp.cameraStream(true, 30);
+  assert.equal(started.fps, 30);
+  assert.ok('fps_now' in started);
+  await assert.rejects(lamp.cameraStream(true, 31), LampError);
+}));
