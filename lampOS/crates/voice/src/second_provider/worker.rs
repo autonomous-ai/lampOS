@@ -6028,8 +6028,14 @@ pub(crate) const NAME_THEN_HELD: &str = "(For you to know, not to answer: right 
 /// `not_for_me` offered. Gemini Live hears who is talking to whom; this
 /// route's model reads one line of words, and on lamp-4ace on 19 Oct it
 /// answered colleagues' talk after a named request six times ("Sounds like
-/// a big saving."), where Live answered it once (#1712).
-pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
+/// a big saving."), where Live answered it once (#1712). On lamp-4ace on 26
+/// Oct (lamp-voice 2a8273ef2, the busy sets) it answered five of six such
+/// lines: "Yes please" to "Do you want coffee? I'm going downstairs.", a joke
+/// to "Can you pass me the charger?", thanks to "That lamp is cute, where
+/// did you get it?". So it is told what people say to each other: things
+/// asked for or handed over, food and drink offered, plans, and talk about
+/// it rather than to it.
+pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. Call not_for_me and say nothing when it is said to someone else or to the room: asking for or handing over a thing, offering a drink or food, making plans, or talking about you rather than to you. A follow-up to what you were just talking about, or a question plainly asked of you, is for you.)";
 
 /// How the rule saw a line when it judged it, kept for a verdict given
 /// once the Policy decides ([`Heeding::policy_now`]).
