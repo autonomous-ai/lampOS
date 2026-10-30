@@ -171,6 +171,9 @@ pub enum EventKind {
     /// The speaker's volume changed, whoever changed it: `level`, `muted`.
     #[serde(rename = "volume.changed")]
     VolumeChanged,
+    /// Where each joint is, up to 25 a second, and the lamp's own state.
+    #[serde(rename = "body.state")]
+    BodyState,
 }
 
 impl EventKind {
@@ -186,6 +189,7 @@ impl EventKind {
             Self::SoundHeard => Some(Grant::Sound),
             Self::AirChanged => Some(Grant::Air),
             Self::VolumeChanged => Some(Grant::Speak),
+            Self::BodyState => Some(Grant::Body),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
         }
     }
