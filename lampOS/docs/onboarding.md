@@ -55,9 +55,25 @@ that the runner asks each step in its own words and counts every try: it
 never names, announces, explains or asks a step itself, and never counts
 calls (lamp-29e7's re-test, 29 Oct: with the runner's calls unheard, the
 model said "That's twice now", "that's three", and led a "touch" step of
-its own while how you sound was still led). Never reported, a step is
-failed after 90 s once the room has been quiet for 20 s, and the walk goes
-on.
+its own while how you sound was still led). A step this lamp never offers
+is never told to the model: `setup_step` and `redo_setup` name `room_sounds`
+only with `--onboarding-room-sounds` and `face_expressions` only with
+`--onboarding-face-expressions`, flags the coordinator passes after
+`--onboarding-file` from the same switches the walk reads
+(`LAMP_PRIVACY_CONTROLS=no-slide`, `LAMP_FACE_EXPRESSIONS_ASK=on`), and
+their words name a step's "clear yes" only for a step offered (#3769:
+on lamp-52e6 on 30 Oct, 8811, with face expressions off, the model, told
+of `face_expressions` by `setup_step`, followed the hello's yes with "Do
+you mind if I notice whether you're smiling or frowning", which went
+unanswered and unkept; tests
+`tools::tests::a_face_expressions_step_that_is_off_is_never_told_to_the_model`,
+`onboarding::tests::a_step_this_lamp_never_offers_is_never_told_to_the_model`).
+`setup_step` for `preferences` answers the model that it was the last
+question: at most five words, never a question, since the walk says the
+done line (`preferences_reported_tells_the_model_no_more_questions`).
+Privacy, whose availability changes while the voice runs, is still named.
+Never reported, a step is failed after 90 s once the room has been quiet
+for 20 s, and the walk goes on.
 
 **`later`: a step nobody tried (#3996, the first builder's yes).** A first-time
 person who says nothing usually didn't understand, so a step that ends with
