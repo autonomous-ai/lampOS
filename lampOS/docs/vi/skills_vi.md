@@ -127,14 +127,28 @@ trang kỹ năng và `LAMP_CLOUD`); chưa unit sản phẩm nào bật. Khi bậ
   base của ping (base đó kết thúc bằng `/api/v1/ai/v1`). Store trả lời
   trong `{"status": 1, "data": ...}`; khi từ chối (lỗi HTTP, hoặc
   `"status": 0`), lý do lấy từ `error_message`, nếu không có thì
-  `error_code`, rồi mới đến `message`.
-- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine` (trang
-  đầu, 20 dòng), các dòng lấy từ `data.data`, trả
+  `error_code`, rồi mới đến `message`. Một câu trả lời 2xx mà `data` không
+  có id, tên hay trạng thái thì báo "the Skills Store's answer couldn't be
+  read", vì ứng dụng sẽ không bao giờ rút lại được nó.
+  **`"preview": true`** không gửi gì: bản chép giống hệt được đọc lại thành
+  `{"preview": {"name", "files": [{"path", "text"}]}}` (tệp không phải văn
+  bản chỉ cho `bytes`; tối đa 65.536 ký tự), để ứng dụng cho chủ đèn xem
+  đúng những gì sẽ rời đi trước khi bấm Send.
+- **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine`, trang đầu:
+  **chỉ 20 kỹ năng gửi gần nhất** hiện ra (với 5 gói một ngày, các gói cũ
+  hơn mất khỏi danh sách sau bốn ngày), các dòng lấy từ `data.data`, trả
   `{"shares": [{"id", "name", "version", "review_status", "review_note"?}]}`.
 - **`skills.unshare`** (`{"id"}`): `DELETE {host}/api/v1/skills/ID`.
 
-Chỉ các tệp của chính kỹ năng và tên gọi chủ đèn gõ rời khỏi đèn; không có
-trí nhớ, khuôn mặt, tên đèn biết, bản ghi, ảnh hay cài đặt. Người duyệt
+Chỉ các tệp của chính kỹ năng và tên gọi chủ đèn gõ rời khỏi đèn; đường gửi
+này không đọc những gì đèn tự giữ: trí nhớ, khuôn mặt, tên đèn biết, bản
+ghi, ảnh hay cài đặt. **Nhưng nội dung
+kỹ năng là những gì agent viết ra từ lời người ta nhờ,** nên một cái tên
+hay một chi tiết trong lời đó ("nhắc Mai uống thuốc lúc 8 giờ") có thể nằm
+trong mô tả hoặc thân kỹ năng và đi theo nó. Vì vậy ứng dụng cho xem toàn
+bộ nội dung (`preview`) trước khi bấm Send. Ứng dụng của chủ đèn thay mặt
+cả đèn, nên có thể gửi một kỹ năng mà người khác ở đèn đã tạo bằng giọng
+nói; dù thế nào, phần xem trước vẫn cho thấy nội dung của nó. Người duyệt
 của Store đọc nó trước khi lên danh sách; chỉ khi được duyệt nó mới được ký
 bằng khóa của Store. Chi tiết, giới hạn và lý do từ chối ở
 [cloud.md](../cloud.md), "A made skill sent to the Store".
