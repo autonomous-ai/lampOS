@@ -682,6 +682,17 @@ impl ScopeLease {
         .flatten()
     }
 
+    /// The person (a memory id) this line is carried for as their
+    /// conversation going on ([`Self::carry_conversation`], #4339), while
+    /// the lease is current and not narrowed. Never authority to act: only
+    /// the by-default name reads it, for the reply (`person::someone_else_now`).
+    pub fn carried_for(&self) -> Option<&str> {
+        (self.is_current() && !self.context.narrowed.load(Ordering::Acquire))
+            .then(|| self.context.carried.get())
+            .flatten()
+            .and_then(ScopeSnapshot::person)
+    }
+
     /// The known person this line was admitted as, whatever came after:
     /// revoked, or narrowed to the room. Never authority to act, only to say
     /// what could not be done for them (reviewer-three's P2 on #3564); every
@@ -860,10 +871,13 @@ mod tests {
         let a_id = a.person().unwrap().to_owned();
         let own = RequestScope::new(key(1), a.clone());
         let lease = own.lease();
+        assert_eq!(lease.carried_for(), None, "not carried yet");
         assert!(lease.carry_conversation(&a_id));
         assert_eq!(lease.scope(), Some(&ScopeSnapshot::held_of("A")));
+        assert_eq!(lease.carried_for(), Some(a_id.as_str()));
         lease.narrow_to_room();
         assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        assert_eq!(lease.carried_for(), None, "a narrow ends it");
         // A room's line, in A's conversation going on (06c1: no face named).
         let room = RequestScope::new(key(2), ScopeSnapshot::room());
         assert!(room.lease().carry_conversation(&a_id));
@@ -881,8 +895,10 @@ mod tests {
         assert_eq!(narrowed.lease().scope(), Some(&ScopeSnapshot::room()));
         let revoked = RequestScope::new(key(5), a);
         let lease = revoked.lease();
+        assert!(lease.carry_conversation(&a_id));
         revoked.revoke();
         assert!(!lease.carry_conversation(&a_id), "revoked");
+        assert_eq!(lease.carried_for(), None, "revoked");
     }
     fn key(worker: u8) -> RequestKey {
         RequestKey {
