@@ -17,6 +17,7 @@
 //! file is read or written.
 pub(crate) mod giving_way;
 pub(crate) mod hardware;
+mod in_language;
 #[cfg(test)]
 pub(crate) mod legacy_words;
 pub(crate) mod near;
@@ -804,6 +805,9 @@ pub struct Onboarding {
     face_saved_unasked: bool,
     /// The name saved with that face, the owner's once it ends the step.
     face_saved_name: Option<String>,
+    /// The owner's language (#4473 (b)): the walk hears and says its lines
+    /// in it ([`in_language`]); none is English, as the walk always was.
+    language: Option<crate::language::Language>,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -934,6 +938,7 @@ impl Onboarding {
                 .as_deref(),
         );
         walk.face_ask = std::env::var(FACE_EXPRESSIONS_ASK_ENVIRONMENT).as_deref() == Ok("on");
+        walk.language = crate::language::at_start();
         Some(walk)
     }
 
@@ -990,6 +995,7 @@ impl Onboarding {
             face_ask: false,
             face_saved_unasked: false,
             face_saved_name: None,
+            language: None,
             looked: None,
             felt: None,
             goals: None,
@@ -1886,13 +1892,14 @@ impl Onboarding {
     }
 
     pub(crate) fn take_invitation(&mut self, token: u64, now_us: u64) -> Option<String> {
-        if self.near_pending().is_some() {
+        let words = if self.near_pending().is_some() {
             self.take_near_invitation(token, now_us)
         } else if self.giving_pending().is_some() {
             self.take_giving_invitation(token, now_us)
         } else {
             self.take_privacy_invitation(token, now_us)
-        }
+        };
+        words.map(|words| in_language::said(words, self.language))
     }
 
     pub(crate) fn bind_invitation(&mut self, token: u64, voice_boot: BootId, turn: u64) -> bool {
@@ -2082,10 +2089,11 @@ impl Onboarding {
         }
         let nudge = self.nudge;
         let face_kept = self.face_kept;
+        let language = self.language;
         let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) else {
             return;
         };
-        let words = words_of(text);
+        let read = reading(language, text);
         let mut ask_hello = false;
         let mut face_answer = None;
         let done = match led.step {
@@ -2096,7 +2104,7 @@ impl Onboarding {
                 // face is saved (`face_saved`), or by the model's report, not
                 // here. On lamp-29e7 (28 Oct, 8001) a name and a yes ended it
                 // at 08:50:29 and no face was kept.
-                if led.heard.name && agrees(&words) {
+                if led.heard.name && read.agrees {
                     // Every yes restarts the wait, so it runs from the
                     // latest: the first is often the name's ("Marie,
                     // right?"), and the face question, its yes, the model's
@@ -2106,7 +2114,7 @@ impl Onboarding {
                         led.heard.face_answered_us = Some(now_us);
                     }
                     !face_kept
-                } else if names_someone(text, &words) {
+                } else if read.names_someone {
                     if !led.heard.name {
                         eprintln!(
                             "lamp-voice: onboarding: who_you_are heard a name; {}",
@@ -2119,7 +2127,7 @@ impl Onboarding {
                     }
                     led.heard.name = true;
                     false
-                } else if face_kept && led.heard.name && refuses(&words) {
+                } else if face_kept && led.heard.name && read.refuses {
                     // With a face to keep, a no after a name neither ends the
                     // step nor erases the name (the Reviewer-lead's P2 on
                     // #3992): a no to "Marie, right?" ended it before the
@@ -2136,7 +2144,7 @@ impl Onboarding {
                     false
                 } else {
                     // "No" to the name the lamp checked: not known.
-                    if refuses(&words) && led.heard.name {
+                    if read.refuses && led.heard.name {
                         eprintln!(
                             "lamp-voice: onboarding: who_you_are heard a no: the name is not known"
                         );
@@ -2153,10 +2161,7 @@ impl Onboarding {
                 // answer on whether the lamp may. On lamp-52e6 on 27 Oct
                 // "Hello, Lamp." ended the step, and the lamp asked again
                 // (reviewer-three's P2 on #3673: "Hi, how are you?" too).
-                let about_hello = words
-                    .iter()
-                    .any(|word| matches!(word.as_str(), "hello" | "hellos" | "hi" | "greet"))
-                    && (hello_yes(&words) || refuses(&words));
+                let about_hello = read.about_hello;
                 // Once the hello question was said, a yes or a no answers it:
                 // "That's fine." does, "Hi, I'm fine." doesn't, since a line
                 // that greets takes only `hello_yes`'s yes. A line naming
@@ -2164,68 +2169,23 @@ impl Onboarding {
                 // the quiet hours, the person's "Please stay quiet after 10PM
                 // each day." took its "please" as the hello's yes, and the
                 // step ended with the hello never asked.
-                let greeting = greets(&words);
-                // "Please" alone is no yes to the hello: in a line it is a
-                // request ("Please tell me more."); "Please do." is one
-                // (Reviewer-three's P2 and P3 on #4480).
-                let yes = if greeting {
-                    hello_yes(&words)
-                } else {
-                    agrees(
-                        &words
-                            .iter()
-                            .filter(|word| *word != "please")
-                            .cloned()
-                            .collect::<Vec<_>>(),
-                    ) || said_together(&words, "please", "do")
-                };
-                // Asking to hear it again is no answer, with or without its
-                // "?" ("Sorry, can you repeat that", "What did you say", "I
-                // didn't catch that.": Reviewer-two's and Reviewer-three's
-                // P3s on #4346).
-                let again = words.first().is_some_and(|word| word == "what")
-                    || words.iter().any(|word| {
-                        matches!(
-                            word.as_str(),
-                            "repeat" | "pardon" | "again" | "catch" | "explain"
-                        )
-                    });
-                let answer = !greeting && !again && !text.contains('?') && !words.is_empty();
-                // Nor does it answer the hello: "Sorry, can you repeat that
-                // please" took its "please" as the hello's yes and ended the
-                // step with the hello never answered (Fourth, #4469's read).
-                let asked_back = again || text.contains('?');
-                // Nor a line that puts it off ([`puts_off_the_hello`]): the
-                // hello is the walk's to wait for (Reviewer-three's P2s on
-                // #4480).
-                let defers = puts_off_the_hello(&words);
-                // Once asked, the hello takes its yes or no from a short
-                // answer ("That's fine.", "Okay.", "No thanks."), or from a
-                // longer one that opens with a firm yes or no ("Yes, any time
-                // from seven.", "Sure, until I tell you to stop."); a longer
-                // line led by "okay" or "please" is the model's to lead until
-                // they answer (Reviewer-three's P2 on #4480). A line that names
-                // the hello is its answer at any length.
-                let short = words.len() <= SHORT_ANSWER_WORDS;
-                let firm = words.first().is_some_and(|word| {
-                    matches!(
-                        word.as_str(),
-                        "yes" | "yeah" | "yep" | "yup" | "sure" | "no" | "nope" | "nah"
-                    )
-                }) || YES_PHRASES.iter().any(|phrase| {
-                    phrase.len() <= words.len()
-                        && phrase.iter().zip(&words).all(|(said, word)| said == word)
-                });
-                if !asked_back
-                    && !defers
+                let greeting = read.greets;
+                // Asking to hear it again is no answer ([`reading`]), nor in
+                // the owner's language a maybe or a filler (#4506).
+                let answer =
+                    !greeting && !read.again && !read.asks && !read.empty && !read.puts_off;
+                // Once asked, the hello takes its answer only as `reading`
+                // says (`answers_hello`: a short line, or one opening with a
+                // firm yes or no; in the owner's language a short, strict yes
+                // or no), never from a line that asks it back or puts it off
+                // (`holds_hello`, #4480 and #4506). A line that names the
+                // hello is its answer at any length.
+                if !read.holds_hello
                     && (about_hello
-                        || (heard.hello_asked
-                            && (short || firm)
-                            && !names_hours(&words)
-                            && (yes || refuses(&words))))
+                        || (heard.hello_asked && !read.names_hours && read.answers_hello))
                 {
                     heard.hello = true;
-                } else if (answer || quiet_hours(&words)) && !heard.quiet_hours && !heard.hello {
+                } else if (answer || read.quiet_hours) && !heard.quiet_hours && !heard.hello {
                     // The hello question is the walk's own, owed once, after
                     // the first answer to the quiet hours, whatever its words:
                     // the model is told never to ask it, so "Only when I'm
@@ -2240,7 +2200,7 @@ impl Onboarding {
                     // nothing and leaves the real answer to owe it.
                     ask_hello = true;
                     heard.quiet_hours = true;
-                } else if quiet_hours(&words) {
+                } else if read.quiet_hours {
                     heard.quiet_hours = true;
                 }
                 heard.quiet_hours && heard.hello
@@ -2256,7 +2216,7 @@ impl Onboarding {
             // and Reviewer-three's P2s on #4469). A question or anything
             // else is no answer here: the model leads it, as before.
             Step::FaceExpressions => {
-                face_answer = match yes_or_no(text).filter(|_| !text.contains('?')) {
+                face_answer = match read.yes_or_no.filter(|_| !read.asks) {
                     Some(true) => Some(Outcome::Done),
                     Some(false) => Some(Outcome::Skipped),
                     None => None,
@@ -2388,6 +2348,7 @@ impl Onboarding {
     /// a step the model ends (the skill's nudge) being led.
     pub fn heard_line(&mut self, text: &str) {
         self.heard_words(text);
+        let language = self.language;
         let Some(led) = self.led.as_mut().filter(|led| {
             self.nudge && led.asked_us.is_some() && self.definition.nudge(led.step).is_some()
         }) else {
@@ -2400,10 +2361,13 @@ impl Onboarding {
         // Only the first line after the lamp has asked its question.
         if led.step == Step::WhoYouAre && led.spoke && !led.name_heard {
             led.name_heard = true;
-            led.name = name_in(text);
+            // ponytail: no name is taken from a line in another language, so
+            // none is asked back and the model keeps the step; the nudge is
+            // off in the product. Read names there if the nudge is turned on.
+            led.name = language.is_none().then(|| name_in(text)).flatten();
         }
         if led.confirm == Confirm::Asked(None) {
-            led.confirm = Confirm::Asked(yes_or_no(text));
+            led.confirm = Confirm::Asked(reading(language, text).yes_or_no);
         }
     }
 
@@ -2484,7 +2448,8 @@ impl Onboarding {
             self.owed_note.bindable = true;
             self.owed_note.turn = None;
         }
-        Some(note)
+        // Kept in English above; said in the owner's language (#4473 (b)).
+        Some(in_language::said(note, self.language))
     }
 
     fn tick_led(
@@ -3707,6 +3672,78 @@ fn words_of(text: &str) -> Vec<String> {
         })
         .filter(|word| !word.is_empty())
         .collect()
+}
+
+/// What `text` says, by the walk's rules: in English, by the words above
+/// ([`words_of`]); in the owner's language, by its own ([`in_language`]).
+fn reading(language: Option<crate::language::Language>, text: &str) -> in_language::Reading {
+    if let Some(language) = language {
+        return in_language::read(language, text);
+    }
+    let words = words_of(text);
+    let greeting = greets(&words);
+    // Asking to hear it again is no answer, with or without its "?" ("Sorry,
+    // can you repeat that", "What did you say", "I didn't catch that.":
+    // Reviewer-two's and Reviewer-three's P3s on #4346).
+    let again = words.first().is_some_and(|word| word == "what")
+        || words.iter().any(|word| {
+            matches!(
+                word.as_str(),
+                "repeat" | "pardon" | "again" | "catch" | "explain"
+            )
+        });
+    // "Please" alone is no yes to the hello: in a line it is a request
+    // ("Please tell me more."); "Please do." is one (Reviewer-three's P2 and
+    // P3 on #4480).
+    let yes = if greeting {
+        hello_yes(&words)
+    } else {
+        agrees(
+            &words
+                .iter()
+                .filter(|word| *word != "please")
+                .cloned()
+                .collect::<Vec<_>>(),
+        ) || said_together(&words, "please", "do")
+    };
+    // Once asked, the hello takes its yes or no from a short answer ("That's
+    // fine.", "Okay.", "No thanks."), or from a longer one that opens with a
+    // firm yes or no ("Yes, any time from seven.", "Sure, until I tell you to
+    // stop."); a longer line led by "okay" or "please" is the model's to lead
+    // until they answer (Reviewer-three's P2 on #4480).
+    let short = words.len() <= SHORT_ANSWER_WORDS;
+    let firm = words.first().is_some_and(|word| {
+        matches!(
+            word.as_str(),
+            "yes" | "yeah" | "yep" | "yup" | "sure" | "no" | "nope" | "nah"
+        )
+    }) || YES_PHRASES.iter().any(|phrase| {
+        phrase.len() <= words.len() && phrase.iter().zip(&words).all(|(said, word)| said == word)
+    });
+    in_language::Reading {
+        agrees: agrees(&words),
+        refuses: refuses(&words),
+        names_someone: names_someone(text, &words),
+        hello_yes: hello_yes(&words),
+        about_hello: words
+            .iter()
+            .any(|word| matches!(word.as_str(), "hello" | "hellos" | "hi" | "greet"))
+            && (hello_yes(&words) || refuses(&words)),
+        greets: greeting,
+        again,
+        asks: text.contains('?'),
+        empty: words.is_empty(),
+        names_hours: names_hours(&words),
+        quiet_hours: quiet_hours(&words),
+        yes_or_no: yes_or_no(text),
+        puts_off: false,
+        answers_hello: (short || firm) && (yes || refuses(&words)),
+        // "Sorry, can you repeat that please" took its "please" as the
+        // hello's yes (Fourth, #4469's read); a line that puts it off
+        // ([`puts_off_the_hello`]) is the walk's to wait for (Reviewer-three's
+        // P2s on #4480).
+        holds_hello: again || text.contains('?') || puts_off_the_hello(&words),
+    }
 }
 
 /// A short line's yes or no; anything else is neither.
@@ -7761,6 +7798,119 @@ mod tests {
         assert!(ok, "{told}");
         assert_eq!(told, json!({"ok": true, "note": PREFERENCES_ANSWER}));
         assert!(PREFERENCES_ANSWER.contains("at most five words, never with a question"));
+    }
+
+    /// #4473 (b): in the owner's language, the walk says its fixed lines in
+    /// it and reads the answers by the same rules as English: a question is
+    /// no answer, a quiet-hours answer naming a time owes the hello, the
+    /// hello's yes closes the step with the walk's done line, and a plain
+    /// yes or no answers the face question.
+    #[test]
+    fn the_walk_hears_and_says_its_lines_in_the_owners_language() {
+        use crate::language::Language;
+        for (language, question, quiet, put_off, hello_yes, yes, no) in [
+            (
+                Language::Vietnamese,
+                "Giờ yên lặng là gì?",
+                "Sau mười giờ tối.",
+                "Ừ, để mình nghĩ đã",
+                "Vâng ạ.",
+                "Có.",
+                "Không.",
+            ),
+            (
+                Language::Japanese,
+                "静かな時間って何？",
+                "夜十時以降。",
+                "はい、ちょっと考えさせて",
+                "はい、お願いします。",
+                "はい。",
+                "いいえ。",
+            ),
+            (
+                Language::Chinese,
+                "安静时间是什么？",
+                "晚上十点以后。",
+                "好吧，我想想",
+                "好的，谢谢。",
+                "好的。",
+                "不要。",
+            ),
+            (
+                Language::Korean,
+                "조용한 시간이 뭐예요?",
+                "밤 열 시 이후요.",
+                "네, 잠깐만요",
+                "네, 부탁해요.",
+                "네.",
+                "아니요.",
+            ),
+        ] {
+            let said = |note: &str| in_language::said(note.to_owned(), Some(language));
+            let code = language.code();
+            let mut room = Room::new(&format!("language-{code}"));
+            room.walk.language = Some(language);
+            assert_eq!(
+                room.wait(7 * S, Some(NEAR_MIDDLE)),
+                [said(SIT_NOTE), said(SIT_DONE)]
+            );
+            assert_ne!(said(SIT_NOTE), SIT_NOTE);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [said(WHO_NOTE)]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(
+                room.wait(5 * S, Some(NEAR_MIDDLE)),
+                [said(PREFERENCES_NOTE)]
+            );
+            room.walk.heard(question, room.at);
+            room.walk.lamp_said();
+            assert!(room.wait(7 * S, Some(NEAR_MIDDLE)).is_empty(), "{code}");
+            room.walk.heard(quiet, room.at);
+            room.walk.lamp_said();
+            assert_eq!(
+                room.wait(S, Some(NEAR_MIDDLE)),
+                [said(skill::PREFERENCES_HELLO)],
+                "{code}"
+            );
+            assert_eq!(room.outcome(Step::Preferences), None, "{code}");
+            // A yes that puts it off is no answer (#4506).
+            room.walk.heard(put_off, room.at);
+            assert!(room.wait(S, Some(NEAR_MIDDLE)).is_empty(), "{code}");
+            assert_eq!(room.outcome(Step::Preferences), None, "{code}");
+            room.walk.heard(hello_yes, room.at);
+            assert_eq!(
+                room.wait(S, Some(NEAR_MIDDLE)),
+                [said(skill::PREFERENCES_DONE)],
+                "{code}"
+            );
+            assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+
+            for (answer, outcome, line) in [
+                (yes, Outcome::Done, skill::FACE_EXPRESSIONS_YES),
+                (no, Outcome::Skipped, skill::FACE_EXPRESSIONS_NO),
+            ] {
+                let mut room = Room::new(&format!("language-face-{code}-{outcome:?}"));
+                room.walk.language = Some(language);
+                room.walk.face_ask = true;
+                room.wait(8 * S, Some(NEAR_MIDDLE));
+                room.wait(4 * S, Some(NEAR_MIDDLE));
+                report(&room.walk, "who_you_are", "done");
+                assert_eq!(
+                    room.wait(4 * S, Some(NEAR_MIDDLE)),
+                    [said(FACE_EXPRESSIONS_NOTE)]
+                );
+                // A question is no answer: the model keeps the step.
+                room.walk.heard(question, room.at);
+                assert!(room.wait(S, Some(NEAR_MIDDLE)).is_empty(), "{code}");
+                assert_eq!(room.outcome(Step::FaceExpressions), None, "{code}");
+                room.walk.heard(answer, room.at);
+                assert_eq!(
+                    room.wait(S, Some(NEAR_MIDDLE)),
+                    [said(&own_line(line.into()))],
+                    "{code}"
+                );
+                assert_eq!(room.outcome(Step::FaceExpressions), Some(outcome));
+            }
+        }
     }
 }
 
