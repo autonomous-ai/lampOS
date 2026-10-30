@@ -348,3 +348,14 @@ Ready for lamp-voice: yes (#4629 and #4638, no new switch; Part of #4595)
 - Train 424 merged #4629's first commit only; the texts fix came as #4638 by cherry-pick, merged in train 426.
 - Gate on f40871a154: the focused voice lib tests 992/0; earlier on #4629: voice lib 4281/3 (known motor flakes, #1569), lamp-update 352/0, clippy, fmt, workspace build clean.
 - Played lines for each case asked as `4ACE RUN #4638`.
+
+### #3923 ask 2, a split line's repeat read as a call (#4645)
+
+Ready for lamp-voice: yes (#4645, behind `LAMP_NAME_REPEAT_NOT_A_CALL`, off; Part of #3923)
+
+- rUB302's d09 came as two lines, the second written "Lamp is cute. Where did you get it?" (the second route's carried 1.5 s written twice), and was let out as a call by its text.
+- With the switch, a line's opening "Lamp …" that repeats two or more of the line before's last words, begun within 2 s, isn't a call by its text; the rest of the line still is. Each line's words reach Attention as soon as speech to text writes them, so a late or out-of-order line still reads its line before.
+- Reviewer-three's and Reviewer-two's HOLDs: P1, the person's words in the journal (now a count); P3, kept words (let go after 30 s and on a camera close or a mute).
+- Gate: voice lib 4331/3 (known motor flakes, #1569); after the HOLD fixes the voice modules touched, 1048/0; lamp-update 352/0; promote notes 9/0; clippy, fmt, workspace build clean. Merged in train 429.
+- Played check (busy set, off against on) asked as `4ACE RUN #4645`.
+- Ask 1 (c11's opening "Lamp" missed by the detector): the 1 s hold-off rules out First's refractory reading; a `lamp-name check` of c11.wav is asked.
