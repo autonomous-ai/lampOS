@@ -642,7 +642,8 @@ mod implementation {
             | VoiceCommand::ProbeCascade
             | VoiceCommand::ProbeCache
             | VoiceCommand::ProbeTools
-            | VoiceCommand::ProbeReminders => None,
+            | VoiceCommand::ProbeReminders
+            | VoiceCommand::ProbeCutIn => None,
             // The reminders' consumer the voice starts beside itself when
             // LAMP_SCHEDULE_TOOLS is on: no output argument, its open files
             // still protected below. On lamp-4ace from 2026-10-15 02:05 to

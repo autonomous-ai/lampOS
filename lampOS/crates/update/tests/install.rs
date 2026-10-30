@@ -1511,6 +1511,27 @@ fn the_product_carries_a_conversation_past_a_silent_face() {
     }
 }
 
+/// An answer cut by a line or a stop is kept as the words that were played
+/// (`LAMP_SAID_AS_HEARD`, #4547), beside the cut-in note that tells a later
+/// "go on" where it stopped (`LAMP_CUT_IN_TOLD`): probe-cut-in on lamp-06c1
+/// on 30 Oct took resume from 19/20 to 20/20, and two played demos picked up
+/// from the cut 2 of 2.
+#[test]
+fn the_product_keeps_a_cut_answer_as_heard() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_CUT_IN_TOLD=on",
+        "Environment=LAMP_SAID_AS_HEARD=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A person's turn is also told the room's lines of the same conversation
 /// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339): on lamp-3e83 on 30 Oct a
 /// search answered in the room's thread was unknown to the person's next
