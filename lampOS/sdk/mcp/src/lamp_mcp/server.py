@@ -64,7 +64,7 @@ STATES = ("presence", "light", "mood", "lamp", "air", "device", "volume", "body"
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
 # here needs none.
-STATE_NEEDS = {"presence": "look", "air": "air", "device": "device", "volume": "speak"}
+STATE_NEEDS = {"presence": "look", "air": "air", "device": "device", "volume": "speak", "body": "body"}
 EVENT_NEEDS = {
     "person.arrived": "look",
     "person.left": "look",
