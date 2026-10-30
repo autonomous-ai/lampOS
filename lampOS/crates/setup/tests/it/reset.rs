@@ -1992,3 +1992,62 @@ fn a_forget_that_hangs_is_killed_at_its_bound_and_never_holds_the_start() {
     reset::run_within(&words(&["true"]), Duration::from_secs(5)).unwrap();
     assert!(reset::run_within(&words(&["false"]), Duration::from_secs(5)).is_err());
 }
+
+/// A reset started in place never reboots (#4500), so a product unit that
+/// waits for the setup marker but is not part of `lampos.target` is not
+/// stopped with the lamp, nor held off by its condition while setup runs:
+/// the reset must stop it ([`reset::WRITERS`]) or start it again
+/// ([`reset::STARTERS`]). Only the boot's own units, which a start in place
+/// does not run, are left: the waking face, which every voice start shows
+/// too. On an office lamp `lamp-peek` was such a unit and kept port 80 from
+/// setup (`peek.md`); a product unit like it fails this until it is named.
+#[test]
+fn every_product_unit_outside_the_target_that_waits_for_setup_is_the_resets() {
+    const BOOT_ONLY: [&str; 1] = ["lamp-waking.service"];
+    let named = |unit: &str| {
+        reset::STARTERS
+            .iter()
+            .chain(&reset::WRITERS)
+            .any(|pattern| match pattern.split_once('*') {
+                Some((head, tail)) => {
+                    unit.starts_with(head)
+                        && unit.ends_with(tail)
+                        && unit.len() >= head.len() + tail.len()
+                }
+                None => *pattern == unit,
+            })
+    };
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut outside = Vec::new();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let kind = path
+            .extension()
+            .map(|kind| kind.to_string_lossy().into_owned());
+        if !matches!(
+            kind.as_deref(),
+            Some("service" | "socket" | "timer" | "path")
+        ) || name == "lampos.target"
+        {
+            continue;
+        }
+        let unit = fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = unit.lines().map(str::trim).collect();
+        if lines.contains(&"ConditionPathExists=/var/lib/lampos-setup/done")
+            && !lines.contains(&"PartOf=lampos.target")
+        {
+            outside.push(name);
+        }
+    }
+    outside.sort();
+    assert!(!outside.is_empty(), "the product's units were read");
+    let unnamed: Vec<&String> = outside
+        .iter()
+        .filter(|unit| !named(unit) && !BOOT_ONLY.contains(&unit.as_str()))
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "outside lampos.target, waiting for setup, and neither stopped nor started by a reset in place: {unnamed:?}"
+    );
+}
