@@ -6,8 +6,11 @@ use lamp_msgs::{
 };
 use std::{
     fs,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
+    path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -27,6 +30,28 @@ impl Drop for Root {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
+}
+
+/// A bus on the test's own clocks (`Bus::clocks`, #1386): a wall, in ms
+/// since 1970, that stands at the host's when the bus is made and moves only
+/// when the test moves it, and as the monotonic clock that wall in
+/// microseconds. Every publish is stamped with that one wall however long
+/// the host takes over its topic's files, so a stall can't age an input past
+/// its limit before the service reads it (#3315's three rows failed so beside
+/// other processes' file churn on a Mac).
+fn bus_on_its_own_clocks(root: &Path) -> (Bus, Arc<AtomicU64>) {
+    let wall_ms = Arc::new(AtomicU64::new(runtime::unix_ms()));
+    let bus = Bus::new(root).unwrap().clocks(
+        {
+            let wall_ms = wall_ms.clone();
+            move || wall_ms.load(Ordering::Relaxed)
+        },
+        {
+            let wall_ms = wall_ms.clone();
+            move || wall_ms.load(Ordering::Relaxed) * 1_000
+        },
+    );
+    (bus, wall_ms)
 }
 
 fn voice(at_us: u64) -> VoiceTiming {
@@ -75,7 +100,9 @@ fn populate(bus: &Bus, at_us: u64) -> u64 {
         .unwrap()
         .publish_json(7, &joints)
         .unwrap();
-    runtime::unix_ms()
+    // The bus's own wall: the host's on a plain bus, the test's on
+    // [`bus_on_its_own_clocks`].
+    bus.now().unix_ms
 }
 
 #[test]
@@ -121,7 +148,7 @@ fn the_heads_topics_are_read_only_with_head_touch() {
 #[test]
 fn enabled_output_uses_a_new_session_and_expires_after_input_loss() {
     let root = Root::new();
-    let bus = Bus::new(&root.0).unwrap();
+    let (bus, _) = bus_on_its_own_clocks(&root.0);
     let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
     let wall = populate(&bus, 10_000_000);
     let output = service.step(|| 10_000_000, wall);
@@ -484,10 +511,6 @@ mod sleep_name {
     use lamp_msgs::{Faces, NameHeard, PersonActivity, Room, RoomState, VoiceProgress};
     use std::{
         process::{Child, Command, Stdio},
-        sync::{
-            Arc,
-            atomic::{AtomicU64, Ordering},
-        },
         time::{Duration, Instant},
     };
 
@@ -643,21 +666,9 @@ mod sleep_name {
             mood: Option<(f32, f32)>,
         ) -> Self {
             let root = Root::new();
-            // The bus reads the fixture's clocks, not the host's (#1386,
-            // `Bus::clocks`): a wall that starts at the host's and moves
-            // only with each step, and as the monotonic clock that same
-            // wall in microseconds.
-            let wall_ms = Arc::new(AtomicU64::new(runtime::unix_ms()));
-            let bus = Bus::new(&root.0).unwrap().clocks(
-                {
-                    let wall_ms = wall_ms.clone();
-                    move || wall_ms.load(Ordering::Relaxed)
-                },
-                {
-                    let wall_ms = wall_ms.clone();
-                    move || wall_ms.load(Ordering::Relaxed) * 1_000
-                },
-            );
+            // On the fixture's own clocks, whose wall moves only with each
+            // step (#1386).
+            let (bus, wall_ms) = bus_on_its_own_clocks(&root.0);
             let mut catalogue =
                 Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
             let sleep = catalogue.alive.as_mut().unwrap().sleep.as_mut().unwrap();
@@ -1228,7 +1239,7 @@ fn without_a_pause_said_expression_asks_exactly_as_before() {
     // requests, but for the lease each new session names.
     let asked = |said: Option<bool>| {
         let root = Root::new();
-        let bus = Bus::new(&root.0).unwrap();
+        let (bus, _) = bus_on_its_own_clocks(&root.0);
         if let Some(paused) = said {
             keeper(&bus)
                 .publish_json(1, &lamp_msgs::Pause { paused })
@@ -1253,7 +1264,7 @@ fn without_a_pause_said_expression_asks_exactly_as_before() {
 fn only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline() {
     let face = |offline_face: bool| {
         let root = Root::new();
-        let bus = Bus::new(&root.0).unwrap();
+        let (bus, _) = bus_on_its_own_clocks(&root.0);
         let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
         if offline_face {
             service = service.with_offline_face(&bus);
