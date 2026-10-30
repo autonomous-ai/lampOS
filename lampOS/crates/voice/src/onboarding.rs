@@ -2070,6 +2070,7 @@ impl Onboarding {
         };
         let words = words_of(text);
         let mut ask_hello = false;
+        let mut face_answer = None;
         let done = match led.step {
             Step::WhoYouAre if nudge => false,
             Step::WhoYouAre => {
@@ -2185,6 +2186,24 @@ impl Onboarding {
                 }
                 heard.quiet_hours && heard.hello
             }
+            // "Face expressions": a plain yes or no after the walk's question
+            // ends the step here, its consent kept as the model's
+            // `setup_step` keeps it (`finish`). On lamp-52e6 (30 Oct 08:55,
+            // #3769) "Yes. That's fine." got the model's words but no call,
+            // and the step was asked 3 times and failed. A consent takes
+            // only the strict reading, `yes_or_no`: four words at most, and
+            // no "please", "okay" or "fine" as a yes, so "Okay, I'd rather
+            // you didn't." or "Say that again please." is no yes (Fourth's
+            // and Reviewer-three's P2s on #4469). A question or anything
+            // else is no answer here: the model leads it, as before.
+            Step::FaceExpressions => {
+                face_answer = match yes_or_no(text).filter(|_| !text.contains('?')) {
+                    Some(true) => Some(Outcome::Done),
+                    Some(false) => Some(Outcome::Skipped),
+                    None => None,
+                };
+                false
+            }
             _ => false,
         };
         if ask_hello {
@@ -2196,6 +2215,18 @@ impl Onboarding {
                 .push(json!({"kind":"onboarding_heard","step":step.name(),
                     "name_kept":(step == Step::WhoYouAre).then_some(false),"at_us":now_us}));
             self.finish(step, Outcome::Done, None, now_us);
+        }
+        if let Some(outcome) = face_answer {
+            self.records
+                .push(json!({"kind":"onboarding_heard","step":FACE_EXPRESSIONS,
+                    "outcome":outcome,"at_us":now_us}));
+            self.finish(Step::FaceExpressions, outcome, None, now_us);
+            let line = if outcome == Outcome::Done {
+                skill::FACE_EXPRESSIONS_YES
+            } else {
+                skill::FACE_EXPRESSIONS_NO
+            };
+            self.owed = Some(own_line(line.to_owned()));
         }
     }
 
@@ -7242,6 +7273,99 @@ mod tests {
         again.walk.face_ask = true;
         assert_eq!(again.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
         assert!(!face_expressions_file(&again).exists());
+    }
+
+    /// lamp-52e6 (30 Oct 08:55, #3769): "Yes. That's fine." to the face
+    /// question got the model's words but no `setup_step`, and the step was
+    /// asked 3 times and failed. The walk takes a plain yes itself: done,
+    /// the same consent file the model's report writes, and its own line.
+    #[test]
+    fn a_plain_yes_heard_ends_face_expressions_with_the_walks_line() {
+        let mut room = asked_face_expressions("face-expressions-heard-yes");
+        room.walk.heard("Yes. That's fine.", room.at);
+        assert_eq!(
+            room.wait(S, Some(NEAR_MIDDLE)),
+            [own_line(skill::FACE_EXPRESSIONS_YES.into())]
+        );
+        assert_eq!(room.outcome(Step::FaceExpressions), Some(Outcome::Done));
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        // Exactly one worked line: the walk's. The model's note tells it to
+        // say nothing after a plain yes or no, and to say the worked line only
+        // after a `setup_step` of its own, so the lamp never says it twice.
+        let worked = "Got it, I'll notice how people look.";
+        assert!(skill::FACE_EXPRESSIONS_YES.contains(worked));
+        let (asked, model_path) = FACE_EXPRESSIONS_NOTE
+            .split_once("If they answer with a plain yes or no, say nothing and call nothing")
+            .expect("the note leaves a plain yes or no to the walk");
+        assert!(!asked.contains(worked));
+        let (_, after_call) = model_path
+            .split_once("For any other answer, call setup_step")
+            .expect("the model keeps the other answers");
+        assert!(after_call.contains(worked));
+        let at = room.walk.kept().steps["face_expressions"].at_unix_s;
+        assert_eq!(
+            std::fs::read(face_expressions_file(&room)).unwrap(),
+            format!(r#"{{"at_unix_s":{at},"face_expressions":"yes","version":1}}"#).as_bytes()
+        );
+        // The model's late report changes nothing.
+        report(&room.walk, "face_expressions", "skipped");
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::FaceExpressions), Some(Outcome::Done));
+    }
+
+    #[test]
+    fn a_plain_no_heard_skips_face_expressions_with_no_consent() {
+        let mut room = asked_face_expressions("face-expressions-heard-no");
+        room.walk.heard("No.", room.at);
+        assert_eq!(
+            room.wait(S, Some(NEAR_MIDDLE)),
+            [own_line(skill::FACE_EXPRESSIONS_NO.into())]
+        );
+        assert_eq!(room.outcome(Step::FaceExpressions), Some(Outcome::Skipped));
+        assert!(!face_expressions_file(&room).exists());
+    }
+
+    /// A question, a sound, a polite refusal, a request to repeat or
+    /// explain, thinking aloud or a conditional yes is no strict yes or no:
+    /// the step stays the model's, and no consent is kept (Fourth's and
+    /// Reviewer-three's P2s on #4469).
+    #[test]
+    fn an_unclear_line_leaves_face_expressions_to_the_model() {
+        let mut room = asked_face_expressions("face-expressions-heard-unclear");
+        for line in [
+            "What do you mean?",
+            "Hmm.",
+            "Okay, I'd rather you didn't.",
+            "Fine, I'd prefer you wouldn't.",
+            "Right, I won't want that.",
+            "Say that again please.",
+            "Please explain what that means.",
+            "Okay, let me think about it.",
+            "Right, and what pictures do you keep.",
+            "Sure, but only when I'm home.",
+            "Correct me if I'm wrong, that means a camera.",
+        ] {
+            room.walk.heard(line, room.at);
+            assert!(room.wait(S, Some(NEAR_MIDDLE)).is_empty(), "{line}");
+            assert_eq!(room.outcome(Step::FaceExpressions), None, "{line}");
+        }
+        assert!(!face_expressions_file(&room).exists());
+    }
+
+    /// A yes heard before the face question was handed out is another
+    /// step's, never this one's.
+    #[test]
+    fn a_yes_before_the_face_question_is_not_taken() {
+        let mut room = Room::new("face-expressions-early-yes");
+        room.walk.face_ask = true;
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        room.walk.heard("Yes. That's fine.", room.at);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [FACE_EXPRESSIONS_NOTE]);
+        assert_eq!(room.outcome(Step::FaceExpressions), None);
+        assert!(room.wait(4 * S, Some(NEAR_MIDDLE)).is_empty());
+        assert!(!face_expressions_file(&room).exists());
     }
 
     #[test]
