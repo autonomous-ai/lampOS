@@ -591,3 +591,5 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 ## 31 Oct, 00:1x: #4625 landed
 
 - #4625 landed in train 426 (`6e49e777c6`, `c8ef0d6da6`, `a30a7dae66`). Reviewer-three's after-merge privacy read: no P1/P2; a P3 (stable-id renames share one hour) inert until `LAMP_MEMORY_STABLE_ID` is set. Lamp checks left (afternoon wording, a known face's hour) need lamp-4ace's policy and skills pins replaced; asked the first builder on #3997.
+- 00:49: taken, Cutting in from the first builder's 00:42 (c6529615576). #4625's 4ACE RUN sheet posted (c6529497524), booked about 08:00 Saturday.
+- 01:28: Cutting in on lamp-c0a4 (8999, product unit, cloud on), the four switches off/on alternating ×3: real cut-ins answered off 2/2, on 2/3 (on round 2 resumed and dropped the question, reason `policy`); the side-remark scene gave one trial. Answer: none of the four go on from this set. Posted on #3997 (c6530414909) since #3504 is full. c0a4 restored, lock released.
