@@ -1614,6 +1614,16 @@ that case, which the persistence fault says.
 The marker is written with its folder synced before the guard is saved, so a
 power cut soon after arming cannot leave it empty.
 
+**Who muted it, on `voice/mute`** (#4332). Where the voice says `voice/mute`
+(`LAMP_HEAD_TOUCH=on` with `--controls-mute`), a mute carries `muted_by`, so
+`lamp-cloud`'s `mic.get` can tell the app: `sleep` for a hand's sleep,
+`restart_guard` while `HandControls::restored_after_fault` holds, `unreadable`
+for a record `load_noting` read as muted with its note (a newer build's, or a
+write a cut left unfinished, `HandControls::unreadable`), and `button` for any
+other mute, the person's. A mute the person chooses over the guard's or an
+unreadable one, or a clear, ends both, where the marker goes. Test:
+`voice_mute_says_who_muted_it`.
+
 **A power cut is not a fault of this run** (#4332). Pulling the plug is how
 most people turn a lamp off, and lamp-220c (29 Oct) came back from one muted
 by the guard, deaf until a head tap, with nothing telling the person to tap.

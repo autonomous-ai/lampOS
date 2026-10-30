@@ -557,15 +557,22 @@ impl Lamp for Real {
             .latest(lamp_msgs::MicrophonePrivacy::TOPIC)
             .filter(|message| !message.expired)
             .and_then(|message| message.parse::<lamp_msgs::MicrophonePrivacy>().ok());
-        let muted = self
+        let mute = self
             .latest(lamp_msgs::VoiceMute::TOPIC)
             .and_then(|message| message.parse::<lamp_msgs::VoiceMute>().ok())
-            .is_some_and(|mute| mute.muted);
+            .filter(|mute| mute.muted);
+        // Who or what muted it (#4332), only while muted; a voice before
+        // `muted_by` still says a sleep's reason.
+        let muted_by = mute.and_then(|mute| {
+            mute.muted_by
+                .or(mute.asleep().then_some(lamp_msgs::MutedBy::Sleep))
+        });
         Ok(Mic {
-            muted,
+            muted: mute.is_some(),
             hw_switch_muted: privacy.as_ref().and_then(|privacy| privacy.physical_muted),
             // The voice renews its lease every 10 ms while it runs.
             available: privacy.is_some(),
+            muted_by,
         })
     }
 
@@ -1041,7 +1048,8 @@ mod tests {
             Ok(Mic {
                 muted: false,
                 hw_switch_muted: None,
-                available: false
+                available: false,
+                muted_by: None,
             })
         );
         assert!(lamp.health().is_err());

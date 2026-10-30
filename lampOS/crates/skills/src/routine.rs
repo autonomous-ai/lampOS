@@ -3142,6 +3142,7 @@ mod tests {
                     &VoiceMute {
                         muted: true,
                         reason: Some(lamp_msgs::MuteReason::Sleep),
+                        muted_by: None,
                     },
                 ),
                 "muted" => mute.publish_json(
@@ -3149,6 +3150,7 @@ mod tests {
                     &VoiceMute {
                         muted: true,
                         reason: None,
+                        muted_by: None,
                     },
                 ),
                 _ => privacy.publish_json(f.now, &closed),
@@ -3170,6 +3172,7 @@ mod tests {
                     &VoiceMute {
                         muted: false,
                         reason: None,
+                        muted_by: None,
                     },
                 )
                 .unwrap();

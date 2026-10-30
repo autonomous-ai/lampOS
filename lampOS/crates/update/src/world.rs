@@ -1001,6 +1001,7 @@ mod tests {
         let asleep = VoiceMute {
             muted: true,
             reason: Some(lamp_msgs::MuteReason::Sleep),
+            muted_by: None,
         };
         mute.publish_json(2, &asleep).unwrap();
         let heard = ears.listen(Duration::from_millis(500));

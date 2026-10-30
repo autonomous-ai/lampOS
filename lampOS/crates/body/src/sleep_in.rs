@@ -134,7 +134,11 @@ mod tests {
         let mut out = bus
             .publisher_declared(VoiceMute::TOPIC, &VoiceMute::declaration(), "voice")
             .unwrap();
-        let said = |muted, reason| VoiceMute { muted, reason };
+        let said = |muted, reason| VoiceMute {
+            muted,
+            reason,
+            muted_by: None,
+        };
         out.publish_json(1, &said(true, Some(MuteReason::Sleep)))
             .unwrap();
         sleep.look_now();
@@ -182,6 +186,7 @@ mod tests {
         let asleep = VoiceMute {
             muted: true,
             reason: Some(MuteReason::Sleep),
+            muted_by: None,
         };
         out.publish_json(1, &asleep).unwrap();
         sleep.look_now();
@@ -205,6 +210,7 @@ mod tests {
         let asleep = VoiceMute {
             muted: true,
             reason: Some(MuteReason::Sleep),
+            muted_by: None,
         };
         out.publish_json(1, &asleep).unwrap();
         std::thread::sleep(Duration::from_millis(20 + lamp_bus::EXPIRY_GRACE_MS + 100));

@@ -833,3 +833,89 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
     );
     let _ = std::fs::remove_dir_all(root);
 }
+
+/// `mic.get`'s `muted_by` (#4332): who or what muted the lamp, as the voice
+/// says it on `voice/mute`, so the app's setup screen can tell the restart
+/// guard's mute after a fault from one the person chose. Only while muted;
+/// absent when it listens, and from a voice that does not say it, but a
+/// sleep's reason still reads as `sleep`.
+#[test]
+fn mic_get_says_who_muted_the_lamp_only_while_muted() {
+    use lamp_msgs::{MuteReason, MutedBy, VoiceMute};
+    let root = PathBuf::from(format!("/tmp/lcm-{}", std::process::id()));
+    let places = lamp(&root);
+    let bus_root = root.join("bus");
+    std::fs::create_dir_all(&bus_root).unwrap();
+    std::fs::create_dir_all(places.proc.join("sys/kernel/random")).unwrap();
+    std::fs::write(places.proc.join("sys/kernel/random/boot_id"), "boot\n").unwrap();
+    let voice = Bus::new(&bus_root).unwrap();
+    let mut says = voice
+        .publisher_declared(VoiceMute::TOPIC, &VoiceMute::declaration(), "voice")
+        .unwrap();
+    let mut real = Real {
+        places,
+        bus: Some(Bus::new(&bus_root).unwrap()),
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        shutdown: None,
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        version: "812+460a1a1aa2b3".into(),
+        id: "d-42".into(),
+        mac: "lamp-7f72".into(),
+        ..Identity::default()
+    };
+    let mut at = 0;
+    let mut mic = |real: &mut Real, said: &Value| -> Value {
+        at += 1;
+        says.publish_json(at, said).unwrap();
+        let result = answer(real, "mic.get", &Value::Null);
+        let sent = me
+            .data("2026-10-30T10:00:00Z", "mic.get", &result)
+            .to_string();
+        let reply: Value = serde_json::from_str(&sent).unwrap();
+        assert_eq!(reply["status"], "success", "{reply}");
+        reply["data"].clone()
+    };
+    for (reason, by, word) in [
+        (Some(MuteReason::Sleep), MutedBy::Sleep, "sleep"),
+        (None, MutedBy::Button, "button"),
+        (None, MutedBy::RestartGuard, "restart_guard"),
+        (None, MutedBy::Unreadable, "unreadable"),
+    ] {
+        let said = VoiceMute {
+            muted: true,
+            reason,
+            muted_by: Some(by),
+        };
+        let data = mic(&mut real, &serde_json::to_value(said).unwrap());
+        assert_eq!(data["muted"], true, "{data}");
+        assert_eq!(data["muted_by"], word, "{data}");
+    }
+    // Listening: no `muted_by` at all.
+    let data = mic(&mut real, &json!({"muted": false}));
+    assert_eq!(data["muted"], false, "{data}");
+    assert!(data.get("muted_by").is_none(), "{data}");
+    // A voice before the field: a plain mute says none, a sleep says sleep.
+    let data = mic(&mut real, &json!({"muted": true}));
+    assert_eq!(data["muted"], true, "{data}");
+    assert!(data.get("muted_by").is_none(), "{data}");
+    let data = mic(&mut real, &json!({"muted": true, "reason": "sleep"}));
+    assert_eq!(data["muted_by"], "sleep", "{data}");
+    let _ = std::fs::remove_dir_all(root);
+}
