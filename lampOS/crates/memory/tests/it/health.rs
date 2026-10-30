@@ -25,8 +25,11 @@ use std::{
 
 const BINARY: &str = env!("CARGO_BIN_EXE_lamp-memory");
 const FIXTURE_BINARY: &str = env!("CARGO_BIN_EXE_lamp-memory-fixture");
-const WAIT: Duration = Duration::from_secs(8);
-const REQUEST_WAIT: Duration = Duration::from_secs(3);
+/// Watchdogs, not latency bounds: `--memory-days` opens and writes with full
+/// flushes, which a busy Mac disk held past 8 s for readiness alone (#1569,
+/// as `HOST_WAIT`).
+const WAIT: Duration = Duration::from_secs(30);
+const REQUEST_WAIT: Duration = Duration::from_secs(30);
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
 type ControlSlot = Rc<RefCell<Option<Controller>>>;
