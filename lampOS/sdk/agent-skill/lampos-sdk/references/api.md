@@ -28,6 +28,7 @@ naming every public call, tool, event and error code they have.
 | subscribe by hand | `await lamp.subscribe(events, phrases)`, `await lamp.unsubscribe(events)` | `lamp.subscribe(events, phrases)`, `lamp.unsubscribe(events)` | — |
 | read state | `await lamp.get("presence", "light", "mood", "lamp")` | `await lamp.get('presence', 'light')` | `lamp_state(which)`, `lamp://state/<name>` |
 | recent events | — | — | `lamp://events/recent` |
+| every event, as it comes | `lamp.on(...)` for each | `lamp.on(...)` for each | `lamp_events(since, wait_s)`, or subscribe to `lamp://events` (each new event sends `notifications/resources/updated`) |
 
 **Events** (each with `at`, a UTC time ending `Z`; grant in brackets):
 
@@ -58,7 +59,7 @@ until the lamp has heard them.
 
 | what | Python | JavaScript | MCP |
 |---|---|---|---|
-| hold the body | `async with lamp.lease("body", why=...) as lease:` | `await lamp.withLease(['body'], async (lease) => …, { why })` | each body tool takes its own |
+| hold the body | `async with lamp.lease("body", why=...) as lease:` | `await lamp.withLease(['body'], async (lease) => …, { why })` | each body tool takes its own, or renews the one it holds |
 | by hand | `lease = lamp.lease("body")`, `await lease.take()`, `await lease.release()` | `lamp.lease(['body'])`, `lease.take()`, `lease.release()` | — |
 | still mine? | `lease.held`, `lease.state`, `lease.lost_why` | `lease.held`, `lease.state` | `lamp://lease` |
 
@@ -74,11 +75,11 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | look | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)`, `look("hand")` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
 | follow a hand | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
 | a move of your own | `await lamp.move(frames, step_ms)` | `lamp.move(frames, stepMs)` | `lamp_move(step_ms, frames)` | body, a body lease |
-| a recorded move | `await lamp.play(name)` | `lamp.play(name)` | — | body, a body lease |
-| aim the joints | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | — | body, the lease named |
+| a recorded move | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
+| aim the joints | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
 | light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | say | `await lamp.say("Build passed.")` | `lamp.say('Build passed.')` | `lamp_say(text)` | speak |
-| a sound | `await lamp.sound(name)` | `lamp.sound(name)` | — | speak |
+| a sound | `await lamp.sound(name)` | `lamp.sound(name)` | `lamp_sound(name)` | speak |
 | stop everything of mine | `await lamp.stop()` | `lamp.stop()` | `lamp_stop()` | none |
 
 Ranges, from lamp-control and the body:
