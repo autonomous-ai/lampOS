@@ -81,12 +81,12 @@ differs. Folders are what the unit makes or names.
 | body | `lamp-body` | orangepi, `dialout` | `/run/lampos-body/` (0755); the servo lock folder | none: its poses are options | `mood.sock`, `gaze.sock` |
 | eyes | `lamp-eyes` | orangepi, `video` | `/var/lib/lampos-eyes/` (0700, `people.json`); `/run/lampos-eyes/` (0755); the camera lock folder | two models, `/opt/lampOS/eyes/*.onnx`, outside the build's folder | `permit.sock`, `who.sock`, `present`, `known`, `sight.jpg` |
 | name | `lamp-name` | orangepi | none | models, `/opt/lampOS/name/models`, outside the build's folder | the bus |
-| expression | `lamp-expression serve` | orangepi | none | a catalogue, `/opt/lampOS/expression/catalogues/*.json` | the bus |
+| expression | `lamp-expression serve` | orangepi | none | a catalogue; the product's is `/etc/lampOS/expression/expression.json` (install's, then each build's settings) | the bus |
 | actions | `lamp-actions` | orangepi, `audio` (product: lampos, `audio`) | `/run/lampos-actions/` (0755, kept across restarts); product: `/var/lib/lampos-output-caps/` (0700) | none | its folder; the bus |
 | memory | `lamp-memory` | orangepi (`@MEMORY_USER@`: its own) | `/var/lib/lampos-memory/` (0700); `/run/lampos-memory/` | none | `memory.sock` |
 | policy | `lamp-policy` | orangepi (template: `DynamicUser=yes`) | `/var/lib/lampos-policy/` (0700) | the judge's key, `/etc/lampOS/policy/jev.key`, as a systemd credential | the bus |
 | health | `lamp-health serve` | orangepi | none | none: what it expects is options | the bus |
-| controls | `lamp-controls serve` | orangepi | none | `controls.json` and `controls-pins.json`, inside the build's folder | the bus |
+| controls | `lamp-controls serve` | orangepi | none | `controls.json` and `controls-pins.json`, in `/etc/lampOS/controls/` in the product (install's, then each build's settings) | the bus |
 | ears | `lamp-ears` | orangepi, `audio` | none | none | the bus |
 | schedule | `lamp-schedule serve` | orangepi | `/var/lib/lampos-schedule/` (0700); `/run/lampos-schedule/` (0700) | none | `call.sock` |
 | air | `lamp-air` | orangepi, `/dev/i2c-0` | none | none | the bus |
@@ -98,6 +98,7 @@ differs. Folders are what the unit makes or names.
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
+| setup | `lamp-setup serve` (first boot only, until setup's marker) and `lamp-setup watch-reset` (the reset button, in the target); `docs/setup.md` | root | `/var/lib/lampos-setup/` (its `StateDirectory`; the marker `done`) | `/etc/lampOS/setup/serve.json` and `reset-plan.json` | setup's hotspot and page, where `serve.json`'s `listen` says; the bus (the reset's watch) |
 | keeper | `lamp-keeper serve` | root | its service data folder | none | `lampos.target.d/keeper.conf`; the bus root |
 | skills | `lamp-skills` | lampos (product unit, #811) | `/var/lib/lampos-skills-state/` (0700, `daily.json`); `/run/lampos-skills/` (0755, runtime) | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools for the voice, `tools.json` and `call.sock` in its runtime folder |
 | surround | `lamp-surround serve` | `@SURROUND_USER@` | not read for this page | `/etc/lampos/surround.json` (lower case, unlike every other part) | not read |
@@ -113,11 +114,16 @@ Binaries the build carries with no unit, which an install leaves alone:
 
 What else a part needs that no build carries: the voice's turn-end model
 and ONNX Runtime library (beside the voice in its folder,
-[endpoint-detection.md](endpoint-detection.md)), the eyes' two ONNX models,
-the name's models, Expression's catalogue, the controls' two files, the
-character file, `provider.json`, `records.json`. lamp-update's manifest
-carries binaries only ([updates.md](updates.md), "Not shown": "models and
-libraries a build does not carry, configuration under `/etc/lampOS`").
+[endpoint-detection.md](endpoint-detection.md)), the eyes' models and the
+name's models, all from `deploy/product/models.json`, which install fetches
+(the publish passes no `--models`); the character file; and the voice's
+private `provider.json` and `second.json`, which install writes and keeps
+up to date while they are its own. Beside its binaries, a build's signed
+manifest carries the rest of `deploy/product/` (the publish's `--deploy`):
+the product units, the reset plan, and Expression's catalogue, the
+controls' two files and `records.json` as settings, which
+`lamp-update-apply` writes at a round's switch (`LAMP_UPDATE_APPLY=on` in
+the product; [updates.md](updates.md), "Settings and tmpfiles").
 
 ## Order at boot
 
