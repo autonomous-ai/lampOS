@@ -393,7 +393,9 @@ the hello's loose yes (Fourth's and Reviewer-three's P2s on #4469): once the
 question was handed out, a line with no "?" that `yes_or_no` reads (four
 words at most; a yes is "yes", "yeah", "yep", "yup", "right", "correct",
 "exactly", "sure" or a yes phrase, never "please", "okay" or "fine"; a no is
-"no", "nope", "nah", "not" or "wrong", which wins) ends the step `done` on a
+"no", "nope", "nah", "not" or "wrong", or any word ending in "n't" left once
+the yes phrases are out, so "Right, I don't." and "Yeah, I won't." are a no
+and "I don't mind" a yes (Fourth's P3 on #4469); a no wins) ends the step `done` on a
 yes and `skipped` on a no, the same outcomes and the same consent record a
 `setup_step` call keeps (`onboarding_heard` with the outcome). The walk then
 says its own line, "Got it, I'll notice how people look." or "Okay, I
