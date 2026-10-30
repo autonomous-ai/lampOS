@@ -22,8 +22,9 @@ judgement and against a label, line by line. The jev-verifier keeps it.
   stops. Taken, it posts PLAYING on #3336, runs `replay.sh run` with a deadline of END - 4 min, renews
   the lock, and on exit posts QUIET with the result and releases the lock. `slot-test.sh` tests it.
 - `replay.sh run OUT`: wakes the lamp (the Mac goes 45 -> 60 -> 75 only on "held back"), plays the
-  quiet block, makes the room busy with two colleagues' talk (and checks `room/state` reads busy before
-  the busy block), plays it, then pulls that window's decisions and the voice's verdicts into `OUT`.
+  quiet block, plays two colleagues' exchanges, then the busy block with talk between its lines (it
+  plays in whatever room the lamp reads: under LAMP_SPOKEN_TO=on held-back talk never makes room/state
+  busy, crates/voice/src/room_told.rs), then pulls that window's decisions and the voice's verdicts into `OUT`.
   A follow-up plays right after the lamp's answer to its parent, only when it answered. Every play
   records `room/state` just before it. The units, their MainPIDs, lamp-policy's cmdline, the build and
   the mute are taken after the preflight and checked at each pass start: any change aborts. With
@@ -35,14 +36,14 @@ judgement and against a label, line by line. The jev-verifier keeps it.
   30/10), and the lamp's clock offset is the midpoint of the fastest of 5 round trips (over 1 s aborts).
 
   `replay.sh preflight OUT` runs every check, the wake (which must produce a policy decision that did
-  not fail) and a busy probe (two exchanges, no labelled line: does `room/state` read busy?), then
+  not fail) and a busy probe (two exchanges, no labelled line: what `room/state` reads), then
   stops. `OUT` holds what the lamp heard: it stays on the Mac, and is refused inside a git work tree.
 - `score.sh OUT`: the scored table (per class and room, Jev vs the voice vs the label), the totals on
   the held lines, the false answers to desk talk, and the decision latency. Each (pass, id) is one
   trial; it says which ids flipped across passes. A missing or failed Jev decision is wrong, on "not"
-  lines too. A busy line whose `room/state` did not read busy just before it is void (counted, not
-  scored). A trial is clean unless the lamp was in conversation (spoke within 20 s; a follow-up is in
-  conversation by design and stays clean) or the room it saw is not the label's; totals show all and
+  lines too. Busy lines are scored as "background talk", in the room as the lamp read it (how many
+  read busy is counted). A trial is clean unless the lamp was in conversation (spoke within 20 s; a follow-up is in
+  conversation by design and stays clean) or a quiet line was seen in a room not quiet; totals show all and
   clean trials, and "Decision inputs" gives the held clean rates with 95% Wilson intervals, the margin
   and the verdict. The per-line table shows probabilities, so it defaults to the tune lines. Hello and
   progress decisions are counted by choice: the set has no arrival (no face is ever in view) and hands

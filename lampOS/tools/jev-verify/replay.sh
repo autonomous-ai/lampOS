@@ -276,7 +276,7 @@ SIG0=$(sig); note "lamp state at preflight: $SIG0"
 if [ "$MODE" = preflight ]; then
   # Busy probe (no labelled line): whether two exchanges make room/state busy, as the busy block needs.
   rest played quiet; talk; talk; sleep "$SETTLE"; r=$(room)
-  note "busy probe: room/state=$r after two exchanges$([ "$r" = busy ] || echo " (the busy block would be skipped)")"
+  note "busy probe: room/state=$r after two exchanges (the busy block plays either way, as background talk)"
   note "preflight done"; exit 0; fi
 rest played quiet   # the wake's answer: GAP s before the first line
 
@@ -297,7 +297,6 @@ for pass in $(seq 1 "$PASSES"); do
     [ -n "$(order "$pass" "$blk")" ] || continue
     if [ "$blk" = busy ]; then
       talk; talk; sleep "$SETTLE"; r=$(room); note "pass $pass busy block: room/state=$r"
-      [ "$r" = busy ] || { note "ABORT busy block (pass $pass): room/state=$r after two exchanges; busy lines not played, quiet results kept"; continue; }
     else
       # busy ends 60 s after the last talk with LAMP_BUSY_ENDS_SOONER, 180 s without (crates/voice/src/room_told.rs)
       k=0; while r=$(room); [ "$r" != quiet ] && [ $k -lt 200 ] && ! due; do sleep 5; k=$((k+5)); done

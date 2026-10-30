@@ -82,8 +82,10 @@ o2=$(export FAIL=; PASSES=1 r run "$T/r2"); cmp -s <(cut -f2 "$T/r/plays.tsv") <
 o3=$(export FAIL=; PASSES=2 ONLY='^q0[1-4]$' r run "$T/r3")
 [ "$(awk -F'\t' '$1==1{printf "%s ",$2}' "$T/r3/plays.tsv")" != "$(awk -F'\t' '$1==2{printf "%s ",$2}' "$T/r3/plays.tsv")" ] || { echo "FAIL passes share an order"; fails=$((fails+1)); }
 
-o=$(export FAIL=roomnotbusy; PASSES=1 r run "$T/rb"); want busy-abort 'ABORT busy block \(pass 1\)' "$o"
-[ "$(awk -F'\t' 'NR>1' "$T/rb/plays.tsv" | wc -l | tr -d ' ')" = 27 ] || { echo "FAIL busy abort kept quiet results"; fails=$((fails+1)); }
+# A room that never reads busy: the busy block still plays (background talk), every line as in a busy room.
+o=$(export FAIL=roomnotbusy; PASSES=1 r run "$T/rb"); want busy-quiet 'pass 1 busy block: room/state=quiet' "$o"
+printf '%s\n' "$o" | grep -q 'ABORT busy block' && { echo "FAIL busy block aborted"; fails=$((fails+1)); }
+[ "$(awk -F'\t' 'NR>1' "$T/rb/plays.tsv" | wc -l)" = "$(awk -F'\t' 'NR>1' "$T/r2/plays.tsv" | wc -l)" ] || { echo "FAIL busy block lines not all played"; fails=$((fails+1)); }
 
 for c in "muted:muted by the restart guard" "act:runs with --act" "face:saw a face" "lock:not held by jev-verifier" \
          "bus:cannot both be read" "dropin:foreign /run drop-in" "noeyes:no report in 15 s" \

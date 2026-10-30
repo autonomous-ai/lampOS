@@ -8,10 +8,11 @@
 # what replay.sh saw. `failed` in the log is a kind (timed_out, ...), not a boolean. Taking the turn: Jev answer|look_up, voice played; correct = takes iff label is lamp.
 # A missing or failed Jev decision is always wrong, on "not" lines too.
 # plays.tsv: `pass id lamp_start_ms lamp_end_ms voice_seen macvol [room_read]` (or the old `id ...` 4
-# columns, pass 1). Each (pass, id) is one trial. A busy-room trial whose room/state did not read busy
-# just before it is void: not scored, only counted. A trial is clean unless its context.room differs from
-# the label's room, or its decision was in_conversation (the lamp spoke within 20 s) on a line that is not
-# a follow_up (a follow_up is in conversation by design).
+# columns, pass 1). Each (pass, id) is one trial. Busy-room lines are scored as "background talk", in
+# whatever room the lamp read: under LAMP_SPOKEN_TO=on held-back talk never makes room/state busy
+# (crates/voice/src/room_told.rs). A trial is clean unless a quiet-room line's context.room is not quiet,
+# or its decision was in_conversation (the lamp spoke within 20 s) on a line that is not a follow_up (a
+# follow_up is in conversation by design).
 # --split filters the class, latency, consistency and per-line tables (default all; the per-line table,
 # which shows probabilities, defaults to tune so held lines' are not seen); totals always show held and
 # all. Median and p90 are nearest-rank. Intervals are 95% Wilson. Hello and progress decisions in the
@@ -55,9 +56,8 @@ def flips(f): group_by(.id) | map(select(length > 1)) | "\(map(select(map(f) | u
 | ($pr[1:] | map(split("\t") | {pass: (if $h.pass == null then "1" else .[$h.pass] end), id: .[$h.id],
     a: (.[$h.lamp_start_ms] | tonumber), b: (.[$h.lamp_end_ms] | tonumber), seen: .[$h.voice_seen],
     rr: (if $h.room_read == null then null else .[$h.room_read] end)})) as $P
-| ($P | map(select($lab[.id].room == "busy" and .rr != null and .rr != "busy")) | length) as $void
+| ($P | map(select($lab[.id].room == "busy" and .rr == "busy")) | length) as $busyread
 | [$P[] | . as $p | $lab[$p.id] as $l | select($l != null)
-  | select(($l.room == "busy" and $p.rr != null and $p.rr != "busy") | not)
   | [$D[] | select(.ended >= $p.a and .ended <= $p.b + 3000)] as $in
   | ($in[0] // null) as $d
   | ($d.request // null) as $req
@@ -68,7 +68,7 @@ def flips(f): group_by(.id) | map(select(length > 1)) | "\(map(select(map(f) | u
      // $p.seen) as $v
   | ($d.context.room // null) as $room
   | $l + {pass: $p.pass, choice: $c, ndec: ($in | length), conv: $d.in_conversation, room_seen: $room,
-      clean: (($l.class == "follow_up" or $d.in_conversation != true) and ($room == null or $room == $l.room)), req: $req, v: $v,
+      clean: (($l.class == "follow_up" or $d.in_conversation != true) and ($room == null or $room == $l.room or $l.room == "busy")), req: $req, v: $v,
       prob: (if $c == "failed" then null else $d.judgement.probability end),
       lat: (if $d == null then null else $d.at_unix_ms - $p.b end), took: $d.took_ms,
       jt: ($c == "answer" or $c == "look_up"), vt: ($v == "played")}
@@ -83,14 +83,14 @@ def flips(f): group_by(.id) | map(select(length > 1)) | "\(map(select(map(f) | u
 "| class | room | n | label | answer | look_up | stay_quiet | failed | missing | Jev correct | voice played | held | none | voice correct |",
 "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
 ($R | group_by([.class, .room]) | sort_by(map(.ord) | min)[]
-  | [.[0].class, .[0].room, length, (map(.label) | unique | join("/")),
+  | [.[0].class, (if .[0].room == "busy" then "background talk" else .[0].room end), length, (map(.label) | unique | join("/")),
      cnt(.choice == "answer"), cnt(.choice == "look_up"), cnt(.choice == "stay_quiet"), cnt(.choice == "failed"),
      cnt(.choice == "missing"), frac(.jc), cnt(.v == "played"), cnt(.v == "held"), cnt(.v == "none"), frac(.vc)] | row),
 "", "### Totals", "",
 "| split | trials | n | Jev correct | voice correct | Jev failed | desk talk: Jev answer | desk talk: Jev answer+look_up | desk talk: voice played | desk talk n |",
 "|---|---|---|---|---|---|---|---|---|---|",
 ($all | (["held", "all"] + (if $split == "tune" then ["tune"] else [] end))[] as $n | totals($n; "all"), totals($n; "clean")),
-"", "In conversation (lamp spoke within 20 s): \($all | cnt(.conv == true)) trials. Room seen not the label room: \($all | cnt(.room_seen != null and .room_seen != .room)) trials. Clean: \($all | cnt(.clean))/\($all | length). Void (busy line, room/state not busy before it; not scored): \($void). Trials with 2+ attention decisions (the line heard in parts; the first is scored): \($all | cnt(.ndec > 1)).",
+"", "In conversation (lamp spoke within 20 s): \($all | cnt(.conv == true)) trials. Room seen not the label room: \($all | cnt(.room_seen != null and .room_seen != .room)) trials. Clean: \($all | cnt(.clean))/\($all | length). Background talk: the room as the lamp read it (busy never reached under LAMP_SPOKEN_TO=on); read busy before \($busyread) of them. Trials with 2+ attention decisions (the line heard in parts; the first is scored): \($all | cnt(.ndec > 1)).",
 "", "Consistency across passes (ids played 2+ times, split \($split)): Jev take flipped on \($R | flips(.jt)) ids, voice on \($R | flips(.vt)) ids.",
 "", "### Latency (ms)", "",
 "| measure | median | p90 | max | n |", "|---|---|---|---|---|",

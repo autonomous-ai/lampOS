@@ -8,7 +8,7 @@
 # q11 also has the talk before it: a decision (request 30) made after q11 began on words that ended
 # before it, and its verdict; neither is q11's. The log's `failed` is a kind, as lamp-policy writes it.
 # A missing or failed decision is wrong on a "not" line. Pass 2 f01 (held follow_up) is in_conversation
-# and still clean. Pass 2 b02 (busy) read room/state quiet before it: void, not scored.
+# and still clean. Pass 2 b02 (busy) read room/state quiet before it: scored as background talk, clean.
 # The same pass-1 rows in the old 4-column plays.tsv must score the same.
 set -u
 cd "$(dirname "$0")" || exit 1
@@ -50,25 +50,26 @@ v() { echo "$(( (B + $1) / 1000 )).$(( (B + $1) % 1000 ))000 lamp-52e6 lamp-voic
 out=$(bash score.sh "$T") || { echo "FAIL score.sh exited non-zero"; exit 1; }
 fail=0
 want() { printf '%s\n' "$out" | grep -qF -- "$1" || { echo "FAIL missing: $1"; fail=1; }; }
-want '| held | all | 5 | 3/5 | 5/5 | 1 | 1 | 1 | 0 | 2 |'
-want '| held | clean | 4 | 2/4 | 4/4 | 1 | 1 | 1 | 0 | 2 |'
-want '| all | all | 10 | 6/10 | 10/10 | 1 | 1 | 2 | 0 | 5 |'
-want '| all | clean | 8 | 4/8 | 8/8 | 1 | 1 | 2 | 0 | 5 |'
-want 'In conversation (lamp spoke within 20 s): 2 trials. Room seen not the label room: 1 trials. Clean: 8/10. Void (busy line, room/state not busy before it; not scored): 1.'
+want '| held | all | 6 | 3/6 | 6/6 | 1 | 1 | 1 | 0 | 2 |'
+want '| held | clean | 5 | 2/5 | 5/5 | 1 | 1 | 1 | 0 | 2 |'
+want '| all | all | 11 | 6/11 | 11/11 | 1 | 1 | 2 | 0 | 5 |'
+want '| all | clean | 9 | 4/9 | 9/9 | 1 | 1 | 2 | 0 | 5 |'
+want 'In conversation (lamp spoke within 20 s): 2 trials. Room seen not the label room: 1 trials. Clean: 9/11. Background talk: the room as the lamp read it (busy never reached under LAMP_SPOKEN_TO=on); read busy before 0 of them.'
+want '| to_lamp | background talk | 1 | lamp | 0 | 0 | 1 | 0 | 0 | 0/1 | 1 | 0 | 0 | 1/1 |'
 want '| follow_up | quiet | 1 | lamp | 1 | 0 | 0 | 0 | 0 | 1/1 | 1 | 0 | 0 | 1/1 |'
 want '- hello: 1 decisions: wait 1'
 want '- progress: 0 decisions (none asked: thin, nothing to score)'
 want 'Jev take flipped on 1/3 ids, voice on 0/3 ids.'
 want '| desk_talk | quiet | 5 | not | 1 | 1 | 1 | 1 | 1 | 1/5 | 0 | 4 | 1 | 5/5 |'
-want '| decision after line end | 1000 | 2000 | 2000 | 9 |'
-want '| took_ms | 500 | 800 | 800 | 9 |'
+want '| decision after line end | 1000 | 1000 | 2000 | 10 |'
+want '| took_ms | 500 | 700 | 800 | 10 |'
 want '| 1 | q01 | tune | quiet | to_lamp | lamp | answer | 0.62 | played | 17 | false | quiet |'
 want '| 1 | q11 | tune | quiet | desk_talk | not | missing | - | none | - | - | - |'
 want '| 2 | q01 | tune | quiet | to_lamp | lamp | answer | 0.80 | played | 21 | true | quiet |'
 printf '%s\n' "$out" | grep -qF '| q02 |' && { echo "FAIL the default per-line table shows a held line"; fail=1; }
-want '- Jev correct: 2/4 (0.50, 95% 0.15-0.85)'
-want '- voice correct: 4/4 (1.00, 95% 0.51-1.00)'
-want '- margin (Jev - voice): -2 trials'
+want '- Jev correct: 2/5 (0.40, 95% 0.12-0.77)'
+want '- voice correct: 5/5 (1.00, 95% 0.57-1.00)'
+want '- margin (Jev - voice): -3 trials'
 want '- desk talk false answers new for Jev (Jev took, voice held back): 1'
 want 'Jev beats the voice: not shown'
 printf '%s\n' "$out" | grep -q SECRET && { echo "FAIL heard text in the output"; fail=1; }
