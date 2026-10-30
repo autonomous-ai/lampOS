@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Run a lamp program against a fresh fake lamp, then stop the fake.
 #
-#   try_fake.sh my_program.py     # or my_program.js
+#   try_fake.sh my_program.py     # or my_program.js / .mjs (ES modules: in a .js,
+#                                 # the folder's package.json needs "type": "module")
 #
 # The fake is paired in a scratch LAMPOS_HOME, so your real pairings are
 # untouched. It answers every op (`--everything`). Needs `lamp` (the lampos
@@ -26,7 +27,7 @@ grep -q "paired as" "$log" || { echo "the fake lamp didn't start:"; cat "$log"; 
 
 status=0
 case "$program" in
-  *.js) node "$program" || status=$? ;;
+  *.js|*.mjs) node "$program" || status=$? ;;
   *) python3 "$program" || status=$? ;;
 esac
 echo "--- the fake lamp's log (it prints what it was asked between its own events):"
