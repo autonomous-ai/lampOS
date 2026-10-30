@@ -1913,9 +1913,27 @@ pub const OWNER_EVERY: Duration = Duration::from_secs(10);
 /// the name it cleared.
 static OWNER_NOW: std::sync::Mutex<(Option<String>, u64)> = std::sync::Mutex::new((None, 0));
 
+#[cfg(test)]
+thread_local! {
+    /// [`owner_for_test`]'s owner, this thread's only.
+    static OWNER_FOR_TEST: std::cell::RefCell<Option<Option<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Tests: [`owner_now`] answers `owner` on this thread; `None` gives back
+/// the kept one.
+#[cfg(test)]
+pub(crate) fn owner_for_test(owner: Option<Option<String>>) {
+    OWNER_FOR_TEST.with(|cell| *cell.borrow_mut() = owner);
+}
+
 /// The owner kept at setup while the eyes still know them, as last found:
 /// no reply waits on the eyes (Reviewer-two's P3 on #4290).
 pub fn owner_now() -> Option<String> {
+    #[cfg(test)]
+    if let Some(owner) = OWNER_FOR_TEST.with(|cell| cell.borrow().clone()) {
+        return owner;
+    }
     OWNER_NOW
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
