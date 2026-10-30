@@ -4,9 +4,12 @@
 //! lamp-control asks for it while a computer streams the camera (later the
 //! microphone), renewing it each second at most 3 s ahead, and once as a
 //! blink for each snapshot. The ring draws one small steady dot, the top
-//! pixel ([`MARK_PIXEL`]), dim white, over every frame it draws: a turn's
-//! face, a resting frame, a skill's light. It is the only thing on the ring
-//! that is never the lamp's own mood, so it never breathes or moves. It goes
+//! pixel ([`MARK_PIXEL`]), red as a camera's recording light, over every
+//! frame it draws: a turn's face, a resting frame, a skill's light. It is
+//! bright on a lit ring and dim on a dark one ([`mark_for`]): on lamp-75c9 (30
+//! Oct) a dim white dot was lost in the person's bright white light. One
+//! pixel, steady, never breathing, so it never reads as the mute's dark-red
+//! breath around the whole ring, nor as the lamp's own mood. It goes
 //! when every claim has lapsed, so an asker that stops can't leave it lit.
 //! Never over the shutdown's warning, and nothing at all on a dark ring.
 use lamp_bus::{Bus, Subscriber};
@@ -16,8 +19,13 @@ use std::{io, path::Path, time::Duration};
 
 /// The pixel the mark takes: the ring's first, at the top.
 pub const MARK_PIXEL: usize = 0;
-/// The mark: dim, white, steady; the ring's ceiling still applies.
-pub const MARK: Rgb = Rgb::new(24, 24, 24);
+/// The mark on a lit ring: red, at the ring's ceiling at most (the ring
+/// caps it as it caps everything).
+pub const MARK_BRIGHT: Rgb = Rgb::new(120, 0, 0);
+/// The mark on a dark ring: red, dim.
+pub const MARK_DIM: Rgb = Rgb::new(24, 0, 0);
+/// A frame with any channel over this is a lit ring.
+const LIT_OVER: u8 = 32;
 /// A snapshot's blink: the dot for this long.
 pub const BLINK_US: u64 = 600_000;
 /// Read the bus at most this often.
@@ -89,9 +97,17 @@ impl Marks {
     }
 }
 
+/// The mark for this frame: bright on a lit ring, dim on a dark one.
+pub fn mark_for(pixels: &[Rgb; PIXEL_COUNT]) -> Rgb {
+    let lit = pixels
+        .iter()
+        .any(|pixel| pixel.red > LIT_OVER || pixel.green > LIT_OVER || pixel.blue > LIT_OVER);
+    if lit { MARK_BRIGHT } else { MARK_DIM }
+}
+
 /// `pixels` with the mark on them.
 pub fn marked(mut pixels: [Rgb; PIXEL_COUNT]) -> [Rgb; PIXEL_COUNT] {
-    pixels[MARK_PIXEL] = MARK;
+    pixels[MARK_PIXEL] = mark_for(&pixels);
     pixels
 }
 
@@ -161,10 +177,19 @@ mod tests {
     }
 
     #[test]
-    fn the_mark_takes_the_top_pixel_whatever_the_face() {
-        let face = [Rgb::new(90, 40, 0); PIXEL_COUNT];
-        let drawn = marked(face);
-        assert_eq!(drawn[MARK_PIXEL], MARK);
-        assert_eq!(drawn[1..], face[1..]);
+    fn the_mark_takes_the_top_pixel_red_bright_on_a_lit_ring_and_dim_on_a_dark_one() {
+        // The person's bright white light (lamp-75c9, 30 Oct).
+        let lit = [Rgb::new(110, 110, 100); PIXEL_COUNT];
+        let drawn = marked(lit);
+        assert_eq!(drawn[MARK_PIXEL], MARK_BRIGHT);
+        assert_eq!(drawn[1..], lit[1..], "one pixel only");
+        let dark = [Rgb::new(2, 1, 0); PIXEL_COUNT];
+        assert_eq!(marked(dark)[MARK_PIXEL], MARK_DIM);
+        // Red only: never the white of the person's light.
+        assert!(
+            [MARK_BRIGHT, MARK_DIM]
+                .iter()
+                .all(|mark| mark.green == 0 && mark.blue == 0)
+        );
     }
 }
