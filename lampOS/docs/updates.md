@@ -537,9 +537,10 @@ that build could never be promoted. Now:
   A newer head refuses as stale, as before.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 8 (2 reads models, 3 settings, 4 image, 5 reset plans,
+`manifest::UPDATER` is 9 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
-product unit the lamp lacks added). With its product deploy tree, this workflow now
+product unit the lamp lacks added, 9 the switch in the build's own order,
+which every product build asks for: `ORDER_UPDATER`, #4582). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
