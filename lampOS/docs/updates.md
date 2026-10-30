@@ -1547,7 +1547,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7). A manifest
+before the field climbs first. The current `UPDATER` is 9; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
@@ -1707,11 +1707,28 @@ Not shown: a real systemd restarting a socket while an instance of its
 template runs, and a carried template on a 7071 lamp. The tests use the
 round's fake systemd.
 
+### Every lamp switches in its build's order (second-P1)
+
+Every product build asks for updater level 9 (`manifest::ORDER_UPDATER`):
+a round stops the voice first and starts it last (#4431, step 8). An
+updater of level 8 or lower reads such a build as too new for it, takes
+only the lamp-update it carries, and that one confirms itself and, in the
+same `serve`, runs the switch in its own order: on lamp-9adf a confirmed
+self ran its next round 2 s later. Without it, a lamp's own older updater
+ran the switch, restarting lamp-controls before the voice, and a lamp on a
+build from 28 Oct 17:16 to 29 Oct 09:59 (8237 to 8498: updater 8, from
+before the voice's own guard release `1c88f2dbd`) came back muted until a
+head tap. The ten customer lamps shipped on the stable of the day they
+were set up at the factory (the lead, #1711, 30 Oct), which may be one of
+those. The cost is the climb itself, about 20 s, on each lamp's next
+update; the self-switch every build already makes moves from after the
+parts to before them.
+
 ### A part added over the air (#3689)
 
 From updater level 8 (`manifest::ADDS_UPDATER`) a round adds a product unit
 the lamp lacks (`crate::added`). Every build with the product's units asks
-for level 8, so an updater of level 7 climbs first. It adds only:
+for at least level 8 (9 since second-P1, above), so an updater of level 7 climbs first. It adds only:
 
 - **On a lamp installed as the product:** a managed updater (its own unit
   starts `update/current/lamp-update`), and every part started through its
@@ -1799,7 +1816,7 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 8; a build with the product's units raises the floor to 8 (`manifest::ADDS_UPDATER`), past their service units (6) and a part's templates, sockets and timers (7).
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 9; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
