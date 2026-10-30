@@ -122,6 +122,7 @@ pub mod ring_light;
 pub mod ring_mood;
 pub mod ring_requests;
 pub mod ring_sight;
+pub mod ring_stir;
 pub mod ring_unplug;
 pub mod ring_wire;
 pub mod ring_worker;

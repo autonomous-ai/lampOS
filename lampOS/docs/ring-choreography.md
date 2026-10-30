@@ -272,6 +272,51 @@ while the slide is open (#1362, "A hand's sleep" below). A lamp with no slide
 as with the route off: the asleep face, the tap face and the pulse, and no
 indicator worker ([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)).
 
+### A stir at its name (#1672)
+
+Off unless set: `LAMP_REST_THROUGH_SOUNDS=on` in the voice's unit, the
+switch Expression and skills read too ([switches.md](switches.md)). Asleep
+for the night with that switch, Expression stirs at the lamp's counted
+name rather than waking: the head rises a few degrees and waits 5 s for
+its answer ([alive.md](alive.md), #4285, the first builder's "stir at the
+name, wake on the answer"). The ring's half is here, since at night the
+ring worker owns the ring. The worker reads `expression/state` every
+40 ms from a thread of its own (`crates/voice/src/ring_stir.rs`), only
+Expression's and only within its 500 ms:
+
+- **While Expression names `stirring` alone** (its answer awaited), the
+  resting face lifts to 1.6 times its night level (`STIR_LIFT`, 0.6): the
+  first level of light, under a ceiling of 24, goes from about 2 to 3
+  steps to 3 to 5. A little, as eyes half open, not a flash. It comes in
+  over 0.25 s, eased, from the first look that finds it. Expression says
+  its state every 200 ms, so the lift begins within about a quarter of a
+  second of the name and is whole within about half a second, with the
+  head's 0.4 s.
+- **Once it names `stir_settling` beside it** (no answer in the 5 s), or
+  no longer names the stir, the lift eases back over 2 s, with the head.
+  The night's sleep goes on as it was.
+- **Its answer** wakes the lamp as always: the speaking face, like
+  listening and thinking, takes no lift, and Expression stops naming the
+  stir at the wake.
+- **A light the person turned off** stays its ember: they asked for dark,
+  and the head's stir is enough. **A closed privacy switch or a mute** is
+  as dark, or as asleep, as before: the stir only shapes the face and
+  never decides whether the ring may show anything, and the muted lamp's
+  asleep face is not this worker's.
+
+Off, the worker never reads `expression/state` and every frame is what it
+was. Tests: `ring_stir.rs`'s lift begins within 0.5 s of Expression's
+`stirring` on a bus, holds while it is said, eases back at `stir_settling`
+and never from another source, and with the switch off nothing is read;
+its easing begins at once, is whole by 0.25 s and takes 2 s back with no
+jump; `ring_face.rs`'s lift is 1.4 to 1.8 times the plain face at its
+full, about half way at half, never past the ceiling, and leaves an ember
+and every turn's face as they were, frame for frame; and the worker under a
+closed privacy switch writes no light through a stir
+(`a_stir_at_its_name_never_lights_a_ring_the_privacy_switch_keeps_dark`).
+Not yet seen on a lamp: the night on lamp-06c1 that #4285 owes (a played
+"Lamp, …" at 03:00) is where its size and pace are judged.
+
 ### Physical mute indication (#755)
 
 `LAMP_PRIVACY_CONTROLS=on` selects the Controls-backed privacy path and enables
