@@ -238,6 +238,21 @@ def test_every_error_code_says_what_to_do_and_both_sdks_say_the_same():
         assert {code: json.loads(line) for code, line in said.items()} == errors.WHAT_TO_DO
 
 
+def test_request_tells_its_id_before_sending_so_an_early_done_can_be_matched(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                told: list[int] = []
+                done = asyncio.get_running_loop().create_future()
+                lamp.on("done", lambda event: done.set_result(event) if told and event["re"] == told[0] else None)
+                reply = await lamp.request("say", on_id=told.append, text="Hello.")
+                assert told == [reply["re"]]
+                assert (await asyncio.wait_for(done, 5))["re"] == told[0]
+
+    run(go())
+
+
 def test_greet_a_person_who_arrives(tmp_path):
     async def go():
         async with FakeLamp(grants=("body", "look")) as fake:

@@ -322,7 +322,7 @@ its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 | `await lamp.say(text)` | `text`: words, up to 300 characters | `speak` | no | 6 a minute, 60 an hour; refused in quiet hours |
 | `await lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no | as `say` |
 | `await lamp.stop()` | | none | no | |
-| `await lamp.request(op, **fields)` | any op of the schema, checked against it first | the op's | | |
+| `await lamp.request(op, *, on_id=None, **fields)` | any op of the schema, checked against it first. `on_id(id)`: told the request's id before it is sent, to match a `done` that may come before the reply is read | the op's | | |
 
 **Refusals** raise `lampos.errors.BY_CODE[code]`, a `LampError` with `code`,
 `why` (the lamp's own words), for `rate` `retry_ms`, and `what_to_do`, the

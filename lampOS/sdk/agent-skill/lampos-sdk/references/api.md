@@ -17,7 +17,7 @@ naming every public call, tool, event and error code they have.
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
 | find lamps on this network | `await find()` (`lampos.discovery`, `lampos[find]`) | `await find()` | — |
-| any op of the schema | `await lamp.request(op, **fields)` | `lamp.request(op, fields)` | — |
+| any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 
 ## Events and state
 
