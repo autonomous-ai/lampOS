@@ -7897,12 +7897,54 @@ fn conversation_with_gate_inner(
                     record(trace, row)?;
                 }
                 ProviderOutput::SleepAsked { request } => {
-                    // Asked once its line has been heard whole, or at the
-                    // cap while it is still sounding.
-                    sleep_owed.asked(request, monotonic_us());
-                    eprintln!(
-                        "lamp-voice: request {request}: asked to sleep; once its line has played"
-                    );
+                    // With `LAMP_SLEEP_LINE=on` and the line kept (#3748
+                    // part 3): the same recording a hand's hold says, in
+                    // place of the model's own words. The model's turn is
+                    // cut as the shutdown's last words cut it, and the sleep
+                    // is owed as a hold's is, until that cue has played.
+                    let line = sleep_line_cache
+                        .as_ref()
+                        .filter(|_| {
+                            reply
+                                .as_ref()
+                                .is_some_and(|current| current.owner.turn() == request)
+                        })
+                        .and_then(|cache| cache.sleep_line());
+                    if let (Some(line), Some(controls)) = (line, controls.as_mut()) {
+                        submission_draining |= cut_for_last_words(
+                            owner,
+                            reply,
+                            &mut provider_queue,
+                            &mut speaker_pending,
+                            &mut admission,
+                            &mut detector,
+                            trace,
+                        )?;
+                        let (now_state, _) = speaker_tone::commit_sound_turn(
+                            owner,
+                            reply,
+                            NoticeDelivery::sound(SpeechOrigin::SleepBreath, line),
+                            "asked_sleep_line",
+                            "the person asked the lamp to sleep: the cached sleep line in the model's place, nothing sent to the provider",
+                            0,
+                            rig.playout_start_now(),
+                            trace,
+                            |state| rig.publish(state),
+                        )?;
+                        snapshot = now_state;
+                        last_publish = monotonic_us();
+                        controls.owe_sleep(monotonic_us());
+                        eprintln!(
+                            "lamp-voice: request {request}: asked to sleep; the sleep line plays in the model's place, the sleep once it has played"
+                        );
+                    } else {
+                        // Asked once its line has been heard whole, or at the
+                        // cap while it is still sounding.
+                        sleep_owed.asked(request, monotonic_us());
+                        eprintln!(
+                            "lamp-voice: request {request}: asked to sleep; once its line has played"
+                        );
+                    }
                 }
                 ProviderOutput::LookNoCall { request, session } => {
                     // Only the look's own turn, still in hand on its session.
@@ -11888,11 +11930,9 @@ fn conversation_with_gate_inner(
             )?;
             if decided.is_ok() {
                 // The recorded line in the breath's place (#3748).
-                let sleep_line = sleep_line_cache.as_ref().and_then(|cache| {
-                    cache
-                        .owners_kept(lamp_msgs::SLEEP_LINE)
-                        .or_else(|| cache.kept(lamp_msgs::SLEEP_LINE))
-                });
+                let sleep_line = sleep_line_cache
+                    .as_ref()
+                    .and_then(|cache| cache.sleep_line());
                 if sleep_line_cache.is_some() && sleep_line.is_none() {
                     eprintln!(
                         "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"

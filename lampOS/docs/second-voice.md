@@ -219,7 +219,7 @@ each line plays exactly as before.
 |---|---|---|---|
 | The shutdown's | `lamp_msgs::GOING_TO_SLEEP` | speech cache, warmed at start | cached `text` played in the owner's words (`Recordings::cached`) |
 | A hand's hold's sleep line | `lamp_msgs::SLEEP_LINE` | speech cache, warmed at start (`LAMP_SLEEP_LINE`) | the owner's when kept, else the English kept line, else the breath |
-| `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words | the model told the owner's words (`sleep_asked::told`) |
+| `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words; with `LAMP_SLEEP_LINE=on` and the line kept, the hold's cached line in its place | the model told the owner's words (`sleep_asked::told`); the cached line as a hold's, when kept |
 | Offline, service down, back online | `language::PROVIDER_UNAVAILABLE`, `VOICE_SERVICE_UNREACHABLE`, `BACK_ONLINE` | the notices release's English file | the cache's line when kept (`FailureNotices::owners_line`), the English file otherwise |
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 
