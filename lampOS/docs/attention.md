@@ -2430,9 +2430,10 @@ fewer the word may be bare ("Ma'am could"), but only for the line after
 it: the cut line itself, a longer one and a whole line still need the
 comma. A line joined with the one it cut short is read on the
 joined words. Words cut short are also never answered in a held line's
-place (`LAMP_JOIN_CUT_WORDS`) when they open with a word said to a person
-("Ma'am could", bare in two words or fewer, as above) or the held line
-does ("Sir, what time is this?") and they don't call the lamp
+place (second-voice.md, "Words cut short by the next line") when they
+open with a word said to a person ("Ma'am could", bare in two words or
+fewer, as above) or the held line does ("Sir, what time is this?") and
+they don't call the lamp
 (`attention::called`: "Lamp, what time is it in London?" cut by "Sir, …"
 is still answered): they are let go, and the journal says
 `request N's words, cut short, are let go: they or request M open with
