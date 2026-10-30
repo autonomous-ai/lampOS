@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 /// The switch, in lamp-cloud's unit: `on` exactly. lamp-voice's own name
@@ -37,6 +38,57 @@ pub const UNREACHED: &str = "making a skill can't be reached on the lamp now";
 
 /// The longest words: the voice's own bound for a skill's request.
 pub const MOST_WORDS_BYTES: usize = 180;
+
+/// How often lamp-cloud asks lamp-voice whether making a skill is ready
+/// ([`watch`]).
+pub const READY_EVERY: Duration = Duration::from_secs(60);
+
+/// The newest [`ready`] answer, read by `system.info`'s `can` with no wait.
+static READY: AtomicBool = AtomicBool::new(false);
+
+/// `{"ready": {}}` (fourteen-P15): whether lamp-voice's maker has a computer
+/// to hand the work to, so the app's "Make a skill" can work on this lamp.
+/// No answer is no.
+pub fn ready(socket: &Path) -> bool {
+    exchange(socket, &json!({"ready": {}}))
+        .is_ok_and(|answer| answer.get("ready") == Some(&json!(true)))
+}
+
+/// [`ready`]'s newest answer.
+pub fn is_ready() -> bool {
+    READY.load(Ordering::Relaxed)
+}
+
+/// Asks [`ready`] at once and every [`READY_EVERY`] on a thread of its own,
+/// so `can` names `skills.make` only while it is (the first builder's yes on
+/// fourteen-P15: the button shows only on a lamp whose Harness has a
+/// computer). The journal says each change, never more.
+pub fn watch(socket: PathBuf) {
+    let spawned = std::thread::Builder::new()
+        .name("lamp-cloud-make-ready".into())
+        .spawn(move || {
+            let mut was = None;
+            loop {
+                let now = ready(&socket);
+                READY.store(now, Ordering::Relaxed);
+                if was != Some(now) {
+                    eprintln!(
+                        "lamp-cloud: making a skill is {}",
+                        if now {
+                            "ready: the computer's agent is set up"
+                        } else {
+                            "not ready: the computer's agent isn't set up for the lamp yet"
+                        }
+                    );
+                    was = Some(now);
+                }
+                std::thread::sleep(READY_EVERY);
+            }
+        });
+    if let Err(error) = spawned {
+        eprintln!("lamp-cloud: making a skill: its readiness can't be watched: {error}");
+    }
+}
 
 /// The socket, with the switch on.
 pub fn from_environment() -> Option<PathBuf> {
@@ -212,6 +264,26 @@ mod tests {
             }
         });
         (socket, lines)
+    }
+
+    /// `ready` (fourteen-P15): yes only for lamp-voice's `{"ready": true}`;
+    /// its no, an answer of another shape, or no lamp-voice is no.
+    #[test]
+    fn ready_only_when_the_voice_says_so() {
+        let (socket, lines) = voice(
+            "ready",
+            vec![
+                json!({"ready": true}),
+                json!({"ready": false, "why": "the computer's agent isn't set up for the lamp yet"}),
+                json!({"making": true}),
+            ],
+        );
+        assert!(ready(&socket));
+        assert_eq!(lines.recv().unwrap(), json!({"ready": {}}));
+        assert!(!ready(&socket));
+        assert!(!ready(&socket));
+        assert!(!ready(Path::new("/nowhere/make.sock")));
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
 
     /// lamp-voice's own names, so the two never part.

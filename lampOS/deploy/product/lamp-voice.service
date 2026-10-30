@@ -278,6 +278,11 @@ Environment=LAMP_TASKS_NEEDS=/usr/local/bin/harness
 # words and tells each task once, with the skill's ask, or itself when no ask has come within 10 s (#1038).
 # The skill takes news of a task that stopped or asks something too (#1722).
 Environment=LAMP_TASK_NEWS=skill
+# A skill made for the person (#1685, #2813, fourteen-P15): asked aloud or typed in the app's "Make a skill",
+# made on their computer through the tasks part, and put on only by a spoken yes at the lamp (the lead's
+# ruling on #1711). The app's button shows only while the tasks part has a computer (app_make's `ready`).
+Environment=LAMP_MAKE_SKILL=on
+Environment=LAMP_APP_MAKE_SKILL=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
