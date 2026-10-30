@@ -3365,7 +3365,8 @@ fn no_second_round_begins_while_lamp_updates_own_switch_waits() {
         lamp.back(update_unit("failed", "failed"), u64::MAX),
         own::Back::Busy
     );
-    assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    // Not a failure: nothing was tried, and the next round tries again.
+    assert!(matches!(lamp.round(), Outcome::NotQuiet(_)));
     assert_eq!(lamp.own_build(), new);
     drop(held);
 
