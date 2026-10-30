@@ -2148,10 +2148,19 @@ impl Onboarding {
                 // each day." took its "please" as the hello's yes, and the
                 // step ended with the hello never asked.
                 let greeting = greets(&words);
+                // "Please" alone is no yes to the hello: in a line it is a
+                // request ("Please tell me more.", Reviewer-three's P2 on
+                // #4480).
                 let yes = if greeting {
                     hello_yes(&words)
                 } else {
-                    agrees(&words)
+                    agrees(
+                        &words
+                            .iter()
+                            .filter(|word| *word != "please")
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                    )
                 };
                 // Asking to hear it again is no answer, with or without its
                 // "?" ("Sorry, can you repeat that", "What did you say", "I
@@ -2169,9 +2178,46 @@ impl Onboarding {
                 // please" took its "please" as the hello's yes and ended the
                 // step with the hello never answered (Fourth, #4469's read).
                 let asked_back = again || text.contains('?');
+                // Nor a line that puts it off ("Okay, let me think.", "Hold
+                // on, okay, one second."): the hello is the walk's to wait
+                // for (Reviewer-three's P2 on #4480).
+                let defers = words.iter().any(|word| {
+                    matches!(
+                        word.as_str(),
+                        "think"
+                            | "wait"
+                            | "hold"
+                            | "moment"
+                            | "second"
+                            | "minute"
+                            | "mean"
+                            | "slower"
+                    )
+                });
+                // Once asked, the hello takes its yes or no from a short
+                // answer ("That's fine.", "Okay.", "No thanks."), or from a
+                // longer one that opens with a firm yes or no ("Yes, any time
+                // from seven.", "Sure, until I tell you to stop."); a longer
+                // line led by "okay" or "please" is the model's to lead until
+                // they answer (Reviewer-three's P2 on #4480). A line that names
+                // the hello is its answer at any length.
+                let short = words.len() <= SHORT_ANSWER_WORDS;
+                let firm = words.first().is_some_and(|word| {
+                    matches!(
+                        word.as_str(),
+                        "yes" | "yeah" | "yep" | "yup" | "sure" | "no" | "nope" | "nah"
+                    )
+                }) || YES_PHRASES.iter().any(|phrase| {
+                    phrase.len() <= words.len()
+                        && phrase.iter().zip(&words).all(|(said, word)| said == word)
+                });
                 if !asked_back
+                    && !defers
                     && (about_hello
-                        || (heard.hello_asked && !names_hours(&words) && (yes || refuses(&words))))
+                        || (heard.hello_asked
+                            && (short || firm)
+                            && !names_hours(&words)
+                            && (yes || refuses(&words))))
                 {
                     heard.hello = true;
                 } else if (answer || quiet_hours(&words)) && !heard.quiet_hours && !heard.hello {
@@ -6213,6 +6259,18 @@ mod tests {
             "Sorry, what? Okay.",
             "Please explain what you mean.",
             "Say hello again?",
+            // Reviewer-three's P2 on #4480: a line that defers, asks for
+            // more or answers at length is no answer to it either.
+            "Please tell me more.",
+            "Okay, let me think about it.",
+            "Okay, let me think.",
+            "Hold on, okay, one second.",
+            "Okay, what does that mean.",
+            "Can you say it slower please.",
+            "Please.",
+            // Seventh's P3: a "?" after a yes, as speech to text may write
+            // it, waits for a plain answer; the model or the re-ask asks.
+            "Yes, say hello?",
         ]
         .into_iter()
         .enumerate()
@@ -6230,6 +6288,43 @@ mod tests {
             room.wait(S, Some(NEAR_MIDDLE));
             assert_eq!(room.outcome(Step::Preferences), None, "{line}");
             room.walk.heard("Yes, that's fine.", room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::Preferences),
+                Some(Outcome::Done),
+                "{line}"
+            );
+        }
+    }
+
+    /// Reviewer-three's P2 on #4480: a short yes or no, or a line naming the
+    /// hello, still answers it once asked.
+    #[test]
+    fn a_short_answer_or_one_naming_the_hello_answers_it() {
+        for (n, line) in [
+            "Yes, that's fine.",
+            "That's fine.",
+            "Okay.",
+            "Sure.",
+            "No thanks.",
+            "Yes, you can say hello when I sit down.",
+            "Please don't greet me.",
+            // Opens with a firm yes: its condition is the model's to keep.
+            "Sure, but not every time.",
+            "Of course, any time you like.",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut room = Room::new(&format!("hello-short-{n}"));
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk.heard("After ten at night.", room.at);
+            room.walk.lamp_said();
+            assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+            room.walk.heard(line, room.at);
             room.wait(S, Some(NEAR_MIDDLE));
             assert_eq!(
                 room.outcome(Step::Preferences),
