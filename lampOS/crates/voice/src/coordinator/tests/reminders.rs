@@ -1395,7 +1395,7 @@ fn waiting_with_a_due_reminder(
             }
             for look in 0..looks {
                 between(fixture, look);
-                gate()?;
+                gate(&mut |_| Ok(()))?;
             }
             Ok(WaitOutcome::Allowed)
         },
@@ -1706,7 +1706,7 @@ fn told_the_face(
                     on_state(switch, crate::process::new_boot().unwrap(), 1)?;
                 }
                 fixture.tick();
-                gate()?;
+                gate(&mut |_| Ok(()))?;
                 told.push(owed.showing());
             }
             Ok(WaitOutcome::Allowed)

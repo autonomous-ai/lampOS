@@ -350,6 +350,48 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   plug:device_speaker is busy at start; waiting up to 20 s for it, as the
   microphone waits for its own`, then, once open, `the speaker was busy for
   9.2 s at start; opened on try 185`. Its holder is not looked up.
+- **The privacy worker's lease lapsing in the muted wait after boot.** On
+  lamp-06c1 on 2026-10-30, a cold boot, run 1: `onboarding skill loaded`
+  at 15.82, `schedule-consumer: due reminders available` at 15.89, then
+  `privacy controller lease expired` at 17.47 and `privacy switch
+  unreadable: privacy.c.p: Connection refused (os error 111); verified
+  cleanup failed: privacy worker exited abnormally: exit status: 1` at
+  17.78: the voice exited 1 and systemd restarted it (#4332). It died in
+  the service's muted wait, before any session. The wait's privacy worker
+  got its authority only after each look's gate (`Waiting::step` in
+  `service_privacy_controls.rs`), and the gate (the reminders' poll, the
+  say socket's refusal, the light, the controls' quiescent observation,
+  which may write the mute record, and the health's report, each with its
+  trace lines) took past the worker's 250 ms lease on that boot. The look
+  now also renews the worker's authority before its gate and between the
+  gate's checks, when 50 ms or more have passed since the last renewal.
+  It is the wait's microphone and camera Denied authority, so nothing is
+  granted, and no lease length, freshness or fail-closed rule changed: one
+  check held past 250 ms still lapses the lease and ends the wait closed.
+  A look whose gate takes 50 ms or more after the switch has been read
+  still finds its readings stale and ends that wait as unreadable, closed,
+  read again after 1 s with a fresh worker, as before; only the lapse that
+  ended the voice is gone. With `LAMP_STALLS=on` each look is timed in
+  `stalls-wait.log` and each check in its own `stalls-wait-<check>.log`
+  (`reminders`, `say`, `light`, `controls`, `owed`, `health`, `state`), so
+  the next slow boot names the slow one. A cold boot of lamp-06c1 with that
+  in, run 2, still logged `privacy controller lease expired` 250 ms after the
+  worker's Ready, before the wait's first line, and exited 1: the first
+  renewal came only inside the first look, after the worker's start, the
+  wait's controller, its stall recorders and the first look's start. The
+  wait now builds its controller before it starts the worker and sends the
+  first authority as soon as it has read the worker's Ready, with no 50 ms
+  rule holding it back; a refused send there fails closed like any other.
+  Each refused renewal now ends its line with which it was: `(renewal after
+  Ready)`, `(renewal before the gate)`, `(renewal in the gate after
+  <check>)` or `(renewal after the gate)`; the rest of the line is as
+  before. Unit tests: a look whose gate takes ~400 ms in ~100 ms checks
+  keeps the stand-in worker's authority arriving within 250 ms (it lapsed
+  at 250 ms before), and one 320 ms check still lapses it; a worker whose
+  Ready is read ~100 ms after its start, then ~200 ms to the first look and
+  ~100 ms in its gate, keeps its lease with the authority at Ready and
+  lapses without it; each refused renewal names itself. A fixture worker,
+  not tried on a lamp.
 - **A worker's first control message older than 100 ms.** A worker sends its
   first control message as soon as its peer is there; at start the
   coordinator may read it only after starting its other workers. lamp-4ace
