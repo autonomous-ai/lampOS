@@ -207,6 +207,36 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         None => Some(PathBuf::from(SIGHT)),
     }
     .filter(|_| bus.is_some());
+    // The camera is never seen without the ring's mark (`light/mark`): no
+    // mark on the bus, no camera.
+    let mark = match (&sight, &bus) {
+        (Some(_), Some(bus)) => match bus.publisher_declared(
+            lamp_msgs::RingMark::TOPIC,
+            &lamp_msgs::RingMark::declaration(),
+            "control",
+        ) {
+            Ok(publisher) => {
+                let publisher = Mutex::new(publisher);
+                Some(lamp_control::camera::mark_on(
+                    clock_id.clone(),
+                    move |mark| {
+                        if let Ok(mut publisher) = publisher.lock()
+                            && let Err(error) =
+                                publisher.publish_json(lamp_ipc::monotonic_us(), mark)
+                        {
+                            eprintln!("lamp-control: the ring's mark was not asked: {error}");
+                        }
+                    },
+                ))
+            }
+            Err(error) => {
+                eprintln!("lamp-control: no camera, since the ring's mark can't be asked: {error}");
+                None
+            }
+        },
+        _ => None,
+    };
+    let sight = sight.zip(mark);
     // The body's own lease, with `--lease-socket` only (lamp-body
     // --lease-socket): a computer's `look` on it, and the follower set by a
     // `look` at `hand`, told to the body with each hold.
@@ -217,7 +247,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
         let lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
         let lamp = match sight {
-            Some(sight) => lamp.seeing(sight),
+            Some((sight, mark)) => lamp.seeing(sight, mark),
             None => lamp,
         };
         Box::new(match on_lease {
