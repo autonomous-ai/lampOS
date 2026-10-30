@@ -13,13 +13,20 @@ people walking past or speak into a conversation.
 - **Trigger:** a face on `humans/faces/tracked` where there was none, after
   at least five minutes with nobody (counted from when they left: a face
   glimpsed for a moment as they sit down does not restart it, #2825); at
-  most once every twenty minutes.
+  most once every twenty minutes, and once an hour to each person (the
+  Policy's hello gate, asked even with `LAMP_SKILLS_ASK=skip`; the first
+  builder, 30 Oct, on the launch testers' findings).
 - **After a rested night:** with Bedtime and Morning on, the first face of
   the morning waits for its morning greeting, which is the welcome back;
   if that chance is dropped, the hello comes as usual (`yields_to`, #1672).
-- **Ask:** the Policy's `hello` question, before anything is done.
+- **Ask:** the Policy's `hello` question, before anything is done, even
+  with `LAMP_SKILLS_ASK=skip`: its hard rules hold every hello (never over
+  talk, twenty minutes between any two, an hour between two to the same
+  person, by the memory's id of a known face; every face not known shares
+  one hour). No answer within its wait, no hello.
 - **Do:** look at the face, warm the light (`lights/warm_glow.toml`), and
-  give the voice a note to say the hello in its own words. With
+  give the voice a note to say a hello and the name only, if it knows it,
+  in one short line: nothing else. With
   `who = true` in its permissions (no other skill has it), the voice tells
   the note a known face's name, and to be one beat warmer to someone who
   comes by often; the typed name is in its instruction.

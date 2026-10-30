@@ -276,18 +276,18 @@ fn the_loader_refuses_what_it_cannot_do() {
         // Words the voice keeps (#939): only what it keeps, only `from`,
         // and still one say a skill.
         (
-            "say = { note = \"They are back at their desk. Greet them in one short line, by name if you know it.\", expires = \"60s\" }",
+            "say = { note = \"They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.\", expires = \"60s\" }",
             "say = { from = \"calendar\" }",
             "say.from is \"schedule\" or \"tasks\", not \"calendar\"",
         ),
         (
-            "say = { note = \"They are back at their desk. Greet them in one short line, by name if you know it.\", expires = \"60s\" }",
+            "say = { note = \"They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.\", expires = \"60s\" }",
             "say = { from = \"schedule\", note = \"x\" }",
             "a say table has from and nothing else",
         ),
         // A say that is neither, told in plain words (Fourth on #1033).
         (
-            "say = { note = \"They are back at their desk. Greet them in one short line, by name if you know it.\", expires = \"60s\" }",
+            "say = { note = \"They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.\", expires = \"60s\" }",
             "say = 5",
             "say is a note in words, or { from = \"schedule\" } or { from = \"tasks\" }",
         ),
@@ -1523,6 +1523,15 @@ fn the_program_timed(
     (lighting, then): (Ring, After),
     on_the_host: bool,
 ) -> Seen {
+    // Skipping the ask, a hello is still asked of the Policy (the first
+    // builder, 30 Oct), and none stands in here: these runs show what a run
+    // does once allowed, so their skill asks another question, which
+    // `skip` allows at once.
+    let skill = &if skip {
+        skill.replace("policy = \"hello\"", "policy = \"unprompted\"")
+    } else {
+        skill.to_owned()
+    };
     // Short: a socket's whole path has to fit in 103 bytes.
     let dir = tempfile::Builder::new()
         .prefix("sk")
@@ -4233,6 +4242,17 @@ fn asking_the_policy_with(
     clock: &Clock,
     hello: &str,
 ) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
+    asking_with(root, clock, hello, "policy")
+}
+
+/// [`asking_the_policy_with`] with `LAMP_SKILLS_ASK` as `ask` says, and the
+/// eyes' known file at `known` in `root` (none there unless a test puts it).
+fn asking_with(
+    root: &Path,
+    clock: &Clock,
+    hello: &str,
+    ask: &str,
+) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
     fs::create_dir(root.join("skills")).unwrap();
     let bus = Bus::new(root.join("bus")).unwrap();
     let voice = UnixListener::bind(root.join("say.sock")).unwrap();
@@ -4267,7 +4287,8 @@ fn asking_the_policy_with(
             root.join("actions.sock").as_os_str(),
         ])
         .args(clock.args())
-        .env("LAMP_SKILLS_ASK", "policy");
+        .env("LAMP_SKILLS_ASK", ask)
+        .env("LAMP_SKILLS_KNOWN_FILE", root.join("known"));
     let running = Running(command.spawn().unwrap());
     clock.started();
     if !on_the_host {
@@ -4439,6 +4460,113 @@ fn asking_the_policy_a_skill_acts_only_on_a_say_now_that_names_its_ask() {
     // Only the first say_now was said, the late one passed over too.
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(said.try_iter().count(), 0);
+}
+
+/// The first builder, 30 Oct, on the launch testers' findings: with
+/// `LAMP_SKILLS_ASK=skip` a hello (`[ask] policy = "hello"`) is still asked
+/// of the Policy on `skills/ask`, for whom it is by the memory's id of the
+/// known face (never the name), and acts only on its `say_now`: a `wait`
+/// leaves it undone, as does no answer.
+#[test]
+fn skipping_the_ask_a_hello_is_still_asked_of_the_policy() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("sh")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    let mut asks = bus.subscribe("skills/ask", "policy").unwrap();
+    let mut decisions = bus
+        .publisher_declared(
+            "policy/decisions",
+            &lamp_msgs::Decision::declaration(),
+            "policy",
+        )
+        .unwrap();
+    let clock = Clock::at(root);
+    let (_running, bus, said) = asking_with(root, &clock, &hello_after_a_second(), "skip");
+    let mut eyes = bus
+        .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+        .unwrap();
+    // A known face at the lamp, as the eyes write it.
+    fs::write(root.join("known"), "Alpha\n").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut answered = Vec::new();
+    let mut put = Vec::new();
+    for (cycle, choice) in ["say_now", "wait", ""].into_iter().enumerate() {
+        a_face_appears(&mut eyes, &clock, false);
+        let ask = next_ask(&mut asks, Duration::from_secs(5)).expect("a hello is asked");
+        if !choice.is_empty() {
+            let decision = serde_json::json!({"about": "hello", "choice": choice,
+                "probability": 0.9, "answers": {}, "by": "rule", "took_ms": 3,
+                "shadow": false, "ask": ask["ask"]});
+            decisions.publish_json(1, &decision).unwrap();
+        } else {
+            // Unanswered: past the program's 2.5 s wait.
+            clock.skip(Duration::from_millis(2_800));
+        }
+        put.push(ask);
+        answered.push(next_answer(&mut events, deadline));
+        if cycle == 0 {
+            said.recv_timeout(Duration::from_secs(2))
+                .expect("the say_now said the hello");
+        }
+    }
+    assert_eq!(
+        (put[0]["skill"].as_str(), put[0]["act"].as_str()),
+        (Some("hello"), Some("hello"))
+    );
+    assert_eq!(
+        put[0]["person"].as_str(),
+        Some(lamp_msgs::known::person_id("Alpha").as_str()),
+        "{put:?}"
+    );
+    assert!(
+        !put[0].to_string().contains("Alpha"),
+        "never the name: {put:?}"
+    );
+    let allowed: Vec<Option<bool>> = answered.iter().map(|event| event.allowed).collect();
+    assert_eq!(
+        allowed,
+        [Some(true), Some(false), Some(false)],
+        "{answered:?}"
+    );
+    assert!(answered[1].why.contains("wait"), "{answered:?}");
+    assert!(answered[2].why.contains("did not answer"), "{answered:?}");
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(said.try_iter().count(), 0, "only the say_now was said");
+}
+
+/// With `LAMP_SKILLS_ASK=skip`, a skill whose `[ask]` is not the hello acts
+/// at once, as before: nothing is asked on `skills/ask`, though the Policy
+/// listens there.
+#[test]
+fn skipping_the_ask_any_other_skill_acts_at_once() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("so")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    let mut asks = bus.subscribe("skills/ask", "policy").unwrap();
+    let clock = Clock::at(root);
+    let skill = hello_after_a_second().replace("policy = \"hello\"", "policy = \"unprompted\"");
+    assert!(skill.contains("policy = \"unprompted\""));
+    let (_running, bus, said) = asking_with(root, &clock, &skill, "skip");
+    let mut eyes = bus
+        .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+        .unwrap();
+    a_face_appears(&mut eyes, &clock, false);
+    let answer = next_answer(&mut events, Instant::now() + Duration::from_secs(10));
+    assert_eq!(answer.allowed, Some(true), "{answer:?}");
+    assert!(answer.why.contains("skipped"), "{answer:?}");
+    said.recv_timeout(Duration::from_secs(2))
+        .expect("said without asking");
+    assert_eq!(next_ask(&mut asks, Duration::from_millis(300)), None);
 }
 
 /// The next ask on `skills/ask`, within `wait`.

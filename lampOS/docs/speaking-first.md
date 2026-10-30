@@ -29,7 +29,7 @@ What the voice's hello did, and where it went:
 | nothing said to the lamp or by it for 30 s | Welcome back's two `voice/state` conditions: resting for 5 s, and the lamp not speaking for 30 s (#1140, [skills.md](skills.md)) |
 | the keeper's pause | the say service's gates (below) |
 | the Policy asked first (`LAMP_HELLO_ASKS_POLICY`, `voice/arrival`) | Welcome back's `[ask] policy = "hello"`, through `lamp-skills`' ask (`LAMP_SKILLS_ASK=policy`) |
-| by the name typed at setup | the name is in the model's instruction (`person::told`, below), and the skill's note says "by name if you know it" |
+| by the name typed at setup | the name is in the model's instruction (`person::told`, below), and the skill's note says "their name if you know it" |
 | by a known face's name | told with Welcome back's note while someone is at the lamp, by its `who = true` permission, which no other skill has: "(The person at the lamp now is NAME: you know their face.)" (`person::at_the_lamp`, `known_faces::note`) |
 | one beat warmer for someone Mood calls `regular` or `close` (#1670) | told with Welcome back's note the same way: "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)" (`person::OFTEN`) |
 | for someone `close`, no hello within the hour | **dropped**: `lamp-skills` has no cooldown by how familiar someone is, and Mood carries no identity, so the hour counted any hello, not one to this person; the 20 minutes hold for everyone |
@@ -66,6 +66,21 @@ turn as it came), `say::tests::who_goes_only_with_a_note`, lamp-skills'
 and Who was here are not given it),
 `speak_up::tests::the_familiar_level_is_read_from_moods_fresh_state_only`.
 No test runs the whole loop with a presence file.
+
+A `who` note is also told, last and whether or not anyone is at the lamp,
+the part of the day from the lamp's own time and to say a hello and the
+name only: "(It is the afternoon here now: if you name the part of the day,
+it is the afternoon, never another. Say only a hello and their name if you
+know it: no weather, no day or date, no time, no question and no offer.)"
+The part is the one the session's time names (morning 5-11, afternoon
+12-16, evening 17-20); at night, or while the clock is not set or the zone
+cannot be read, it is told not to name one and just say hello. A hello at
+15:42 had said "Evening" and added the weather, the weekday and "how's it
+going" (the first builder, 30 Oct, on the launch testers' findings: the
+part of the day from the local time, never the model's own). Any other
+skill's note is unchanged (`local_time::hello_told`, `person::told_hello`;
+tests `local_time::tests::a_hello_is_told_the_part_of_the_day_from_the_lamps_own_time`,
+`person::tests::only_a_note_that_asked_is_told_the_part_of_the_day`).
 
 The say's `skill_says` record keeps whether its note was told
 (`told_who`, true or false) and Mood's level it was told with (`familiar`:
@@ -170,7 +185,7 @@ connection resumed from it (the reviewer's two P2s on #3050):
   real Live connection takes longer to open.
 
 Without a memory the Live route has no lease of a person, so it never
-tells the name. Welcome back's "by name if you know it" has the typed name
+tells the name. Welcome back's "their name if you know it" has the typed name
 only where a line was told it; a known face's own name is told as before
 (`person::at_the_lamp`).
 

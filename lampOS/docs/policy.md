@@ -714,6 +714,15 @@ in `/etc/lampOS/policy/jev.key`, readable by root alone, and systemd hands
 the service its own copy (`LoadCredential`); the log is in
 `/var/lib/lampos-policy`, which only the service's user can enter.
 
+**The hello on a home lamp** (the first builder, 30 Oct, on the launch
+testers' findings): the product unit passes `--hello --act hello --gate`,
+so Welcome back's hello, which lamp-skills asks on `skills/ask` even with
+`LAMP_SKILLS_ASK=skip` ([skills.md](skills.md)), is decided here by the
+hard rules above, one an hour to each person among them, and the judge:
+one model asking for each arrival that passes the rules. Every other
+question stays off; `--gate` also makes the moment question, which the
+product's skills do not ask under `skip`.
+
 **On a home lamp** (#811) the product unit asks Jev through V1's route, the
 campaign-api proxy (`--endpoint
 https://campaign-api.autonomous.ai/api/v1/ai/v1/jev/decisions`), as V1's own
@@ -1789,6 +1798,20 @@ unanswered would leave the hello to its rule.
   it ([below](#the-quiet-counts-talk-to-the-lamp-1155)).
 - **No hello within twenty minutes of the last:** the voice's minutes since
   its last hello, or the last `say_now` this acted on.
+- **No hello to the same person within an hour** (`ONCE_PER_PERSON`), for a
+  skill's ask (`--gate`): by the ask's `person`, the memory's id of the
+  known face at the lamp, which lamp-skills reads from the eyes' known file
+  as it asks (never the name); every ask without one, a face not known,
+  shares one key, `someone`. Counted from the last `say_now` this acted on
+  for that person, as the twenty minutes are, so nothing in shadow starts
+  it. Guard `greeted_person`, checked after the two above and before a kept
+  rule, and again as an answer comes back. The first builder, 30 Oct, on
+  the launch testers' findings: on stable 8899 Welcome back greeted the
+  same person every time they came back after five minutes away, as soon
+  as its 20-minute cooldown let it (15:13 and 15:41 on one lamp); the ruling
+  is at most once an hour per person. Tests:
+  `hello::tests::one_hello_an_hour_to_the_same_person_and_asks_without_one_share_a_key`,
+  `hello::tests::a_hello_in_shadow_starts_no_persons_hour`.
 - **With `--rules` (#813), not when a rule the people at the lamp kept
   holds it** ([above](#a-persons-rules-about-speaking-first-813)): `quiet`,
   `quiet_mornings`, and the `hello` limits (`never`, not before or from a
@@ -1927,7 +1950,9 @@ and for a hello its minutes away and seconds there), and is answered by a
 `--act hello`:
 - `act` `hello` is put to the hello question as an arrival of that number
   is: the same hard rules (someone talking, a hello within 20 minutes),
-  the same question and the same log. The quiet it is shown is the
+  and one of its own, a hello to the same person within the hour, by the
+  ask's `person` ([above](#hello-on-arrival-say-hello-now-752)), the same
+  question and the same log. The quiet it is shown is the
   policy's own (since anything was last said, or since it started), and
   the last hello its own. The decision names the ask, not an arrival:
   whether it came from a skill is carried with it from waiting to decided
@@ -2049,8 +2074,8 @@ state shown, the answers, the judgement and any `guard`, `failed` or
     lamp-policy: hello decision 2 arrival=98563000000 choice=say_now probability=0.720 by=model took_ms=612 guard=none
 
 The diagnostics add `hello_decided`, `hello_by_rule`, `hello_said`,
-`hello_held_talking`, `hello_held_recent`, `hello_late`, `hello_held_rule`
-with `--rules`, and `hello_acts` with `--act hello`; the start line `hello=true`, and `act=` names each
+`hello_held_talking`, `hello_held_recent`, `hello_held_person` (the hour
+to the same person), `hello_late`, `hello_held_rule` with `--rules`, and `hello_acts` with `--act hello`; the start line `hello=true`, and `act=` names each
 question that acts (`act=progress,hello`). A yes held as it comes back is
 counted too, under its kind, with or without `--rules`: someone talking
 by then counts in `hello_held_talking`, which the code before #1003 did

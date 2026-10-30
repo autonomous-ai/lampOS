@@ -5461,8 +5461,10 @@ impl Engine {
         self
     }
 
-    /// `skip_ask`: act without asking the Policy (`LAMP_SKILLS_ASK=skip`).
-    /// Without it, or `asking_the_policy`, nothing a skill starts is done.
+    /// `skip_ask`: act without asking the Policy (`LAMP_SKILLS_ASK=skip`),
+    /// but for a skill whose `[ask]` is the Policy's `hello`, which is
+    /// asked still ([`asks_anyway`]). Without it, or `asking_the_policy`,
+    /// nothing a skill starts is done.
     pub fn new(skills: Vec<Skill>, skip_ask: bool) -> Self {
         Self {
             generation: Arc::new(()),
@@ -7445,7 +7447,7 @@ impl Engine {
                     }
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.
-                    if nudge && !self.ask_policy {
+                    if nudge && !(self.ask_policy || asks_anyway(skill, self.skip_ask)) {
                         nudged(&mut self.nudges, &self.latest, skill, now_us);
                     }
                     // Its end is told even if the Policy says no: with no
@@ -7656,6 +7658,19 @@ fn question(skill: &Skill) -> Value {
     json!({ "skill": skill.name, "act": act })
 }
 
+/// Whether a skill is asked of the Policy with `LAMP_SKILLS_ASK=skip`: one
+/// whose `[ask]` is the Policy's `hello` (Welcome back), so that its hard
+/// rules, among them one hello an hour to the same person, hold on every
+/// lamp (the first builder, 30 Oct, on the launch testers' findings). Every
+/// other skill acts at once under skip, as before.
+pub fn asks_anyway(skill: &Skill, skip_ask: bool) -> bool {
+    skip_ask && skill.policy == HELLO
+}
+
+/// The Policy's question asked even with `LAMP_SKILLS_ASK=skip`
+/// ([`asks_anyway`]).
+pub const HELLO: &str = "hello";
+
 /// A trigger held: with `(skip_ask, ask_policy)`, the Policy is asked
 /// `question` and the calls wait for its answer, or the ask is skipped and
 /// they are made, or neither, and nothing is done. The calls are made only
@@ -7709,7 +7724,7 @@ fn decide(
         queue: false,
         from: None,
     };
-    if ask_policy {
+    if ask_policy || asks_anyway(skill, skip_ask) {
         return run(events, made(), Some(question));
     }
     if !skip_ask {

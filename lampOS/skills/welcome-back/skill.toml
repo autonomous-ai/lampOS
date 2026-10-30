@@ -41,7 +41,7 @@ field = "state"
 not_equals = "speaking"
 for = "30s"
 
-[ask]                       # anything the lamp starts itself asks the Policy first
+[ask]                       # anything the lamp starts itself asks the Policy first; this hello even with LAMP_SKILLS_ASK=skip
 policy = "hello"
 
 [[do]]
@@ -50,5 +50,7 @@ light = "warm_glow"
 # The hello lives a minute, as the chance does (`wait`): a room line the lamp
 # answers as it is asked, and the voice's 15 s quiet after that turn, take
 # more than the say's own 30 s (#2861, round 2 on lamp-06c1, 27 Oct). One say
-# a skill and the 20-minute cooldown keep it to one hello an arrival.
-say = { note = "They are back at their desk. Greet them in one short line, by name if you know it.", expires = "60s" }
+# a skill and the 20-minute cooldown keep it to one hello an arrival; the
+# Policy's hello gate, asked even with LAMP_SKILLS_ASK=skip, to one an hour
+# to each person (the first builder, 30 Oct, on the launch testers' findings).
+say = { note = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.", expires = "60s" }
