@@ -1477,6 +1477,48 @@ fn the_product_saves_a_carried_line_into_its_conversation() {
     }
 }
 
+/// A silent face doesn't count against a carry
+/// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`, #4339): on lamp-3e83 on 30 Oct the
+/// known face was in all 30 looks of a line and alone in none, so 4 lines
+/// carried while one conversation split in two.
+#[test]
+fn the_product_carries_a_conversation_past_a_silent_face() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_CARRIES=on",
+        "Environment=LAMP_JOIN_CUT_WORDS=on",
+        "Environment=LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A person's turn is also told the room's lines of the same conversation
+/// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339): on lamp-3e83 on 30 Oct a
+/// search answered in the room's thread was unknown to the person's next
+/// turn.
+#[test]
+fn the_product_tells_a_person_the_rooms_lines_of_their_conversation() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A long conversation keeps its rules and score past the thread's view
 /// (`LAMP_CONVERSATION_SUMMARY`, #1693's long-conversation plan, step 3): on
 /// lamp-06c1 on 29 Oct, 11 exchanges after a quiz's rules the lamp said
