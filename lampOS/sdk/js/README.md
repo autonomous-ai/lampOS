@@ -104,7 +104,7 @@ await lamp.closed();
   | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
-  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; the door already refuses `say` and `sound` in quiet hours, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
+  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; on a lamp that sets quiet hours, off by default, the door refuses `say` and `sound` in them, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
   | `volume.changed` | `level` (0–100), `muted`: the speaker's volume changed, whoever changed it (the person by voice or in the app, or a computer) | `speak` |
 
 - **State:** `await lamp.get('presence', 'lamp')` resolves with the states
@@ -269,7 +269,7 @@ every public method named here.
 **Today a lamp refuses** `look` (but at `'hand'`, on a lamp with the body's lease
 socket), `joints` and `play` with `refused`, "not routed yet: waits for
 …" (`LAMP_CONTROL_REFUSES` in `lampos/testing`), and `say` and `sound` in its quiet
-hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
+hours when it sets them (off by default; a lamp sets its own window, said in
 `lamp.limits.quiet_hours`), or while its time isn't known, with `quiet_hours`.
 
 ### Connecting
@@ -278,7 +278,7 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 |---|---|---|
 | `Lamp.pair(code, host, { pin, port = 7731, name, keyring })` | `code`: the owner's 8-digit pairing code. `host`: the lamp's address. `pin`: the certificate's SHA-256 the app shows, 64 hex. `port`: 7731. `name`: this computer's name in the app, 1–64 characters, default the host name. `keyring`: default `new Keyring()` (`LAMPOS_HOME`, else `~/.config/lampos`) | the pairing (`lamp`, `client`, `grants`, …) |
 | `Lamp.connect(lamp, { host, keyring })` | `lamp`: a paired lamp's id, or `undefined` for the only one paired. `host`: an address to use instead of the kept one | a `Lamp`, after hello |
-| `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: `rates: "off"` (lamp-control's default), the two guards as `{most, within_ms}` windows (`refused` and `phrases`), `hold_max_ms`, `take_max_ms`, `say_max_chars` and `quiet_hours` (`{from, to}` or `off`). A lamp run with `--rates default` sends a window for each class (`joints`, `motion`, `light`, `say`, `express`, …) and no `rates`. The fake lamp sends the same as a lamp with its rates off |
+| `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: each rate as `{most, within_ms}` windows (`joints`, `motion`, `light`, `say`, `express`, …), `hold_max_ms` (a light's longest `for_ms`, 30000), `lease_max_ms` (the longest one lease take or renewal asks for, 600000), `say_max_bytes` (the longest say's text in UTF-8 bytes, 900) and `quiet_hours` (`{from, to}`, or `off`, the default). There is no ceiling on renewing a lease, and a say is counted in bytes (older lamps also sent `take_max_ms` and `say_max_chars`). By default the rates are off: `rates: "off"`, and only the `refused` and `phrases` windows (a lamp run with `--rates default` gives every class). The fake lamp sends the same as a lamp with its rates off |
 | `lamp.close()` | | lets go of every lease, then closes |
 | `lamp.closed()` | | resolves when the connection ends |
 | `find(ms = 3000)` | `ms`: how long to listen for mDNS | the lamps on this network (`id`, `name`, `host`, `port`, `fp`) |
@@ -298,7 +298,7 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 
 | call | parameters | |
 |---|---|---|
-| `lamp.withLease(parts, body, { forMs = 30_000, why })` | `parts`: `body` (grant `body`), `light` (`light`), `voice` (`speak`). `forMs`: 1–30,000. `why`: up to 200 characters, shown to the owner. `body(lease)`: async | takes the lease, renews it at half its time, and lets go when `body` ends |
+| `lamp.withLease(parts, body, { forMs = 30_000, why })` | `parts`: `body` (grant `body`), `light` (`light`), `voice` (`speak`). `forMs`: 1–600,000; renewed in time, a lease has no ceiling. `why`: up to 200 characters, shown to the owner. `body(lease)`: async | takes the lease, renews it at half its time, and lets go when `body` ends |
 | `lamp.lease(...parts)`, then `await lease.take()` and `await lease.release()` | as above, for 30 s | `lease.id`, `lease.state` (`held`, `suspended`, `lost`, `released`), `lease.held`, `lease.lostWhy` |
 
 ### Actions
@@ -310,17 +310,17 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | call | parameters | grant | lease |
 |---|---|---|---|
 | `lamp.express(feeling, strength)` | `feeling`: `glad`, `lively` or `low`. `strength`: 0–1, default 0.5 | `body` and `light` | no |
-| `lamp.gesture(name, { wait })` | `name`: `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (never `idle` or `scanning`) | `body` | no |
-| `lamp.look(at)` | `at`: `'face'` (needs `look` too), `'hand'` (needs `look` too: the body follows the hand in view until another look, a `stop` or the lease ends; answered `{"to":"body","follow":"hand"}`, no `done`; needs the body's lease socket on the lamp), `'name'`, `'ahead'`, or `{ yaw, pitch }` in degrees, −180 to 180 and −90 to 90, right and up positive | `body` | `body` |
+| `lamp.gesture(name, { wait })` | `name`: `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz`, the clips offered to programs; the lamp takes `idle` and `scanning` too, and any other lowercase name the body answers (rule 8: keep `scanning` for when a person asks) | `body` | no |
+| `lamp.look(at)` | `at`: `'face'` (needs `look` too), `'hand'` (needs `look` too: the body follows the hand in view until another look, a `stop` or the lease ends; answered `{"to":"body","follow":"hand"}`, no `done`; needs the body's lease socket on the lamp), `'name'`, `'ahead'`, or `{ yaw, pitch }` in degrees, right and up positive, any finite number: the body clamps them to its reach | `body` | `body` |
 | `lamp.followHand({ forMs, why })`, `lamp.withHand(body, options)` | `await lamp.followHand().start()` then `await following.stop()`, or `lamp.withHand(async (following) => ...)`: a `look` at `'hand'` under a body lease of its own (`forMs`, default 10,000, renewed), until `stop()`, another look, or the lamp takes the body back. `following.ended` says how: `finished`/`stopped`, or `cut_short` with the why. `lamp.stop()` lets go of its lease too. After another look the lease stays held (that look runs under it), and the lamp's own life stands back until `stop()`; a new `followHand()` lets go of it first. A lamp that takes the look without following (before #4183) is `refused`, and the lease let go. Where the hand is comes as `hand` events | `body`, `look` | its own |
-| `lamp.move(frames, stepMs, { wait })` | `frames`: 2–500 frames of 5 joints in counts from home, the first and last all 0. `stepMs`: 40–1,000, and 1.5 to 10 s in all. Each joint within the body's reach and speed, else `bad_request` in the body's words | `body` | `body` |
+| `lamp.move(frames, stepMs, { wait })` | `frames`: 2 frames at least (at most what 10 s allows: 251 at 40 ms) of 5 joints in counts from home, the first and last all 0. `stepMs`: 40–1,000, and 1.5 to 10 s in all. Each joint within the body's reach and speed, else `bad_request` in the body's words | `body` | `body` |
 | `lamp.play(name, { wait })` | `name`: a move of your installed package | `body` | `body` |
-| `lamp.joints(lease, withinMs, targets)` | `lease`: your held `body` lease. `withinMs`: up to 5,000. `targets`: `{ pitch, roll, yaw, shoulder, elbow }` in degrees, −180 to 180, at least one | `body` | `body` (named) |
+| `lamp.joints(lease, withinMs, targets)` | `lease`: your held `body` lease. `withinMs`: 0 or more (the body's caps pace each step). `targets`: `{ pitch, roll, yaw, shoulder, elbow }` in degrees, −180 to 180, at least one | `body` | `body` (named) |
 | `lamp.light(colour, level, forMs, pattern)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `forMs`: 1–30,000. `pattern`: none (steady), `'breathe'` (level 2 or up), `'candle'` (3 or up) or `'pulse'` (2 or up). Under its level a pattern is `refused`. The ring plays one pulse a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no |
 | `lamp.ring(pixels, { forMs, brightness, fadeMs })` | `pixels`: one colour per pixel, from pixel 0 around the ring, each `'#rrggbb'` or `[r, g, b]` 0–255, exactly `lamp.ringPixels` of them (hello's `limits.ring.pixels`, 32 on today's ring). `brightness`: 0–100, 100 by default, under the ring's own ceiling (lower at night). `forMs`: up to 30,000. `fadeMs`: 1,000–60,000 | `light` | no | as `light` |
 | `lamp.lightRgb(rgb, { forMs, brightness, fadeMs })` | one colour of your own for the whole ring, `'#rrggbb'` or `[r, g, b]` | `light` | no | as `light` |
 | `lamp.ringPixels` | how many pixels the ring has, from hello; `undefined` from a lamp before pixel lights | | | |
-| `lamp.say(text, { rephrase })` | `text`: words, up to 300 characters, spoken **exactly as written** through the lamp's speech service (no model, no tools) once the person isn't talking. `{ rephrase: true }`: the lamp's model says it in its own words instead, as before. Since #4958 `say` is exact by default; before it, every say was the model's version, which `{ rephrase: true }` keeps | `speak` | no | 6 a minute, 60 an hour; refused in quiet hours |
+| `lamp.say(text, { rephrase })` | `text`: words, at most 900 UTF-8 bytes (about 900 Latin letters, 300 in a three-byte script), the voice's own cap, checked here before sending as the lamp checks it, never stricter; spoken **exactly as written** through the lamp's speech service (no model, no tools) once the person isn't talking. `{ rephrase: true }`: the lamp's model says it in its own words instead, as before. Since #4958 `say` is exact by default; before it, every say was the model's version, which `{ rephrase: true }` keeps | `speak` | no | 6 a minute, 60 an hour with the rates on; refused in quiet hours where the lamp sets them |
 | `lamp.cameraSnapshot()` | none; resolves to the camera's newest picture, a JPEG `Buffer` about 320 across. Refused while the lamp is private, or with the camera closed | `camera` | no |
 | `lamp.cameraStream(on = true, fps, size)` | `fps`: 1 to 30 a second at most (2); `size`: `640x480` (the default) or `1280x720`. Where the eyes serve every frame (the answer's `fast: true`), each `camera.frame` comes as the camera made it, with the JPEG as `data` (a Buffer); otherwise the eyes' newest frame, about 1 to 2 a second, with `jpeg` in base64. `fps_now` is the rate lately; each new frame once, until `cameraStream(false)`, `stop` or a `camera.ended` event. Ends with `camera.ended` when the lamp turns private, or after 10 s with the camera closed | `camera` | no |
 | `lamp.sound(name)` | `name`: `hum`, the lamp's own short hum, or one of your clips (`uploadSound`), played once the person isn't talking, as an exact `say` is | `speak` | no |
@@ -329,12 +329,12 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.removeSound(name)` | deletes one of your clips | `speak` | no |
 | `lamp.volume({ to, step, mute })` | exactly one of `to`: 0–100 of what the lamp allows (0 is muted), `step`: `'up'` or `'down'` (the voice's own step, within the lamp's floor and ceiling), or `mute`: `true` or `false` (an unmute brings it back to where it was). Resolves to `{ level, muted }`, the level it left. The person's own volume, the same the voice and the app set | `speak` | no |
 | `lamp.stop()` | | none | no |
-| `lamp.startTurn(prompt, { wait })` | `prompt`: words said first, as `say`'s `text` (`undefined`: none). Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. Resolves `{"to": "voice"}`; with `wait`, its `done`: `finished` once the answer has sounded, else `dropped` with the voice's why (`dropped: nobody spoke`). Refused in quiet hours, as `say` | `speak` and `hear` | no |
+| `lamp.startTurn(prompt, { wait })` | `prompt`: words said first, as `say`'s `text` (`undefined`: none). Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. Resolves `{"to": "voice"}`; with `wait`, its `done`: `finished` once the answer has sounded, else `dropped` with the voice's why (`dropped: nobody spoke`). Refused in quiet hours where the lamp sets them, as `say` | `speak` and `hear` | no |
 | `lamp.endTurn()` | Ends the turn this computer started, never another's: `{"turn": "ended", "started": <the turn.start's id>}`, and the start's `done` follows. With none, `busy` ("not this computer's turn") | `speak` | no |
 | `lamp.setListening(on)` | `false` holds this computer's mute: `{"mute": "held"}` (again: the same, nothing new). `true` lifts it: `{"mute": "lifted"}`, or `{"mute": "nothing_held"}`. The person wins: a hand on the head lifts it, said as a `done` `cut_short`, "a hand on the head", naming the `listen.set` that held it; and it ends when this computer's last connection closes or it is revoked. A `stop` doesn't lift it. Nothing the lamp hears reaches a computer either way | `hear` | no |
 | `lamp.request(op, fields)` | any op of the schema, checked against it first | the op's | |
 
-A lamp has no rate limits, except two guards: refused actions, 20 a second (past it the connection closes), and changes of the phrases a connection listens for, 6 a minute. Hello's `limits` says `"rates": "off"` with those two as `refused` and `phrases`. `say` and `sound` are still refused in quiet hours.
+A lamp has no rate limits, except two guards: refused actions, 20 a second (past it the connection closes), and changes of the phrases a connection listens for, 6 a minute. Hello's `limits` says `"rates": "off"` with those two as `refused` and `phrases`. `say`, `sound` and `turn.start` are still refused in quiet hours where this lamp sets them (off by default).
 
 **Refusals** reject with `byCode[code]`, a `LampError` with `code`, `why`
 (the lamp's own words), for `rate` `retryMs`, and `whatToDo`, the line below
@@ -349,7 +349,7 @@ for its code (`WHAT_TO_DO`):
 | `lease_lost` | The lamp took the body back; `why` says why (a conversation, a hand, private, a stop). Let it be, and take a new lease later. |
 | `busy` | A motion still plays (a gesture, move or feeling's move, whoever asked): wait `retry_ms` and send it again. Without `retry_ms`, someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
 | `refused` | The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again. |
-| `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, by default 22:00 to 07:00): `say` and `sound` wait until they end. A light is still fine. |
+| `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, off unless this lamp sets them): `say`, `sound` and `turn.start` wait until they end. A light is still fine. |
 | `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. |
 | `paused` | The person paused the lamp. Wait for `lamp.changed` with `paused` false. |
 | `asleep` | The lamp is asleep. Wait for `lamp.changed` with `asleep` false. |

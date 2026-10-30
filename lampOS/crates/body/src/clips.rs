@@ -210,7 +210,7 @@ mod tests {
     fn the_control_schemas_gestures_are_the_clips_but_idle_and_scanning() {
         let schema: serde_json::Value =
             serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
-        let named: Vec<&str> = schema["$defs"]["gesture"]["enum"]
+        let named: Vec<&str> = schema["$defs"]["gesture"]["examples"]
             .as_array()
             .unwrap()
             .iter()

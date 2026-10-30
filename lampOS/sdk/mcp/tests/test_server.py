@@ -504,8 +504,15 @@ def test_a_refusal_keeps_the_lamps_code_words_and_retry(tmp_path):
             fake.refuse_next("gesture", "quiet_hours", "it's night")
             result = await session.call_tool("lamp_gesture", {"name": "nod"})
             assert result.isError and "quiet_hours: it's night" in text(result)
-            result = await session.call_tool("lamp_say", {"text": "x" * 301})
-            assert result.isError and not fake.asked("say")
+            # The voice's 900 bytes, as the door holds them, counted in bytes.
+            for said in ("a" * 900, "ế" * 300):
+                assert not (await session.call_tool("lamp_say", {"text": said})).isError
+            for over in ("a" * 901, "ế" * 301):
+                result = await session.call_tool("lamp_say", {"text": over})
+                assert result.isError and "text: at most 900 bytes as the voice takes it" in text(result)
+            result = await session.call_tool("lamp_say", {"text": "two\nlines"})
+            assert result.isError and "text: words, no control characters" in text(result)
+            assert fake.asked("say") == [{"text": "a" * 900}, {"text": "ế" * 300}]
 
     run(go())
 
@@ -1057,8 +1064,12 @@ def test_turns_and_the_mute_send_their_ops_and_say_only_how_they_ended(tmp_path)
             await fake.done(fake.requests[-1]["id"], "dropped", "dropped: nobody spoke")
             assert text(await waiting) == "turn dropped: dropped: nobody spoke"
             assert fake.asked("turn.start") == [{"prompt": "Shall we start?"}, {}]
-            long = await session.call_tool("lamp_start_turn", {"prompt": "x" * 301})
-            assert long.isError and "at most 300 characters" in text(long)
+            # A prompt is held as a say's text: 900 UTF-8 bytes, no control characters.
+            long = await session.call_tool("lamp_start_turn", {"prompt": "ế" * 301})
+            assert long.isError and "prompt: at most 900 bytes as the voice takes it" in text(long)
+            two = await session.call_tool("lamp_start_turn", {"prompt": "two\nlines"})
+            assert two.isError and "prompt: words, no control characters" in text(two)
+            assert len(fake.asked("turn.start")) == 2
             assert "muted" in text(await session.call_tool("lamp_set_listening", {"on": False}))
             assert text(await session.call_tool("lamp_set_listening", {"on": True})) == "listening again"
             assert "no mute" in text(await session.call_tool("lamp_set_listening", {"on": True}))
