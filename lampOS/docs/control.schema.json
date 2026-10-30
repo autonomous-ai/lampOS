@@ -59,7 +59,8 @@
         "touch",
         "button",
         "time",
-        "lamp.changed"
+        "lamp.changed",
+        "body.state"
       ]
     },
     "state_name": {
@@ -1577,6 +1578,64 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "body.state"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "joints": {
+                "type": "object",
+                "description": "Each joint the body read, named as the joints op names them.",
+                "properties": {
+                  "pitch": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "roll": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "yaw": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "shoulder": {
+                    "$ref": "#/$defs/body_joint"
+                  },
+                  "elbow": {
+                    "$ref": "#/$defs/body_joint"
+                  }
+                }
+              },
+              "lamp": {
+                "type": "object",
+                "description": "The lamp's own state beside the joints: the light it shows now, whether it talks, whether it is private.",
+                "properties": {
+                  "light": {
+                    "type": "object"
+                  },
+                  "talking": {
+                    "type": "boolean"
+                  },
+                  "private": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "light",
+                  "talking",
+                  "private"
+                ]
+              }
+            },
+            "required": [
+              "joints",
+              "lamp"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "lease"
               }
             }
@@ -1657,6 +1716,51 @@
             ]
           }
         }
+      ]
+    },
+    "body_joint": {
+      "description": "One joint in a body.state: where it is, from the body's own read.",
+      "type": "object",
+      "properties": {
+        "deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Where it is, in degrees from the middle of its servo's turn (the body/joint_states frame), to a tenth."
+        },
+        "counts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4095,
+          "description": "Where it is, in the servo's own encoder counts: 4,096 a turn, 2,048 its middle."
+        },
+        "goal_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Where it was last asked to be, in the same frame as deg."
+        },
+        "load": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "How hard it works: the share of its servo's full strength, without a direction."
+        },
+        "moving": {
+          "type": "boolean",
+          "description": "Turning at 5 degrees a second or more."
+        },
+        "temp_c": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Its servo's temperature, from the body's once-a-second report; absent until the first."
+        }
+      },
+      "required": [
+        "deg",
+        "counts",
+        "moving"
       ]
     }
   }

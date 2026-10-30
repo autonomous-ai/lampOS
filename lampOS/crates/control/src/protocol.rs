@@ -137,6 +137,9 @@ pub enum EventKind {
     Time,
     #[serde(rename = "lamp.changed")]
     LampChanged,
+    /// Where each joint is, up to 25 a second, and the lamp's own state.
+    #[serde(rename = "body.state")]
+    BodyState,
 }
 
 impl EventKind {
@@ -150,6 +153,7 @@ impl EventKind {
             | Self::Hand => Some(Grant::Look),
             Self::PhraseHeard | Self::NameHeard => Some(Grant::Hear),
             Self::SoundHeard => Some(Grant::Sound),
+            Self::BodyState => Some(Grant::Body),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
         }
     }

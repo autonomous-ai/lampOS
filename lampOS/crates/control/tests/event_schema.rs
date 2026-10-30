@@ -188,6 +188,27 @@ fn every_event_from_the_bus_validates_against_the_schema() {
             json!({"x": 0.42, "y": 0.61, "size": 0.18, "open": true, "confidence": 0.93, "t": 1}),
             27 * S,
         ),
+        (
+            "light/drawn",
+            json!({"on": true, "colour": "warm", "level": 3}),
+            28 * S,
+        ),
+        (
+            "diagnostics",
+            json!({"level": 0, "name": "body", "message": "", "values": [{"key": "temperature_head_pitch", "value": "44"}]}),
+            28 * S,
+        ),
+        (
+            "body/joint_states",
+            json!({
+                "name": ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"],
+                "position": [-0.5, 0.7, -1.1, 0.02, 0.3],
+                "velocity": [0.4, 0.0, 0.0, 0.0, 0.0],
+                "effort": [0.1, 0.35, 0.2, 0.0, 0.06],
+                "commanded": [-0.4, 0.7, -1.1, 0.0, 0.3],
+            }),
+            28 * S,
+        ),
     ];
     let mut kinds = std::collections::BTreeSet::new();
     let mut outs: Vec<(String, Value, Out)> = Vec::new();
@@ -231,6 +252,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         "button",
         "lamp.changed",
         "hand",
+        "body.state",
     ] {
         assert!(kinds.contains(kind), "{kind} not seen: {kinds:?}");
     }

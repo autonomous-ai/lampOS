@@ -14,6 +14,7 @@
 //! the parts come in the pieces after it, off unless `LAMP_CONTROL=on`.
 
 pub mod body_lease;
+pub mod body_state;
 pub mod cert;
 pub mod feelings;
 pub mod journal;

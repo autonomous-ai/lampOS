@@ -1,0 +1,180 @@
+{
+  "model": "lampos-lamp",
+  "version": 1,
+  "hardware": "Lamp_09102026",
+  "source": "robots/lamp/hardware/cad/glb/lamp.glb (from the Fusion design f3d/Lamp_09102026.f3d)",
+  "units": {
+    "length": "m",
+    "angle": "deg"
+  },
+  "frame": "glTF: y up, metres; each joint turns its bone about axis, in the bone's own frame after rest_quat",
+  "measured": {
+    "origins": "cad",
+    "zero_and_sign": "cad: zero_deg is the servo's deg (body.state) at the CAD's rest pose, sign +1, until measured on a lamp",
+    "reach": "product: lamp-body --reach around each lamp's home; a lamp's home is its own (/etc/lampOS/body/lamp.env)"
+  },
+  "chain": [
+    "yaw",
+    "shoulder",
+    "elbow",
+    "pitch",
+    "roll"
+  ],
+  "base_mesh": "0_base",
+  "joints": [
+    {
+      "name": "yaw",
+      "bus": "base_yaw",
+      "servo": 1,
+      "bone": "base_yaw",
+      "parent": "base",
+      "origin_m": [
+        0.0003,
+        0.0495,
+        0
+      ],
+      "rest_quat": [
+        0.0003,
+        0.7071,
+        0.0003,
+        0.7071
+      ],
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "sign": 1,
+      "zero_deg": 0,
+      "reach_counts": {
+        "either_way": 250
+      },
+      "reach_deg": {
+        "either_way": 22
+      },
+      "mesh": "1_base_yaw"
+    },
+    {
+      "name": "shoulder",
+      "bus": "shoulder",
+      "servo": 2,
+      "bone": "base_pitch",
+      "parent": "yaw",
+      "origin_m": [
+        0,
+        0.0471,
+        0
+      ],
+      "rest_quat": [
+        -0.3743,
+        -0.0003,
+        -0.0004,
+        0.9273
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "sign": 1,
+      "zero_deg": 0,
+      "reach_counts": null,
+      "reach_deg": null,
+      "mesh": "2_base_pitch"
+    },
+    {
+      "name": "elbow",
+      "bus": "elbow",
+      "servo": 3,
+      "bone": "elbow_pitch",
+      "parent": "shoulder",
+      "origin_m": [
+        0,
+        0.137,
+        0
+      ],
+      "rest_quat": [
+        0.7061,
+        -0.0004,
+        0.002,
+        0.7081
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "sign": 1,
+      "zero_deg": 0,
+      "reach_counts": null,
+      "reach_deg": null,
+      "mesh": "3_elbow_pitch"
+    },
+    {
+      "name": "roll",
+      "bus": "head_roll",
+      "servo": 4,
+      "bone": "wrist_roll",
+      "parent": "pitch",
+      "origin_m": [
+        0,
+        0.056,
+        -0.0029
+      ],
+      "rest_quat": [
+        0.7134,
+        0.0018,
+        0.004,
+        0.7007
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "sign": 1,
+      "zero_deg": 0,
+      "reach_counts": {
+        "either_way": 1
+      },
+      "reach_deg": {
+        "either_way": 0.1
+      },
+      "mesh": "4_wrist_roll"
+    },
+    {
+      "name": "pitch",
+      "bus": "head_pitch",
+      "servo": 5,
+      "bone": "wrist_pitch",
+      "parent": "elbow",
+      "origin_m": [
+        0,
+        0.0982,
+        0
+      ],
+      "rest_quat": [
+        -0.0049,
+        0.0006,
+        -0.0057,
+        1
+      ],
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "sign": 1,
+      "zero_deg": 0,
+      "reach_counts": {
+        "up": 150,
+        "down": 15
+      },
+      "reach_deg": {
+        "up": 13.2,
+        "down": 1.3
+      },
+      "mesh": "5_wrist_pitch"
+    }
+  ]
+}

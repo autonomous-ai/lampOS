@@ -10,7 +10,7 @@
     "./testing": "./src/testing.js"
   },
   "bin": { "lamp": "./src/cli.js", "lampos": "./src/cli.js" },
-  "files": ["src"],
+  "files": ["src", "tools"],
   "dependencies": { "ws": "^8.18.3" },
   "optionalDependencies": { "bonjour-service": "^1.2.1" },
   "scripts": { "test": "node --test --test-timeout=20000 test/*.test.js" }

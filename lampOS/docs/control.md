@@ -82,6 +82,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `button` | `press` (`press`, `long_press`) | `controls/gesture` | none |
 | `time` | the client's own schedule | the lamp's clock and zone | none |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
+| `body.state` | `joints`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow`, each `deg`, `counts`, `goal_deg`, `load`, `moving`, `temp_c`; `lamp`: `light`, `talking`, `private` ("Where the body is") | `body/joint_states`, the body's `diagnostics`, the light and the voice | `body` (proposed: a read-only `body_state`, Queue #3997) |
 
 lamp-control reads each topic on its own thread. A state topic's message that says nothing new for these, the same privacy, pause, sleep, talking, light or mood as the last one, is passed over on that thread and never handed to the watch that turns the bus into events; a repeat still goes on every 250 ms. `voice/privacy` alone comes a hundred times a second (its lease, renewed every 10 ms), and handing each one on was half of lamp-control's idle CPU on lamp-75c9 (2.1% of a core before, 1.1% after; the rest is that thread reading them). A privacy lease not handed on for 1 s counts as private: every lease is lost with `private` and `lamp.changed` says so, until the lease is heard again. That is later than the voice's own microphone gate, which closes once a lease is 50 ms old; lamp-control says it 0.75 to 1.25 s after the last lease heard (1 s after the last one handed on, which is up to 250 ms older, and then the next 250 ms check), so a running voice, renewing every 10 ms, never reads as private. Each message is timed when its thread receives it, and every message already come is taken before a lapse is judged, so a lamp-control held up by a slow save doesn't read a renewed lease as lapsed. Before the first lease nothing lapses, so a lamp whose voice publishes none is never private for that.
 
@@ -345,6 +346,31 @@ SDK can keep under them. With the rates off, the default, it says `"rates": "off
 `phrase.heard` needs `phrases`, the ones to listen for, and `phrases` go
 only with it. A `get` reply carries each state asked for: `presence`,
 `light`, `mood`, and `lamp_state` for `lamp`.
+
+### Where the body is
+
+`body.state` says where each joint is, from the body's own reads, so that
+a computer can draw the lamp as it stands (a digital twin). It goes out with
+each `body/joint_states` message, at most 25 a second (`body_state::EVERY_US`).
+The body says its joints every fourth step of its 20 ms loop, so that is 12.5
+a second today. The voice's `body_motion` and the eyes' `full_look` judge a
+moving joint by that 80 ms, so it stays as it is, and a page drawing the lamp
+eases between two messages.
+
+```json
+{"ev":"body.state","at":"2026-10-30T15:40:00+07:00","joints":{"yaw":{"deg":-28.6,"counts":1722,"goal_deg":-22.9,"load":0.1,"moving":true,"temp_c":41},"pitch":{"deg":17.2,"counts":2244,"goal_deg":17.2,"load":0.06,"moving":false,"temp_c":44}},"lamp":{"light":{"on":true,"colour":"warm","level":3},"talking":false,"private":false}}
+```
+
+- **Each joint**, under the `joints` op's names, holds these fields:
+  - `deg`: degrees from the middle of its servo's turn, the `body/joint_states` frame, to a tenth.
+  - `counts`: the servo's encoder counts, 4,096 a turn, 2,048 its middle.
+  - `goal_deg`: where it was last asked to be.
+  - `load`: the share of its servo's strength, 0 to 1, without a direction.
+  - `moving`: turning at 5° a second or more (`MOVING_DEG_S`), since a held servo's reading wanders a count or two.
+  - `temp_c`: from the body's once-a-second report, where each joint's `temperature_<joint>` follows its other facts. It is absent until the first report.
+- **The lamp beside them:** the light it shows now (`light/drawn`, or `light/state` before that), whether it talks, and whether it is private.
+- **The model:** [lamp.model.json](lamp.model.json) is the lamp's kinematic model, written from the rigged CAD (`robots/lamp/hardware/cad/glb/lamp.glb`) by the JS SDK's `tools/lamp-model.js` and shipped in both SDKs as `model`. It holds the chain from the base out, each joint's bone, origin, axis and reach. Each joint's `zero_deg` and `sign` (its `deg` here at the CAD's rest pose) are the CAD's until measured on a lamp. The JS SDK's `examples/twin/` draws the lamp with it, live.
+- **The cost:** each `body/joint_states` message, and every part's once-a-second `diagnostics`, now reaches lamp-control's watch. Twelve and a half messages a second is an eighth of the `voice/privacy` hundred that once cost 1% of a core on lamp-75c9; the cost on a lamp is to be measured.
 
 ### Leases
 

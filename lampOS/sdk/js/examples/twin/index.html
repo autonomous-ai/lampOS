@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lamp twin</title>
+<style>
+  :root { --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --soft: #6b6862; --line: #dcd8d0; --accent: #c8742c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161513; --panel: #201f1c; --ink: #ece9e3; --soft: #9a968e; --line: #34322e; --accent: #e3954f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; display: grid; grid-template-columns: 1fr 340px; height: 100vh; }
+  #view { position: relative; min-height: 320px; }
+  #view canvas { display: block; }
+  #status { position: absolute; left: 12px; bottom: 12px; right: 12px; font-size: 12px; color: var(--soft); background: var(--panel); padding: 4px 8px; border-radius: 6px; width: fit-content; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); padding: 16px; overflow: auto; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .sub { color: var(--soft); font-size: 12px; margin: 0 0 16px; }
+  .joint { border-top: 1px solid var(--line); padding: 10px 0; }
+  .joint header { display: flex; justify-content: space-between; align-items: baseline; }
+  .joint b { font-weight: 600; }
+  .joint .now { font-variant-numeric: tabular-nums; }
+  .joint .facts { color: var(--soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .moving { color: var(--accent); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+  details label { display: grid; grid-template-columns: 70px 1fr 60px; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
+  details input[type=number] { width: 100%; }
+  #ring { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--line); }
+  #log { font-size: 12px; color: var(--soft); margin-top: 12px; white-space: pre-wrap; }
+  @media (max-width: 720px) { body { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="view"><div id="status">loading the lamp…</div></div>
+<aside>
+  <h1>Lamp twin</h1>
+  <p class="sub"><span id="ring"></span><span id="lampline">waiting for body.state</span></p>
+  <div id="joints"></div>
+  <details>
+    <summary>Calibrate (zero and direction)</summary>
+    <p class="sub">The model's zero and sign are the CAD's until measured. Hold the lamp in a known pose, set each joint so the twin matches, then copy the values into lamp.model.json.</p>
+    <div id="cal"></div>
+    <button id="copy">Copy as JSON</button>
+  </details>
+  <div id="log"></div>
+</aside>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// The token the server printed, on every request (guard.js).
+const token = new URLSearchParams(location.search).get('t') ?? '';
+const withToken = (path) => `${path}?t=${encodeURIComponent(token)}`;
+const model = await (await fetch(withToken('/model.json'))).json();
+const view = document.getElementById('view');
+const status = document.getElementById('status');
+const log = (text) => {
+  const el = document.getElementById('log');
+  el.textContent = `${new Date().toLocaleTimeString()} ${text}\n${el.textContent}`.slice(0, 2000);
+};
+
+// Calibration: kept in this browser only, and starting from the model's.
+const saved = (() => { try { return JSON.parse(localStorage.getItem('twin-cal') || '{}'); } catch { return {}; } })();
+const cal = Object.fromEntries(model.joints.map((j) => [j.name, { zero_deg: saved[j.name]?.zero_deg ?? j.zero_deg, sign: saved[j.name]?.sign ?? j.sign }]));
+const keep = () => { try { localStorage.setItem('twin-cal', JSON.stringify(cal)); } catch { /* private window */ } };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+view.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 10);
+camera.position.set(0.45, 0.35, 0.55);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.17, 0);
+scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
+scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(1, 2, 1.5);
+scene.add(sun);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(0.5, 64), new THREE.MeshStandardMaterial({ color: 0x888478, roughness: 1 }));
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
+const resize = () => {
+  const { clientWidth: w, clientHeight: h } = view;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+};
+addEventListener('resize', resize);
+resize();
+
+// The light: a glow where the head's light is, coloured as the ring draws
+// each of its ten colours (lamp_msgs::Light::TINTS), its level 1 to 5.
+const TINTS = { yellow: [1, 0.8, 0], red: [1, 0, 0], green: [0, 1, 0.12], blue: [0, 0.22, 1], cyan: [0, 0.9, 1],
+  purple: [0.62, 0, 1], orange: [1, 0.34, 0], pink: [1, 0.22, 0.42], white: [1, 0.88, 0.72], warm: [1, 0.55, 0] };
+const glow = new THREE.PointLight(0xffb060, 0, 0.6);
+const glowRange = (size) => (glow.distance = size);
+const disc = new THREE.Mesh(new THREE.SphereGeometry(0.012, 24, 16), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+
+const bones = {};
+const rest = {};
+const gltf = await new GLTFLoader().loadAsync(withToken('/lamp.glb'));
+scene.add(gltf.scene);
+gltf.scene.traverse((node) => {
+  for (const joint of model.joints) if (node.name === joint.bone) { bones[joint.name] = node; rest[joint.name] = node.quaternion.clone(); }
+});
+// Frame the whole lamp, from a little above and to its side. Its skinned
+// parts' bounds are the bind pose's, so the box is the base's and the arm's
+// reach above it: about 0.4 m standing.
+const box = new THREE.Box3().setFromObject(gltf.scene);
+const reach = model.joints.reduce((sum, joint) => sum + Math.hypot(...joint.origin_m), 0);
+const size = Math.max(box.getSize(new THREE.Vector3()).length(), reach * 1.6);
+controls.target.set(0, box.min.y + reach * 0.55, 0);
+camera.position.copy(controls.target).add(new THREE.Vector3(0.9, 0.35, 1.1).normalize().multiplyScalar(size * 2.2));
+camera.near = size / 100;
+camera.far = size * 20;
+camera.updateProjectionMatrix();
+floor.scale.setScalar(size * 2);
+floor.position.y = box.min.y;
+glowRange(size);
+const head = bones[model.chain[model.chain.length - 1]];
+if (head) { head.add(glow); head.add(disc); disc.position.set(0, 0.05, 0); glow.position.copy(disc.position); }
+status.textContent = `the lamp: ${model.hardware}, ${model.chain.join(' → ')}; origins ${model.measured.origins}`;
+
+// Each joint turns its bone about its axis by sign × (deg − zero), after rest.
+const shown = Object.fromEntries(model.joints.map((j) => [j.name, 0]));
+const wanted = { ...shown };
+function pose() {
+  for (const joint of model.joints) {
+    const bone = bones[joint.name];
+    if (!bone) continue;
+    shown[joint.name] += (wanted[joint.name] - shown[joint.name]) * 0.35; // ease between 12.5 Hz frames
+    const { zero_deg, sign } = cal[joint.name];
+    const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...joint.axis), THREE.MathUtils.degToRad(sign * (shown[joint.name] - zero_deg)));
+    bone.quaternion.copy(rest[joint.name]).multiply(turn);
+  }
+}
+renderer.setAnimationLoop(() => { pose(); controls.update(); renderer.render(scene, camera); });
+
+// The panel: one row per joint, from the base out.
+const rows = {};
+const panel = document.getElementById('joints');
+for (const name of model.chain) {
+  const joint = model.joints.find((j) => j.name === name);
+  const row = document.createElement('div');
+  row.className = 'joint';
+  row.innerHTML = `<header><b>${name}</b><span class="now">–</span></header>
+    <input type="range" min="-180" max="180" step="0.5" value="0" aria-label="${name}">
+    <div class="facts">servo ${joint.servo} · ${joint.bus}</div>`;
+  const slider = row.querySelector('input');
+  let dragging = false;
+  let sentAt = 0;
+  slider.addEventListener('pointerdown', () => (dragging = true));
+  slider.addEventListener('pointerup', () => (dragging = false));
+  slider.addEventListener('input', () => {
+    wanted[name] = Number(slider.value);
+    const now = performance.now();
+    if (now - sentAt < 40) return; // 25 a second at most
+    sentAt = now;
+    send({ type: 'drag', joint: name, deg: Number(slider.value) });
+  });
+  slider.addEventListener('change', () => send({ type: 'drag', joint: name, deg: Number(slider.value) }));
+  rows[name] = { row, slider, now: row.querySelector('.now'), facts: row.querySelector('.facts'), dragging: () => dragging };
+  panel.append(row);
+}
+
+// Calibration rows.
+const calPanel = document.getElementById('cal');
+for (const name of model.chain) {
+  const label = document.createElement('label');
+  label.innerHTML = `<span>${name}</span><input type="number" step="0.5" value="${cal[name].zero_deg}" aria-label="${name} zero"><button>${cal[name].sign > 0 ? '+1' : '−1'}</button>`;
+  const [zero, flip] = [label.querySelector('input'), label.querySelector('button')];
+  zero.addEventListener('input', () => { cal[name].zero_deg = Number(zero.value) || 0; keep(); });
+  flip.addEventListener('click', () => { cal[name].sign *= -1; flip.textContent = cal[name].sign > 0 ? '+1' : '−1'; keep(); });
+  calPanel.append(label);
+}
+document.getElementById('copy').addEventListener('click', async () => {
+  const text = JSON.stringify(cal, null, 2);
+  try { await navigator.clipboard.writeText(text); log('calibration copied'); } catch { log(text); }
+});
+
+// The live link.
+let ws;
+const send = (message) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
+function connect() {
+  ws = new WebSocket(`ws://${location.host}${withToken('/live')}`);
+  ws.onopen = () => log('connected');
+  ws.onclose = () => { log('disconnected; retrying'); setTimeout(connect, 1000); };
+  ws.onmessage = (message) => {
+    const data = JSON.parse(message.data);
+    if (data.type === 'said') return log(data.text);
+    if (data.type !== 'state') return;
+    const { joints = {}, lamp = {} } = data.state;
+    for (const [name, joint] of Object.entries(joints)) {
+      const row = rows[name];
+      if (!row) continue;
+      if (!row.dragging()) { wanted[name] = joint.deg; row.slider.value = joint.deg; }
+      row.now.textContent = `${joint.deg.toFixed(1)}°`;
+      row.now.classList.toggle('moving', joint.moving);
+      const temp = joint.temp_c === undefined ? '' : ` · ${joint.temp_c} °C`;
+      const goal = joint.goal_deg === undefined ? '' : ` · goal ${joint.goal_deg.toFixed(1)}°`;
+      const load = joint.load === undefined ? '' : ` · load ${Math.round(joint.load * 100)}%`;
+      row.facts.textContent = `${joint.counts} counts${goal}${load}${temp}`;
+    }
+    const light = lamp.light ?? {};
+    const on = light.on === true && TINTS[light.colour];
+    const share = on ? Math.min(5, Math.max(1, light.level ?? 3)) / 5 : 0;
+    const tint = new THREE.Color(...(on ? TINTS[light.colour] : [0.13, 0.13, 0.13]));
+    disc.material.color.copy(on ? tint.clone().multiplyScalar(0.4 + 0.6 * share) : tint);
+    glow.color.copy(tint);
+    glow.intensity = share * 2;
+    document.getElementById('ring').style.background = `#${disc.material.color.getHexString()}`;
+    document.getElementById('lampline').textContent = `light ${on ? `${light.colour}, ${light.level} of 5` : 'off'}${lamp.talking ? ' · talking' : ''}${lamp.private ? ' · private' : ''}`;
+  };
+}
+connect();
+</script>
+</body>
+</html>
