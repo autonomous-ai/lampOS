@@ -45,7 +45,7 @@ pub fn list(adapter: &Adapter, data: &Value) -> Result<Option<Value>, String> {
         None | Some(Value::Null) => 0,
         Some(value) => value.as_u64().ok_or("after_id must be a whole number")?,
     };
-    let page = answered(adapter.call("list_reminders", &json!({"after_id": after_id})))?;
+    let page = answered(adapter.call_plain("list_reminders", &json!({"after_id": after_id})))?;
     Ok(Some(json!({
         "items": page["items"],
         "next_after_id": page["next_after_id"],

@@ -209,6 +209,25 @@ fn each_kept_state_reads_with_its_items() {
                 ],
                 "{day}"
             );
+            // Each says when it was set, from the creation time the store
+            // has always kept: the fixture's, 14 Oct at 08:00 UTC.
+            let set = engine
+                .answer(
+                    Request::ListSet {
+                        after_id: 0,
+                        limit: 8,
+                        pending_only: false,
+                    },
+                    &at,
+                )
+                .unwrap();
+            for item in set["items"].as_array().unwrap() {
+                assert_eq!(
+                    (item["set_local"].as_str(), item["set_day"].as_str()),
+                    (Some("2026-10-14T08:00:00+00:00[Etc/UTC]"), Some("today")),
+                    "{day}: {item}"
+                );
+            }
             let snoozed = engine.answer(Request::Get { id: 1 }, &at).unwrap();
             let item = &snoozed["item"];
             assert_eq!(

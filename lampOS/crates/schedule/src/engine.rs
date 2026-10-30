@@ -740,6 +740,17 @@ impl<P: Persistence> Engine<P> {
         })
     }
 
+    /// [`Self::item_view`] with when it was set ([`Request::ListSet`]), in
+    /// the lamp's zone (`time::set_at`): null when that can't be said,
+    /// which the model is told as unknown.
+    fn item_view_set(&self, item: &Item, now: &ClockSample) -> Value {
+        let mut view = self.item_view(item, now);
+        let set = time::set_at(item.created_unix_ms, now, &self.zone).ok();
+        view["set_local"] = json!(set.as_ref().map(|(local, _)| local));
+        view["set_day"] = json!(set.as_ref().map(|(_, day)| day));
+        view
+    }
+
     fn reply(&self, body: Value) -> Value {
         with_identity(body, &self.state.store_id, self.state.revision)
     }
@@ -803,6 +814,22 @@ impl<P: Persistence> Engine<P> {
     }
 
     pub fn answer(&mut self, request: Request, now: &ClockSample) -> Result<Value, Error> {
+        // `ListSet` is `List` whose items also say when each was set.
+        let (request, with_set) = match request {
+            Request::ListSet {
+                after_id,
+                limit,
+                pending_only,
+            } => (
+                Request::List {
+                    after_id,
+                    limit,
+                    pending_only,
+                },
+                true,
+            ),
+            request => (request, false),
+        };
         self.follow_zone();
         self.tick(now)?;
         match &request {
@@ -831,7 +858,11 @@ impl<P: Persistence> Engine<P> {
                     .collect();
                 let mut views = Vec::new();
                 for item in available.iter().take(usize::from(*limit)) {
-                    views.push(self.item_view(item, now));
+                    views.push(if with_set {
+                        self.item_view_set(item, now)
+                    } else {
+                        self.item_view(item, now)
+                    });
                     // Reserve the largest cursor representation. Text is never
                     // truncated just to fit a page, including escaped Unicode.
                     let probe = self.reply(json!({"items":views,"next_after_id":u64::MAX}));

@@ -418,7 +418,11 @@ are rejected. Read operations need no guard:
 {"op":"status"}
 {"op":"get","id":1}
 {"op":"list","after_id":0,"limit":8,"pending_only":false}
+{"op":"list_set","after_id":0,"limit":8,"pending_only":false}
 ```
+
+`list_set` is `list` whose items also say when each was set (`set_local`,
+`set_day`; see the model tools below).
 
 Each line above represents a separate connection. `status` returns the current
 store identity/revision, item and pending counts, waiting-for-clock count,
@@ -605,6 +609,46 @@ Each listed item also says its `kind`, and `cancel_reminder` says to cancel
 only an item of the kind asked for, so "cancel my timer" with a reminder also
 due cancels only the timer. The list stays oldest first. Test:
 `cancel_my_timer_with_a_reminder_also_due_cancels_only_the_timer`.
+
+**Questions about a reminder are answered from the list (the person's call,
+30 Oct).** "What did I ask you to remind me about?", "when is my reminder?"
+and "when did I set that reminder?" are the reminder list's, not memory's:
+reminders are not memories (memory.md's decision record), and a fired
+reminder's turn is kept out of the journal on purpose. The miss was the
+model calling `recall`, or nothing, and saying it did not remember. So
+`list_reminders`' description now ends (`LIST_ASKED`, after the earlier
+text, kept as `LIST_BEFORE`): call this, not recall, for any question about
+their reminders or timers, what is set, when one is due or when they set
+it; never say you do not remember a reminder before calling this; and
+never list reminders unasked (rule 8). Both routes declare the same
+catalog, so the Live route and the second route are told the same.
+
+Each listed item now says when it was set: `set_day` (`today`,
+`yesterday`, or its `YYYY-MM-DD`) and `set_clock` (its local `HH:MM`), so
+the lamp can say "you set it yesterday at nine". They come from the
+`created_unix_ms` every stored item has always kept (a `Set` needs a trusted
+wall clock, so it is a real time), said in the lamp's zone as it is when
+listed (`time::set_at`); the store's format is unchanged, so old stores
+load with their set times. They come from a request of their own,
+`list_set` (`Request::ListSet`, the same arguments as `list`), whose items
+add `set_local` (RFC 9557) and `set_day`; with now's wall clock untrusted,
+the day is its date, never `today` on a guess. `list` and `get` are exactly
+as they were, because the delivery ledger reads their items strictly (an
+older voice would refuse a field it doesn't know). An older Schedule
+service refuses `list_set` as `bad_request`; the adapter then asks the same
+`list` once (a read, nothing to repeat), and every other refusal is not
+asked again. Only Voice's `list_reminders` asks `list_set`: the app's
+`schedule.list` (`crates/cloud`, `Adapter::call_plain`) asks plain `list`
+and its items carry no set time, so its contract is unchanged. `set_day` and `set_clock` are null, told as "I don't know
+when", when they can't be said: a zone this build can't name, or an older
+Schedule service. Tests: `a_list_set_item_says_when_it_was_set_in_the_lamps_zone`
+and `kept::each_kept_state_reads_with_its_items` (`crates/schedule/tests/it`),
+`each_listed_item_says_when_it_was_set_and_a_day_on_it_is_yesterday`,
+`an_item_without_a_readable_set_time_lists_with_it_unknown`,
+`an_older_schedule_is_listed_without_set_times` and
+`list_reminders_is_described_for_questions_about_reminders`
+(`crates/actions/tests/it/schedule.rs`). The wording is measured with
+`lamp-voice probe-reminders` ([second-voice.md](second-voice.md)).
 
 The declarations use Gemini's small `parameters` schema subset, omitting
 `additionalProperties`, `maxLength`, and regex patterns. Runtime validation
