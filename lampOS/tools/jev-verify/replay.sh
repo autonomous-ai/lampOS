@@ -84,8 +84,10 @@ standing() { local s; s=$($L "sudo -n journalctl -u lamp-body --since -35s --no-
 BR=/run/lampos-bus SU=
 room() { $L "${SU}tail -n +2 $BR/room/state/latest 2>/dev/null" | grep -oE 'quiet|busy|unknown' | head -1; }
 # room_at: "STATE AT_MS", the room and its header's at_unix_ms (when the voice last said it), in one read.
-room_at() { local o; o=$($L "${SU}cat $BR/room/state/latest 2>/dev/null")
-  echo "$(printf '%s\n' "$o" | tail -n +2 | grep -oE 'quiet|busy|unknown' | head -1) $(printf '%s\n' "$o" | head -1 | grep -oE '"at_unix_ms":[0-9]+' | grep -oE '[0-9]+$')"; }
+room_at() { local o st at; o=$($L "${SU}cat $BR/room/state/latest 2>/dev/null")
+  st=$(printf '%s\n' "$o" | tail -n +2 | grep -oE 'quiet|busy|unknown' | head -1)
+  at=$(printf '%s\n' "$o" | head -1 | grep -oE '"at_unix_ms":[0-9]+' | grep -oE '[0-9]+$')
+  echo "${st:-none} ${at:-none}"; }   # both always there, so `read rr ra` never shifts a field
 # sig: what the scores belong to: units and their MainPIDs, lamp-policy's cmdline, the build, the mute.
 # Taken after the preflight; any change at a pass start aborts the run.
 sig() { $L "systemctl is-active lamp-voice lamp-policy lamp-body lamp-eyes; systemctl show -p MainPID --value lamp-voice lamp-policy; sudo -n tr '\\0' ' ' < /proc/\$(systemctl show lamp-policy -p MainPID --value)/cmdline; echo; sudo -n grep -o '\"build\":{[^}]*}' /var/lib/lampos-update/state.json; readlink /opt/lampOS/voice/current /opt/lampOS/policy/current; true" | tr '\n' ' '

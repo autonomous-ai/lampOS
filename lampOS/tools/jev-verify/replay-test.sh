@@ -30,6 +30,7 @@ case $a in
   *"for f in room/state voice/state"*) case $f in bus) echo plain ;; sudobus) echo sudo; echo sudo ;; *) echo plain; echo plain ;; esac ;;
   *"room/state/latest"*) # the header, then busy while the colleagues' talk is among the last 3 clips played
     echo '{"seq":7,"at_us":1,"at_unix_ms":1761700000000,"enc":"json"}'
+    [ "$f" = roomempty ] && case $a in *"cat /run/lampos-bus/room"*) exit 0 ;; esac   # a header, no body
     [ "$f" != roomnotbusy ] && tail -3 "$DRY_PLAYLOG" 2>/dev/null | grep -q t02 && echo '"busy"' || echo '"quiet"' ;;
   *"heard [1-9]"*) echo 0 ;;
   *"a face in"*) case $f in face) echo 2 ;; noeyes) ;; *) echo 0 ;; esac ;;
@@ -75,6 +76,10 @@ for pf in q02:f01 q04:f02 q06:f03 b04:f04 b02:f05; do
   { echo "FAIL a busy line's room_read is not busy"; fails=$((fails+1)); }
 [ "$(awk -F'\t' 'NR>1 && $8 != "1761700000000"' "$T/r/plays.tsv" | wc -l | tr -d ' ')" = 0 ] ||
   { echo "FAIL a play's room_at_ms is not the header's at_unix_ms"; fails=$((fails+1)); }
+# A header with an empty body: room_read none, room_at_ms still the header's.
+o=$(export FAIL=roomempty; PASSES=1 r run "$T/re")
+[ "$(awk -F'\t' 'NR>1 && !($7 == "none" && $8 == "1761700000000")' "$T/re/plays.tsv" | wc -l | tr -d ' ')" = 0 ] &&
+  [ "$(wc -l < "$T/re/plays.tsv")" -gt 1 ] || { echo "FAIL roomempty: room_read is not none, or room_at_ms not the header's"; fails=$((fails+1)); }
 o=$(export FAIL=; PASSES=1 DEADLINE=1 r run "$T/dl"); want deadline '^ABORT the deadline has passed already; nothing ran' "$o"
 grep -q 'aborted, nothing ran' "$T/stub.log" || { echo "FAIL deadline abort loans line"; fails=$((fails+1)); }
 o=$(export FAIL=sudobus; r preflight "$T/sb"); want sudo-bus '^ok room/state=quiet from /run/lampos-bus/room/state/latest \(with sudo\)' "$o"; want sudo-bus-done 'preflight done' "$o"
