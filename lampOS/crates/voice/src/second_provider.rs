@@ -526,6 +526,11 @@ pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON"
 /// [`worker::Heeding::keeping_the_name_in_its_line`]).
 pub const NAME_STAYS_ENVIRONMENT: &str = "LAMP_NAME_STAYS_IN_ITS_LINE";
 
+/// Whether the conversation's windows are measured to when a line began, not
+/// to its judging after it ended (`on`, and nothing else;
+/// [`worker::Heeding::measuring_windows_from_start`], #4594).
+pub const WINDOW_FROM_START_ENVIRONMENT: &str = "LAMP_WINDOW_FROM_START";
+
 /// Where the worker reads whether the lamp's name at a line's start
 /// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
 /// start, not its soft start's lead (`on`, and nothing else;
