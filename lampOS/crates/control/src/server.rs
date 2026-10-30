@@ -171,6 +171,9 @@ pub struct Shared {
     /// The manage helper's socket, root's, which installs, lists and
     /// removes pushed skills (`crate::push`).
     manage: Mutex<Option<PathBuf>>,
+    /// Whether computers beyond the lamp's own network may connect
+    /// (`--remote on`): off unless given.
+    remote: std::sync::atomic::AtomicBool,
     /// What the helper is told of pairings, one at a time in the door's
     /// order, by one thread started at the first (Reviewer-two on #3504: a
     /// late wider grant change must never be served after a newer narrower
@@ -192,10 +195,17 @@ impl Shared {
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
             changes: Mutex::new(None),
+            remote: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
     /// The manage helper at `socket` for pushed skills.
+    /// Lets computers beyond the lamp's own network connect too (`--remote
+    /// on`), never to the camera or the microphone.
+    pub fn set_remote(&self, remote: bool) {
+        self.remote.store(remote, Ordering::Relaxed);
+    }
+
     pub fn set_manage_socket(&self, socket: PathBuf) {
         *self.manage.lock().expect("manage") = Some(socket);
     }
@@ -308,6 +318,7 @@ impl Shared {
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
                 changes: Mutex::new(None),
+                remote: std::sync::atomic::AtomicBool::new(false),
             }
         })
     }
@@ -552,9 +563,10 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
                 continue;
             }
         };
-        // Only the lamp's own network: anyone else is closed before TLS,
-        // and said once in the journal.
-        if !is_local(peer.ip()) {
+        // Only the lamp's own network, unless `--remote on`: anyone else is
+        // closed before TLS, and said once in the journal.
+        let remote = !is_local(peer.ip());
+        if remote && !shared.remote.load(Ordering::Relaxed) {
             eprintln!(
                 "lamp-control: refused a connection from {}: not on the lamp's own network",
                 peer.ip()
@@ -583,7 +595,7 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared).await;
+                connection(socket, shared, remote).await;
             }
         });
     }
@@ -604,8 +616,11 @@ fn only_v1(request: &Request, response: Response) -> Result<Response, ErrorRespo
     }
 }
 
-async fn connection<S>(mut socket: tokio_tungstenite::WebSocketStream<S>, shared: Arc<Shared>)
-where
+async fn connection<S>(
+    mut socket: tokio_tungstenite::WebSocketStream<S>,
+    shared: Arc<Shared>,
+    remote: bool,
+) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
@@ -613,6 +628,9 @@ where
     // Weak, so a revoke that drops the connection's outbox still closes it.
     let answers = outbox.downgrade();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
+    if remote {
+        session.set_remote();
+    }
     shared.open.lock().expect("open").insert(
         id,
         Open {
@@ -699,6 +717,16 @@ where
                 }
                 event = inbox.recv() => {
                     let Some(event) = event else { break };
+                    // A picture or a sound started from the lamp's own
+                    // network never goes to the same computer's connection
+                    // from beyond it.
+                    if remote
+                        && event["ev"]
+                            .as_str()
+                            .is_some_and(|ev| ev.starts_with("camera.") || ev.starts_with("microphone."))
+                    {
+                        continue;
+                    }
                     if socket.send(Message::text(event.to_string())).await.is_err() {
                         break;
                     }
