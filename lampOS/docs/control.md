@@ -178,9 +178,10 @@ so it never outlives that lease, and only the holder's connection is read.
 - **Its end:** the body answers each look once, `there` when the head and
   base are within 6 counts of goals that have stopped moving for 10 steps
   (0.2 s), or `cut_short`. The door makes that the computer's `done`.
-- **On a product lamp** no unit passes `--lease-socket` yet, so `look` is
-  refused there as "the body's lease socket is not on here" until both units
-  do (lamp-control's after #3876, lamp-body's with it).
+- **On a product lamp** the lamp-body unit passes `--lease-socket`
+  (`/run/lampos-body/lease.sock`, #4568). `look` still needs lamp-control's
+  own unit to pass it as well (#4526); until then a product lamp refuses it
+  as "the body's lease socket is not on here".
 
 **Colours and patterns:** the ten of `lamp_msgs::Light::COLOURS` (`yellow`,
 `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`),
