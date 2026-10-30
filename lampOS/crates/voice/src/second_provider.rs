@@ -930,6 +930,9 @@ struct Shared {
     /// the lamp, round 1's words wait for its end, and a decline says
     /// nothing (#3945).
     declines_silent: bool,
+    /// [`Engine::holding_round_one_when`]: with `declines_silent`, whether a
+    /// request's round 1 words wait; none, every such line's do.
+    round_one_held: Option<Busy>,
     /// [`Engine::speaking_tags`]: each piece of a reply is cut into what
     /// the voice is given and the lamp's words; `Some(true)` when the voice
     /// reads tags.
@@ -2431,6 +2434,7 @@ impl Engine {
                 #[cfg(test)]
                 named_ask_journal: None,
                 busy: None,
+                round_one_held: None,
                 named_to_a_face: None,
                 policy_now: None,
                 call_note: None,
@@ -3043,8 +3047,9 @@ impl Engine {
 
     /// `LAMP_DECLINE_SILENT=on` ([`DECLINE_SILENT_ENVIRONMENT`], #3945): on a
     /// spoken line told it may not be for the lamp (`worker::DECLINE_NOTE`
-    /// or `worker::CONVERSATION_ALONE`), round 1's words wait for the
-    /// round's end, when its calls are known: beside a `not_for_me` call,
+    /// or `worker::CONVERSATION_ALONE`) and judged where talk not for the
+    /// lamp may be ([`Self::holding_round_one_when`]), round 1's words wait
+    /// for the round's end, when its calls are known: beside a `not_for_me` call,
     /// or written as "not for me" ([`crate::not_speech::opens_not_for_me`]),
     /// nothing of them is said; else they are said as one piece. The worker
     /// is told the decline ([`Did::Declined`]). A line said by name, a
@@ -3053,6 +3058,20 @@ impl Engine {
     pub fn declining_silently(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.declines_silent = on;
+        }
+        self
+    }
+
+    /// With [`Self::declining_silently`], whether a request's round 1 words
+    /// wait at all: only where talk not for the lamp may be, a busy room or
+    /// a second voice or face (`worker::Heeding::holds_round_one`; the first
+    /// builder's call on #3945: in a quiet room with one person every line
+    /// is for the lamp, and the wait was latency on ordinary talk). Without
+    /// it every line that may be declined waits, as before. Before any turn
+    /// only.
+    pub fn holding_round_one_when(mut self, held: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.round_one_held = Some(held);
         }
         self
     }
@@ -8309,13 +8328,26 @@ async fn answer(
     // `LAMP_DECLINE_SILENT`: on a spoken line told it may not be for the
     // lamp, round 1's words are held to its end, when its calls say whether
     // it is declined (#3945: words streamed before a `not_for_me` call were
-    // said). A line told it was said by name holds nothing.
-    let mut decline_held = (shared.declines_silent
+    // said). A line told it was said by name holds nothing, nor one in a
+    // quiet room with one voice and at most one face, where every line is
+    // for the lamp (the first builder's call on #3945): its words stream
+    // as without the switch.
+    let may_be_declined = shared.declines_silent
         && heard
         && notes
             .iter()
-            .any(|note| note == worker::DECLINE_NOTE || note == worker::CONVERSATION_ALONE))
-    .then(String::new);
+            .any(|note| note == worker::DECLINE_NOTE || note == worker::CONVERSATION_ALONE);
+    let round_one_held = may_be_declined
+        && shared
+            .round_one_held
+            .as_ref()
+            .is_none_or(|held| held(request));
+    if may_be_declined && !round_one_held {
+        eprintln!(
+            "lamp-voice second: request {request}: a quiet room, one voice, no second face: its words are not held (LAMP_DECLINE_SILENT)"
+        );
+    }
+    let mut decline_held = round_one_held.then(String::new);
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
