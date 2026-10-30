@@ -496,6 +496,11 @@ was, to the resting face (`ring_night::Fade`, `over`).
   whose light was never switched off keeps it.
 - **Not drawn:** over the unplug picture or the shutdown's warning, which
   come first.
+- **Said in the journal** (`lamp-voice ring: night face: …`), once per change
+  and never per frame: `shown N ms after asleep` (N counted from when the face's
+  sleep began with the light off), `held, the light is on` (once per sleep)
+  and `gone (woke)` or `gone (light on)` as it starts fading out
+  (`ring_night::Said`).
 
 Tests: `ring_night`'s
 `only_a_fresh_enabled_expression_saying_asleep_is_asleep`,
