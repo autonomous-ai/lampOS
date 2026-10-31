@@ -56,8 +56,9 @@ pub struct TaskProgress {
     /// The task's number in the tasks part's store: what `get_task` and
     /// `get_progress` take.
     pub task: u64,
-    /// Who has the work, as the task's target names it: `claude` or
-    /// `codex`.
+    /// Who has the work, as the task's target names it on the bus
+    /// (`lamp_tasks`' `EngineKind::bus_name`): `claude`, `codex`, `opencode`,
+    /// `devin`, `devin_cloud` or `hermes`.
     pub engine: String,
     pub state: AgentState,
     /// Seconds since the task was handed over, if that was in this boot.
