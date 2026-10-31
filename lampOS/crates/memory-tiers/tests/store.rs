@@ -612,3 +612,38 @@ fn owner_identity_accepts_the_bench_contract_limit() {
     assert!(Store::in_memory(&"x".repeat(128)).is_ok());
     assert!(Store::in_memory(&"x".repeat(129)).is_err());
 }
+
+#[test]
+fn weekly_window_uses_calendar_days_across_both_dst_transitions() {
+    fn ms(s: &str) -> i64 {
+        s.parse::<jiff::Timestamp>().unwrap().as_millisecond()
+    }
+    for (now, before, inside) in [
+        (
+            "2026-03-15T04:00:00Z",
+            "2026-03-08T04:30:00Z",
+            "2026-03-08T05:15:00Z",
+        ),
+        (
+            "2026-11-08T05:00:00Z",
+            "2026-11-01T03:30:00Z",
+            "2026-11-01T04:30:00Z",
+        ),
+    ] {
+        let mut s = store();
+        s.set_time_zone("America/New_York").unwrap();
+        let mut old = incoming("An observation before the local week.");
+        old.at_ms = ms(before);
+        s.ingest(old).unwrap();
+        let mut recent = incoming("An observation inside the local week.");
+        recent.at_ms = ms(inside);
+        let id = s.ingest(recent).unwrap().unwrap();
+        let input = s.prepare_sleep(ms(now), PassKind::Weekly).unwrap().unwrap();
+        assert_eq!(
+            input.records().iter().map(|r| r.id).collect::<Vec<_>>(),
+            vec![id]
+        );
+        let applied = s.apply_sleep(&input, EMPTY).unwrap();
+        assert!(!applied.pending);
+    }
+}

@@ -75,7 +75,9 @@ network request inside Store:
    persisted validity and expiry are absolute milliseconds.
 2. `prepare_sleep` takes at most 128 eligible owner records and at most 64 KiB
    of encoded JSON, with bounded previous facts, owner-model lines and related
-   episodes. Weekly batches advance their own cursor and freeze an upper id
+   episodes. Weekly lookback subtracts seven calendar days in the named zone
+   using the shared bundled Jiff zone data; it is not a fixed 168-hour duration.
+   Jiff's compatible resolution handles an ambiguous or skipped local time. Weekly batches advance their own cursor and freeze an upper id
    for that local day's pass. The database is released before any model call.
 3. `ModelClient::propose` sends that input using its configured transport.
    Nightly and weekly use the same client. Tests inject fixture responses;
