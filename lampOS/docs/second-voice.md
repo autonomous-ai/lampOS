@@ -817,8 +817,14 @@ order is kept. A written turn is the same from the chat on.
     line ("Warmer.", "Done." when they differ) as soon as the calls are
     answered.
   - **A round whose one call set a timer, committed,** says "Timer set. It
-    rings at HH:MM." with the schedule's own `clock`, the local time it
-    rings, so the time said is the time set (`timer_line`).
+    rings at 7:52 pm." with the schedule's own `clock`, the local time it
+    rings, on a 12-hour clock as the lamp's other words are, so the time
+    said is the time set (`timer_line`, `spoken_clock`).
+  - **In English only:** those words are English, so with an owner's
+    language chosen (`language::at_start()`: Vietnamese, Japanese, Chinese
+    or Korean) such turns wait for the model's words as without the switch,
+    and the journal says so at start (`worker::says_at_once`, Thirteen's P2
+    on #4700).
   - **Then the next round still runs,** told the lamp said it
     (`short_done_note`), for anything else asked ("brighter, and is it
     sunny?" gets the weather after "Brighter."). It is no longer waited for:
