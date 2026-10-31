@@ -40,7 +40,8 @@ struct Went {
     asked: usize,
     /// The calls run.
     ran: usize,
-    /// Whether a round was told the change is answered (`short_done_note`).
+    /// Whether a round was told the change is answered (`short_done_note`,
+    /// or `said_at_once_note` once it was said at once).
     noted: bool,
 }
 
@@ -64,6 +65,17 @@ fn turn_with(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
+    turn_noted(short, at_once, heard, first, later).0
+}
+
+/// [`turn_with`], and every note the rounds were asked with.
+fn turn_noted(
+    short: bool,
+    at_once: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> (Went, Vec<String>) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
@@ -100,19 +112,28 @@ fn turn_with(
         .filter(|label| label.starts_with("said:"))
         .collect();
     let asked = script.asked.lock().unwrap();
-    let noted = asked.iter().flatten().any(|message| {
-        message
-            .content
-            .as_ref()
-            .and_then(|content| content.as_str())
-            .is_some_and(|content| content.contains("the lamp itself says"))
+    let notes: Vec<String> = asked
+        .iter()
+        .flatten()
+        .filter_map(|message| {
+            message
+                .content
+                .as_ref()
+                .and_then(|content| content.as_str())
+        })
+        .filter(|content| content.starts_with("(For you to know"))
+        .map(str::to_owned)
+        .collect();
+    let noted = notes.iter().any(|note| {
+        note.contains("the lamp itself says") || note.contains("the lamp itself already said")
     });
-    Went {
+    let went = Went {
         said,
         asked: asked.len(),
         ran: ran.lock().unwrap().len(),
         noted,
-    }
+    };
+    (went, notes)
 }
 
 /// "Make it brighter." with round 2's words as today's.
@@ -735,6 +756,18 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
             "Remind me in one and a half hours to call.",
             reminder("call"),
         ),
+        // The name however it was heard, after a greeting (candidate 9276
+        // on lamp-4ace: "Lamp" as "Lynn", the first builder on #4710, 21:4x).
+        ("Hey Lynn, it's too bright.", calls(&["light_dimmer"])),
+        (
+            "Hey Lynn, make it warmer. Thanks!",
+            calls(&["light_warmer"]),
+        ),
+        (
+            "Okay Lamb, set a timer for five minutes.",
+            calls(&["set_timer"]),
+        ),
+        ("Hello, make it warmer.", calls(&["light_warmer"])),
     ] {
         assert!(!asks_more(one, &called), "{one}");
     }
@@ -749,6 +782,9 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
         "Make it warmer, how warm is it outside?",
         "What's the weather and make it warmer.",
         "Set a timer for two minutes and a half and tell me a joke.",
+        "Hey Lynn, what's the weather?",
+        "Hey Lynn, make it warmer, what's the weather?",
+        "Hey there Lynn, make it warmer.",
     ] {
         assert!(asks_more(more, &calls(&["light_warmer"])), "{more}");
     }
@@ -764,4 +800,79 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
             "{more}"
         );
     }
+}
+
+/// Candidate 9276 on lamp-4ace (the first builder on #4710, 21:4x): each of
+/// three lights at its limit said its "already" at once, then round 2 said it
+/// again ("Already as warm as I go — that's my limit."). With "Lamp" heard
+/// as "Lynn", the greeting is the name, so a single ask ends with the
+/// at-once line; and a round still asked after one is told the line was said
+/// aloud, never only that the lamp says it.
+#[test]
+fn an_already_said_at_once_is_said_once() {
+    let again = || {
+        vec![vec![
+            text("Already as cool as I go — that's my limit."),
+            Ok(ChatEvent::Done),
+        ]]
+    };
+    let line = "I'm already as cool as I go.";
+    for heard in [
+        "Hey Lynn, make it cooler. Thanks!",
+        "Hey Lynn, it's too warm.",
+        "Okay Lamb, make it cooler.",
+    ] {
+        assert_eq!(
+            turn_with(true, true, heard, calling(&["light_cooler"]), again()),
+            Went {
+                said: said(&[line]),
+                asked: 1,
+                ran: 1,
+                noted: false
+            },
+            "{heard}"
+        );
+    }
+    // "It's freezing in here" asks no change, so the round is asked, told
+    // the line was said.
+    let (went, notes) = turn_noted(
+        true,
+        true,
+        "Make it cooler, it's freezing in here.",
+        calling(&["light_cooler"]),
+        again(),
+    );
+    assert_eq!(went.asked, 2, "{went:?}");
+    assert_eq!(
+        went.said.first().map(String::as_str),
+        Some("said:I'm already as cool as I go.")
+    );
+    assert!(
+        notes
+            .iter()
+            .any(|note| note.contains(&format!("already said aloud \"{line}\""))),
+        "{notes:?}"
+    );
+    assert!(
+        !notes
+            .iter()
+            .any(|note| note.contains("the lamp itself says")),
+        "{notes:?}"
+    );
+    // Without the answer at once the line still waits for the round, which
+    // is told the lamp says it.
+    let (went, notes) = turn_noted(
+        true,
+        false,
+        "Make it cooler, it's freezing in here.",
+        calling(&["light_cooler"]),
+        again(),
+    );
+    assert_eq!(went.asked, 2, "{went:?}");
+    assert!(
+        notes
+            .iter()
+            .any(|note| note.contains("the lamp itself says")),
+        "{notes:?}"
+    );
 }

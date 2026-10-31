@@ -826,11 +826,13 @@ order is kept. A written turn is the same from the chat on.
     you at 7:52 pm."
   - **With one ask, the turn ends there.** The next round is not asked, so
     it can't say the change again in other words. It still runs, told the
-    lamp said it (`short_done_note`), when the person's words plainly hold
-    more (`asks_more`): cut into clauses at a sentence's end (not a point
-    between digits), a comma or semicolon, or "and", "also", "then" or
-    "plus" (not an "and" before "a half", "half" or "a quarter", "two and a
-    half minutes" as speech to text writes it), with a clause of only thanks, a greeting, the name or "okay"
+    line was already said aloud and heard (`said_at_once_note`), when the
+    person's words plainly hold more (`asks_more`): cut into clauses at a
+    sentence's end (not a point between digits), a comma or semicolon, or
+    "and", "also", "then" or "plus" (not an "and" before "a half", "half"
+    or "a quarter", "two and a half minutes" as speech to text writes it),
+    with a clause of only thanks, a greeting, the name or "okay", or of a
+    greeting and one word (the name however it was heard, "Hey Lynn,"),
     left out and a call's own words (a reminder's `text`) taken as its ask,
     it is more when a clause holds no word of a light, the volume or a timer,
     when a clause after the first is a question, or when there are more
@@ -854,7 +856,8 @@ order is kept. A written turn is the same from the chat on.
     on #4700).
   - **Never** for a keep or a forget beside the change (either can come back
     held for the person's yes, Reviewer-three's P2 on #4635), a call
-    refused, failed, held or unchanged, two timers, a reminder at a day and
+    refused, failed or held, calls that differ with one of them unchanged,
+    two timers, a reminder at a day and
     time, or a round with words of its own. Those turns go on as without the
     switch.
 
@@ -890,6 +893,14 @@ order is kept. A written turn is the same from the chat on.
   lamp-actions gives such a call its own words ("I'm already as warm as I
   go.", `lamp_actions::already_say`), and they're said at once too. The
   model's own words over it still ask round 2, which says nothing changed.
+  On candidate 9276 (the first builder on #4710, 21:4x) all three such
+  lines were said twice, the "already" at once and then again by round 2
+  ("Already as warm as I go — that's my limit."). With "Lamp" heard as
+  "Lynn", "Hey Lynn," was a clause of its own, so round 2 ran, and told
+  only that the lamp says the line it said it again. So a greeting and one
+  word is now the name, and a round asked after an answer at once is told
+  the line was already said aloud (`said_at_once_note`), in the words
+  `said_once_note` gives the model's own.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
