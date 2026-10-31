@@ -1167,5 +1167,10 @@ stop and the reboot for the second.
 
 ## Not shown
 
-No lamp, phone, router or hotspot was used for this page. The V1 behaviour
-above is read from source and V1's own documentation, not measured.
+The V1 behaviour above is read from source and V1's own documentation, not
+measured. V2's own setup has run on lamps since this page was first
+written (15 Oct): lamp-06c1 with its person and a phone (16 Oct, "First
+run" above), and the ten customer lamps, each set up through the app on
+Wi-Fi by the hardware team before it was reset and packed (the lead,
+#1711, 30 Oct). What a section still lacks on a lamp, it says itself ("Not
+shown on a lamp: …").
