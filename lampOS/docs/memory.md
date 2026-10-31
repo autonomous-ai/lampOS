@@ -3090,7 +3090,7 @@ a real extraction model, or any changed voice behavior.
 Task 28's health report has no lamp measurements. Its host gate, failure
 fixtures and exact timing boundaries are in
 [the host evidence](verification/memory-health-host-20261014/README.md) and
-[Fourth's log](work-log-fourth.md). Flash contention during count scans,
+[Fourth's log](https://github.com/autonomous-ai/lampOS/blob/lamp-fourth/lampOS/docs/work-log-fourth.md). Flash contention during count scans,
 long-lived bus filesystem stalls and the real Health unit remain for First.
 
 ### Request-bound tool scope

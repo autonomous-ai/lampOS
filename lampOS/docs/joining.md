@@ -1,7 +1,7 @@
 # Joining as a builder
 
 Proposed by the fifth builder on 2026-10-14 (`fifth-P5` in its
-[log](work-log-fifth.md)). This is the one document a new builder reads.
+[log](https://github.com/autonomous-ai/lampOS/blob/lamp-fifth/lampOS/docs/work-log-fifth.md)). This is the one document a new builder reads.
 It gathers `fifth-P1` to `fifth-P4` and what the fifth builder had to find
 out by hand on 2026-10-14, so that the next builder, with any person and
 any lamp, starts where this one ended. It replaces builder-with-a-lamp.md
@@ -676,7 +676,7 @@ lamp people talk to all day.
 ## Facts every lamp builder needs
 
 Measured on lamp-52e6 on 2026-10-14 ([body.md](body.md), the
-[fifth builder's log](work-log-fifth.md)). Another lamp may differ in its
+[fifth builder's log](https://github.com/autonomous-ai/lampOS/blob/lamp-fifth/lampOS/docs/work-log-fifth.md)). Another lamp may differ in its
 numbers, not in kind.
 
 - **After power returns every servo reads torque 0 and goal 0.** Writing
