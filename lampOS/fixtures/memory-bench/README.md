@@ -161,3 +161,9 @@ same schedule. The earlier 5a9a1774b reference plumbing attempts predate the
 weekly scheduling addition and retain that revision in their manifests.
 Recorded main-session forgetting controls precede all ten persistence probes;
 probe-local hypothetical operations never establish durable-forgetting credit.
+
+The [human audit list](human-audit-list.json) extracts the fifty pre-selected
+questions from the frozen registration, without claiming any completed
+review. It also states the additional disagreement/privacy audits. The
+[out-of-tree adapter notes](external-arms.md) describe mem0 and MemoryOS
+integration requirements without adding either runtime to lampOS.
