@@ -40,7 +40,12 @@ whitespace. The complete text must be one of:
 
 - “let me think”, “let me think for a moment”, “let me think for a second”;
 - “one moment”, “just one moment”, “one second”, “just a second”, “just a moment”;
-- “give me a second”, “give me a moment”.
+- “give me a second”, “give me a moment”;
+- “let me check”, “let me check that”, “let me check that one”, “let me
+  check on that”, “let me look that up”, “let me look it up”, “let me find
+  out”: a check promised with no call. On lamp-4ace on 31 Oct “Let me check
+  that one.” about an Aeron chair was the whole answer, with no search
+  (#4684's line 3); the continuation lets the search be made.
 
 A quotation, any added words, or a phrase followed by the answer does not
 match. “Let me see” is excluded even on its own: it can invite someone to
