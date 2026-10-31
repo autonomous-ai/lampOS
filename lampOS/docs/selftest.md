@@ -86,7 +86,7 @@ yet, is `not_checked` while it is still looking. Touch with no `controls/touch_s
 of the five is its own part. Run it with
 
 ```sh
-lamp-selftest --occasion factory|first-boot|on-demand [--dir ABSOLUTE] [--bus-root ABSOLUTE]
+lamp-selftest [--occasion factory|first-boot|on-demand] [--dir ABSOLUTE] [--bus-root ABSOLUTE]
 ```
 
 The storage part reads `/dev/kmsg`, which a lamp with `kernel.dmesg_restrict = 1`
@@ -121,8 +121,9 @@ A passive run that failed a part checks that part again half a minute later
 at that moment, or a hand resting on a pad, would otherwise mark a sound lamp
 `error` for six hours (the reviewer on #1245). Every timed run reports
 `occasion: first_boot`, the passive one. The timer comes with `lamp-update install`,
-which writes and enables the units; an update round adds no unit, so a lamp that
-only takes rounds gets it at its next install.
+which writes and enables the units, and an update round adds it to a lamp that
+lacks it, with the self-test it starts (updater 8 and later, updates.md, "A part
+added over the air").
 `lamp-health` then carries the newest run in `lamp/health`, so a part that failed since is said
 before its person finds out. The factory's run and an on-demand one are started by hand.
 
