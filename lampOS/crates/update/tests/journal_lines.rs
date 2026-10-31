@@ -223,3 +223,35 @@ fn every_line_a_round_says_has_a_row_in_updates_md() {
         "updates.md's \"Every line a round says\" has no row for {unnamed:#?}"
     );
 }
+
+/// `docs/updates.md`'s "The commands" is `lamp-update --help`'s first
+/// paragraph (`main.rs`'s `USAGE`), word for word: on 31 Oct it had lost
+/// `back`, `apply` and `writer-refresh`, and three of `manifest`'s options.
+#[test]
+fn the_commands_in_updates_md_are_lamp_updates_usage() {
+    let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let main = fs::read_to_string(crate_dir.join("src/main.rs")).unwrap();
+    let docs = fs::read_to_string(crate_dir.join("../../docs/updates.md")).unwrap();
+    let usage = main
+        .split_once("const USAGE: &str = \"\\\n")
+        .and_then(|(_, after)| after.split_once("\n\n"))
+        .map(|(usage, _)| usage)
+        .expect("main.rs has USAGE, its commands ending at a blank line");
+    assert!(
+        !usage.contains(['\\', '"']),
+        "USAGE's commands are read as written, with no escapes: {usage}"
+    );
+    assert!(
+        usage.lines().count() >= 10,
+        "only part of USAGE found: {usage}"
+    );
+    let block = docs
+        .split_once("### The commands\n\n```text\n")
+        .and_then(|(_, after)| after.split_once("\n```"))
+        .map(|(block, _)| block)
+        .expect("updates.md has \"The commands\" as a text block");
+    assert_eq!(
+        block, usage,
+        "updates.md's \"The commands\" is not lamp-update's USAGE"
+    );
+}

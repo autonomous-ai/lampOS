@@ -60,7 +60,7 @@ Read for this task: `docs/bootstrap-ota.md` (sections 1, 2, 4 and 5) and
 | GO-3.4 | State written to a temporary file, synced, renamed; a corrupt state kept aside as `state.json.corrupt-<time>` and begun again, its key paths marked as once written (#1263) | `rebuild from the idea` | Taken as it is, for every record, with the folder synced too | `lamp-update`, `records.rs` | built |
 | GO-3.4 | `componentInstalled`: a component the device does not have is not updated | `rebuild from the idea` | Taken: only parts with a unit installed on this lamp are updated; a binary the build carries and the lamp does not run is not fetched | `lamp-update` | built |
 | GO-3.6 | Five safeguards "learned the hard way" (`bootstrap-ota.md`, "Invariants") | `take the cases` | (1) One run at a time: taken, `flock` on the records' `lock`. (2) A missing installation is a reinstall: taken, a unit whose folder is gone gets the build's binary afresh. (3) Publish with the live tree's mode: taken, folders 0755 and binaries 0755, never a temporary folder's 0700. (4) A virtualenv is not relocatable: nothing here is relocated; files are installed under their final folder's parent and renamed. (5) Failure feedback is temporary: no light at all (the ring is the voice's) | `lamp-update` | built, (5) not needed |
-| GO-3.6 | A journal written and flushed before the live tree is replaced; recovery before any new update | `rebuild from the idea` | Taken: the journal and the units as they were are written before any unit changes; at the next start an unfinished switch is put back before anything else | `lamp-update` | built |
+| GO-3.6 | A journal written and flushed before the live tree is replaced; recovery before any new update | `rebuild from the idea` | Taken: the journal and the units as they were are written before any unit changes; at the next round an unfinished switch is put back before any build is looked at (only a wait on lamp-update's own unconfirmed switch and the settings writer's refresh come first) | `lamp-update` | built |
 | GO-3.6 | Core binaries: a `--version` probe within 15 s, then a health URL and "the service remains active" | `rebuild from the idea` | The second half is taken: a part must stay up with one process for a minute and not say it is worse in `lamp/health`. No `--version` probe: the folder is named by the binary's SHA-256, which says more, and a probe would start a second copy of a part beside the one running | `lamp-update`, `judge.rs` | built |
 | GO-3.7 | Ten progress phases; `/security` posture with the key's fingerprint and the last fetch | `later` | The log says each outcome, and the key's fingerprint is printed at start; a page and progress belong with the surround's pages | The surround | partly |
 | GO-3.4 | LED feedback while updating (orange breath, green, red) | `ignore` | The ring is the voice's; an update at a quiet moment says nothing | Nowhere | none |
@@ -952,7 +952,8 @@ lamp-skills, for good. `crates/update/src/product_skills.rs`:
 - **Carried:** `lamp-update manifest --skills lampOS/skills` writes
   `lamp-product-skills` beside the binaries: JSON (`lampos-skills/1`) of
   every file of each `install::PRODUCT_SKILLS` folder but its `tests/` and
-  hidden files, each text, at most 1 MiB; the `skill.toml` of each of
+  hidden files, each as text, the bundle at most 1 MiB and 256 files
+  (`product_skills::MOST_BYTES`, `MOST_FILES`); the `skill.toml` of each of
   `install::PRODUCT_SKILLS_OFF` with `enabled = false` above it
   (`install::OFF_LINE`), as install writes it. It is listed in the manifest's
   `files` with its SHA-256 and size, as a binary is, so it is signed with
@@ -1031,12 +1032,16 @@ lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
 lamp-update harness-off
 lamp-update harness-on
-lamp-update check-units --cat FILE [--product DIR]
+lamp-update back
+lamp-update apply
+lamp-update writer-probe
+lamp-update writer-refresh
+lamp-update check-units --cat FILE [--product DIR] [--image DIR [--variant NAME]]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
-                     [--min-updater N]
+                     [--min-updater N] [--models FILE] [--settings on|off] [--image DIR]
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
-lamp-update writer-probe
+lamp-update --help
 ```
 
 `writer-probe` prints one line, `lamp-update writer-probe 1 <sha256>`, the
@@ -2526,8 +2531,9 @@ Why the window can't be zero:
 
 - **Signed together.** lamp-voice and lamp-memory are both `core`
   (`deploy/package-binaries.json:4-5`), and one envelope covers the whole
-  manifest (`.github/scripts/lampos-publish.py:196-231`). Publishing is
-  still off (`.github/workflows/lampos-arm64.yml:279`).
+  manifest (`lampos-publish.py`'s `prepare` signs `manifest.json` into it).
+  Publication is on: lamp-voice's push runs `lampos-arm64.yml`'s "sign and
+  publish" job, behind `vars.LAMPOS_UPDATE_PUBLISH`.
 - **Not switched as one step.** Each `current` link is renamed in turn,
   and each active changed unit is restarted separately, in the candidate
   unit graph's startup order (step 8 above). Voice's declared prerequisites
@@ -2713,7 +2719,7 @@ the file is never read back.
 | update | lamp-update's own switch, `/var/lib/lampos-update/self.json` | JSON | `version` 1, never checked | read, dropped (a guard test) | n/a | fixed for #1680: one it can't parse is a switch that **failed**, never one confirmed. When the link moved after the file was written and `update/` holds exactly one other build, the new build is refused, then the link goes back, then the file is set aside (`update/src/own.rs`, `known_builds`, `settle`); a cut between steps never turns it around, since a start that finds the other build refused takes the put-back as done and only sets the file aside. This is done by the updater that runs, which then execs the old one, or by `lamp-update-back` on its usual gate, the deadline counted from the file's mtime. When the builds aren't known it's renamed `self.json.corrupt-<ms>` with a `log.jsonl` line and the link left, by `serve` only after the dry round a confirm needs. A round refuses while it waits. A file the disk won't give (not bad JSON) is never settled: that round is refused with a line (`self-unread`) and the next one reads it again. Only a `lamp-update-back` installed from this build on does its part |
 | update | `/var/lib/lampos-update/state.json` | JSON | none | **kept**: fields a later build wrote survive a save (`State::later`, `records.rs`) | n/a | read when a round acts. Unparseable is set aside as `state.json.corrupt-<ms>` with a line. `peek_state` (dry rounds) still falls back to empty silently |
 | update | `/var/lib/lampos-update/journal.json`, a switch under way | JSON | none | read, dropped (`records.rs`) | n/a | fixed for #1680: one it can't parse is set aside as `journal.json.corrupt-<ms>` with a line (`round.rs`, `acting`), and the round goes on from the units as they are. What it drops is a half-done switch's put-back: units, links, models, settings and skill files stay as the cut switch left them, the next round finishes that switch, and if that fails its put-back returns to the mixed state, not to the build before. Still better than every round failing for good. A newer field about what to put back is still not put back |
-| update | `self-refused`, `previous/`, `log.jsonl`, `harness-at-boot` in `/var/lib/lampos-update/` | text / JSONL | none | n/a | n/a | bad lines skipped (`own.rs:109`, `records.rs:375`); `log.jsonl` never read back |
+| update | `self-refused`, `previous/`, `log.jsonl`, `harness-at-boot` in `/var/lib/lampos-update/` | text / JSONL | none | n/a | n/a | bad lines skipped (`own.rs:109`, `records.rs:375`); `log.jsonl` read back only for its last round's end, when lamp-update starts (`records.rs`'s `last_round`) |
 | update | apply's `request.json`, `back.json`, `done.json` in `/var/lib/lampos-update/apply/` | JSON | `version`, never checked (`apply.rs:79`, `112`) | read, dropped | `Op` refused (`apply.rs:68`) | refused when used: that apply or back fails and writes nothing (`apply.rs:370`, `623`, `297`) |
 | policy | decision and judge logs, `/var/lib/lampos-policy/<kind>-<date>.jsonl` | JSONL | none | never parsed by the daemon (`record.rs:136-145`) | n/a | only the last byte is read, to end a cut line |
 | policy | judge key, `/etc/lampOS/policy/jev.key` | one token | n/a | n/a | n/a | refuses to start on anything but one token (`decide.rs:997-1014`); a token can't gain a field |

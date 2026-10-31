@@ -95,7 +95,7 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 | Wi-Fi | V1's `wpa_supplicant-wlan0.conf` | The same file, mode 0600. |
 | The voice's service | `/etc/lampOS/voice/provider.json`, which names a credential file | The user's key, in that file and in the Policy's `/etc/lampOS/policy/jev.key` (#806, 16:13); `provider.json` comes with `install`. |
 | Update trust | `/etc/lampOS/update/key.pub` | Nothing: a trust root belongs in the image, not on a page anyone near the lamp can open. |
-| Time zone | Schedule takes `--zone Asia/Ho_Chi_Minh`; Memory, Expression and the policy take `--utc-offset-minutes 420` | `/etc/localtime` and `/etc/timezone`, and `/etc/lampOS/zone.env` again (#820). The product's memory and Expression take `--zone system`, which follows `/etc/localtime` across daylight saving and without a restart; schedule (`LAMP_ZONE`) and skills (`LAMP_UTC_OFFSET_MINUTES`) read `zone.env`. A zone the parts' own zone data lacks leaves `zone.env` as install wrote it, since schedule would not start on it. The voice reads `/etc/localtime` itself. |
+| Time zone | Schedule takes `--zone Asia/Ho_Chi_Minh`; Memory, Expression and the policy take `--utc-offset-minutes 420` | `/etc/localtime` and `/etc/timezone`, and `/etc/lampOS/zone.env` again (#820). The product's memory, Expression and skills take `--zone system`, which follows `/etc/localtime` across daylight saving and without a restart; schedule (`LAMP_ZONE`) reads `zone.env`. A zone the parts' own zone data lacks leaves `zone.env` as install wrote it, since schedule would not start on it. The voice reads `/etc/localtime` itself. |
 | The person's name | Read by the voice with `LAMP_PERSON_NAME` (the product unit sets it, #806): told to the model after its character, and the hello's name when no face is known (`crates/voice/src/person.rs`). The instruction says the lamp belongs to the person who set it up and gives that name as the answer to "who owns this lamp?" when the name is available to the turn. If the file is absent, the character tells the model to say it cannot verify the owner rather than claiming it has none. With `LAMP_PERSON_NAME_OWNER_ONLY=on` (#2602; on in the product since #4461) it is not in the character: a line is told it only when it is the owner's own known face (the face kept under the typed name, alone in view); never nobody in view, an unknown face, another known face or two faces. Beside it the product's `LAMP_PERSON_NAME_BY_DEFAULT` (#3884) tells a second-route reply the owner is most likely the one speaking unless someone else is seen or heard now, so the owner alone or looking away is named right after setup too. The owner's own "forget everything about me" removes the file once their memory is emptied, and the second route reads it again for each reply, so the lamp names no one from the next (#4461, `person::forget_with_everything`, `memory.md`) | A private file, one line: `/etc/lampOS/person/name`. |
 | The owner's language (#4473) | Read by the voice at each start with `LAMP_LANGUAGE_FILE` (the product unit sets it): `en`, `vi`, `ja`, `zh` or `ko`; no file, empty, `en` or unknown is English, as before ([second-voice.md](second-voice.md), "The owner's language"). Written by setup when the request names one (below) and by the app's `language.set` ("Changed after setup"); `lamp-cloud` reads it back as `system.info`'s `host.language` | `/etc/lampOS/setup/language` (`language` in the settings), one line, root's, 0644. A reset keeps it, as the zone. |
 | The backend's link | `lamp-cloud`, on in the product (`LAMP_CLOUD=on` in its unit, #1418, #1815) | `/etc/lampOS/setup/backend.json` (`backend` in the settings), root's, 0600, written after the zone and before the key. It holds the fields above when the request carries a whole link: an endpoint, a port (a number, or digits), both channels, each field at most 512 bytes with no space or control character (the password may hold spaces). A missing or broken link writes nothing; when the request named one (an `mqtt_endpoint`) the journal gets one line naming the fields that were missing or not valid, never their values. The device's id, the endpoint, the port and both channels are needed; the base, the username and the password may be empty. Neither a broken link nor one that cannot be written fails setup: the lamp joins the Wi-Fi and talks, and only its place in the app waits. The password never appears in a debug line, and a crashed write's temporary file is removed at start. |
@@ -137,7 +137,7 @@ Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
 checkpoint and transient handoff files share its root-owned 0700 directory.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
 0640 root:lampos so lamp-ears can read it; both reset plans wipe that file.
-The product unit names that canonical file without enabling `LAMP_ONBOARDING`.
+The product unit names that canonical file and turns `LAMP_ONBOARDING` on.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.
 The installed core skill in `/var/lib/lampOS/skills/onboarding` is kept.
@@ -594,13 +594,13 @@ left as a setup with the new value leaves them. Wi-Fi is #1959's second piece.
 
 **The helper.** systemd holds `/run/lampos-setup-change/change.sock`
 (`deploy/product/lamp-setup-change.socket`) and starts
-`lamp-setup change --config /etc/lampOS/setup/serve.json --enable` as root for
+`lamp-setup change --config /etc/lampOS/setup/serve.json --bus-root /run/lampos-bus --enable` as root for
 each connection (`lamp-setup-change@.service`), with the connection as its
 standard input and output. It reads one line (at most 4 KiB), answers
 `{"done": …}` or `{"refused": why}` on one line, and exits, unless a zone
 or the language changed (below). It checks every request itself, whoever
 connects: exactly one of `{"person_name": s}`, `{"display_name": s}`,
-`{"timezone": s}` or `{"language": s}`.
+`{"timezone": s}`, `{"language": s}` or `{"owner_place": …}` (the table below).
 Without `--enable` every request is refused, "changes after setup are off",
 and nothing is written. **Only `lamp-cloud` may ask:** the socket's group lets
 a `lampos` process connect, and the helper then takes its peer's credentials
@@ -782,7 +782,8 @@ for it. It is recorded once at build time in the lamp's own voice and played
 by the voice:
 
 - **Asked** as `{"skill":"wifi","recording":"wifi_lost","priority":7,"expires_in_ms":60000}`.
-  The say service takes only the names it knows (`wifi_lost`), and only from
+  The say service takes only the names it knows (`wifi_lost` and
+  `wifi_recovering`), and only from
   the Wi-Fi helper: the socket's peer must be root (`SO_PEERCRED`, read on
   Linux), so a skill, under any name, is refused ("recording is asked by the
   Wi-Fi helper only") and cannot say there is no Wi-Fi while the lamp is
@@ -823,9 +824,6 @@ by the voice:
   journalled the same way. After them the helper has hung up and counts the
   ask as waiting in the voice: a refusal that comes later is read by nobody
   and **not journalled**. Either way the next try is a minute later.
-- **Owed:** the recording itself. No clip has been rendered (it needs the
-  voice's key) and none is in `deploy/product/` or `lamp-update install`'s
-  list; until it is, the line is silent and journalled.
 
 **The password** is in the request line and the network file, and nowhere
 else: no reply, error or journal line holds it, and the journal holds no
@@ -1094,7 +1092,7 @@ reset plan (`reset-plan-product.json`) also wipes the person's stores
 `/var/lib/lampos-output-caps` (durable light and volume restrictions), even
 when those features are switched off. These stores belong to the previous
 owner; the private service directories remain for the next start. The zone
-is the one setup setting it keeps. The installed plan comes from
+and the language are the setup settings it keeps. The installed plan comes from
 `crates/setup/fixtures/reset-plan-product.json`; its wipe list matches the
 keeper example in `reset-plan-example.json`. It follows the build (#806):
 each install, and each update round with `LAMP_UPDATE_APPLY=on`, writes the
@@ -1105,9 +1103,10 @@ A lamp with no plan gets none (docs/updates.md, "Setup's reset plan").
 **The units the marker starts.** `lampos-setup-done.path` starts
 `lampos.target` once the marker exists. Every part that is `PartOf` it waits
 for the marker (`ConditionPathExists=/var/lib/lampos-setup/done`): actions,
-air and its clock, body, cloud, controls, ears, expression, eyes, health,
-memory, name, policy, schedule, the self-test's timer, the reset's watcher,
-skills, tasks and voice. `lamp-setup` itself stops being started once the
+add-ons, air and its clock, body, cloud, controls, ears, expression, eyes,
+health, memory, mood, name, policy, schedule, the self-test's timer, the
+reset's watcher, skills, tasks and voice, and the change, keys and Wi-Fi
+helpers' sockets. `lamp-setup` itself stops being started once the
 marker is there; `lamp-update` and `lamp-records` don't wait for it.
 
 ```sh
