@@ -93,8 +93,7 @@ at least the reservation or any higher known charge. Restoring a probe does not
 restore this account. Transcription confidence remains optional; no confidence
 is inferred from a missing service field.
 
-This accounting layer has fake-provider tests. The verified shared transcript
-cache and live orchestration remain required before any scored execution.
+This accounting layer has fake-provider tests. Live orchestration remains required before any scored execution.
 
 Each durable reservation also binds its billing kind. Token evidence cannot
 refund an audio reservation, and audio evidence cannot refund a token reservation;
@@ -133,3 +132,27 @@ identity drift, deadline cancellation, secret echoes and failed evidence writes.
 These tests are plumbing checks; they do not establish recognition quality.
 The wire matches the in-tree product speech client and the
 [Deepgram streaming reference](https://developers.deepgram.com/reference/speech-to-text/listen-streaming).
+
+
+## Shared speech cache
+
+`speech_cache::create` accepts the sole budgeted model worker and prepared audio;
+it reads no credential and constructs no separate provider or spending account.
+Each distinct WAV is transcribed once, and its result is mapped back to all matching
+records. WAV and PCM hashes, sample count and script mapping are verified before
+dispatch. A failed attempt stays in its own directory and is never retried silently.
+
+Successful results are re-derived from the saved request and final speech frames.
+The cache copies the actual WAV, request, response and provenance files, pins their
+hashes, and requires one returned speech-model revision for the whole corpus.
+Missing confidence stays unknown. Unknown duration keeps its original spending
+reservation; an overrun cannot qualify a cached result. Aggregate file and row
+limits apply before publication and during reading. The complete manifest is
+written last, so interrupted caches cannot qualify a run.
+
+`verify-speech-cache SOURCE_EVENTS CACHE_DIRECTORY MANIFEST_SHA256 live|fixture`
+rechecks every source, audio and provider file against the pinned manifest and
+reconstructs observed events. A fixture/loopback cache cannot qualify a live run.
+No clean script replaces a failed transcript. These cache checks need no provider
+call, and the command prints verification counts only. Live cache creation remains
+an internal API pending the approved campaign configuration and orchestration.

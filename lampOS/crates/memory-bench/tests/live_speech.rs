@@ -175,7 +175,7 @@ impl Drop for Server {
         }
     }
 }
-fn input(samples: usize) -> audio::Input {
+fn wav(samples: usize) -> Vec<u8> {
     let size = samples * 2;
     let mut b = b"RIFF".to_vec();
     b.extend(((size + 36) as u32).to_le_bytes());
@@ -188,7 +188,10 @@ fn input(samples: usize) -> audio::Input {
     b.extend(b"data");
     b.extend((size as u32).to_le_bytes());
     b.resize(size + 44, 0);
-    audio::Input::from_wav(&b).unwrap()
+    b
+}
+fn input(samples: usize) -> audio::Input {
+    audio::Input::from_wav(&wav(samples)).unwrap()
 }
 fn config(server: &Server) -> Config {
     Config {
@@ -529,4 +532,250 @@ fn a_later_final_cannot_hide_an_unresolved_earlier_interval() {
     let mut provider = provider(&server, &temp);
     assert!(provider.invoke(&call(), deadline()).is_err());
     server.finish();
+}
+fn cache_inputs(temp: &Temp) -> (PathBuf, PathBuf) {
+    use lamp_memory_bench::{protocol::*, speech::Audio};
+    let events = temp.0.join("events.jsonl");
+    let audio_dir = temp.0.join("audio");
+    fs::create_dir(&audio_dir).unwrap();
+    let bytes = wav(640);
+    fs::write(audio_dir.join("fixture.wav"), &bytes).unwrap();
+    let audio = input(640);
+    let mut event_bytes = vec![];
+    let mut audio_bytes = vec![];
+    for n in 0..2 {
+        let e = Event {
+            record_id: format!("e{n}"),
+            at_unix_ms: n + 1,
+            session_id: "s1".into(),
+            kind: EventKind::Utterance,
+            person: Person::Owner,
+            person_id: Some("owner-a".into()),
+            presence: Presence::OwnerAlone,
+            heard: "Made up source text.".into(),
+            said: "Okay.".into(),
+            stt_confidence: None,
+            cues: Cues::default(),
+        };
+        let a = Audio {
+            record_id: e.record_id.clone(),
+            script_hash: hash(e.heard.as_bytes()),
+            wav_hash: hash(&bytes),
+            pcm_hash: audio.pcm_sha256().into(),
+            file: "fixture.wav".into(),
+            duration_ms: 40,
+            voice: "fixture".into(),
+            words_per_minute: 175,
+        };
+        event_bytes.extend(serde_json::to_vec(&e).unwrap());
+        event_bytes.push(b'\n');
+        audio_bytes.extend(serde_json::to_vec(&a).unwrap());
+        audio_bytes.push(b'\n');
+    }
+    fs::write(&events, event_bytes).unwrap();
+    fs::write(audio_dir.join("audio.jsonl"), audio_bytes).unwrap();
+    (events, audio_dir)
+}
+fn cache(temp: &Temp) -> (PathBuf, PathBuf, String) {
+    let (events, audio) = cache_inputs(temp);
+    let mut server = Server::new(Scenario::normal());
+    let mut worker = lamp_memory_bench::model_worker::Worker::start(client(&server, temp)).unwrap();
+    let output = temp.0.join("cache");
+    let summary = lamp_memory_bench::speech_cache::create(
+        &events,
+        &audio,
+        &temp.artifacts(),
+        &output,
+        config(&server),
+        true,
+        &mut worker,
+    )
+    .unwrap();
+    let account = worker.finish(deadline()).unwrap();
+    server.finish();
+    assert_eq!(account.receipts.len(), 1);
+    assert_eq!(account.charged_microusd, 40);
+    assert_eq!(summary["unique_audio"], 1);
+    (
+        events,
+        output,
+        summary["manifest_sha256"].as_str().unwrap().into(),
+    )
+}
+#[test]
+fn verified_cache_transcribes_identical_audio_once_and_reopens_without_calls() {
+    let temp = Temp::new();
+    let (events, output, pin) = cache(&temp);
+    let observed = lamp_memory_bench::speech_cache::load(&output, &events, &pin, false).unwrap();
+    assert_eq!(observed.len(), 2);
+    assert!(
+        observed
+            .iter()
+            .all(|e| e.heard == "heard words" && e.stt_confidence == Some(0.9))
+    );
+    assert!(lamp_memory_bench::speech_cache::load(&output, &events, &pin, true).is_err());
+}
+#[test]
+fn cache_reopen_checks_real_audio_request_response_and_receipt_bytes() {
+    let temp = Temp::new();
+    let (events, output, pin) = cache(&temp);
+    let audio_hash = hash(&wav(640));
+    for file in [
+        "audio.wav",
+        "request.json",
+        "response.jsonl",
+        "provenance.json",
+    ] {
+        let path = output.join(&audio_hash).join(file);
+        let original = fs::read(&path).unwrap();
+        let mut corrupt = original.clone();
+        *corrupt.last_mut().unwrap() ^= 1;
+        fs::write(&path, corrupt).unwrap();
+        assert!(
+            lamp_memory_bench::speech_cache::load(&output, &events, &pin, false).is_err(),
+            "{file}"
+        );
+        fs::write(path, original).unwrap();
+    }
+}
+#[test]
+fn self_consistently_rehashed_text_cannot_replace_the_actual_final_transcript() {
+    let temp = Temp::new();
+    let (events, output, _) = cache(&temp);
+    let path = output.join("manifest.json");
+    let mut manifest: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    for (file, field) in [
+        ("transcripts.jsonl", "transcript_hash"),
+        ("observed-events.jsonl", "observed_hash"),
+    ] {
+        let text = fs::read_to_string(output.join(file))
+            .unwrap()
+            .replace("heard words", "clean script");
+        fs::write(output.join(file), &text).unwrap();
+        manifest[field] = json!(hash(text.as_bytes()));
+    }
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    fs::write(path, &bytes).unwrap();
+    assert!(lamp_memory_bench::speech_cache::load(&output, &events, &hash(&bytes), false).is_err());
+}
+#[test]
+fn cache_cannot_be_relabelled_live_and_partial_caches_are_unusable() {
+    let temp = Temp::new();
+    let (events, output, pin) = cache(&temp);
+    let path = output.join("manifest.json");
+    let original = fs::read(&path).unwrap();
+    let mut manifest: Value = serde_json::from_slice(&original).unwrap();
+    manifest["fixture"] = json!(false);
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    fs::write(&path, &bytes).unwrap();
+    assert!(lamp_memory_bench::speech_cache::load(&output, &events, &hash(&bytes), true).is_err());
+    fs::remove_file(path).unwrap();
+    assert!(lamp_memory_bench::speech_cache::load(&output, &events, &pin, false).is_err());
+}
+#[test]
+fn prepared_audio_mismatch_is_rejected_before_a_model_call() {
+    let temp = Temp::new();
+    let (events, audio) = cache_inputs(&temp);
+    let mut bytes = fs::read(audio.join("fixture.wav")).unwrap();
+    bytes[44] = 1;
+    fs::write(audio.join("fixture.wav"), bytes).unwrap();
+    // A service-free worker proves this path refuses before invoking a provider.
+    let provider = Services::new(None, None);
+    let client = Client::new(
+        provider,
+        Prices {
+            source: "offline".into(),
+            date: "2026-10-31".into(),
+            input_microusd_per_million: 1,
+            output_microusd_per_million: 1,
+        },
+        1000,
+    )
+    .unwrap()
+    .with_speech(audio::Prices {
+        source: "offline".into(),
+        date: "2026-10-31".into(),
+        microusd_per_minute: 60_000,
+    })
+    .unwrap();
+    fs::create_dir(temp.artifacts()).unwrap();
+    let mut worker = lamp_memory_bench::model_worker::Worker::start(client).unwrap();
+    assert!(
+        lamp_memory_bench::speech_cache::create(
+            &events,
+            &audio,
+            &temp.artifacts(),
+            &temp.0.join("cache"),
+            Config {
+                endpoint: "ws://127.0.0.1:1/listen".into(),
+                expected_model_arch: "nova-3".into(),
+                expected_model_revision: None
+            },
+            true,
+            &mut worker
+        )
+        .is_err()
+    );
+    assert!(worker.finish(deadline()).unwrap().receipts.is_empty());
+}
+
+#[test]
+fn provenance_whitespace_changes_are_detected_even_when_json_is_equivalent() {
+    let temp = Temp::new();
+    let (events, output, pin) = cache(&temp);
+    let path = output.join(hash(&wav(640))).join("provenance.json");
+    let parsed: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    fs::write(path, serde_json::to_vec(&parsed).unwrap()).unwrap();
+    assert!(lamp_memory_bench::speech_cache::load(&output, &events, &pin, false).is_err());
+}
+#[test]
+fn a_self_consistent_cached_duration_overrun_is_ineligible() {
+    let temp = Temp::new();
+    let (events, output, _) = cache(&temp);
+    let audio_hash = hash(&wav(640));
+    let dir = output.join(&audio_hash);
+    let path = dir.join("response.jsonl");
+    let source = fs::read_to_string(&path).unwrap();
+    let mut bytes = vec![];
+    for line in source.lines() {
+        let mut frame: Value = serde_json::from_str(line).unwrap();
+        if frame["kind"] == "text" {
+            let mut payload: Value = serde_json::from_str(frame["text"].as_str().unwrap()).unwrap();
+            if payload["type"] == "Metadata" {
+                payload["duration"] = json!(0.08);
+                frame["text"] = json!(payload.to_string());
+            }
+        }
+        bytes.extend(serde_json::to_vec(&frame).unwrap());
+        bytes.push(b'\n');
+    }
+    fs::write(path, &bytes).unwrap();
+    let path = dir.join("provenance.json");
+    let mut p: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    p["response_sha256"] = json!(hash(&bytes));
+    p["audio"]["duration_usage"]["audio_micros"] = json!(80_000);
+    let p_bytes = serde_json::to_vec(&p).unwrap();
+    fs::write(path, &p_bytes).unwrap();
+    let path = output.join("manifest.json");
+    let mut manifest: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    manifest["entries"][&audio_hash]["provenance"] = p;
+    manifest["entries"][&audio_hash]["provenance_hash"] = json!(hash(&p_bytes));
+    // Keep transcript hashes consistent too; only the verified PCM duration
+    // makes this cache invalid, rather than a stale outer hash.
+    let path_t = output.join("transcripts.jsonl");
+    let mut rows = vec![];
+    for line in fs::read_to_string(&path_t).unwrap().lines() {
+        let mut row: Value = serde_json::from_str(line).unwrap();
+        row["response_hash"] = json!(hash(&bytes));
+        rows.extend(serde_json::to_vec(&row).unwrap());
+        rows.push(b'\n');
+    }
+    fs::write(path_t, &rows).unwrap();
+    manifest["transcript_hash"] = json!(hash(&rows));
+    let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+    fs::write(path, &manifest_bytes).unwrap();
+    assert!(
+        lamp_memory_bench::speech_cache::load(&output, &events, &hash(&manifest_bytes), false)
+            .is_err()
+    );
 }

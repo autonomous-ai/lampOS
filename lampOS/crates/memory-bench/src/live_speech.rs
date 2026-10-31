@@ -39,6 +39,10 @@ pub struct Config {
     pub expected_model_revision: Option<String>,
 }
 impl Config {
+    pub(crate) fn validate(&self, fixture: bool) -> Result<()> {
+        self.url(fixture).map(|_| ())
+    }
+
     fn url(&self, fixture: bool) -> Result<Url> {
         let mut url =
             Url::parse(&self.endpoint).map_err(|_| invalid("invalid public speech endpoint"))?;
@@ -193,9 +197,7 @@ impl Provider for Speech {
         if !meta.is_dir() || meta.permissions().mode() & 0o077 != 0 {
             return Err(invalid("speech artifact directory is not private"));
         }
-        let request_body = serde_json::to_vec(
-            &json!({"url":self.url.as_str(),"audio":audio,"frame_ms":20,"pacing":"real_time","controls":["Finalize","CloseStream"],"expected_model_arch":self.config.expected_model_arch,"expected_model_revision":self.config.expected_model_revision}),
-        )?;
+        let request_body = request_bytes(&self.config, &self.url, audio)?;
         self.next += 1;
         let artifact = format!("{:06}", self.next);
         let dir = self.artifacts.join(&artifact);
@@ -378,4 +380,86 @@ impl Provider for Services {
     fn take_provenance(&mut self) -> Option<Provenance> {
         self.last.take()
     }
+}
+
+fn request_bytes(config: &Config, url: &Url, audio: &crate::audio::Input) -> Result<Vec<u8>> {
+    Ok(serde_json::to_vec(
+        &json!({"url":url.as_str(),"audio":audio,"frame_ms":20,"pacing":"real_time","controls":["Finalize","CloseStream"],"expected_model_arch":config.expected_model_arch,"expected_model_revision":config.expected_model_revision}),
+    )?)
+}
+// Re-derive a cache transcript from its original, bounded wire evidence.
+pub(crate) fn verify_saved(
+    config: &Config,
+    fixture: bool,
+    audio: &crate::audio::Input,
+    request: &[u8],
+    response: &[u8],
+    provenance: &Provenance,
+) -> Result<String> {
+    let url = config.url(fixture)?;
+    let expected = request_bytes(config, &url, audio)?;
+    if request != expected
+        || provenance.request_sha256 != hash(request)
+        || provenance.response_sha256 != hash(response)
+        || response.len() > MAX_WIRE
+        || !response.ends_with(b"\n")
+        || provenance.transport != "deepgram_websocket"
+        || provenance.requested_model != MODEL
+        || provenance.http_status != Some(101)
+        || provenance.finish_reason.as_deref() != Some("normal_close")
+        || !provenance.response_complete
+        || !provenance.evidence_complete
+        || provenance.usage.is_some()
+        || provenance.system_fingerprint.is_some()
+    {
+        return Err(invalid(
+            "speech cache request or response provenance differs",
+        ));
+    }
+    let mut parser = stream::Stream::new(
+        &config.expected_model_arch,
+        config.expected_model_revision.as_deref(),
+    );
+    let mut closed = false;
+    let mut count = 0;
+    for line in response
+        .split(|b| *b == b'\n')
+        .filter(|line| !line.is_empty())
+    {
+        count += 1;
+        if count > 16_384 || closed {
+            return Err(invalid("invalid cached speech frame sequence"));
+        }
+        let frame: Value = serde_json::from_slice(line)?;
+        match frame["kind"].as_str() {
+            Some("text") => {
+                let text = frame["text"]
+                    .as_str()
+                    .filter(|s| s.len() <= MAX_FRAME)
+                    .ok_or_else(|| invalid("invalid cached speech text frame"))?;
+                parser.feed(&serde_json::from_str(text)?)?;
+            }
+            Some("keepalive") => {}
+            Some("close") if frame["code"].is_null() || frame["code"].as_u64() == Some(1000) => {
+                closed = true;
+            }
+            _ => return Err(invalid("invalid cached speech control frame")),
+        }
+    }
+    if !closed
+        || provenance.reported_model != parser.model_name
+        || provenance.provider_request_id != parser.request_id
+        || serde_json::to_value(&provenance.audio)?
+            != serde_json::to_value(Some(parser.evidence(audio, audio.samples())))?
+        || parser.duration.as_ref().is_some_and(|u| {
+            u.audio_micros.saturating_add(50_000) < audio.reserve_micros()
+                || u.audio_micros > audio.reserve_micros()
+        })
+    {
+        return Err(invalid("cached speech evidence differs from saved frames"));
+    }
+    parser
+        .reply(audio)?
+        .content
+        .ok_or_else(|| invalid("cached speech omitted transcript"))
 }

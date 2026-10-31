@@ -43,6 +43,23 @@ fn run(args: &[String]) -> Result<()> {
                 }
             )?
         ),
+        [command, source, cache, pin, mode] if command == "verify-speech-cache" => {
+            let live = match mode.as_str() {
+                "live" => true,
+                "fixture" => false,
+                _ => return Err(invalid("cache mode must be live or fixture")),
+            };
+            let events = lamp_memory_bench::speech_cache::load(
+                Path::new(cache),
+                Path::new(source),
+                pin,
+                live,
+            )?;
+            println!(
+                "{}",
+                json!({"verified":true,"events":events.len(),"mode":mode,"manifest_sha256":pin,"scores":null})
+            );
+        }
         [command, events, destination, voice, rate] if command == "speech-prepare" => println!(
             "{}",
             lamp_memory_bench::speech::prepare(
