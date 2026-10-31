@@ -805,26 +805,40 @@ pub(crate) fn timer_line(
 }
 
 /// Whether `said` plainly holds more than one ask, so the round after an
-/// answer at once is still asked (`LAMP_SECOND_SAY_WITH_CALL`, #2135). The
-/// words are cut into clauses at a sentence's end (not a point between
-/// digits, "2.5"), a comma or semicolon, and "and", "also", "then" or
-/// "plus"; a clause of only thanks, a greeting, the name or "okay" asks
-/// nothing; a call's own words ("take out the trash and recycling", a
-/// reminder's `text`) are its ask. More clauses than the round's `calls`
-/// answered is more: "Brighter, and is it sunny?" and "Dim the light, tell
-/// me a joke." are; "Make it warmer." "It's too bright." "Make it warmer and
-/// brighter." (two calls) and "Make it warmer. Thanks!" are not
-/// (Reviewer-three's P2 on #4726). With one ask, the turn ends with the
-/// acting part's words: on lamp-4ace on 31 Oct the next round, told the lamp
-/// had answered, said the reminder again in other words ("Two minutes —
-/// I'll nudge you at 12:03.", the first builder on #4710). A line misread
-/// as holding more only asks the round as before.
+/// answer at once is still asked (`LAMP_SECOND_SAY_WITH_CALL`, #2135). A
+/// dropped question is the bad failure and a second confirmation the safe
+/// one, so it leans to more. The words are cut into clauses at a sentence's
+/// end (not a point between digits, "2.5"), a comma or semicolon, and
+/// "and", "also", "then" or "plus"; a clause of only thanks, a greeting, the
+/// name or "okay" asks nothing; a call's own words ("take out the trash and
+/// recycling", a reminder's `text`) are its ask. It is more when a clause
+/// holds no word of a light, the volume or a timer ("what's the weather"),
+/// when a clause after the first is a question ("Make it cozy, what's on my
+/// calendar today?", where "on" alone would pass), or when there are more
+/// clauses than the round's calls. "Make it warmer." "It's too bright."
+/// "Make it warmer and brighter." (two calls), "Make it cozy." (two calls)
+/// and "Make it warmer. Thanks!" are one (Reviewer-three's P2s on #4726 and
+/// #4729). With one ask, the turn ends with the acting part's words: on
+/// lamp-4ace on 31 Oct the next round, told the lamp had answered, said the
+/// reminder again in other words ("Two minutes — I'll nudge you at 12:03.",
+/// the first builder on #4710).
 pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
     const JOINING: [&str; 4] = ["and", "also", "then", "plus"];
-    const FILLER: [&str; 15] = [
+    const FILLER: [&str; 17] = [
         "thanks", "thank", "you", "please", "okay", "ok", "cheers", "lamp", "hey", "hi", "great",
-        "cool", "now", "so", "oh",
+        "cool", "now", "so", "oh", "much", "very",
     ];
+    const ASKING: [&str; 21] = [
+        "what", "what's", "whats", "how", "how's", "when", "where", "who", "who's", "why", "which",
+        "whose", "is", "are", "can", "could", "will", "would", "do", "does", "tell",
+    ];
+    // The starts of words a light, volume or timer ask holds.
+    const CHANGING: [&str; 30] = [
+        "bright", "dim", "dark", "warm", "cool", "cozy", "cosy", "colo", "light", "glow", "red",
+        "blue", "green", "yellow", "white", "pink", "purple", "orange", "loud", "quiet", "soft",
+        "volume", "sound", "music", "timer", "remind", "minute", "second", "hour", "alarm",
+    ];
+    const TURNING: [&str; 6] = ["on", "off", "up", "down", "turn", "switch"];
     let mut line = said.to_lowercase();
     for text in calls.iter().filter_map(|call| call.args["text"].as_str()) {
         let text = text.trim().to_lowercase();
@@ -837,33 +851,48 @@ pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
         at.and_then(|at| chars.get(at))
             .is_some_and(char::is_ascii_digit)
     };
-    let marked: String = chars
-        .iter()
-        .enumerate()
-        .map(|(at, &c)| match c {
-            '.' if digit(at.checked_sub(1)) && digit(Some(at + 1)) => c,
-            '.' | '!' | '?' | ',' | ';' => '|',
-            _ => c,
-        })
-        .collect();
+    // Each part with whether it ended with a question mark.
+    let mut parts: Vec<(String, bool)> = vec![(String::new(), false)];
+    for (at, &c) in chars.iter().enumerate() {
+        match c {
+            '.' if digit(at.checked_sub(1)) && digit(Some(at + 1)) => {
+                parts.last_mut().expect("a part").0.push(c)
+            }
+            '.' | '!' | '?' | ',' | ';' => {
+                parts.last_mut().expect("a part").1 = c == '?';
+                parts.push((String::new(), false));
+            }
+            _ => parts.last_mut().expect("a part").0.push(c),
+        }
+    }
     let mut clauses: usize = 0;
-    for part in marked.split('|') {
+    for (part, asked) in &parts {
         let mut clause: Vec<&str> = Vec::new();
         let words = part
             .split(|c: char| !c.is_alphanumeric() && c != '\'')
             .filter(|word| !word.is_empty());
-        for word in words.chain(std::iter::once("and")) {
-            if JOINING.contains(&word) {
-                if clause.iter().any(|word| !FILLER.contains(word)) {
-                    clauses += 1;
-                }
-                clause.clear();
-            } else {
+        let mut ended = words.chain(std::iter::once("and")).peekable();
+        while let Some(word) = ended.next() {
+            if !JOINING.contains(&word) {
                 clause.push(word);
+                continue;
             }
+            let last = ended.peek().is_none();
+            if clause.iter().any(|word| !FILLER.contains(word)) {
+                clauses += 1;
+                let changes = clause.iter().any(|word| {
+                    TURNING.contains(word) || CHANGING.iter().any(|stem| word.starts_with(stem))
+                });
+                let question =
+                    clause.first().is_some_and(|word| ASKING.contains(word)) || (last && *asked);
+                if !changes || (clauses > 1 && question) {
+                    return true;
+                }
+            }
+            clause.clear();
         }
     }
-    clauses.saturating_sub(1) > calls.len().saturating_sub(1)
+    clauses > calls.len().max(1)
 }
 
 /// An `HH:MM` clock on a 12-hour clock: "07:52" is "7:52 am", "19:52"
