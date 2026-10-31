@@ -40,6 +40,7 @@ on:
       - 'lampOS/docs/install.md'
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/switches.md'
+      - 'lampOS/docs/updates.md'
       - '.github/workflows/lampos-clippy.yml'
       # The ARM64 workflow too: a pull request (or a train) of that file alone
       # otherwise starts ARM64 and no clippy, and the train bot waits for one
