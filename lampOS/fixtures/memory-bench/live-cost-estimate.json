@@ -789,5 +789,791 @@
       "measurement": "awaiting offered batches from the new common adapter; no old run is relabelled"
     }
   },
-  "measured_registration_version": 3
+  "measured_registration_version": 3,
+  "topic_segmentation_measurement": {
+    "label": "planning estimate from recorded request shapes; not billed usage or scores",
+    "scores": null,
+    "pass": {
+      "label": "recorded plumbing pass; no scores",
+      "scores": null,
+      "registration_sha256": "3ee255b5921100c268314c905094094d8d2bc4bd87fd46a271c11a287ff50a35",
+      "runner_revision": "6420a2f490263df664a12c8f8848c95421c30abd",
+      "runner_sha256": "c7e93b0cedd75a0211bdb714f77f51fb62d5232359cfa08c096de8935886edac",
+      "adapter_revision": "7d6d0a2364bc2052c323327334633a97450b12b3",
+      "adapter_sha256": "ad0eef3379b5753bd01ce3df7aa29db998c1f366739e59a7d60cb005432d5f97",
+      "recorded_reply_sha256": "2ebe9431e74bc42b7861e8d7f60c3be50c54ed9257e3d897e1c429566f6f934f",
+      "order": [
+        "none",
+        "full_history",
+        "lampos_today_partial",
+        "tiers",
+        "tiers_minus_episodes",
+        "tiers_minus_life_story",
+        "tiers_minus_facts",
+        "tiers_minus_owner_model",
+        "tiers_minus_how_to_be",
+        "tiers_minus_ahead",
+        "tiers_minus_feelings",
+        "tiers_minus_nightly_sleep",
+        "tiers_minus_importance",
+        "tiers_minus_fading",
+        "tiers_session_cutting_only"
+      ]
+    },
+    "rates": {
+      "flash": {
+        "input_per_million": 0.3,
+        "output_per_million": 1.2
+      },
+      "pro": {
+        "input_per_million": 1.32,
+        "output_per_million": 3.96
+      }
+    },
+    "sources": {
+      "model_prices": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "token_heuristic": "https://api-docs.deepseek.com/quick_start/token_usage/",
+      "speech_prices": "https://deepgram.com/pricing"
+    },
+    "token_heuristic": "1 English character approximately 0.3 token; JSON and model tokenization differ; actual provider usage remains authoritative",
+    "judge_reserve_per_run": {
+      "questions": 76,
+      "criteria": 175,
+      "prompt_bytes": 9149994,
+      "candidate_answer_turns": 100,
+      "input_tokens_estimate_and_allowance": 2835111,
+      "output_tokens_allowance": 38912,
+      "assumption": "All eligible observed source text, complete fixed rubric, 512 input tokens per candidate answer/follow-up, 512 input instruction tokens per judge, 512 output tokens per judge; no live judge called.",
+      "cost": {
+        "flash": 0.8972277,
+        "pro": 3.89643804
+      },
+      "prompt_characters": 9149994
+    },
+    "setups": [
+      {
+        "arm": "none",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "b0e0976ef6422b6781103e58b0f9e1d4fdeceb711c012b9022b43f4829c8f7b7",
+        "ledger_sha256": "c2cf7e8e5587a95cf704b320837d172b4e055ac515768430fb580c4720916fa9",
+        "ledger_final_hash": "492feec915328ab6cdee681c13d56a44682361d35fb50bb372eb7bdee09471df",
+        "calls": 224,
+        "templates": {
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 108853,
+            "input_tokens_estimate": 32656,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.14742239999999998,
+              "pro": 0.49727039999999995
+            }
+          }
+        },
+        "input_tokens_estimate": 32656,
+        "output_tokens_allowance": 114688,
+        "model_cost": {
+          "flash": 0.14742239999999998,
+          "pro": 0.49727039999999995
+        },
+        "model_and_judge_cost": {
+          "flash": 1.0446501,
+          "pro": 4.39370844
+        }
+      },
+      {
+        "arm": "full_history",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "f3059100dbaaae6dd904a0b637cac927978e7caea1913784b8c2fd211b1b64a3",
+        "ledger_sha256": "2d2f9247771591b1174b2cb589af92d625ca0c1ee13968c3fe3752d185a9fadb",
+        "ledger_final_hash": "e6b46e0a134676c9b02c0afdd6880c2e95b79007b8dca64aa8da949524900ead",
+        "calls": 224,
+        "templates": {
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 82827495,
+            "input_tokens_estimate": 24848249,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 7.5921003,
+              "pro": 33.25385316
+            }
+          }
+        },
+        "input_tokens_estimate": 24848249,
+        "output_tokens_allowance": 114688,
+        "model_cost": {
+          "flash": 7.5921003,
+          "pro": 33.25385316
+        },
+        "model_and_judge_cost": {
+          "flash": 8.489328,
+          "pro": 37.1502912
+        }
+      },
+      {
+        "arm": "lampos_today_partial",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "9e1404f90738e9835773546af8b95524d749acb4c1b386d2805fe2f740f7b87a",
+        "ledger_sha256": "9ed7a555643617d1c4863bb86aaec995df69ac156a426169f9e85005a5d2bc2b",
+        "ledger_final_hash": "8be1849a95cd5e8bd9f2b126756b3985b69a14a3a5bdcf600cf29fb70b6f4538",
+        "calls": 224,
+        "templates": {
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 333565,
+            "input_tokens_estimate": 100070,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1676466,
+              "pro": 0.58625688
+            }
+          }
+        },
+        "input_tokens_estimate": 100070,
+        "output_tokens_allowance": 114688,
+        "model_cost": {
+          "flash": 0.1676466,
+          "pro": 0.58625688
+        },
+        "model_and_judge_cost": {
+          "flash": 1.0648743,
+          "pro": 4.48269492
+        }
+      },
+      {
+        "arm": "tiers",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "2ddf2a2da414ae363fe6c5e16943c0148661d4252d26674cbf65a92115cc8d29",
+        "ledger_sha256": "da5eb452616b68fdd38ffd86c9f583b17517c5825b1c51db0b255519f090fd68",
+        "ledger_final_hash": "8f45edcbcc84f7af46504ff2b17fea16673402cbc31c416c1440653ba3d9bbba",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_minus_episodes",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "7a3f73d852e56d9b528402d188a8a2e85e435c6b530de0d253a7cbb4278ced87",
+        "ledger_sha256": "b4a359d51bbf281ffa6c6998b0f2f845028fbcbe9ea1d98d8ff4fe671e8b1785",
+        "ledger_final_hash": "798478d3dd76fac226c1353676bae940008c18ec4a1bd242e053646eb0e253d7",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 573108,
+            "input_tokens_estimate": 171933,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1892055,
+              "pro": 0.68111604
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 572663,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6197625,
+          "pro": 2.23419504
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5169902,
+          "pro": 6.13063308
+        }
+      },
+      {
+        "arm": "tiers_minus_life_story",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "8988636c62e7b9a00c0bb2072b66ffeffa7948b03ad6ca1b710b7ae19ddf7761",
+        "ledger_sha256": "a320d09677577a3847c65247ad116cb44a4a9428ecdd5653571ee5f9c05a1aab",
+        "ledger_final_hash": "e26fabec9322f34a335a31a31ab922cb2eb4abf2d7c21e0fec42c7bb40745274",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_minus_facts",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "0da32752c5c375cec3a14f64619b12ab9283d1473966c54d372c469f1cfee4d0",
+        "ledger_sha256": "a1caec8a35ae82c812e3ac3ad554f8ba575f774d6549dddcc41f14d18f7ec2ec",
+        "ledger_final_hash": "d6dab2ea5ddd939b32637c128bfe535329f7902d32d71db9530fca39b32178b9",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 569883,
+            "input_tokens_estimate": 170965,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1889151,
+              "pro": 0.67983828
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 571695,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6194721,
+          "pro": 2.2329172799999997
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5166998,
+          "pro": 6.12935532
+        }
+      },
+      {
+        "arm": "tiers_minus_owner_model",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "d8d4ed079da97b3a816fa435c57929f2294b30e85642172eb90a8c8eacb0691a",
+        "ledger_sha256": "a4fb33b422151c118ef348eedf59ff9ea6b5bedaa2adae6a9967fe724bc6aa63",
+        "ledger_final_hash": "243e47484f14af5cf4059a33268136d96fdb600ed560d5d1b3a6584575bbc63a",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_minus_how_to_be",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "6f3a140603ba9aab714105b192fe2bffe9d9e0a7df242972035087cf69988680",
+        "ledger_sha256": "c4e9874cf1a3371707706fc61ef4ce73e270954d3b76ae60348160ce7718277c",
+        "ledger_final_hash": "0ccf7ac27f07c838339891c332f6ed50de12d0610d11575fc94b5858e4efc5be",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_minus_ahead",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "cd6c1a89f6b6732665f709422cf198d0c7657309fe6cb5c59771758041339792",
+        "ledger_sha256": "96f1696ee18121dc99a9b3c6b26b3d4d6945067e95a68a00b93add9c18c439e2",
+        "ledger_final_hash": "96f6eb9333ce9cacf42a2c9c91020e988d3437abd7cc29dd692a5478dd6b9b31",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_minus_feelings",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "6dc996f116d387b541056d1df84bfe514e04d70a61bfbe1d75e00ad9ad078654",
+        "ledger_sha256": "b94652d932287f16a549ab4bc89e72157b21656027b006062e3f34212a1f0653",
+        "ledger_final_hash": "4ee3bdac66cb85350c4b273cbd3a965bc359143aa7ee4c9d85166beaaedabb6e",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_minus_nightly_sleep",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "ac34112366e9acea79323a90f20643f52a534b7c09cd57de727f92c857c99cf1",
+        "ledger_sha256": "bbc11c737994d7948d8ed7b9d3a8c21119e82eaa677938704786f1ea053a9a6c",
+        "ledger_final_hash": "9c10618471158a548f7692a9507c7f4106f9e9d6af0b0675d87a9d7758aedc4f",
+        "calls": 476,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 12,
+            "input_characters": 349318,
+            "input_tokens_estimate": 104796,
+            "output_tokens_allowance": 49152,
+            "model_cost": {
+              "flash": 0.0904212,
+              "pro": 0.33297264
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529823,
+            "input_tokens_estimate": 158947,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.1515837,
+              "pro": 0.55267872
+            }
+          }
+        },
+        "input_tokens_estimate": 452646,
+        "output_tokens_allowance": 250423,
+        "model_cost": {
+          "flash": 0.43630139999999995,
+          "pro": 1.5891677999999998
+        },
+        "model_and_judge_cost": {
+          "flash": 1.3335290999999998,
+          "pro": 5.48560584
+        }
+      },
+      {
+        "arm": "tiers_minus_importance",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "05ff9de55c378ebf578d5aaad98c3f6a59e7f044062bd17557b9911c7beb2357",
+        "ledger_sha256": "0ffc98b7f06e6a694069e794bdf43e06eba12c08885fcc51ea663833345276fa",
+        "ledger_final_hash": "1d3ea10ad09dbe13e5fa2e2d9c5b8799ce5e5cf90672de6ebb79bc18296cdd38",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_minus_fading",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "8dbbd0be34477cdc26d61ad9f7ddd7360c2471e68e1a46fcc22fc8c42da8ff28",
+        "ledger_sha256": "e10f24cb08e9ba9a7518d976c72392c45540be0f5fb75c2b3034c8b3adb55791",
+        "ledger_final_hash": "cf28db48d4b55848919072a242fda740feafce3e4fb3527daa8382e096669517",
+        "calls": 506,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 805933,
+            "input_tokens_estimate": 241780,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2789724,
+              "pro": 1.0003963200000001
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          },
+          "topic_segmentation": {
+            "calls": 240,
+            "input_characters": 529833,
+            "input_tokens_estimate": 158950,
+            "output_tokens_allowance": 86583,
+            "model_cost": {
+              "flash": 0.15158459999999999,
+              "pro": 0.55268268
+            }
+          }
+        },
+        "input_tokens_estimate": 589634,
+        "output_tokens_allowance": 373303,
+        "model_cost": {
+          "flash": 0.6248537999999999,
+          "pro": 2.25659676
+        },
+        "model_and_judge_cost": {
+          "flash": 1.5220814999999999,
+          "pro": 6.1530348
+        }
+      },
+      {
+        "arm": "tiers_session_cutting_only",
+        "label": "recorded plumbing only",
+        "scores": null,
+        "manifest_sha256": "5e56f786ce06e0bff0d9313dc9b6b87fefc53a9f2f7522677fa19e44edfc9865",
+        "ledger_sha256": "a0d22b3f4f8ffae312d4f0c8bc01c290b19ca74aa176f6cddc713fa7ad06a8bb",
+        "ledger_final_hash": "cbc40458a60e8ccac94f7da1661ffa346f1c66c954be12bded8552c6905b8c12",
+        "calls": 266,
+        "templates": {
+          "empty_consolidation": {
+            "calls": 42,
+            "input_characters": 810715,
+            "input_tokens_estimate": 243215,
+            "output_tokens_allowance": 172032,
+            "model_cost": {
+              "flash": 0.2794029,
+              "pro": 1.00229052
+            }
+          },
+          "fixed_answer": {
+            "calls": 224,
+            "input_characters": 629679,
+            "input_tokens_estimate": 188904,
+            "output_tokens_allowance": 114688,
+            "model_cost": {
+              "flash": 0.1942968,
+              "pro": 0.70351776
+            }
+          }
+        },
+        "input_tokens_estimate": 432119,
+        "output_tokens_allowance": 286720,
+        "model_cost": {
+          "flash": 0.4736997,
+          "pro": 1.70580828
+        },
+        "model_and_judge_cost": {
+          "flash": 1.3709274,
+          "pro": 5.60224632
+        }
+      }
+    ],
+    "totals": {
+      "flash": {
+        "development_with_contingency": 286.9931326875,
+        "held_back_equal_workload_with_contingency": 286.9931326875,
+        "two_personas_with_contingency": 573.986265375,
+        "topic_model_cost_per_persona_three_runs": 5.0022891000000005
+      },
+      "pro": {
+        "development_with_contingency": 1123.0324432125,
+        "held_back_equal_workload_with_contingency": 1123.0324432125,
+        "two_personas_with_contingency": 2246.064886425,
+        "topic_model_cost_per_persona_three_runs": 18.238516560000004
+      }
+    },
+    "three_runs_per_setup": true,
+    "runs_one_persona": 45,
+    "runs_two_personas": 90,
+    "allowances": "Same full-product foreground/background, candidate learned-state multiplier and 25% contingency as earlier estimate. Held-back assumes equal workload. Aging/outside systems excluded.",
+    "flash_exceeds_proposed_600_cap": false,
+    "uncertainty": "Synthetic one-range boundaries and empty consolidation do not measure actual segmentation choices, learned content, retries, full-product hooks or live judge usage."
+  },
+  "current_estimate": "topic_segmentation_measurement; historical version-3 rows and provisional topic projection remain immutable",
+  "current_budget_decision": {
+    "active_planning_scope": "two months only; 90 runs",
+    "paid_execution_approved": false,
+    "month_flash_proposed_cap_usd": 600,
+    "aging_extension_proposed_cap_usd": 610,
+    "aging_extension_status": "asked of owner, unanswered; aging excluded until decision"
+  }
 }
