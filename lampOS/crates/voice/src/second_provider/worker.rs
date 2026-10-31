@@ -8227,8 +8227,8 @@ impl Heeding {
         // 13 s was held as no conversation going on (lamp-3e83 on 30 Oct,
         // Jarvis and Migrate's launch finding 2 on #3997). The moment from
         // its end to its judging is left in, so a window ends no later.
-        // Only with `LAMP_WINDOW_FROM_START=on`, until its played check
-        // (Reviewer-two's P2 on #4604); off, measured to the judging as before.
+        // Only with `LAMP_WINDOW_FROM_START=on`, on in the product since its
+        // played check on 31 Oct (#4604); off, measured to the judging as before.
         let line_ran = Duration::from_micros(ended.saturating_sub(onset_us));
         let ran_for = if self.from_start {
             line_ran
