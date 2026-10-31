@@ -397,6 +397,40 @@ fn on_this_repository_each_switch_is_counted_as_the_product_has_it() {
     );
 }
 
+/// The real page: a row whose proposed product default is off until a
+/// check is never counted `off`. It is `until` while it waits, or `on` once
+/// a product file turns it on (the test above). Counted `off`, it is left out
+/// of `waiting` and so of the stable notes' "Built but not on yet": on 31 Oct
+/// six rows were, the voice-asked stand among them (Second's #4787).
+#[test]
+fn on_this_repository_no_switch_waiting_on_a_check_is_counted_off() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let rows = notes::rows(&page);
+    let waiting_on_a_check = |row: &&notes::Row| {
+        row.proposed.as_deref().is_some_and(|cell| {
+            cell.trim_start_matches(['*', '_', '`', ' '])
+                .to_lowercase()
+                .starts_with("off until")
+        })
+    };
+    assert!(
+        rows.iter().filter(waiting_on_a_check).count() > 100,
+        "the Proposed product default column was not read"
+    );
+    let wrong: Vec<String> = rows
+        .iter()
+        .filter(waiting_on_a_check)
+        .filter(|row| row.counted == "off")
+        .map(|row| format!("{} ({})", row.switch, row.part))
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "counted `off` in docs/switches.md, but its Proposed product default is off until a check; count it `until`:\n{}",
+        wrong.join("\n")
+    );
+}
+
 /// The real page and units: every `LAMP_*` a product file turns on has a
 /// row in the page's switch tables, unless the page's own left-out list
 /// ("How to read it": paths, sockets and test hooks, as `LAMP_*_SOCKET`)

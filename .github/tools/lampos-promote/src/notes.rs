@@ -42,6 +42,8 @@ const WAITING: [&str; 2] = ["until", "now"];
 pub const ON_UNSET: &str = "on (unset)";
 /// The column of a switch table that says what the product unit does.
 const PRODUCT_COLUMN: &str = "Product unit";
+/// The column of a switch table that says when the product should take it.
+const PROPOSED_COLUMN: &str = "Proposed product default";
 /// A value that leaves a switch off.
 const OFF: [&str; 5] = ["", "off", "0", "false", "no"];
 /// One sentence of a row's words at most this long.
@@ -179,6 +181,8 @@ pub struct Row {
     values: String,
     /// Its "Product unit" cell, if its table has one.
     pub product: Option<String>,
+    /// Its "Proposed product default" cell, if its table has one.
+    pub proposed: Option<String>,
 }
 
 /// Every row of the page's switch tables that names a switch, in the
@@ -188,6 +192,7 @@ pub fn rows(page: &str) -> Vec<Row> {
     let mut part = None;
     let mut header = false;
     let mut product_at = None;
+    let mut proposed_at = None;
     for line in page.lines() {
         if line.starts_with("## ") {
             part = TABLES
@@ -196,6 +201,7 @@ pub fn rows(page: &str) -> Vec<Row> {
                 .map(|(_, name)| *name);
             header = false;
             product_at = None;
+            proposed_at = None;
             continue;
         }
         let Some(part) = part else {
@@ -207,6 +213,7 @@ pub fn rows(page: &str) -> Vec<Row> {
         if !header {
             header = true;
             product_at = cells(line).iter().position(|cell| *cell == PRODUCT_COLUMN);
+            proposed_at = cells(line).iter().position(|cell| *cell == PROPOSED_COLUMN);
             continue;
         }
         let row = cells(line);
@@ -222,6 +229,9 @@ pub fn rows(page: &str) -> Vec<Row> {
             counted: row.last().copied().unwrap_or_default().to_owned(),
             values: row[1].to_owned(),
             product: product_at
+                .and_then(|at| row.get(at))
+                .map(|cell| (*cell).to_owned()),
+            proposed: proposed_at
                 .and_then(|at| row.get(at))
                 .map(|cell| (*cell).to_owned()),
         });
