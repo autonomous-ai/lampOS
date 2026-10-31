@@ -247,8 +247,9 @@ says it too, from the file itself: while a `schedule.sqlite3.newer-*` file is
 in Schedule's folder, its `schedule` diagnostic is a warning, "Schedule set
 aside a store from a newer build; its reminders will not sound", with
 `set_aside` naming the newest one (by its trailing seconds), as lamp-tasks'
-health does for its own (#1554). The folder is listed once a second, at most,
-with the diagnostic, and a folder that can't be listed says nothing rather
+health does for its own (#1554). The folder is listed each time the diagnostic is
+published: once a second (`REPORT_EVERY`), and again at each change of
+revision or readiness, and a folder that can't be listed says nothing rather
 than stopping the part. Removing the file, once someone has looked, ends the
 warning. Test: `a_store_set_aside_is_said_in_health_until_it_is_gone`
 (`crates/schedule/tests/it/runtime.rs`).
@@ -712,7 +713,9 @@ dropping the field (its items then are no one's, which only narrows).
 - **The app is the owner's view.** `schedule.list` and `schedule.cancel`
   (`Adapter::call_plain`, `Adapter::call`) send no asker and see every
   item, as before: the app is the owner's, over the lamp's own account
-  channel.
+  channel. That route is lamp-cloud's, only with `LAMP_APP_SCHEDULE=on`,
+  and the product's `lamp-cloud.service` does not set it
+  ([switches.md](switches.md): off until the app's page uses it).
 - **A forget takes them too.** A person's "forget everything about me"
   that emptied their memory cancels every reminder they set
   (`Request::Forget`, the executive's own `schedule_forget` op, which no
@@ -734,7 +737,8 @@ dropping the field (its items then are no one's, which only narrows).
 A room line's reminder (nobody known) is then heard and cancelled only on
 the owner's line: on a lamp where nobody is known by face or typed name,
 no line is the owner's, and such a reminder is said when due but can't be
-listed or cancelled by voice, only from the app. Tests:
+listed or cancelled by voice. Only the app could, and its route is off in
+the product (above), so on a product lamp nothing lists or cancels it. Tests:
 `each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_person_ones`,
 `a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing`,
 `a_persons_forget_cancels_every_reminder_they_set_and_survives_a_reopen`
