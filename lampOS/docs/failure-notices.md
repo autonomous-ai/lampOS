@@ -185,7 +185,7 @@ retirement as `turn_lost`. With no recording provisioned the turn is
 **Back online.** When the link is ready again after an outage in which the
 line was said, "I'm back online." (`back_online`) is owed for 60 s
 (`BACK_ONLINE_OWED_US`). It is said once by a turn the lamp takes for itself
-with no input (`commit_back_online`, local-only like the offline turn), only
+with no input (`commit_own_line`, local-only like the offline turn; it says the signed-out line too), only
 when nothing holds the lamp (no turn, nothing queued or pending, not paused,
 the microphone allowed) and the room is quiet as for a reminder. Someone
 answered first, a new outage, or the minute passing let it go unsaid. Both
@@ -307,10 +307,11 @@ as a line begins, so a held line opens none.
 
 ## Verified, and not
 
-Host, `crates/audio/tests/it/notice.rs`, 7 tests: an exact load; every
+Host, `crates/audio/tests/it/notice.rs`, 9 tests: an exact load; every
 manifest-level failure; test assets refused in production; one faulty asset
 refusing only itself; format, length and silence checks at both bounds; a
-linked asset; malformed names and text.
+linked asset; malformed names and text; and the Wi-Fi lost and recovering
+lines, each a kind of its own.
 
 Not done: native qualification of the optional live playback integration.
 
@@ -396,8 +397,10 @@ lines, which say why, are still the answer: the product's come from
 `lamp-voice directed` and `lamp-voice serve` accept the paired options
 `--failure-notice-dir ABS_PATH --failure-notice-language TAG`. Both must be
 explicit. Omission preserves silent failure behavior. Fixture-provider and
-child-worker commands reject these options. This integration selects only
-`turn_lost` in the exact requested language, requires `approval: production`,
+child-worker commands reject these options. This integration loads seven
+kinds, `turn_lost`, `provider_unavailable`, `back_online`,
+`voice_service_unreachable`, `wifi_lost`, `wifi_recovering` and `signed_out`
+(`FailureNotices::load_with_approval`), in the exact requested language, requires `approval: production`,
 and loads it once before starting audio workers. It never synthesizes,
 downloads, resamples, or opens a second speaker. A missing or refused recording
 is visible in `failure_notice_capability`; active ticks perform no asset I/O.
