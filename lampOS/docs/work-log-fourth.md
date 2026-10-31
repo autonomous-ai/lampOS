@@ -1,3 +1,13 @@
+## 2026-10-31 11:4x ICT — #4713 and #4715 land; the night-sleep race (#4718); fixed lines in the owner's language (#4723)
+
+**Landed in train 450:** #4715 (the catalog tests on the rig's clock) and #4713 ("Let me look." and "Let me check." in the owner's language). Reviewer-two's P3 on #4715, a clause in `logical_clock()`'s doc, is #4720, with their READ-OK, in train 451.
+
+**#4718, night sleep (draft):** lamp-skills' tick read the clock, then Expression's state from the bus, and a state written between the two (stamped after `now`) ended an admitted rest. Tests found the same path at the same time and couldn't build it (disk). I ran their proposed test (it failed: a Cancel published) and fixed it by judging such a state at the next tick. It's no evidence anyway (`target` needs `stamp <= now`), and the 3 s lease still bounds a confused clock. Tests dropped their copy and gave READ-OK. It's a draft until Seventh's yes (night sleep is theirs).
+
+**#4723, the owner's language:** a sweep of the second route's spoken constants against the product units found three lines on in the product and always English. They were the down lines (`LAMP_SECOND_DOWN_LINE`), "I couldn't get a good look." (`LAMP_SECOND_LOOK`) and "Okay, I'll stop there." (`LAMP_SPOKEN_STOP_ENDS`). They're now `FIXED_LINES` rows (15) said through `fixed_in`, with a Japanese down-line test whose control fails on the English. It waits on Thirteen's or Seventh's read.
+
+**#4337's played check** (asks which area instead of guessing) was still owed. I added it to the first builder's `4ACE RUN #4700` slot.
+
 ## 2026-10-31 10:4x ICT — #4700 lands; its 4ace run asked; a catalog test flake (#4715)
 
 **#4700 landed in train 448** (`3ed3cb0aa2`, `65b10836e0`), with `LAMP_SECOND_SAY_WITH_CALL` off. I asked the first builder for `4ACE RUN #4700` on the Queue: their #4635 day lines with it on and off, `LAMP_SHORT_DONE` on in lamp-actions' unit, and the light started below its warmest, because three of their four warmer turns at 07:51 were unchanged calls, which #4700 never answers at once. It also covers the ErgoChair price line with `LAMP_SECOND_CHECKING_LINE` on. #2135 says it waits on that run.
