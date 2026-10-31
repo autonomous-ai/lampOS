@@ -803,6 +803,31 @@ order is kept. A written turn is the same from the chat on.
   ask in the same line ("dim the light and tell me a joke") is still said
   (the Reviewer-lead's P2 on #2930). Without `LAMP_SECOND_SAID_ONCE` the
   switch asks nothing, and the journal says so at start.
+
+  **The model rarely did.** On lamp-4ace on 31 Oct (build `4ac4cc2bdf`, the
+  product unit, day lines with the switch off and on alternating) its own
+  words came with the call 1 time in 8 acting turns, round 2 still ran each
+  time, and the median first sound was 1.83 s off against 1.88 s on (the
+  first builder on #4635). So the same switch also answers such a turn
+  **with the acting part's own words, at once** (`Engine::saying_at_once`,
+  #2135), without `LAMP_SECOND_SAID_ONCE`:
+  - **A round with no words of its own whose calls all changed the light or
+    the volume,** each one answered short by lamp-actions (its `say`, with
+    `LAMP_SHORT_DONE=on` in `lamp-actions.service`), says the calls' own
+    line ("Warmer.", "Done." when they differ) as soon as the calls are
+    answered.
+  - **A round whose one call set a timer, committed,** says "Timer set. It
+    rings at HH:MM." with the schedule's own `clock`, the local time it
+    rings, so the time said is the time set (`timer_line`).
+  - **Then the next round still runs,** told the lamp said it
+    (`short_done_note`), for anything else asked ("brighter, and is it
+    sunny?" gets the weather after "Brighter."). It is no longer waited for:
+    without the switch, `LAMP_SHORT_DONE`'s line is kept until that round
+    has added nothing (the Reviewer-lead's P2 on #2930).
+  - **Never** for a keep or a forget beside the change, a call refused,
+    failed, held or unchanged ("already"), two timers, a reminder at a day
+    and time (its day words are still to come), or a round with words of
+    its own. Those turns go on as without the switch.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
