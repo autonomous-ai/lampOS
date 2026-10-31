@@ -4,7 +4,7 @@
 and the light on one injected clock. It opens no hardware. It starts in
 **shadow mode**; only `serve --enable` publishes actuator requests. Body has
 an opt-in consumer, `LAMP_EXPRESSION_BODY=on`, used by First on lamp-4ace
-since 2026-10-14, 10:05. Voice's ring integration and all physical
+since 2026-10-14, 10:05, and set in the product's body unit. Voice's ring integration and all physical
 qualification remain First's work.
 
 Since 2026-10-14 the voice publishes the three inputs it owes
@@ -12,8 +12,9 @@ Since 2026-10-14 the voice publishes the three inputs it owes
 `LAMP_EXPRESSION_OUT=on`: see "What the voice says, as built" below.
 Task 18 adds the separate `voice/progress` and `voice/sound` contract and
 the optional [`rest-behaviours.json`](../crates/expression/rest-behaviours.json)
-catalogue. The current Voice publisher still uses the original contract;
-First must wire the new pair before selecting that catalogue on the lamp.
+catalogue. The voice publishes the new pair beside the original three
+(`crates/voice/src/expression_out.rs`, `ExpressionOut::on`), and the
+product's catalogue selects it (`"resumable_voice": true`).
 The separate [`playout-behaviours.json`](../crates/expression/playout-behaviours.json)
 catalogue adds bounded recent-level sampling to today's original Voice
 protocol. Selecting it does not enable the finishing nod, rest or new protocol.
@@ -156,8 +157,10 @@ cannot hide an abrupt short segment. The shipped two-second rise requests
 at most 0.03375 radians/second and 0.0675 radians/second² before composition
 with other layers; these are calculated trajectory bounds, not measurements.
 
-**Current Body boundary.** Body deliberately ignores Expression offsets
-when settled at rest. It also has a separate optional idle author. This task
+**Current Body boundary.** Body ignores Expression offsets when settled at
+rest unless started with `--rest-glance on`, as the product's body unit is:
+then a lamp at rest takes the head's offsets, up to 50 counts of pitch and
+25 of roll, and never turns the base (`REST_GLANCE_REACH`). It also has a separate optional idle author. This task
 therefore supplies a rest plan, not resting motion on the lamp. First must
 choose one author, decide how an eligible rest request reaches the final
 writer, and preserve Body's local safety and privacy rules. See
@@ -284,7 +287,7 @@ it has said that is still to end. The voice says its sound 200 ms ahead
 was ever at the lag: the speaking motion took level 0, and a story on
 lamp-4ace nodded and swayed never and only settled (#1759; the coordinator
 test, which set the lag to 0, hid it). Now a move lands at most 100 ms early,
-under one nod's 360 ms. Tests: `speaking_engine.rs`'s
+under one nod's 450 ms (`nod_us`). Tests: `speaking_engine.rs`'s
 `an_answer_said_200_ms_ahead_nods_and_sways_at_the_catalogues_own_lag` (0
 nods without it), and the second route's coordinator test at the
 catalogue's own lag. The old playout clip still takes the level at the lag
@@ -379,7 +382,8 @@ runs an eight-second answer with stressed words every 1.1 s and a half-second
 pause every 3 s through the engine, in a quiet and a busy room. It expects
 2 or 3 nods (one a sentence), the base turned out by more than 0.055 rad, over 0.02 rad
 of pitch range, the settle, and what speaking adds never stepping more than
-0.007 rad of pitch or of yaw in a 20 ms tick. Without `speaking`, the
+0.007 rad of yaw in a 20 ms tick, nor of pitch more than 1.1 times a smooth
+nod's own steepest step (at least 0.007). Without `speaking`, the
 same answer plans none of it and never turns the base, and #955's section
 with `sway_roll` loads and plans no sway (`tests/it/program.rs`: the service
 starts with it and says so once). It also checks the fences: a new turn, or a
@@ -636,8 +640,8 @@ in `Timing`, which has no bus and takes its clock from the caller; the
 coordinator looks at itself once each pass of its loop and hands that over.
 `clock_id` is the kernel's boot identity, `session_id` the service's
 `INVOCATION_ID`, and `request` is the turn's own number.
-This is First's existing legacy publisher. It does not yet publish
-`VoiceProgress` or `VoiceSound`.
+This is First's existing legacy publisher. It also publishes
+`VoiceProgress` and `VoiceSound` (`ExpressionOut::on`).
 
 | Said | From what | When |
 |---|---|---|
@@ -675,8 +679,8 @@ from the task 18 host implementation:
   listening from the first moment of a yield, as they did before; a
   consumer of `expression/light` and `expression/body` inside the voice or
   the body must let that local knowledge win. The new progress/sound pair
-  above supplies the missing "paused, may resume" contract; First still has
-  to connect it to this publisher.
+  above supplies the missing "paused, may resume" contract, and this
+  publisher sends it.
 - **The turn that cuts the lamp off begins in the same moment.** On the lamp
   the person who interrupts is heard at once as a turn of their own, so
   `Interrupted` and the next turn's first state arrive together. As first
@@ -724,7 +728,8 @@ from the task 18 host implementation:
   second, stale at 5 s). Missing, one of them means a part is not running
   or not publishing.
 - **The body can take its requests** (`crates/body/src/expression_in.rs`,
-  `LAMP_EXPRESSION_BODY=on`, off by default; [body.md](body.md), "What
+  `LAMP_EXPRESSION_BODY=on`, off by default and on in the product's body
+  unit; [body.md](body.md), "What
   Expression may add"). It takes the head's pitch and roll and the base's
   turn, adds them to the pose its own mood wants, and holds them to its
   own reach and speed. The sign it reads: a positive `head_pitch` dips the
@@ -748,7 +753,7 @@ endings, the listening after a cut-off, nothing a reader would refuse, the
 person's speech and pauses, the stretches of sound, the dating of a write),
 and one test that passes twelve made-up seconds of the voice's loop through
 `Timing` into `lamp_expression::Engine` as the bus would
-(`crates/voice/tests/expression_out.rs`): 155 timing, 39 activity and 70
+(`crates/voice/tests/it/expression_out.rs`): 155 timing, 39 activity and 70
 playout messages, none refused and no warning, and the planner planned
 the nod in the pause (120 ms into it), the glance while the answer was
 awaited, the sway while it played, the yield when it was cut off, and a
@@ -789,7 +794,7 @@ channel and does not change type or ownership.
 
 | Topic / type | Subscriber and action |
 |---|---|
-| `expression/body` / `ExpressionBody` | Body: bounded relative offsets or a stillness request. The current consumer takes head pitch/roll and base yaw, ignores arms and the optional normalized gaze, and does not stir settled rest |
+| `expression/body` / `ExpressionBody` | Body: bounded relative offsets or a stillness request. The current consumer takes head pitch/roll and base yaw, ignores arms and the optional normalized gaze, and stirs settled rest only with `--rest-glance on` (the product's) |
 | `expression/light` / `ExpressionLight` | Voice's ring owner: draw the face and brightness multiplier using the included persistent `Light` setting; preserve off and explicit settings |
 | `expression/state` / `ExpressionState` | Operator/model/recorder: enabled/shadow, planned behaviors, missing inputs and warnings; not proof of execution |
 | `diagnostics` / `Diagnostic` | Health: readiness, accepted/refused input, transport losses/errors and measured host service-loop time |
@@ -1084,8 +1089,8 @@ First's legacy publisher, shadow planner and Body consumer measurements are
 recorded above and in [Body](body.md#what-expression-may-add) and
 [work-split.md](work-split.md). Third has not accessed the lamp. Those earlier
 measurements do not qualify the new hold/resume contract, the combined
-finishing nod or rest. Voice does not yet publish the new pair, and Body
-still suppresses settled-rest offsets.
+finishing nod or rest. Voice publishes the new pair, and Body takes
+settled-rest offsets only with `--rest-glance on`.
 
 Host tests and authored replays do not establish physical motion, camera
 calibration, optical latency, acoustic onset/cancellation, safe motor
