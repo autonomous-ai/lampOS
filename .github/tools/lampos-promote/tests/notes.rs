@@ -324,6 +324,23 @@ fn on_this_repository_a_file_install_never_places_turns_nothing_on() {
     );
 }
 
+/// A file counts as placed only by the name install places it under: a hand
+/// drop-in holding an installed unit's text word for word is not read
+/// (Second's P3 on #4666).
+#[test]
+fn a_file_with_an_installed_text_under_another_name_is_not_read() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let voice = std::fs::read_to_string(lamp_os.join("deploy/product/lamp-voice.service")).unwrap();
+    let copy = tempfile::tempdir().unwrap();
+    let product = copy.path().join("deploy/product");
+    std::fs::create_dir_all(product.join("settings")).unwrap();
+    std::fs::write(product.join("lamp-voice.service"), &voice).unwrap();
+    std::fs::write(product.join("hand-voice.conf"), &voice).unwrap();
+    let files = notes::product_files(copy.path()).unwrap();
+    assert!(files.contains_key("lamp-voice.service"));
+    assert!(!files.contains_key("hand-voice.conf"));
+}
+
 /// The real page and units: no switch a product file turns on is counted
 /// `until` or `now`, which say it waits off for a check, so the page's
 /// counts of what waits are what's off (Reviewer-two's P3 on #4662).
