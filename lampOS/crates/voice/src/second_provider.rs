@@ -227,6 +227,12 @@ pub const LOOKING: &str = "Let me look.";
 /// on: the search, our page's price read and the next round can take 4.5 s
 /// with nothing said (lamp-4ace on 31 Oct, #4684's run, line 1).
 pub const CHECKING: &str = "Let me check.";
+
+/// [`CHECKING`] as the lamp says it: in the owner's language
+/// (`language::FIXED_LINES`), English where none is chosen.
+fn checking_words() -> &'static str {
+    crate::language::fixed_in(crate::language::at_start(), CHECKING)
+}
 /// With Gemini's speech, the answer's first piece goes once this many words
 /// have come, if no sentence or clause ended sooner
 /// ([`Engine::cutting_first_words`]; the first builder on #1712: "cut at the
@@ -9817,7 +9823,12 @@ async fn answer(
                 if ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?
                     && !queue.started
                 {
-                    queue.push(LOOKING.to_owned()).await?;
+                    queue
+                        .push(
+                            crate::language::fixed_in(crate::language::at_start(), LOOKING)
+                                .to_owned(),
+                        )
+                        .await?;
                 }
                 return Ok(());
             }
@@ -9923,9 +9934,10 @@ async fn answer(
                     .any(|call| call.name == net::search::NAME || call.name == net::search::FETCH);
             if checking {
                 eprintln!(
-                    "lamp-voice second: request {request} chat round {round} searches with nothing said; said \"{CHECKING}\" (LAMP_SECOND_CHECKING_LINE)"
+                    "lamp-voice second: request {request} chat round {round} searches with nothing said; said \"{}\" (LAMP_SECOND_CHECKING_LINE)",
+                    checking_words()
                 );
-                queue.push(CHECKING.to_owned()).await?;
+                queue.push(checking_words().to_owned()).await?;
             }
             messages.push(Message::assistant_calls_with(
                 Some(text),
@@ -10304,7 +10316,12 @@ async fn answer(
                 && ask_look(shared, request, heard || searching, (&name, args), note).await?
             {
                 if !queue.started {
-                    queue.push(LOOKING.to_owned()).await?;
+                    queue
+                        .push(
+                            crate::language::fixed_in(crate::language::at_start(), LOOKING)
+                                .to_owned(),
+                        )
+                        .await?;
                 }
                 return Ok(());
             }
@@ -10333,7 +10350,7 @@ async fn answer(
                 messages.push(Message::system(note));
             }
             if checking {
-                messages.push(Message::system(said_once_note(CHECKING)));
+                messages.push(Message::system(said_once_note(checking_words())));
             }
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
