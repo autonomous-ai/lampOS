@@ -12,7 +12,7 @@ has the whole of it; where an older note differs, this section is current.
 It replaces the three-agent `harness send` route of 12 October.
 
 - **Where.** Status, `free`, questions and proposals for the first builder go
-  as comments on the current Queue issue (#3997, continued from #3504).
+  as comments on the current Queue issue (#4710, continued from #3997).
   If it fills, follow the continuation link in its body; an older role file
   may still name a full Queue.
   A review and its answers go on the pull request. A fault in someone else's
