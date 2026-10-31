@@ -810,32 +810,65 @@ pub(crate) fn timer_line(
 }
 
 /// Whether `said` plainly holds more than one ask, so the round after an
-/// answer at once is still asked (`LAMP_SECOND_SAY_WITH_CALL`, #2135): a
-/// word that joins asks ("and", "also", "then", "plus", "too"), or a second
-/// sentence. "Make it warmer." and "Remind me in two minutes to stretch."
-/// hold one; "Brighter, and is it sunny?" holds two. With one, the turn ends
-/// with the acting part's words: on lamp-4ace on 31 Oct the next round, told
-/// the lamp had answered, said the reminder again in other words ("Two
-/// minutes — I'll nudge you at 12:03.", the first builder on #4710). A line
-/// misread as holding two only asks the round as before.
-pub(crate) fn asks_more(said: &str) -> bool {
-    const JOINING: [&str; 5] = ["and", "also", "then", "plus", "too"];
-    let lower = said.to_lowercase();
-    if lower
-        .split(|c: char| !c.is_alphanumeric() && c != '\'')
-        .any(|word| JOINING.contains(&word))
-    {
-        return true;
-    }
-    let mut ended = false;
-    for c in said.chars() {
-        if matches!(c, '.' | '?' | '!') {
-            ended = true;
-        } else if ended && c.is_alphanumeric() {
-            return true;
+/// answer at once is still asked (`LAMP_SECOND_SAY_WITH_CALL`, #2135). The
+/// words are cut into clauses at a sentence's end (not a point between
+/// digits, "2.5"), a comma or semicolon, and "and", "also", "then" or
+/// "plus"; a clause of only thanks, a greeting, the name or "okay" asks
+/// nothing; a call's own words ("take out the trash and recycling", a
+/// reminder's `text`) are its ask. More clauses than the round's `calls`
+/// answered is more: "Brighter, and is it sunny?" and "Dim the light, tell
+/// me a joke." are; "Make it warmer." "It's too bright." "Make it warmer and
+/// brighter." (two calls) and "Make it warmer. Thanks!" are not
+/// (Reviewer-three's P2 on #4726). With one ask, the turn ends with the
+/// acting part's words: on lamp-4ace on 31 Oct the next round, told the lamp
+/// had answered, said the reminder again in other words ("Two minutes —
+/// I'll nudge you at 12:03.", the first builder on #4710). A line misread
+/// as holding more only asks the round as before.
+pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
+    const JOINING: [&str; 4] = ["and", "also", "then", "plus"];
+    const FILLER: [&str; 15] = [
+        "thanks", "thank", "you", "please", "okay", "ok", "cheers", "lamp", "hey", "hi", "great",
+        "cool", "now", "so", "oh",
+    ];
+    let mut line = said.to_lowercase();
+    for text in calls.iter().filter_map(|call| call.args["text"].as_str()) {
+        let text = text.trim().to_lowercase();
+        if !text.is_empty() {
+            line = line.replace(&text, " ");
         }
     }
-    false
+    let chars: Vec<char> = line.chars().collect();
+    let digit = |at: Option<usize>| {
+        at.and_then(|at| chars.get(at))
+            .is_some_and(char::is_ascii_digit)
+    };
+    let marked: String = chars
+        .iter()
+        .enumerate()
+        .map(|(at, &c)| match c {
+            '.' if digit(at.checked_sub(1)) && digit(Some(at + 1)) => c,
+            '.' | '!' | '?' | ',' | ';' => '|',
+            _ => c,
+        })
+        .collect();
+    let mut clauses: usize = 0;
+    for part in marked.split('|') {
+        let mut clause: Vec<&str> = Vec::new();
+        let words = part
+            .split(|c: char| !c.is_alphanumeric() && c != '\'')
+            .filter(|word| !word.is_empty());
+        for word in words.chain(std::iter::once("and")) {
+            if JOINING.contains(&word) {
+                if clause.iter().any(|word| !FILLER.contains(word)) {
+                    clauses += 1;
+                }
+                clause.clear();
+            } else {
+                clause.push(word);
+            }
+        }
+    }
+    clauses.saturating_sub(1) > calls.len().saturating_sub(1)
 }
 
 /// An `HH:MM` clock on a 12-hour clock: "07:52" is "7:52 am", "19:52"
@@ -9146,9 +9179,10 @@ async fn answer(
     // mind." is rightly answered with nothing (the Reviewer-lead's P2 on
     // #3712).
     let by_name = crate::attention::begins_with_the_name(&said) && !says_stop(&said);
-    // Whether the line asks more than an answer at once covers, and whether
-    // it asked for a reminder (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
-    let more_asked = asks_more(&said);
+    // The line's words, for whether it asks more than an answer at once
+    // covers, and whether it asked for a reminder
+    // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
+    let heard_words = said.clone();
     let reminded = said.to_lowercase().contains("remind");
     let words = Message::user(said.clone());
     let event_words = said.clone();
@@ -10475,7 +10509,7 @@ async fn answer(
                 // (`LAMP_SECOND_SAY_WITH_CALL`, #2135: on lamp-4ace on 31 Oct
                 // the model's own words came with the call 1 time in 8).
                 queue.push(line.to_owned()).await?;
-                if !more_asked {
+                if !asks_more(&heard_words, &calls) {
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" said at once, and nothing else was asked: the turn ends with it (LAMP_SECOND_SAY_WITH_CALL)"
                     );
@@ -10497,7 +10531,7 @@ async fn answer(
                 && let Some(line) = timer_line(&calls, &short_told, reminded)
             {
                 queue.push(line.clone()).await?;
-                if !more_asked {
+                if !asks_more(&heard_words, &calls) {
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round}: the timer is set; \"{line}\" said at once, and nothing else was asked: the turn ends with it (LAMP_SECOND_SAY_WITH_CALL)"
                     );
