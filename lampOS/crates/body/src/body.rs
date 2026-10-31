@@ -3287,26 +3287,41 @@ fn let_go_at_end<P: PortIo, R: Runtime>(bus: &mut Bus<'_, P, R>, report: &mut Bo
 /// then lies (#4390): torque off to the shoulder and the elbow, a read, each
 /// goal set to its position, torque on. Folded, the arm is at its lowest and
 /// stays where it is let go, and a joint wedged against its stop stops
-/// pushing there. The read after, or the first failure.
+/// pushing there. The read after, or the first failure. A failed write
+/// never leaves a joint limp: a torque-off that fails part-way puts torque
+/// back on the joints it let go, and torque comes back on each joint
+/// whatever its goal write did.
 fn release_arm<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
 ) -> Result<[Sample; 5], String> {
     let mut holding = ARM.to_vec();
     if let Some(detail) = torque_off(bus, report, &mut holding) {
+        for joint in ARM.into_iter().filter(|joint| !holding.contains(joint)) {
+            report.torque_writes = report.torque_writes.saturating_add(1);
+            let _ = bus.write_patiently(joint, &torque_write(joint, 1));
+        }
         return Err(detail);
     }
     let due = bus.runtime.now() + Standing::RELEASE;
     bus.sleep_until(due);
     let now = bus.samples();
+    let mut failed = None;
     for joint in ARM {
-        // Torque comes back on whatever the read said: where it was told to
-        // go before, if the read failed.
-        if let Ok(now) = &now {
-            bus.write_goal(joint, now[joint.index()].position, true)?;
+        // Torque comes back on whatever the read or the goal write did:
+        // where it was told to go before, if either failed.
+        if let Ok(now) = &now
+            && let Err(detail) = bus.write_goal(joint, now[joint.index()].position, true)
+        {
+            failed.get_or_insert(detail);
         }
         report.torque_writes = report.torque_writes.saturating_add(1);
-        bus.write_patiently(joint, &torque_write(joint, 1))?;
+        if let Err(detail) = bus.write_patiently(joint, &torque_write(joint, 1)) {
+            failed.get_or_insert(detail);
+        }
+    }
+    if let Some(detail) = failed {
+        return Err(detail);
     }
     report.arm_releases = report.arm_releases.saturating_add(1);
     now
