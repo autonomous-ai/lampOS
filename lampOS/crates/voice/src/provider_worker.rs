@@ -9942,7 +9942,10 @@ pub(crate) mod tests {
     /// The worker's leases, heartbeat bound and waits, and the rig's
     /// heartbeats and capture times, read the scenario clock; the rig's
     /// ticks move it two milliseconds at a time with Tokio's, so a wait of
-    /// seconds passes in no time and the two clocks never part.
+    /// seconds passes in no time and the two clocks never part. It also
+    /// serves a runtime that is not paused (`tests/catalog.rs`): the rig's
+    /// ticks still drive it, so a stall of the host between two heartbeats
+    /// is not counted, while Tokio's timers and `Instant` stay on the host.
     fn logical_clock() -> crate::scenario_clock::Scope {
         let scope = crate::scenario_clock::Scope::enter(Duration::from_secs(60)).unwrap();
         scope.set_pump(|_| Ok(())).unwrap();
