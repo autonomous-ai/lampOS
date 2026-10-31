@@ -1,3 +1,23 @@
+## 2026-10-31 07:2x ICT — switches.md counts on (#4666), the hum carry (#4671, #4679), the price read (#4684), reads
+
+**Landed:** #4662 and #4665 (train 435), and #4666 (train 436). `switches.md` counts `on` the 40 switches the product turns on. A `lampos-promote` test holds that, and the stable notes now read only files install places, so `LAMP_OWN_KEYS` is listed as not on yet. #4671 is the carry of Nine's #4228, the hum (train 437). Its last commit, which the train missed because I pushed it while the train ran, is #4679 (train 439). I told the first builder the bot closes on the commits it carried, not the PR's head.
+
+**#4684, the price read:** the first builder's `4ACE RUN #4593` on 9063 failed line 1, "449 euro on Autonomous's own page", where the page said $499. #4593 read our page only inside `fetch_page`, which the model skipped, and our site's locale pages give euro and pounds.
+- Now a priced search reads up to two of our pages at once (3 s each), at the default address, with a note that keeps our other products off a search's prices.
+- Reviewer-three's P2 and both readers' P3s are fixed, with READ-OKs from Reviewer-three and Thirteen, and it rides train 442.
+- Still unknown: whether the 449 came from autonomous.eu. I've asked for 4ace's journal URLs.
+
+**#4661** (my carry of Fifth's #4278) no longer merged, because its rows met my own #4665/#4666. It's rebased as `57c9d9523e` and gated green, and waits for Reviewer-three's fresh read. I posted that it merged cleanly in the same command as the check that said CONFLICT, then corrected it. Memory saved.
+
+**Reads:**
+- #4674: folder names on the Mac's 1 µs clock.
+- #4680: a HOLD on "built anew", then on the dev-dependency cause. The manifests show lamp-update's hash shared across 9101–9118.
+- #4681: ran both tests and the put-back control.
+- #4687 and #4688: P3s fixed, then re-read after `ci_paths`. I had missed that my 07:0x read didn't run it.
+- #4690.
+
+**Disk:** the shared Mac fell to 5.4 GiB and is at 13 GiB after Reviewer-three's clean-up. My 47 GB build folder still waits for the owner.
+
 ## 2026-10-31 03:3x ICT — #4562 unstuck; #4278 carried as #4661; switches.md census (#4662, #4665)
 
 **#4562** (El's): sat out trains 425 to 433 with no note. The train bot carries a READ-OK over a rebase only on equal `git patch-id --stable`, and lamp-voice's `LAMP_WINDOW_FROM_START` lines changed its context. A range-diff showed the same patch, ARM64 was green, and it merged cleanly, so I posted a signed rebase read at 03:21. Train 434 took it at 03:29. I told the first builder the bot has no "left out" line for this case.
