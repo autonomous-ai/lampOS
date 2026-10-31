@@ -154,8 +154,9 @@ Synthetic token usage must never be multiplied by live prices as an invoice
 or realistic forecast. Cost estimates use the measured request shapes and
 explicit assumptions instead.
 
-Nightly work drains after each local session end; weekly work drains after
-every seventh local session end. Weekly dates follow fixture calendar days,
+Nightly work drains after the final event of each local fixture day; weekly
+work drains after every seventh local fixture day. Weekly dates follow
+fixture calendar days,
 not seven fixed 24-hour intervals. All reference and candidate arms use this
 same schedule. The earlier 5a9a1774b reference plumbing attempts predate the
 weekly scheduling addition and retain that revision in their manifests.
@@ -167,3 +168,9 @@ questions from the frozen registration, without claiming any completed
 review. It also states the additional disagreement/privacy audits. The
 [out-of-tree adapter notes](external-arms.md) describe mem0 and MemoryOS
 integration requirements without adding either runtime to lampOS.
+
+The [cost estimate](cost-estimate.md) separates measured request sizes from
+unmeasured live-path allowances. The [recorded run evidence](recorded-runs/registration-v3/README.md)
+retains all fourteen completed month checks and interrupted attempts. These
+checks have null scores and do not establish memory quality. Fading is **not
+exercised by this month**; the separate aging test remains to be registered.

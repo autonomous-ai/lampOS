@@ -1,0 +1,742 @@
+{
+  "as_of": "2026-10-31",
+  "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+  "label": "planning estimate, not billed usage and not accuracy scores",
+  "complete_measured_table": true,
+  "token_heuristic": "1 English character approximately 0.3 token; JSON and model tokenization differ; actual provider usage remains authoritative",
+  "rates": {
+    "flash": {
+      "input_per_million": 0.3,
+      "output_per_million": 1.2
+    },
+    "pro": {
+      "input_per_million": 1.32,
+      "output_per_million": 3.96
+    }
+  },
+  "rate_assumptions": "Peak list rates, cache misses, no discounts/free credits; Flash V4.1-Flash-1017 and Pro V4-Pro-0813; model choice not yet pinned by owner",
+  "sources": {
+    "model_prices": "https://api-docs.deepseek.com/quick_start/pricing/",
+    "token_heuristic": "https://api-docs.deepseek.com/quick_start/token_usage/",
+    "speech_prices": "https://deepgram.com/pricing"
+  },
+  "fixture_registration_sha256": "8d7b09d0a5ec44f57c5118e938120df1f49e3acf7a8f5b906015c08f0b315490",
+  "fixture_events_sha256": "638f418a71453a64f56eb840f91435ce1a45bd032dea12f21bebd21dd2f86248",
+  "scripted_replies": "Common deterministic acknowledgements, no ingestion foreground model calls. Does not test real replies or promises.",
+  "setup_count": 14,
+  "repetitions": 3,
+  "runs_one_persona": 42,
+  "runs_two_personas": 84,
+  "optional_outside_arms": "mem0 and MemoryOS add six runs per persona; not estimated",
+  "judge_reserve_per_run": {
+    "questions": 76,
+    "criteria": 175,
+    "prompt_bytes": 9149726,
+    "candidate_answer_turns": 100,
+    "input_tokens_estimate_and_allowance": 2835030,
+    "output_tokens_allowance": 38912,
+    "assumption": "All eligible observed source text, complete fixed rubric, 512 input tokens per candidate answer/follow-up, 512 input instruction tokens per judge, 512 output tokens per judge; no live judge called.",
+    "cost": {
+      "flash": 0.8972034,
+      "pro": 3.89633112
+    }
+  },
+  "speech_once": {
+    "records": 1500,
+    "unique_audio": 191,
+    "all_record_minutes": 51.85358333333333,
+    "unique_audio_minutes": 9.616883333333334,
+    "nova3_streaming_per_minute": 0.0077,
+    "keyterm_per_minute": 0.0013,
+    "all_record_cost": 0.46668224999999997,
+    "deduplicated_cost": 0.08655195,
+    "charged_once_per_persona_cache": true,
+    "tts_cloud_cost": 0,
+    "live_calls": 0,
+    "audio_and_pcm_hashes_verified": 191
+  },
+  "complete_product_extra_reserve_per_run": {
+    "main_observation_calls": 254,
+    "main_summary_and_final_fold_calls": 1500,
+    "probe_observation_calls_allowance": 448,
+    "probe_summary_calls_allowance": 1120,
+    "observation_input_tokens_per_call": 16000,
+    "summary_input_tokens_per_call": 6000,
+    "output_tokens_per_call": 4000,
+    "input_tokens_allowance": 26952000,
+    "output_tokens_allowance": 13288000,
+    "cost_per_run": {
+      "flash": 24.0312,
+      "pro": 88.19712
+    },
+    "assumption": "240 scripted conversations plus two possible splits for each of seven visitor utterances. Each fold consumes at least one previously unsubmitted exchange. Additional isolated probe allowance is two observations and five folds per answer turn, allowing old/new conversation closure, four retained scopes and one final fold. These are planning assumptions, not proven product execution bounds or new per-call limits. The product has no output-token ceiling today; only the owner-approved run/campaign budget can provide a spending ceiling."
+  },
+  "setups": [
+    {
+      "arm": "none",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-none-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "manifest_sha256": "ab0a016e689c7f71fe6b55e03838f996a92ad03c968b4bbddae6528b29d9d765",
+      "executable_sha256": "5679b501eceefe936c321f73320328face532f5a70c4f7af0639131dc4d511f5",
+      "ledger_final_hash": "943083be974701ad07df7dad185f02934cf7aa07fcdfb74a920c2926f45ce21b",
+      "calls": 224,
+      "request_bytes": 108853,
+      "input_characters_or_byte_proxy": 108853,
+      "input_tokens_estimate": 32656,
+      "output_tokens_allowance": 114688,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224
+      },
+      "model_cost": {
+        "flash": 0.14742239999999998,
+        "pro": 0.49727039999999995
+      },
+      "model_and_judge_cost": {
+        "flash": 1.0446258,
+        "pro": 4.39360152
+      },
+      "scores": null
+    },
+    {
+      "arm": "full_history",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-full_history-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "manifest_sha256": "9db2a67021a34f0bc834de533bb2b409211b50dc8c90995f87de51b7c07d58dd",
+      "executable_sha256": "5679b501eceefe936c321f73320328face532f5a70c4f7af0639131dc4d511f5",
+      "ledger_final_hash": "c085f319ba7f935ca0e4ee15d75a9aff4fb7d5978172a73153e5a67941960d25",
+      "calls": 224,
+      "request_bytes": 82094932,
+      "input_characters_or_byte_proxy": 82094932,
+      "input_tokens_estimate": 24628480,
+      "output_tokens_allowance": 114688,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224
+      },
+      "model_cost": {
+        "flash": 7.526169599999999,
+        "pro": 32.963758080000005
+      },
+      "model_and_judge_cost": {
+        "flash": 8.423373,
+        "pro": 36.860089200000004
+      },
+      "scores": null
+    },
+    {
+      "arm": "lampos_today_partial",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-lampos_today_partial-3d8be60e8-attempt-2",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "manifest_sha256": "c7af3a9ab33d122b2dab879c3373cc64686e1f266e408c92b84a71ddb226d5de",
+      "executable_sha256": "5679b501eceefe936c321f73320328face532f5a70c4f7af0639131dc4d511f5",
+      "ledger_final_hash": "eb7559bc22f4dbcc01e6ae8c3d7936063c0eac2c18eb8ee8c87fbccd826a3cb5",
+      "calls": 224,
+      "request_bytes": 112116,
+      "input_characters_or_byte_proxy": 112116,
+      "input_tokens_estimate": 33635,
+      "output_tokens_allowance": 114688,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224
+      },
+      "model_cost": {
+        "flash": 0.14771610000000002,
+        "pro": 0.49856268
+      },
+      "model_and_judge_cost": {
+        "flash": 1.0449195,
+        "pro": 4.394893800000001
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "e8ae6500dd99429c453a3583f02463f4b526219f5a7f0cb31b8fc881ab9e3834",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "45eb0b559a499c8c09e2b88d19e8c49fb0ff241d03171784563ae7a21d08bd5c",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_episodes",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_episodes-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "1f5d718915451e60f0bf05de0acf064c3b2d83576251da738b6dd3ff3c79d36c",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "2758d608bb91fc0b3e3409749652b24e73406809b0fa2f9c9dc8534ce7d764d9",
+      "calls": 266,
+      "request_bytes": 1383823,
+      "input_characters_or_byte_proxy": 1383823,
+      "input_tokens_estimate": 415147,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.46860809999999997,
+        "pro": 1.68340524
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3658115,
+        "pro": 5.57973636
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_life_story",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_life_story-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "6e62dc95f98787d58d977e623c37e86189f4ead3ec5b8d15f9b227738b65318b",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "22466603af4e3997a51c9e016c2400f73901cd9a659625dc0ad9e77950b5d424",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_facts",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_facts-3d8be60e8-attempt-2",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "fbcf8627b25886ee7fa43a959a898d77691ffa4c035a6b24601252972f586373",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "8acf55c71b7ae098c68107cced45fb946c562a31e7410c831be39024658a1f9d",
+      "calls": 266,
+      "request_bytes": 1380598,
+      "input_characters_or_byte_proxy": 1380598,
+      "input_tokens_estimate": 414180,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.468318,
+        "pro": 1.6821287999999999
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3655214,
+        "pro": 5.57845992
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_owner_model",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_owner_model-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "9c23538fc082479a740927dfbd983f96de6e1b5efa52b2e8e0f71e0f6281acaf",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "55e931769830cd3d364bf14d2cf9139014eb6857e4034dc84b08f63cc06ee71a",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_how_to_be",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_how_to_be-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "e5550b822ddb94bae47924047c8a2716c8f78d3168f93536f53bf6a163203472",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "b6c6c94e45d52f19ca4957755094e246c862394476066c13374408220a095ec8",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_ahead",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_ahead-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "3f3d98dfe219953d1b2f3f088eb393657068193841079d18e3c01f5f5d1da0e1",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "d7bf0eb170eb6fd30088a89ac3163bd1d718da9667c92942bce990220996d5da",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_feelings",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_feelings-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "17f7732f11712506a6e720483d616ba2f90924a5e6fe5abb390214d991e61364",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "cb57d9abe8f461fcbe10a70915f4eead2ebb96056bca2ee9b1c90b8d6b286b20",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_nightly_sleep",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_nightly_sleep-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "ee6d45678be37104baeb1ce6a8dc8f71fdef95b887a4578121a61b0ed9dc024e",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "8efdd3fc91ab03a32eb361bf09c5b759a170cb285359f4fbd4772b0d7a423dee",
+      "calls": 236,
+      "request_bytes": 981349,
+      "input_characters_or_byte_proxy": 981349,
+      "input_tokens_estimate": 294405,
+      "output_tokens_allowance": 163840,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12
+      },
+      "model_cost": {
+        "flash": 0.2849295,
+        "pro": 1.037421
+      },
+      "model_and_judge_cost": {
+        "flash": 1.1821328999999998,
+        "pro": 4.93375212
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_importance",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_importance-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "865a2fe2c3391715762e8221c1bf5fd982b97fa96b01897fe203b5b733b9f4a5",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "706d4a6544fa1544f745445177204c3c28ba7d3cbdedc021c10cd9bb311a4131",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    },
+    {
+      "arm": "tiers_minus_fading",
+      "status": "completed_plumbing_only",
+      "source_run": "burst-tiers_minus_fading-3d8be60e8",
+      "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+      "adapter_revision": "66b96bb73a51c68cfe21658f9f28254f58c325d4",
+      "manifest_sha256": "52438b52d06c3e1d3c1435c560d0161b84c30af269a87a73266538b3e68d71d8",
+      "executable_sha256": "c75c10e70691bcd04c5beab98755233aa6285d8f8fe9434c24a47a36e770cb1b",
+      "ledger_final_hash": "8d589ae949ee3130facced0d978f6dc6f475a5c06f84637902393fe9c3e52696",
+      "calls": 266,
+      "request_bytes": 1440394,
+      "input_characters_or_byte_proxy": 1440394,
+      "input_tokens_estimate": 432119,
+      "output_tokens_allowance": 286720,
+      "cost_basis": "recorded request Unicode characters; synthetic output replaced by maximum registered output allowance",
+      "purpose_counts": {
+        "answer": 224,
+        "reflect": 12,
+        "sleep": 30
+      },
+      "model_cost": {
+        "flash": 0.4736997,
+        "pro": 1.70580828
+      },
+      "model_and_judge_cost": {
+        "flash": 1.3709030999999998,
+        "pro": 5.6021394
+      },
+      "scores": null
+    }
+  ],
+  "attempts": [
+    {
+      "arm": "none",
+      "run": "burst-none-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "ab0a016e689c7f71fe6b55e03838f996a92ad03c968b4bbddae6528b29d9d765",
+        "events.jsonl": "1dad99495447f736f762195bc9ab6b180c0d3623e022fd7631303187e2641f48"
+      },
+      "ledger_final_hash": "943083be974701ad07df7dad185f02934cf7aa07fcdfb74a920c2926f45ce21b",
+      "manifest_sha256": "ab0a016e689c7f71fe6b55e03838f996a92ad03c968b4bbddae6528b29d9d765",
+      "ledger_sha256": "1dad99495447f736f762195bc9ab6b180c0d3623e022fd7631303187e2641f48"
+    },
+    {
+      "arm": "full_history",
+      "run": "burst-full_history-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "9db2a67021a34f0bc834de533bb2b409211b50dc8c90995f87de51b7c07d58dd",
+        "events.jsonl": "ca47580ac3515c8c0692f15f3328df536918f27ad52e7bd20d96938bce00a48a"
+      },
+      "ledger_final_hash": "c085f319ba7f935ca0e4ee15d75a9aff4fb7d5978172a73153e5a67941960d25",
+      "manifest_sha256": "9db2a67021a34f0bc834de533bb2b409211b50dc8c90995f87de51b7c07d58dd",
+      "ledger_sha256": "ca47580ac3515c8c0692f15f3328df536918f27ad52e7bd20d96938bce00a48a"
+    },
+    {
+      "arm": "lampos_today_partial",
+      "run": "burst-lampos_today_partial-3d8be60e8",
+      "status": "failed",
+      "files_sha256": {
+        "manifest.json": "0ec331d2733097de22a278b765f8ab35908e6edf8b94a44788c285eb417eae27",
+        "events.jsonl": "e59adaa3b08a5187d395d5e428be705bd1eec06dc17bf60d2eb8bc4074fa9897"
+      },
+      "ledger_final_hash": "453b5ff5b6d4059b6b023b9cd0c6bf2bcbed943897a9432e17d030295c42cfe5",
+      "manifest_sha256": "0ec331d2733097de22a278b765f8ab35908e6edf8b94a44788c285eb417eae27",
+      "ledger_sha256": "e59adaa3b08a5187d395d5e428be705bd1eec06dc17bf60d2eb8bc4074fa9897"
+    },
+    {
+      "arm": "lampos_today_partial",
+      "run": "burst-lampos_today_partial-3d8be60e8-attempt-2",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "c7af3a9ab33d122b2dab879c3373cc64686e1f266e408c92b84a71ddb226d5de",
+        "events.jsonl": "93c8bbfb6e27e2ec1cf2853828fdeccaca0db1f2cbf6fa651afd0c23e0a47ff1"
+      },
+      "ledger_final_hash": "eb7559bc22f4dbcc01e6ae8c3d7936063c0eac2c18eb8ee8c87fbccd826a3cb5",
+      "manifest_sha256": "c7af3a9ab33d122b2dab879c3373cc64686e1f266e408c92b84a71ddb226d5de",
+      "ledger_sha256": "93c8bbfb6e27e2ec1cf2853828fdeccaca0db1f2cbf6fa651afd0c23e0a47ff1"
+    },
+    {
+      "arm": "tiers",
+      "run": "burst-tiers-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "e8ae6500dd99429c453a3583f02463f4b526219f5a7f0cb31b8fc881ab9e3834",
+        "events.jsonl": "97c72c50be14d8b18606a1c1cf0ddc39b3e149b1d29686e7627aa6b4efae9af6"
+      },
+      "ledger_final_hash": "45eb0b559a499c8c09e2b88d19e8c49fb0ff241d03171784563ae7a21d08bd5c",
+      "manifest_sha256": "e8ae6500dd99429c453a3583f02463f4b526219f5a7f0cb31b8fc881ab9e3834",
+      "ledger_sha256": "97c72c50be14d8b18606a1c1cf0ddc39b3e149b1d29686e7627aa6b4efae9af6"
+    },
+    {
+      "arm": "tiers_minus_episodes",
+      "run": "burst-tiers_minus_episodes-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "1f5d718915451e60f0bf05de0acf064c3b2d83576251da738b6dd3ff3c79d36c",
+        "events.jsonl": "c089ba9886b71d2d7193e8f585a23d7ac8c5a2e1bb0e011d5e42a7043cdd6bfa"
+      },
+      "ledger_final_hash": "2758d608bb91fc0b3e3409749652b24e73406809b0fa2f9c9dc8534ce7d764d9",
+      "manifest_sha256": "1f5d718915451e60f0bf05de0acf064c3b2d83576251da738b6dd3ff3c79d36c",
+      "ledger_sha256": "c089ba9886b71d2d7193e8f585a23d7ac8c5a2e1bb0e011d5e42a7043cdd6bfa"
+    },
+    {
+      "arm": "tiers_minus_life_story",
+      "run": "burst-tiers_minus_life_story-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "6e62dc95f98787d58d977e623c37e86189f4ead3ec5b8d15f9b227738b65318b",
+        "events.jsonl": "f1a09b021e30b9ecc0c8d3ee10d3c2891f58cd9758406d1b47ecfdf77c45d9b4"
+      },
+      "ledger_final_hash": "22466603af4e3997a51c9e016c2400f73901cd9a659625dc0ad9e77950b5d424",
+      "manifest_sha256": "6e62dc95f98787d58d977e623c37e86189f4ead3ec5b8d15f9b227738b65318b",
+      "ledger_sha256": "f1a09b021e30b9ecc0c8d3ee10d3c2891f58cd9758406d1b47ecfdf77c45d9b4"
+    },
+    {
+      "arm": "tiers_minus_facts",
+      "run": "burst-tiers_minus_facts-3d8be60e8",
+      "status": "failed",
+      "files_sha256": {
+        "manifest.json": "32807220c071c8e0acc498fb12e3e2871f0e325a8aac9c5b5bc6032e269513bc",
+        "events.jsonl": "e240c1a7397a731c19adad8564bbb93d4ae0b49c0a2447d0d8d0401b9313e954"
+      },
+      "ledger_final_hash": "84129a32ab1cb326242e4cbb828487844158364a42a5930a93e251d210fa414e",
+      "manifest_sha256": "32807220c071c8e0acc498fb12e3e2871f0e325a8aac9c5b5bc6032e269513bc",
+      "ledger_sha256": "e240c1a7397a731c19adad8564bbb93d4ae0b49c0a2447d0d8d0401b9313e954"
+    },
+    {
+      "arm": "tiers_minus_facts",
+      "run": "burst-tiers_minus_facts-3d8be60e8-attempt-2",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "fbcf8627b25886ee7fa43a959a898d77691ffa4c035a6b24601252972f586373",
+        "events.jsonl": "2b49c0ed0af07a494d9d981e83ad70d6437b98cbe42a1e89e35548fe9c0d25f1"
+      },
+      "ledger_final_hash": "8acf55c71b7ae098c68107cced45fb946c562a31e7410c831be39024658a1f9d",
+      "manifest_sha256": "fbcf8627b25886ee7fa43a959a898d77691ffa4c035a6b24601252972f586373",
+      "ledger_sha256": "2b49c0ed0af07a494d9d981e83ad70d6437b98cbe42a1e89e35548fe9c0d25f1"
+    },
+    {
+      "arm": "tiers_minus_owner_model",
+      "run": "burst-tiers_minus_owner_model-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "9c23538fc082479a740927dfbd983f96de6e1b5efa52b2e8e0f71e0f6281acaf",
+        "events.jsonl": "571852702856823b94b245721a70e8468f7be8e3574f82dbff5f8df57c01db61"
+      },
+      "ledger_final_hash": "55e931769830cd3d364bf14d2cf9139014eb6857e4034dc84b08f63cc06ee71a",
+      "manifest_sha256": "9c23538fc082479a740927dfbd983f96de6e1b5efa52b2e8e0f71e0f6281acaf",
+      "ledger_sha256": "571852702856823b94b245721a70e8468f7be8e3574f82dbff5f8df57c01db61"
+    },
+    {
+      "arm": "tiers_minus_how_to_be",
+      "run": "burst-tiers_minus_how_to_be-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "e5550b822ddb94bae47924047c8a2716c8f78d3168f93536f53bf6a163203472",
+        "events.jsonl": "6a630c87390b90647bb3b7837139cd4f7476e5c52368d708880671c3a54893bb"
+      },
+      "ledger_final_hash": "b6c6c94e45d52f19ca4957755094e246c862394476066c13374408220a095ec8",
+      "manifest_sha256": "e5550b822ddb94bae47924047c8a2716c8f78d3168f93536f53bf6a163203472",
+      "ledger_sha256": "6a630c87390b90647bb3b7837139cd4f7476e5c52368d708880671c3a54893bb"
+    },
+    {
+      "arm": "tiers_minus_ahead",
+      "run": "burst-tiers_minus_ahead-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "3f3d98dfe219953d1b2f3f088eb393657068193841079d18e3c01f5f5d1da0e1",
+        "events.jsonl": "1d408f9d4f8b35ce70e36fabe97b6711601f87ca6e9a77232fd8c871e70ac27b"
+      },
+      "ledger_final_hash": "d7bf0eb170eb6fd30088a89ac3163bd1d718da9667c92942bce990220996d5da",
+      "manifest_sha256": "3f3d98dfe219953d1b2f3f088eb393657068193841079d18e3c01f5f5d1da0e1",
+      "ledger_sha256": "1d408f9d4f8b35ce70e36fabe97b6711601f87ca6e9a77232fd8c871e70ac27b"
+    },
+    {
+      "arm": "tiers_minus_feelings",
+      "run": "burst-tiers_minus_feelings-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "17f7732f11712506a6e720483d616ba2f90924a5e6fe5abb390214d991e61364",
+        "events.jsonl": "67a2cf14ad0558f08d15554b55631fb140b5554f3a36e1d3fce72ce629e4a147"
+      },
+      "ledger_final_hash": "cb57d9abe8f461fcbe10a70915f4eead2ebb96056bca2ee9b1c90b8d6b286b20",
+      "manifest_sha256": "17f7732f11712506a6e720483d616ba2f90924a5e6fe5abb390214d991e61364",
+      "ledger_sha256": "67a2cf14ad0558f08d15554b55631fb140b5554f3a36e1d3fce72ce629e4a147"
+    },
+    {
+      "arm": "tiers_minus_nightly_sleep",
+      "run": "burst-tiers_minus_nightly_sleep-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "ee6d45678be37104baeb1ce6a8dc8f71fdef95b887a4578121a61b0ed9dc024e",
+        "events.jsonl": "1e63a7ebc0b9ed600fc75bccc1bd6b0cf7afcddf43393e575c7e313118df35d3"
+      },
+      "ledger_final_hash": "8efdd3fc91ab03a32eb361bf09c5b759a170cb285359f4fbd4772b0d7a423dee",
+      "manifest_sha256": "ee6d45678be37104baeb1ce6a8dc8f71fdef95b887a4578121a61b0ed9dc024e",
+      "ledger_sha256": "1e63a7ebc0b9ed600fc75bccc1bd6b0cf7afcddf43393e575c7e313118df35d3"
+    },
+    {
+      "arm": "tiers_minus_importance",
+      "run": "burst-tiers_minus_importance-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "865a2fe2c3391715762e8221c1bf5fd982b97fa96b01897fe203b5b733b9f4a5",
+        "events.jsonl": "38915a796395038510f5b4752c1b805bd348a0de61bcf6132fae0bab9460916d"
+      },
+      "ledger_final_hash": "706d4a6544fa1544f745445177204c3c28ba7d3cbdedc021c10cd9bb311a4131",
+      "manifest_sha256": "865a2fe2c3391715762e8221c1bf5fd982b97fa96b01897fe203b5b733b9f4a5",
+      "ledger_sha256": "38915a796395038510f5b4752c1b805bd348a0de61bcf6132fae0bab9460916d"
+    },
+    {
+      "arm": "tiers_minus_fading",
+      "run": "burst-tiers_minus_fading-3d8be60e8",
+      "status": "completed",
+      "files_sha256": {
+        "manifest.json": "52438b52d06c3e1d3c1435c560d0161b84c30af269a87a73266538b3e68d71d8",
+        "events.jsonl": "c7e5422b41f2bcf15eba87c42e9799c03bc108db67bdb20b80a1c184a6e7da93"
+      },
+      "ledger_final_hash": "8d589ae949ee3130facced0d978f6dc6f475a5c06f84637902393fe9c3e52696",
+      "manifest_sha256": "52438b52d06c3e1d3c1435c560d0161b84c30af269a87a73266538b3e68d71d8",
+      "ledger_sha256": "c7e5422b41f2bcf15eba87c42e9799c03bc108db67bdb20b80a1c184a6e7da93"
+    }
+  ],
+  "totals": {
+    "flash": {
+      "three_runs_model_and_judge": 76.18082669999998,
+      "one_persona_measured_shapes_and_stt": 76.64750894999999,
+      "one_persona_with_product_allowance": 148.74110894999998,
+      "two_same_size_personas_with_product_allowance": 297.48221789999997,
+      "learned_state_and_replacement_foreground_allowance": 58.733385299999995,
+      "one_persona_planning_total": 207.47449424999996,
+      "one_persona_with_25_percent_contingency": 259.34311781249994,
+      "two_same_size_personas_with_25_percent_contingency": 518.6862356249999
+    },
+    "pro": {
+      "three_runs_model_and_judge": 319.67294436,
+      "one_persona_measured_shapes_and_stt": 320.13962661,
+      "one_persona_with_product_allowance": 584.73098661,
+      "two_same_size_personas_with_product_allowance": 1169.46197322,
+      "learned_state_and_replacement_foreground_allowance": 231.24190715999998,
+      "one_persona_planning_total": 815.9728937699999,
+      "one_persona_with_25_percent_contingency": 1019.9661172125,
+      "two_same_size_personas_with_25_percent_contingency": 2039.932234425
+    }
+  },
+  "limitations": [
+    "Recorded usage values are placeholders and are not billed tokens.",
+    "Tiers consolidation proposals are fixed empty synthetic records; live learned state can change prompt sizes and number of calls.",
+    "Current-product row is partial; voice observation, talk-note, running-summary and tool dispatch costs are not measured.",
+    "Recorded answer path has no tool calls; model-dependent tool rounds and retries need separate reserve.",
+    "Judge reserve is a planning prompt size and output allowance, not a run or a frozen judge implementation.",
+    "Held-back persona is not authored; any two-persona projection assumes a same-sized month.",
+    "STT uses one frozen cache shared by every arm and repetition; no service has been called.",
+    "Fading is not exercised by this month; its removal remains reported but retention must be decided on the separate aging test.",
+    "The separate 120-day aging test and optional external systems are excluded from the 84-run cost total."
+  ],
+  "full_product_foreground_allowance": {
+    "answer_turns": 224,
+    "max_requests_per_turn": 8,
+    "input_tokens_assumed_per_request": 16000,
+    "output_tokens_per_request": 512,
+    "input_tokens_allowance": 28672000,
+    "output_tokens_allowance": 917504,
+    "cost_per_run": {
+      "flash": 9.702604800000001,
+      "pro": 41.48035584
+    },
+    "basis": "All eight registered request rounds at each probe turn. Planning input allowance, not a guaranteed bound; replaces measured partial-arm foreground model cost. No other current in-tree arm advertises tools."
+  },
+  "candidate_learned_state_allowance": {
+    "extra_multiple_of_measured_model_cost": 2,
+    "basis": "Adds twice each candidate model-only cost for larger learned prompts and more batches; judge cost is already separate. Sensitivity allowance, not evidence that live usage is bounded by this factor."
+  },
+  "contingency_fraction": 0.25,
+  "aging_test": {
+    "status": "not yet registered or priced",
+    "included_in_totals": false,
+    "target_days": 120,
+    "reason": "The month cannot exercise fading beyond the unchanged 90-day threshold."
+  },
+  "recommended_flash_campaign_cap_usd": 600,
+  "recommended_flash_cap_per_persona_usd": 300
+}
