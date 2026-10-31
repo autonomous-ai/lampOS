@@ -128,3 +128,26 @@ fn a_second_resident_is_observed_as_owner_without_revealing_the_true_speaker() {
     );
     files::validate(&c).unwrap();
 }
+
+#[test]
+fn forgetting_persistence_controls_are_in_the_main_stream_before_every_probe() {
+    let c = corpus::generate(persona()).unwrap();
+    let controls = c
+        .events
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.heard.starts_with("Please forget my "))
+        .map(|(i, _)| i)
+        .collect::<Vec<_>>();
+    assert_eq!(controls.len(), 2);
+    for q in c.questions.iter().filter(|q| q.category == "forgetting") {
+        let prefix = c
+            .events
+            .iter()
+            .position(|e| e.record_id == q.after_record)
+            .unwrap();
+        assert!(controls.iter().all(|i| *i < prefix));
+        assert!(!q.query.heard.starts_with("Please forget"));
+        assert!(q.followups.is_empty());
+    }
+}

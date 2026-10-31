@@ -610,3 +610,12 @@ It has no playback or network invocation. Its current recorded cache checks
 cover missing/changed inputs, unknown confidence and refusal to treat a
 recorded transcript as live. A real service pass and verified raw-response
 cache remain required; file synthesis alone does not meet that gate.
+
+The external recorded-month runner pins the adapter and runner independently.
+Fixed empty consolidation proposals exercise the broker and bounded batches
+without pretending to produce learned memory. Nightly work runs after every
+local session end, and weekly work after every seventh local session end;
+each pending batch must finish before the next main event. This common
+calendar schedule is frozen before scored runs. The two scripted forgetting
+requests are main-stream utterances before every forgetting-persistence probe,
+not mutations inside a disposable question child.

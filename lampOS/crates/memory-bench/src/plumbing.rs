@@ -27,22 +27,42 @@ fn log(log: &Log, kind: &str, data: Value) -> Result<()> {
 }
 struct Template {
     reply: Reply,
+    logfile: Log,
 }
+const EMPTY_CONSOLIDATION: &str = r#"{"facts":[],"lines":[],"episodes":[]}"#;
 impl Provider for Template {
     fn invoke(&mut self, call: &Call, deadline: Instant) -> Result<Reply> {
-        if !matches!(
-            call,
-            Call::Chat {
-                purpose: Purpose::Answer,
-                ..
-            }
-        ) {
-            return Err(invalid("plumbing template supports answer calls only"));
-        }
+        let Call::Chat {
+            purpose,
+            messages,
+            max_output_tokens,
+            ..
+        } = call
+        else {
+            return Err(invalid("recorded month does not synthesize embeddings"));
+        };
+        let reply = match purpose {
+            Purpose::Answer => self.reply.clone(),
+            Purpose::Sleep | Purpose::Reflect => Reply {
+                content: Some(EMPTY_CONSOLIDATION.into()),
+                usage: Some(Usage {
+                    input_tokens: 1,
+                    output_tokens: 1,
+                }),
+                ..Reply::default()
+            },
+            _ => return Err(invalid("unsupported recorded purpose")),
+        };
+        let serialized = serde_json::to_string(call)?;
+        log(
+            &self.logfile,
+            "model_shape",
+            json!({"request_hash":call.request_hash()?,"purpose":purpose,"request_bytes":serialized.len(),"request_characters":serialized.chars().count(),"message_count":messages.len(),"max_output_tokens":max_output_tokens,"recorded_output_characters":reply.content.as_ref().map_or(0,|s|s.chars().count()),"usage_is_synthetic":true}),
+        )?;
         // Exercise the exact-request Recorded provider; no evaluator facts or live fallback.
         let recording = Recording {
             request_hash: call.request_hash()?,
-            reply: self.reply.clone(),
+            reply,
         };
         let mut bytes = serde_json::to_vec(&recording)?;
         bytes.push(b'\n');
@@ -56,10 +76,14 @@ fn operation(
     request: Request,
 ) -> Result<Outcome> {
     let data = runner.execute(request.clone(), client)?;
+    let mut portable = request;
+    if portable.op == Op::Init {
+        portable.data["state_dir"] = json!("$RUN_STATE");
+    }
     log(
         logfile,
         "operation",
-        json!({"request":request,"outcome":data}),
+        json!({"request":portable,"outcome":data,"state_path":"run-relative placeholder"}),
     )?;
     Ok(data)
 }
@@ -69,6 +93,39 @@ fn effect(data: &Value) -> Result<ForgetEffect> {
             .cloned()
             .ok_or_else(|| invalid("mutation effect absent"))?,
     )?)
+}
+fn drain_sleep(
+    runner: &mut Runner,
+    client: &mut Worker,
+    logfile: &Log,
+    event: &Event,
+    cadence: &str,
+) -> Result<()> {
+    let mut cursor = None;
+    for batch in 0..100 {
+        let sleep = operation(
+            runner,
+            client,
+            logfile,
+            Request::new(
+                format!("sleep-{}-{cadence}-{batch}", event.record_id),
+                Op::Sleep,
+                json!({"at_unix_ms":event.at_unix_ms,"cadence":cadence}),
+            ),
+        )?;
+        if sleep.data["pending"] == false {
+            return Ok(());
+        }
+        let next = sleep.data["next_cursor"]
+            .as_str()
+            .ok_or_else(|| invalid("sleep pending without cursor"))?
+            .to_owned();
+        if cursor.as_ref() == Some(&next) {
+            return Err(invalid("sleep cursor did not advance"));
+        }
+        cursor = Some(next);
+    }
+    Err(invalid("sleep failed to drain bounded batches"))
 }
 /// The caller pins source and registration revisions. The manifest independently
 /// records the executable and all input hashes; a revision string is not a binary attestation.
@@ -80,9 +137,38 @@ pub fn run(
     registration_revision: &str,
     recorded_reply: &Path,
 ) -> Result<Value> {
+    let executable = std::env::current_exe()?;
+    run_with_adapter(
+        fixture,
+        output,
+        arm,
+        revision,
+        registration_revision,
+        recorded_reply,
+        AdapterSpec {
+            executable: &executable,
+            args: vec!["arm".into(), revision.into()],
+            revision,
+        },
+    )
+}
+pub struct AdapterSpec<'a> {
+    pub executable: &'a Path,
+    pub args: Vec<String>,
+    pub revision: &'a str,
+}
+pub fn run_with_adapter(
+    fixture: &Path,
+    output: &Path,
+    arm: &str,
+    revision: &str,
+    registration_revision: &str,
+    recorded_reply: &Path,
+    adapter: AdapterSpec<'_>,
+) -> Result<Value> {
     let corpus = files::read_corpus(fixture)?;
     let reply: Reply = files::json_file(recorded_reply)?;
-    let executable = std::env::current_exe()?;
+    let executable = fs::canonicalize(adapter.executable)?;
     let manifest = Manifest {
         run_id: output
             .file_name()
@@ -91,21 +177,24 @@ pub fn run(
             .into(),
         mode: Mode::Recorded,
         arm: arm.into(),
-        implementation_revision: revision.into(),
+        implementation_revision: adapter.revision.into(),
         registration_revision: registration_revision.into(),
         registration_hash: hash(&fs::read(fixture.join("registration.json"))?),
         fixture_hash: hash(&fs::read(fixture.join("events.jsonl"))?),
         transcript_hash: None,
         timezone: corpus.persona.timezone.clone(),
         model: "fixed-recorded-answer-plumbing-only".into(),
-        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8}),
+        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8,"runner_revision":revision,"consolidation_fixture_hash":hash(EMPTY_CONSOLIDATION.as_bytes()),"consolidation":"fixed empty synthetic proposal; no learned content or accuracy claim","weekly":"after every seventh local session end"}),
         budget_microusd: 1_000_000_000,
         seed: corpus.persona.seed,
     };
     let logfile = Arc::new(Mutex::new(Ledger::create(output, &manifest)?));
     let audit = logfile.clone();
     let client = Client::new(
-        Template { reply },
+        Template {
+            reply,
+            logfile: logfile.clone(),
+        },
         Prices {
             source: "synthetic-accounting-only".into(),
             date: "2030-01-01".into(),
@@ -125,7 +214,7 @@ pub fn run(
     let state = output.join("state");
     fs::DirBuilder::new().mode(0o700).create(&state)?;
     let state = fs::canonicalize(state)?;
-    let mut runner = Runner::spawn(&executable, &["arm".into(), revision.into()], &state)?;
+    let mut runner = Runner::spawn(&executable, &adapter.args, &state)?;
     let result = (|| -> Result<Value> {
         let init = operation(
             &mut runner,
@@ -137,7 +226,7 @@ pub fn run(
                 json!({"run_id":manifest.run_id,"arm":arm,"state_dir":state,"owner_id":corpus.persona.id,"timezone":corpus.persona.timezone,"at_unix_ms":corpus.events.first().ok_or_else(||invalid("empty month"))?.at_unix_ms,"config":{}}),
             ),
         )?;
-        if init.data["implementation_revision"] != revision {
+        if init.data["implementation_revision"] != adapter.revision {
             return Err(invalid("arm revision mismatch"));
         }
         let mut recent = Conversation::default();
@@ -158,32 +247,13 @@ pub fn run(
             )?;
             recent.record(event, effect(&ingested.data)?)?;
             if event.kind == EventKind::SessionEnd {
-                let mut cursor = None;
-                for batch in 0..100 {
-                    let sleep = operation(
-                        &mut runner,
-                        &mut client,
-                        &logfile,
-                        Request::new(
-                            format!("sleep-{}-{batch}", event.record_id),
-                            Op::Sleep,
-                            json!({"at_unix_ms":event.at_unix_ms,"cadence":"nightly"}),
-                        ),
-                    )?;
-                    if sleep.data["pending"] == false {
-                        nights += 1;
-                        break;
-                    }
-                    let next = sleep.data["next_cursor"]
-                        .as_str()
-                        .ok_or_else(|| invalid("sleep pending without cursor"))?
-                        .to_owned();
-                    if cursor.as_ref() == Some(&next) || batch == 99 {
-                        return Err(invalid("sleep failed to drain bounded batches"));
-                    }
-                    cursor = Some(next);
+                drain_sleep(&mut runner, &mut client, &logfile, event, "nightly")?;
+                nights += 1;
+                if nights % 7 == 0 {
+                    drain_sleep(&mut runner, &mut client, &logfile, event, "weekly")?;
                 }
             }
+
             for question in corpus
                 .questions
                 .iter()
@@ -305,7 +375,7 @@ pub fn run(
             Request::new("close", Op::Close, json!({})),
         )?;
         Ok(
-            json!({"label":"plumbing check","arm":arm,"events":corpus.events.len(),"questions":probes,"answer_turns":turns,"nights":nights,"categories":categories,"scores":null,"live_model_calls":0,"speech_transcribed":false}),
+            json!({"label":"plumbing check","arm":arm,"events":corpus.events.len(),"questions":probes,"answer_turns":turns,"nights":nights,"weekly_passes":nights/7,"categories":categories,"scores":null,"live_model_calls":0,"speech_transcribed":false}),
         )
     })();
     drop(runner);

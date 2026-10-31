@@ -130,3 +130,22 @@ unknown confidence null, and tie the response/request hashes to the exact
 audio. Cache application rejects missing, extra, duplicate or changed rows;
 there is no clean-text fallback. The cache producer must verify the stored
 raw response hash before accepting an imported transcript as live evidence.
+
+The external form is `plumbing-external FIXTURE NEW_RUN ARM RUNNER_REVISION
+REGISTRATION_REVISION RECORDED_ANSWER ADAPTER ADAPTER_REVISION`. It pins the
+adapter independently of the runner. The Tiers consolidation response is a
+fixed empty synthetic proposal: facts, owner-model lines and episodes are
+empty. This exercises operation ordering, batching, model brokering and
+restoration, not the quality of learned memory. Every model shape records
+purpose, input size, output allowance and the fact that usage is synthetic.
+Synthetic token usage must never be multiplied by live prices as an invoice
+or realistic forecast. Cost estimates use the measured request shapes and
+explicit assumptions instead.
+
+Nightly work drains after each local session end; weekly work drains after
+every seventh local session end. Weekly dates follow fixture calendar days,
+not seven fixed 24-hour intervals. All reference and candidate arms use this
+same schedule. The earlier 5a9a1774b reference plumbing attempts predate the
+weekly scheduling addition and retain that revision in their manifests.
+Recorded main-session forgetting controls precede all ten persistence probes;
+probe-local hypothetical operations never establish durable-forgetting credit.

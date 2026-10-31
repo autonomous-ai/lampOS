@@ -6,6 +6,32 @@ use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
 fn run(args: &[String]) -> Result<()> {
     match args {
+        [
+            command,
+            fixture,
+            output,
+            arm,
+            revision,
+            registration,
+            recorded,
+            adapter,
+            adapter_revision,
+        ] if command == "plumbing-external" => println!(
+            "{}",
+            lamp_memory_bench::plumbing::run_with_adapter(
+                Path::new(fixture),
+                Path::new(output),
+                arm,
+                revision,
+                registration,
+                Path::new(recorded),
+                lamp_memory_bench::plumbing::AdapterSpec {
+                    executable: Path::new(adapter),
+                    args: vec![],
+                    revision: adapter_revision
+                }
+            )?
+        ),
         [command, events, destination, voice, rate] if command == "speech-prepare" => println!(
             "{}",
             lamp_memory_bench::speech::prepare(
