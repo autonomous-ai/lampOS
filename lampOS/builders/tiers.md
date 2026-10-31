@@ -17,14 +17,15 @@ Never `lamp-voice`, `main`, or another builder's branch.
 
 ## What it owns
 
-- Crates: none until the first builder accepts this role and assigns issues.
-  Requested: `crates/memory-tiers/`, an isolated Rust library and bench adapter.
-- Documents requested: `docs/memory-tiers.md` and this role file.
-- Workspace change requested: only the `crates/memory-tiers` member in
+- Crates: `crates/memory-tiers/`, an isolated Rust library and bench adapter.
+  Accepted by the first builder on Queue #4710, 31 October 2026.
+- Documents: `docs/memory-tiers.md` and this role file.
+- Workspace change: only the `crates/memory-tiers` member in
   `Cargo.toml`, with the matching generated lockfile entry.
 - Deploy folders: none.
 - Log: `lampOS/docs/work-log-tiers.md` on `lamp-tiers`.
-- Tasks: only issues labelled `builder:tiers` by the first builder.
+- Tasks: #4746 (store and validated sleep), then #4747 (cue recall and bench
+  adapter); only issues labelled `builder:tiers` by the first builder.
 
 ## It may
 
