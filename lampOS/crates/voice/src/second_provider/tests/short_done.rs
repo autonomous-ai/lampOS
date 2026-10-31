@@ -18,6 +18,10 @@ fn told(name: &str) -> Value {
             json!({"error": "I asked for it but could not confirm my light changed."})
         }
         "light_colour" => json!({"result": "My light is already orange."}),
+        // lamp-actions' schedule, committed (`schedule.rs`'s answer).
+        "set_timer" => {
+            json!({"status": "committed", "id": 1, "due_unix_ms": 1_792_454_700_000_u64, "local": "2026-10-31T07:52:00+07:00", "clock": "07:52"})
+        }
         _ => json!({"ok": true}),
     }
 }
@@ -43,6 +47,18 @@ fn short_turn(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Went {
+    turn_with(on, false, heard, first, later)
+}
+
+/// [`short_turn`], with `LAMP_SHORT_DONE` as `short` and
+/// `LAMP_SECOND_SAY_WITH_CALL`'s answer at once as `at_once`.
+fn turn_with(
+    short: bool,
+    at_once: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
@@ -62,7 +78,8 @@ fn short_turn(
         Arc::new(Instant::now),
     )
     .announcing(false)
-    .answering_short(on);
+    .answering_short(short)
+    .saying_at_once(at_once);
     let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -288,4 +305,176 @@ fn the_short_line_needs_every_call_marked_and_worded() {
     assert_eq!(short_done_line(&[short(" ")]), None);
     assert_eq!(short_done_line(&[json!({"error": "no"})]), None);
     assert!(short_done_note("Dimmer.").contains("\"Dimmer.\""));
+}
+
+/// `LAMP_SECOND_SAY_WITH_CALL` (#2135): the acting part's own words are
+/// said at once, before the next round, and that round's words follow; the
+/// line is never held for it (lamp-4ace on 31 Oct: the model's own words
+/// came with the call 1 time in 8, and round 2 always ran).
+#[test]
+fn with_say_at_once_the_parts_own_words_come_first_and_the_next_rounds_follow() {
+    assert_eq!(
+        turn_with(
+            true,
+            true,
+            "Make it brighter.",
+            calling(&["light_brighter"]),
+            vec![nothing()]
+        ),
+        Went {
+            said: said(&["Brighter."]),
+            asked: 2,
+            ran: 1,
+            noted: true
+        }
+    );
+    // More asked: the short line first, then the rest, where without it
+    // the short line went unsaid.
+    let sunny = "And yes, it is sunny.";
+    let more = || vec![vec![text(sunny), Ok(ChatEvent::Done)]];
+    assert_eq!(
+        turn_with(
+            true,
+            true,
+            "Brighter, and is it sunny?",
+            calling(&["light_brighter"]),
+            more()
+        ),
+        Went {
+            // A piece after another is said with its space.
+            said: vec!["said:Brighter.".to_owned(), format!("said: {sunny}")],
+            asked: 2,
+            ran: 1,
+            noted: true
+        }
+    );
+    assert_eq!(
+        turn_with(
+            true,
+            false,
+            "Brighter, and is it sunny?",
+            calling(&["light_brighter"]),
+            more()
+        )
+        .said,
+        said(&[sunny])
+    );
+    // A timer: its own clock, said with or without LAMP_SHORT_DONE.
+    for short in [false, true] {
+        assert_eq!(
+            turn_with(
+                short,
+                true,
+                "Set a timer for ten minutes.",
+                calling(&["set_timer"]),
+                vec![nothing()]
+            ),
+            Went {
+                said: said(&["Timer set. It rings at 07:52."]),
+                asked: 2,
+                ran: 1,
+                noted: true
+            },
+            "short {short}"
+        );
+    }
+    // Off: a timer's turn waits for round 2's words, as today.
+    assert_eq!(
+        turn_with(
+            false,
+            false,
+            "Set a timer for ten minutes.",
+            calling(&["set_timer"]),
+            more()
+        )
+        .said,
+        said(&[sunny])
+    );
+}
+
+/// Never for a keep beside the change (#4635's P2: a keep can wait for a
+/// yes), a call refused or unchanged, two timers, or the model's own words
+/// before the call: those turns go on as without the switch.
+#[test]
+fn say_at_once_never_answers_a_keep_a_refusal_or_the_models_own_words() {
+    let okay = || vec![vec![text("Okay."), Ok(ChatEvent::Done)]];
+    let worded = || {
+        let mut first = vec![text("Sure.")];
+        first.extend(calling(&["set_timer"]));
+        first
+    };
+    for (why, first) in [
+        (
+            "a keep beside the timer",
+            calling(&["set_timer", "remember"]),
+        ),
+        (
+            "a keep beside the light",
+            calling(&["light_brighter", "remember"]),
+        ),
+        ("refused", calling(&["light_warmer"])),
+        ("already", calling(&["light_colour"])),
+        ("two timers", calling(&["set_timer", "set_timer"])),
+        ("its own words first", worded()),
+    ] {
+        let went = turn_with(true, true, "Do it.", first, okay());
+        assert!(!went.noted, "{why}: {went:?}");
+        assert!(
+            !went
+                .said
+                .iter()
+                .any(|said| said.contains("Brighter.") || said.contains("Timer set")),
+            "{why}: {went:?}"
+        );
+        assert!(
+            went.said.iter().any(|said| said.ends_with("Okay.")),
+            "{why}: {went:?}"
+        );
+    }
+}
+
+/// The timer's line is its own answer's clock, or none: one `set_timer`,
+/// committed, with an HH:MM clock.
+#[test]
+fn the_timer_line_is_its_own_clock_or_none() {
+    let call = |name: &str| net::ToolCall {
+        id: "c0".to_owned(),
+        name: name.to_owned(),
+        args: json!({}),
+        extra: None,
+    };
+    let committed = json!({"status": "committed", "clock": "07:52"});
+    assert_eq!(
+        timer_line(&[call("set_timer")], std::slice::from_ref(&committed)).as_deref(),
+        Some("Timer set. It rings at 07:52.")
+    );
+    for (why, calls, told) in [
+        (
+            "not set",
+            vec![call("set_timer")],
+            vec![json!({"error": "no"})],
+        ),
+        (
+            "no clock",
+            vec![call("set_timer")],
+            vec![json!({"status": "committed"})],
+        ),
+        (
+            "not a clock",
+            vec![call("set_timer")],
+            vec![json!({"status": "committed", "clock": "seven"})],
+        ),
+        (
+            "a reminder",
+            vec![call("set_reminder")],
+            vec![committed.clone()],
+        ),
+        (
+            "two",
+            vec![call("set_timer"), call("set_timer")],
+            vec![committed.clone(), committed.clone()],
+        ),
+    ] {
+        assert_eq!(timer_line(&calls, &told), None, "{why}");
+    }
 }

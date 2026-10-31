@@ -3198,6 +3198,19 @@ pub fn serve(
         );
     }
     engine = engine.saying_checking(checking_line);
+    // A light, volume or timer turn answered at once by the part that acted,
+    // with the next round no longer waited for (`LAMP_SECOND_SAY_WITH_CALL=on`,
+    // #2135).
+    let say_at_once = std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if say_at_once {
+        eprintln!(
+            "lamp-voice second: a turn whose calls all changed a light or the volume, or set one timer, is answered at once with the acting part's own words (LAMP_SECOND_SAY_WITH_CALL)"
+        );
+    }
+    engine = engine.saying_at_once(say_at_once);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)

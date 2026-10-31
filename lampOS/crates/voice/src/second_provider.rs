@@ -480,7 +480,10 @@ pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 /// else, and only with [`SAID_ONCE_ENVIRONMENT`], which tells the next round
 /// they were heard. On lamp-4ace on 30 Oct (8999) these calls said nothing
 /// until their second chat round: 2.4 to 3.3 s to the first sound, against
-/// 1.54 to 1.62 s for plain answers (#2135).
+/// 1.54 to 1.62 s for plain answers (#2135). The model rarely did so (1 of
+/// 8 acting turns on lamp-4ace on 31 Oct), so the same switch also answers
+/// such a turn with the acting part's own words at once
+/// ([`Engine::saying_at_once`]), which needs no `LAMP_SECOND_SAID_ONCE`.
 pub const SAY_WITH_CALL_ENVIRONMENT: &str = "LAMP_SECOND_SAY_WITH_CALL";
 
 /// Where the worker reads whether the lamp says [`CHECKING`] itself as a
@@ -769,6 +772,27 @@ pub(crate) fn short_done_line(told: &[Value]) -> Option<&str> {
     Some(line)
 }
 
+/// The timer's own line for a round whose one call set a timer
+/// (`LAMP_SECOND_SAY_WITH_CALL`, #2135): its time is the `clock` the
+/// schedule answered, the local HH:MM it rings, so the time said is the
+/// time set. `None` unless the one call is `set_timer` and its answer is
+/// committed with a clock.
+pub(crate) fn timer_line(calls: &[net::ToolCall], told: &[Value]) -> Option<String> {
+    let ([call], [told]) = (calls, told) else {
+        return None;
+    };
+    if call.name != "set_timer" || told["status"] != "committed" {
+        return None;
+    }
+    let clock = told["clock"].as_str().filter(|clock| {
+        let bytes = clock.as_bytes();
+        bytes.len() == 5
+            && bytes[2] == b':'
+            && [0, 1, 3, 4].iter().all(|&at| bytes[at].is_ascii_digit())
+    })?;
+    Some(format!("Timer set. It rings at {clock}."))
+}
+
 /// The note after a round's calls all answered short (`LAMP_SHORT_DONE`,
 /// #2877): the lamp answers the change itself with `line`, so the next
 /// round adds only what else was asked, or nothing at all.
@@ -1041,6 +1065,8 @@ struct Shared {
     short_done: bool,
     /// [`Engine::saying_checking`] (#4684).
     checking_line: bool,
+    /// [`Engine::saying_at_once`] (#2135).
+    say_at_once: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// The lamp's own written turns may begin as late as
@@ -2633,6 +2659,7 @@ impl Engine {
                 speech_tags: None,
                 short_done: false,
                 checking_line: false,
+                say_at_once: false,
                 no_words_again: false,
                 written_wait: false,
                 resend: None,
@@ -3453,6 +3480,23 @@ impl Engine {
     pub fn saying_checking(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.checking_line = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_SAY_WITH_CALL=on` ([`SAY_WITH_CALL_ENVIRONMENT`],
+    /// #2135): a round with no words of its own whose calls all did what
+    /// was asked of a light, the volume or one timer is answered at once by
+    /// the part that acted: the calls' own short line ([`short_done_line`],
+    /// lamp-actions' `"say"` with `LAMP_SHORT_DONE`), or the timer's
+    /// [`timer_line`] from its own answer. The next round still runs, told
+    /// the lamp said it ([`short_done_note`]), for anything else asked; it
+    /// is no longer waited for. Never for a keep, a forget, a call that
+    /// needs a yes, or one refused, failed, held or unchanged: those turns
+    /// go on as without the switch. Before any turn only.
+    pub fn saying_at_once(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.say_at_once = on;
         }
         self
     }
@@ -9904,7 +9948,7 @@ async fn answer(
             // forget ran before them, and the model said no words beside
             // them. Any word is beyond the ask (a call written as words
             // too), and the turn goes on as without the switch.
-            let may_answer_short = shared.short_done
+            let may_answer_short = (shared.short_done || shared.say_at_once)
                 && first_calls
                 && !held_forget_ran
                 && !text.chars().any(char::is_alphanumeric);
@@ -10316,15 +10360,36 @@ async fn answer(
             // alone), so the round is asked, never assumed (the
             // Reviewer-lead's P2 on #2930). A call held, refused or run by
             // anyone else told nothing short, so the count falls short.
-            if may_answer_short
-                && short_told.len() == calls.len()
-                && let Some(line) = short_done_line(&short_told)
+            let short = (may_answer_short && short_told.len() == calls.len())
+                .then(|| short_done_line(&short_told).map(str::to_owned))
+                .flatten();
+            if let Some(line) = short.as_deref()
+                && shared.say_at_once
             {
+                // Said now, by the part that acted, not after the next round
+                // (`LAMP_SECOND_SAY_WITH_CALL`, #2135: on lamp-4ace on 31 Oct
+                // the model's own words came with the call 1 time in 8).
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
+                );
+                messages.push(Message::system(short_done_note(line)));
+                queue.push(line.to_owned()).await?;
+            } else if let Some(line) = short {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" kept while the next round says whether more was asked (LAMP_SHORT_DONE)"
                 );
-                messages.push(Message::system(short_done_note(line)));
-                short_line = Some(line.to_owned());
+                messages.push(Message::system(short_done_note(&line)));
+                short_line = Some(line);
+            } else if shared.say_at_once
+                && may_answer_short
+                && short_told.len() == calls.len()
+                && let Some(line) = timer_line(&calls, &short_told)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: the timer is set; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
+                );
+                messages.push(Message::system(short_done_note(&line)));
+                queue.push(line).await?;
             }
             if let Some(note) = said_once {
                 eprintln!(
