@@ -48,6 +48,11 @@ session boundaries, visitors, arrivals and departures, breaks, plans that
 change, corrections, uncertainty, and quiet intervals. Script the lamp's
 replies consistently so one arm's early answer cannot change another arm's
 later input. Use a recorded generation seed and stable record ids.
+Each persona declares an IANA timezone. The development fixture uses
+`Asia/Ho_Chi_Minh`; the held-back persona may use a daylight-saving zone.
+Resolve relative dates, appointment expiry, and night/week boundaries in that
+zone, while retaining UTC milliseconds for event ordering. Test a local
+midnight and a daylight-saving transition without adding fixed 24-hour days.
 
 The evaluator's answer key is separate from the observed event stream. Each
 claim or trait has supporting record ids, validity times, acceptable answers,
@@ -181,10 +186,22 @@ outstanding, with at most 8 model calls in an operation. Model and wall-clock
 budgets may impose stricter bounds. Exceeding a bound records a failure and
 ends the owned process; there is no silent retry.
 
+Recall has a **200 ms turn budget**, measured from sending the request until
+its complete response is available. A separate session-start `snapshot` has
+**300 ms**, matching the product note budget. The arm returns empty memory
+when its budget expires; an answer never waits for late recall or a late
+snapshot. The runner also enforces these deadlines, ignores late content,
+and records a miss. At most one request stays in flight while its terminal
+response is drained under the outer watchdog; no late response can become
+the next question's memory. These are host contract boundaries, not proof of
+first-audio latency on a lamp.
+
 `init` runs exactly once, before any other operation. There is at most one
 open probe; `probe_end` must match it, and `close` follows its restoration.
-Only `ingest`, `sleep`, `recall`, and `tool` permit model calls and receive
-the 120-second operation deadline. Other operations are local, with the
+Only `ingest`, `sleep`, `recall`, and `tool` permit model calls. `ingest`,
+`sleep`, and `tool` receive the 120-second operation deadline; calls made by
+`recall` remain within its 200 ms total budget, with empty memory on expiry.
+`snapshot` is local and bounded by 300 ms. Other operations are local, with the
 30-second deadline, and cannot extend it by asking for a model. Request ids
 and model call ids are unique across the whole run. Event and operation time
 never moves backward within the main state or an isolated probe. Restoring
@@ -199,11 +216,12 @@ is an evaluator's hidden correction of an observed mistake.
 
 | Operation | Request `data` | Successful response `data` |
 |---|---|---|
-| `init` | `run_id`, `arm`, `state_dir`, `owner_id`, `at_unix_ms`, `config` | `arm`, `implementation_revision`, `capabilities` |
+| `init` | `run_id`, `arm`, `state_dir`, `owner_id`, `timezone`, `at_unix_ms`, `config` | `arm`, `implementation_revision`, `capabilities` |
 | `ingest` | `event` (shape below) | `accepted`, `source_ids` |
-| `sleep` | `at_unix_ms`, `cadence` (`nightly` or `weekly`) | `applied`, `source_ids`, `reason` (nullable) |
+| `sleep` | `at_unix_ms`, `cadence` (`nightly` or `weekly`) | `applied`, `source_ids`, `reason` (nullable), `pending`, `next_cursor` (nullable opaque string) |
 | `forget` | `at_unix_ms`, `person_id`, `record_ids`, `text` | `applied`, `removed_count` |
 | `probe_begin` | `probe_id`, `at_unix_ms` | `isolated: true` |
+| `snapshot` | `query` (shape below, with empty `heard`) | `owner_model`, `source_ids`, `memory_instructions` |
 | `recall` | `query` (shape below) | `context`, `source_ids`, `owner_model`, `tools`, `memory_instructions` |
 | `tool` | `probe_id`, `name`, `arguments` | `result`, `source_ids` |
 | `inspect` | `person_id` | `owner_model`, `retained_record_ids`, `stats` |
@@ -218,6 +236,14 @@ a run unsupported. A no-op sleep for a baseline reports `applied: false` and
 update instead reports its actual reason. `accepted` means eligible input was
 handled, not that an owner fact was proven. `source_ids` always refer to input
 record ids, never to the answer key.
+
+Sleep reports `pending: true` while eligible records remain unprocessed;
+`next_cursor` identifies its resume point without containing record text.
+The runner repeats bounded batches at the same fixture time up to the
+manifest's batch and cost limits. Exhaustion with work pending is an
+incomplete night, never a successful pass. A no-op baseline returns
+`pending: false` and `next_cursor: null`. A candidate cannot silently skip
+records when a batch fills. Its cursor advances only after a successful apply.
 
 An event:
 
@@ -241,8 +267,12 @@ A query:
 
 `context`, `memory_instructions`, and each `owner_model` line are UTF-8 text.
 `owner_model` is an array of `{text, source_ids}`. The requested context bound
-counts the combined bytes of context, owner-model text, memory instructions,
-tool schemas, and subsequent tool results in this probe. Report any selection
+counts all UTF-8 text memory adds to the prompt: context, owner-model text,
+memory instructions, textual tool schemas, and subsequent tool results.
+The base character prompt is outside this cap and identical across arms.
+The snapshot is reused within its session, counted once; recall must not
+duplicate it. Forgetting or a changed access scope invalidates that snapshot.
+Report any selection
 in `stats` when inspected. The example's 16,384-byte bound is illustrative;
 the run manifest fixes one common bound for all arms, plus model token
 accounting that reserves the common prompt, question, immediate conversation,
@@ -259,7 +289,8 @@ other arms may return empty tools/instructions. Their differences are recorded.
 `probe_begin` creates a reversible isolated view of the current arm state.
 `ingest`, `forget`, `sleep`, `recall`, and tools inside it affect only that
 view. `probe_end` restores all durable and in-memory state, including caches,
-follow-up marks, and counters used by the memory policy. No nested probes.
+follow-up marks, forget fingerprints, consolidation cursors, and counters
+used by the memory policy. No nested probes.
 A runner aborts rather than continue if isolation or restoration fails.
 Probe restoration never restores or refunds global model cost, reservations,
 request identities, or ledger history. Those remain monotonic across probes.
