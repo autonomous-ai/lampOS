@@ -6463,14 +6463,15 @@ async fn spoken(
                 .is_some_and(crate::memory_scope::ScopeLease::by_one_face),
             (shared.clock)(),
         );
+        // In the owner's language, as its other fixed lines (#4473).
+        let line = crate::language::fixed_in(crate::language::at_start(), crate::spoken_stop::LINE);
         eprintln!(
-            "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)",
-            crate::spoken_stop::LINE
+            "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{line}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)"
         );
         let said = shared
             .emit(ProviderOutput::Transcript {
                 request: Some(request),
-                text: crate::spoken_stop::LINE.to_owned(),
+                text: line.to_owned(),
                 finished: false,
             })
             .await;
@@ -6479,7 +6480,7 @@ async fn spoken(
             let clip = match kept {
                 Some(clip) => clip,
                 None => {
-                    let clip = render_line(&shared.services, crate::spoken_stop::LINE).await;
+                    let clip = render_line(&shared.services, line).await;
                     if !clip.is_empty()
                         && let Ok(mut kept) = shared.stop_line.lock()
                     {
