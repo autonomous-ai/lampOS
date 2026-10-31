@@ -1,0 +1,32 @@
+[package]
+name = "lamp-memory-tiers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+tempfile = "3"
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hmac = "0.12"
+rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint", "hooks", "backup"] }
+unicode-normalization = "0.1"
+lamp-local-time = { path = "../local-time" }
+jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
+tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "sync", "io-std", "io-util"] }
+reqwest = { version = "0.13", default-features = false, features = ["stream", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
+webpki-roots = "1"
+
+[dev-dependencies]
+tokio = { version = "=1.53.1", features = ["test-util", "net", "io-util"] }
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "lamp-memory-tiers-arm"
+path = "src/bin/arm.rs"
