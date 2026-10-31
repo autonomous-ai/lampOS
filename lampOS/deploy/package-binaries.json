@@ -16,7 +16,7 @@
   "development": [
     "lamp-audio", "lamp-body-inspect", "lamp-ipc-probe", "lamp-memory-eval", "lamp-observer",
     "lamp-policy-fit", "lamp-policy-judges", "lamp-sound-fixtures", "lamp-tasks-harness-fixture",
-    "lamp-voice-eval", "lamp-memory-fixture", "lamp-records-fixture", "lamp-same-voice",
+    "lamp-voice-eval", "lamp-memory-bench", "lamp-memory-fixture", "lamp-records-fixture", "lamp-same-voice",
     "lamp-policy-replay", "lamp-station", "lamp-seems-measure"
   ]
 }

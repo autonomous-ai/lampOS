@@ -1,0 +1,47 @@
+{
+  "candidate_order": [
+    "tiers",
+    "tiers_minus_fading"
+  ],
+  "comparison": "Full engine first, then no fading; three runs each. Retain fading if removing it lowers overall or any aging category mean by more than full-engine max-minus-min spread, or for safety/privacy necessity. Missing prerequisites mean not exercised; no keep/drop conclusion.",
+  "coverage_gates": [
+    "accepted nonempty detail and gist in low-importance episodes below 0.5",
+    "high-importance controls at or above 0.5",
+    "sleep maintenance after day 90",
+    "report whether eligible old detail competes with recent evidence under the fixed byte cap"
+  ],
+  "days": 120,
+  "fictional": true,
+  "files": {
+    "answer-key.jsonl": "ce7189719d2cfe023e3e40f7ca62c1da834e87e74448d6ce98d152cf90b5fd68",
+    "events.jsonl": "768297eba1df1c254f397d0f08c84b17acdc4e3e762fad522d850f98b77859b2",
+    "persona.json": "19d74b5e7377c89d947cd6f924a515b2a0d0b84757e204e66d5b07779b3e82cc",
+    "questions.jsonl": "ed33125967f5af3120e62492a2a3569f42c167662ec8adb87bedba4ca4c8e656"
+  },
+  "gaps": [
+    "no delivered-recall acknowledgement or protection test",
+    "no second identified person"
+  ],
+  "history_access": "ordinary recall is primary; explicit-history access is separately reported because source records survive fading",
+  "human_audit": "all 42 questions before any live score",
+  "memory_text_bytes": 4096,
+  "probes": "Matched gist and high-importance-control questions after day 90 and day 120; recent facts and forgetting after day 120. Probes are isolated.",
+  "profile": {
+    "base_registration_hash": "3ee255b5921100c268314c905094094d8d2bc4bd87fd46a271c11a287ff50a35",
+    "kind": "aging",
+    "scenario_hash": "05478eb9a14575242bee0ca28e844d5c8a42c041c38d304dd873bf89f394bc02"
+  },
+  "protocol_minor": 1,
+  "protocol_version": 2,
+  "question_count": 42,
+  "reason": "The unchanged 30-day month cannot exercise the unchanged strictly-over-90-day fading threshold.",
+  "repetitions": 3,
+  "schedule": "Thirty-day base plus sixteen additional early two-exchange episodes, then one two-exchange visit each day 31 through 120. Nightly maintenance on all 120 calendar days; weekly after days 7, 14, ... 119.",
+  "scores": null,
+  "seed": 731,
+  "status": "registered_before_scoring_pending_human_review",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "topic_segmentation": "enabled identically in both setups; use the same agreed segmented build",
+  "transcripts": "not_yet_recorded",
+  "version": 2
+}

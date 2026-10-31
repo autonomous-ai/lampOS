@@ -1,0 +1,196 @@
+{
+  "engine_revision": "38a822541e318f05f233bbeb2db075c738a66cd9",
+  "registered_month_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+  "recorded_candidate_revision": "444ac6b66c9377f7d537aee82619a257520be890",
+  "method": "Read-only engine/reference-arm code and structural JSON fields: timestamps, event/role/presence types, session counts, cue presence, query categories and byte limits. Aggregate SQLite counts only. No question wording, answer rules, answer-key text, persona or claim/quote text inspected. No fixture, policy, threshold or arm changed.",
+  "structure": {
+    "registration_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+    "event_count": 2220,
+    "kind": {
+      "arrive": 120,
+      "session_start": 240,
+      "utterance": 1500,
+      "session_end": 240,
+      "leave": 120
+    },
+    "person": {
+      "owner": 2213,
+      "visitor": 7
+    },
+    "presence": {
+      "owner_alone": 2093,
+      "unknown": 120,
+      "others": 7
+    },
+    "sessions": 240,
+    "anonymous_person_ids": 1,
+    "event_cues": {
+      "topic": 0,
+      "activity": 2220,
+      "objects": 0
+    },
+    "utterance_cues": {
+      "topic": 0,
+      "activity": 1500,
+      "objects": 0
+    },
+    "event_span_days": 29.319351851851852,
+    "question_count": 200,
+    "query_count": 224,
+    "categories": {
+      "recall": 40,
+      "when": 20,
+      "changed_facts": 20,
+      "across_days": 20,
+      "understanding": 24,
+      "preferences": 20,
+      "ahead": 12,
+      "not_knowing": 12,
+      "visitors": 9,
+      "wrong_person_retention": 3,
+      "forgetting": 10,
+      "decoys": 10
+    },
+    "query_person": {
+      "owner": 215,
+      "visitor": 9
+    },
+    "query_presence": {
+      "owner_alone": 215,
+      "others": 9
+    },
+    "query_cues": {
+      "topic": 0,
+      "activity": 0,
+      "objects": 0
+    },
+    "query_time_span_days": 28.370486111111113,
+    "context_caps": [
+      1048576
+    ],
+    "anchor_matches": 200
+  },
+  "recorded_candidate_state": {
+    "episodes": 240,
+    "closed_episodes": 240,
+    "episode_gists": 0,
+    "episode_details": 0,
+    "importance_levels": [
+      0,
+      1
+    ],
+    "retained_records": 1491,
+    "facts": 7,
+    "fact_kinds": [
+      "statement"
+    ],
+    "modeled_lines": 0,
+    "nightly_passes": 30,
+    "weekly_passes": 4,
+    "pending_weekly_batches_drained": 8,
+    "probe_restorations": 200,
+    "memory_prompts": 224,
+    "maximum_memory_text_bytes": 2085
+  },
+  "setups": [
+    {
+      "setup": "none",
+      "coverage": "structurally exercised",
+      "evidence": "224 answer turns after earlier event anchors; the reference arm deliberately supplies no persistent memory.",
+      "limit": "Recorded fixed answers establish invocation and shared-context plumbing only, never accuracy."
+    },
+    {
+      "setup": "full_history",
+      "coverage": "structurally exercised",
+      "evidence": "2,220 events and later queries provide history to retain and recall.",
+      "limit": "One owner identity only; no cross-owner namespace test. Actual retrieval/accuracy needs the reference ledger and scored runs."
+    },
+    {
+      "setup": "lampos_today_partial",
+      "coverage": "incomplete baseline",
+      "evidence": "Real-store adapter is invoked, but explicitly advertises complete_baseline=false.",
+      "limit": "Voice observations, talk notes, running summary and voice forget dispatch are absent; it cannot stand in for the complete product baseline."
+    },
+    {
+      "setup": "tiers",
+      "coverage": "partially exercised",
+      "evidence": "Owner capture, 240 closed episodes, explicit keep facts, 30 nights, four weeks, snapshots, recall and isolation execute.",
+      "limit": "Empty recorded consolidation leaves every modeled line tier absent; real tier contribution remains conditional on accepted output and retrieval."
+    },
+    {
+      "setup": "tiers_minus_episodes",
+      "coverage": "structurally reachable; partly exercised",
+      "evidence": "240 closed episodes allow recent raw-record episode fallback.",
+      "limit": "Zero episode gists/details in the recorded run. Older summarized-episode behavior needs accepted model output. Topic-change cutting is not exercised because every input topic cue is null."
+    },
+    {
+      "setup": "tiers_minus_life_story",
+      "coverage": "model-dependent; not populated in recorded run",
+      "evidence": "Chapter/event lines can be proposed and retrieved through FTS or a found fact.",
+      "limit": "Zero modeled lines observed. Passage of days alone does not create life-story lines; generic question categories cannot prove coverage without looking at semantics."
+    },
+    {
+      "setup": "tiers_minus_facts",
+      "coverage": "partly exercised",
+      "evidence": "Seven explicit statement facts are present in the recorded full candidate.",
+      "limit": "Model-extracted facts and person/place lines remain unpopulated. Proof rows stay for other tiers; removing fact recall also removes fact-seeded discovery of related lines, although direct line FTS remains."
+    },
+    {
+      "setup": "tiers_minus_owner_model",
+      "coverage": "model-dependent; not populated in recorded run",
+      "evidence": "224 memory prompts request a session snapshot.",
+      "limit": "Every modeled line tier is empty in the recorded run, so snapshot removal has no owner-model content to remove. Live output must populate and cite valid facts."
+    },
+    {
+      "setup": "tiers_minus_how_to_be",
+      "coverage": "model-dependent; not populated in recorded run",
+      "evidence": "Taught rules and learned patterns have proposal and retrieval paths.",
+      "limit": "An explicit remember command creates a statement fact, not a taught-rule line. Learned patterns require at least two distinct owner records; taught rules require one exact quoted source."
+    },
+    {
+      "setup": "tiers_minus_ahead",
+      "coverage": "model-dependent; not populated in recorded run",
+      "evidence": "There are 12 ahead-category questions and modeled ahead-line support.",
+      "limit": "Category presence does not prove line population or retrieval. Recorded facts are statements; plan/appointment expiry is therefore not exercised by this recorded run."
+    },
+    {
+      "setup": "tiers_minus_feelings",
+      "coverage": "model-dependent; not populated in recorded run",
+      "evidence": "Feeling lines can be proposed, grounded and retrieved.",
+      "limit": "No automatic emotion classifier, independent feeling expiry or feeling-specific structural question category. Generic understanding/preferences categories cannot certify semantic coverage."
+    },
+    {
+      "setup": "tiers_minus_nightly_sleep",
+      "coverage": "scheduled mechanism exercised; benefit model-dependent",
+      "evidence": "Thirty nightly passes and four weekly passes; queries occur on 19 days, including nonweekly days.",
+      "limit": "The removal preserves weekly reflection, maintenance and raw/explicit memory. Empty proposals cannot show a recall benefit from nightly consolidation; weekly output may mask some differences."
+    },
+    {
+      "setup": "tiers_minus_importance",
+      "coverage": "weight variation present; selection effect conditional",
+      "evidence": "Recorded full candidate has episode importance levels 0 and 1.",
+      "limit": "Importance only weights episodes. A query must have competing eligible items for ordering to matter; variation alone is not proof of answer impact. Importance-dependent aging is outside this month."
+    },
+    {
+      "setup": "tiers_minus_fading",
+      "coverage": "not exercised by this month",
+      "evidence": "Events span 29.32 days; last query is 28.37 days after the first event. Fading requires strictly more than 90 days.",
+      "limit": "Keep the no-fading run reported. This month cannot decide keep/drop; the lead requires a separately registered approximately 120-day aging test."
+    }
+  ],
+  "additional_gaps": [
+    "Every query has null topic/activity cues and no object cues; cue-driven topic/activity/desk-object retrieval is unexercised. Inputs have one constant activity and no topic or object cues. Word-driven FTS and observed-owner identity still have paths.",
+    "All identified input belongs to one observed person id. The mismatched-owner departure guard and multiple-owner namespace separation are unit-test coverage, not month coverage. Visitor/mixed-presence paths do occur.",
+    "All queries allow 1,048,576 memory-text bytes; the recorded candidate returns at most 2,085. This run does not stress text-budget truncation. Separate exact-UTF8 and 500-byte regressions cover it deterministically.",
+    "The current fixed empty consolidation fixture cannot validate the comparative value of modeled tiers. Record accepted population and actual retrieval per tier during live runs before interpreting equal scores as evidence of no value.",
+    "The month offers enough time for a 14-day plan expiry but does not guarantee typed plan facts. Actual appointments and expiry coverage remains conditional on accepted model classifications; do not infer it from question category alone."
+  ],
+  "aging_test_prerequisites": [
+    "Close candidate episodes with topic changes or matched-owner session/departure boundaries; silence or calendar advancement alone does not close an episode.",
+    "Create accepted nonempty episode detail with importance below 0.5 and retain its gist. Include a high-importance control.",
+    "Run sleep maintenance strictly after the 90-day boundary; advancing only a recall clock does not apply fading.",
+    "Original source records and gist survive fading. Source-history recall may bypass lost detail, so distinguish ordinary retrieval from explicit-history access in the registered design.",
+    "The current adapter never acknowledges a completed answer to the store, so recall does not refresh the fading-protection timestamp. Do not claim that the aging bench tests that protection without a delivery-ack contract."
+  ],
+  "decision_boundary": "Structural reachability is not semantic coverage or score evidence. Preserve the registered month and threshold; proposed coverage additions require lead/Bench registration before live scoring."
+}

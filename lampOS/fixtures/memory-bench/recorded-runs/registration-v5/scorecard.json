@@ -1,0 +1,1357 @@
+{
+  "coverage_gaps": [
+    "no second identified person",
+    "no delivered-recall acknowledgement"
+  ],
+  "label": "plumbing checks; no accuracy scores",
+  "runs": [
+    {
+      "arm": "none",
+      "details": {
+        "answer_turns": 224,
+        "arm": "none",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 224,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 448,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {}
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "run_id": "none",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "full_history",
+      "details": {
+        "answer_turns": 224,
+        "arm": "full_history",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 224,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 448,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "full_history": {
+              "items": 1438,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 64579
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "run_id": "full_history",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "lampos_today_partial",
+      "details": {
+        "answer_turns": 224,
+        "arm": "lampos_today_partial",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 224,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 448,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "record": {
+              "items": 1444,
+              "recall_calls": 70,
+              "snapshot_calls": 0,
+              "text_bytes": null
+            },
+            "running_summary": {
+              "items": null,
+              "recall_calls": null,
+              "snapshot_calls": null,
+              "text_bytes": null
+            },
+            "talk_notes": {
+              "items": null,
+              "recall_calls": null,
+              "snapshot_calls": null,
+              "text_bytes": null
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "run_id": "lampos_today_partial",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "run_id": "tiers",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_episodes",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_episodes",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "population and returned text observed; not quality evidence",
+      "run_id": "tiers_minus_episodes",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_life_story",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_life_story",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "not exercised",
+      "run_id": "tiers_minus_life_story",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_facts",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_facts",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "evidence_only_facts": {
+              "items": 7,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "facts": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "population and returned text observed; not quality evidence",
+      "run_id": "tiers_minus_facts",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_owner_model",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_owner_model",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "not exercised",
+      "run_id": "tiers_minus_owner_model",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_how_to_be",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_how_to_be",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "not exercised",
+      "run_id": "tiers_minus_how_to_be",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_ahead",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_ahead",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "not exercised",
+      "run_id": "tiers_minus_ahead",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_feelings",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_feelings",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "not exercised",
+      "run_id": "tiers_minus_feelings",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_nightly_sleep",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_nightly_sleep",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 476,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 952,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "run_id": "tiers_minus_nightly_sleep",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_importance",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_importance",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "run_id": "tiers_minus_importance",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_minus_fading",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_minus_fading",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 506,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 1012,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "removal_coverage": "not exercised by this month",
+      "run_id": "tiers_minus_fading",
+      "scores": null,
+      "status": "completed"
+    },
+    {
+      "arm": "tiers_session_cutting_only",
+      "details": {
+        "answer_turns": 224,
+        "arm": "tiers_session_cutting_only",
+        "categories": {
+          "across_days": 20,
+          "ahead": 12,
+          "changed_facts": 20,
+          "decoys": 10,
+          "forgetting": 10,
+          "not_knowing": 12,
+          "preferences": 20,
+          "recall": 40,
+          "understanding": 24,
+          "visitors": 9,
+          "when": 20,
+          "wrong_person_retention": 3
+        },
+        "coverage_gaps": [
+          "no second identified person",
+          "no delivered-recall acknowledgement",
+          "fading not exercised by this month"
+        ],
+        "events": 2220,
+        "fixture_profile": {
+          "kind": "month"
+        },
+        "label": "plumbing check",
+        "live_model_calls": 0,
+        "nights": 30,
+        "questions": 200,
+        "recorded_calls": 266,
+        "scores": null,
+        "speech_transcribed": false,
+        "synthetic_budget_debit_microusd": 532,
+        "tier_usage": {
+          "missing_diagnostics": false,
+          "probes": 200,
+          "tiers": {
+            "ahead": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "episodes": {
+              "items": 17,
+              "recall_calls": 215,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "facts": {
+              "items": 7,
+              "recall_calls": 212,
+              "snapshot_calls": 0,
+              "text_bytes": 1476
+            },
+            "feelings": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "how_to_be": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "life_story": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "owner_model": {
+              "items": 0,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 0
+            },
+            "record": {
+              "items": 1442,
+              "recall_calls": 0,
+              "snapshot_calls": 0,
+              "text_bytes": 53745
+            }
+          }
+        },
+        "weekly_passes": 4
+      },
+      "label": "plumbing check",
+      "run_id": "tiers_session_cutting_only",
+      "scores": null,
+      "status": "completed"
+    }
+  ]
+}
