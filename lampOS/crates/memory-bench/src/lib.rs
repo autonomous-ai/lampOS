@@ -66,3 +66,5 @@ pub fn hash(bytes: &[u8]) -> String {
 }
 
 pub mod answering;
+
+pub mod trial;

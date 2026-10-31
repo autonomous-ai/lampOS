@@ -212,3 +212,13 @@ scalar text count as UTF-8; JSON punctuation, escaping and the runner's provenan
 envelope are separate overhead. The immediate conversation exposes source IDs
 using the existing same-person, same-presence and ten-minute/twelve-exchange
 selection. No answer-key evidence or setup label enters the answer request.
+
+The chronological executor preserves the registered nightly and weekly schedule,
+then runs isolated probes with the common answer loop and blind evaluator. It
+checks the public owner-model and retained-source view after restoration; model
+accounting never restores. Suppressed forget confirmations remain in evaluation
+evidence but the entire post-answer exchange is omitted from memory replay, as
+in the product journal. Such exchanges cannot supply a later memory citation.
+This clarification is registered in live policy v2; original scripted ingestion
+still reaches every setup. Recorded execution can exercise the judge transport,
+but emits no question score and keeps every per-kind mean null.

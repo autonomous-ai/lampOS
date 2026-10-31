@@ -335,3 +335,77 @@ fn probe_source_namespace_cannot_alias_scripted_history() {
         .is_err()
     );
 }
+#[test]
+fn omitted_forget_exchange_is_not_a_later_candidate_source() {
+    let q = question(true);
+    let mut answers = vec![
+        answer("Not yet."),
+        answer("How did it go?"),
+        answer("Next task."),
+    ];
+    answers[1].evidence_ids = vec!["probe-q001-0".into()];
+    let (mut worker, seen) = worker(judgment());
+    let result = evaluation::evaluate_with_history(
+        &q,
+        &answers,
+        &[false, true, true],
+        &[source()],
+        "UTC",
+        &mut worker,
+    )
+    .unwrap();
+    assert_eq!(result.score.fraction, Some(0.0));
+    assert!(result.score.needs_audit);
+    assert!(seen.lock().unwrap().is_empty());
+    assert!(worker.finish(deadline()).unwrap().receipts.is_empty());
+    assert!(
+        evaluation::judge_call_with_history(&q, &answers, &[true, true, true], &[source()], "UTC")
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        evaluation::judge_call_with_history(&q, &answers, &[true], &[source()], "UTC").is_err()
+    );
+}
+#[test]
+fn maximum_probe_names_keep_bounded_sources_and_temporal_citations() {
+    let mut q = question(true);
+    q.id = "q".repeat(128);
+    q.query.probe_id = q.id.clone();
+    for followup in &mut q.followups {
+        followup.probe_id = q.id.clone();
+    }
+    let first = evaluation::probe_source_id(&q.id, 0);
+    let next = evaluation::probe_source_id(&q.id, 1);
+    assert!(lamp_memory_bench::protocol::valid_id(&first));
+    assert_ne!(first, next);
+    assert_eq!(evaluation::probe_source_id("q001", 0), "probe-q001-0");
+    let mut e = source();
+    e.record_id = first.clone();
+    e.validate().unwrap();
+    let mut answers = vec![
+        answer("Not yet."),
+        answer("How did it go?"),
+        answer("Next task."),
+    ];
+    answers[1].evidence_ids = vec![first.clone()];
+    assert!(
+        evaluation::judge_call_with_history(&q, &answers, &[true, true, true], &[source()], "UTC")
+            .unwrap()
+            .is_some()
+    );
+    for id in [first, next] {
+        answers[0].evidence_ids = vec![id];
+        assert!(
+            evaluation::judge_call_with_history(
+                &q,
+                &answers,
+                &[true, true, true],
+                &[source()],
+                "UTC"
+            )
+            .unwrap()
+            .is_none()
+        );
+    }
+}

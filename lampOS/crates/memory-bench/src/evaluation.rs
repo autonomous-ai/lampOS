@@ -18,8 +18,17 @@ pub const JUDGE_PROMPT: &str =
     include_str!("../../../fixtures/memory-bench/live-policy/judge-system.txt");
 pub const OUTPUT_TOKENS: u64 = 512;
 pub const TOOL_ROUNDS: usize = 8;
+/// Stable shared provenance ID; ordinary registered IDs retain their v1 spelling.
+pub fn probe_source_id(probe_id: &str, index: usize) -> String {
+    let direct = format!("probe-{probe_id}-{index}");
+    if crate::protocol::valid_id(&direct) {
+        direct
+    } else {
+        format!("probe-{}", hash(format!("{probe_id}\0{index}").as_bytes()))
+    }
+}
 pub fn policy() -> Value {
-    json!({"version":1,"before_any_score":true,"answer_prompt_sha256":hash(ANSWER_PROMPT.as_bytes()),"judge_prompt_sha256":hash(JUDGE_PROMPT.as_bytes()),"output_tokens":OUTPUT_TOKENS,"tool_rounds":TOOL_ROUNDS,
+    json!({"version":2,"before_any_score":true,"answer_prompt_sha256":hash(ANSWER_PROMPT.as_bytes()),"judge_prompt_sha256":hash(JUDGE_PROMPT.as_bytes()),"output_tokens":OUTPUT_TOKENS,"tool_rounds":TOOL_ROUNDS,
         "probe_input":"fixed registered text, including all 224 month turns; no probe STT allowance",
         "month_input":"one verified real-STT cache shared by all setups and repetitions",
         "probe_boundary_reason":"A misheard question changes the memory skill under test. Noisy questions belong to a separate voice test; these scores can be kinder than real spoken use.",
@@ -31,6 +40,7 @@ pub fn policy() -> Value {
         "invalid_output":"failed or malformed answer/judge output leaves the trial incomplete; no numerical score, silent repair or unregistered retry",
         "forget_restart":"after an actual forget attempt, drop the current round and all cached memory, take a fresh snapshot and restart from the current question plus a content-free forget-status note; apply uniformly to every setup",
         "current_product_forget_gap":"the current product clears future recent history but retains the current request prefix and previous tool results; the uniform bench restart is stronger and may improve its measured forgetting",
+        "forget_probe_replay":"when an actual action suppresses confirmation, keep the answer in evaluation evidence but omit its post-answer memory ingest and source eligibility; original scripted ingestion remains unchanged",
         "human_audit":"rubric scores are provisional until audited; preserve every registered audit and suspected privacy failure"})
 }
 fn aggregate(question: &Question, answers: &[Answer]) -> Result<Answer> {
@@ -72,11 +82,17 @@ fn aggregate(question: &Question, answers: &[Answer]) -> Result<Answer> {
         abstain: answers.iter().all(|a| a.abstain),
     })
 }
-fn prepared(question: &Question, answers: &[Answer]) -> Result<(Question, Answer, Score)> {
+fn prepared(
+    question: &Question,
+    answers: &[Answer],
+    recorded: &[bool],
+) -> Result<(Question, Answer, Score)> {
     let aggregate = aggregate(question, answers)?;
+    if recorded.len() != answers.len() {
+        return Err(invalid("probe replay evidence length differs from turns"));
+    }
     let mut eligible: BTreeSet<_> = question.eligible_evidence_ids.iter().cloned().collect();
-    if (0..answers.len()).any(|index| eligible.contains(&format!("probe-{}-{index}", question.id)))
-    {
+    if (0..answers.len()).any(|index| eligible.contains(&probe_source_id(&question.id, index))) {
         return Err(invalid(
             "probe source namespace collides with scripted history",
         ));
@@ -94,7 +110,9 @@ fn prepared(question: &Question, answers: &[Answer]) -> Result<(Question, Answer
                 },
             ));
         }
-        eligible.insert(format!("probe-{}-{index}", question.id));
+        if recorded[index] {
+            eligible.insert(probe_source_id(&question.id, index));
+        }
     }
     let mut scored = question.clone();
     scored.eligible_evidence_ids = eligible.into_iter().collect();
@@ -116,7 +134,7 @@ fn scripted_sources(question: &Question, answers: &[Answer]) -> BTreeSet<String>
 fn supplied_judge_ids(question: &Question, answers: &[Answer]) -> Vec<String> {
     scripted_sources(question, answers)
         .into_iter()
-        .chain((0..answers.len()).map(|index| format!("probe-{}-{index}", question.id)))
+        .chain((0..answers.len()).map(|index| probe_source_id(&question.id, index)))
         .collect()
 }
 fn local(at: u64, timezone: &str) -> Result<String> {
@@ -135,7 +153,23 @@ pub fn judge_call(
     source_events: &[Event],
     timezone: &str,
 ) -> Result<Option<Call>> {
-    let (_, _, preliminary) = prepared(question, answers)?;
+    judge_call_with_history(
+        question,
+        answers,
+        &vec![true; answers.len()],
+        source_events,
+        timezone,
+    )
+}
+/// Retention is reported by the actual tool/ingest effects, never a keyword.
+pub fn judge_call_with_history(
+    question: &Question,
+    answers: &[Answer],
+    recorded: &[bool],
+    source_events: &[Event],
+    timezone: &str,
+) -> Result<Option<Call>> {
+    let (_, _, preliminary) = prepared(question, answers, recorded)?;
     if !preliminary.needs_judge {
         return Ok(None);
     }
@@ -164,7 +198,7 @@ pub fn judge_call(
         }
         evidence.push(json!({"origin":"scripted_history","source_id":event.record_id,"at_unix_ms":event.at_unix_ms,"local_time":local(event.at_unix_ms,timezone)?,"person":event.person,"person_id":event.person_id,"presence":event.presence,"heard":event.heard,"said":event.said,"cues":event.cues}));
     }
-    let turns=std::iter::once(&question.query).chain(&question.followups).zip(answers).enumerate().map(|(index,(query,answer))|Ok(json!({"origin":"candidate_probe_exchange","source_id":format!("probe-{}-{index}",question.id),"at_unix_ms":query.at_unix_ms,"local_time":local(query.at_unix_ms,timezone)?,"speaker":query.person,"person_id":query.person_id,"presence":query.presence,"question":query.heard,"answer":answer}))).collect::<Result<Vec<_>>>()?;
+    let turns=std::iter::once(&question.query).chain(&question.followups).zip(answers).enumerate().map(|(index,(query,answer))|Ok(json!({"origin":"candidate_probe_exchange","source_id":probe_source_id(&question.id,index),"at_unix_ms":query.at_unix_ms,"local_time":local(query.at_unix_ms,timezone)?,"speaker":query.person,"person_id":query.person_id,"presence":query.presence,"question":query.heard,"answer":answer}))).collect::<Result<Vec<_>>>()?;
     let packet = json!({"timezone":timezone,"rubric":criteria,"source_evidence":evidence,"candidate_turns":turns});
     let call = Call::Chat {
         purpose: Purpose::Judge,
@@ -193,8 +227,26 @@ pub fn evaluate(
     timezone: &str,
     worker: &mut Worker,
 ) -> Result<Evaluation> {
-    let (mut scored_question, aggregate, preliminary) = prepared(question, answers)?;
-    let Some(call) = judge_call(question, answers, source_events, timezone)? else {
+    evaluate_with_history(
+        question,
+        answers,
+        &vec![true; answers.len()],
+        source_events,
+        timezone,
+        worker,
+    )
+}
+pub fn evaluate_with_history(
+    question: &Question,
+    answers: &[Answer],
+    recorded: &[bool],
+    source_events: &[Event],
+    timezone: &str,
+    worker: &mut Worker,
+) -> Result<Evaluation> {
+    let (mut scored_question, aggregate, preliminary) = prepared(question, answers, recorded)?;
+    let Some(call) = judge_call_with_history(question, answers, recorded, source_events, timezone)?
+    else {
         return Ok(Evaluation {
             score: preliminary,
             judge: None,
