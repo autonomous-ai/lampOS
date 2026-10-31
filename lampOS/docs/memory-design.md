@@ -47,6 +47,12 @@ profile or announcing that it remembers.
   indicates another person. Another voice, another face, or an unknown face
   is contrary evidence. Uncertain attribution remains uncertain; it cannot
   establish an owner fact or owner-model line.
+  A default owner label is not verified identity: a second resident alone
+  at the desk can receive that label when the camera is unsure or off. The
+  benchmark registers that failure case with evaluator-only true identity
+  and requires zero owner facts or owner-model lines derived from those
+  records. This risk is not accepted or waived by the design; it must be
+  measured and resolved before a product integration can satisfy the gate.
 - An enrolled known person retains a separate small memory. An unknown
   visitor's statements do not become owner memory. Visitors receive none of
   the owner's private memory. Sharing a desk never grants access.
@@ -55,6 +61,8 @@ profile or announcing that it remembers.
   is not proof that the owner is alone.
 - The owner can inspect, correct, forget, pause, and export memory. A pause
   prevents new retention, including queued consolidation and derived copies.
+  An export contains only the owner's own memory, never an enrolled person's
+  separate memory or private information retained about other people.
 - Persistent memory is text on the lamp. No raw audio, pictures, faces, or
   screens become memory artifacts. Text sent for inference goes through the
   existing relay; provider and relay retention must be established before
@@ -136,8 +144,11 @@ unattributed model invention can become a relationship in that graph.
    Rank with keyword search, recency, and importance. Questions about exact
    past words can search the record as well. Measure each ranking component.
 7. **Forget.** A request deletes the selected source and dependent content,
-   including cached or queued derivatives. Retain only a non-revealing
-   fingerprint needed to prevent re-learning. Later sleep, retries, replay,
+   including cached or queued derivatives. Retain only a keyed HMAC
+   fingerprint needed to prevent re-learning, with its key in a separate
+   private file. The database alone cannot confirm a guessed value; the
+   database and key together still permit that test. Reset deletes the key
+   as well as the store. Later sleep, retries, replay,
    and reconstruction must not restore the forgotten content.
 
 The model never deletes records. Deterministic, reviewed code owns expiry,
