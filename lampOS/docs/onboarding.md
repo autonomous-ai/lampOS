@@ -202,7 +202,8 @@ it was confirmed. Filled data is never interpreted as another slot.
 `near_failed`, `sentence_first`, `sentence_louder`, `sentence_closer`,
 `sentence_again`, `sentence_done`, `sentence_failed`, `give_again`,
 `give_done`, `give_failed` and `who_confirm`. Unknown or missing data fields are refused,
-except #3769's `touch_done`, `touch_failed` and `give_again`, #3702's `near_missed`, and #3996's `later` and
+except #3769's `touch_done`, `touch_failed` and `give_again`, #3702's `near_missed`,
+`give_felt`, `give_prompt` and `give_more`, and #3996's `later` and
 `later_after_s` (1800 s without it), which are optional: an
 older updater's `install` writes its own built-in onboarding file without them,
 and the walk still runs, saying what it said before (no line at a touch's end,
@@ -485,7 +486,7 @@ both steps were `not_available` with every switch set).
 It starts the first time the voice runs with the switch on and no step kept
 yet, and someone is at the lamp. Each step begins after 3 s of quiet: no voice
 the detector calls speech, words or none, no words heard and none of the
-lamp's own, as [speaking-first.md](speaking-first.md) ("When") counts it. A
+lamp's own, as [speaking-first.md](speaking-first.md) ("Someone at the lamp") counts it. A
 request that heard no words holds it only through its speech, not through
 its end's silence or the wait for an answer (on lamp-52e6 on 21 October the
 lamp's fan had kept the privacy step from ever being offered). A walk left half done (they walked off,
@@ -711,7 +712,9 @@ location (below) and Controls' privacy receipts, `LAMP_PRIVACY_CONTROLS=on`
 (the `privacy_bus.rs` worker): the GPIO
 privacy worker sends no receipt, and without one no invitation could ever be
 offered, so the step is `not_available` and the walk goes on. The product's
-`lamp-voice.service` doesn't set `LAMP_PRIVACY_CONTROLS`.
+`lamp-voice.service` sets `LAMP_PRIVACY_CONTROLS=on`, as `lamp-controls.service`
+does; privacy is still `not_available` there, since it sets no
+`LAMP_ONBOARDING_HARDWARE_PROFILE` (below).
 
 With the receipt source on, a receipt that never shows the switch open and
 fresh (faulted, stale, a reader that stopped) would hold the walk at privacy
@@ -917,7 +920,7 @@ before a hearing is known; the try is judged 0.3 s after that for delivery.
 That 7.3 s is only for a try where no sure call is heard. A sure call (a
 `name/heard` at 0.95 or more begun in the window, or over the prompt's last
 word) is judged as soon as its own second of rise is in, 1.3 s after it began,
-about 0.7 s after its final hearing; and the next prompt, its answer ("Got it. Once more." or
+about 0.7 s after its final hearing; and the next prompt, its answer ("Got it. Say 'Hey Lamp' once more." or
 "I didn't catch that. …"), waits only 0.5 s of quiet (`ANSWER_QUIET_US`),
 not the walk's 3 s, so it follows the call as a reply would (the
 Reviewer-lead's P3 on #4001: a call 1 s into the window was answered about
@@ -1279,7 +1282,8 @@ monotonic clock and is never read as a time):
 
 Any of the three head joints counts: the base turning (`base_yaw`, lamp-52e6)
 or the head tilting (`head_pitch`, the run that passed on lamp-29e7, 28 Oct),
-so the invitation names no direction ("any way you like").
+so the invitation asks only for a gentle tilt to one side ("tilt my head
+gently to one side"), and a turn of the base counts as well.
 
 1. `body/joint_states` with no hand on it: each head joint's goal (`base_yaw`,
    `head_pitch`, `head_roll`), where it was asked to be. The base is a head
