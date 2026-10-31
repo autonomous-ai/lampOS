@@ -2081,6 +2081,7 @@ dependencies = [
 name = "lamp-memory-bench"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "hmac",
  "jiff",
  "lamp-memory",
@@ -2091,6 +2092,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "tokio-tungstenite",
  "webpki-roots 1.0.9",
 ]
 

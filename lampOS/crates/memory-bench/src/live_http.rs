@@ -221,7 +221,7 @@ impl Http {
         Ok(bytes)
     }
 }
-fn save(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn save(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -354,7 +354,7 @@ impl Provider for Http {
 // Inspect JSON strings even in rejected SSE frames or non-JSON envelopes.
 // A malformed/truncated quoted string is not safe to archive: retain only the
 // digest and safe accounting metadata. This scan is independent of acceptance.
-fn wire_safe_to_save(bytes: &[u8], secret: &str) -> bool {
+pub(crate) fn wire_safe_to_save(bytes: &[u8], secret: &str) -> bool {
     if bytes.windows(secret.len()).any(|w| w == secret.as_bytes()) {
         return false;
     }
@@ -387,7 +387,7 @@ fn wire_safe_to_save(bytes: &[u8], secret: &str) -> bool {
     }
     true
 }
-fn contains_secret(value: &Value, secret: &str) -> bool {
+pub(crate) fn contains_secret(value: &Value, secret: &str) -> bool {
     match value {
         Value::String(s) => s.contains(secret),
         Value::Array(items) => items.iter().any(|v| contains_secret(v, secret)),

@@ -93,8 +93,8 @@ at least the reservation or any higher known charge. Restoring a probe does not
 restore this account. Transcription confidence remains optional; no confidence
 is inferred from a missing service field.
 
-This layer has fake-provider tests. The WebSocket speech transport and verified
-shared transcript cache remain to be implemented before any scored execution.
+This accounting layer has fake-provider tests. The verified shared transcript
+cache and live orchestration remain required before any scored execution.
 
 Each durable reservation also binds its billing kind. Token evidence cannot
 refund an audio reservation, and audio evidence cannot refund a token reservation;
@@ -102,3 +102,34 @@ a mismatch is persisted as a stop. Existing token-only journals retain their
 original serialized hashes. A successful transcription must match its recorded
 transcript hash, and any supplied confidence must be finite and within zero to one.
 These checks precede refunds and also have restart regression coverage.
+
+
+## Speech transport and evidence
+
+The WebSocket transport uses the product route's Nova-3 general English settings,
+16 kHz mono PCM16 and 20 ms audio frames paced in real time. It has a ten-second
+handshake bound, a thirty-second response stall bound, a bounded Finalize wait,
+a fifteen-second closing bound and the caller's absolute deadline across all of
+these. It makes no retry. Chat and speech share one provider facade, client and
+campaign account; an absent service fails before network dispatch.
+
+Credentials come from the environment. Only the explicit offline fixture entry
+point permits literal loopback plain WebSockets, using a fixed dummy credential.
+Each call saves a private request description, received text frames and provenance
+with hashes. Credential echoes cannot enter those artifacts. Frames, accumulated
+wire bytes and transcript length are bounded. The WAV and PCM identity, samples
+sent, provider request/model revision, terminal duration and optional confidence
+remain linked to the receipt, including failed requests. Known duration survives
+an identity or close failure; missing duration retains the original reservation.
+
+Only final results enter the transcript. Repeated identical finals are deduplicated;
+conflicting, overlapping or unresolved later results fail. Final coverage must
+reach the input's end within 50 ms; processed duration alone cannot prove that no
+words were lost. Missing confidence remains unknown. Terminal model maps are
+cross-checked against result identity. There is no clean-script or interim fallback.
+
+Offline WebSocket tests exercise upload pacing, finalization, metadata, truncation,
+identity drift, deadline cancellation, secret echoes and failed evidence writes.
+These tests are plumbing checks; they do not establish recognition quality.
+The wire matches the in-tree product speech client and the
+[Deepgram streaming reference](https://developers.deepgram.com/reference/speech-to-text/listen-streaming).

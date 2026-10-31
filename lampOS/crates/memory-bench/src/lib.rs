@@ -10,6 +10,7 @@ pub mod diagnostics;
 pub mod files;
 pub mod ledger;
 pub mod live_http;
+pub mod live_speech;
 pub mod model;
 pub mod model_worker;
 pub mod partial;
