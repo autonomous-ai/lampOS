@@ -329,6 +329,10 @@ with Rust 1.96.0, the first lookup after synthetic ingestion took 1.599 ms and
 the slowest of 20 subsequent lookups took 1.426 ms. The in-memory SQLite pages
 were populated by ingestion; this is not a cold-disk measurement. The ordinary
 workspace ARM64 build/tests and all-target Linux clippy include the adapter.
+The subprocess harness bounds responses and expected child exits at ten
+seconds, retains stderr diagnostics, and checks deadline counters alongside
+empty privacy/forget results. Its broker-timeout case requires the configured
+20 ms timeout to return within a two-second host scheduling allowance.
 
 Not yet shown: live extraction or billed cost, the three-run ledger scorecard
 against every baseline, real STT, held-back human review, cross-owner voice
