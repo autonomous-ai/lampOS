@@ -1,5 +1,106 @@
 # Tiers work log
 
+## 2026-10-31: stopped handoff — accepted checkpoint, wider task blocked
+
+The lead accepted `7d6d0a236` with both independent reads and native gates green,
+then instructed this builder to record the handoff, mark the task blocked and
+stop. **Blocked:** the stack awaits the second read on #4750; live scoring
+awaits the owner's model access keys and explicit spending cap. No further
+implementation is queued for this session. This is not completion of the
+three-run scoring assignment. Earlier entries describe historical states;
+this section is the current handoff.
+
+### Branches and merge order
+
+All four PRs remain open and target `lamp-voice`; each later branch includes
+the earlier work. Merge in this order through the first builder or reviewer:
+
+| Order | PR | Branch | Accepted checkpoint |
+|---|---|---|---|
+| 1 | [#4750: store and sleep](https://github.com/autonomous-ai/lampOS/pull/4750) | `tiers/store-sleep` | `1c9d4cd17` |
+| 2 | [#4756: recall and adapter](https://github.com/autonomous-ai/lampOS/pull/4756) | `tiers/recall-adapter` | `38a822541` |
+| 3 | [#4777: count-only diagnostics](https://github.com/autonomous-ai/lampOS/pull/4777) | `tiers/usage-diagnostics` | `62e092173` |
+| 4 | [#4783: nightly topic boundaries](https://github.com/autonomous-ai/lampOS/pull/4783) | `tiers/sleep-topic-segmentation` | `7d6d0a236` |
+
+The source worktree is clean on `tiers/sleep-topic-segmentation`. The work log
+and accepted role live on `lamp-tiers`. Do not push to `lamp-voice` or merge
+these PRs as a builder. Recheck the queue and PR state on resumption; follow
+the first builder's stack-refresh instructions after each predecessor lands.
+Any changed code needs the corresponding gates on its new head.
+
+### Exact executable and registration pins
+
+- Adapter: `7d6d0a2364bc2052c323327334633a97450b12b3`, macOS x86_64 debug,
+  Rust 1.96.0, 11,785,456 bytes. SHA-256:
+  `ad0eef3379b5753bd01ce3df7aa29db998c1f366739e59a7d60cb005432d5f97`.
+  In this worktree:
+  `lampOS/.cache/tiers-session/artifacts/7d6d0a2364bc2052c323327334633a97450b12b3/lamp-memory-tiers-arm`.
+  Its adjacent `artifact.json` records the embedded-revision check. The shared
+  bundle is `lampOS/.cache/tiers-session/tiers-arm-7d6d0a236-macos-x86_64.tar.gz`.
+- Runner and registrations: `6420a2f490263df664a12c8f8848c95421c30abd`,
+  14,507,456 bytes. SHA-256:
+  `c7e93b0cedd75a0211bdb714f77f51fb62d5232359cfa08c096de8935886edac`.
+  The preserved executable belongs to Bench's worktree, at
+  `.harness/bench-session/bin/lamp-memory-bench-6420a2f49`; use it read-only.
+  Verify its checksum again before use. The registered development and aging
+  fixtures are at that Git revision. The copied fixed reply is in this
+  worktree at `lampOS/.cache/tiers-session/topic-recorded-answer.json`.
+- Historical controls remain preserved: the prior adapter at `38a822541`
+  and diagnostics checkpoint `62e092173` have their own artifact directories
+  and manifests under `lampOS/.cache/tiers-session/artifacts/`. For the
+  registered comparison, all twelve candidate setups use the new `7d6d0a236`
+  executable; only `tiers_session_cutting_only` disables topic segmentation.
+
+### Evidence and next work
+
+The final checkpoint passed 100 functional tests and three API checks in both
+the Mac workspace and source-only copy, formatting, strict clippy and the
+workspace build. Native ARM64
+[41209271034](https://github.com/autonomous-ai/lampOS/actions/runs/41209271034)
+passed 13,041 tests (107 skipped) plus doctests; Linux clippy
+[41209271111](https://github.com/autonomous-ai/lampOS/actions/runs/41209271111)
+passed. Tests and Reviewer-three both gave READ-OK on the exact adapter pin.
+All twelve contract smokes passed. The following entry records both completed
+ledger hashes, counts and output reservations.
+
+Keep `lampOS/.cache/tiers-session/` intact. In particular,
+`topic-month-tiers-7d6d0a236/` and `topic-aging-tiers-7d6d0a236/` contain the
+verified runs; `topic-*-model-shapes.json` and `topic-*-ledger-verification.json`
+are the count-only summaries. `topic-recorded-ledgers-7d6d0a236.tar.gz` contains
+only the two manifests and event ledgers, excluding databases and private keys.
+Bench and the lead received these summaries, ledger bundle and executable pin.
+
+Bench owns the full fifteen-setup recorded pass, updated cost projection,
+live runner and scorecard. Once the owner supplies keys and approves a cap,
+resume through the lead using the frozen registration: three runs of every
+setup, all results retained, month and separate aging test. Do not start paid
+calls on the basis of a proposed cap. The complete current-product baseline,
+live model/STT evidence and verified fading prerequisites remain outstanding.
+Empty or unused tiers must read as not exercised. No product integration or
+device change is authorized by this library-phase handoff.
+
+### Most likely wrong or still unproved
+
+- Fixed empty consolidation and one-range topic replies prove protocol and
+  privacy enforcement, not real extraction, topic quality or model usefulness.
+- The 128-record, 64 KiB or output-ceiling boundary can split one real topic;
+  records revisited for new episode summaries can repeat fact extraction.
+  Actual model behavior, total cost and semantic quality need the registered runs.
+- Fading was not exercised: the month is too short and recorded aging replies
+  create no eligible detail. Low importance, old nonempty detail and no recent
+  recall must be observed before interpreting the aging comparison.
+- A second identified person, delivered-recall acknowledgement and a complete
+  product baseline remain explicit gaps. No score establishes product readiness.
+- Parallel adapter tests timed out on the shared Mac; serial tests passed
+  without relaxing deadlines. A full-flush explanation was suggested but not
+  sampled. The optional per-arm timeout diagnostic is deferred.
+
+No local build, test, run or CI watcher remains active. The shared build slot
+was released and rebuildable output cleaned; pinned artifacts and ledgers remain.
+On resumption, acquire the shared slot and require at least 15 GiB free before
+Cargo work, preserve any new executable, clean only this worktree's build output,
+then release the slot. Never remove another builder's lock or files.
+
 ## 2026-10-31: topic checkpoint ready and recorded integration complete
 
 [PR #4783](https://github.com/autonomous-ai/lampOS/pull/4783) is undrafted at
