@@ -177,7 +177,9 @@ candidate arms in this order, three repetitions each:
 1. `tiers`: the full engine.
 2. `tiers_minus_episodes`: remove episodes.
 3. `tiers_minus_life_story`: remove chapters and events.
-4. `tiers_minus_facts_people_places`: remove facts and people/place links.
+4. `tiers_minus_facts_people_places`: **facts not recalled; kept only as
+   evidence**. Remove facts and people/place links from recall and prompt
+   text, retaining proof rows so the remaining components can be checked.
 5. `tiers_minus_owner_model`: remove the owner model.
 6. `tiers_minus_how_to_be`: remove taught and learned behavior memory.
 7. `tiers_minus_whats_ahead`: remove prospective memory.
