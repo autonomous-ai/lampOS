@@ -535,3 +535,50 @@ fn failed_probe_cleanup_ends_run_without_overwriting_main_store() {
         1
     );
 }
+
+#[test]
+fn paced_episodes_cut_on_topic_or_matching_owner_departure() {
+    let mut p = ArmProcess::new("tiers");
+    let mut event = json!({"record_id":"pace-1","at_unix_ms":1000,"session_id":"paced-session","kind":"utterance","person":"owner","person_id":"owner-a","presence":"owner_alone","heard":"The blue pencil is useful.","said":"","stt_confidence":null,"cues":{"activity":"desk","objects":[],"topic":"sketching"}});
+    assert_eq!(p.request("ingest", json!({"event":event}))["ok"], true);
+    event["record_id"] = json!("pace-2");
+    event["at_unix_ms"] = json!(3000);
+    event["heard"] = json!("I keep the pencil by the notebook.");
+    assert_eq!(p.request("ingest", json!({"event":event}))["ok"], true);
+    let mut departure = event.clone();
+    departure["record_id"] = json!("other-departure");
+    departure["at_unix_ms"] = json!(4000);
+    departure["kind"] = json!("leave");
+    departure["person_id"] = json!("other-person");
+    departure["heard"] = json!("");
+    departure["presence"] = json!("unknown");
+    assert_eq!(p.request("ingest", json!({"event":departure}))["ok"], true);
+    event["record_id"] = json!("pace-3");
+    event["at_unix_ms"] = json!(6000);
+    event["heard"] = json!("A soft pencil suits the sketch.");
+    assert_eq!(p.request("ingest", json!({"event":event}))["ok"], true);
+    event["record_id"] = json!("pace-4");
+    event["at_unix_ms"] = json!(8000);
+    event["cues"]["topic"] = json!("garden");
+    event["heard"] = json!("My fern needs water.");
+    assert_eq!(p.request("ingest", json!({"event":event}))["ok"], true);
+    departure["record_id"] = json!("owner-departure");
+    departure["at_unix_ms"] = json!(10000);
+    departure["person_id"] = json!("owner-a");
+    assert_eq!(p.request("ingest", json!({"event":departure}))["ok"], true);
+    event["record_id"] = json!("pace-5");
+    event["at_unix_ms"] = json!(600000);
+    event["heard"] = json!("The fern looks green.");
+    assert_eq!(p.request("ingest", json!({"event":event}))["ok"], true);
+    p.close();
+    let store =
+        lamp_memory_tiers::Store::open(p._dir.path().join("tiers.sqlite"), "owner-a").unwrap();
+    let records = store
+        .records(lamp_memory_tiers::Access::OWNER_ALONE)
+        .unwrap();
+    assert_eq!(records.len(), 5);
+    assert_eq!(records[0].episode_id, records[1].episode_id);
+    assert_eq!(records[1].episode_id, records[2].episode_id);
+    assert_ne!(records[2].episode_id, records[3].episode_id);
+    assert_ne!(records[3].episode_id, records[4].episode_id);
+}
