@@ -253,6 +253,15 @@ struct Kind {
     heard: &'static [&'static str],
 }
 
+/// The name the person calls `engine`'s agent by (`devin-cloud` is Devin),
+/// or `None` for an engine the voice doesn't know.
+pub(crate) fn name_of(engine: &str) -> Option<&'static str> {
+    KINDS
+        .iter()
+        .find(|kind| kind.engine == engine)
+        .map(|kind| kind.name)
+}
+
 /// The agents the lamp hands work to, as the person calls them: what the
 /// second route's speech to text listens for (`second_provider::net::key_terms`).
 pub fn agent_names() -> Vec<&'static str> {
