@@ -685,15 +685,17 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     believe the person (`OWN_PRICE_NOTE`). No price read, or offers in two
     currencies: `note` says to give none from elsewhere
     (`OWN_PRICE_UNREAD_NOTE`).
-  - **Saying it checks** (`LAMP_SECOND_CHECKING_LINE=on`, off unless set;
-    #4684). On lamp-4ace on 31 Oct (build `7fa975266f`, the first builder's
-    run of #4684) "How much is the Autonomous ErgoChair Pro?" got its right
-    price 4.5 s after the words, with nothing said before: round 1's
+  - **Saying it checks** (`LAMP_SECOND_CHECKING_LINE=on`, off unless set,
+    on in the product; #4684, #4707). On lamp-4ace on 31 Oct (build
+    `7fa975266f`, the first builder's run of #4684) "How much is the
+    Autonomous ErgoChair Pro?" got its right price 4.5 s after the words,
+    with nothing said before: round 1's
     `web_search` call came with no words, then the search, our page's read
     and round 2. With the switch, a round with no words of its own that
     calls `web_search` or `fetch_page`, with nothing said yet in the turn,
-    is begun with the lamp's own "Let me check." (`CHECKING`), said as the
-    search runs, and the next round is told it was said
+    is begun with the lamp's own "Let me check." (`CHECKING`, in the
+    owner's language: "The owner's language", above), said as the search
+    runs, and the next round is told it was said
     (`said_once_note`). It is the lamp's line, spoken only when a search
     really runs, so it never promises a search that isn't made (#4595's
     case, line 3 of the same run). Each search also says in the journal how
