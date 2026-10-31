@@ -1,5 +1,37 @@
 # Tiers work log
 
+## 2026-10-31: topic checkpoint ready and recorded integration complete
+
+[PR #4783](https://github.com/autonomous-ai/lampOS/pull/4783) is undrafted at
+`7d6d0a236`. Native ARM64 run 41209271034 passed 13,041 tests (107 skipped)
+plus doctests, and strict Linux clippy 41209271111 passed. Tests and
+Reviewer-three both recorded READ-OK on this exact head. Tests' optional
+per-arm startup diagnostic remains noted; no deadline or measured source was
+changed. The Mac full-flush explanation is unverified, not a finding.
+
+The independent recorded runs used checksum-verified runner `6420a2f49` and
+the same pinned adapter, one setup at a time. The month completed 2,220 events,
+200 isolated probes, 224 answer turns, 30 nights and four weekly passes.
+Its 240 boundary calls reserved 86,583 output tokens (160 to 642 per call),
+91.2% below the former flat allowance. Its completed 5,896-entry ledger ends at
+`2d1ffb27cd7b91e4984a8573afbe38cea52a8761d43c32e74da3f473a910a1eb`.
+
+The aging run completed 2,856 events, 42 probes, 120 nights and 17 weekly
+passes. Its 346 boundary calls reserved 104,815 output tokens, 92.6% below
+the former flat allowance. Its completed 5,332-entry ledger ends at
+`ebcc58a1cf37299d1cedad736a7c5fc592501612f59dd38cae18b60757db6e28`.
+Both ledgers verify, report diagnostics on every probe, and have zero recall
+or snapshot deadline misses. Peak memory text was 2,085 bytes for the month
+and 2,005 for aging. Both fixture bodies preserve the prior event, question
+and answer-key bytes. Request shapes and ledger bundles were handed to Bench.
+
+These are fixed-reply plumbing checks with synthetic usage: 506 calls for the
+month and 534 for aging, no live calls and no scores. Empty modeled tiers and
+unpopulated fading prerequisites remain unexercised. The wider assignment still
+needs live three-run scorecards, actual model/STT evidence, fading prerequisites
+and the complete current-product baseline. No product caller or lamp changed;
+no local run remains active, and the shared build slot is released.
+
 ## 2026-10-31: bounded nightly topic segmentation
 
 [PR #4783](https://github.com/autonomous-ai/lampOS/pull/4783), head
