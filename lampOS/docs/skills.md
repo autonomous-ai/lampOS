@@ -262,7 +262,7 @@ the design above, the Policy is the one
 gate for everything the lamp starts itself (#939). Until that gate exists, a
 skill that must keep quiet in those cases says so with a `[[while]]`.
 Routine skills additionally require their documented freshness, local-time
-and durable daily admission checks; see [scheduled skill execution](#scheduled-skill-execution).
+and durable daily admission checks; see [bedtime-morning.md](bedtime-morning.md#authored-routine).
 
 **`moves/`** holds the skill's own moves, read only as `do.body.move` names
 them. The body plays one as it plays its own gestures: on a standing lamp

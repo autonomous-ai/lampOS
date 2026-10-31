@@ -1761,7 +1761,7 @@ with it, `acting_a_say_now_goes_out_for_real_while_the_attention_question_stays_
 (`crates/policy/tests/it/progress.rs`) shows `shadow: false` for progress and
 `true` for attention. The chain from a change on `tasks/status` to one note
 offered by the voice runs with this crate's own loop and a stand-in judge in
-`crates/voice/tests/progress_news.rs`.
+`crates/voice/tests/it/progress_news.rs`.
 
 **On the lamp** (the first builder): the steps are in
 [tasks.md](tasks.md#playing-progress-news-on-lamp-4ace).
