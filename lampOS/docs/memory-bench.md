@@ -237,7 +237,9 @@ memory text; this is not evidence of a live context-window check.
 
 The development month has one identified person. It exercises visitors and a
 wrongly attributed second resident, but no second correctly identified person.
-That gap is reserved for the held-back persona or a later fixture. Delivered
+That gap is reserved for the held-back persona or a later fixture. Two
+correctly identified people, tested in both directions, are a prerequisite
+for any product-integration proposal. Delivered
 recall acknowledgement is also absent from the adapter, so the month does not
 test the mechanism that protects recently delivered memories from fading.
 Both gaps remain visible beside results.

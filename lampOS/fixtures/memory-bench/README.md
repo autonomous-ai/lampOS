@@ -173,7 +173,7 @@ The [cost estimate](cost-estimate.md) separates measured request sizes from
 unmeasured live-path allowances. The [recorded run evidence](recorded-runs/registration-v3/README.md)
 retains all fourteen completed month checks and interrupted attempts. These
 checks have null scores and do not establish memory quality. Fading is **not
-exercised by this month**; the separate aging test remains to be registered.
+exercised by this month**; the separate aging fixture is registered before scoring.
 
 Registration v4 changes only seat activity and query byte limits. The
 [coverage preservation report](development/coverage-revision.json) verifies
@@ -204,3 +204,9 @@ plan expiry and importance-dependent selection also require actual eligible
 content. Topic/object labels, a second identified person and delivered-recall
 protection remain absent. Sparse aging activity will be scheduled on each
 calendar day so nightly/weekly maintenance cannot drift to active-day cadence.
+
+The separate [aging registration plan](aging-plan.md) keeps the month unchanged
+and extends the same fictional owner to 120 days. Its 42 fixed probes compare
+useful gist, important controls, recent facts and forgetting before/after the
+fading boundary; absence of real eligible detail remains unexercised. The
+[scenario](aging-scenario.json) is evaluator authoring input, not arm context.

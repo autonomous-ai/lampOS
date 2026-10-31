@@ -1,7 +1,7 @@
 //! Separate evaluator artifacts from the event-only input sent to an arm.
 use crate::{
     Result,
-    corpus::{Corpus, Persona},
+    corpus::{Corpus, Persona, Profile},
     hash, invalid,
     protocol::{MAX_FRAME_BYTES, read_frame},
 };
@@ -78,7 +78,7 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
     .into_iter()
     .map(|name| Ok((name, hash(&fs::read(path.join(name))?))))
     .collect::<Result<BTreeMap<_, _>>>()?;
-    let registration = json!({"version":4,"protocol_version":2,"protocol_minor":1,"status":"draft_pending_human_review","fictional":true,
+    let mut registration = json!({"version":4,"protocol_version":2,"protocol_minor":1,"status":"draft_pending_human_review","fictional":true,
         "question_count":200,"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
         "seed":corpus.persona.seed,"files":hashes,"scorers":"src/score.rs and tests/guards.rs committed before scored runs",
         "coverage_revision":{"date":"2026-10-31","before_any_score":true,"reason":"Give memory only product-observable activity and a realistic prompt budget; prevent empty or unused tier removals from being treated as evidence of no value.","activity":"Scripted at_desk, head_down and away from visit stage directions; probe posture rotates independently of question content.","topic":null,"objects":[],"memory_text_bytes":4096,"no_memory":"no memory text","full_history":"ceiling; no memory-selection cap, complete prompt must fit pinned model context; transport overflow is unsupported, never truncation","diagnostics":"optional metadata-only tier-usage-v1 on inspection; unknown when absent; never scored","gaps":["fading not exercised by this month","no second identified person","no delivered-recall acknowledgement","no supplied-topic episode split","no supplied object labels"]},
@@ -93,6 +93,20 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
         "comparison":"mean loss exceeds full-engine max-minus-min spread for overall or any category, or safety/privacy necessity",
         "recall_ms":200,"snapshot_ms":300,"transcripts":"not_yet_recorded","human_audit":"pending",
         "judge":"required for rubric scores; recorded tests are not live results"});
+    if let Profile::Aging { .. } = &corpus.profile {
+        registration = json!({"version":1,"profile":corpus.profile,"protocol_version":2,"protocol_minor":1,
+            "status":"registered_before_scoring_pending_human_review","fictional":true,"days":120,"question_count":42,
+            "timezone":corpus.persona.timezone,"seed":corpus.persona.seed,"files":hashes,
+            "candidate_order":["tiers","tiers_minus_fading"],"repetitions":3,"memory_text_bytes":4096,
+            "reason":"The unchanged 30-day month cannot exercise the unchanged strictly-over-90-day fading threshold.",
+            "schedule":"Thirty-day base plus sixteen additional early two-exchange episodes, then one two-exchange visit each day 31 through 120. Nightly maintenance on all 120 calendar days; weekly after days 7, 14, ... 119.",
+            "probes":"Matched gist and high-importance-control questions after day 90 and day 120; recent facts and forgetting after day 120. Probes are isolated.",
+            "coverage_gates":["accepted nonempty detail and gist in low-importance episodes below 0.5","high-importance controls at or above 0.5","sleep maintenance after day 90","report whether eligible old detail competes with recent evidence under the fixed byte cap"],
+            "comparison":"Full engine first, then no fading; three runs each. Retain fading if removing it lowers overall or any aging category mean by more than full-engine max-minus-min spread, or for safety/privacy necessity. Missing prerequisites mean not exercised; no keep/drop conclusion.",
+            "history_access":"ordinary recall is primary; explicit-history access is separately reported because source records survive fading",
+            "gaps":["no delivered-recall acknowledgement or protection test","no second identified person"],
+            "transcripts":"not_yet_recorded","human_audit":"all 42 questions before any live score","scores":null});
+    }
     create(
         &path.join("registration.json"),
         &serde_json::to_vec_pretty(&registration)?,
@@ -100,18 +114,29 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
     Ok(())
 }
 pub fn read_corpus(path: &Path) -> Result<Corpus> {
+    let registration: Value = json_file(&path.join("registration.json"))?;
+    let profile: Profile = registration
+        .get("profile")
+        .map(|v| serde_json::from_value(v.clone()))
+        .transpose()?
+        .unwrap_or_default();
+    if let Profile::Aging { scenario_hash, .. } = &profile
+        && hash(&fs::read(path.join("scenario.json"))?) != *scenario_hash
+    {
+        return Err(invalid("aging scenario hash differs from registration"));
+    }
     let persona: Persona = json_file(&path.join("persona.json"))?;
     let events = lines(&path.join("events.jsonl"))?;
     let answer_key = lines(&path.join("answer-key.jsonl"))?;
     let questions = lines(&path.join("questions.jsonl"))?;
     let corpus = Corpus {
+        profile,
         persona,
         events,
         answer_key,
         questions,
     };
     validate(&corpus)?;
-    let registration: Value = json_file(&path.join("registration.json"))?;
     for name in [
         "persona.json",
         "events.jsonl",
@@ -131,7 +156,14 @@ pub fn read_corpus(path: &Path) -> Result<Corpus> {
 }
 pub fn validate(corpus: &Corpus) -> Result<()> {
     corpus.persona.validate()?;
-    if corpus.events.len() != 30 * 74 || corpus.questions.len() != 200 {
+    let (event_count, question_count, day_count) = match corpus.profile {
+        Profile::Month => (2220, 200, 30),
+        Profile::Aging { .. } => (2856, 42, 120),
+    };
+    if corpus.events.len() != event_count
+        || corpus.questions.len() != question_count
+        || corpus.day_end_records()?.len() != day_count
+    {
         return Err(invalid("corpus dimensions differ from plan"));
     }
     let mut records = BTreeMap::new();

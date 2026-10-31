@@ -6,6 +6,17 @@ use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
 fn run(args: &[String]) -> Result<()> {
     match args {
+        [command, month, scenario, destination] if command == "generate-aging" => {
+            let corpus = lamp_memory_bench::aging::write(
+                Path::new(month),
+                Path::new(scenario),
+                Path::new(destination),
+            )?;
+            println!(
+                "{}",
+                json!({"events":corpus.events.len(),"questions":corpus.questions.len(),"days":corpus.day_end_records()?.len(),"status":"registered aging fixture; not scored"})
+            );
+        }
         [
             command,
             fixture,

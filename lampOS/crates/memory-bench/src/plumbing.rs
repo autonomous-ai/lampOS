@@ -184,7 +184,7 @@ pub fn run_with_adapter(
         transcript_hash: None,
         timezone: corpus.persona.timezone.clone(),
         model: "fixed-recorded-answer-plumbing-only".into(),
-        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8,"runner_revision":revision,"consolidation_fixture_hash":hash(EMPTY_CONSOLIDATION.as_bytes()),"consolidation":"fixed empty synthetic proposal; no learned content or accuracy claim","nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day","protocol_minor":MINOR_VERSION,"memory_cap_policy":"4096 bytes; none must return no text; full history has no selection cap and must fit transport and pinned model context"}),
+        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8,"runner_revision":revision,"consolidation_fixture_hash":hash(EMPTY_CONSOLIDATION.as_bytes()),"consolidation":"fixed empty synthetic proposal; no learned content or accuracy claim","nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day","fixture_profile":corpus.profile,"protocol_minor":MINOR_VERSION,"memory_cap_policy":"4096 bytes; none must return no text; full history has no selection cap and must fit transport and pinned model context"}),
         budget_microusd: 1_000_000_000,
         seed: corpus.persona.seed,
     };
@@ -405,8 +405,17 @@ pub fn run_with_adapter(
             &logfile,
             Request::new("close", Op::Close, json!({})),
         )?;
+        let mut coverage_gaps = vec![
+            "no second identified person",
+            "no delivered-recall acknowledgement",
+        ];
+        coverage_gaps.push(if matches!(corpus.profile, crate::corpus::Profile::Month) {
+            "fading not exercised by this month"
+        } else {
+            "aging prerequisites and competition require metadata audit before interpretation"
+        });
         Ok(
-            json!({"label":"plumbing check","arm":arm,"events":corpus.events.len(),"questions":probes,"answer_turns":turns,"nights":nights,"weekly_passes":nights/7,"categories":categories,"tier_usage":coverage,"coverage_gaps":["fading not exercised by this month","no second identified person","no delivered-recall acknowledgement"],"scores":null,"live_model_calls":0,"speech_transcribed":false}),
+            json!({"label":"plumbing check","arm":arm,"events":corpus.events.len(),"questions":probes,"answer_turns":turns,"nights":nights,"weekly_passes":nights/7,"categories":categories,"tier_usage":coverage,"fixture_profile":corpus.profile,"coverage_gaps":coverage_gaps,"scores":null,"live_model_calls":0,"speech_transcribed":false}),
         )
     })();
     drop(runner);
@@ -464,7 +473,15 @@ pub fn scorecard(paths: &[String]) -> Result<Value> {
             row["removal_coverage"] = json!(full.as_ref().map_or("unknown", |c| c.exercise(tier)));
         }
         if row["arm"] == "tiers_minus_fading" {
-            row["removal_coverage"] = json!("not exercised by this month");
+            row["removal_coverage"] = json!(if row
+                .pointer("/details/fixture_profile/kind")
+                .and_then(Value::as_str)
+                == Some("aging")
+            {
+                "aging prerequisites require audit; no quality evidence"
+            } else {
+                "not exercised by this month"
+            });
         }
     }
     Ok(

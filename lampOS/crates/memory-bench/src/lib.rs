@@ -1,4 +1,5 @@
 //! A pre-registered, fictional-month memory evaluation. No hardware access.
+pub mod aging;
 pub mod arm_server;
 pub mod arms;
 pub mod conversation;

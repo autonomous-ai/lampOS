@@ -128,7 +128,7 @@ impl Persona {
         Ok(())
     }
     pub fn local_date(&self, day: u32) -> Result<Date> {
-        if !(1..=31).contains(&day) {
+        if !(1..=120).contains(&day) {
             return Err(invalid("day outside fixture"));
         }
         let mut date: Date = self
@@ -164,10 +164,21 @@ pub struct Evidence {
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct Corpus {
+    pub profile: Profile,
     pub persona: Persona,
     pub events: Vec<Event>,
     pub answer_key: Vec<Evidence>,
     pub questions: Vec<Question>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Profile {
+    #[default]
+    Month,
+    Aging {
+        base_registration_hash: String,
+        scenario_hash: String,
+    },
 }
 impl Corpus {
     /// Consolidation follows local calendar days, never conversation count.
@@ -429,6 +440,7 @@ pub fn generate(persona: Persona) -> Result<Corpus> {
     }
     let questions = questions(&persona, &events, &evidence)?;
     Ok(Corpus {
+        profile: Profile::Month,
         persona,
         events,
         answer_key: evidence,
