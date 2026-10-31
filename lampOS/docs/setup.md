@@ -1173,4 +1173,5 @@ written (15 Oct): lamp-06c1 with its person and a phone (16 Oct, "First
 run" above), and the ten customer lamps, each set up through the app on
 Wi-Fi by the hardware team before it was reset and packed (the lead,
 #1711, 30 Oct). Some sections say what they still lack on a lamp (the
-ring's colours, the Wi-Fi change's check: "Not shown on a lamp: …").
+ring's colours, and the hotspot again when the saved network is gone: "Not
+shown on a lamp: …").
