@@ -538,10 +538,11 @@ fn the_timer_line_is_its_own_clock_or_none() {
 }
 
 /// One ask or more, as the person's words say it (#2135, Reviewer-three's
-/// P2 on #4726): a clause more than the round's calls answered is more;
-/// "too" meaning "very", two changes both called, a reminder's own "and", a
-/// thanks after, or a decimal point are not; a second ask joined by a comma
-/// is.
+/// P2s on #4726 and #4729): a clause with no word of a light, the volume or
+/// a timer, a question after the first clause, or more clauses than calls is
+/// more; "too" meaning "very", two changes both called, a reminder's own
+/// "and", a thanks after, or a decimal point are not; a second ask joined by
+/// a comma is, and so is one beside a clause that took two calls.
 #[test]
 fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
     let calls = |names: &[&str]| -> Vec<net::ToolCall> {
@@ -584,6 +585,11 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
             "Lamp, make it a little warmer, thank you.",
             calls(&["light_warmer"]),
         ),
+        (
+            "Lamp, make it warmer, thank you so much.",
+            calls(&["light_warmer"]),
+        ),
+        ("Make it cozy.", calls(&["light_warmer", "light_dimmer"])),
     ] {
         assert!(!asks_more(one, &called), "{one}");
     }
@@ -595,7 +601,21 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
         "Dim the light, tell me a joke.",
         "Make it warmer, what's the weather?",
         "Make it warmer and brighter.",
+        "Make it warmer, how warm is it outside?",
+        "What's the weather and make it warmer.",
     ] {
         assert!(asks_more(more, &calls(&["light_warmer"])), "{more}");
+    }
+    // One clause taking two calls never covers a question beside it
+    // (Reviewer-three's P2 on #4729).
+    for more in [
+        "Make it cozy and what's the weather?",
+        "Make it cozy, what's on my calendar today?",
+        "Set the reading light and tell me a joke.",
+    ] {
+        assert!(
+            asks_more(more, &calls(&["light_warmer", "light_dimmer"])),
+            "{more}"
+        );
     }
 }

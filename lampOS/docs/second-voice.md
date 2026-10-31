@@ -817,10 +817,15 @@ order is kept. A written turn is the same from the chat on.
     between digits), a comma or semicolon, or "and", "also", "then" or
     "plus", with a clause of only thanks, a greeting, the name or "okay"
     left out and a call's own words (a reminder's `text`) taken as its ask,
-    more clauses than the round's calls. So "brighter, and is it sunny?" and
-    "dim the light, tell me a joke" get round 2 after the first words, and
+    it is more when a clause holds no word of a light, the volume or a timer,
+    when a clause after the first is a question, or when there are more
+    clauses than the round's calls. It leans to more, since a dropped
+    question is worse than a second confirmation. So "brighter, and is it
+    sunny?", "dim the light, tell me a joke" and "make it cozy, what's on my
+    calendar today?" (two calls) get round 2 after the first words, and
     "It's too bright.", "Make it warmer and brighter." (two calls) and "Make
-    it warmer. Thanks!" end with them (Reviewer-three's P2 on #4726).
+    it warmer. Thanks!" end with them (Reviewer-three's P2s on #4726 and
+    #4729).
   - **In English only:** those words are English, so with an owner's
     language chosen (`language::at_start()`: Vietnamese, Japanese, Chinese
     or Korean) such turns wait for the model's words as without the switch,
