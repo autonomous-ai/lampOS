@@ -4,7 +4,10 @@ use lampos_promote::notes::{
     self, DEVELOPERS, HEADING, ON_UNSET, PLAIN, PLAIN_MOST, Waiting, placed, plain_lines, section,
     turned_on, waiting,
 };
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 const PAGE: &str = "\
 # Switches
@@ -392,6 +395,64 @@ fn on_this_repository_each_switch_is_counted_as_the_product_has_it() {
         "docs/switches.md's Counted as, against the product files:\n{}",
         wrong.join("\n")
     );
+}
+
+/// The real page and units: every `LAMP_*` a product file turns on has a
+/// row in the page's switch tables, unless the page's own left-out list
+/// ("How to read it": paths, sockets and test hooks, as `LAMP_*_SOCKET`)
+/// names it. On 31 Oct `LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` were on in
+/// `lamp-update.service` with no row (Tests-P1, #4755).
+#[test]
+fn on_this_repository_each_switch_a_product_file_turns_on_has_a_row() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let list = page
+        .split_once("Paths, sockets and test hooks (")
+        .and_then(|(_, after)| after.split_once(')'))
+        .map(|(list, _)| list)
+        .expect("switches.md says which names it leaves out");
+    let left_out: Vec<&str> = list
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|name| name.starts_with("LAMP_"))
+        .collect();
+    assert!(left_out.len() >= 5, "only {left_out:?} read as left out");
+    let rows: BTreeSet<String> = notes::rows(&page)
+        .into_iter()
+        .map(|row| row.switch)
+        .collect();
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let missing: Vec<String> = on
+        .iter()
+        .filter(|(name, _)| name.starts_with("LAMP_") && !rows.contains(*name))
+        .filter(|(name, _)| !left_out.iter().any(|pattern| matches(pattern, name)))
+        .map(|(name, file)| format!("{name} ({file})"))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "turned on by a product file, with no row in docs/switches.md and not in its left-out list:\n{}",
+        missing.join("\n")
+    );
+}
+
+/// Whether `name` matches `pattern`, where each `*` stands for any run of
+/// characters (`LAMP_*_SOCKET`).
+fn matches(pattern: &str, name: &str) -> bool {
+    let parts: Vec<&str> = pattern.split('*').collect();
+    let Some(mut rest) = name.strip_prefix(parts[0]) else {
+        return false;
+    };
+    for (index, part) in parts.iter().enumerate().skip(1) {
+        if index == parts.len() - 1 {
+            return rest.ends_with(part);
+        }
+        match rest.find(part) {
+            Some(at) => rest = &rest[at + part.len()..],
+            None => return false,
+        }
+    }
+    rest.is_empty()
 }
 
 /// The real page: every switch the notes list has a plain line in its
