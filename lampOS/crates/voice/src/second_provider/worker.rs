@@ -1351,6 +1351,23 @@ pub(crate) fn says_at_once(on: bool, language: Option<crate::language::Language>
     on && language.is_none()
 }
 
+/// Told after the character's notes when such turns are answered at once
+/// ([`says_at_once`]): the model says nothing beside the call, since words
+/// in that reply come before its result. On lamp-4ace on 31 Oct "Warmest it
+/// is." went with the call and the result was no change, so the next round
+/// said so ("I'm already as warm as I go", the first builder on #4710,
+/// 15:34). The acting part says what was done instead.
+pub(crate) const QUIET_WITH_CALL_NOTE: &str = " When you call a function that changes your light or how loud you are, or sets a timer, say nothing in that same reply: the lamp says what was done itself.";
+
+/// The spoken character with [`QUIET_WITH_CALL_NOTE`] after it when `on`.
+pub(crate) fn quiet_with_calls(character: String, on: bool) -> String {
+    if on {
+        format!("{character}{QUIET_WITH_CALL_NOTE}")
+    } else {
+        character
+    }
+}
+
 /// Whether a hearing of the name at `at_us` with `score` is one since
 /// `from_us`, as the rule takes a hearing for a line.
 fn name_counts(score: f32, at_us: u64, from_us: u64) -> bool {
@@ -2259,6 +2276,18 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let character = spoken_character(&character, look_by_call, tools.memory.is_some());
+    // Nothing said beside a call the acting part answers at once
+    // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
+    let character = quiet_with_calls(
+        character,
+        says_at_once(
+            std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on"),
+            crate::language::at_start(),
+        ),
+    );
     let character = if speech_tags == Some(true) {
         format!("{character}{}", crate::second_provider::speech_tags::NOTE)
     } else {
@@ -24825,6 +24854,22 @@ mod tests {
             Language::Korean,
         ] {
             assert!(!super::says_at_once(true, Some(language)), "{language:?}");
+        }
+    }
+
+    /// With such turns answered at once, the model is told to say nothing
+    /// beside the call (the first builder's run of 31 Oct, 15:34: "Warmest
+    /// it is." before a result of no change); without, nothing is added.
+    #[test]
+    fn the_model_is_told_to_say_nothing_beside_a_call_answered_at_once() {
+        let spoken = super::spoken_character("CHARACTER", false, true);
+        assert_eq!(super::quiet_with_calls(spoken.clone(), false), spoken);
+        let told = super::quiet_with_calls(spoken.clone(), true);
+        assert_eq!(told, format!("{spoken}{}", super::QUIET_WITH_CALL_NOTE));
+        assert!(super::QUIET_WITH_CALL_NOTE.starts_with(' '));
+        assert!(super::QUIET_WITH_CALL_NOTE.contains("say nothing in that same reply"));
+        for word in ["remember", "keep", "forget"] {
+            assert!(!super::QUIET_WITH_CALL_NOTE.contains(word), "{word}");
         }
     }
 

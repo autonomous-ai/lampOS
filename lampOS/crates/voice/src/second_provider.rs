@@ -867,17 +867,29 @@ pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
     }
     let mut clauses: usize = 0;
     for (part, asked) in &parts {
-        let mut clause: Vec<&str> = Vec::new();
-        let words = part
+        let words: Vec<&str> = part
             .split(|c: char| !c.is_alphanumeric() && c != '\'')
-            .filter(|word| !word.is_empty());
-        let mut ended = words.chain(std::iter::once("and")).peekable();
-        while let Some(word) = ended.next() {
-            if !JOINING.contains(&word) {
+            .filter(|word| !word.is_empty())
+            .collect();
+        // "Two and a half minutes", as speech to text writes it: an "and"
+        // before a fraction joins a number, not two asks (Reviewer-three on
+        // the first builder's run of 31 Oct, 15:34).
+        let fraction = |at: usize| {
+            matches!(
+                words.get(at + 1..),
+                Some(["a", "half" | "quarter", ..] | ["half", ..])
+            )
+        };
+        let mut clause: Vec<&str> = Vec::new();
+        for at in 0..=words.len() {
+            let word = words.get(at).copied();
+            if let Some(word) = word
+                && (!JOINING.contains(&word) || (word == "and" && fraction(at)))
+            {
                 clause.push(word);
                 continue;
             }
-            let last = ended.peek().is_none();
+            let last = word.is_none();
             if clause.iter().any(|word| !FILLER.contains(word)) {
                 clauses += 1;
                 let changes = clause.iter().any(|word| {
@@ -10109,6 +10121,18 @@ async fn answer(
                 && first_calls
                 && !held_forget_ran
                 && !text.chars().any(char::is_alphanumeric);
+            // Or the model's own words came with those calls, though it is
+            // told to say nothing beside them (`worker::QUIET_WITH_CALL_NOTE`):
+            // when each call did what was asked, those words answered a single
+            // ask, and the next round would only say it again
+            // (`LAMP_SECOND_SAY_WITH_CALL`, the first builder's run on 31 Oct,
+            // 15:34: "Warmer it is" once, but a second round after words has
+            // said the change twice).
+            let may_end_worded = shared.say_at_once
+                && first_calls
+                && !held_forget_ran
+                && text.chars().any(char::is_alphanumeric)
+                && !crate::not_speech::names_a_function(&text);
             // What each call was told, while every one may be answered short.
             let mut short_told: Vec<Value> = Vec::new();
             // Its own words doubt what was heard: a keep in it is not run
@@ -10449,7 +10473,7 @@ async fn answer(
                         picture_note(&answer.told),
                     ));
                 }
-                if may_answer_short {
+                if may_answer_short || may_end_worded {
                     short_told.push(answer.told.clone());
                 }
                 // Any call of this request that ran and was not refused (a
@@ -10560,6 +10584,16 @@ async fn answer(
                     "lamp-voice second: request {request} chat round {round}: the timer is set; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
                 );
                 messages.push(Message::system(short_done_note(&line)));
+            } else if may_end_worded
+                && short_told.len() == calls.len()
+                && (short_done_line(&short_told).is_some()
+                    || timer_line(&calls, &short_told, reminded).is_some())
+                && !asks_more(&heard_words, &calls)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: its own words came with calls that each did what was asked, and nothing else was asked: the turn ends with them (LAMP_SECOND_SAY_WITH_CALL)"
+                );
+                return Ok(());
             }
             if let Some(note) = said_once {
                 eprintln!(
