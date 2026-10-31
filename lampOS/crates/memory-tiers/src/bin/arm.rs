@@ -433,9 +433,7 @@ impl Adapter {
                         }
                         _ => {}
                     }
-                } else if matches!(event.kind.as_str(), "session_end" | "leave")
-                    && event.person == "owner"
-                {
+                } else if matches!(event.kind.as_str(), "session_end" | "leave") && access.owner {
                     context.store.owner_left(event.at_unix_ms)?;
                     invalidate_snapshot(&mut context.policy);
                 }
