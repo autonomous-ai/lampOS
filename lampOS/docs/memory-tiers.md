@@ -213,6 +213,9 @@ at most 8192 output tokens and a timeout no longer than 60 seconds. Successful
 apply reports whether work remains and an opaque cursor. A rejected proposal
 keeps its records pending. Broker refusal, timeout or identity mismatch ends the
 process without retry; the runner records the failure and keeps its reservation.
+A storage error also ends the process, so an uncertain deletion cannot be
+followed by another answer using possibly stale state. It is recorded as a
+failed run, never a successful privacy result.
 The runner is the sole model-cost owner, including calls during isolated probes.
 Unknown provider usage is accepted without substituting zero; the runner keeps
 its full reservation. Owner ids accept the contract's 128-byte limit.

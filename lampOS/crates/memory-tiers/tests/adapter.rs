@@ -438,3 +438,29 @@ fn direct_forget_reports_effects_and_v1_is_never_upgraded() {
     assert!(old.get("data").is_none());
     p.close();
 }
+
+#[test]
+fn storage_failure_ends_the_run_before_any_later_answer() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "Remember the blue notebook.", 1000);
+    let conn = rusqlite::Connection::open(p._dir.path().join("tiers.sqlite")).unwrap();
+    conn.execute_batch("CREATE TRIGGER simulated_failure BEFORE DELETE ON records BEGIN SELECT RAISE(FAIL,'simulated storage failure'); END;").unwrap();
+    drop(conn);
+    let response = p.ingest("erase", "Forget the blue notebook.", 1100);
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "storage");
+    assert!(matches!(
+        p.output.recv_timeout(Duration::from_secs(2)),
+        Err(mpsc::RecvTimeoutError::Disconnected)
+    ));
+    assert!(!p.child.wait().unwrap().success());
+    let store =
+        lamp_memory_tiers::Store::open(p._dir.path().join("tiers.sqlite"), "owner-a").unwrap();
+    assert_eq!(
+        store
+            .records(lamp_memory_tiers::Access::OWNER_ALONE)
+            .unwrap()
+            .len(),
+        1
+    );
+}
