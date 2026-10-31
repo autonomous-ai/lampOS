@@ -1819,11 +1819,13 @@ const SHUTDOWN_READERS: &[(&str, &[&str])] = &[
 /// The switch census for `LAMP_SHUTDOWN` (the first builder, 22:1x on 30
 /// Oct): on in the product, it must be on in every unit whose part reads it,
 /// or one way to turn the lamp off would be silently missing (the app's
-/// Turn off with no amber hold, or a hold that's never acted on). The
-/// readers are found in the source at test time, past comments, so a part
-/// that starts reading it fails here until its unit is listed.
+/// Turn off with no amber hold, or a hold that's never acted on). Off until
+/// the button's check on a product lamp (#3697, the first builder on 31
+/// Oct), it is set in none of them. The readers are found in the source at
+/// test time, past comments, so a part that starts reading it fails here
+/// until its unit is listed.
 #[test]
-fn every_product_unit_whose_part_reads_the_shutdown_switch_turns_it_on() {
+fn the_product_sets_the_shutdown_switch_in_every_unit_whose_part_reads_it_or_in_none() {
     fn sources(folder: &Path, found: &mut Vec<PathBuf>) {
         for entry in fs::read_dir(folder).unwrap() {
             let path = entry.unwrap().path();
@@ -1894,7 +1896,10 @@ fn every_product_unit_whose_part_reads_the_shutdown_switch_turns_it_on() {
         .flat_map(|(_, units)| units.iter().copied())
         .collect();
     units.sort();
-    assert_eq!(on, units);
+    assert!(
+        on.is_empty() || on == units,
+        "LAMP_SHUTDOWN is set in {on:?}: set it in all of {units:?} or in none"
+    );
 }
 
 /// #4500 (lamp-cb94, 30 Oct): the A733 board's warm reset hung one time in
