@@ -755,7 +755,7 @@ errors, interrupted removals and recovery, receipt bounds, real bus delivery,
 and live reporter reloads through enable/disable and changed retention policy.
 No lamp records were available to this builder. Initial development failures
 and the exact container commands are retained in
-[Fourth's work log](work-log-fourth.md).
+[Fourth's work log](https://github.com/autonomous-ai/lampOS/blob/lamp-fourth/lampOS/docs/work-log-fourth.md).
 
 ## Switched on, lamp-4ace (first builder, 2026-10-14, 14:03)
 
