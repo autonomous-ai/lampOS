@@ -21,8 +21,8 @@ of the lines addressed to a similar name.
 
 ## The process
 
-    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--not-while-speaking on|off] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]
-    lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...
+    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--not-while-speaking on|off] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--near SCORE] [--moving-least SCORE] [--bus-root ABSOLUTE_DIR]
+    lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...
 
 | Option | What it is | If left out |
 |---|---|---|
@@ -159,7 +159,8 @@ The 15 lines, each at the 8 places (hits at 0.9, of 40 a condition):
 At 10 the score no longer depends on where the word falls; the 8 misses
 left in each of the first two are one voice the model scores 0.65–0.80
 wherever it lies, whose clean file scores 0.84: its reach, not the step.
-Off (80) until its cost is measured on a lamp beside a voice turn.
+Off (80) unless given; the product's unit gives `--step-ms 10`, woken
+(below).
 
 **Woken grids (`--wake`, #694).** On lamp-75c9, beside a voice turn, `--step-ms
 10` took 76% of a core against 9% at 80. Almost all of a step is the second
@@ -224,8 +225,8 @@ Its cost, `check`'s whole run on a laptop:
 
 So about 1.2 times 80's work while no name is near, and 10's while one is.
 A real room wakes it more often than clean files do: 4ace's office heard
-the name at 0.9 or more 227 times in a day. Off until its CPU on a lamp is
-measured.
+the name at 0.9 or more 227 times in a day. Off unless given; the product's
+unit gives `--wake 0.03`.
 With `--wake`, the minute line also says `wakes=` (times the later grids
 woke that minute) and `woken_steps=` (the steps they were awake for), so a
 room's cost is read from the journal.
@@ -473,10 +474,13 @@ With it the lamp's health has six parts reporting.
 - **What its one stray hearing was.** No sound is kept, so what the
   lamp's microphone held at that moment cannot be gone back to. It was
   between two played lines, while or just after the lamp answered.
-- **Its own tests are small**: the rule for a hearing (five), the options
-  and the report (four), resting (six), not its own voice (five), and two
-  from the review of 14 October. The models are not in the repository, so no test here runs
-  them unless they are given (`tests/it/quiet_models.rs`, ignored);
+- **Its own tests are small**: the rule for a hearing and the stop word
+  (six, `said.rs`), the options and the report (fifteen, `main.rs`),
+  resting (six), not its own voice (five), a moving body (eight), the rescue
+  (two), the grids (six, `hear.rs`), and two from the review of 14 October.
+  The models are not in the repository, so no test here runs them unless
+  they are given (`tests/it/quiet_models.rs` and `tests/it/step_models.rs`,
+  ignored);
   `lamp-name check` and the measurement above are what exercises them.
 - **The classifier's training** is outside the repository and was one
   afternoon's work on generated speech. A version trained with similar
