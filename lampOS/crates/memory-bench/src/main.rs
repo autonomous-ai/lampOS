@@ -6,6 +6,15 @@ use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
 fn run(args: &[String]) -> Result<()> {
     match args {
+        [command, events, destination, voice, rate] if command == "speech-prepare" => println!(
+            "{}",
+            lamp_memory_bench::speech::prepare(
+                Path::new(events),
+                Path::new(destination),
+                voice,
+                rate.parse().map_err(|_| invalid("invalid TTS rate"))?
+            )?
+        ),
         [
             command,
             fixture,

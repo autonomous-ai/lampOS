@@ -14,6 +14,7 @@ pub mod runner;
 pub mod score;
 pub mod session;
 pub mod smoke;
+pub mod speech;
 pub mod transport;
 
 use sha2::{Digest, Sha256};

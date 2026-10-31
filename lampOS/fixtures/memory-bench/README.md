@@ -109,3 +109,24 @@ absolute state directory. It requires the two synthetic sleep calls to
 remain charged across probe restoration and a 500-byte memory-text response
 to pass regardless of the runner's separately reported JSON framing. This
 fixture contains only a made-up notebook preference and never scores an arm.
+
+## Speech preparation
+
+On a Mac, `speech-prepare EVENTS_JSONL NEW_AUDIO_DIRECTORY VOICE RATE`
+synthesizes only to files. For example use an installed `Samantha` voice and
+rate `175`. It never selects an output device, plays a file, installs a voice,
+or invokes a transcription service. Identical script/voice/rate entries share
+one WAV within the preparation. The manifest pins script, WAV and PCM hashes,
+duration and synthesis settings; the request plan pins the `say` executable
+hash and declares that the voice revision is unreported. Keep these binary
+files outside Git and reuse the frozen audio rather than regenerating it.
+
+The parser accepts bounded 16 kHz mono PCM16 WAVE only. The service request
+plan follows the product's Nova-3-general websocket settings and sends PCM
+frames, not a RIFF header. Live invocation still needs the single budgeted
+client's speech transport and the owner's private service configuration.
+`Transcript` cache rows distinguish live and recorded provenance, keep
+unknown confidence null, and tie the response/request hashes to the exact
+audio. Cache application rejects missing, extra, duplicate or changed rows;
+there is no clean-text fallback. The cache producer must verify the stored
+raw response hash before accepting an imported transcript as live evidence.

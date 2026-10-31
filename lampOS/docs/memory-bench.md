@@ -603,3 +603,10 @@ natural-language forget dispatch is also absent. It cannot be substituted for
 `lampos_today`. See the [fixture README](../fixtures/memory-bench/README.md)
 for exact limitations and invocation. No recorded result satisfies a scored
 baseline, speech-to-text, blinded-judge or human-audit acceptance gate.
+
+The `speech-prepare` implementation writes WAV files only, with per-record
+script/audio/PCM hashes, synthesis settings and a frozen service request plan.
+It has no playback or network invocation. Its current recorded cache checks
+cover missing/changed inputs, unknown confidence and refusal to treat a
+recorded transcript as live. A real service pass and verified raw-response
+cache remain required; file synthesis alone does not meet that gate.
