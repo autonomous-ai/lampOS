@@ -3475,4 +3475,36 @@ mod tests {
             "docs/install.md does not name {unsaid:?}"
         );
     }
+
+    /// docs/install.md's "The parts" has a row for every part of the
+    /// product, its binary first in the row's Binary cell, so a part added
+    /// to [`PRODUCT`] is said there: setup had no row until #4682.
+    #[test]
+    fn install_md_has_a_row_in_the_parts_for_every_part() {
+        let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/install.md");
+        let doc = fs::read_to_string(doc).unwrap();
+        let section = doc
+            .split("\n## The parts\n")
+            .nth(1)
+            .and_then(|rest| rest.split("\n## ").next())
+            .expect("docs/install.md has \"## The parts\"");
+        let binaries: Vec<&str> = section
+            .lines()
+            .filter_map(|line| line.strip_prefix("| ")?.split(" | ").nth(1))
+            .collect();
+        let rowless: Vec<String> = parts()
+            .into_iter()
+            .map(|part| part.binary)
+            .filter(|binary| {
+                !binaries.iter().any(|cell| {
+                    cell.starts_with(&format!("`{binary} "))
+                        || cell.starts_with(&format!("`{binary}`"))
+                })
+            })
+            .collect();
+        assert!(
+            rowless.is_empty(),
+            "docs/install.md's \"The parts\" has no row for {rowless:?}"
+        );
+    }
 }
