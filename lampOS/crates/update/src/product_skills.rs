@@ -830,7 +830,10 @@ mod tests {
 
     /// The bundle CI makes from `lampOS/skills` is, file for file, what
     /// install writes from `install::SETTINGS`: a lamp gets the same
-    /// product skills from a round as from an install of that build.
+    /// product skills from a round as from an install of that build. And
+    /// the settings a build carries name none of them, so a file has one
+    /// writer at the switch, the round (docs/updates.md, "Settings and
+    /// tmpfiles"); the Store's key beside them is added on its own.
     #[test]
     fn the_bundle_of_the_repository_is_what_install_writes() {
         let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
@@ -847,5 +850,11 @@ mod tests {
             .collect();
         assert_eq!(from_bundle, from_install);
         assert!(bytes(&made).unwrap().len() < MOST_BYTES as usize);
+        let carried: Vec<String> = crate::install::product_settings()
+            .into_iter()
+            .map(|setting| setting.path)
+            .filter(|path| path.starts_with(&format!("{FOLDER}/")))
+            .collect();
+        assert!(carried.is_empty(), "{carried:?}");
     }
 }
