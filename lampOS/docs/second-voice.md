@@ -831,10 +831,13 @@ order is kept. A written turn is the same from the chat on.
     sentence's end (not a point between digits), a comma or semicolon, or
     "and", "also", "then" or "plus" (not an "and" before "a half", "half"
     or "a quarter", "two and a half minutes" as speech to text writes it),
-    with a clause of only thanks, a greeting, the name or "okay", or of a
-    greeting and the name however it was heard ("Hey Lynn,": a word written
-    capitalized, as speech to text writes a name, or a letter from "lamp";
-    "Okay music." stays an ask), left out and a call's own words (a reminder's `text`) taken as its ask,
+    with a clause of only thanks, a greeting, the name or "okay" left out,
+    and the line's first word too when it is set off as a name is (past a
+    greeting at most, then a comma or a stop: the name however it was heard,
+    "Amen. Make it warmer.", "Hey, Lynn. It's too bright."), unless a
+    question mark sets it off or it is a word of an ask ("Weather? …",
+    "Brighter, and …"), and a call's own words (a reminder's `text`) taken
+    as its ask,
     it is more when a clause holds no word of a light, the volume or a timer,
     when a clause after the first is a question, or when there are more
     clauses than the round's calls. It leans to more, since a dropped
@@ -896,10 +899,10 @@ order is kept. A written turn is the same from the chat on.
   model's own words over it still ask round 2, which says nothing changed.
   On candidate 9276 (the first builder on #4710, 21:4x) all three such
   lines were said twice, the "already" at once and then again by round 2
-  ("Already as warm as I go — that's my limit."). With "Lamp" heard as
-  "Lynn", "Hey Lynn," was a clause of its own, so round 2 ran, and told
-  only that the lamp says the line it said it again. So a greeting and the
-  name as heard (a capitalized word, or a letter from "lamp") now asks
+  ("Already as warm as I go — that's my limit."). With macOS `say`'s "Hey
+  Lamp" heard as "Amen." and "Hey, Lynn.", the misheard name was a clause
+  of its own, so round 2 ran, and told only that the lamp says the line it
+  said it again. So the line's first word set off as a name now asks
   nothing, and a round asked after an answer at once is told
   the line was already said aloud (`said_at_once_note`), in the words
   `said_once_note` gives the model's own.
