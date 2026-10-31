@@ -488,6 +488,10 @@ expires like that of a `serve` that has stopped.
 
 ## On the lamp
 
+A record of 14 Oct. The product's `lamp-health.service` now expects 14
+parts and judges `skin` alone, with `--online on`
+(`deploy/product/lamp-health.service`).
+
 On lamp-4ace since 03:16 on 2026-10-14, as `lamp-health.service` under
 the lamp's ordinary user, with the command also at
 `/usr/local/bin/lamp-health`:

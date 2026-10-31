@@ -84,6 +84,11 @@ breaks, a part that says whether the lamp is online, show it) come after it.
 | surround | Only when an operator stages a release | That command fails | No | — |
 | memory, eyes, schedule, health, actions, body, controls, expression, air, ears, keeper | No (no network crate, no socket; checked in each `Cargo.toml` and `src`) | Work | No | — |
 
+Two cells have changed since that read at `4ad0ec5c3`. Health can now ask
+the internet itself with `--reach-probe on` (`crates/health/src/reach.rs`,
+below), which the product's unit doesn't pass. And the second voice's doc is on `lamp-voice` as
+[second-voice.md](second-voice.md).
+
 ## Each part with a clock not set
 
 The lamp has no battery clock. After power it starts at its last saved time
