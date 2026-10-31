@@ -478,8 +478,8 @@ With it the lamp's health has six parts reporting.
   (six, `said.rs`), the options and the report (fifteen, `main.rs`),
   resting (six), not its own voice (five), a moving body (eight), the rescue
   (two), the grids (six, `hear.rs`), and two from the review of 14 October;
-  `examples/stop_words_replay.rs` has six more, run only with `--examples`
-  or `--all-targets`.
+  `examples/stop_words_replay.rs` has six more, which `cargo test` runs too
+  (`test = true` in Cargo.toml).
   The models are not in the repository, so no test here runs them unless
   they are given (`tests/it/quiet_models.rs` and `tests/it/step_models.rs`,
   ignored);
