@@ -239,10 +239,15 @@ nightly topic-boundary pass. All model calls remain budgeted and audited.
 
 If the segmented build is not ready when live access arrives, only the three
 reference setups may start. Hold every Tiers setup until the common build is
-ready. The six added session-only runs increase the two-persona planning
-projection to about $536.07, excluding unmeasured new segmentation overhead;
-the proposed $600 cap remains a hard spending decision, not a completion
-guarantee. The original recorded pass and costs retain their original pins.
+ready. The completed recorded pass measures the bounded boundary-call shapes.
+Including those shapes, the two-month Flash projection is $573.99 for 90
+runs, with planning allowances and 25% contingency. The held-back line assumes
+an equal workload until its independent fixture is registered. The separate
+six-run aging comparison adds $29.66, or $603.64 combined. Until the owner
+answers the proposed $610 extension, the active scope remains the two months
+only. Keys and spending are still unapproved; optional outside systems remain
+unpriced and excluded. A cap is a hard stop, not a completion guarantee. The
+original recorded pass and costs retain their original pins.
 
 ### Coverage revision before scoring: 31 October 2026
 
