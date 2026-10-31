@@ -518,7 +518,8 @@ const KOREAN: Lexicon = Lexicon {
         "네",
         "예",
         "응",
-        "그래",
+        // A whole word: "그래요" may be only "I heard you", asked again.
+        "그래 ",
         "좋아",
         "좋습니다",
         "물론",
@@ -531,15 +532,27 @@ const KOREAN: Lexicon = Lexicon {
         "돼요",
         "됩니다",
         "그럼요",
+        "넵",
+        "넹",
+        "그러세요",
+        "당연",
+        "허락",
     ],
+    // Hangul is matched by the syllable: "아니" is no "아닙니다", "안 돼" no
+    // "안 됩니다".
     no: &[
         "아니",
+        "아닙니다",
         "아뇨",
         "싫",
         "안 돼",
         "안돼",
+        "안 됩니다",
+        "안됩니다",
         "안 해",
         "하지 마",
+        "하지마",
+        "하지 말아",
         "않",
         "없",
         "말아",
@@ -559,6 +572,17 @@ const KOREAN: Lexicon = Lexicon {
         "물론",
         "물론이죠",
         "물론이에요",
+        "넵",
+        "네네",
+        "예예",
+        "넹",
+        "그럼요",
+        "그러세요",
+        "당연하죠",
+        "당연하지",
+        "좋습니다",
+        "오케이",
+        "허락할게요",
     ],
     put_off: &[
         "나중에",
@@ -574,7 +598,18 @@ const KOREAN: Lexicon = Lexicon {
         "근데",
         "하지만",
         "아마",
-        "음",
+        "그런데",
+        "그렇지만",
+        "그래도",
+        "어쩌면",
+        "혹시",
+        "이따",
+        "다음에",
+        "모르겠",
+        "아직",
+        "다만",
+        // A whole word: "음악" and "음성" are no "음".
+        "음 ",
     ],
     polite: &[
         "부탁해요",
@@ -583,22 +618,66 @@ const KOREAN: Lexicon = Lexicon {
         "주세요",
         "감사합니다",
         "고마워요",
+        // A permission after a yes ("네, 그렇게 하세요"), longest first, as
+        // each is taken out whole.
+        "그렇게 하세요",
+        "그러세요",
+        "해도 돼요",
+        "하세요",
+        "돼요",
+        "됩니다",
         "요",
     ],
-    question: &["까요 ", "나요 "],
-    strict_no: &["아니", "아뇨", "싫", "안 돼", "안돼", "틀려"],
+    question: &[
+        "까요 ",
+        "나요 ",
+        "니까 ",
+        "인가요 ",
+        "건가요 ",
+        "는가요 ",
+        "래요 ",
+        "죠 ",
+        "지요 ",
+    ],
+    strict_no: &[
+        "아니",
+        "아닙니다",
+        "아뇨",
+        "싫",
+        "안 돼",
+        "안돼",
+        "안 됩니다",
+        "안됩니다",
+        "안 해",
+        "하지 마",
+        "하지마",
+        "하지 말아",
+        "말아",
+        "틀려",
+    ],
     hello: &["인사", "안녕"],
     greet: &[
         "좋은 아침",
         "좋은 저녁",
         "안녕",
         "여보세요",
+        "반가워",
+        "반갑",
         "하이",
         "헬로",
         "hello",
         "hi",
     ],
-    again: &["다시", "뭐", "못 들었", "잘 안 들"],
+    again: &[
+        "다시",
+        "뭐",
+        "못 들었",
+        "잘 안 들",
+        "안 들려",
+        "안 들렸",
+        "못 알아들",
+        "한 번 더",
+    ],
     ignore: &[],
     when: &[
         "밤",
@@ -614,6 +693,9 @@ const KOREAN: Lexicon = Lexicon {
         "이전",
         "전에",
         "후에",
+        // "One o'clock" too: unlike Chinese 一点 ("a little"), "한 시" is
+        // only an hour.
+        "한 시",
         "두 시",
         "세 시",
         "네 시",
@@ -625,6 +707,7 @@ const KOREAN: Lexicon = Lexicon {
         "열 시",
         "열한 시",
         "열두 시",
+        "한시",
         "두시",
         "세시",
         "네시",
@@ -639,8 +722,29 @@ const KOREAN: Lexicon = Lexicon {
     ],
     quiet: &["조용", "시간"],
     name_marks: &["이름", "불러", "저는", "나는"],
+    // "음" and "어" whole words: "음악" and "어진" are no filler.
     not_a_name: &[
-        "괜찮", "여기", "미안", "죄송", "바빠", "바쁘", "피곤", "lamp", "음", "어", "저기",
+        "괜찮",
+        "여기",
+        "미안",
+        "죄송",
+        "바빠",
+        "바쁘",
+        "피곤",
+        "lamp",
+        "음 ",
+        "어 ",
+        "저기",
+        "잠시",
+        "잠깐",
+        "글쎄",
+        "나중",
+        "아직",
+        "그냥",
+        "몰라",
+        "모르겠",
+        "램프",
+        "헤이",
     ],
     short_answer: 4,
     short_name: 2,
@@ -680,6 +784,19 @@ impl Lexicon {
 
     fn any(&self, line: &str, words: &[&str]) -> bool {
         words.iter().any(|word| self.has(line, word))
+    }
+
+    /// A yes word in the line. A one-syllable Korean yes is a whole word,
+    /// alone or with its "요" ("네요"), since a name can start with it:
+    /// "예린" is no "예" (a Korean customer's review of #4506, A7).
+    fn any_yes(&self, line: &str, words: &[&str]) -> bool {
+        words.iter().any(|word| {
+            if self.found == Found::WordStart && word.chars().count() == 1 {
+                line.contains(&format!(" {word} ")) || line.contains(&format!(" {word}요 "))
+            } else {
+                self.has(line, word)
+            }
+        })
     }
 
     /// `line` with `words` taken out, and whether any was there.
@@ -739,9 +856,10 @@ impl Lexicon {
 
     fn read(&self, text: &str) -> Reading {
         let line = plain(text);
+        // A bare yes ending as a question may ("물론이죠") is no question.
         let asks = text.contains('?')
             || text.contains('？')
-            || self.question.iter().any(|mark| line.contains(mark));
+            || (self.question.iter().any(|mark| line.contains(mark)) && !self.bare_yes(&line));
         let puts_off = self.any(&line, self.put_off);
         let greets = self.any(&line, self.greet);
         let again = self.any(&line, self.again);
@@ -751,7 +869,7 @@ impl Lexicon {
         let (rest, phrase) = self.without(&answer, self.yes_phrases);
         let (ungreeted, _) = self.without(&rest, self.greet);
         let refuses = self.any(&rest, self.no);
-        let agrees = !puts_off && (phrase || self.any(&ungreeted, self.yes)) && !refuses;
+        let agrees = !puts_off && (phrase || self.any_yes(&ungreeted, self.yes)) && !refuses;
         let size = self.size(&line);
         let (timed, _) = self.without(&line, self.greet);
         let names_a_time = self.any(&timed, self.when) || timed.chars().any(|c| c.is_numeric());
@@ -766,12 +884,15 @@ impl Lexicon {
                 }
             })
             .flatten();
+        // A Korean put-off starts its word, so it is never in a name
+        // ("잠시만요"); in Japanese and Chinese one can sit inside one (かな).
         let names_someone = !asks
             && !greets
             && !again
             && !refuses
-            && !self.any(&ungreeted, self.yes)
-            && !self.any(&ungreeted, self.strict_yes)
+            && (!puts_off || self.found != Found::WordStart)
+            && !self.any_yes(&ungreeted, self.yes)
+            && !self.any_yes(&ungreeted, self.strict_yes)
             && !self.any(&line, self.not_a_name)
             && (self.any(&line, self.name_marks) || (1..=self.short_name).contains(&size));
         Reading {
@@ -1543,6 +1664,19 @@ mod tests {
                     "네, 그런데요",
                     "네, 어쩌면요",
                     "네, 나중에요",
+                    "네, 그렇지만요",
+                    "네, 그래도요",
+                    "네, 혹시요",
+                    "네, 이따가요",
+                    "네, 다음에요",
+                    "네, 모르겠어요",
+                    "네, 아직요",
+                    "네, 다만요",
+                    "네, 음",
+                    "됩니까",
+                    "그런 건가요",
+                    "할래요",
+                    "그렇죠",
                 ][..],
             ),
         ] {
@@ -1550,6 +1684,11 @@ mod tests {
                 let read = read(language, line);
                 // Neither the consent's yes nor any answer to the hello.
                 assert_eq!(read.yes_or_no, None, "{language:?}: {line}");
+                // In Korean, nor the yes that ends "who you are" (a Korean
+                // customer's review of #4506, A1).
+                if language == Language::Korean {
+                    assert!(!read.agrees, "{language:?}: {line}");
+                }
                 assert!(!read.hello_yes && !read.about_hello, "{language:?}: {line}");
             }
         }
@@ -1587,7 +1726,30 @@ mod tests {
             ),
             (
                 Language::Korean,
-                &["네, 부탁해요", "네, 좋아요", "예, 감사합니다", "네, 주세요"][..],
+                &[
+                    "네, 부탁해요",
+                    "네, 좋아요",
+                    "예, 감사합니다",
+                    "네, 주세요",
+                    // A Korean customer's review of #4506, A2.
+                    "넵",
+                    "네네",
+                    "예예",
+                    "넹",
+                    "그럼요",
+                    "당연하죠",
+                    "당연하지",
+                    "좋습니다",
+                    "오케이",
+                    "허락할게요",
+                    "물론이죠",
+                    "네, 그렇게 하세요",
+                    "네, 그러세요",
+                    "네, 하세요",
+                    "네, 해도 돼요",
+                    "네, 돼요",
+                    "네, 됩니다",
+                ][..],
             ),
         ] {
             for line in lines {
@@ -1596,6 +1758,90 @@ mod tests {
                 assert!(read.answers_hello && read.hello_yes, "{language:?}: {line}");
                 assert!(!read.holds_hello, "{language:?}: {line}");
             }
+        }
+    }
+
+    /// A Korean customer's review of #4506: what a Korean speaker means.
+    #[test]
+    fn korean_reads_as_a_korean_speaker_means_it() {
+        let ko = |line| read(Language::Korean, line);
+        // A2: maybe "no thanks" or "I heard you": asked again.
+        for line in ["괜찮아요", "괜찮습니다", "알겠어요", "알겠습니다", "그래요"]
+        {
+            assert_eq!(ko(line).yes_or_no, None, "{line}");
+        }
+        assert!(!ko("그래요").agrees && ko("그래").agrees);
+        // A5: a question without its mark; a bare yes ending so is none.
+        for line in [
+            "됩니까",
+            "그런 건가요",
+            "할래요",
+            "그렇죠",
+            "그렇지요",
+            "맞는가요",
+        ] {
+            assert!(ko(line).asks, "{line}");
+        }
+        assert!(!ko("물론이죠").asks);
+        // A3: a refusal, by its own syllables.
+        for line in [
+            "아닙니다",
+            "안 됩니다",
+            "하지 마세요",
+            "하지 말아 주세요",
+            "하지마",
+            "안 해요",
+            "말아 주세요",
+        ] {
+            let read = ko(line);
+            assert_eq!(read.yes_or_no, Some(false), "{line}");
+            assert!(read.refuses && !read.agrees, "{line}");
+        }
+        // A4: "음악" and "음성" are no "음".
+        for line in ["네, 음악", "음성 좋아요"] {
+            assert!(!ko(line).puts_off, "{line}");
+        }
+        assert!(ko("음").puts_off);
+        // A6: a filler is no name.
+        for line in [
+            "잠시만요",
+            "글쎄요",
+            "나중에요",
+            "그냥요",
+            "몰라요",
+            "램프",
+            "헤이",
+            "어쩌면요",
+            "어",
+        ] {
+            assert!(!ko(line).names_someone, "{line}");
+        }
+        // A4 and A7: a name may start with a yes or a filler syllable.
+        for line in ["예린", "저는 예린이에요", "예준", "응수", "음석", "어진"] {
+            let read = ko(line);
+            assert!(read.names_someone && !read.agrees, "{line}");
+        }
+        assert!(ko("네요").agrees && !ko("네요").names_someone);
+        // A8: asking to hear it again.
+        for line in [
+            "안 들려요",
+            "안 들렸어요",
+            "못 알아들었어요",
+            "한 번 더요",
+            "다시 한 번",
+        ] {
+            let read = ko(line);
+            assert!(read.again && read.holds_hello, "{line}");
+            assert_eq!(read.yes_or_no, None, "{line}");
+        }
+        // A9: one o'clock is an hour.
+        for line in ["새벽 한 시까지", "한시 이후"] {
+            assert!(ko(line).quiet_hours, "{line}");
+        }
+        // A11: a greeting.
+        for line in ["반가워요", "반갑습니다"] {
+            let read = ko(line);
+            assert!(read.greets && !read.names_someone, "{line}");
         }
     }
 
