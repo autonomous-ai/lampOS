@@ -48,9 +48,14 @@ pub enum Outcome {
     /// What was established, as a sentence.
     Done(String),
     /// Done, and nothing changed: it already was so ("My light is already
-    /// orange."). Said to the model as a `Done` is, and never answered
-    /// short, since there is no change to be the answer (the reviewer and
-    /// Third on #1520).
+    /// orange."). Said to the model as a `Done` is. With the switch, a light
+    /// or volume call so answered carries its own few words too
+    /// ([`already_say`]), told that nothing changed ([`SHORT_ALREADY_NEXT`])
+    /// and marked `"already"`, so the voice never takes it for a change made:
+    /// the voice says them at once, where without them a light that couldn't
+    /// change waited for the next chat round, 2.8 to 3.3 s against 1.3 to 1.8 s
+    /// with the voice's answer at once off (lamp-4ace on 31 Oct, the first
+    /// builder on #4710 at 17:35).
     Already(String),
     /// Why it was not done, or could not be confirmed, as a sentence.
     Failed(String),
@@ -80,6 +85,9 @@ impl Outcome {
         match self {
             Self::Done(said) if short && is_short(name) => {
                 json!({"ok": true, "result": {"result": said, "next": SHORT_NEXT, "say": short_say(name)}})
+            }
+            Self::Already(said) if short && is_short(name) => {
+                json!({"ok": true, "result": {"result": said, "already": true, "next": SHORT_ALREADY_NEXT, "say": already_say(name)}})
             }
             _ => self.line(),
         }
@@ -118,6 +126,30 @@ pub fn short_say(name: &str) -> &'static str {
 /// [`short_say`] for a change with no way to name: on, off, a colour, mute
 /// and unmute.
 pub const SHORT_DONE_SAY: &str = "Done.";
+
+/// What the model is told after a light or volume call that changed
+/// nothing, with `LAMP_SHORT_DONE=on` ([`Outcome::Already`]).
+pub const SHORT_ALREADY_NEXT: &str = "Nothing changed: it already was so. About this, say only a few words, in your own words. Answer anything else they asked as you would.";
+
+/// The call's own words when it changed nothing ([`Outcome::Already`]): a
+/// step at its end says so in the lamp's own voice ("I'm already as warm as
+/// I go.", as the model put it on lamp-4ace on 31 Oct), anything else
+/// [`SHORT_ALREADY_SAY`].
+pub fn already_say(name: &str) -> &'static str {
+    match name {
+        "light_brighter" => "I'm already as bright as I go.",
+        "light_dimmer" => "I'm already as dim as I go.",
+        "light_warmer" => "I'm already as warm as I go.",
+        "light_cooler" => "I'm already as cool as I go.",
+        "volume_up" => "I'm already as loud as I go.",
+        "volume_down" => "I'm already as quiet as I go.",
+        _ => SHORT_ALREADY_SAY,
+    }
+}
+
+/// [`already_say`] for a call with no end to name: on, off, a colour, mute
+/// and unmute, each already so.
+pub const SHORT_ALREADY_SAY: &str = "It already is.";
 
 /// The functions that can be carried out now.
 pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
@@ -349,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn only_a_done_light_or_volume_call_is_answered_short_and_only_with_the_switch() {
+    fn a_light_or_volume_call_done_or_already_is_answered_short_only_with_the_switch() {
         let done = Outcome::Done("The light is warm now.".into());
         for (name, say) in [
             ("light_warmer", "Warmer."),
@@ -373,13 +405,29 @@ mod tests {
         }
         let failed = Outcome::Failed("I could not confirm it changed.".into());
         assert_eq!(failed.line_for("light_warmer", true), failed.line());
-        // Nothing changed: said as without the switch, for the model to say.
+        // Nothing changed: with the switch, its own words and the model told
+        // so (the first builder on #4710, 17:35); without, as before.
         let already = Outcome::Already("My light is already orange.".into());
-        assert_eq!(already.line_for("light_colour", true), already.line());
+        for (name, say) in [
+            ("light_colour", "It already is."),
+            ("light_warmer", "I'm already as warm as I go."),
+            ("light_dimmer", "I'm already as dim as I go."),
+            ("volume_down", "I'm already as quiet as I go."),
+        ] {
+            assert_eq!(
+                already.line_for(name, true),
+                json!({"ok": true, "result": {"result": "My light is already orange.", "already": true, "next": SHORT_ALREADY_NEXT, "say": say}}),
+                "{name}"
+            );
+            assert_eq!(already.line_for(name, false), already.line(), "{name}");
+        }
+        assert_eq!(already.line_for("set_timer", true), already.line());
         assert_eq!(
             already.line(),
             json!({"ok": true, "result": {"result": "My light is already orange."}})
         );
+        assert!(SHORT_ALREADY_NEXT.contains("Nothing changed"));
+        assert!(!SHORT_ALREADY_NEXT.contains("such as") && !SHORT_ALREADY_NEXT.contains('"'));
         assert!(SHORT_NEXT.contains("a word or two"));
         // No one word to repeat after every change (rule 8): no example,
         // quoted or not.
