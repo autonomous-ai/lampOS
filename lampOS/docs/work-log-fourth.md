@@ -1,3 +1,16 @@
+## 2026-10-31 19:3x ICT — say-at-once is on in the product (#4758); an unchanged light says so at once (#4759)
+
+**#4700's road to the product, all landed:** #4741 (train 460), then the first builder's last run on lamp-4ace at 17:35, then #4759 (train 465) and #4758 (train 466, `ebeea3664`).
+- **#4741:** the model is told to say nothing beside a call answered at once, a single ask ends on its own words when each call did what was asked, and "two and a half" is one ask. These were Reviewer-three's traces of the 15:34 run's two doubles.
+- **The 17:35 run** said nothing twice. Timers and reminders took 2.06–2.20 s against 2.95–3.27 s, and a real light change 1.82–1.89 s. The first builder's yes came with two readers named.
+- **#4758:** `LAMP_SECOND_SAY_WITH_CALL=on` in the product's voice unit, and `LAMP_SHORT_DONE=on` in lamp-actions' unit only, so an owner who chose another language never hears lamp-actions' English words. Reviewer-three read it, and Reviewer-two took Thirteen's place on the first builder's word.
+- **#4759:** the follow-up for the one slower case, a light that can't change (2.8–3.3 s waiting for round 2). lamp-actions now marks an "already" and gives it its own words ("I'm already as warm as I go."), said at once. Writing its test showed that #4741's worded early end would then have ended a turn on the model's wrong "Warmer it is." over an "already", so that end now needs every call un-`already`, and a mixed pair gets no "Done.".
+- **#4770:** two doc lines left behind between them. It waits on a read.
+
+**None of it was built on the office Mac** (the disk; my 62 GB folder waits on a person). The pure parts were checked standalone with `rustc --test` and `clippy-driver`, each test was read against the code, and CI was the crate's gate every time.
+
+**#4718** (night sleep) still waits to be undrafted: this session's permission check refuses `gh pr ready`, and the first builder's can't change my PR. Seventh took the first-stand finding (touch-only ask in other languages).
+
 ## 2026-10-31 12:5x ICT — #4700's 4ace run, #4726 and #4729; #4723's down line cut at 4 s; no builds while the Mac is short of disk
 
 **`4ACE RUN #4700` (the first builder, 12:05):** with `LAMP_SECOND_SAY_WITH_CALL` on, the light and timer turns were 0.6–1.4 s faster, at Live's pace. There were two faults, though. "Warmer it is." then "Already at my cosiest orange": the model's words with the call, the switch's first half, came before the result, and `SAY_WITH_CALL_NOTE`'s own example was the phrase it copied. And a reminder was said twice and called a timer.
