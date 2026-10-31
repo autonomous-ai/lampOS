@@ -185,9 +185,13 @@ out the owner model, invent a fact, or turn recall into an unasked interview.
 6. App inspection, correction, pause, export, desk observation, and voice
    identification need their own assigned work and acceptance evidence.
 
-The owner approved building the new design on 31 October. The existing
-`AGENTS.md` release exclusion still requires a first-builder or reviewer
-ruling. Proposed replacement, limited to this phase:
+The owner approved building the new design on 31 October. The first builder
+[accepted Bench-P1 on the Queue](https://github.com/autonomous-ai/lampOS/issues/4710#issuecomment-6541830902):
+new crates and docs only, product memory, voice and deployment unchanged,
+no product links, and fictional people only. The current `AGENTS.md` release
+exclusion therefore remains in force: this is an experiment until its scores,
+reviews, and the owner's integration decision. The proposed clarification,
+limited to this phase, was:
 
 > Keep Harness, agent sessions, and browsing out of this release. Allow the
 > isolated memory benchmark and tiered-memory library experiment approved on
@@ -195,7 +199,7 @@ ruling. Proposed replacement, limited to this phase:
 > deployment until its benchmark and integration gates are accepted; live
 > chat must not depend on the experiment.
 
-This document proposes that wording; it does not itself change `AGENTS.md`.
+The ruling permits the isolated experiment without changing `AGENTS.md`.
 
 ## What was not shown
 
