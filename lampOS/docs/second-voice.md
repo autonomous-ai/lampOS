@@ -784,58 +784,52 @@ order is kept. A written turn is the same from the chat on.
   words before its calls: the next round is told they were heard`. The
   check is on the lamp: the day lines' timer and reminder at 4 of 4 runs,
   one confirmation each.
-- **With `LAMP_SECOND_SAY_WITH_CALL=on`, a call that changes something
-  carries its words** (off unless set, and only beside
-  `LAMP_SECOND_SAID_ONCE`; #2135, the first builder's yes at 22:13 on 30 Oct).
-  On lamp-4ace on 30 Oct (8999), `light_warmer`, `remember` and `set_timer`
+- **With `LAMP_SECOND_SAY_WITH_CALL=on`, a call that changes something is
+  answered at once with the acting part's own words, its result** (off
+  unless set; #2135, the first builder's yes at 22:13 on 30 Oct). On
+  lamp-4ace on 30 Oct (8999), `light_warmer`, `remember` and `set_timer`
   said nothing until their second chat round: round 1 took about 1.0–1.5 s
   to the call, and round 2 another 1.0–1.2 s, so 2.4–3.3 s to the first
-  sound, against 1.54–1.62 s for plain answers. With the switch, the spoken
-  character ends asking for the few words of a call that changes the light
-  or how loud the lamp is, or sets a timer or a reminder, in the same reply
-  as the call (`worker::SAY_WITH_CALL_NOTE`). Never a keep or a forget, or
-  anything that needs the person's yes: those can come back held for it (a
-  carried line's keep, `LAMP_CONVERSATION_CARRIED_SAVES`; every forget), and
-  words said with the call would promise what the next round then asks, so
-  "Forgotten." could be said while the forget waits for a yes never given
-  (Reviewer-three's P2 on #4635). They are said after the result, as before. The round's words
-  are said as they come, before the call runs, as any round's are, and
-  `LAMP_SECOND_SAID_ONCE` tells the next round they were heard. The next
-  round still runs, so a failure, the time a timer is set for, or another
-  ask in the same line ("dim the light and tell me a joke") is still said
-  (the Reviewer-lead's P2 on #2930). Without `LAMP_SECOND_SAID_ONCE` the
-  switch asks nothing, and the journal says so at start.
-
-  **The model rarely did.** On lamp-4ace on 31 Oct (build `4ac4cc2bdf`, the
-  product unit, day lines with the switch off and on alternating) its own
-  words came with the call 1 time in 8 acting turns, round 2 still ran each
-  time, and the median first sound was 1.83 s off against 1.88 s on (the
-  first builder on #4635). So the same switch also answers such a turn
-  **with the acting part's own words, at once** (`Engine::saying_at_once`,
-  #2135), without `LAMP_SECOND_SAID_ONCE`:
+  sound, against 1.54–1.62 s for plain answers (`Engine::saying_at_once`):
   - **A round with no words of its own whose calls all changed the light or
     the volume,** each one answered short by lamp-actions (its `say`, with
     `LAMP_SHORT_DONE=on` in `lamp-actions.service`), says the calls' own
     line ("Warmer.", "Done." when they differ) as soon as the calls are
-    answered.
+    answered. A change that didn't happen ("already") carries no `say`, so
+    nothing is said early and the next round says why.
   - **A round whose one call set a timer, committed,** says "Timer set. It
     rings at 7:52 pm." with the schedule's own `clock`, the local time it
     rings, on a 12-hour clock as the lamp's other words are, so the time
-    said is the time set (`timer_line`, `spoken_clock`).
+    said is the time set (`timer_line`, `spoken_clock`). One asked for as a
+    reminder (the person's words say "remind") is named as one: "I'll remind
+    you at 7:52 pm."
+  - **With one ask, the turn ends there.** The next round is not asked, so
+    it can't say the change again in other words. It still runs, told the
+    lamp said it (`short_done_note`), when the person's words plainly hold
+    more (`asks_more`: "and", "also", "then", "plus" or "too", or a second
+    sentence), so "brighter, and is it sunny?" gets the weather after
+    "Brighter.".
   - **In English only:** those words are English, so with an owner's
     language chosen (`language::at_start()`: Vietnamese, Japanese, Chinese
     or Korean) such turns wait for the model's words as without the switch,
     and the journal says so at start (`worker::says_at_once`, Thirteen's P2
     on #4700).
-  - **Then the next round still runs,** told the lamp said it
-    (`short_done_note`), for anything else asked ("brighter, and is it
-    sunny?" gets the weather after "Brighter."). It is no longer waited for:
-    without the switch, `LAMP_SHORT_DONE`'s line is kept until that round
-    has added nothing (the Reviewer-lead's P2 on #2930).
-  - **Never** for a keep or a forget beside the change, a call refused,
-    failed, held or unchanged ("already"), two timers, a reminder at a day
-    and time (its day words are still to come), or a round with words of
-    its own. Those turns go on as without the switch.
+  - **Never** for a keep or a forget beside the change (either can come back
+    held for the person's yes, Reviewer-three's P2 on #4635), a call
+    refused, failed, held or unchanged, two timers, a reminder at a day and
+    time, or a round with words of its own. Those turns go on as without the
+    switch.
+
+  **Tried and dropped: the model's words with the call.** The switch first
+  also asked the model to say its few words in the same reply as the call.
+  On lamp-4ace on 31 Oct (build `4ac4cc2bdf`) they came 1 time in 8 acting
+  turns (the first builder on #4635). On `65b10836e0` (11:29–12:04) they
+  came every time, but before the result: "Warmer it is." then "Already at
+  my cosiest orange, actually." And a reminder was said twice, "Timer set.
+  It rings at 12:03 pm." then "Two minutes — I'll nudge you at 12:03." (the
+  first builder on #4710). The light and timer turns were 0.6–1.4 s faster,
+  at Live's pace. So only the result's own words are said early now, and a
+  single ask ends with them.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The

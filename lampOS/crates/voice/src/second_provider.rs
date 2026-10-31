@@ -479,17 +479,15 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// six forty-four and change.", 2 of the last 4 runs).
 pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 
-/// Where the worker reads whether the model is asked to say its few words
-/// in the same reply as a call that changes the light or the voice's
-/// loudness or sets a timer or reminder, never a keep or a forget, so they
-/// are heard at the first round's pace (`worker::SAY_WITH_CALL_NOTE`): `on`, and nothing
-/// else, and only with [`SAID_ONCE_ENVIRONMENT`], which tells the next round
-/// they were heard. On lamp-4ace on 30 Oct (8999) these calls said nothing
-/// until their second chat round: 2.4 to 3.3 s to the first sound, against
-/// 1.54 to 1.62 s for plain answers (#2135). The model rarely did so (1 of
-/// 8 acting turns on lamp-4ace on 31 Oct), so the same switch also answers
-/// such a turn with the acting part's own words at once
-/// ([`Engine::saying_at_once`]), which needs no `LAMP_SECOND_SAID_ONCE`.
+/// Where the worker reads whether a turn whose calls all changed a light or
+/// the volume, or set one timer, is answered at once with the acting part's
+/// own words, its result ([`Engine::saying_at_once`]): `on`, and nothing
+/// else. On lamp-4ace on 30 Oct (8999) these calls said nothing until their
+/// second chat round: 2.4 to 3.3 s to the first sound, against 1.54 to 1.62
+/// s for plain answers (#2135). Asking the model to speak with the call was
+/// tried under this switch and dropped: its words came before the result
+/// ("Warmer it is." then "Already at my cosiest orange", lamp-4ace on 31 Oct,
+/// the first builder on #4710).
 pub const SAY_WITH_CALL_ENVIRONMENT: &str = "LAMP_SECOND_SAY_WITH_CALL";
 
 /// Where the worker reads whether the lamp says [`CHECKING`] itself as a
@@ -784,7 +782,15 @@ pub(crate) fn short_done_line(told: &[Value]) -> Option<&str> {
 /// time set, said on a 12-hour clock as the lamp's other words are
 /// ("7:52 pm", Thirteen's P3 on #4700). `None` unless the one call is
 /// `set_timer` and its answer is committed with a clock.
-pub(crate) fn timer_line(calls: &[net::ToolCall], told: &[Value]) -> Option<String> {
+/// A timer the person asked for as a reminder (`reminded`: their words
+/// said "remind") is named as one, "I'll remind you at 12:03 pm.", never a
+/// timer (lamp-4ace on 31 Oct: "Remind me in two minutes to stretch." got
+/// "Timer set. …", the first builder on #4710).
+pub(crate) fn timer_line(
+    calls: &[net::ToolCall],
+    told: &[Value],
+    reminded: bool,
+) -> Option<String> {
     let ([call], [told]) = (calls, told) else {
         return None;
     };
@@ -792,7 +798,40 @@ pub(crate) fn timer_line(calls: &[net::ToolCall], told: &[Value]) -> Option<Stri
         return None;
     }
     let clock = spoken_clock(told["clock"].as_str()?)?;
-    Some(format!("Timer set. It rings at {clock}."))
+    Some(if reminded {
+        format!("I'll remind you at {clock}.")
+    } else {
+        format!("Timer set. It rings at {clock}.")
+    })
+}
+
+/// Whether `said` plainly holds more than one ask, so the round after an
+/// answer at once is still asked (`LAMP_SECOND_SAY_WITH_CALL`, #2135): a
+/// word that joins asks ("and", "also", "then", "plus", "too"), or a second
+/// sentence. "Make it warmer." and "Remind me in two minutes to stretch."
+/// hold one; "Brighter, and is it sunny?" holds two. With one, the turn ends
+/// with the acting part's words: on lamp-4ace on 31 Oct the next round, told
+/// the lamp had answered, said the reminder again in other words ("Two
+/// minutes — I'll nudge you at 12:03.", the first builder on #4710). A line
+/// misread as holding two only asks the round as before.
+pub(crate) fn asks_more(said: &str) -> bool {
+    const JOINING: [&str; 5] = ["and", "also", "then", "plus", "too"];
+    let lower = said.to_lowercase();
+    if lower
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .any(|word| JOINING.contains(&word))
+    {
+        return true;
+    }
+    let mut ended = false;
+    for c in said.chars() {
+        if matches!(c, '.' | '?' | '!') {
+            ended = true;
+        } else if ended && c.is_alphanumeric() {
+            return true;
+        }
+    }
+    false
 }
 
 /// An `HH:MM` clock on a 12-hour clock: "07:52" is "7:52 am", "19:52"
@@ -9086,6 +9125,10 @@ async fn answer(
     // mind." is rightly answered with nothing (the Reviewer-lead's P2 on
     // #3712).
     let by_name = crate::attention::begins_with_the_name(&said) && !says_stop(&said);
+    // Whether the line asks more than an answer at once covers, and whether
+    // it asked for a reminder (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
+    let more_asked = asks_more(&said);
+    let reminded = said.to_lowercase().contains("remind");
     let words = Message::user(said.clone());
     let event_words = said.clone();
     // One of the onboarding walk's fixed lines, written by the lamp: if its
@@ -10402,11 +10445,17 @@ async fn answer(
                 // Said now, by the part that acted, not after the next round
                 // (`LAMP_SECOND_SAY_WITH_CALL`, #2135: on lamp-4ace on 31 Oct
                 // the model's own words came with the call 1 time in 8).
+                queue.push(line.to_owned()).await?;
+                if !more_asked {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" said at once, and nothing else was asked: the turn ends with it (LAMP_SECOND_SAY_WITH_CALL)"
+                    );
+                    return Ok(());
+                }
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
                 );
                 messages.push(Message::system(short_done_note(line)));
-                queue.push(line.to_owned()).await?;
             } else if let Some(line) = short {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" kept while the next round says whether more was asked (LAMP_SHORT_DONE)"
@@ -10416,13 +10465,19 @@ async fn answer(
             } else if shared.say_at_once
                 && may_answer_short
                 && short_told.len() == calls.len()
-                && let Some(line) = timer_line(&calls, &short_told)
+                && let Some(line) = timer_line(&calls, &short_told, reminded)
             {
+                queue.push(line.clone()).await?;
+                if !more_asked {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: the timer is set; \"{line}\" said at once, and nothing else was asked: the turn ends with it (LAMP_SECOND_SAY_WITH_CALL)"
+                    );
+                    return Ok(());
+                }
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: the timer is set; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
                 );
                 messages.push(Message::system(short_done_note(&line)));
-                queue.push(line).await?;
             }
             if let Some(note) = said_once {
                 eprintln!(

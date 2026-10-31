@@ -1342,23 +1342,6 @@ pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember s
 /// finds answers the question, never more (rule 8).
 pub(crate) const RECALL_BEFORE_NOT_KNOWING: &str = " Before you say you don't know or don't remember something about their own life (their plans, the people in it, their work, or what you talked about earlier), call recall first, and say you don't remember only if it finds nothing. Use what it finds only to answer what they asked.";
 
-/// Told after the character's notes with `LAMP_SECOND_SAY_WITH_CALL=on`
-/// ([`crate::second_provider::SAY_WITH_CALL_ENVIRONMENT`], #2135): the few
-/// words for a call that changes something go in the same reply as the
-/// call, so they are said at the first round's pace. The next round is told
-/// they were heard (`LAMP_SECOND_SAID_ONCE`) and adds only what the results
-/// or the rest of the request call for, so another ask in the same line
-/// ("dim the light and tell me a joke") is still answered. Never a keep or
-/// a forget: either can come back held for the person's yes (a carried
-/// line's keep, `LAMP_CONVERSATION_CARRIED_SAVES`; every forget,
-/// `held_forget_told`), and words said with the call would promise what
-/// round 2 then asks (Reviewer-three's P2 on #4635: "Forgotten." said, the
-/// forget waiting for a yes never given, the data kept).
-pub(crate) const SAY_WITH_CALL_NOTE: &str = " When you call a function that changes your light or how loud you are, or sets a timer or a reminder, say your few words in the same reply as the call, such as \"Warmer it is.\" or \"Ten minutes, starting now.\", not after it. Never for remembering or forgetting, or for anything that needs their yes: say those after the result, as before.";
-
-/// The spoken character with [`SAY_WITH_CALL_NOTE`] after it when `on`:
-/// `LAMP_SECOND_SAY_WITH_CALL` together with `LAMP_SECOND_SAID_ONCE`, which
-/// keeps the next round from saying the words again.
 /// Whether a light, volume or timer turn is answered at once with the
 /// acting part's own words (`LAMP_SECOND_SAY_WITH_CALL`, #2135): with the
 /// switch `on` and no owner's language chosen. Those words are English
@@ -1366,14 +1349,6 @@ pub(crate) const SAY_WITH_CALL_NOTE: &str = " When you call a function that chan
 /// owner's language must not begin in English (Thirteen's P2 on #4700).
 pub(crate) fn says_at_once(on: bool, language: Option<crate::language::Language>) -> bool {
     on && language.is_none()
-}
-
-pub(crate) fn saying_with_calls(character: String, on: bool) -> String {
-    if on {
-        format!("{character}{SAY_WITH_CALL_NOTE}")
-    } else {
-        character
-    }
 }
 
 /// Whether a hearing of the name at `at_us` with `score` is one since
@@ -2284,26 +2259,6 @@ pub fn serve(
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
     let character = spoken_character(&character, look_by_call, tools.memory.is_some());
-    // The words for a call that changes something said with the call
-    // (`LAMP_SECOND_SAY_WITH_CALL`, #2135), only beside
-    // `LAMP_SECOND_SAID_ONCE`, which tells the next round they were heard.
-    let on = |name: &str| std::env::var(name).ok().as_deref() == Some("on");
-    let say_with_call = on(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT);
-    if say_with_call {
-        if on(crate::second_provider::SAID_ONCE_ENVIRONMENT) {
-            eprintln!(
-                "lamp-voice second: a call that changes something is asked to carry its few words, said at the first round's pace (LAMP_SECOND_SAY_WITH_CALL)"
-            );
-        } else {
-            eprintln!(
-                "lamp-voice second: LAMP_SECOND_SAY_WITH_CALL needs LAMP_SECOND_SAID_ONCE, which is off; not asked"
-            );
-        }
-    }
-    let character = saying_with_calls(
-        character,
-        say_with_call && on(crate::second_provider::SAID_ONCE_ENVIRONMENT),
-    );
     let character = if speech_tags == Some(true) {
         format!("{character}{}", crate::second_provider::speech_tags::NOTE)
     } else {
@@ -24870,29 +24825,6 @@ mod tests {
             Language::Korean,
         ] {
             assert!(!super::says_at_once(true, Some(language)), "{language:?}");
-        }
-    }
-
-    #[test]
-    fn a_changing_calls_words_are_asked_with_the_call_only_when_on() {
-        let spoken = super::spoken_character("CHARACTER", false, true);
-        assert_eq!(super::saying_with_calls(spoken.clone(), false), spoken);
-        let asked = super::saying_with_calls(spoken.clone(), true);
-        assert_eq!(asked, format!("{spoken}{}", super::SAY_WITH_CALL_NOTE));
-        assert!(super::SAY_WITH_CALL_NOTE.contains("in the same reply as the call"));
-        assert!(super::SAY_WITH_CALL_NOTE.starts_with(' '));
-        // Never a keep or a forget, which may come back held for the
-        // person's yes (Reviewer-three's P2 on #4635): they are said after
-        // the result.
-        let note = super::SAY_WITH_CALL_NOTE;
-        assert!(
-            note.contains(
-                "Never for remembering or forgetting, or for anything that needs their yes"
-            )
-        );
-        let asked = &note[..note.find("Never").unwrap()];
-        for word in ["remember", "keep", "forget", "save"] {
-            assert!(!asked.contains(word), "asked with {word}: {asked}");
         }
     }
 
