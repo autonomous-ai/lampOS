@@ -3,10 +3,14 @@
 //! Prepare a bounded sleep input, release the store while the model runs, then
 //! apply its proposal atomically. Forget and corrections invalidate old inputs.
 pub mod model;
+mod policy;
+mod recall;
 mod schema;
 mod store;
 mod types;
 
+pub use policy::Arm;
+pub use recall::*;
 pub use store::Store;
 pub use types::*;
 
