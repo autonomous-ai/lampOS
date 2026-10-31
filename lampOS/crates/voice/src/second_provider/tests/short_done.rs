@@ -537,27 +537,65 @@ fn the_timer_line_is_its_own_clock_or_none() {
     }
 }
 
-/// One ask or more, as the person's words say it (#2135): a word that joins
-/// asks or a second sentence is more; the rest is one.
+/// One ask or more, as the person's words say it (#2135, Reviewer-three's
+/// P2 on #4726): a clause more than the round's calls answered is more;
+/// "too" meaning "very", two changes both called, a reminder's own "and", a
+/// thanks after, or a decimal point are not; a second ask joined by a comma
+/// is.
 #[test]
-fn a_line_asks_more_with_a_joining_word_or_a_second_sentence() {
-    for one in [
-        "Make it brighter.",
-        "Remind me in two minutes to stretch.",
-        "Set a timer for one minute",
-        "Hey Lamp, warmer please.",
-        "Can you turn it down?",
+fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
+    let calls = |names: &[&str]| -> Vec<net::ToolCall> {
+        names
+            .iter()
+            .map(|name| call("c0", name, json!({})))
+            .collect()
+    };
+    let reminder = |text: &str| {
+        vec![call(
+            "c0",
+            "set_timer",
+            json!({"text": text, "seconds": 60}),
+        )]
+    };
+    for (one, called) in [
+        ("Make it brighter.", calls(&["light_brighter"])),
+        ("Remind me in two minutes to stretch.", reminder("stretch")),
+        ("Set a timer for one minute", calls(&["set_timer"])),
+        ("Hey Lamp, warmer please.", calls(&["light_warmer"])),
+        ("Can you turn it down?", calls(&["volume_down"])),
+        ("It's too bright.", calls(&["light_dimmer"])),
+        ("Too dark in here.", calls(&["light_brighter"])),
+        (
+            "Make it warmer and brighter.",
+            calls(&["light_warmer", "light_brighter"]),
+        ),
+        (
+            "Dim it a bit and make it warmer.",
+            calls(&["light_dimmer", "light_warmer"]),
+        ),
+        (
+            "Remind me in an hour to take out the trash and recycling.",
+            reminder("Take out the trash and recycling"),
+        ),
+        ("Make it warmer. Thanks!", calls(&["light_warmer"])),
+        ("Set a timer for 2.5 minutes.", calls(&["set_timer"])),
+        ("Okay, set a timer for five minutes.", calls(&["set_timer"])),
+        (
+            "Lamp, make it a little warmer, thank you.",
+            calls(&["light_warmer"]),
+        ),
     ] {
-        assert!(!asks_more(one), "{one}");
+        assert!(!asks_more(one, &called), "{one}");
     }
     for more in [
         "Brighter, and is it sunny?",
         "Set a timer for ten minutes. What's the weather?",
         "Dim the light, then tell me a joke.",
         "Make it warmer, also how are you?",
-        "Turn it down too.",
-        "AND what time is it",
+        "Dim the light, tell me a joke.",
+        "Make it warmer, what's the weather?",
+        "Make it warmer and brighter.",
     ] {
-        assert!(asks_more(more), "{more}");
+        assert!(asks_more(more, &calls(&["light_warmer"])), "{more}");
     }
 }

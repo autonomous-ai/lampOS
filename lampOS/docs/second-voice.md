@@ -819,9 +819,14 @@ order is kept. A written turn is the same from the chat on.
   - **With one ask, the turn ends there.** The next round is not asked, so
     it can't say the change again in other words. It still runs, told the
     lamp said it (`short_done_note`), when the person's words plainly hold
-    more (`asks_more`: "and", "also", "then", "plus" or "too", or a second
-    sentence), so "brighter, and is it sunny?" gets the weather after
-    "Brighter.".
+    more (`asks_more`): cut into clauses at a sentence's end (not a point
+    between digits), a comma or semicolon, or "and", "also", "then" or
+    "plus", with a clause of only thanks, a greeting, the name or "okay"
+    left out and a call's own words (a reminder's `text`) taken as its ask,
+    more clauses than the round's calls. So "brighter, and is it sunny?" and
+    "dim the light, tell me a joke" get round 2 after the first words, and
+    "It's too bright.", "Make it warmer and brighter." (two calls) and "Make
+    it warmer. Thanks!" end with them (Reviewer-three's P2 on #4726).
   - **In English only:** those words are English, so with an owner's
     language chosen (`language::at_start()`: Vietnamese, Japanese, Chinese
     or Korean) such turns wait for the model's words as without the switch,
