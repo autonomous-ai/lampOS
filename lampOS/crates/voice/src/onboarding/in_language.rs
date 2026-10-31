@@ -1043,7 +1043,7 @@ pub(super) const LINES: &[Line] = &[
         "Bạn tìm công tắc riêng tư của mình ({location}). Gạt đóng lại, rồi mở ra lại.",
         "プライバシースイッチを探してください（{location}）。一度閉じてから、また開けてください。",
         "请找到我的隐私开关（{location}）。把它关上，再打开。",
-        "제 프라이버시 스위치를 찾아 주세요({location}). 한 번 닫았다가 다시 열어 주세요.",
+        "제 프라이버시 스위치를 찾아 주세요({location}). 밀어서 닫았다가 다시 열어 주세요.",
     ]),
     ("Earlier we skipped my privacy switch. Let's try it now.", [
         "Lúc nãy mình bỏ qua công tắc riêng tư. Giờ mình thử nhé.",
