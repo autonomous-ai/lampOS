@@ -180,6 +180,11 @@ the `### Built but not on yet` part. It lists each `switches.md` row counted
 `until` or `now` whose switch no product file turns on, read from the
 units themselves (`Environment=` lines, `ExecStart` flags and the settings'
 `.env` files in `deploy/product`), not from the row's "Product unit" cell.
+Both are read, and the binary built, at the promoted build's own commit (the
+receipt's `commit`, from its signed manifest, checked out beside the job's
+checkout), not at `lamp-voice`'s head when the promotion was dispatched,
+which may be past the build: 9276's list read at the head would have left
+out `LAMP_WINDOW_FROM_START`, turned on in the product after 9276 (31 Oct).
 Only files `lamp-update install` places are read, matched by name and text: a
 file there that install never places is on no lamp. So `LAMP_OWN_KEYS`,
 set only in `own-keys-voice.conf`, which a test lamp gets by hand, is
