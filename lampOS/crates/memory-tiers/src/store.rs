@@ -43,7 +43,7 @@ impl Store {
         Self::from_connection(Connection::open_in_memory()?, owner, random_key()?)
     }
     fn from_connection(conn: Connection, owner: &str, fingerprint_key: [u8; 32]) -> Result<Self> {
-        text_valid(owner, 64)?;
+        text_valid(owner, 128)?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version != 0 && version != 2 {
             return Err(Error::Invalid(

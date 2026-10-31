@@ -202,8 +202,8 @@ LAMP_MEMORY_TIERS_REVISION=$(git rev-parse HEAD) cargo build --manifest-path lam
 
 A source-only build can set the same variable from its recorded source manifest.
 Without it, initialization reports `unversioned`, unsuitable for scored runs.
-The process speaks [contract v1](memory-bench.md#json-lines-arm-contract-draft-v1),
-pinned at `a51e3024f`, on standard input/output. It requires a fresh private
+The process speaks [contract v2](memory-bench.md#json-lines-arm-contract-draft-v2),
+pinned at `5cfcb7455`, on standard input/output. It requires a fresh private
 state directory and an explicit IANA zone. Frames are bounded to 4 MiB. Unknown
 operations, bad ordering, duplicate request ids and backward clocks fail.
 Diagnostics contain no source text. It opens no socket and loads no credential.
@@ -214,6 +214,8 @@ apply reports whether work remains and an opaque cursor. A rejected proposal
 keeps its records pending. Broker refusal, timeout or identity mismatch ends the
 process without retry; the runner records the failure and keeps its reservation.
 The runner is the sole model-cost owner, including calls during isolated probes.
+Unknown provider usage is accepted without substituting zero; the runner keeps
+its full reservation. Owner ids accept the contract's 128-byte limit.
 
 Ordinary English input recognizes explicit remember, pause/resume and forget
 requests using documented deterministic prefixes. Remember copies the owner
@@ -228,6 +230,16 @@ paraphrase or multilingual understanding. The main benchmark must measure its
 misses and excessive deletions. No hidden intent flag is accepted. Ingestion
 retains only attributed owner speech in an observed owner-alone room; assistant,
 visitor, unsure and mixed-room speech is not retained by this conservative arm.
+
+Version 2 ingest and forget replies include `forget_effect`: `ran` records
+an admitted forget attempt, including a no-match attempt; it stays false for
+an earlier identity/target refusal or a bare word. `suppress_confirmation` is
+true after actual removal, and false for an explicit no-removal result. The
+runner clears its common recent conversation when the attempt ran and omits
+the confirmation when requested. Direct protocol forgetting uses this admitted
+path; it is not a store-only diagnostic. This adapter accepts v2 requests only
+and echoes unsupported request versions in errors; older recorded v1 data and
+its unknown effect remain the runner reader's responsibility.
 
 `probe_begin` copies the SQLite state into a feature-gated in-memory child.
 The original connection stays open and untouched. Child rows, fingerprints,

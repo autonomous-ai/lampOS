@@ -606,3 +606,9 @@ fn forgotten_episode_boundaries_only_describe_survivors() {
     assert!(episodes[0].topic.is_empty());
     assert!(episodes[0].gist.is_empty());
 }
+
+#[test]
+fn owner_identity_accepts_the_bench_contract_limit() {
+    assert!(Store::in_memory(&"x".repeat(128)).is_ok());
+    assert!(Store::in_memory(&"x".repeat(129)).is_err());
+}

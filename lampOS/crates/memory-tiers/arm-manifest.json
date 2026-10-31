@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "contract_revision": "a51e3024f",
+  "contract_revision": "5cfcb7455b0e8972d94b1cfb2332b3aed3c17a6a",
   "registered_before_candidate_scores": true,
   "repetitions": 3,
   "arms": [
@@ -68,5 +68,6 @@
     "runner-owned global costs and model identities"
   ],
   "threshold": "Keep a component if its removal lowers overall or any question-kind score by more than the full engine three-run spread, or it is required for a safety/privacy result. Remove a component adding cost without a score gain.",
-  "policy": "All arms use the same extraction prompt, then code filters the removed outputs. Proof facts remain in all arms. Episodes retain structural source grouping even when not recalled. Nightly removal retains weekly reflection. Importance removal stores zero proposed importance, removes importance from ranking, and fades all old episodes equally. Every arm and failed attempt is reported."
+  "policy": "All arms use the same extraction prompt, then code filters the removed outputs. Proof facts remain in all arms. Episodes retain structural source grouping even when not recalled. Nightly removal retains weekly reflection. Importance removal stores zero proposed importance, removes importance from ranking, and fades all old episodes equally. Every arm and failed attempt is reported.",
+  "protocol_version": 2
 }
