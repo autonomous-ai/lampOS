@@ -6,8 +6,11 @@
 times, retains due occurrences, and serves guarded local requests. The executable
 does nothing unless started with `--enable`. Actions exposes its six tools only
 with `LAMP_SCHEDULE_TOOLS=on`; Voice declares/routes them with the same exact
-switch. Voice's separate `LAMP_SCHEDULE_SPEAK=on` consumer may speak due work
-under the final Voice owner. Both additions are off unless explicitly set.
+switch. Voice's separate `LAMP_SCHEDULE_SPEAK=on` consumer (or `skill`;
+`reminders::speaks`) may speak due work under the final Voice owner. Both
+additions are off unless explicitly set; the product's units set both
+(`LAMP_SCHEDULE_TOOLS=on` in lamp-actions' and lamp-voice's,
+`LAMP_SCHEDULE_SPEAK=skill` in lamp-voice's).
 
 The product references were reviewed on 2026-10-14. Apple's
 [HomePod guide](https://support.apple.com/en-nz/guide/homepod/apd82db5cb0d/homepod)
@@ -56,9 +59,12 @@ opening a store, socket, bus publisher, or worker:
 lamp-schedule serve
 ```
 
-An enabled Linux example is below. These are example paths for a service user,
-not an installed unit. First must choose the actual user and provision the
-existing parent directories. All paths supplied here are absolute.
+An enabled Linux example is below, with example paths for a service user. The
+product's unit (`deploy/product/lamp-schedule.service`) runs it as `lampos`
+with `--dir /var/lib/lampos-schedule/store --socket
+/run/lampos-schedule/call.sock --zone ${LAMP_ZONE} --bus-root /run/lampos-bus
+--kernel-clock`, both folders made 0700 by systemd (`StateDirectory`,
+`RuntimeDirectory`). All paths supplied here are absolute.
 
 ```sh
 lamp-schedule serve --enable \
@@ -149,12 +155,12 @@ Reminder text and the most recent request are private plaintext in this store;
 they are not encrypted. File permissions do not defend against another hostile
 process with the same UID.
 
-When provisioning, First must register this private data directory in the
-personal-data reset manifest and arrange owner shutdown before its removal.
-The store contains personal reminder text, each person's own: every item
-keeps who set it, and a voice line hears only its own, and the room's
-short timers ("Whose reminders a line hears" below). No deployment, reset manifest, or reset-owner code is
-changed by this task.
+The product's reset plan lists this store (`/var/lib/lampos-schedule/store`)
+and Voice's delivery folder (`/var/lib/lampOS/voice/schedule-delivery`)
+(`crates/setup/fixtures/reset-plan-product.json`, embedded by install), so a
+factory reset wipes them. The store contains personal reminder text, each
+person's own: every item keeps who set it, and a voice line hears only its
+own, and the room's short timers ("Whose reminders a line hears" below).
 
 A new database is prepared as `.schedule.sqlite3.init`, synced, and published
 without replacing an existing database. An interrupted, unpublished empty
