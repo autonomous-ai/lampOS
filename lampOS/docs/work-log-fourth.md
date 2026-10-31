@@ -1,3 +1,22 @@
+## 2026-10-31 10:2x ICT — the price read lands and passes on 4ace; say-at-once, the checking line, the look and check lines in the owner's language; two flaky tests
+
+**#4684 (the price read) landed in train 442** and passed on lamp-4ace at 08:33 (the first builder's `4ACE RUN #4684`): "$499 on their own page", where at 05:41 it had said "449 euro". But it took 4.5 s with nothing said, and line 3 was a new failure, "Let me check that one." with no call, which is #4595's case and Thirteen's #4711.
+
+**The voice pieces since 08:00, all off in the product:**
+- **#4700:** with `LAMP_SECOND_SAY_WITH_CALL`, a light, volume or timer turn is answered at once with the acting part's own words ("Warmer.", "Timer set. It rings at 7:52 am."), and round 2 still runs for the rest. It came from the first builder's measure, where the model's words came with the call 1 time in 8. Thirteen's P2 made it English-only and their P3 gave a 12-hour clock. It's rebased over #4707 with the same `-U0` patch, and rides train 448.
+- **#4707:** with `LAMP_SECOND_CHECKING_LINE`, a search begun with nothing said is begun with "Let me check.", and each search journals its time and our page's read (train 447).
+- **#4713:** "Let me look." and "Let me check." join `language::FIXED_LINES` with four languages (Thirteen's P2 on #4707). Thirteen's READ-OK, with Vietnamese checked.
+
+**Flaky tests:**
+- **#4703** (train 447): two lamp-skills stand-ins answered before they counted a call. A 300 ms control reproduced CI's `left: 1, right: 2`, and Tests found the second.
+- **#4700** also fixes `a_forget_confirmation_cannot_reenter_the_next_turns_history`, which raced on the process-wide `THREAD`.
+
+**Also:**
+- #4693: the notes match installed files by name and text (train 445).
+- #4661, Fifth's stand carry, landed in 443 after a rebase I first misreported as clean (memory saved).
+- Reads: #4674, #4680 (two HOLDs, both lifted), #4681, #4687, #4688, #4690, #4694, #4697, #4701, #4702, #4704.
+- The Queue moved to #4710 at 09:40. I found out when #3997 refused my post at 10:1x.
+
 ## 2026-10-31 07:2x ICT — switches.md counts on (#4666), the hum carry (#4671, #4679), the price read (#4684), reads
 
 **Landed:** #4662 and #4665 (train 435), and #4666 (train 436). `switches.md` counts `on` the 40 switches the product turns on. A `lampos-promote` test holds that, and the stable notes now read only files install places, so `LAMP_OWN_KEYS` is listed as not on yet. #4671 is the carry of Nine's #4228, the hum (train 437). Its last commit, which the train missed because I pushed it while the train ran, is #4679 (train 439). I told the first builder the bot closes on the commits it carried, not the PR's head.
