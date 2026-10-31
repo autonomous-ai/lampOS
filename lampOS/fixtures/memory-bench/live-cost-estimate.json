@@ -1,7 +1,7 @@
 {
   "as_of": "2026-10-31",
   "runner_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
-  "label": "planning estimate, not billed usage and not accuracy scores",
+  "label": "Historical v3 recorded measurements with separate current-plan projection; not billed usage or accuracy scores",
   "complete_measured_table": true,
   "token_heuristic": "1 English character approximately 0.3 token; JSON and model tokenization differ; actual provider usage remains authoritative",
   "rates": {
@@ -732,11 +732,57 @@
   },
   "contingency_fraction": 0.25,
   "aging_test": {
-    "status": "not yet registered or priced",
+    "status": "registered before scoring; not priced",
     "included_in_totals": false,
     "target_days": 120,
-    "reason": "The month cannot exercise fading beyond the unchanged 90-day threshold."
+    "reason": "The month cannot exercise fading beyond the unchanged 90-day threshold.",
+    "runs": 6
   },
   "recommended_flash_campaign_cap_usd": 600,
-  "recommended_flash_cap_per_persona_usd": 300
+  "recommended_flash_cap_per_persona_usd": 300,
+  "topic_segmentation_projection": {
+    "before_any_score": true,
+    "reason": "Register sleep-time topic segmentation and append session cutting only; prior measured records remain unchanged.",
+    "setup_count": 15,
+    "candidate_count": 12,
+    "runs_one_persona": 45,
+    "runs_two_personas": 90,
+    "new_setup": "tiers_session_cutting_only",
+    "new_setup_label": "session cutting only",
+    "new_setup_basis": "Prior unsegmented full-engine recorded request shape; a projection, not a new measured run.",
+    "no_nightly_sleep_label": "no consolidation of facts, lines and episode summaries; nightly topic-boundary pass still runs",
+    "segmentation_enabled_in": "full tiers and all ten single-component removals",
+    "segmentation_overhead": "unmeasured; not included in projection; budget must stop the campaign before spending exceeds the approved cap",
+    "new_setup_input_tokens_estimate": 432119,
+    "new_setup_output_tokens_allowance": 286720,
+    "costs": {
+      "flash": {
+        "new_setup_per_run_model_and_judge": 1.3709030999999998,
+        "six_added_runs_model_and_judge": 8.2254186,
+        "six_added_runs_with_learned_state_and_contingency": 17.387268749999997,
+        "development_month_with_contingency": 268.0367521874999,
+        "held_back_equal_workload_with_contingency": 268.0367521874999,
+        "two_personas_with_contingency": 536.0735043749999
+      },
+      "pro": {
+        "new_setup_per_run_model_and_judge": 5.6021394,
+        "six_added_runs_model_and_judge": 33.612836400000006,
+        "six_added_runs_with_learned_state_and_contingency": 67.60316970000001,
+        "development_month_with_contingency": 1053.7677020625,
+        "held_back_equal_workload_with_contingency": 1053.7677020625,
+        "two_personas_with_contingency": 2107.535404125
+      }
+    },
+    "registration_version": 5,
+    "complete_measured_table": false,
+    "boundary_output_allowance": {
+      "formula": "78 + sum(39 + 2 * decimal_digit_count(record_id)) for each offered record",
+      "equivalent": "64 + compact JSON byte length of one range per record",
+      "six_one_digit_record_tokens": 324,
+      "batch_limit": "adapter shortens the batch at its configured output ceiling",
+      "response_checks": "both output bytes and reported output tokens",
+      "measurement": "awaiting offered batches from the new common adapter; no old run is relabelled"
+    }
+  },
+  "measured_registration_version": 3
 }

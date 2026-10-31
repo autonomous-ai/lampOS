@@ -14,7 +14,7 @@ use std::{
     path::Path,
 };
 
-pub const ARMS: [&str; 11] = [
+pub const ARMS: [&str; 12] = [
     "tiers",
     "tiers_minus_episodes",
     "tiers_minus_life_story",
@@ -26,6 +26,7 @@ pub const ARMS: [&str; 11] = [
     "tiers_minus_nightly_sleep",
     "tiers_minus_importance",
     "tiers_minus_fading",
+    "tiers_session_cutting_only",
 ];
 pub fn json_file<T: DeserializeOwned>(path: &Path) -> Result<T> {
     let meta = fs::symlink_metadata(path)?;
@@ -78,10 +79,11 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
     .into_iter()
     .map(|name| Ok((name, hash(&fs::read(path.join(name))?))))
     .collect::<Result<BTreeMap<_, _>>>()?;
-    let mut registration = json!({"version":4,"protocol_version":2,"protocol_minor":1,"status":"draft_pending_human_review","fictional":true,
+    let mut registration = json!({"version":5,"protocol_version":2,"protocol_minor":1,"status":"draft_pending_human_review","fictional":true,
         "question_count":200,"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
         "seed":corpus.persona.seed,"files":hashes,"scorers":"src/score.rs and tests/guards.rs committed before scored runs",
         "coverage_revision":{"date":"2026-10-31","before_any_score":true,"reason":"Give memory only product-observable activity and a realistic prompt budget; prevent empty or unused tier removals from being treated as evidence of no value.","activity":"Scripted at_desk, head_down and away from visit stage directions; probe posture rotates independently of question content.","topic":null,"objects":[],"memory_text_bytes":4096,"no_memory":"no memory text","full_history":"ceiling; no memory-selection cap, complete prompt must fit pinned model context; transport overflow is unsupported, never truncation","diagnostics":"optional metadata-only tier-usage-v1 on inspection; unknown when absent; never scored","gaps":["fading not exercised by this month","no second identified person","no delivered-recall acknowledgement","no supplied-topic episode split","no supplied object labels"]},
+        "topic_segmentation_revision":{"date":"2026-10-31","before_any_score":true,"reason":"The prior engine cut only on sessions and departures; measure sleep-time topic segmentation rather than assuming its benefit.","full_engine":"nightly model proposes record-id ranges within each session; code requires contiguous ranges covering every eligible record exactly once; no added live-reply work","all_ten_removals":"segmentation remains enabled; each removal differs from the full engine only in its named component","no_nightly_sleep_label":"no consolidation of facts, lines and episode summaries; nightly topic-boundary pass still runs","no_nightly_sleep_weekly":"weekly reflection remains enabled","session_cutting_only":"same engine with topic segmentation disabled; session and departure boundaries remain","readiness":"If segmentation is not ready, only the three reference setups may run; hold every Tiers setup for one agreed segmented build.","unchanged":"all persona, event, question and answer-key bytes from registration v4","cost":"six additional two-persona runs; new segmentation overhead unmeasured"},
         "candidate_order":ARMS,"repetitions":3,"candidate_label":"ours (tiers)",
         "facts_removal":"facts not recalled; kept only as evidence",
         "timing_revision":{"date":"2026-10-31","before_any_score":true,"reason":"Nine-minute spacing incorrectly made every utterance a product conversation and biased time-based episode boundaries.","conversations_per_day":8,"exchanges_per_conversation":[2,12],"exchange_gap_seconds":[3,30],"visits_per_day":4,"nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day","unchanged":"persona, owner utterance content and IDs, question content and scoring, answer key; eligible source lists include new boundary events"},
@@ -94,10 +96,10 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
         "recall_ms":200,"snapshot_ms":300,"transcripts":"not_yet_recorded","human_audit":"pending",
         "judge":"required for rubric scores; recorded tests are not live results"});
     if let Profile::Aging { .. } = &corpus.profile {
-        registration = json!({"version":1,"profile":corpus.profile,"protocol_version":2,"protocol_minor":1,
+        registration = json!({"version":2,"profile":corpus.profile,"protocol_version":2,"protocol_minor":1,
             "status":"registered_before_scoring_pending_human_review","fictional":true,"days":120,"question_count":42,
             "timezone":corpus.persona.timezone,"seed":corpus.persona.seed,"files":hashes,
-            "candidate_order":["tiers","tiers_minus_fading"],"repetitions":3,"memory_text_bytes":4096,
+            "candidate_order":["tiers","tiers_minus_fading"],"topic_segmentation":"enabled identically in both setups; use the same agreed segmented build","repetitions":3,"memory_text_bytes":4096,
             "reason":"The unchanged 30-day month cannot exercise the unchanged strictly-over-90-day fading threshold.",
             "schedule":"Thirty-day base plus sixteen additional early two-exchange episodes, then one two-exchange visit each day 31 through 120. Nightly maintenance on all 120 calendar days; weekly after days 7, 14, ... 119.",
             "probes":"Matched gist and high-importance-control questions after day 90 and day 120; recent facts and forgetting after day 120. Probes are isolated.",

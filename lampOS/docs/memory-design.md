@@ -122,8 +122,15 @@ unattributed model invention can become a relationship in that graph.
 1. **Take in.** Eligible directed speech reaches working memory and the
    record. Fold older exchanges into a running summary as the working
    budget fills. Keep uncertain attribution separate from eligible evidence.
-2. **Cut episodes.** End an episode on topic change or the owner leaving,
-   rather than a fixed 45-second quiet interval. Mark importance from an
+2. **Cut episodes.** Session endings and departures establish initial
+   boundaries. During nightly sleep, a model proposes topic episodes as
+   record-id ranges within each session. Code requires contiguous ranges
+   covering every eligible record exactly once, without invented source
+   text. This work adds nothing to the live reply path. The benchmark
+   compares it with a separately registered session-cutting-only setup.
+   A forget during an in-flight topic pass cancels it or discards its result;
+   proposed ranges cannot name forgotten records, and eligible input excludes
+   fingerprinted text under the same rules as consolidation. Mark importance from an
    explicit request to remember, strong feeling, first mentions, plans,
    promises, names, dates, and repetition. Small talk is usually low priority.
 3. **Remember explicitly.** A direct request uses a fast path and is read

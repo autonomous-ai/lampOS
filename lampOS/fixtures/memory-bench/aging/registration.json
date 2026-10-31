@@ -27,7 +27,7 @@
   "memory_text_bytes": 4096,
   "probes": "Matched gist and high-importance-control questions after day 90 and day 120; recent facts and forgetting after day 120. Probes are isolated.",
   "profile": {
-    "base_registration_hash": "a87489cc380a5674eca844f542ef8500b66ee3d746f8cdce4d87a188d4f4033e",
+    "base_registration_hash": "3ee255b5921100c268314c905094094d8d2bc4bd87fd46a271c11a287ff50a35",
     "kind": "aging",
     "scenario_hash": "05478eb9a14575242bee0ca28e844d5c8a42c041c38d304dd873bf89f394bc02"
   },
@@ -41,6 +41,7 @@
   "seed": 731,
   "status": "registered_before_scoring_pending_human_review",
   "timezone": "Asia/Ho_Chi_Minh",
+  "topic_segmentation": "enabled identically in both setups; use the same agreed segmented build",
   "transcripts": "not_yet_recorded",
-  "version": 1
+  "version": 2
 }

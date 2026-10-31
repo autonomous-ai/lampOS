@@ -14,7 +14,7 @@ that heuristic. Actual returned usage is authoritative; synthetic receipts
 with placeholder usage are never priced as live tokens. No caching discount,
 off-peak discount or free credit is assumed.
 
-## One month, one repetition per setup
+## Recorded v3 request shapes, one repetition per setup
 
 Input and output columns are model-only millions of tokens. Outputs use the
 registered maximum output allowance per recorded call, not the tiny synthetic
@@ -33,9 +33,13 @@ reply. Dollar columns also include the same blinded-judge planning allowance.
 | Without behavior memory | 0.4321 | 0.2867 | $1.37 | $5.60 |
 | Without upcoming plans | 0.4321 | 0.2867 | $1.37 | $5.60 |
 | Without feelings | 0.4321 | 0.2867 | $1.37 | $5.60 |
-| Without nightly sleep | 0.2944 | 0.1638 | $1.18 | $4.93 |
+| No consolidation of facts, lines and episode summaries; nightly topic-boundary pass still runs* | 0.2944 | 0.1638 | $1.18 | $4.93 |
 | Without importance | 0.4321 | 0.2867 | $1.37 | $5.60 |
 | Without fading | 0.4321 | 0.2867 | $1.37 | $5.60 |
+
+*The row uses the older no-sleep recorded request shape, when the topic pass
+did not exist. Its new topic-boundary cost is unmeasured and is not included
+in that historical dollar value. All candidate rows retain their v3 pins.
 
 The judge allowance covers 76 rubric questions, 175
 criteria and 100 answer/follow-up turns per run:
@@ -74,35 +78,57 @@ That factor is not a proven live-cost bound. Add 25% contingency for request
 variation and retries. Every retry remains an explicit retained attempt;
 there is no authorization here to spend money or retry silently.
 
-## Three runs each: fourteen setups, 42 runs per persona
+## Current plan: fifteen setups, 45 runs per persona
 
-| Planning stage | Flash | Pro |
-|---|---:|---:|
-| Recorded request shapes plus judge (three runs each) | $76.18 | $319.67 |
-| All allowances plus one speech cache | $207.47 | $815.97 |
-| With 25% contingency | $259.34 | $1019.97 |
-| Two same-sized personas, with contingency | $518.69 | $2039.93 |
+Before any score, registration v5 adds **session cutting only**, after the
+existing ten removals. The full engine and all ten removals keep nightly
+topic segmentation enabled. The no-nightly-sleep setup means **no consolidation
+of facts, lines and episode summaries; nightly topic-boundary pass still runs**.
+Weekly reflection remains enabled in that setup.
+Its added boundary-pass cost, and segmentation overhead in the other candidate
+setups, remain unmeasured. The projection below excludes that new overhead;
+the campaign cap must stop the run if the allowance is exhausted.
 
+The boundary-only allowance is now registered as 64 plus the compact JSON
+byte length of one singleton range per offered record: equivalently 78 plus
+39 and twice the decimal ID length for each record. Six one-digit IDs allow
+324 tokens. The adapter shortens batches at its configured ceiling and checks
+both returned bytes and reported tokens. Actual offered batches from the new
+pinned adapter are needed to replace the unmeasured overhead; the old pass
+contains no such calls. Do not substitute the synthetic response length.
+
+The extra setup uses the prior unsegmented full-engine shape as its estimate:
+432,119 input tokens and 286,720 output tokens allowed
+per run, plus the same judge reserve. That is $1.37 Flash
+or $5.60 Pro per run. Six extra runs across the two personas add
+$8.23 Flash before allowances, or $17.39 with the same learned-state
+allowance and 25% contingency. This is a projection, not a measured new run.
 
 | Requested scope | Runs | Flash, with contingency | Pro, with contingency |
 |---|---:|---:|---:|
-| Development month | 42 | $259.34 | $1019.97 |
-| Held-back repetition, assuming equal workload | 42 | $259.34 | $1019.97 |
-| Both personas | 84 | $518.69 | $2039.93 |
+| Development month | 45 | $268.04 | $1053.77 |
+| Held-back repetition, assuming equal workload | 45 | $268.04 | $1053.77 |
+| Both personas | 90 | $536.07 | $2107.54 |
 | Optional mem0 and MemoryOS, both personas | 12 extra | Not estimated; excluded | Not estimated; excluded |
-| Separate 120-day aging test | Not registered yet | Not estimated; excluded | Not estimated; excluded |
+| Separate registered 120-day aging test | 6 extra | Not estimated; excluded | Not estimated; excluded |
 
-**Recommended owner decision: a $600 Flash campaign cap, split into $300 per
-persona.** This rounds up the $518.69 projection; it is not approval to spend
-or a guarantee of completion. The unregistered aging test and optional outside
-systems need separate estimates and budget decisions. If Pro is selected,
-the corresponding two-persona estimate is $2,039.93; a rounded $2,400 cap
-would provide the same per-persona split and additional margin.
+**Proposed owner decision remains a $600 Flash campaign cap, split into $300
+per persona.** The $536.07 projection does not authorize spending or guarantee
+completion. The separately registered aging test and optional outside systems
+need separate estimates and budget decisions. If Pro is selected, the
+corresponding two-persona estimate is $2107.54; the previous rounded $2,400
+proposal remains above it, also without a completion guarantee.
+
+For comparison, the prior fourteen-setup projection was $259.34 Flash per
+persona ($518.69 for both), or $1019.97 Pro per persona ($2039.93 for both).
+Its measured rows, original totals, revisions, hashes and retained ledgers
+remain unchanged in the machine-readable estimate. No earlier run is
+relabelled as evidence for the new engine or the new registration.
 
 Fading is **not exercised by this month**: the existing mechanism starts only
 beyond 90 days, while the month spans about 29 days. Its removal still runs
-and is reported, but this month cannot decide whether fading stays. A separate
-sparse continuation to about 120 days must be registered before live scoring.
+and is reported, but this month cannot decide whether fading stays. The separate
+[120-day aging fixture](aging-plan.md) is registered before live scoring.
 No threshold or registered month content is changed to fit the test.
 
 Speech is charged once per persona and reused across every setup/repetition.

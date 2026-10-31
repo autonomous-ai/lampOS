@@ -55,7 +55,8 @@ IANA timezone; it does not simulate dates by adding fixed 24-hour intervals.
 question's `after_record`, not later records before its query timestamp;
 `evidence_ids` identifies the specific rubric's source material. These are
 not the same: a correct follow-up may legitimately cite another past plan.
-The appointment probes use a topic cue to disambiguate which plan they test.
+The appointment probes name the plan in their spoken question; they receive
+no supplied topic cue.
 
 Exact scorers compare the whole normalized answer, dates use a registered
 one-day tolerance, and abstention requires a complete registered form.
@@ -210,3 +211,18 @@ and extends the same fictional owner to 120 days. Its 42 fixed probes compare
 useful gist, important controls, recent facts and forgetting before/after the
 fading boundary; absence of real eligible detail remains unexercised. The
 [scenario](aging-scenario.json) is evaluator authoring input, not arm context.
+
+Registration v5 preserves every v4 input/key/question byte and adds the
+session-cutting-only candidate after the ten removals. Full Tiers and all ten
+removals keep nightly topic segmentation enabled. The no-nightly-sleep setup
+means **no consolidation of facts, lines and episode summaries; nightly
+topic-boundary pass still runs**. Only the three reference setups may begin
+before one agreed segmented build is ready. See the [plan](../../docs/memory-bench.md#topic-segmentation-revision-before-scoring-31-october-2026).
+
+Recorded topic requests use the adapter's pinned boundary-only system prompt.
+The provider returns one range covering exactly the offered record order,
+including singleton batches and nonconsecutive numeric IDs. It adds no topic
+judgment or source text. Changed or malformed topic requests fail closed.
+Model-shape rows identify these calls separately from empty consolidation,
+so their input size and output allowance can be priced without treating
+synthetic token receipts as live usage. These checks never produce scores.

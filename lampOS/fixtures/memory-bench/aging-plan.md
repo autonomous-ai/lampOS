@@ -36,7 +36,8 @@ rehearsals for day 120. The shared memory-text cap is 4,096 bytes. The primary
 comparison uses ordinary recall; any explicit source-history access is
 reported separately because original records and gists survive fading.
 
-Run the full Tiers engine first, then no fading, three fresh runs each. Report
+Run the full Tiers engine first, then no fading, three fresh runs each.
+Both use the same agreed build with nightly topic segmentation enabled. Report
 all six attempts, including failures. Compare each setup's mean overall and
 per-category score to the full engine's max-minus-min spread for that metric,
 using the same retention rule as the month. A safety/privacy necessity can
@@ -46,7 +47,8 @@ after seeing scores.
 Coverage is a prerequisite to interpreting the comparison. Before scoring,
 inspect metadata establishing nonempty accepted detail and gist on the target
 low-importance episodes (importance below 0.5), high-importance controls at or
-above 0.5, and maintenance strictly after the 90-day boundary. Report whether
+above 0.5, no recall within the preceding 90 days, and maintenance strictly
+after the 90-day boundary. Report whether
 old eligible detail competes with recent evidence under the fixed cap. A long
 script or a day-120 timestamp alone does not prove those conditions. Missing
 or unpopulated prerequisites mean **not exercised**, not a reason to drop
@@ -68,5 +70,14 @@ cargo run -p lamp-memory-bench -- validate /tmp/new-memory-aging
 Generation refuses an existing destination. The generated registration pins
 the base registration, scenario, event stream, questions and answer key. A
 real speech-to-text cache and live judge remain required for scored speech
-results. The six aging runs are additional to the 84-run month projection;
+results. The six aging runs are additional to the 90-run month projection;
 the earlier $600 suggested Flash cap does not include them.
+
+The [timestamp-only audit](aging/structure-summary-e8d6dea08.json) is pinned to
+the initial aging checkpoint. It finds 120 active days, 29 nightly boundaries
+more than 90 days after the first event, and 26 later question turns. These
+counts remain applicable because the topic-registration revision changes no
+aging event or question bytes. The audit inspected no answer or question
+text. It establishes age opportunity only: empty recorded consolidation
+cannot establish fading coverage, and a live run still needs the content,
+importance and recent-recall prerequisites above.
