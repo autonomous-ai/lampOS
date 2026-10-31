@@ -2162,7 +2162,7 @@ When the coordinator switches (below):
 - `LAMP_MEMORY_DAYS=on` reaches this worker as it reaches the Gemini one
   (`process.rs`).
 - **The known person's name** (#2539, `LAMP_SECOND_FACE_NAME=on`, off by
-  default): a turn whose person is the face the eyes know now is told
+  default, on in the product beside `LAMP_PERSON_SCOPE_SEEN`): a turn whose person is the face the eyes know now is told
   "(The person at the lamp now is X: you know their face.)", as the Live
   route tells it (`known_faces::note`), after the memory note
   (`worker::known_name_told`).
@@ -2172,7 +2172,11 @@ When the coordinator switches (below):
     the forgotten name (`memory/tests/it/voice_name.rs`, #1722, 21 Oct
     15:28).
   - **Never told:** for the room's turn, another person's turn, or a face
-    gone, since the known file is fresh only 3 s.
+    gone, since the known file is fresh only 3 s. Nor for a line carried in
+    a person's conversation (`LAMP_CONVERSATION_CARRIES`): its scope is
+    theirs, but no face was seen speaking it. A line narrowed to the room
+    whose person's face was only alone in view is not named this way; the
+    owner alone is named there through the typed name (#4090, #4132).
   - **A line another face spoke** is narrowed to the room, and told none, only
     with `LAMP_SECOND_SCOPED_CONTEXT` and `LAMP_SECOND_SPEAKING_FACE` on.
     Without them the turn is the session's person, read from the same known
