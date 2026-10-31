@@ -44,8 +44,10 @@ pub fn switched_on(value: Option<&str>) -> bool {
 /// How the lamp's parts are stopped: as the reset's plan stops them, each
 /// part named and each read back stopped ([`crate::reset::stop_and_wait`]).
 /// Stopped on its own before the rest (#3697): the voice reads the privacy
-/// switch from lamp-controls, which `lampos.target` stops first (controls
-/// start after the voice). A voice that loses the switch while it stops
+/// switch from lamp-controls, which `lampos.target` stopped first while
+/// controls started after the voice; the product's voice is now after
+/// Controls, and this stays for a lamp whose units are older. A voice that
+/// loses the switch while it stops
 /// counts it a fault, and its restart guard keeps the lamp muted at the
 /// next power-on: lamp-52e6, 27 Oct, after each shutdown.
 /// The path that starts `lampos.target` once the lamp is set up stops with
