@@ -128,6 +128,10 @@ pub struct Watch {
     /// light a computer or a skill asked for over it; none until it says.
     shows: Option<Value>,
     mood: Value,
+    /// The body's last `body/limits` and `body/joint_states`, for `get`
+    /// `body`.
+    body_limits: Value,
+    body_joints: Value,
     sounds: [bool; 4],
     /// The newest hand heard, and when.
     hand: Option<(Hand, u64)>,
@@ -175,6 +179,14 @@ impl Watch {
     pub fn take(&mut self, topic: &str, payload: &Value, now_us: u64) -> Vec<Out> {
         match topic {
             "humans/faces/tracked" => self.faces(payload, now_us),
+            "body/limits" => {
+                self.body_limits = payload.clone();
+                Vec::new()
+            }
+            "body/joint_states" => {
+                self.body_joints = payload.clone();
+                Vec::new()
+            }
             "humans/hands/tracked" => match Hand::of(payload) {
                 Some(hand) => {
                     self.hand = Some((hand, now_us));
@@ -337,6 +349,7 @@ impl Watch {
                 }
             },
             StateKind::Mood => self.mood.clone(),
+            StateKind::Body => crate::body_info::state(&self.body_limits, &self.body_joints),
             StateKind::Lamp => {
                 json!({"talking": self.talking, "paused": self.paused, "private": self.private, "asleep": self.asleep})
             }

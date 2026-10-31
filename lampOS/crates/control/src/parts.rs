@@ -31,8 +31,10 @@
 //!   end comes later as a `done` event, with the angles the head reached.
 //!
 //! `look` at `face` and at `name` are not in this release, and refused as
-//! that. Not routed yet, each refused with what it waits for: `joints` (a
-//! goal stream on the lease socket), `play` and `sound` (a client's package,
+//! that. `joints`' `yaw` and `pitch` go as the holder's look, the same
+//! degrees from home; its `roll`, `shoulder` and `elbow` wait for the body's
+//! goal stream. Not routed yet, each refused with what it waits for: `play`
+//! and `sound` (a client's package,
 //! with the Store's packaging). State and events from the
 //! bus come in their own piece.
 
@@ -323,6 +325,60 @@ impl Lamp {
         Ok(json!({"to": "body"}))
     }
 
+    /// `joints`: the head's `yaw` and `pitch`, in degrees from home, go as
+    /// the holder's look on the body's lease socket, said `"from":"home"`:
+    /// the body takes its pose's offset off, so a standing lamp's stand pose
+    /// doesn't move the frame (its `done` says where the head got to, from
+    /// home too). A joint
+    /// not named stays where it is now, as `get` `body` says it. `roll`,
+    /// `shoulder` and `elbow` wait for the body's own goal stream.
+    fn joints(
+        &self,
+        client: &str,
+        re: u64,
+        targets: &crate::protocol::Joints,
+    ) -> Result<Value, Error> {
+        if targets.roll.is_some() || targets.shoulder.is_some() || targets.elbow.is_some() {
+            return Err(waits_for(
+                "the body's goal stream for roll, shoulder and elbow; yaw and pitch go now",
+            ));
+        }
+        let now = |joint: &str| {
+            self.watch
+                .as_ref()
+                .and_then(|watch| watch.lock().ok().map(|watch| watch.state(StateKind::Body)))
+                .and_then(|body| body["joints"][joint]["deg"].as_f64())
+                .map(|deg| deg as f32)
+        };
+        let (Some(yaw), Some(pitch)) = (
+            targets.yaw.or_else(|| now("yaw")),
+            targets.pitch.or_else(|| now("pitch")),
+        ) else {
+            return Err(Error::new(
+                ErrorCode::Refused,
+                "name both yaw and pitch until the body has said where it is (get body)",
+            ));
+        };
+        let Some(looks) = &self.looks else {
+            return Err(Error::new(
+                ErrorCode::Refused,
+                "the body's lease socket is not on here",
+            ));
+        };
+        looks
+            .send(crate::body_lease::Look {
+                client: client.to_owned(),
+                re,
+                line: json!({"look": {"yaw": yaw, "pitch": pitch, "from": "home"}}).to_string(),
+            })
+            .map_err(|_| not_here("the body's lease"))?;
+        // As any look taken: a hand-follow ends.
+        if let Some(follow) = &self.follow {
+            *follow.lock().expect("follower") = None;
+        }
+        Ok(json!({"to": "body"}))
+    }
+
     fn ask_ring(
         &mut self,
         client: &str,
@@ -485,7 +541,7 @@ impl Parts for Lamp {
             } => self.light(client, colour, *level, *pattern, *for_ms),
             Op::Say { text } => self.say(client, re, text),
             Op::Look { at } => self.look(client, re, at),
-            Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
+            Op::Joints { targets, .. } => self.joints(client, re, targets),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
             // Only the hum today (protocol.rs refuses any other name).
             Op::Sound { .. } => self.sound(client, re),
@@ -985,6 +1041,78 @@ mod tests {
             )
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `joints`' yaw and pitch go as the holder's look (the same degrees
+    /// from home); a joint not named stays where `get` `body` says it is;
+    /// roll and the arm wait for the body's goal stream.
+    #[test]
+    fn joints_yaw_and_pitch_go_as_the_holders_look() {
+        let (looks, mut looked) = tokio::sync::mpsc::unbounded_channel();
+        let watch = Arc::new(std::sync::Mutex::new(crate::watch::Watch::new()));
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet())
+            .watching(watch.clone())
+            .looking(looks);
+        let joints = |frame: &str| op(frame);
+        lamp.act(
+            "c_1",
+            12,
+            &joints(r#"{"id":12,"op":"joints","lease":"l_1","targets":{"yaw":-10,"pitch":5},"within_ms":300}"#),
+            0,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&looked.try_recv().unwrap().line).unwrap(),
+            json!({"look": {"yaw": -10.0, "pitch": 5.0, "from": "home"}})
+        );
+        // Only yaw, before the body has said where it is: refused.
+        let error = lamp
+            .act(
+                "c_1",
+                13,
+                &joints(
+                    r#"{"id":13,"op":"joints","lease":"l_1","targets":{"yaw":4},"within_ms":300}"#,
+                ),
+                0,
+            )
+            .unwrap_err();
+        assert!(error.why.contains("name both"), "{}", error.why);
+        // Once it has: the pitch stays where it is.
+        {
+            let mut watch = watch.lock().unwrap();
+            let limits = json!({"joints": [{"name": "head_pitch", "min": 1955, "max": 2015, "home": 2000}, {"name": "base_yaw", "min": 1975, "max": 2055, "home": 2015}], "speed": 50.0, "acceleration": 400.0, "heat_stop": 62, "stands": false});
+            watch.take("body/limits", &limits, 0);
+            let tau = std::f64::consts::TAU;
+            let radians = |counts: f64| (counts - 2_048.0) * tau / 4_096.0;
+            let joints = json!({"name": ["base_yaw", "head_pitch"], "position": [radians(2_015.0), radians(1_966.0)]});
+            watch.take("body/joint_states", &joints, 0);
+        }
+        lamp.act(
+            "c_1",
+            14,
+            &joints(r#"{"id":14,"op":"joints","lease":"l_1","targets":{"yaw":4},"within_ms":300}"#),
+            0,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&looked.try_recv().unwrap().line).unwrap(),
+            json!({"look": {"yaw": 4.0, "pitch": 3.0, "from": "home"}})
+        );
+        let error = lamp
+            .act(
+                "c_1",
+                15,
+                &joints(
+                    r#"{"id":15,"op":"joints","lease":"l_1","targets":{"roll":3},"within_ms":300}"#,
+                ),
+                0,
+            )
+            .unwrap_err();
+        assert!(
+            error.why.contains("roll, shoulder and elbow"),
+            "{}",
+            error.why
+        );
     }
 
     #[test]

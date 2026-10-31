@@ -603,9 +603,16 @@ class Lamp:
         return await self.request("unsubscribe", events=events)
 
     async def get(self, *states: str) -> dict:
-        """The states asked for (`presence`, `light`, `mood`, `lamp`), by
-        name: the reply's `state`."""
+        """The states asked for (`presence`, `light`, `mood`, `lamp`, `body`),
+        by name: the reply's `state`."""
         return (await self.request("get", state=list(states))).get("state", {})
+
+    async def body_info(self) -> dict:
+        """What the body may do, joint by joint, and where each joint is now:
+        `get("body")`'s `body` (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`,
+        each with `deg` from its home, `min_deg`, `max_deg` and its counts;
+        the speed, load and heat limits)."""
+        return (await self.get("body")).get("body", {})
 
     # Leases.
 

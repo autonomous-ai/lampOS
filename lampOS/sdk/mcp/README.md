@@ -25,7 +25,7 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 
 | tool | parameter | type | allowed | default | grant | lease |
 |---|---|---|---|---|---|---|
-| `lamp_state` | `which` | list of strings | some of `presence`, `light`, `mood`, `lamp`; a state the grants don't allow is refused | every state the grants allow | none (`presence`: look) | no |
+| `lamp_state` | `which` | list of strings | some of `presence`, `light`, `mood`, `lamp`, `body`; a state the grants don't allow is refused | every state the grants allow | none (`presence`: look; `body`: body) | no |
 | `lamp_wait_for` | `events` | list of strings, required | some of `person.arrived`, `person.left`, `person.stood_up`, `person.facing`, `phrase.heard`, `name.heard`, `sound.heard`, `hand`, `touch`, `button`, `time`, `lamp.changed`; one the grants don't allow is refused before anything is sent | — | the event's: `person.*` and `hand` look, `phrase.heard` and `name.heard` hear, `sound.heard` sound | no |
 | | `phrases` | list of strings | the phrases to listen for; required with `phrase.heard` | none | | |
 | | `timeout_s` | number | 0 to 120; more waits 120 | 60 | | |
@@ -93,6 +93,7 @@ All JSON, read when asked; none takes a parameter.
 | `lamp://state/light` | its light | none |
 | `lamp://state/mood` | its mood | none |
 | `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
+| `lamp://state/body` | what its body may do, joint by joint (degrees from home, bounds, poses, speed, load and heat limits), and where each joint is | body (listed only with it) |
 | `lamp://lease` | the leases this server holds now | none |
 | `lamp://events/recent` | the last 50 events `lamp_wait_for` heard, newest last; never a transcript: `phrase.heard` says only which registered phrase it was | none |
 | `lamp://events` | the events stream: every event the grants let this computer hear but `phrase.heard`, the last 200, newest last, each with its `seq`, and `latest`. Subscribable: a subscribed client gets `notifications/resources/updated` for each new event, and for `lamp://state/presence` or `lamp://state/lamp` when one changes it | none (each event needs its own grant) |

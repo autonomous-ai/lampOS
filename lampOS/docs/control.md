@@ -94,7 +94,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `look` | `at`: `face`, `hand`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive). `hand` follows it until `stop`, another look or the lease ends | `ahead` and `{yaw, pitch}`: the body's lease socket `{look}`, eased to and held while the lease is, inside the gaze's reach and the pose's bounds (below); `hand` with the lease socket's hold; `face` and `name` refused, "not in this release: look at a face or a name" | `body` (and `look` for `face` and `hand`) | body |
 | `move` | `step_ms` 40–1,000, `frames` (2–500) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
-| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
+| `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees from home; one at least), `within_ms` ≤ 5,000 | **today:** `yaw` and `pitch` go as the holder's look on the body's lease socket, said `"from":"home"`: the body takes its pose's offset off, so on a standing lamp too they're the degrees `get` `body` says, cut to the same reach, with the look's `done` in the same frame (a joint not named stays where `get` `body` says it is; before the body has said its limits, name both). `roll`, `shoulder` and `elbow` are refused until the body's own goal stream, every step through its caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
 | `say` | `text`, at most 300 characters | `say.sock`, with its quiet after a turn, privacy and busy gates | `speak` | no |
 | `sound` | `name`: `hum` only in this release, the voice's built-in short hum (no file, no model); the recorded notices are never a computer's | `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates; its `done` follows | `speak` | no |
@@ -344,7 +344,41 @@ SDK can keep under them. With the rates off, the default, it says `"rates": "off
 
 `phrase.heard` needs `phrases`, the ones to listen for, and `phrases` go
 only with it. A `get` reply carries each state asked for: `presence`,
-`light`, `mood`, and `lamp_state` for `lamp`.
+`light`, `mood`, `lamp_state` for `lamp`, and `body`.
+
+#### The body's limits: `get` `body`
+
+`body` says what the lamp's body may do, joint by joint, and where each joint
+is now (`crates/control/src/body_info.rs`). It comes from the body's own
+`body/limits`, said once it has found where it is and every 10 s, and its
+`body/joint_states`. It needs the `body` grant, as `body.state` does. Until the body has said its limits, it is `{"known": false, "why": ...}`.
+
+- `joints`: `yaw`, `pitch`, `roll`, `shoulder` and `elbow`, the names
+  `joints` takes. Each has `counts` (where it is, of 4,096 a turn), `deg`
+  (degrees from its home), `min_deg` and `max_deg`, and `min_counts`,
+  `max_counts`, `home_counts`, `folded_counts` and `stand_counts`.
+- **Home** is where the head and base were found when the body started, and
+  the arm's folded pose. The base turns right and the arm rises with more
+  counts, so `yaw`, `shoulder` and `elbow` are positive that way. The head
+  looks up with fewer counts, and `pitch` is positive up. `roll` is positive
+  with more counts.
+- **The bounds** are the body's: the head's reach from home (`--reach`, and
+  the gaze's yaw if wider), inside the pitch window and never under its floor,
+  and the arm's window from folded to stood up. On a lamp that may not stand
+  (`stands: false`), the arm has no poses and its whole turn.
+- `speed_deg_s` and `acceleration_deg_s2` are the head's and base's caps.
+  `load_limit` is the force cap as a share, `null` where each servo keeps its
+  own. `heat_stop_c` is where a joint stops.
+- **Nothing here can be raised from outside the body.**
+
+**One convention for every joint's degrees.** `get` `body`, `body.state` and
+`joints`' targets all count degrees the same way, from one function
+(`body_info::from_home`): from home (the found home for the head and base,
+the folded pose for the arm), to a tenth of a degree. `yaw`, `shoulder`,
+`elbow` and `roll` are positive with more counts, and `pitch` with fewer, so
+up is positive. A `joints` target of `{"yaw": 10}` is 10 degrees right of
+where the base was found, and `{"pitch": 5}` is 5 degrees up from where the
+head was found. Raw counts stay counts.
 
 ### Leases
 

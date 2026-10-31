@@ -67,7 +67,8 @@
         "presence",
         "light",
         "mood",
-        "lamp"
+        "lamp",
+        "body"
       ]
     },
     "colour": {

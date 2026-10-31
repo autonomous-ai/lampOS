@@ -304,6 +304,8 @@ class FakeLamp:
             "light": None,
             "mood": None,
             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
+            # A lamp that may stand, as lamp-control's `get` `body` answers it.
+            "body": {"known": True, "joints": {"yaw": {"counts": 2015.0, "deg": 0.0, "min_deg": -3.5, "max_deg": 3.5, "min_counts": 1975.0, "max_counts": 2055.0, "home_counts": 2015.0, "folded_counts": None, "stand_counts": None}, "shoulder": {"counts": 2050.0, "deg": 0.0, "min_deg": -7.0, "max_deg": 59.8, "min_counts": 1970.0, "max_counts": 2730.0, "home_counts": 2050.0, "folded_counts": 2050.0, "stand_counts": 2650.0}, "elbow": {"counts": 2047.0, "deg": 0.0, "min_deg": -7.0, "max_deg": 55.6, "min_counts": 1967.0, "max_counts": 2680.0, "home_counts": 2047.0, "folded_counts": 2047.0, "stand_counts": 2600.0}, "roll": {"counts": 2044.0, "deg": 0.0, "min_deg": -2.6, "max_deg": 2.6, "min_counts": 2014.0, "max_counts": 2074.0, "home_counts": 2044.0, "folded_counts": None, "stand_counts": None}, "pitch": {"counts": 2000.0, "deg": 0.0, "min_deg": -1.3, "max_deg": 4.0, "min_counts": 1955.0, "max_counts": 2015.0, "home_counts": 2000.0, "folded_counts": None, "stand_counts": None}}, "stands": True, "speed_deg_s": 4.4, "acceleration_deg_s2": 35.2, "load_limit": 0.6, "heat_stop_c": 62, "counts_per_turn": 4096.0},
         }
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
         # Each connection whose head follows the hand (`look` at `hand`) and
@@ -536,7 +538,8 @@ class FakeLamp:
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
-            return ["look"] if "presence" in request.get("state", []) else []
+            asked = request.get("state", [])
+            return (["look"] if "presence" in asked else []) + (["body"] if "body" in asked else [])
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") in ("face", "hand") else ["body"]

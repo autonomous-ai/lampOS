@@ -167,6 +167,9 @@ pub enum StateKind {
     Mood,
     /// Talking, paused, private, asleep, quiet hours, the lease holder.
     Lamp,
+    /// What the body may do, joint by joint, and where each joint is now
+    /// (`crate::body_info`).
+    Body,
 }
 
 impl StateKind {
@@ -174,6 +177,9 @@ impl StateKind {
     pub fn needs(self) -> Option<Grant> {
         match self {
             Self::Presence => Some(Grant::Look),
+            // The body's bounds and where it is: as `body.state`, with the
+            // body grant.
+            Self::Body => Some(Grant::Body),
             Self::Light | Self::Mood | Self::Lamp => None,
         }
     }

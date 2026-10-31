@@ -1598,6 +1598,7 @@ fn a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go() {
                 Asked {
                     held: now < held_until,
                     aim: (now >= Duration::from_secs(1)).then_some([-30.0, 0.0]),
+                    aim_from_home: false,
                     ..Asked::default()
                 }
             },
@@ -1647,6 +1648,7 @@ fn a_held_look_is_said_as_applied_after_the_joints_own_bounds() {
             move || Asked {
                 held,
                 aim: (time.get() >= Duration::from_secs(1)).then_some(aim),
+                aim_from_home: false,
                 ..Asked::default()
             },
             |glimpse| aimed.push((glimpse.look_aimed, glimpse.goals)),
@@ -1695,6 +1697,7 @@ fn a_held_look_arrives_and_stops_being_written() {
             move || Asked {
                 held: true,
                 aim: (time.get() >= Duration::from_secs(1)).then_some([-30.0, 0.0]),
+                aim_from_home: false,
                 ..Asked::default()
             },
             |_| {},
@@ -2639,6 +2642,7 @@ fn gesture_run(
                 held_by_test: false,
                 held: false,
                 aim: None,
+                aim_from_home: false,
                 asleep: false,
                 woken: false,
             }
@@ -2714,6 +2718,7 @@ fn expression_run_with(
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             asleep: false,
             woken: false,
         },
@@ -2879,6 +2884,7 @@ fn speaking_run_with(
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             asleep: false,
             woken: false,
         },
@@ -3587,6 +3593,7 @@ fn rest_glances_watched(
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             asleep: false,
             woken: false,
         },
@@ -4006,6 +4013,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             asleep: false,
             woken: false,
         },
@@ -4072,6 +4080,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             asleep: false,
             woken: false,
         },
@@ -4156,6 +4165,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                aim_from_home: false,
                 asleep: false,
                 woken: false,
             }
@@ -4579,6 +4589,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     held_by_test: false,
                     held: false,
                     aim: None,
+                    aim_from_home: false,
                     asleep: false,
                     woken: false,
                 }
@@ -4658,6 +4669,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                aim_from_home: false,
                 asleep: false,
                 woken: false,
             }
@@ -4744,6 +4756,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 held_by_test: false,
                 held: false,
                 aim: None,
+                aim_from_home: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -7580,6 +7593,7 @@ fn called_run(
                 held_by_test: false,
                 held: false,
                 aim: None,
+                aim_from_home: false,
                 asleep: false,
                 woken: false,
             }
@@ -12237,6 +12251,7 @@ fn held_from_test_input_run(
                 held_by_test: held,
                 held: false,
                 aim: None,
+                aim_from_home: false,
                 ..Asked::default()
             };
             (asked, Priority::Skill)
@@ -13181,6 +13196,7 @@ fn unplug_never_attests_an_arm_stuck_away_from_its_fold() {
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -13212,6 +13228,7 @@ fn unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off() {
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -13251,6 +13268,7 @@ fn unplug_brings_a_base_looking_aside_home_before_it_attests() {
                     held_by_test: false,
                     held: false,
                     aim: None,
+                    aim_from_home: false,
                     ..Asked::default()
                 }
             }
@@ -13312,6 +13330,7 @@ fn unplug_ready_stays_ready_through_a_second_turn() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                aim_from_home: false,
                 seen: late.then_some(Seen {
                     face: Some(crate::gaze::Sight {
                         x: 0.8,
@@ -13367,6 +13386,7 @@ fn unplug_ready_survives_a_bad_read() {
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             ..Asked::default()
         },
         |glimpse| {
@@ -13506,6 +13526,7 @@ fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
             held_by_test: false,
             held: false,
             aim: None,
+            aim_from_home: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -13563,6 +13584,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                     held_by_test: false,
                     held: false,
                     aim: None,
+                    aim_from_home: false,
                     paused: paused && at >= Duration::from_secs(16),
                     stand_share: None,
                     ..Asked::default()
@@ -15137,4 +15159,19 @@ fn a_stand_asked_never_goes_above_the_lamps_own_share() {
     let capped = at(9);
     assert!(capped[0] > 2_100 && capped[0] < 2_300, "{capped:?}");
     assert_eq!(at(23), capped, "asked 60 %, held at its own 30 %");
+}
+
+/// A computer's `joints` is counted from the found home; the body's look
+/// from the pose's own direction. Folded the two are the same; standing,
+/// the stand pose's offset is taken off (Ten's finding on #4580).
+#[test]
+fn an_aim_from_home_takes_the_poses_offset_off() {
+    let home = [2_000, 2_044, 2_015];
+    // Folded: the pose is home, nothing changes.
+    let folded = [2_000.0, 2_044.0, 2_015.0];
+    assert_eq!(aim_from_home([30.0, -40.0], home, folded), [30.0, -40.0]);
+    // Standing: the head's pitch pose is 228 counts up (1772), the base 10
+    // right. Ten degrees up from home (-114 counts) is 114 down from there.
+    let standing = [1_772.0, 2_044.0, 2_025.0];
+    assert_eq!(aim_from_home([0.0, -114.0], home, standing), [-10.0, 114.0]);
 }

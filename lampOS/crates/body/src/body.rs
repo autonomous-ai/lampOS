@@ -543,6 +543,21 @@ pub struct Asked {
     /// direction, as the gaze's own look is, already inside the reach the
     /// holder was given. Taken only while `held`, in place of the gaze's.
     pub aim: Option<[f32; 2]>,
+    /// `aim` is counted from where the head and base were found at start,
+    /// not from the pose (`{"look":{…,"from":"home"}}`, a computer's
+    /// `joints`): the pose's offset is taken off ([`aim_from_home`]).
+    pub aim_from_home: bool,
+}
+
+/// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
+/// as the body's look is from the pose's own direction now (`home_now`):
+/// yaw and pitch counts, the pose's offset taken off. On a folded lamp the
+/// two are the same; standing, the head's pose is the stand pose's.
+pub fn aim_from_home(aim: [f32; 2], home: [u16; 3], home_now: [f32; 3]) -> [f32; 2] {
+    [
+        aim[0] - (home_now[2] - f32::from(home[2])),
+        aim[1] - (home_now[0] - f32::from(home[0])),
+    ]
 }
 
 impl Asked {
@@ -565,6 +580,7 @@ impl Asked {
         held_by_test: false,
         held: false,
         aim: None,
+        aim_from_home: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -587,6 +603,7 @@ impl Asked {
         held_by_test: false,
         held: false,
         aim: None,
+        aim_from_home: false,
     };
 }
 
@@ -1124,6 +1141,10 @@ pub struct Glimpse {
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
     pub waiting: Option<&'static str>,
+    /// Where the head and base were found at start, pitch, roll, yaw: the
+    /// frame a computer's degrees are counted from (`body/limits`). `None`
+    /// before it is found.
+    pub home: Option<[u16; 3]>,
 }
 
 /// The gestures asked from outside that were taken or dropped on one step,
@@ -1634,7 +1655,9 @@ const FIRST_HEAT_REREADS: usize = 3;
 /// The window each arm goal must be inside, shoulder then elbow, for a body
 /// given a pose to stand in: its way between folded and stood up, and
 /// `ARM_WINDOW_MARGIN` either side.
-fn arm_windows(standing: Option<Standing>) -> [(u16, u16); 2] {
+/// The shoulder's and the elbow's windows: from folded to stood up, and a
+/// margin each way; the whole turn on a lamp that may not stand.
+pub fn arm_windows(standing: Option<Standing>) -> [(u16, u16); 2] {
     std::array::from_fn(|index| match standing {
         Some(up) => {
             let (folded, pose) = (up.folded[index], up.pose[3 + index]);
@@ -3707,6 +3730,7 @@ pub(crate) fn run_looking(
         held_by_test: false,
         held: false,
         aim: None,
+        aim_from_home: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5915,7 +5939,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // Held by lamp-control's lease, its holder's look in place of the
         // gaze's, inside the same bounds every pose keeps (#3504's `look`).
-        let aim = asked_now.aim.filter(|_| asked_now.held);
+        let aim = asked_now.aim.filter(|_| asked_now.held).map(|aim| {
+            if asked_now.aim_from_home {
+                aim_from_home(aim, home, home_now)
+            } else {
+                aim
+            }
+        });
         match aim {
             Some(aim) => look = aim,
             // Let go, with no gaze of its own to say otherwise: back to the
@@ -6501,7 +6531,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             arm_loads: ARM.map(|joint| samples[joint.index()].load),
             arm_temperatures: ARM.map(|joint| samples[joint.index()].temperature),
             look,
-            look_aimed: aimed,
+            // Said in the frame it was asked in: from home, the pose's
+            // offset put back.
+            look_aimed: aimed.map(|aimed| {
+                if asked_now.aim_from_home {
+                    [
+                        aimed[0] + (home_now[2] - f32::from(home[2])),
+                        aimed[1] + (home_now[0] - f32::from(home[0])),
+                    ]
+                } else {
+                    aimed
+                }
+            }),
             face,
             gesture: playing.map(|(clip, _)| clip.name),
             kept_where_put: report.kept_where_put,
@@ -6532,6 +6573,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 _ => 0,
             },
             waiting: None,
+            home: Some(home),
         };
         if !unplug_latched {
             watch(&glimpse);

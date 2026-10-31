@@ -254,7 +254,9 @@ export class FakeLamp {
     this.pings = 0;
     this.leases = new Map();
     this.subscribed = new Map();
-    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false } };
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false },
+      // A lamp that may stand, as lamp-control's `get` `body` answers it.
+      body: {"known": true, "joints": {"yaw": {"counts": 2015.0, "deg": 0.0, "min_deg": -3.5, "max_deg": 3.5, "min_counts": 1975.0, "max_counts": 2055.0, "home_counts": 2015.0, "folded_counts": null, "stand_counts": null}, "shoulder": {"counts": 2050.0, "deg": 0.0, "min_deg": -7.0, "max_deg": 59.8, "min_counts": 1970.0, "max_counts": 2730.0, "home_counts": 2050.0, "folded_counts": 2050.0, "stand_counts": 2650.0}, "elbow": {"counts": 2047.0, "deg": 0.0, "min_deg": -7.0, "max_deg": 55.6, "min_counts": 1967.0, "max_counts": 2680.0, "home_counts": 2047.0, "folded_counts": 2047.0, "stand_counts": 2600.0}, "roll": {"counts": 2044.0, "deg": 0.0, "min_deg": -2.6, "max_deg": 2.6, "min_counts": 2014.0, "max_counts": 2074.0, "home_counts": 2044.0, "folded_counts": null, "stand_counts": null}, "pitch": {"counts": 2000.0, "deg": 0.0, "min_deg": -1.3, "max_deg": 4.0, "min_counts": 1955.0, "max_counts": 2015.0, "home_counts": 2000.0, "folded_counts": null, "stand_counts": null}}, "stands": true, "speed_deg_s": 4.4, "acceleration_deg_s2": 35.2, "load_limit": 0.6, "heat_stop_c": 62, "counts_per_turn": 4096.0} };
     this.refusals = new Map();
     this.nextLease = 1;
     // The newest light a computer asked for, and until when (the fake's
@@ -446,7 +448,10 @@ export class FakeLamp {
 
   needs(op, request) {
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
-    if (op === 'get') return (request.state ?? []).includes('presence') ? ['look'] : [];
+    if (op === 'get') {
+      const asked = request.state ?? [];
+      return [...(asked.includes('presence') ? ['look'] : []), ...(asked.includes('body') ? ['body'] : [])];
+    }
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);

@@ -1885,7 +1885,7 @@ answered `refused` with why and closed. Lines of JSON each way
 |-------|----------|
 | `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
 | `{"let_go":true}` | `{"lease":"free"}` |
-| `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive) or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
+| `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive, from the pose's own direction, as the gaze's look), `{"look":{"yaw":Y,"pitch":P,"from":"home"}}` (from where the head and base were found at start, as a computer's `joints` and `get` `body`: the body takes its pose's offset off, `body::aim_from_home`, and says `there` in the same frame), or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
 
 **A holder's look** (`lease::Looking`, the protocol's `look`): degrees become

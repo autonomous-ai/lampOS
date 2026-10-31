@@ -306,6 +306,77 @@ impl JointState {
     }
 }
 
+/// One joint's bounds and poses, as [`BodyLimits`] carries it, in the
+/// servo's own counts (4,096 a turn).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct JointLimits {
+    /// The bus's name, as in [`JointState`]: `base_yaw`, `shoulder`,
+    /// `elbow`, `head_roll`, `head_pitch`.
+    pub name: String,
+    /// The least and the most the body ever asks of it.
+    pub min: u16,
+    pub max: u16,
+    /// Where it was found when the body started, the frame a computer's
+    /// degrees are counted from. None for a joint the body doesn't drive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Option<u16>,
+    /// The arm's folded and stood-up poses, on a lamp that may stand.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folded: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stand: Option<u16>,
+}
+
+/// What the body may do, joint by joint (`body/limits`): its bounds, the
+/// poses it keeps, and the caps on how it moves. Said once the body has
+/// found where it is, and again every 10 s, so a reader that starts later
+/// has it. Nothing here can be raised from outside the body.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BodyLimits {
+    /// In the order of every list of [`JointState`].
+    pub joints: Vec<JointLimits>,
+    /// The fastest the head and base are moved, in counts a second, and
+    /// how fast that may change, in counts a second squared.
+    pub speed: f64,
+    pub acceleration: f64,
+    /// The most force the joints that carry the lamp may push with, of
+    /// 1,000; none where the body leaves each servo its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub force: Option<u16>,
+    /// A joint this warm, in degrees Celsius, stops what it does.
+    pub heat_stop: u8,
+    /// Whether the lamp may stand: the shoulder and the elbow are driven.
+    pub stands: bool,
+}
+
+impl BodyLimits {
+    pub const TYPE: &str = "lamp_msgs/BodyLimits";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "body/limits";
+
+    /// The newest replaces the last; said at least every 10 s.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest).every(Duration::from_secs(10))
+    }
+
+    /// Each joint's bounds in order, and its poses inside them.
+    pub fn check(&self) -> Result<(), Invalid> {
+        for joint in &self.joints {
+            let inside = |count: Option<u16>| count.is_none_or(|count| count <= 4_095);
+            if joint.min > joint.max || joint.max > 4_095 {
+                return invalid(format!("{}: min over max, or past 4095", joint.name));
+            }
+            if !(inside(joint.home) && inside(joint.folded) && inside(joint.stand)) {
+                return invalid(format!("{}: a pose past 4095", joint.name));
+            }
+        }
+        if !(self.speed.is_finite() && self.speed >= 0.0 && self.acceleration.is_finite()) {
+            return invalid("speed and acceleration: finite, speed 0 or more".to_owned());
+        }
+        Ok(())
+    }
+}
+
 /// One face in the camera's view.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Face {
@@ -1535,6 +1606,7 @@ pub fn body_topics() -> Vec<(&'static str, Declaration)> {
         (Hand::TOPIC, Hand::declaration()),
         (BodyGesture::TOPIC, BodyGesture::declaration()),
         (StandAsked::TOPIC, StandAsked::declaration()),
+        (BodyLimits::TOPIC, BodyLimits::declaration()),
     ]
 }
 
