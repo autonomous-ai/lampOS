@@ -1090,7 +1090,7 @@ Tests (host, fake SPI): `crates/ring/src/tests.rs`
 `an_sd_mmc_retune_of_late_writes_is_kept_not_a_fault`,
 `late_writes_lasting_the_late_run_are_an_observed_fault_not_a_claimed_timeout`,
 `an_on_time_write_ends_a_run_of_late_ones`;
-`crates/voice/tests/ring_worker.rs`
+`crates/voice/tests/it/ring_worker.rs`
 `an_sd_mmc_retune_of_late_writes_is_kept_and_the_ring_goes_on`,
 `a_late_run_past_two_seconds_faults_and_a_ring_started_again_writes_black_then_the_light`
 (the fake sink's write time is injected through `FrameSink::simulated_elapsed_us`,

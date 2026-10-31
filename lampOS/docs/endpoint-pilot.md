@@ -507,13 +507,13 @@ motor code.
 | --- | --- | --- | --- |
 | `42a07701` | `crates/turn-end-wire/**`, `crates/turn-end/**` | Worker, IPC, supervisor, features, pinned model loading, process and parity tests, fixture provenance | New crates only |
 | `1d94414d` | `Cargo.toml`, `Cargo.lock`, `crates/voice/Cargo.toml` | Two workspace members; `lamp-voice` → `lamp-turn-end-wire`; 65 added lock entries, none removed or changed | Shared |
-| `ae5fea33` | `crates/voice/src/activity.rs`, `crates/voice/tests/endpoint_confirmation.rs` | Detector seam, baseline-exact pauses, parity `ConfirmPolicy`; no early end | Shared (`activity.rs`) |
+| `ae5fea33` | `crates/voice/src/activity.rs`, `crates/voice/tests/it/endpoint_confirmation.rs` | Detector seam, baseline-exact pauses, parity `ConfirmPolicy`; no early end | Shared (`activity.rs`) |
 | `3de3b636` | `coordinator.rs`, `coordinator/endpoint.rs`, `options.rs`, `coordinator/tests/endpoint_session.rs`, and one `endpoint: None` field in the test `Rig` literals of `camera.rs`, `optional_ring_tests.rs`, `provider_terminal.rs`, `service_mute.rs`, `termination.rs`, `motor/tests.rs`, `tests/pilot_faults.rs` | `--endpoint smart-turn`, worker start in `spawn_rig`, traces, confirmed-reap teardown, full-session stress tests; the baseline `endpoint_policy` record keeps its fields | Shared |
 | `fc55a090` | `crates/turn-end/{Cargo.toml,src/main.rs,src/lib.rs,src/reference.rs,tests/parity.rs}`, `crates/turn-end-wire/tests/process.rs` | `--check-model` self-check, Linux resource bounds, damaged-model and idle tests | New crates only |
 | `afd2c52b` | `crates/voice/src/coordinator/tests/endpoint_session.rs` | Emulated endpoint sessions run one at a time | Agent 2 test file |
 | `eea0ac0c` | `crates/turn-end/src/main.rs` and tests | Worker bounds never raise an inherited soft or hard limit (MAIN-059) | New crates only |
 | `e053b100` | `crates/voice/src/coordinator.rs` | Baseline `local_endpoint` records keep their exact fields | Shared |
-| `98075207` | `crates/voice-eval/src/{main.rs,physical/session.rs}`, `crates/voice-eval/tests/serve_plan.rs`, `fixtures/voice-eval-serve-endpoint-trial.example.json` | `--endpoint` as a typed runtime flag beside `--microphone`, validated by lamp-voice's parser; the trial configuration | Agent 2 crate |
+| `98075207` | `crates/voice-eval/src/{main.rs,physical/session.rs}`, `crates/voice-eval/tests/it/serve_plan.rs`, `fixtures/voice-eval-serve-endpoint-trial.example.json` | `--endpoint` as a typed runtime flag beside `--microphone`, validated by lamp-voice's parser; the trial configuration | Agent 2 crate |
 | `549daeb7` | `crates/voice/src/options.rs`, `coordinator/tests/endpoint_session.rs` (and formatting in `coordinator.rs`, `coordinator/endpoint.rs`) | Smart-turn on duplex, with duplex full-session tests | Shared (`options.rs`) |
 | docs commits | `docs/endpoint-detection.md`, `docs/endpoint-pilot.md`, `coordination/agent-2.md` | This package | Agent 2 files |
 
@@ -1083,7 +1083,7 @@ service before the end),
 `a_bare_calls_note_goes_with_its_end_only_when_both_fit`. Not yet measured on
 the lamp: "Hey Lamp." alone five times, and the busy-room scene again.
 
-Tests (`crates/voice/tests/call_wait.rs`, `options.rs`):
+Tests (`crates/voice/src/coordinator/tests/call_wait.rs`, `crates/voice/src/options.rs`):
 - only the name waits, and its record says so;
 - the rest is the same utterance, and ends at its own pause;
 - the wait's bounds, and a name heard long before;
