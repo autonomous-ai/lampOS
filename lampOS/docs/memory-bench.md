@@ -184,10 +184,10 @@ score. Treat an unavailable outside arm as unmeasured, never as zero accuracy.
 ### Registered candidate removals
 
 Registered on 31 October, before any candidate score: the protocol name is
-`tiers`; its scorecard label is **ours (tiers)**. Run and report all eleven
+`tiers`; its scorecard label is **ours (tiers)**. Run and report all twelve
 candidate arms in this order, three repetitions each:
 
-1. `tiers`: the full engine.
+1. `tiers`: the full engine, including sleep-time topic segmentation.
 2. `tiers_minus_episodes`: remove episodes.
 3. `tiers_minus_life_story`: remove chapters and events.
 4. `tiers_minus_facts`: **facts not recalled; kept only as
@@ -197,11 +197,16 @@ candidate arms in this order, three repetitions each:
 6. `tiers_minus_how_to_be`: remove taught and learned behavior memory.
 7. `tiers_minus_ahead`: remove prospective memory.
 8. `tiers_minus_feelings`: remove feeling tags.
-9. `tiers_minus_nightly_sleep`: remove nightly consolidation.
+9. `tiers_minus_nightly_sleep`: **no consolidation of facts, lines and episode
+   summaries; nightly topic-boundary pass still runs**.
 10. `tiers_minus_importance`: remove importance scoring.
 11. `tiers_minus_fading`: remove detail fading.
+12. `tiers_session_cutting_only`: **session cutting only**; disable topic
+    segmentation while keeping session and departure boundaries.
 
-Each removal changes that component or mechanism alone. All arms retain
+Each removal changes that component or mechanism alone. Sleep-time topic
+segmentation stays enabled in all ten removals, including the setup without
+nightly consolidation. All arms retain
 source provenance and forgetting enforcement: these are safety rules, not
 optional tiers. Report every registered arm, including failures and missing
 results; do not discard an inconvenient arm after seeing its scores.
@@ -214,6 +219,30 @@ range for that same metric as its spread. A component that adds cost without
 a qualifying score gain or safety/privacy need goes. Preserve the per-kind
 results and audit status so this rule cannot hide a lost safety result in an
 overall average.
+
+### Topic segmentation revision before scoring: 31 October 2026
+
+Registration v5 preserves all v4 persona, event, question and answer-key
+bytes. The previous engine cut episodes only on sessions and departures.
+The full engine now adds a nightly model pass that proposes topic episodes
+as record-id ranges within each session. Code checks that ranges are
+contiguous and cover every eligible record exactly once; invalid proposals
+cannot drop records or invent source text. Nothing is added to the live
+reply path, and the fixture supplies no topic labels.
+
+The session-only setup is appended after the existing ten removals. All
+fifteen setups (three references and twelve candidates) run three times per
+persona: 45 runs per persona, 90 across two equally sized personas. Each
+removal uses the same segmented build and differs in exactly one named
+component. In particular, disabling nightly consolidation still runs the
+nightly topic-boundary pass. All model calls remain budgeted and audited.
+
+If the segmented build is not ready when live access arrives, only the three
+reference setups may start. Hold every Tiers setup until the common build is
+ready. The six added session-only runs increase the two-persona planning
+projection to about $536.07, excluding unmeasured new segmentation overhead;
+the proposed $600 cap remains a hard spending decision, not a completion
+guarantee. The original recorded pass and costs retain their original pins.
 
 ### Coverage revision before scoring: 31 October 2026
 
