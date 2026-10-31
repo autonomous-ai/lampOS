@@ -1,0 +1,184 @@
+//! Separate evaluator artifacts from the event-only input sent to an arm.
+use crate::{
+    Result,
+    corpus::{Corpus, Persona},
+    hash, invalid,
+    protocol::{MAX_FRAME_BYTES, read_frame},
+};
+use serde::{Serialize, de::DeserializeOwned};
+use serde_json::{Value, json};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs::{self, File, OpenOptions},
+    io::{BufReader, Write},
+    path::Path,
+};
+
+pub const ARMS: [&str; 11] = [
+    "tiers",
+    "tiers_minus_episodes",
+    "tiers_minus_life_story",
+    "tiers_minus_facts_people_places",
+    "tiers_minus_owner_model",
+    "tiers_minus_how_to_be",
+    "tiers_minus_whats_ahead",
+    "tiers_minus_feelings",
+    "tiers_minus_nightly_sleep",
+    "tiers_minus_importance",
+    "tiers_minus_fading",
+];
+pub fn json_file<T: DeserializeOwned>(path: &Path) -> Result<T> {
+    let meta = fs::symlink_metadata(path)?;
+    if !meta.is_file() || meta.len() > MAX_FRAME_BYTES as u64 {
+        return Err(invalid("JSON input must be a bounded regular file"));
+    }
+    Ok(serde_json::from_reader(File::open(path)?)?)
+}
+pub fn lines<T: DeserializeOwned>(path: &Path) -> Result<Vec<T>> {
+    let mut reader = BufReader::new(File::open(path)?);
+    let mut values = Vec::new();
+    while let Some(value) = read_frame(&mut reader)? {
+        if values.len() >= 100_000 {
+            return Err(invalid("too many input rows"));
+        }
+        values.push(serde_json::from_value(value)?);
+    }
+    Ok(values)
+}
+fn create(path: &Path, bytes: &[u8]) -> Result<()> {
+    let mut file = OpenOptions::new().create_new(true).write(true).open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
+}
+fn write_lines<T: Serialize>(path: &Path, values: &[T]) -> Result<()> {
+    let mut file = OpenOptions::new().create_new(true).write(true).open(path)?;
+    for value in values {
+        crate::protocol::write_frame(&mut file, value)?;
+    }
+    file.sync_all()?;
+    Ok(())
+}
+pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
+    validate(corpus)?;
+    fs::create_dir(path)?;
+    create(
+        &path.join("persona.json"),
+        &serde_json::to_vec_pretty(&corpus.persona)?,
+    )?;
+    write_lines(&path.join("events.jsonl"), &corpus.events)?;
+    write_lines(&path.join("answer-key.jsonl"), &corpus.answer_key)?;
+    write_lines(&path.join("questions.jsonl"), &corpus.questions)?;
+    let hashes = [
+        "persona.json",
+        "events.jsonl",
+        "answer-key.jsonl",
+        "questions.jsonl",
+    ]
+    .into_iter()
+    .map(|name| Ok((name, hash(&fs::read(path.join(name))?))))
+    .collect::<Result<BTreeMap<_, _>>>()?;
+    let registration = json!({"version":1,"status":"draft_pending_human_review","fictional":true,
+        "question_count":200,"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
+        "seed":corpus.persona.seed,"files":hashes,"scorers":"src/score.rs and tests/guards.rs committed before scored runs",
+        "candidate_order":ARMS,"repetitions":3,"candidate_label":"ours (tiers)",
+        "facts_removal":"facts not recalled; kept only as evidence",
+        "retained_safety_rules":["source_provenance","forgetting_enforcement"],
+        "comparison":"mean loss exceeds full-engine max-minus-min spread for overall or any category, or safety/privacy necessity",
+        "recall_ms":200,"snapshot_ms":300,"transcripts":"not_yet_recorded","human_audit":"pending",
+        "judge":"required for rubric scores; recorded tests are not live results"});
+    create(
+        &path.join("registration.json"),
+        &serde_json::to_vec_pretty(&registration)?,
+    )?;
+    Ok(())
+}
+pub fn read_corpus(path: &Path) -> Result<Corpus> {
+    let persona: Persona = json_file(&path.join("persona.json"))?;
+    let events = lines(&path.join("events.jsonl"))?;
+    let answer_key = lines(&path.join("answer-key.jsonl"))?;
+    let questions = lines(&path.join("questions.jsonl"))?;
+    let corpus = Corpus {
+        persona,
+        events,
+        answer_key,
+        questions,
+    };
+    validate(&corpus)?;
+    let registration: Value = json_file(&path.join("registration.json"))?;
+    for name in [
+        "persona.json",
+        "events.jsonl",
+        "answer-key.jsonl",
+        "questions.jsonl",
+    ] {
+        let actual = hash(&fs::read(path.join(name))?);
+        if registration
+            .pointer(&format!("/files/{name}"))
+            .and_then(Value::as_str)
+            != Some(&actual)
+        {
+            return Err(invalid(format!("registered {name} hash differs")));
+        }
+    }
+    Ok(corpus)
+}
+pub fn validate(corpus: &Corpus) -> Result<()> {
+    corpus.persona.validate()?;
+    if corpus.events.len() != 30 * 52 || corpus.questions.len() != 200 {
+        return Err(invalid("corpus dimensions differ from plan"));
+    }
+    let mut records = BTreeMap::new();
+    let mut last = 0;
+    for event in &corpus.events {
+        event.validate()?;
+        if event.at_unix_ms < last || records.insert(event.record_id.as_str(), event).is_some() {
+            return Err(invalid("unordered or duplicate event"));
+        }
+        last = event.at_unix_ms;
+    }
+    let mut keyed = BTreeSet::new();
+    for evidence in &corpus.answer_key {
+        if !records.contains_key(evidence.record_id.as_str()) || !keyed.insert(&evidence.record_id)
+        {
+            return Err(invalid("answer key references missing or duplicate source"));
+        }
+    }
+    let mut questions = BTreeSet::new();
+    for q in &corpus.questions {
+        q.validate()?;
+        let expected: BTreeSet<_> = records
+            .values()
+            .filter(|e| e.at_unix_ms <= q.query.at_unix_ms)
+            .map(|e| e.record_id.as_str())
+            .collect();
+        let eligible: BTreeSet<_> = q.eligible_evidence_ids.iter().map(String::as_str).collect();
+        if eligible != expected || eligible.len() != q.eligible_evidence_ids.len() {
+            return Err(invalid(
+                "eligible evidence differs from the observed history",
+            ));
+        }
+        let boundary = records
+            .get(q.after_record.as_str())
+            .ok_or_else(|| invalid("question has no scheduled boundary"))?;
+        if !questions.insert(&q.id) || q.query.at_unix_ms < boundary.at_unix_ms {
+            return Err(invalid("question is before its boundary or duplicated"));
+        }
+        for source in &q.evidence_ids {
+            if records
+                .get(source.as_str())
+                .is_none_or(|e| e.at_unix_ms > q.query.at_unix_ms)
+            {
+                return Err(invalid("answer key cites future or absent evidence"));
+            }
+        }
+        let mut time = q.query.at_unix_ms;
+        for followup in &q.followups {
+            if followup.probe_id != q.id || followup.at_unix_ms < time {
+                return Err(invalid("invalid multi-turn probe order"));
+            }
+            time = followup.at_unix_ms;
+        }
+    }
+    Ok(())
+}

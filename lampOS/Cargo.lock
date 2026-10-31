@@ -2068,6 +2068,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-memory-bench"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "lamp-mood"
 version = "0.1.0"
 dependencies = [

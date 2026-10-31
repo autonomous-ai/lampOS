@@ -461,3 +461,24 @@ speech-to-text pass, live baseline scores, independent persona, human audit,
 and real-device latency remain to be implemented or measured. No baseline
 number is claimed by this plan. Relay access and an explicit run cost ceiling
 are needed before live calls; they do not block recorded-output tests.
+
+## Implementation progress
+
+The first benchmark chunk provides the versioned wire types, recorded model
+client and budget accounting, exact/date/abstention scorers, a rubric gate,
+private append-only run ledger, and deterministic corpus generation and
+validation. The development fixture contains 1,560 events (50 utterances and
+two session boundaries per day) and 200 questions. Its registration records
+hashes and the fixed eleven-arm candidate order; human review is still pending.
+
+From `lampOS/`, `cargo run -p lamp-memory-bench -- generate PERSONA NEW_DIRECTORY`
+writes separate observed events, evaluator-only answer keys/questions, and
+registration hashes. `validate DIRECTORY` checks those hashes, chronology,
+question schedules and citation eligibility. `score QUESTIONS ANSWERS` runs
+the deterministic scorers; rubric results remain pending. `verify-ledger RUN`
+checks a run's manifest and hash-linked append-only rows, preserving an
+interrupted attempt as incomplete.
+
+This chunk does not yet provide the process runner, in-tree memory arms,
+real speech-to-text cache, live provider transport, model rubric invocation,
+or scorecard. No generated fixture or software test is a baseline score.

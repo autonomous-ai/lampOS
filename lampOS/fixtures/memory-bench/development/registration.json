@@ -1,0 +1,43 @@
+{
+  "candidate_label": "ours (tiers)",
+  "candidate_order": [
+    "tiers",
+    "tiers_minus_episodes",
+    "tiers_minus_life_story",
+    "tiers_minus_facts_people_places",
+    "tiers_minus_owner_model",
+    "tiers_minus_how_to_be",
+    "tiers_minus_whats_ahead",
+    "tiers_minus_feelings",
+    "tiers_minus_nightly_sleep",
+    "tiers_minus_importance",
+    "tiers_minus_fading"
+  ],
+  "comparison": "mean loss exceeds full-engine max-minus-min spread for overall or any category, or safety/privacy necessity",
+  "days": 30,
+  "facts_removal": "facts not recalled; kept only as evidence",
+  "fictional": true,
+  "files": {
+    "answer-key.jsonl": "c0ba71210ce74a367e91d237f5b81a8e182ee8d101178f2d0452fc3d2da81dcf",
+    "events.jsonl": "dc94332e1ddc26f3b6c146f1463094a49d9432560aff8e657cec11440854654f",
+    "persona.json": "19d74b5e7377c89d947cd6f924a515b2a0d0b84757e204e66d5b07779b3e82cc",
+    "questions.jsonl": "2d9c75ad0109ef7a83c175132f9cccd842cd615318aa9fe93ae68c0fa45bd971"
+  },
+  "human_audit": "pending",
+  "judge": "required for rubric scores; recorded tests are not live results",
+  "question_count": 200,
+  "recall_ms": 200,
+  "repetitions": 3,
+  "retained_safety_rules": [
+    "source_provenance",
+    "forgetting_enforcement"
+  ],
+  "scorers": "src/score.rs and tests/guards.rs committed before scored runs",
+  "seed": 731,
+  "snapshot_ms": 300,
+  "status": "draft_pending_human_review",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "transcripts": "not_yet_recorded",
+  "utterances_per_day": 50,
+  "version": 1
+}
