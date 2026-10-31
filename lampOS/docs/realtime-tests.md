@@ -13,9 +13,11 @@ started first, beside the rest (below). In the ARM64 run
 | Push to `lamp-voice` (every merge; its binaries are what [updates](updates.md) downloads) | 1 | `pr` | one per core | run, one at a time, started first |
 | Full run: nightly, or manual with `full` | 4 | `default` | one, as before | run |
 
-The nightly full run starts at 19:00 UTC (02:00 in Vietnam) from
+The nightly full run is set for 19:00 UTC (02:00 in Vietnam) in
 `.github/workflows/lampos-nightly.yml` on `main`: GitHub starts a scheduled
-workflow only from the default branch. It starts this workflow on
+workflow only from the default branch. GitHub starts it late, though: the six
+nightlies of 25 to 30 Oct began between 21:34 and 23:10 UTC (04:34 to 06:10 in
+Vietnam), so look for a night's result after 06:00 there. It starts this workflow on
 `lamp-voice` as a manual run with `full`, so the job is defined in one place.
 By hand: Actions, "lampOS on ARM64", "Run workflow", branch `lamp-voice`,
 tick `full`; or `gh workflow run lampos-arm64.yml --ref lamp-voice -f full=true`.
@@ -23,14 +25,19 @@ tick `full`; or `gh workflow run lampos-arm64.yml --ref lamp-voice -f full=true`
 When a full run fails, a job opens an issue titled "lampOS: the full ARM64
 run failed", or comments on the open one. Nothing the tests assert was
 changed. The runners are unchanged (`ubuntu-22.04-arm`): larger runners cost
-too much.
+too much. A push to `lamp-voice`, or a manual run there, can instead go to the
+internal Mac Studio (`.github/scripts/lampos-route.py`, the switch
+`vars.LAMPOS_STUDIO`). On 31 Oct that switch is `off`, so every run is
+GitHub-hosted.
 
 Each runner compiles every test binary again (about 5 of its 10 minutes), so
 pull requests and merges use one runner, where the realtime group was
 skipped until 2026-10-17; those tests took
 about a minute in parallel (run 38721013037: 4,399 tests, 55 s, 4 cores).
-A merge costs one runner for about 11 minutes; until 2026-10-15 it cost four
-for about 15.
+A merge cost one runner for about 11 minutes on 17 Oct (until 2026-10-15 it
+cost four for about 15). On 31 Oct, with three times the tests, a push's ARM64
+job took 25 to 27 minutes (the last five), and its whole run, signing and
+publishing included, 28 to 30.
 
 ## Why
 
