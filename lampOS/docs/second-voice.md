@@ -226,11 +226,12 @@ each line plays exactly as before.
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 | The second route's answer to a stop said over it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on) | the owner's words, rendered and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
+| The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, sixteen today (`FIXED_LINES`), then the English two
+lines first, eighteen today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -248,6 +249,8 @@ own and stays the release's file or the sigh. Onboarding's fixed lines
 (the skill's words, said as they are when the chat fails, #4263) and the
 language change line (already in its own words) are not in this table.
 Tests: `language::tests::each_fixed_line_has_its_words_in_each_language`,
+`language::tests::the_first_stand_reads_the_language_as_the_voice_does`,
+`first_stand::tests::another_language_takes_the_touch_alone`,
 `tts_cache::tests::the_owners_language_warms_its_own_lines_first_and_english_is_as_today`,
 `say::tests::the_owners_language_is_played_when_kept_and_english_otherwise`,
 `failure_notice::offline_lines_are_said_in_the_owners_language_when_kept_and_english_otherwise`,
