@@ -40,6 +40,7 @@ fn plan(cap: u64) -> Plan {
 fn reservation(number: u64, amount: u64) -> Receipt {
     Receipt {
         provenance: None,
+        audio_usage: None,
         call_number: number,
         request_hash: hash(format!("request-{number}").as_bytes()),
         reserved_microusd: amount,
@@ -47,7 +48,7 @@ fn reservation(number: u64, amount: u64) -> Receipt {
         request_bytes: 100,
         outcome: "uncertain".into(),
         usage: None,
-        cost_basis: "test".into(),
+        cost_basis: "conservative_token_debit".into(),
     }
 }
 #[test]
@@ -308,4 +309,35 @@ fn a_completion_only_run_log_failure_does_not_erase_known_usage() {
             .charged_microusd(),
         3
     );
+}
+
+#[test]
+fn reservation_binds_usage_kind_and_wrong_kind_cannot_refund_after_restart() {
+    for audio in [false, true] {
+        let temp = Temp::new();
+        let mut c = Campaign::create(&temp.0, plan(100), 100).unwrap();
+        let mut r = reservation(1, 70);
+        if audio {
+            r.cost_basis = "conservative_audio_duration_debit".into();
+        }
+        c.audit("typed", "model_reserved", &r).unwrap();
+        drop(c);
+        let journal = std::fs::read_to_string(temp.0.join("costs.jsonl")).unwrap();
+        assert_eq!(journal.contains("\"billing\":\"audio\""), audio);
+        let mut c = Campaign::open(&temp.0, plan(100), 30).unwrap();
+        r.charged_microusd = 1;
+        r.outcome = "accounted".into();
+        if audio {
+            r.usage = Some(lamp_memory_bench::model::Usage {
+                input_tokens: 1,
+                output_tokens: 0,
+            });
+        } else {
+            r.audio_usage = Some(lamp_memory_bench::audio::Usage { audio_micros: 1 });
+        }
+        assert!(c.audit("typed", "model_completed", &r).is_err());
+        assert_eq!(c.charged_microusd(), 70);
+        drop(c);
+        assert!(Campaign::open(&temp.0, plan(100), 1).is_err());
+    }
 }

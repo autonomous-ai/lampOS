@@ -15,7 +15,7 @@ use std::{
     process::{Command, Stdio},
     time::{Duration, Instant},
 };
-const MOST_AUDIO: usize = 32_000 * 60;
+const MOST_AUDIO: usize = 32_000 * 120;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Audio {
@@ -178,7 +178,7 @@ pub fn prepare(events_file: &Path, output: &Path, voice: &str, rate: u32) -> Res
         manifest.sync_data()?;
         count += 1;
     }
-    let request = json!({"status":"prepared; no STT service call","transport":"websocket","path":"/v1/listen or relay /ws/audio/transcriptions","model":"nova-3-general","encoding":"linear16","sample_rate":16000,"channels":1,"language":"en","smart_format":true,"interim_results":true,"endpointing":300,"vad_events":true,"keyterm":["Lamp"],"audio_frames_ms":20,"final_control":{"type":"CloseStream"},"event_file_hash":hash(&fs::read(events_file)?),"audio_manifest_hash":hash(&fs::read(output.join("audio.jsonl"))?),"tts":"macOS say, file only","tts_executable_sha256":hash(&fs::read("/usr/bin/say")?),"voice_revision":null,"host_os":std::env::consts::OS,"unique_audio":made.len(),"records":count,"auth":"private runtime configuration; never written here"});
+    let request = json!({"status":"prepared; no STT service call","transport":"websocket","path":"/v1/listen or relay /ws/audio/transcriptions","model":"nova-3-general","encoding":"linear16","sample_rate":16000,"channels":1,"language":"en","smart_format":true,"interim_results":true,"endpointing":300,"vad_events":true,"keyterm":["Lamp"],"audio_frames_ms":20,"final_control":{"type":"CloseStream"},"event_file_hash":hash(&fs::read(events_file)?),"audio_manifest_hash":hash(&fs::read(output.join("audio.jsonl"))?),"tts":"macOS say, file only","tts_executable_sha256":hash(&fs::read("/usr/bin/say")?),"voice_revision":null,"host_os":std::env::consts::OS,"unique_audio":made.len(),"records":count,"auth":"environment variable only; never written here"});
     create(
         &output.join("request-plan.json"),
         &serde_json::to_vec_pretty(&request)?,

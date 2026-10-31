@@ -32,6 +32,25 @@ impl Plan {
         Ok(())
     }
 }
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum BillingKind {
+    #[default]
+    Tokens,
+    Audio,
+}
+impl BillingKind {
+    fn tokens(&self) -> bool {
+        *self == Self::Tokens
+    }
+    fn from_basis(basis: &str) -> Result<Self> {
+        match basis {
+            "conservative_token_debit" => Ok(Self::Tokens),
+            "conservative_audio_duration_debit" => Ok(Self::Audio),
+            _ => Err(invalid("unknown campaign billing basis")),
+        }
+    }
+}
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum Change {
@@ -40,6 +59,9 @@ enum Change {
         call: u64,
         request_hash: String,
         amount: u64,
+        // Omitted for tokens to preserve hashes of existing token-only journals.
+        #[serde(default, skip_serializing_if = "BillingKind::tokens")]
+        billing: BillingKind,
     },
     Settle {
         run: String,
@@ -62,6 +84,7 @@ struct Reservation {
     request_hash: String,
     amount: u64,
     settled: bool,
+    billing: BillingKind,
 }
 /// Keep this handle alive for the whole run. The OS releases its exclusive
 /// lock on process exit, while the journal retains every uncertain charge.
@@ -213,6 +236,7 @@ impl Campaign {
                 call,
                 request_hash,
                 amount,
+                billing,
             } => {
                 if !valid_id(run)
                     || *call == 0
@@ -231,6 +255,7 @@ impl Campaign {
                         request_hash: request_hash.clone(),
                         amount: *amount,
                         settled: false,
+                        billing: *billing,
                     },
                 );
             }
@@ -274,14 +299,29 @@ impl Campaign {
                     call: receipt.call_number,
                     request_hash: receipt.request_hash.clone(),
                     amount: receipt.reserved_microusd,
+                    billing: BillingKind::from_basis(&receipt.cost_basis)?,
                 }
             }
             "model_completed" => {
-                if receipt.usage.is_none()
-                    && receipt.charged_microusd < receipt.reserved_microusd
-                    && !(receipt.outcome == "expired_before_dispatch"
-                        && receipt.charged_microusd == 0)
-                {
+                let billing = self
+                    .calls
+                    .get(&(run.into(), receipt.call_number))
+                    .ok_or_else(|| invalid("campaign completion has no reservation"))?
+                    .billing;
+                let mismatch = BillingKind::from_basis(&receipt.cost_basis).ok() != Some(billing)
+                    || match billing {
+                        BillingKind::Tokens => receipt.audio_usage.is_some(),
+                        BillingKind::Audio => receipt.usage.is_some(),
+                    };
+                let known = match billing {
+                    BillingKind::Tokens => receipt.usage.is_some(),
+                    BillingKind::Audio => receipt.audio_usage.is_some(),
+                };
+                let keeps_reservation =
+                    mismatch || receipt.charged_microusd >= receipt.reserved_microusd;
+                let expired_undispatched =
+                    receipt.outcome == "expired_before_dispatch" && receipt.charged_microusd == 0;
+                if !(keeps_reservation || known || expired_undispatched) {
                     return Err(invalid("unknown model usage cannot refund a reservation"));
                 }
                 Change::Settle {
@@ -289,11 +329,16 @@ impl Campaign {
                     call: receipt.call_number,
                     request_hash: receipt.request_hash.clone(),
                     reserved: receipt.reserved_microusd,
-                    charged: receipt.charged_microusd,
-                    accounting_failed: matches!(
-                        receipt.outcome.as_str(),
-                        "reservation_exceeded" | "accounting_overflow" | "evidence_failed"
-                    ),
+                    charged: if mismatch {
+                        receipt.charged_microusd.max(receipt.reserved_microusd)
+                    } else {
+                        receipt.charged_microusd
+                    },
+                    accounting_failed: mismatch
+                        || matches!(
+                            receipt.outcome.as_str(),
+                            "reservation_exceeded" | "accounting_overflow" | "evidence_failed"
+                        ),
                 }
             }
             _ => return Err(invalid("unknown campaign accounting stage")),

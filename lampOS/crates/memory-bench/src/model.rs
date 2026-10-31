@@ -1,5 +1,5 @@
 //! One accounting boundary for every model request, including recorded tests.
-use crate::{Result, hash, invalid};
+use crate::{Result, audio, hash, invalid};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, io::BufRead, time::Instant};
@@ -7,6 +7,10 @@ use std::{collections::BTreeMap, io::BufRead, time::Instant};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Call {
+    /// Constructed only from verified local PCM. Arms cannot deserialize or
+    /// invoke this variant, and serialized calls contain no PCM or local path.
+    #[serde(skip_deserializing)]
+    Transcribe { audio: audio::Input },
     Chat {
         purpose: Purpose,
         messages: Vec<Value>,
@@ -37,6 +41,7 @@ impl Call {
             return Err(invalid("model input exceeds one MiB"));
         }
         match self {
+            Self::Transcribe { audio } => audio.validate()?,
             Self::Chat {
                 messages,
                 max_output_tokens,
@@ -79,6 +84,7 @@ impl Call {
     }
     pub fn arm_permitted(&self) -> bool {
         let purpose = match self {
+            Self::Transcribe { .. } => return false,
             Self::Chat { purpose, .. } | Self::Embedding { purpose, .. } => purpose,
         };
         matches!(
@@ -92,6 +98,7 @@ impl Call {
     fn reservation_tokens(&self) -> Result<(u64, u64)> {
         let bytes = serde_json::to_vec(self)?.len() as u64;
         let (overhead, output) = match self {
+            Self::Transcribe { .. } => return Err(invalid("speech uses duration accounting")),
             Self::Chat {
                 messages,
                 max_output_tokens,
@@ -128,6 +135,17 @@ pub struct Reply {
 impl Reply {
     fn validate(&self, call: &Call, dimensions: Option<usize>) -> Result<()> {
         match call {
+            Call::Transcribe { .. } => {
+                if self.content.is_none()
+                    || self.content.as_ref().is_some_and(|t| t.len() > 32_768)
+                    || self.usage.is_some()
+                    || !self.vectors.is_empty()
+                    || self.reasoning_details.is_some()
+                    || !self.tool_calls.is_empty()
+                {
+                    return Err(invalid("invalid transcription response"));
+                }
+            }
             Call::Chat {
                 max_output_tokens, ..
             } => {
@@ -214,6 +232,8 @@ pub struct Provenance {
     /// Relative directory inside this run's private provider-artifact folder.
     pub artifact: String,
     pub response_complete: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<audio::Evidence>,
     pub evidence_complete: bool,
     /// Only terminal provider usage, never inferred from returned text.
     pub usage: Option<Usage>,
@@ -231,6 +251,8 @@ pub struct Receipt {
     /// This is a budget debit, not an assertion about a provider's invoice.
     pub cost_basis: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub audio_usage: Option<audio::Usage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub provenance: Option<Provenance>,
 }
 type Audit = Box<dyn FnMut(&str, &Receipt) -> Result<()> + Send>;
@@ -238,6 +260,7 @@ pub struct Client<P> {
     provider: P,
     chat_prices: Prices,
     embedding_prices: Option<Prices>,
+    speech_prices: Option<audio::Prices>,
     dimensions: Option<usize>,
     limit: u64,
     charged: u64,
@@ -255,6 +278,7 @@ impl<P: Provider> Client<P> {
             provider,
             chat_prices: prices,
             embedding_prices: None,
+            speech_prices: None,
             dimensions: None,
             limit: limit_microusd,
             charged: 0,
@@ -272,6 +296,11 @@ impl<P: Provider> Client<P> {
     ) -> Self {
         self.audit = Some(Box::new(audit));
         self
+    }
+    pub fn with_speech(mut self, prices: audio::Prices) -> Result<Self> {
+        prices.validate()?;
+        self.speech_prices = Some(prices);
+        Ok(self)
     }
     pub fn with_embeddings(mut self, prices: Prices, dimensions: usize) -> Result<Self> {
         if dimensions == 0
@@ -304,15 +333,31 @@ impl<P: Provider> Client<P> {
         if Instant::now() >= deadline {
             return Err(invalid("model deadline expired before dispatch"));
         }
-        let prices = match call {
-            Call::Chat { .. } => &self.chat_prices,
-            Call::Embedding { .. } => self
-                .embedding_prices
-                .as_ref()
-                .ok_or_else(|| invalid("embedding not configured"))?,
+        let billing = match call {
+            Call::Transcribe { audio } => Billing::Speech {
+                prices: self
+                    .speech_prices
+                    .as_ref()
+                    .ok_or_else(|| invalid("speech pricing not configured"))?,
+                micros: audio.reserve_micros(),
+            },
+            Call::Chat { .. } | Call::Embedding { .. } => {
+                let prices = if matches!(call, Call::Chat { .. }) {
+                    &self.chat_prices
+                } else {
+                    self.embedding_prices
+                        .as_ref()
+                        .ok_or_else(|| invalid("embedding not configured"))?
+                };
+                let (input, output) = call.reservation_tokens()?;
+                Billing::Tokens {
+                    prices,
+                    input,
+                    output,
+                }
+            }
         };
-        let (max_input, max_output) = call.reservation_tokens()?;
-        let reserve = prices.charge(max_input, max_output)?;
+        let reserve = billing.reserve()?;
         let next = self
             .charged
             .checked_add(reserve)
@@ -330,7 +375,13 @@ impl<P: Provider> Client<P> {
             request_bytes: serde_json::to_vec(call)?.len(),
             outcome: "uncertain".into(),
             usage: None,
-            cost_basis: "conservative_token_debit".into(),
+            cost_basis: if matches!(call, Call::Transcribe { .. }) {
+                "conservative_audio_duration_debit"
+            } else {
+                "conservative_token_debit"
+            }
+            .into(),
+            audio_usage: None,
             provenance: None,
         };
         if let Some(audit) = &mut self.audit
@@ -356,22 +407,47 @@ impl<P: Provider> Client<P> {
             .ok()
             .and_then(|r| r.usage.clone())
             .or_else(|| receipt.provenance.as_ref().and_then(|p| p.usage.clone()));
-        let evidence_failed = receipt
+        receipt.audio_usage = receipt
             .provenance
             .as_ref()
-            .is_some_and(|p| !p.evidence_complete);
+            .filter(|p| p.response_complete)
+            .and_then(|p| p.audio.as_ref())
+            .and_then(|a| a.duration_usage.clone());
+        let audio_evidence = receipt.provenance.as_ref().and_then(|p| p.audio.as_ref());
+        let audio_mismatch = if let Call::Transcribe { audio } = call {
+            receipt.usage.is_some()
+                || dispatched.is_ok() && audio_evidence.is_none()
+                || audio_evidence.is_some_and(|a| {
+                    a.pcm_sha256 != audio.pcm_sha256()
+                        || a.samples_sent != audio.samples()
+                        || a.confidence
+                            .is_some_and(|c| !c.is_finite() || !(0.0..=1.0).contains(&c))
+                        || dispatched
+                            .as_ref()
+                            .ok()
+                            .and_then(|r| r.content.as_ref())
+                            .is_some_and(|text| a.transcript_sha256 != hash(text.as_bytes()))
+                })
+        } else {
+            audio_evidence.is_some()
+        };
+        let evidence_failed = audio_mismatch
+            || receipt
+                .provenance
+                .as_ref()
+                .is_some_and(|p| !p.evidence_complete);
         let result = (|| {
-            if let Some(usage) = &receipt.usage {
-                let actual = match prices.charge(usage.input_tokens, usage.output_tokens) {
-                    Ok(actual) => actual,
-                    Err(error) => {
-                        self.charged = u64::MAX;
-                        self.poisoned = true;
-                        receipt.charged_microusd = u64::MAX;
-                        receipt.outcome = "accounting_overflow".into();
-                        return Err(error);
-                    }
-                };
+            let known = match billing.known(&receipt) {
+                Ok(known) => known,
+                Err(error) => {
+                    self.charged = u64::MAX;
+                    self.poisoned = true;
+                    receipt.charged_microusd = u64::MAX;
+                    receipt.outcome = "accounting_overflow".into();
+                    return Err(error);
+                }
+            };
+            if let Some((actual, exceeded)) = known {
                 let actual = if evidence_failed {
                     actual.max(reserve)
                 } else {
@@ -380,7 +456,7 @@ impl<P: Provider> Client<P> {
                 self.charged = (self.charged - reserve).saturating_add(actual);
                 receipt.charged_microusd = actual;
                 receipt.outcome = "accounted".into();
-                if usage.input_tokens > max_input || usage.output_tokens > max_output {
+                if exceeded {
                     self.poisoned = true;
                     receipt.outcome = "reservation_exceeded".into();
                     return Err(invalid("provider usage exceeded conservative reservation"));
@@ -410,6 +486,53 @@ impl<P: Provider> Client<P> {
             return Err(error);
         }
         result
+    }
+}
+
+enum Billing<'a> {
+    Tokens {
+        prices: &'a Prices,
+        input: u64,
+        output: u64,
+    },
+    Speech {
+        prices: &'a audio::Prices,
+        micros: u64,
+    },
+}
+impl Billing<'_> {
+    fn reserve(&self) -> Result<u64> {
+        match self {
+            Self::Tokens {
+                prices,
+                input,
+                output,
+            } => prices.charge(*input, *output),
+            Self::Speech { prices, micros } => prices.charge(*micros),
+        }
+    }
+    fn known(&self, receipt: &Receipt) -> Result<Option<(u64, bool)>> {
+        match self {
+            Self::Tokens {
+                prices,
+                input,
+                output,
+            } => receipt
+                .usage
+                .as_ref()
+                .map(|u| {
+                    Ok((
+                        prices.charge(u.input_tokens, u.output_tokens)?,
+                        u.input_tokens > *input || u.output_tokens > *output,
+                    ))
+                })
+                .transpose(),
+            Self::Speech { prices, micros } => receipt
+                .audio_usage
+                .as_ref()
+                .map(|u| Ok((prices.charge(u.audio_micros)?, u.audio_micros > *micros)))
+                .transpose(),
+        }
     }
 }
 

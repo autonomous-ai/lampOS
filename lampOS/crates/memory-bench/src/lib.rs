@@ -2,6 +2,7 @@
 pub mod aging;
 pub mod arm_server;
 pub mod arms;
+pub mod audio;
 pub mod campaign;
 pub mod conversation;
 pub mod corpus;

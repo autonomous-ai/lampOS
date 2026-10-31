@@ -326,6 +326,7 @@ impl Provider for Http {
             response_sha256: hash(&raw),
             artifact,
             response_complete: parser.done,
+            audio: None,
             evidence_complete: false,
             usage: parser.done.then(|| parser.usage.clone()).flatten(),
         };

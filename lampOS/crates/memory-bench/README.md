@@ -74,3 +74,31 @@ adds output/context bounds and evidence; it does not enable thinking or select a
 different model. Provisional usage before the finishing chunk is not a final bill.
 Any evidence failure stops subsequent spending, even when known usage costs less
 than the reservation. Rejected SSE receives the same credential scan as answers.
+
+## Verified audio and duration accounting
+
+The internal transcription request owns immutable PCM decoded from a bounded
+16 kHz mono PCM16 WAV. Its identity includes computed WAV/PCM hashes and sample
+count; serialized requests contain no audio bytes or filesystem path. External
+arms cannot deserialize or invoke transcription requests. The audio bound is
+120 seconds, covering the unchanged aging fixture's 66.804-second utterance.
+
+Speech uses the same `Client`, `Worker`, receipts and durable campaign as chat.
+Dated per-minute prices charge integer microseconds, without minute-sized billing
+blocks. Before dispatch, the sample count reserves the actual duration rounded
+up to one millisecond. Only complete provider duration evidence can reconcile
+that reserve. Missing/incomplete duration retains the reserve. A duration overrun,
+mismatched PCM evidence or failed evidence write stops future spending and keeps
+at least the reservation or any higher known charge. Restoring a probe does not
+restore this account. Transcription confidence remains optional; no confidence
+is inferred from a missing service field.
+
+This layer has fake-provider tests. The WebSocket speech transport and verified
+shared transcript cache remain to be implemented before any scored execution.
+
+Each durable reservation also binds its billing kind. Token evidence cannot
+refund an audio reservation, and audio evidence cannot refund a token reservation;
+a mismatch is persisted as a stop. Existing token-only journals retain their
+original serialized hashes. A successful transcription must match its recorded
+transcript hash, and any supplied confidence must be finite and within zero to one.
+These checks precede refunds and also have restart regression coverage.
