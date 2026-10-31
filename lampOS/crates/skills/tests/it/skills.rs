@@ -3582,10 +3582,14 @@ fn a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps() {
                     .publish_json(1, &Light::new(true, colour, 3).unwrap())
                     .unwrap();
             }
+            // Counted before it is answered, as in
+            // `a_held_dim_asked_of_the_policy`: the runs' `done` follow the
+            // answers, and the calls are read after them (Tests' P3 on
+            // #4703).
+            let _ = called.send(line);
             (&stream)
                 .write_all(b"{\"ok\":true,\"result\":{}}\n")
                 .unwrap();
-            let _ = called.send(line);
         }
     });
     let tools = root.join("tools");
