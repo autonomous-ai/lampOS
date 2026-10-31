@@ -1,5 +1,28 @@
 # Tiers work log
 
+## 2026-10-31: optional diagnostics checkpoint
+
+[PR #4777](https://github.com/autonomous-ai/lampOS/pull/4777), head
+`62e092173`, follows the unchanged reviewed adapter in #4756. Contract 2.1
+reports count-only eligible population and cumulative recall/snapshot use.
+The facts-removal arm keeps proof rows separate. Measurement reuses existing
+eligibility checks, returns unknown on timeout, and changes no stored memory.
+Usage survives probe restoration and is never a prompt or ranking input.
+
+On macOS x86_64, Rust 1.96.0, formatting, strict all-target clippy, 77 functional
+tests, three API compile-fail checks and the workspace build passed. The same
+80 tests passed from a source-only copy. The read-only peer audit found no
+issues. Native ARM64 run 41205204042 and Linux clippy 41205204063 are pending.
+Reviewer-three and Tests were asked to read the follow-up delta.
+
+The pinned executable verified its embedded revision. All eleven setups
+passed 132 operations using Bench's checksum-verified runner at `2d276c3fc`:
+zero model calls and zero memory deadline misses. The registered v4 month
+plumbing run is next, using neutral recorded replies without reading the
+question text or answer key. There are no scores or live calls in this evidence.
+The shared build slot was released after cleaning 7.1 GiB; all ledgers and
+pinned artifacts remain preserved. No product caller or device changed.
+
 ## 2026-10-31: reviewed adapter and pre-score coverage audit
 
 Recall/adapter code is ready for review at `38a822541` in
