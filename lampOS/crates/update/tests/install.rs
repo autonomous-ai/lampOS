@@ -1435,6 +1435,29 @@ fn the_product_keeps_a_repeated_thing_once() {
     }
 }
 
+/// A known person's own turn is told their name on the second route
+/// (`LAMP_SECOND_FACE_NAME`, #2539), only beside the switches that bind a
+/// turn to the face seen speaking it: without them a silent face in view
+/// would name an off-camera caller (reviewer-two on #3371).
+#[test]
+fn the_product_names_a_known_face_only_on_its_own_seen_line() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_SECOND_FACE_NAME=on",
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_SECOND_SPEAKING_FACE=on",
+        "Environment=LAMP_SECOND_SCOPED_CONTEXT=on",
+        "Environment=LAMP_EYES_SPEAKING=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// Within a conversation going on, a known person's line no face was seen
 /// speaking stays theirs to be told from (`LAMP_CONVERSATION_CARRIES`, #4339),
 /// beside the scope by sight it acts with: on lamp-3e83 on 29 Oct one such
