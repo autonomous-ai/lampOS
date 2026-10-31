@@ -149,6 +149,8 @@ impl Store {
             }
             let overhead = if result.items.is_empty() {
                 MEMORY_NOTICE.len()
+            } else if snapshot {
+                0
             } else {
                 2
             };
