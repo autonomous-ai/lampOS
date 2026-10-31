@@ -1170,20 +1170,3 @@ fn load_fingerprint_key(path: &Path, populated: bool) -> Result<[u8; 32]> {
     file.read_exact(&mut key)?;
     Ok(key)
 }
-
-#[cfg(feature = "bench")]
-impl Store {
-    /// Test-only isolated child. The original connection stays alive and is
-    /// never replaced from an old copy. Costs and request identities belong to
-    /// the runner, outside this copy. This API is absent from default builds.
-    pub fn bench_fork(&self) -> Result<Self> {
-        let mut conn = Connection::open_in_memory()?;
-        {
-            let backup = rusqlite::backup::Backup::new(&self.conn, &mut conn)?;
-            if backup.step(-1)? != rusqlite::backup::StepResult::Done {
-                return Err(Error::Invalid("probe snapshot incomplete"));
-            }
-        }
-        Self::from_connection(conn, &self.owner, self.fingerprint_key)
-    }
-}

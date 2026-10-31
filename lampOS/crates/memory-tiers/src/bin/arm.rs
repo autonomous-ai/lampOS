@@ -1,4 +1,6 @@
 //! Bench-only JSON-lines adapter. No listener, credentials or direct provider.
+#[path = "arm/probe.rs"]
+mod probe;
 use lamp_memory_tiers::{model::PROMPT, *};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -190,12 +192,24 @@ struct PolicyState {
 struct Context {
     store: Store,
     policy: PolicyState,
+    // Fields drop in order: close the store before removing its files.
+    scratch: Option<tempfile::TempDir>,
+}
+impl Context {
+    fn discard(self) -> Result<()> {
+        drop(self.store);
+        if let Some(scratch) = self.scratch {
+            scratch.close()?;
+        }
+        Ok(())
+    }
 }
 struct Adapter {
     context: Option<Context>,
     main: Option<Context>,
     probe: Option<String>,
     owner: String,
+    root: PathBuf,
     arm: Arm,
     config: Config,
     requests: BTreeSet<String>,
@@ -209,6 +223,7 @@ impl Default for Adapter {
             main: None,
             probe: None,
             owner: String::new(),
+            root: PathBuf::new(),
             arm: Arm::Tiers,
             config: Config::default(),
             requests: BTreeSet::new(),
@@ -327,11 +342,13 @@ impl Adapter {
             let root = init.state_dir.canonicalize()?;
             let mut store = Store::open(root.join("tiers.sqlite"), &init.owner_id)?;
             store.set_time_zone(&init.timezone)?;
+            self.root = root;
             self.owner = init.owner_id;
             self.arm = arm;
             self.config = init.config;
             self.context = Some(Context {
                 store,
+                scratch: None,
                 policy: PolicyState {
                     clock: init.at_unix_ms,
                     ..Default::default()
@@ -524,9 +541,11 @@ impl Adapter {
                 }
                 let at = timestamp(&request.data)?;
                 time_check(context.policy.clock, at)?;
+                let (store, scratch) = probe::fork(&self.root, &self.owner)?;
                 let mut child = Context {
-                    store: context.store.bench_fork()?,
+                    store,
                     policy: context.policy.clone(),
+                    scratch: Some(scratch),
                 };
                 child.policy.clock = at;
                 self.main = self.context.replace(child);
@@ -541,6 +560,9 @@ impl Adapter {
                     .main
                     .take()
                     .ok_or(Error::Invalid("no isolated probe"))?;
+                if let Some(child) = self.context.take() {
+                    child.discard()?;
+                }
                 self.context = Some(main);
                 self.probe = None;
                 Ok(json!({"restored":true}))

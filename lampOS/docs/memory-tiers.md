@@ -246,12 +246,15 @@ path; it is not a store-only diagnostic. This adapter accepts v2 requests only
 and echoes unsupported request versions in errors; older recorded v1 data and
 its unknown effect remain the runner reader's responsibility.
 
-`probe_begin` copies the SQLite state into a feature-gated in-memory child.
-The original connection stays open and untouched. Child rows, fingerprints,
-cursors, snapshot accounting, mappings and policy counters are discarded by
-`probe_end`. There is no operation that overwrites the original database from
-an older snapshot. Global request identities and model-call counts are outside
-the child and never roll back. No probe API exists in default builds.
+`probe_begin` copies the SQLite state and fingerprint key into a private temporary
+child directory owned by the development binary. The main store stays open and
+untouched. The child includes fingerprints, cursors and policy state; `probe_end`
+closes and removes it before resuming the main store. Cleanup failure ends the run.
+Costs and request identities remain outside the child and never roll back. The
+library has no public copy, connection-import or restore API in any build; compile-
+fail tests enforce that boundary. A process crash may leave a private child
+directory in the runner-owned scratch directory, which the runner must dispose of
+after the run. This is synthetic benchmark state, not a product restore facility.
 
 The ordered [arm manifest](../crates/memory-tiers/arm-manifest.json) registers
 all eleven arms before any candidate score. Every arm runs three times and is

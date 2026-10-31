@@ -172,21 +172,6 @@ fn cold_and_repeated_lookup_at_month_scale() {
     assert!(cold < RECALL_BUDGET);
     assert!(max < RECALL_BUDGET);
 }
-#[cfg(feature = "bench")]
-#[test]
-fn isolated_child_restores_fingerprints_and_cursors_by_discarding_only_child() {
-    let mut main = seed();
-    let mut child = main.bench_fork().unwrap();
-    child.forget_records(&[1]).unwrap();
-    assert!(child.records(Access::OWNER_ALONE).unwrap().is_empty());
-    assert_eq!(main.records(Access::OWNER_ALONE).unwrap().len(), 1);
-    drop(child);
-    assert_eq!(main.snapshot(&query()).unwrap().items.len(), 1);
-    main.forget_records(&[1]).unwrap();
-    let child = main.bench_fork().unwrap();
-    assert!(child.snapshot(&query()).unwrap().items.is_empty());
-}
-
 #[test]
 fn episode_cites_the_exact_later_batch_and_never_returns_future_detail() {
     let mut s = Store::in_memory("fictional-owner").unwrap();
