@@ -1682,12 +1682,17 @@ order is kept. A written turn is the same from the chat on.
   Otherwise it's dropped and round 1 is asked as before. Neither the rule
   nor a tool runs early, since both change what the lamp knows or does.
   The cost is a dropped round now and then, and one more of the system
-  message's memory recalls for each line it's begun on. **A known
-  slowness:** with `LAMP_SECOND_SCOPED_CONTEXT=on` (#1839) a turn is told for
-  its admitted scope, but the early round is begun from the unscoped system
-  message, so every scoped turn drops it as "the conversation changed". That
-  is safe, and no faster than without the switch (the merge of `lamp-voice`
-  into #1712, 19 Oct). The journal says
+  message's memory recalls for each line it's begun on. With
+  `LAMP_SECOND_SCOPED_CONTEXT=on` (#1839) the early round is begun from the
+  system message of the scope the line holds when its early words come
+  (`told`, since #1895), so it stands when that scope is the one the line
+  is answered in. A line narrowed at its end, to the room, drops it as
+  "the conversation changed", and the room's context is asked afresh
+  (`tests/music_scope.rs`: the speaking face that matches keeps the
+  prepared round, another's discards it).
+  With `LAMP_PERSON_SCOPE_SEEN=on` a known person's line is never prepared
+  ("A line is a known person's only when …", below), so in the product
+  only a room's line can keep it. The journal says
   `request N: its chat is begun on the line's early words`, then `… is
   kept, begun T ms ago` or `… is dropped: <why>`. In a host test on the
   paused clock, with a 400 ms `Finalize` answer and a chat's 600 ms to its
