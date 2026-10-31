@@ -2069,6 +2069,58 @@ fn a_strain_of_an_arm_that_lifted_lets_nothing_go() {
     assert_eq!(report.cannot_lift, None);
 }
 
+/// A report to count into, from a run cancelled at once.
+fn spare_report() -> BodyReport {
+    let (mut lamp, mut clock) = folded(Duration::ZERO);
+    run(&mut lamp, &mut clock, Limits::FOLDED, None, || None, |_| {})
+}
+
+/// A folded arm let go whose shoulder falls past where a goal may be
+/// written from its last one: the refused goal write still puts torque
+/// back on both arm joints, and the refusal is returned after.
+#[test]
+fn a_refused_goal_write_while_the_arm_is_let_go_still_puts_torque_back_on() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(5));
+    // The shoulder sags 120 counts while let go: under a bad read's jump,
+    // over a goal's step from the goal it had.
+    lamp.event = Some((Duration::from_millis(20), 1, Event::Push(120.0)));
+    let mut report = spare_report();
+    let result = {
+        let mut bus = Bus::new(&mut lamp, &mut clock, Some(lamp_4ace_standing()));
+        bus.samples().unwrap();
+        bus.write_goal(Joint::BasePitch, 2_050, false).unwrap();
+        release_arm(&mut bus, &mut report)
+    };
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(report.arm_releases, 0);
+    assert_eq!((lamp.servos[1].torque, lamp.servos[2].torque), (1, 1));
+}
+
+/// A torque-off to the folded arm that the shoulder takes and the elbow
+/// does not: the shoulder gets torque back on, so no joint is left limp.
+#[test]
+fn a_torque_off_that_fails_part_way_puts_torque_back_on_the_joint_it_let_go() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(5));
+    lamp.deaf = Some((2, 1));
+    let mut report = spare_report();
+    let result = {
+        let mut bus = Bus::new(&mut lamp, &mut clock, Some(lamp_4ace_standing()));
+        bus.samples().unwrap();
+        release_arm(&mut bus, &mut report)
+    };
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(report.arm_releases, 0);
+    assert_eq!((lamp.servos[1].torque, lamp.servos[2].torque), (1, 1));
+    assert_eq!(
+        lamp.registers
+            .iter()
+            .filter(|(id, address, _)| *id == 2 && *address == 40)
+            .map(|(_, _, bytes)| bytes[0])
+            .collect::<Vec<_>>(),
+        [0, 1]
+    );
+}
+
 /// Under the strain guard (#4501), standing with the elbow at 500, over the
 /// guard's 450, for `seconds`: the elbow's long strain sits the lamp down
 /// and is said, a second inside the hour seats it, its arm let go, and it

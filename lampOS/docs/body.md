@@ -918,7 +918,11 @@ pressed into its stop at 464 to 557 for hours once folded. After such a
 sit-down, once the arm has been down a second, the shoulder and the elbow
 are let go for 100 ms (`Standing::RELEASE`, torque off) and taken back
 where they then lie (goal to position, torque on); folded, the arm is at
-its lowest and stays where it is let go. The report counts each
+its lowest and stays where it is let go. A failed write never leaves a
+joint limp: a torque-off the shoulder takes and the elbow does not puts the
+shoulder's torque back on, and torque comes back on each joint whatever its
+goal write did (a refused or unacknowledged goal keeps the goal it had);
+the first failure is logged and the release not counted. The report counts each
 (`arm_releases`). After two long rests begun by such sit-downs
 (`Standing::UNLIFTED_LONG_RESTS`) it stops trying until it is started
 again, and does not strain every half hour for days: one journal line
