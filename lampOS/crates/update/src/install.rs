@@ -3507,4 +3507,40 @@ mod tests {
             "docs/install.md's \"The parts\" has no row for {rowless:?}"
         );
     }
+
+    /// docs/skills.md's "Core and installable skills" has a row for every
+    /// skill the product installs ([`PRODUCT_SKILLS`]), by its title (its
+    /// folder's name in words, "watch-you-leave" as "Watch you leave") or
+    /// its folder's name in backticks, so a skill added there is said where
+    /// a reader of the skills looks: Onboarding, Startle, Watch you leave
+    /// and Music sway had no row.
+    #[test]
+    fn skills_md_has_a_row_for_every_product_skill() {
+        let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/skills.md");
+        let doc = fs::read_to_string(doc).unwrap();
+        let section = doc
+            .split("\n### Core and installable skills\n")
+            .nth(1)
+            .and_then(|rest| rest.split("\n#").next())
+            .expect("docs/skills.md has \"### Core and installable skills\"");
+        let skills: Vec<String> = section
+            .lines()
+            .filter_map(|line| line.strip_prefix("| ")?.split(" | ").next())
+            .map(str::to_lowercase)
+            .collect();
+        let rowless: Vec<&str> = PRODUCT_SKILLS
+            .iter()
+            .copied()
+            .filter(|name| {
+                let title = name.replace('-', " ");
+                !skills
+                    .iter()
+                    .any(|cell| cell.contains(&title) || cell.contains(&format!("`{name}`")))
+            })
+            .collect();
+        assert!(
+            rowless.is_empty(),
+            "docs/skills.md's \"Core and installable skills\" has no row for {rowless:?}"
+        );
+    }
 }
