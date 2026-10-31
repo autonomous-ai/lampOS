@@ -753,10 +753,13 @@ pub(crate) fn said_once_note(said: &str) -> String {
 /// answered short (`LAMP_SHORT_DONE`, #2877): `told` holds what each call
 /// was told, one for each. lamp-actions marks a light or volume change it
 /// made with `"next"` and gives its own words in `"say"` ("Brighter.");
-/// a call refused, failed, held, unchanged ("already") or anyone else's
-/// carries no `"say"`, and then there is no line and the turn goes on as
-/// without the switch. One line for the round: the calls' own when they
-/// agree, [`SHORT_DONE_TOGETHER`] when they differ.
+/// a call refused, failed, held or anyone else's carries no `"say"`, and
+/// then there is no line and the turn goes on as without the switch. One
+/// that changed nothing is marked `"already"`, with its own words that it
+/// already is ("I'm already as warm as I go.", the first builder on #4710
+/// at 17:35); an older lamp-actions gave it none. One line for the round:
+/// the calls' own when they agree, [`SHORT_DONE_TOGETHER`] when they differ
+/// and each made its change, none when they differ and one changed nothing.
 pub(crate) fn short_done_line(told: &[Value]) -> Option<&str> {
     let mut says = told.iter().map(|told| {
         told["next"]
@@ -769,6 +772,11 @@ pub(crate) fn short_done_line(told: &[Value]) -> Option<&str> {
     let mut line = first;
     for say in says {
         if say? != first {
+            // "Done." for calls that differ, never over one that changed
+            // nothing.
+            if told.iter().any(|told| told["already"] == true) {
+                return None;
+            }
             line = SHORT_DONE_TOGETHER;
         }
     }
@@ -10586,6 +10594,10 @@ async fn answer(
                 messages.push(Message::system(short_done_note(&line)));
             } else if may_end_worded
                 && short_told.len() == calls.len()
+                // Every call made its change: words over one that changed
+                // nothing ("Warmest it is." over "already") need the next
+                // round to say so.
+                && short_told.iter().all(|told| told["already"] != true)
                 && (short_done_line(&short_told).is_some()
                     || timer_line(&calls, &short_told, reminded).is_some())
                 && !asks_more(&heard_words, &calls)

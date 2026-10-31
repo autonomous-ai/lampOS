@@ -198,8 +198,9 @@ fn the_list_is_there_a_call_changes_the_control_and_anything_else_is_refused_in_
 
 /// `LAMP_SHORT_DONE` (the first builder on #705, 13:4x): with it, a volume
 /// change the model asked for is answered with what was established and
-/// told to say only a word or two after it. A call not done, and the app's
-/// numbers, are answered as without it.
+/// told to say only a word or two after it, and one at its end with its own
+/// words that it already is. A call not done, and the app's numbers, are
+/// answered as without it.
 #[test]
 fn with_the_switch_a_volume_change_is_answered_short_and_nothing_else_changes() {
     let home = directory("short");
@@ -229,9 +230,10 @@ fn with_the_switch_a_volume_change_is_answered_short_and_nothing_else_changes() 
         }})
     );
     assert_eq!(level.load(Ordering::Acquire), 70);
-    // At the ceiling, nothing changes: said as without the switch, so
-    // "louder" is never answered as if it had been made louder (the
-    // reviewer and Third on #1520).
+    // At the ceiling, nothing changes: never answered as if it had been
+    // made louder (the reviewer and Third on #1520), but with its own words
+    // that it already is, for the voice to say at once (the first builder
+    // on #4710, 17:35).
     for _ in 0..2 {
         ask(
             &home,
@@ -244,7 +246,12 @@ fn with_the_switch_a_volume_change_is_answered_short_and_nothing_else_changes() 
             &home,
             b"{\"op\":\"call\",\"name\":\"volume_up\",\"args\":{}}\n"
         ),
-        json!({"ok":true,"result":{"result":"My speaker is already as loud as it is allowed to go."}})
+        json!({"ok":true,"result":{
+            "result":"My speaker is already as loud as it is allowed to go.",
+            "already":true,
+            "next":lamp_actions::SHORT_ALREADY_NEXT,
+            "say":"I'm already as loud as I go."
+        }})
     );
     // Not done: the sentence alone, for the model to say.
     assert_eq!(
