@@ -2044,6 +2044,26 @@ mod tests {
         assert!(continued.valid_until_us <= until);
         assert!(requests.recv(Duration::ZERO).unwrap().is_none());
     }
+    /// main takes the clock before `tick` reads Expression's latest state,
+    /// so a state published in between is stamped after `now`: newer than
+    /// the pass's clock, not from the future. It must not end a held rest
+    /// (`routine_service`'s reload test failed so on ARM64, 31 Oct).
+    #[test]
+    fn a_state_stamped_after_the_ticks_clock_keeps_the_held_rest() {
+        let mut f = Fixture::new();
+        let held = f.resting();
+        f.now += 1;
+        f.heartbeat();
+        f.now -= 1;
+        f.manager
+            .tick(f.now, f.now, Some(&LocalTime::Offset(0)), NIGHT);
+        let active = f.manager.sources["routine"].active.as_ref();
+        assert_eq!(
+            active.map(|active| (active.request.op, active.request.episode)),
+            Some((Op::Rest, held.episode)),
+            "a state 1 µs ahead of the pass's clock ended the rest"
+        );
+    }
     /// Night sleep's 23:00 to 22:59 (#940): a rest still held at 22:58 is
     /// carried through the gap minute into the next night, its episode cap
     /// counted from the handover, with no cancel.
