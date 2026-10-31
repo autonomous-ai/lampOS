@@ -297,6 +297,12 @@ removal or measured handle-close/visible-light latency.
 
 ### Opt-in touch contracts (Task 33)
 
+| Type | Topic | Kind | Period / lifespan | What it says |
+|---|---|---|---|---|
+| `TouchEvent` | `controls/touch` | event | none / 500 ms | A touch gesture on the head or the strip, from `lamp-controls --touch` |
+| `TouchState` | `controls/touch_state` | latest | 100 ms / 300 ms | Each touch source's state now, and its events kept |
+| `HeadPet` | `controls/pet` | event | none / 500 ms | A pet on the head (#3997), only with `LAMP_HEAD_PET=on` |
+
 `touch_topics()` declares `controls/touch` (`TouchEvent`, event, 500 ms
 transport lifespan) and `controls/touch_state` (`TouchState`, latest,
 100 ms declared period/300 ms lifespan), and `controls/pet` (`HeadPet` v1,
