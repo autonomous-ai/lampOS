@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "before_any_score": true,
+  "answer_prompt_sha256": "f8202a74821bfbab0bf6c7e731a79c127ef0d4922bbd36f21bcd5253f6710260",
+  "judge_prompt_sha256": "f69d1f5d26e9e7e303903099cc3b0a70729e1d02ad946c448211ca9fabd6ba51",
+  "output_tokens": 512,
+  "tool_rounds": 8,
+  "probe_input": "fixed registered text, including all 224 month turns; no probe STT allowance",
+  "month_input": "one verified real-STT cache shared by all setups and repetitions",
+  "probe_boundary_reason": "A misheard question changes the memory skill under test. Noisy questions belong to a separate voice test; these scores can be kinder than real spoken use.",
+  "judge": "question turns, fixed criteria, eligible scripted source evidence and candidate answers only; no arm, run, provider, spending or diagnostic metadata",
+  "multi_turn": "all turns scored together; not just the last answer",
+  "probe_citations": "an answer may cite a source from the main prefix or an earlier completed exchange in its own isolated probe, never a future or current exchange; restoration removes probe sources",
+  "deterministic_precedence": "exact/date/abstention/forbidden claims and unsupported citations cannot be overruled by the judge",
+  "invalid_output": "failed or malformed answer/judge output leaves the trial incomplete; no numerical score, silent repair or unregistered retry",
+  "human_audit": "rubric scores are provisional until audited; preserve every registered audit and suspected privacy failure",
+  "judge_sources": "gold and eligible candidate-cited scripted records plus fixed probe questions; generated candidate answers have explicit IDs and can witness timing or dialogue, never establish independent owner facts",
+  "forget_restart": "after an actual forget attempt, drop the current round and all cached memory, take a fresh snapshot and restart from the current question plus a content-free forget-status note; apply uniformly to every setup",
+  "current_product_forget_gap": "the current product clears future recent history but retains the current request prefix and previous tool results; the uniform bench restart is stronger and may improve its measured forgetting"
+}

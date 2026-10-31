@@ -156,3 +156,42 @@ reconstructs observed events. A fixture/loopback cache cannot qualify a live run
 No clean script replaces a failed transcript. These cache checks need no provider
 call, and the command prints verification counts only. Live cache creation remains
 an internal API pending the approved campaign configuration and orchestration.
+
+## Registered evaluation policy
+
+The common answerer and blind judge prompts, output allowances and probe rules
+are frozen in `fixtures/memory-bench/live-policy/registration.json`. Their hashes
+are checked against the compiled prompts. This registration precedes every scored
+run; it does not constitute model-access or spending approval.
+
+The month enters memory through one shared real-STT cache. All 224 development
+probe turns remain fixed registered text, as ruled before scoring on 31 October.
+This isolates memory performance from question recognition. The limitation is
+explicit: results can be kinder than noisy spoken questions in real use; those
+belong in a separate voice test. No probe speech allowance is added.
+
+The judge receives only the fixed criteria, eligible scripted source evidence,
+and every candidate turn with its question and local timestamp. It receives no
+setup, run, provider, spending or tier diagnostics. Appointment timing and repeat
+avoidance are judged across the complete three-turn probe. Earlier completed
+exchanges inside that isolated probe are valid citations only for later turns;
+current, future and other-probe sources fail the deterministic evidence gate.
+Those exchanges never become sources in the restored main month. The judge gets
+explicit source IDs for completed probe exchanges and the union of gold and
+eligible candidate-cited scripted records. Generated answers can witness timing
+or dialogue; they never establish independent owner facts. Fixed probe questions
+remain scripted input, separate from the generated answer.
+
+Exact, date, abstention, forbidden-claim and citation checks take precedence over
+the judge. Malformed answers or judgments remain incomplete, without silent repair
+or a numeric score. Rubric results remain provisional pending human audit. The
+existing scorer rules, original questions and answer keys are unchanged. Unit
+fixtures test wrong and contradictory answers; they are not benchmark results.
+
+After an actual forget attempt, every setup drops its current round transcript
+and all cached memory, obtains a fresh snapshot, and restarts the answer from the
+current question plus a content-free forget-status note. This uniform rule was
+approved before scoring. It is stronger than the current product, which clears
+future recent history but retains the current request prefix and earlier tool
+results. Results must carry this privacy-relevant gap: the bench may improve the
+current-product setup's forgetting relative to the real lamp.

@@ -7,6 +7,7 @@ pub mod campaign;
 pub mod conversation;
 pub mod corpus;
 pub mod diagnostics;
+pub mod evaluation;
 pub mod files;
 pub mod ledger;
 pub mod live_http;
