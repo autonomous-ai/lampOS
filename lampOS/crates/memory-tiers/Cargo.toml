@@ -1,0 +1,26 @@
+[package]
+name = "lamp-memory-tiers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
+unicode-normalization = "0.1"
+lamp-local-time = { path = "../local-time" }
+tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "sync"] }
+reqwest = { version = "0.13", default-features = false, features = ["stream", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
+webpki-roots = "1"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "=1.53.1", features = ["test-util", "net", "io-util"] }
+
+[lints]
+workspace = true

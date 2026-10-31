@@ -2068,6 +2068,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-memory-tiers"
+version = "0.1.0"
+dependencies = [
+ "lamp-local-time",
+ "reqwest",
+ "rusqlite",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "unicode-normalization",
+ "webpki-roots 1.0.9",
+]
+
+[[package]]
 name = "lamp-mood"
 version = "0.1.0"
 dependencies = [
