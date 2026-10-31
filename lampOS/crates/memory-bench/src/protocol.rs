@@ -122,6 +122,9 @@ impl Response {
         }
         match (self.data, self.error) {
             (Some(data), None) if data.is_object() => Ok(data),
+            (None, Some(error)) if error.code == "unsupported" => {
+                Err(crate::Error::Unsupported(error.message))
+            }
             (None, Some(error)) => Err(invalid(format!(
                 "adapter {}: {}",
                 error.code, error.message

@@ -535,7 +535,7 @@ validation. The development fixture contains 1,560 events (50 utterances and
 two session boundaries per day) and 200 questions. Its registration records
 hashes and the fixed eleven-arm candidate order; human review is still pending.
 
-From `lampOS/`, `cargo run -p lamp-memory-bench --features bench -- generate PERSONA NEW_DIRECTORY`
+From `lampOS/`, `cargo run -p lamp-memory-bench -- generate PERSONA NEW_DIRECTORY`
 writes separate observed events, evaluator-only answer keys/questions, and
 registration hashes. `validate DIRECTORY` checks those hashes, chronology,
 question schedules and citation eligibility. `score QUESTIONS ANSWERS` runs
@@ -569,10 +569,30 @@ protocol on two fictional component operations, without loading a persona,
 calling a model or producing a score. It checks the pinned revision, an empty
 sleep, snapshot/recall bounds, deletion invalidation and probe restoration.
 
-The executable is opt-in with `--features bench`, so the default product
-workspace does not build a new unclassified deployment binary. Feature-enabled
-formatting, strict clippy, tests and a native ARM64 run remain required.
+The runner is an ordinary binary target, covered by the standard ARM64 and
+Linux clippy workflows. It must be classified as a development executable in
+the separately owned deployment inventory; product crates do not link it.
 
 The orchestration CLI, in-tree arms, real speech-to-text cache, live provider
 transport, model rubric invocation and scorecard are still being implemented.
 No generated fixture or software test is a baseline score.
+
+### Recorded execution checkpoint
+
+The benchmark branch provides `plumbing` and `plumbing-card` for the complete
+scripted month using a fixed synthetic recorded answer. Every output is a
+**plumbing check**, with null scores, zero live model calls and explicit
+clean-text input. This exercises isolated question/follow-up execution,
+nightly bounded draining, recent-conversation effects, budget accounting and
+the append-only ledger without supplying performance evidence.
+
+The reference child implements `none`, `full_history` and
+`lampos_today_partial`. Full history uses a declared lexical forget recognizer
+and keyed suppression fingerprints; it never truncates to fit. The partial
+arm currently exercises the real Days library/protocol directly, including
+store aging and isolated copies of the closed database. It does **not** test
+socket transport or the voice tool/observation/talk-note/summary paths. Its
+natural-language forget dispatch is also absent. It cannot be substituted for
+`lampos_today`. See the [fixture README](../fixtures/memory-bench/README.md)
+for exact limitations and invocation. No recorded result satisfies a scored
+baseline, speech-to-text, blinded-judge or human-audit acceptance gate.

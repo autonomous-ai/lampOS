@@ -6,6 +6,35 @@ use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
 fn run(args: &[String]) -> Result<()> {
     match args {
+        [
+            command,
+            fixture,
+            output,
+            arm,
+            revision,
+            registration,
+            recorded,
+        ] if command == "plumbing" => println!(
+            "{}",
+            lamp_memory_bench::plumbing::run(
+                Path::new(fixture),
+                Path::new(output),
+                arm,
+                revision,
+                registration,
+                Path::new(recorded)
+            )?
+        ),
+        [command, paths @ ..] if command == "plumbing-card" && !paths.is_empty() => {
+            println!("{}", lamp_memory_bench::plumbing::scorecard(paths)?)
+        }
+        [command, revision] if command == "arm" => {
+            lamp_memory_bench::arm_server::serve(
+                &mut std::io::stdin().lock(),
+                &mut std::io::stdout().lock(),
+                revision,
+            )?;
+        }
         [command, adapter, arm, revision, state] if command == "smoke" => {
             println!(
                 "{}",

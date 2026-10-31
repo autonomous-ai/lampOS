@@ -14,13 +14,22 @@ use std::{
     time::{Duration, Instant},
 };
 pub fn run(executable: &Path, arm: &str, revision: &str, state: &Path) -> Result<Value> {
+    run_with_args(executable, &[], arm, revision, state)
+}
+pub fn run_with_args(
+    executable: &Path,
+    args: &[String],
+    arm: &str,
+    revision: &str,
+    state: &Path,
+) -> Result<Value> {
     if revision.len() != 40 || !revision.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(invalid("smoke requires full adapter revision"));
     }
     std::fs::DirBuilder::new().mode(0o700).create(state)?;
     let state = std::fs::canonicalize(state)?;
     let executable = std::fs::canonicalize(executable)?;
-    let mut runner = Runner::spawn(&executable, &[], &state)?;
+    let mut runner = Runner::spawn(&executable, args, &state)?;
     let mut client = Worker::start(Client::new(
         Recorded::read(Cursor::new(Vec::<u8>::new()))?,
         Prices {
