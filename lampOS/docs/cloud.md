@@ -115,7 +115,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.share`/`skills.shared`/`skills.unshare`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
@@ -268,7 +268,7 @@ rested between turns (5 s; at most 45 s, then all the same), so the app's
 `success` leaves before `lamp-cloud` is stopped with the rest of the lamp.
 A helper not there is "the lamp's settings are not running"; one that does
 not answer within 2 s, "the lamp's settings did not answer in time".
-Pinned in `tests/app_contract.rs`, with a stand-in helper that answers with
+Pinned in `tests/it/app_contract.rs`, with a stand-in helper that answers with
 the helper's own code against a real update lock.
 
 Whether the app's "restart" should reboot the machine, as V1's does, is
@@ -320,7 +320,7 @@ The request and its replies, for the app (V1's `data` envelope):
   and the kind is not in `can`.
 - **Asked again** after a `success`: the same `success`, nothing asked again.
 
-Pinned in `tests/app_contract.rs` with the stand-in helper.
+Pinned in `tests/it/app_contract.rs` with the stand-in helper.
 
 ## A face from the app's photo (#1968, `faces.add_photo`)
 
@@ -1250,7 +1250,7 @@ builder. The 15 s ping is unchanged.
 
 `lamp-update install` places the reserved
 `/etc/systemd/system/UNIT.d/exit-note.conf` for every service in Cloud's
-fixed `reports::UNITS` list, including its five templates. An install test
+fixed `reports::UNITS` list, including its six templates. An install test
 holds the installer list equal to Cloud's list and the product's service
 files. Each drop-in runs `lamp-cloud exit-note %n` as `ExecStopPost=` with
 the existing `-+` prefixes (`deploy/product/exit-note.conf`): the recorder
@@ -1516,8 +1516,8 @@ asks come in one second, the stop is kept as held only if every one was.
   `fd_channel`; the payload carries `id` (the design proposed none);
   `stopped` is kept until it is sent and sent once more on the next
   connection, rather than dropped when offline.
-- "Are you sending reports?" by voice is not built: only the stop is
-  declared, one function of the 32.
+- "Are you sending reports?" by voice is `reports_state` (above), declared
+  beside the stop behind the same switch (`tools.rs`): two functions.
 
 ### The backend's side, as agreed
 
