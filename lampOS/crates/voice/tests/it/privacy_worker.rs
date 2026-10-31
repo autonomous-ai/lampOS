@@ -42,6 +42,12 @@ use std::{
 
 const WAIT: Duration = Duration::from_secs(2);
 const SAMPLE: Duration = Duration::from_millis(5);
+/// How often the rig renews the worker's authority: the coordinator's own
+/// pace (`coordinator.rs`, a snapshot every 20 ms). The worker ends when one
+/// pass finds 16 queued (`privacy_bus.rs`), so a stalled worker has about
+/// 320 ms, the product's own margin; at 10 ms a 160 ms runner stall ended it
+/// (#4733's ARM64, 31 Oct: "privacy authority drain overflow").
+const AUTHORITY_EVERY: Duration = Duration::from_millis(20);
 
 fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
@@ -611,7 +617,7 @@ impl Rig {
         worker.check_running()?;
         if self
             .last_authority
-            .is_none_or(|at| at.elapsed() >= Duration::from_millis(10))
+            .is_none_or(|at| at.elapsed() >= AUTHORITY_EVERY)
         {
             let snapshot = self.controller.snapshot(now()).map_err(io::Error::other)?;
             worker
@@ -1487,7 +1493,7 @@ fn allowed_authority_without_a_first_observation_cannot_start_a_gap_ride() {
                 monotonic_us() < deadline_us,
                 "worker rode startup without a first grant"
             );
-            if last_authority.elapsed() >= Duration::from_millis(10) {
+            if last_authority.elapsed() >= AUTHORITY_EVERY {
                 renew(&mut worker, &mut controller);
                 last_authority = Instant::now();
             }
