@@ -1359,6 +1359,15 @@ pub(crate) const SAY_WITH_CALL_NOTE: &str = " When you call a function that chan
 /// The spoken character with [`SAY_WITH_CALL_NOTE`] after it when `on`:
 /// `LAMP_SECOND_SAY_WITH_CALL` together with `LAMP_SECOND_SAID_ONCE`, which
 /// keeps the next round from saying the words again.
+/// Whether a light, volume or timer turn is answered at once with the
+/// acting part's own words (`LAMP_SECOND_SAY_WITH_CALL`, #2135): with the
+/// switch `on` and no owner's language chosen. Those words are English
+/// ("Warmer.", "Timer set. It rings at 7:52 pm."), and a turn in the
+/// owner's language must not begin in English (Thirteen's P2 on #4700).
+pub(crate) fn says_at_once(on: bool, language: Option<crate::language::Language>) -> bool {
+    on && language.is_none()
+}
+
 pub(crate) fn saying_with_calls(character: String, on: bool) -> String {
     if on {
         format!("{character}{SAY_WITH_CALL_NOTE}")
@@ -3201,13 +3210,19 @@ pub fn serve(
     // A light, volume or timer turn answered at once by the part that acted,
     // with the next round no longer waited for (`LAMP_SECOND_SAY_WITH_CALL=on`,
     // #2135).
-    let say_at_once = std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
+    let say_with_call = std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
         .ok()
         .as_deref()
         == Some("on");
+    let language = crate::language::at_start();
+    let say_at_once = says_at_once(say_with_call, language);
     if say_at_once {
         eprintln!(
             "lamp-voice second: a turn whose calls all changed a light or the volume, or set one timer, is answered at once with the acting part's own words (LAMP_SECOND_SAY_WITH_CALL)"
+        );
+    } else if say_with_call {
+        eprintln!(
+            "lamp-voice second: the acting part's own words are English, and the owner's language is {language:?}; such turns wait for the model's words as without LAMP_SECOND_SAY_WITH_CALL"
         );
     }
     engine = engine.saying_at_once(say_at_once);
@@ -18652,12 +18667,16 @@ mod tests {
             None,
             None,
         );
+        // Only this turn's words are looked for: the thread is the process's
+        // own, and another test's turn may write to it between these lines
+        // (it failed so in a module run beside #4700's turns, 31 Oct).
         assert!(
-            crate::thread::THREAD
+            !crate::thread::THREAD
                 .lock()
                 .unwrap()
                 .recent_for(None, Instant::now(), Duration::from_secs(60), 8)
-                .is_empty()
+                .iter()
+                .any(|recent| recent.lamp.contains("peanut allergy"))
         );
         super::keep_scoped(
             &ProviderOutput::TurnComplete {
@@ -24836,6 +24855,24 @@ mod tests {
     /// #2135: with `LAMP_SECOND_SAY_WITH_CALL` (and `LAMP_SECOND_SAID_ONCE`)
     /// the character ends asking for a changing call's words in the same
     /// reply; off, it is as it was, byte for byte.
+    /// The acting part's own words at once only in English (Thirteen's P2
+    /// on #4700): with an owner's language, the turn waits for the model's
+    /// words, as without the switch.
+    #[test]
+    fn the_parts_own_words_are_said_at_once_only_in_english() {
+        use crate::language::Language;
+        assert!(super::says_at_once(true, None));
+        assert!(!super::says_at_once(false, None));
+        for language in [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+        ] {
+            assert!(!super::says_at_once(true, Some(language)), "{language:?}");
+        }
+    }
+
     #[test]
     fn a_changing_calls_words_are_asked_with_the_call_only_when_on() {
         let spoken = super::spoken_character("CHARACTER", false, true);

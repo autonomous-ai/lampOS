@@ -370,7 +370,7 @@ fn with_say_at_once_the_parts_own_words_come_first_and_the_next_rounds_follow() 
                 vec![nothing()]
             ),
             Went {
-                said: said(&["Timer set. It rings at 07:52."]),
+                said: said(&["Timer set. It rings at 7:52 am."]),
                 asked: 2,
                 ran: 1,
                 noted: true
@@ -433,6 +433,24 @@ fn say_at_once_never_answers_a_keep_a_refusal_or_the_models_own_words() {
     }
 }
 
+/// The clock said on a 12-hour clock (Thirteen's P3 on #4700).
+#[test]
+fn a_clock_is_said_on_a_12_hour_clock() {
+    for (clock, said) in [
+        ("07:52", Some("7:52 am")),
+        ("19:52", Some("7:52 pm")),
+        ("00:05", Some("12:05 am")),
+        ("12:30", Some("12:30 pm")),
+        ("23:59", Some("11:59 pm")),
+        ("24:00", None),
+        ("07:60", None),
+        ("7:52", None),
+        ("seven", None),
+    ] {
+        assert_eq!(spoken_clock(clock).as_deref(), said, "{clock}");
+    }
+}
+
 /// The timer's line is its own answer's clock, or none: one `set_timer`,
 /// committed, with an HH:MM clock.
 #[test]
@@ -446,7 +464,7 @@ fn the_timer_line_is_its_own_clock_or_none() {
     let committed = json!({"status": "committed", "clock": "07:52"});
     assert_eq!(
         timer_line(&[call("set_timer")], std::slice::from_ref(&committed)).as_deref(),
-        Some("Timer set. It rings at 07:52.")
+        Some("Timer set. It rings at 7:52 am.")
     );
     for (why, calls, told) in [
         (

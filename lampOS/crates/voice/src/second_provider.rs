@@ -775,8 +775,9 @@ pub(crate) fn short_done_line(told: &[Value]) -> Option<&str> {
 /// The timer's own line for a round whose one call set a timer
 /// (`LAMP_SECOND_SAY_WITH_CALL`, #2135): its time is the `clock` the
 /// schedule answered, the local HH:MM it rings, so the time said is the
-/// time set. `None` unless the one call is `set_timer` and its answer is
-/// committed with a clock.
+/// time set, said on a 12-hour clock as the lamp's other words are
+/// ("7:52 pm", Thirteen's P3 on #4700). `None` unless the one call is
+/// `set_timer` and its answer is committed with a clock.
 pub(crate) fn timer_line(calls: &[net::ToolCall], told: &[Value]) -> Option<String> {
     let ([call], [told]) = (calls, told) else {
         return None;
@@ -784,13 +785,28 @@ pub(crate) fn timer_line(calls: &[net::ToolCall], told: &[Value]) -> Option<Stri
     if call.name != "set_timer" || told["status"] != "committed" {
         return None;
     }
-    let clock = told["clock"].as_str().filter(|clock| {
-        let bytes = clock.as_bytes();
-        bytes.len() == 5
-            && bytes[2] == b':'
-            && [0, 1, 3, 4].iter().all(|&at| bytes[at].is_ascii_digit())
-    })?;
+    let clock = spoken_clock(told["clock"].as_str()?)?;
     Some(format!("Timer set. It rings at {clock}."))
+}
+
+/// An `HH:MM` clock on a 12-hour clock: "07:52" is "7:52 am", "19:52"
+/// "7:52 pm", "00:05" "12:05 am" and "12:30" "12:30 pm". `None` for
+/// anything but a 24-hour `HH:MM`.
+pub(crate) fn spoken_clock(clock: &str) -> Option<String> {
+    let (hour, minute) = clock.split_once(':')?;
+    if hour.len() != 2 || minute.len() != 2 {
+        return None;
+    }
+    let (hour, minute): (u32, u32) = (hour.parse().ok()?, minute.parse().ok()?);
+    if hour > 23 || minute > 59 {
+        return None;
+    }
+    let half = if hour < 12 { "am" } else { "pm" };
+    let hour = match hour % 12 {
+        0 => 12,
+        hour => hour,
+    };
+    Some(format!("{hour}:{minute:02} {half}"))
 }
 
 /// The note after a round's calls all answered short (`LAMP_SHORT_DONE`,
