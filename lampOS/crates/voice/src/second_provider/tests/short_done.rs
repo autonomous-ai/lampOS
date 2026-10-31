@@ -768,6 +768,9 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
             calls(&["set_timer"]),
         ),
         ("Hello, make it warmer.", calls(&["light_warmer"])),
+        // Or a letter from "lamp", whatever its case.
+        ("hey lamb, make it warmer.", calls(&["light_warmer"])),
+        ("Okay lam, make it brighter.", calls(&["light_brighter"])),
     ] {
         assert!(!asks_more(one, &called), "{one}");
     }
@@ -785,6 +788,10 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
         "Hey Lynn, what's the weather?",
         "Hey Lynn, make it warmer, what's the weather?",
         "Hey there Lynn, make it warmer.",
+        // A word after "okay" that speech to text didn't write as a name is
+        // an ask (Reviewer-three's P3 on #4789).
+        "Make it warmer. Okay music.",
+        "Okay weather, make it warmer.",
     ] {
         assert!(asks_more(more, &calls(&["light_warmer"])), "{more}");
     }
