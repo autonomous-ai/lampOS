@@ -219,6 +219,26 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "로그아웃됐어요. 앱에서 다시 설정해 주세요.",
         ],
     ),
+    // The second route's own words before a look and a search (Thirteen's
+    // P2 on #4707): never English in a turn in the owner's language.
+    (
+        crate::second_provider::LOOKING,
+        [
+            "Để mình xem nào.",
+            "ちょっと見てみるね。",
+            "我看一下。",
+            "잠깐 볼게요.",
+        ],
+    ),
+    (
+        crate::second_provider::CHECKING,
+        [
+            "Để mình kiểm tra nhé.",
+            "ちょっと調べてみるね。",
+            "我查一下。",
+            "잠깐 확인해 볼게요.",
+        ],
+    ),
 ];
 
 impl Language {
@@ -525,7 +545,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 8);
+        assert_eq!(FIXED_LINES.len(), 10);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
@@ -549,6 +569,15 @@ mod tests {
         assert_eq!(
             Language::Vietnamese.fixed(lamp_msgs::SLEEP_LINE),
             Some("Mình ngủ đây. Chạm vào đầu mình để đánh thức nhé.")
+        );
+        // The second route's look and search lines (#4707's P2).
+        assert_eq!(
+            fixed_in(Some(Language::Japanese), crate::second_provider::CHECKING),
+            "ちょっと調べてみるね。"
+        );
+        assert_eq!(
+            fixed_in(None, crate::second_provider::LOOKING),
+            crate::second_provider::LOOKING
         );
     }
 
