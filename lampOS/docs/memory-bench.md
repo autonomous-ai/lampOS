@@ -480,7 +480,7 @@ recent-conversation window when `ran` is true, and excludes that turn's
 scripted or generated confirmation when the second flag is true. Do not
 silently retain earlier exchanges or restore them at the next turn.
 
-This mirrors today's voice wrapper: an admitted `forget`/`forget_everything`
+For subsequent turns, this follows today's voice wrapper: an admitted `forget`/`forget_everything`
 attempt clears all scopes' exchanges, pending lines, written notes, unfinished
 heard text and running summaries. It re-arms invalidation after the call,
 because a timed-out deletion may still commit. A result other than explicit
@@ -488,6 +488,19 @@ because a timed-out deletion may still commit. A result other than explicit
 identity/target/keep refusals do not trigger that clear. The ordinary common
 window uses the product's 12 exchanges within 600 seconds, with observed
 scope admission; fresh exchanges can establish a new window after clearing.
+
+The common live answerer also drops the current request prefix, all earlier
+tool-result text and remaining calls in that batch after an actual forget
+attempt. It requests fresh memory and restarts with only the current question
+and a content-free forget-status note. This stronger restart applies to every
+setup. Today's product clears future recent history but can retain the current
+request prefix and earlier tool results; record that gap beside every result.
+
+When the actual action suppresses its confirmation, the evaluator preserves
+that answer for judging but omits the entire answered probe exchange from
+memory replay and later source eligibility. Original scripted ingestion is
+unchanged. The question itself never becomes a forgotten fact merely because
+it contains a keyword; only reported admitted actions trigger these effects.
 
 Direct storage deletion is a separate component operation. Deleting a single
 record in the store does not itself clear today's voice thread; successful
@@ -637,6 +650,33 @@ facts or promises. This is also registered before scoring: the month does
 **not** test the lamp's own promises or its real replies. Those require a
 separate future fixture. Recorded empty consolidation proposals still only
 exercise interfaces; synthetic usage is not a bill.
+
+### Common answer and judge policy registered before scoring
+
+The 31 October 2026 ruling keeps all 224 month probe turns as fixed text. Only
+the scripted month passes through the shared real speech-to-text cache. A
+misheard question can change the memory skill being tested, so noisy probe
+questions belong in a separate voice fixture. This choice can make results
+kinder than real spoken use; it adds no speech allowance for probes.
+
+Every setup uses the same frozen answer prompt, model settings, 512-token
+output limit and eight-round tool loop. The rubric judge sees all turns of a
+probe together, the frozen criteria and eligible scripted source evidence.
+It receives no setup name, run identity, cost or tier diagnostics. Generated
+candidate replies can witness dialogue or timing but cannot establish an
+independent owner fact. Exact, date, abstention, forbidden-claim and source
+eligibility checks take precedence over the judge. Invalid outputs leave the
+attempt incomplete; no silent repair or unregistered retry is allowed.
+Rubric results remain provisional until the registered human audit.
+
+The live campaign policy pins both model routes, dated prices, fixture and
+audio registrations, evaluation prompts, executable hashes and revisions,
+setup order, three repetitions and all spending allowances. The separate
+approval records that policy hash and the owner's cap. Every service call
+uses the shared durable cost journal; uncertain work remains charged after
+failure. No new attempt can reset the balance. Every failed, incomplete or
+missing repetition remains in the comparison and prevents a three-run mean.
+Recorded outputs and fake-server tests always keep accuracy scores null.
 
 ## What was not shown
 
