@@ -202,22 +202,26 @@ a qualifying score gain or safety/privacy need goes. Preserve the per-kind
 results and audit status so this rule cannot hide a lost safety result in an
 overall average.
 
-## JSON-lines arm contract, draft v1
+## JSON-lines arm contract, draft v2
 
 This is the boundary for an in-tree or external memory adapter. It deliberately
 uses no Rust crate dependency across implementations. The first fixture and
-contract tests will freeze it before baseline runs. Additive fields require a
+contract tests freeze each version before baseline runs. Version 2 adds actual
+forget effects to mutation replies; version 1 remains readable for earlier
+test records, but cannot establish recent-history forgetting parity. New
+scored runs require version 2. Responses echo the request version; the runner
+never silently upgrades a version-1 result. Additive fields require a
 versioned compatibility test; breaking changes require another protocol version.
 
 The benchmark launches one adapter process with private fresh state. stdin
 and stdout are newline-delimited UTF-8 JSON objects; stderr is diagnostic only.
-Exactly one request is active. Every frame carries `v: 1` and an `id` echoed
+Exactly one request is active. Every frame carries `v: 2` and an `id` echoed
 by its final response. The envelope is:
 
 ```json
-{"v":1,"id":"r1","op":"init","data":{}}
-{"v":1,"id":"r1","ok":true,"data":{}}
-{"v":1,"id":"r1","ok":false,"error":{"code":"unsupported","message":"short explanation"}}
+{"v":2,"id":"r1","op":"init","data":{}}
+{"v":2,"id":"r1","ok":true,"data":{}}
+{"v":2,"id":"r1","ok":false,"error":{"code":"unsupported","message":"short explanation"}}
 ```
 
 Unknown versions and operations are errors. A nonzero exit, malformed frame,
@@ -313,7 +317,12 @@ counts all UTF-8 text memory adds to the prompt: context, owner-model text,
 memory instructions, textual tool schemas, and subsequent tool results.
 The base character prompt is outside this cap and identical across arms.
 The snapshot is reused within its session, counted once; recall must not
-duplicate it. Forgetting or a changed access scope invalidates that snapshot.
+duplicate it. After every `ingest`, `sleep`, `forget`, or `tool`, the runner discards all
+cached memory text, even when the operation reports no change. A changed
+access scope or probe transition also invalidates it. Before the next answer,
+it requests a fresh snapshot, then fresh recall. This includes ordinary-text
+forget requests handled inside ingestion. No stale snapshot, recall, tool
+schema, or prior tool-result text may remain in a rebuilt answer prompt.
 Report any selection
 in `stats` when inspected. The example's 16,384-byte bound is illustrative;
 the run manifest fixes one common bound for all arms, plus model token
@@ -355,19 +364,59 @@ Direct `forget`, whether given ids or text, is a separate component test; it
 cannot prove end-to-end natural-language forgetting. The runner never tags
 an ordinary input with the scorer's hidden intent classification.
 
+### Version 2: forgetting and recent conversation
+
+Every successful `ingest`, `forget`, and `tool` reply additionally contains:
+
+```json
+{"forget_effect":{"ran":false,"suppress_confirmation":false}}
+```
+
+Both flags describe the adapter's actual execution, never evaluator intent or
+an answer-key label. `ran` becomes true once an admitted forget action runs,
+including an uncertain result whose deletion may still commit. It is false
+for an earlier refusal or a bare occurrence of the word. The second flag is
+true when the forget turn's confirmation must stay out of recent history;
+it cannot be true while `ran` is false. The runner clears the entire common
+recent-conversation window when `ran` is true, and excludes that turn's
+scripted or generated confirmation when the second flag is true. Do not
+silently retain earlier exchanges or restore them at the next turn.
+
+This mirrors today's voice wrapper: an admitted `forget`/`forget_everything`
+attempt clears all scopes' exchanges, pending lines, written notes, unfinished
+heard text and running summaries. It re-arms invalidation after the call,
+because a timed-out deletion may still commit. A result other than explicit
+`forgotten: false` suppresses the confirmation from later history. Earlier
+identity/target/keep refusals do not trigger that clear. The ordinary common
+window uses the product's 12 exchanges within 600 seconds, with observed
+scope admission; fresh exchanges can establish a new window after clearing.
+
+Direct storage deletion is a separate component operation. Deleting a single
+record in the store does not itself clear today's voice thread; successful
+person/all deletion emits the product's forgetting event, which clears the
+thread when its summary/bus listener is active. The partial/current-product
+adapter records which path and listener configuration it exercises. A direct
+store-only component test cannot claim end-to-end voice forgetting parity.
+The version-2 `forget` operation means the adapter's admitted forgetting path;
+a store-only diagnostic must not silently acquire a stronger voice side effect.
+
+Version-1 terminal records can omit `forget_effect`; readers preserve that
+absence as unknown. They must not infer a successful clear, invent flags, or
+mix those records into a version-2 privacy result.
+
 ### Model calls through the runner
 
 An arm needs no network key. During an operation it may emit a model request
 instead of its terminal response:
 
 ```json
-{"v":1,"id":"r2","model_request":{"call_id":"m1","kind":"chat","purpose":"sleep","messages":[{"role":"user","content":"bounded input"}],"max_output_tokens":1024,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}}
+{"v":2,"id":"r2","model_request":{"call_id":"m1","kind":"chat","purpose":"sleep","messages":[{"role":"user","content":"bounded input"}],"max_output_tokens":1024,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}}
 ```
 
 The runner replies on stdin, then the adapter resumes the original operation:
 
 ```json
-{"v":1,"id":"r2","model_response":{"call_id":"m1","ok":true,"content":"{\"facts\":[]}","tool_calls":[],"usage":{"input_tokens":20,"output_tokens":4}}}
+{"v":2,"id":"r2","model_response":{"call_id":"m1","ok":true,"content":"{\"facts\":[]}","tool_calls":[],"usage":{"input_tokens":20,"output_tokens":4}}}
 ```
 
 On refusal or failure it returns `ok: false` and an `error` object instead of
