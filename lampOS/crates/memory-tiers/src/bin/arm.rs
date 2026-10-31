@@ -81,13 +81,13 @@ impl Wire {
     ) -> Result<String> {
         let input = input.json()?;
         let call_id = format!("tiers-model-{call}");
-        self.write(&json!({"v":1,"id":id,"model_request":{"call_id":call_id,"kind":"chat","purpose":if weekly{"reflect"}else{"sleep"},"messages":[{"role":"system","content":PROMPT},{"role":"user","content":input}],"max_output_tokens":config.max_output_tokens,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}})).await?;
+        self.write(&json!({"v":2,"id":id,"model_request":{"call_id":call_id,"kind":"chat","purpose":if weekly{"reflect"}else{"sleep"},"messages":[{"role":"system","content":PROMPT},{"role":"user","content":input}],"max_output_tokens":config.max_output_tokens,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}})).await?;
         let response =
             tokio::time::timeout(Duration::from_millis(config.model_timeout_ms), self.read())
                 .await
                 .map_err(|_| Error::Timeout)??
                 .ok_or(Error::Model("broker closed"))?;
-        if response["v"] != 1
+        if response["v"] != 2
             || response["id"] != id
             || response["model_response"]["call_id"] != call_id
         {
@@ -100,11 +100,14 @@ impl Wire {
         if !model["tool_calls"].as_array().is_some_and(Vec::is_empty) {
             return Err(Error::Model("unexpected model tools"));
         }
-        if model["usage"]["input_tokens"].as_u64().is_none()
-            || model["usage"]["output_tokens"].as_u64().is_none()
+        if !model["usage"].is_null()
+            && (model["usage"]["input_tokens"].as_u64().is_none()
+                || model["usage"]["output_tokens"].as_u64().is_none())
         {
-            return Err(Error::Model("missing broker usage"));
+            return Err(Error::Model("invalid broker usage"));
         }
+        // Unknown usage is permitted: the runner keeps its full reservation.
+        // The adapter never substitutes zero or owns a second cost ledger.
         let content = model["content"]
             .as_str()
             .ok_or(Error::Model("missing model content"))?;
@@ -228,7 +231,12 @@ fn timestamp(value: &Value) -> Result<i64> {
         .ok_or(Error::Invalid("missing operation time"))
 }
 fn valid_id(id: &str) -> Result<()> {
-    if id.is_empty() || id.len() > 128 || id.chars().any(char::is_control) {
+    if id.is_empty()
+        || id.len() > 128
+        || !id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"_-.:".contains(&c))
+    {
         return Err(Error::Invalid("invalid identifier"));
     }
     Ok(())
@@ -273,7 +281,7 @@ fn invalidate_snapshot(policy: &mut PolicyState) {
 }
 impl Adapter {
     async fn dispatch(&mut self, request: &Request, wire: &mut Wire) -> Result<Value> {
-        if request.v != 1 {
+        if request.v != 2 || !request.data.is_object() {
             return Err(Error::Invalid("unsupported protocol version"));
         }
         valid_id(&request.id)?;
@@ -287,7 +295,7 @@ impl Adapter {
             let init: Init = parse(request.data.clone())?;
             valid_id(&init.run_id)?;
             valid_id(&init.owner_id)?;
-            if init.owner_id.len() > 64
+            if init.owner_id.len() > 128
                 || init.timezone == "system"
                 || lamp_local_time::LocalTime::zone(&init.timezone).is_err()
             {
@@ -362,11 +370,16 @@ impl Adapter {
                 }
                 let mut sources = Vec::new();
                 let mut handled_control = false;
+                let mut forget_ran = false;
+                let mut suppress_confirmation = false;
                 if event.kind == "utterance" && access.owner && !event.heard.trim().is_empty() {
                     match command(&event.heard) {
                         Command::Forget(text) => {
                             handled_control = true;
-                            forget_text(context, &text)?;
+                            if let Some(removed) = forget_text(context, &text)? {
+                                forget_ran = true;
+                                suppress_confirmation = removed > 0;
+                            }
                             invalidate_snapshot(&mut context.policy);
                         }
                         Command::Pause => {
@@ -414,7 +427,7 @@ impl Adapter {
                 context.policy.event_ids.insert(event.record_id);
                 context.policy.clock = event.at_unix_ms;
                 Ok(
-                    json!({"accepted":(access.owner && access.alone)||handled_control,"source_ids":sources}),
+                    json!({"accepted":(access.owner && access.alone)||handled_control,"source_ids":sources,"forget_effect":{"ran":forget_ran,"suppress_confirmation":suppress_confirmation}}),
                 )
             }
             "sleep" => {
@@ -495,11 +508,13 @@ impl Adapter {
                     }
                     let n = context.store.forget_records(&ids)?;
                     prune_sources(context)?;
-                    n
+                    Some(n)
                 };
                 invalidate_snapshot(&mut context.policy);
                 context.policy.clock = at;
-                Ok(json!({"applied":removed>0,"removed_count":removed}))
+                Ok(
+                    json!({"applied":removed.is_some_and(|n|n>0),"removed_count":removed.unwrap_or(0),"forget_effect":{"ran":removed.is_some(),"suppress_confirmation":removed.is_some_and(|n|n>0)}}),
+                )
             }
             "probe_begin" => {
                 let id = string(&request.data, "probe_id")?;
@@ -538,7 +553,14 @@ impl Adapter {
                 }
                 scope(&query.person, &query.presence)?;
                 time_check(context.policy.clock, query.at_unix_ms)?;
-                if query.max_context_bytes > 1_048_576 {
+                valid_id(&query.probe_id)?;
+                if let Some(id) = &query.person_id {
+                    valid_id(id)?;
+                }
+                if matches!(query.person.as_str(), "owner" | "known") && query.person_id.is_none() {
+                    return Err(Error::Invalid("identified query needs a person id"));
+                }
+                if !(1..=1_048_576).contains(&query.max_context_bytes) {
                     return Err(Error::Invalid("context limit exceeds bound"));
                 }
                 if request.op == "snapshot" && !query.heard.is_empty() {
@@ -743,9 +765,9 @@ fn normalized(text: &str) -> Vec<String> {
         .map(str::to_owned)
         .collect()
 }
-fn forget_text(context: &mut Context, text: &str) -> Result<usize> {
+fn forget_text(context: &mut Context, text: &str) -> Result<Option<usize>> {
     if text.len() > MAX_RECORD_BYTES {
-        return Err(Error::Invalid("forget request too large"));
+        return Ok(None);
     }
     let records = context.store.records(Access::OWNER_ALONE)?;
     let clean = normalized(text).join(" ");
@@ -772,7 +794,7 @@ fn forget_text(context: &mut Context, text: &str) -> Result<usize> {
             .filter(|w| !ignored.contains(&w.as_str()))
             .collect::<BTreeSet<_>>();
         if words.is_empty() || words.len() > 64 {
-            return Err(Error::Invalid("forget target is empty or too broad"));
+            return Ok(None);
         }
         let matches = |text: &str| {
             let tokens: BTreeSet<_> = normalized(text).into_iter().collect();
@@ -794,7 +816,7 @@ fn forget_text(context: &mut Context, text: &str) -> Result<usize> {
         .store
         .forget_records(&ids.into_iter().collect::<Vec<_>>())?;
     prune_sources(context)?;
-    Ok(count)
+    Ok(Some(count))
 }
 fn prune_sources(context: &mut Context) -> Result<()> {
     let retained: BTreeSet<_> = context
@@ -824,9 +846,9 @@ async fn run() -> Result<()> {
         let response = adapter.dispatch(&request, &mut wire).await;
         let fatal = matches!(&response, Err(Error::Timeout | Error::Model(_)));
         let response = match response {
-            Ok(data) => json!({"v":1,"id":request.id,"ok":true,"data":data}),
+            Ok(data) => json!({"v":request.v,"id":request.id,"ok":true,"data":data}),
             Err(error) => {
-                json!({"v":1,"id":request.id,"ok":false,"error":{"code":match error {Error::Budget=>"budget",Error::Timeout=>"timeout",Error::Invalid(_)=>"invalid",Error::Model(_)=>"model",_=>"storage"},"message":match error {Error::Invalid(s)|Error::Model(s)=>s,_=>"operation failed"}}})
+                json!({"v":request.v,"id":request.id,"ok":false,"error":{"code":match error {Error::Budget=>"budget",Error::Timeout=>"timeout",Error::Invalid(_)=>"invalid",Error::Model(_)=>"model",_=>"storage"},"message":match error {Error::Invalid(s)|Error::Model(s)=>s,_=>"operation failed"}}})
             }
         };
         wire.write(&response).await?;

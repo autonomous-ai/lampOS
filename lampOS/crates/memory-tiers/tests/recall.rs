@@ -289,6 +289,7 @@ fn manifest_freezes_all_arms_before_scores() {
     let manifest: serde_json::Value =
         serde_json::from_str(include_str!("../arm-manifest.json")).unwrap();
     assert_eq!(manifest["repetitions"], 3);
+    assert_eq!(manifest["protocol_version"], 2);
     assert_eq!(manifest["arms"].as_array().unwrap().len(), Arm::ALL.len());
     for (i, arm) in Arm::ALL.iter().enumerate() {
         assert_eq!(manifest["arms"][i]["name"], arm.name());
