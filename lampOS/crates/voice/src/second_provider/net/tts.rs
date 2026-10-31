@@ -101,6 +101,8 @@ const ELEVENLABS_VOICES: &[(&str, &str)] = &[
     ("Yun", "YxbjaPemDJV2xlfvkiIG"),
     ("Evan Zhao", "MI36FIkp9wRP7cpWKPTl"),
     ("Jin", "vZZLclMx4wouUtKBRfZn"),
+    // Not V1's: Korean's voice (`language::Language::voice`, #4473).
+    ("Kanna", "5I7B1di44aCL15NkP0jn"),
 ];
 
 /// One request's URL, key header and body.
@@ -2398,6 +2400,19 @@ mod tests {
             "wss://api.elevenlabs.io/v1/text-to-speech/a3AkyqGG4v8Pg7SWQ0Y3/stream-input?model_id=eleven_flash_v2_5&output_format=pcm_24000&inactivity_timeout=60"
         );
         assert_eq!((direct.header, direct.value.as_str()), ("xi-api-key", "k"));
+        // Korean's voice is asked for by its id (#4473).
+        let korean = socket_request(
+            "https://api.elevenlabs.io/v1/",
+            "k",
+            Some(crate::language::Language::Korean.voice()),
+            None,
+        )
+        .unwrap();
+        assert!(
+            korean.url.contains("/text-to-speech/5I7B1di44aCL15NkP0jn/"),
+            "{}",
+            korean.url
+        );
         for (voice, model) in [(Some("a/b"), None), (None, Some("m&x")), (None, Some(""))] {
             assert_eq!(socket_request(PROXY, "k", voice, model), Err(Error::Url));
         }
