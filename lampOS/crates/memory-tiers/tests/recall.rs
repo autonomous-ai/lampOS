@@ -281,3 +281,38 @@ fn manifest_freezes_all_arms_before_scores() {
         assert_eq!(manifest["arms"][i]["label"], arm.description());
     }
 }
+
+#[test]
+fn snapshot_counts_only_returned_utf8_text_at_the_exact_cap() {
+    let mut s = seed();
+    s.ingest(Incoming {
+        text: "My café notebook is teal.".into(),
+        speaker: Speaker::Owner,
+        at_ms: NOW + 20,
+        stt_confidence: None,
+        strength: Strength::Said,
+        addressed_to_lamp: true,
+        topic: "notebooks".into(),
+        remember: false,
+    })
+    .unwrap();
+    let input = s
+        .prepare_sleep(NOW + 30, PassKind::Nightly)
+        .unwrap()
+        .unwrap();
+    s.apply_sleep(&input, &json!({"facts":[{"key":"teal","claim":"Keeps a teal café notebook.","record_ids":[2],"strength":"said","kind":"statement","true_since_ms":NOW+20,"true_until_ms":null,"supersedes":null}],"lines":[{"replaces":null,"kind":"owner_model","text":"Keeps a teal café notebook.","fact_ids":[],"fact_keys":["teal"]}],"episodes":[]}).to_string()).unwrap();
+    let mut q = query();
+    let result = s.snapshot(&q).unwrap();
+    assert_eq!(result.items.len(), 2);
+    let exact = result.instructions.len()
+        + result
+            .items
+            .iter()
+            .map(|line| line.text.len())
+            .sum::<usize>();
+    assert_eq!(result.bytes, exact);
+    q.max_bytes = exact;
+    assert_eq!(s.snapshot(&q).unwrap().items.len(), 2);
+    q.max_bytes = exact - 1;
+    assert_eq!(s.snapshot(&q).unwrap().items.len(), 1);
+}
