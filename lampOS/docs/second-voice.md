@@ -2787,8 +2787,8 @@ after a take-over, but now for every turn:
     poem…", "… ask Codex to write a haiku…") lost "Hey Lamp" to the lamp's
     own voice and were held as no conversation, "it was last heard saying
     words, to their end, 0 s ago" (the first builder at 01:50 and 02:04 on
-    #1712). With `LAMP_WINDOW_FROM_START=on` (off until its played check,
-    #4594), the thread's 45 s, the 20 s after the words and a call's 15 s
+    #1712). With `LAMP_WINDOW_FROM_START=on` (on in the product since 31 Oct,
+    #4594, #4604), the thread's 45 s, the 20 s after the words and a call's 15 s
     are measured to when the line began, not to its judging after it ended,
     so a line begun inside them goes on however long it runs: on lamp-3e83
     on 30 Oct a follow-up begun 9 s after the lamp's words and spoken for
