@@ -127,7 +127,10 @@ unattributed model invention can become a relationship in that graph.
    record-id ranges within each session. Code requires contiguous ranges
    covering every eligible record exactly once, without invented source
    text. This work adds nothing to the live reply path. The benchmark
-   compares it with a separately registered session-cutting-only setup. Mark importance from an
+   compares it with a separately registered session-cutting-only setup.
+   A forget during an in-flight topic pass cancels it or discards its result;
+   proposed ranges cannot name forgotten records, and eligible input excludes
+   fingerprinted text under the same rules as consolidation. Mark importance from an
    explicit request to remember, strong feeling, first mentions, plans,
    promises, names, dates, and repetition. Small talk is usually low priority.
 3. **Remember explicitly.** A direct request uses a fast path and is read
