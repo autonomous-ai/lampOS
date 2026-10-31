@@ -29,6 +29,9 @@ Restart=on-failure
 RestartSec=60s
 StandardInput=null
 SyslogIdentifier=lamp-first-stand
+# The owner's language, the voice's file (#4473): in vi, ja, zh or ko the lamp asks for the touch alone,
+# never a spoken yes, since that is heard by English words only (Fourth's finding on #4710).
+Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
 # The stand's folder is private to this unit (the reviewer-lead on #2541).
 PrivateTmp=yes
 

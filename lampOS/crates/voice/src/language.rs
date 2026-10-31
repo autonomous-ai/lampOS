@@ -299,6 +299,27 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 말이 막혔어요. 다시 물어봐 줄래요?",
         ],
     ),
+    // The first stand's ask and its "here I go", sent to the say service as
+    // text (Fourth's finding on #4710). In another language than English it
+    // asks for the touch alone, never the spoken yes.
+    (
+        lamp_body::first_stand::ASK_TOUCH_ONLY,
+        [
+            "Mình muốn vươn vai lần đầu tiên. Khi nào bạn sẵn sàng thì đặt tay lên đầu mình nhé.",
+            "はじめて体を伸ばしてみたいな。準備ができたら、頭に手をのせてね。",
+            "我想第一次伸个懒腰。你准备好了，就把手放在我头上吧。",
+            "처음으로 기지개를 켜 보고 싶어요. 준비되면 제 머리에 손을 올려 주세요.",
+        ],
+    ),
+    (
+        lamp_body::first_stand::GOING,
+        [
+            "Được rồi, mình bắt đầu đây.",
+            "よし、いくよ。",
+            "好，我开始啦。",
+            "좋아요, 시작할게요.",
+        ],
+    ),
 ];
 
 impl Language {
@@ -605,7 +626,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 16);
+        assert_eq!(FIXED_LINES.len(), 18);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
@@ -639,6 +660,30 @@ mod tests {
             fixed_in(None, crate::second_provider::LOOKING),
             crate::second_provider::LOOKING
         );
+        // The first stand's ask and "here I go" (#4710).
+        assert_eq!(
+            fixed_in(Some(Language::Korean), lamp_body::first_stand::GOING),
+            "좋아요, 시작할게요."
+        );
+        assert_eq!(
+            fixed_in(None, lamp_body::first_stand::ASK_TOUCH_ONLY),
+            lamp_body::first_stand::ASK_TOUCH_ONLY
+        );
+    }
+
+    /// The first stand reads the voice's language file, and takes a language
+    /// as not English exactly where the voice does.
+    #[test]
+    fn the_first_stand_reads_the_language_as_the_voice_does() {
+        use lamp_body::first_stand::{LANGUAGE_FILE, speaks_other_than_english};
+        assert_eq!(LANGUAGE_FILE, FILE_ENVIRONMENT);
+        for text in ["", "en", "vi", "ja\n", "zh", " ko ", "fr", "JA"] {
+            assert_eq!(
+                speaks_other_than_english(Some(text)),
+                matches!(Language::parse(text), Ok(Some(_))),
+                "{text:?}"
+            );
+        }
     }
 
     #[test]

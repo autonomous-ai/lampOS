@@ -435,8 +435,8 @@ mod tests {
             let (cache, calls) = counted(&dir, "Rachel");
             let cache = cache.speaking(Some(language));
             let lines = cache.warm_lines();
-            assert_eq!(lines.len(), 16 + WARM.len(), "{language:?}");
-            assert_eq!(&lines[16..], WARM);
+            assert_eq!(lines.len(), 18 + WARM.len(), "{language:?}");
+            assert_eq!(&lines[18..], WARM);
             let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
             assert_eq!(lines[1], words);
             assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));
