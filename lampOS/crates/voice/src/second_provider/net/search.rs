@@ -184,14 +184,40 @@ impl Search {
             return json!({"error": "a search needs a short query"});
         };
         let (url, header, body) = self.search_request(query);
+        let began = std::time::Instant::now();
         match tokio::time::timeout(WITHIN, self.ask(&url, header, &body)).await {
             Ok(Ok(answer)) => {
+                let searched = began.elapsed();
                 let told = results(&answer, query);
-                with_own_price(
-                    told,
-                    |own| async move { own_price(&self.client, &own).await },
-                )
-                .await
+                let note = told.get("note").cloned();
+                let read_began = std::time::Instant::now();
+                let told =
+                    with_own_price(
+                        told,
+                        |own| async move { own_price(&self.client, &own).await },
+                    )
+                    .await;
+                // How long the search and our page's read each took, so a
+                // slow answer can be split (#4684's run: 4.5 s to the first
+                // sound, nothing said).
+                if told.get("note").cloned() == note {
+                    eprintln!(
+                        "lamp-voice second: web_search answered in {} ms",
+                        searched.as_millis()
+                    );
+                } else {
+                    eprintln!(
+                        "lamp-voice second: web_search answered in {} ms; our page's price read in {} ms ({})",
+                        searched.as_millis(),
+                        read_began.elapsed().as_millis(),
+                        if told.get("price").is_some() {
+                            "read"
+                        } else {
+                            "not read"
+                        }
+                    );
+                }
+                told
             }
             Ok(Err(error)) => json!({"error": format!("the search failed: {error}")}),
             Err(_) => json!({"error": "the search did not answer in time"}),

@@ -1686,6 +1686,7 @@ fn second_route_worker_environment(
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
         crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+        crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
         crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -1850,6 +1851,7 @@ mod tests {
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+            crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
@@ -2504,6 +2506,7 @@ mod tests {
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
+                    || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
@@ -2683,6 +2686,7 @@ mod tests {
                     "LAMP_SCHEDULE_ASKED=on",
                     "LAMP_SECOND_CHAT_KEPT=on",
                     "LAMP_SECOND_CHAT_WARM=on",
+                    "LAMP_SECOND_CHECKING_LINE=on",
                     "LAMP_SECOND_CUE_AFTER_MS=on",
                     "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
                     "LAMP_SECOND_FACE_NAME=on",

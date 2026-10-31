@@ -222,6 +222,11 @@ pub const CHAIN_MOST_FOR: Duration = Duration::from_secs(20);
 pub const LOOK_CALL: &str = "take_a_look";
 /// What the lamp says as it looks by a call the model made with no words.
 pub const LOOKING: &str = "Let me look.";
+/// What the lamp says itself as a round with no words of its own begins a
+/// search (`web_search` or `fetch_page`), with [`CHECKING_LINE_ENVIRONMENT`]
+/// on: the search, our page's price read and the next round can take 4.5 s
+/// with nothing said (lamp-4ace on 31 Oct, #4684's run, line 1).
+pub const CHECKING: &str = "Let me check.";
 /// With Gemini's speech, the answer's first piece goes once this many words
 /// have come, if no sentence or clause ended sooner
 /// ([`Engine::cutting_first_words`]; the first builder on #1712: "cut at the
@@ -477,6 +482,13 @@ pub const SAID_ONCE_ENVIRONMENT: &str = "LAMP_SECOND_SAID_ONCE";
 /// until their second chat round: 2.4 to 3.3 s to the first sound, against
 /// 1.54 to 1.62 s for plain answers (#2135).
 pub const SAY_WITH_CALL_ENVIRONMENT: &str = "LAMP_SECOND_SAY_WITH_CALL";
+
+/// Where the worker reads whether the lamp says [`CHECKING`] itself as a
+/// round with no words of its own calls `web_search` or `fetch_page`, with
+/// nothing said yet in the turn, and tells the next round it was said
+/// ([`Engine::saying_checking`]): `on`, and nothing else. Said only when a
+/// search really runs, so it never promises one that isn't made (#4595).
+pub const CHECKING_LINE_ENVIRONMENT: &str = "LAMP_SECOND_CHECKING_LINE";
 
 /// Where the worker reads whether the chat is told a few emotion tags its
 /// voice may read ([`speech_tags`], [`Engine::speaking_tags`]): `on`, and
@@ -1027,6 +1039,8 @@ struct Shared {
     speech_tags: Option<bool>,
     /// [`Engine::answering_short`] (#2877).
     short_done: bool,
+    /// [`Engine::saying_checking`] (#4684).
+    checking_line: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// The lamp's own written turns may begin as late as
@@ -2618,6 +2632,7 @@ impl Engine {
                 declines_silent: false,
                 speech_tags: None,
                 short_done: false,
+                checking_line: false,
                 no_words_again: false,
                 written_wait: false,
                 resend: None,
@@ -3426,6 +3441,18 @@ impl Engine {
     pub fn answering_short(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.short_done = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_CHECKING_LINE=on` ([`CHECKING_LINE_ENVIRONMENT`],
+    /// #4684): a round with no words of its own that calls `web_search` or
+    /// `fetch_page`, with nothing said yet in the turn, is begun with the
+    /// lamp's own [`CHECKING`], said as the search runs, and the next round
+    /// is told it was said ([`said_once_note`]). Before any turn only.
+    pub fn saying_checking(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.checking_line = on;
         }
         self
     }
@@ -9886,6 +9913,20 @@ async fn answer(
             // Its own words doubt what was heard: a keep in it is not run
             // (#3504 finding N5).
             let doubted = crate::remember::doubted::doubts_what_was_heard(&text);
+            // A search begun with nothing said: the lamp says it is checking,
+            // as it does for a look (`LAMP_SECOND_CHECKING_LINE`, #4684).
+            let checking = shared.checking_line
+                && !queue.started
+                && !text.chars().any(char::is_alphanumeric)
+                && calls
+                    .iter()
+                    .any(|call| call.name == net::search::NAME || call.name == net::search::FETCH);
+            if checking {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round} searches with nothing said; said \"{CHECKING}\" (LAMP_SECOND_CHECKING_LINE)"
+                );
+                queue.push(CHECKING.to_owned()).await?;
+            }
             messages.push(Message::assistant_calls_with(
                 Some(text),
                 &calls,
@@ -10290,6 +10331,9 @@ async fn answer(
                     "lamp-voice second: request {request} chat round {round} said words before its calls: the next round is told they were heard"
                 );
                 messages.push(Message::system(note));
+            }
+            if checking {
+                messages.push(Message::system(said_once_note(CHECKING)));
             }
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
