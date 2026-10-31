@@ -818,10 +818,11 @@ pub(crate) fn timer_line(
 /// one, so it leans to more. The words are cut into clauses at a sentence's
 /// end (not a point between digits, "2.5"), a comma or semicolon, and
 /// "and", "also", "then" or "plus"; a clause of only thanks, a greeting, the
-/// name or "okay" asks nothing, nor does a greeting and one word, the name
-/// however it was heard ("Hey Lynn," for "Hey Lamp,": candidate 9276 on
-/// lamp-4ace, the first builder on #4710, 21:4x); a call's own words ("take
-/// out the trash and recycling", a reminder's `text`) are its ask. It is more when a clause
+/// name or "okay" asks nothing, nor does a greeting and the name however it
+/// was heard, a word written capitalized as a name or a letter from "lamp"
+/// ("Hey Lynn," for "Hey Lamp,": candidate 9276 on lamp-4ace, the first
+/// builder on #4710, 21:4x; "Okay music." stays an ask); a call's own words
+/// ("take out the trash and recycling", a reminder's `text`) are its ask. It is more when a clause
 /// holds no word of a light, the volume or a timer ("what's the weather"),
 /// when a clause after the first is a question ("Make it cozy, what's on my
 /// calendar today?", where "on" alone would pass), or when there are more
@@ -838,7 +839,8 @@ pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
         "thanks", "thank", "you", "please", "okay", "ok", "cheers", "lamp", "hey", "hi", "hello",
         "great", "cool", "now", "so", "oh", "much", "very",
     ];
-    // A clause of one of these and one more word calls the lamp by its name.
+    // A clause of one of these and the name, however it was heard, calls
+    // the lamp.
     const GREETING: [&str; 5] = ["hey", "hi", "hello", "okay", "ok"];
     const ASKING: [&str; 21] = [
         "what", "what's", "whats", "how", "how's", "when", "where", "who", "who's", "why", "which",
@@ -851,6 +853,23 @@ pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
         "volume", "sound", "music", "timer", "remind", "minute", "second", "hour", "alarm",
     ];
     const TURNING: [&str; 6] = ["on", "off", "up", "down", "turn", "switch"];
+    // A greeting's next word is the name only as speech to text writes a
+    // name, capitalized ("Hey Lynn", "Okay Lamb"), or a letter from "lamp":
+    // an ask after "okay" with no comma ("Okay music.") stays an ask
+    // (Reviewer-three's P3 on #4789).
+    let heard: Vec<&str> = said
+        .split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .filter(|word| !word.is_empty())
+        .collect();
+    let names: Vec<String> = heard
+        .windows(2)
+        .filter(|pair| {
+            GREETING.contains(&pair[0].to_lowercase().as_str())
+                && pair[1].chars().next().is_some_and(char::is_uppercase)
+        })
+        .map(|pair| pair[1].to_lowercase())
+        .collect();
+    let a_name = |word: &str| names.iter().any(|name| name == word) || one_from(word, "lamp");
     let mut line = said.to_lowercase();
     for text in calls.iter().filter_map(|call| call.args["text"].as_str()) {
         let text = text.trim().to_lowercase();
@@ -902,7 +921,7 @@ pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
                 continue;
             }
             let last = word.is_none();
-            let called = clause.len() == 2 && GREETING.contains(&clause[0]);
+            let called = clause.len() == 2 && GREETING.contains(&clause[0]) && a_name(clause[1]);
             if !called && clause.iter().any(|word| !FILLER.contains(word)) {
                 clauses += 1;
                 let changes = clause.iter().any(|word| {
@@ -918,6 +937,23 @@ pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
         }
     }
     clauses > calls.len().max(1)
+}
+
+/// Whether `word` is `other` but for at most one letter changed, added or
+/// left out ("lamb", "lam" and "lamps" for "lamp").
+fn one_from(word: &str, other: &str) -> bool {
+    let (a, b): (Vec<char>, Vec<char>) = (word.chars().collect(), other.chars().collect());
+    let (short, long) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+    if long.len() - short.len() > 1 {
+        return false;
+    }
+    let same = short.iter().zip(&long).take_while(|(x, y)| x == y).count();
+    if same == short.len() {
+        return true;
+    }
+    // One changed where they part, or one more in the longer.
+    let changed = usize::from(short.len() == long.len());
+    short[same + changed..] == long[same + 1..]
 }
 
 /// An `HH:MM` clock on a 12-hour clock: "07:52" is "7:52 am", "19:52"
