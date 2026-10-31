@@ -1,5 +1,47 @@
 # Tiers work log
 
+## 2026-10-31: bounded nightly topic segmentation
+
+[PR #4783](https://github.com/autonomous-ai/lampOS/pull/4783), head
+`7d6d0a236`, adds the lead's pre-score topic comparison on top of #4777.
+The model returns only contiguous record-id ranges for a closed session;
+code checks exact coverage, current membership and forgetting before applying.
+All ten removals retain the boundary pass; `tiers_session_cutting_only`
+preserves the prior consolidation path. No model call enters live recall.
+
+The output allowance is 64 plus the compact all-singleton reply's UTF-8 size,
+or `78 + sum(39 + 2 * decimal_digits(id))` for positive ids. Six one-digit
+records reserve 324 tokens. Batches stop at 128 records, 64 KiB or the configured
+output ceiling with explicit continuation. Canonical size and measured token
+overruns fail closed; oversized replies with unknown usage are refused.
+
+The Mac workspace and source-only copy each passed 100 functional tests and
+three API checks, with original deadlines and one test thread. Formatting,
+strict all-target clippy and the workspace build passed. A parallel attempt
+hit shared-host subprocess timeouts; the prior green executable also took
+7.0 seconds for start/init/close, versus 8.1 seconds for the new build, while
+process-only startup was about 8 ms. No deadline was relaxed. Native ARM64
+41209271034 and strict Linux clippy 41209271111 are pending on this head.
+
+Regression checks cover in-flight forget cancellation, forgotten endpoints,
+fingerprinted input, residual timestamps, inherited importance, recent recall,
+wire-session isolation, schema upgrade/reopen, bounded replies and accounting.
+Residual-time, recency and inherited-importance tests failed before their fixes.
+The pinned Mac executable verified its revision and passed all twelve runner
+smokes: 144 operations, zero model calls and zero memory deadline misses.
+The shared slot was released after cleaning 6.6 GiB; evidence remains preserved.
+Bench is building the topic-aware recorded provider for the registered pass.
+Native CI, independent review, live calls and scorecards remain separate gates.
+
+The earlier diagnostics checkpoint at `62e092173` is now undrafted: ARM64
+41205204042 passed 13,018 tests (107 skipped) plus doctests, Linux clippy
+41205204063 passed, and Tests and Reviewer-three recorded READ-OK. Its v4 month
+run completed 2,220 events, 200 isolated probes and 224 answer turns, with
+diagnostics on every probe. The verified 4,936-entry ledger ends at
+`000ce5c6873d48901fc160400c8ad12d8c76b8691d493c6831c91cbdaf7037ba`.
+Its 266 calls used recorded replies, with no live calls or scores. Empty modeled
+tiers are not exercised evidence. No product caller or lamp changed.
+
 ## 2026-10-31: optional diagnostics checkpoint
 
 [PR #4777](https://github.com/autonomous-ai/lampOS/pull/4777), head
