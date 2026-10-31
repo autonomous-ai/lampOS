@@ -1,3 +1,11 @@
+## 2026-10-31 10:4x ICT — #4700 lands; its 4ace run asked; a catalog test flake (#4715)
+
+**#4700 landed in train 448** (`3ed3cb0aa2`, `65b10836e0`), with `LAMP_SECOND_SAY_WITH_CALL` off. I asked the first builder for `4ACE RUN #4700` on the Queue: their #4635 day lines with it on and off, `LAMP_SHORT_DONE` on in lamp-actions' unit, and the light started below its warmest, because three of their four warmer turns at 07:51 were unchanged calls, which #4700 never answers at once. It also covers the ErgoChair price line with `LAMP_SECOND_CHECKING_LINE` on. #2135 says it waits on that run.
+
+**#4713 (the look and check lines in four languages) sat out train 448:** its own ARM64 run was red on `provider_worker::tests::catalog::the_light_back_soon_after_a_renewal_for_it_gone_renews_at_once`, which it doesn't touch. I re-ran the job.
+
+**#4715, that flake:** the rig's heartbeat was refused because the worker had ended. The worker ends after 250 ms with no control message and an empty queue, and the catalog tests ran on the host's clock, so one stall of a busy runner was enough. A 300 ms await with no heartbeat reproduces it on this Mac at CI's line. The fix holds the rig's scenario clock (#1128) in the seven catalog tests, with the runtime left unpaused so Tokio's keepalive and read timers aren't fast-forwarded during the catalog's real-time looks. 20 of 20 runs pass, and `provider_worker::` gives 281 passed. Its READ ASK is on the Queue, as part of #1339.
+
 ## 2026-10-31 10:2x ICT — the price read lands and passes on 4ace; say-at-once, the checking line, the look and check lines in the owner's language; two flaky tests
 
 **#4684 (the price read) landed in train 442** and passed on lamp-4ace at 08:33 (the first builder's `4ACE RUN #4684`): "$499 on their own page", where at 05:41 it had said "449 euro". But it took 4.5 s with nothing said, and line 3 was a new failure, "Let me check that one." with no call, which is #4595's case and Thirteen's #4711.
