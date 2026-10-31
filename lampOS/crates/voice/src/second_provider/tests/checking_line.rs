@@ -32,8 +32,13 @@ fn calls(names: &[&str]) -> Vec<net::Result<ChatEvent>> {
 }
 
 /// "How much is an Aeron chair?" with round 1's `first` events, then
-/// round 2's [`ANSWER`], the switch `on`.
-fn checking_turn(on: bool, first: Vec<net::Result<ChatEvent>>) -> Went {
+/// round 2's [`ANSWER`], the switch `on`, the owner's `language` (`None`:
+/// English).
+fn checking_turn(
+    on: bool,
+    language: Option<crate::language::Language>,
+    first: Vec<net::Result<ChatEvent>>,
+) -> Went {
     let second = vec![text(ANSWER), Ok(ChatEvent::Done)];
     let script = Arc::new(Script {
         heard: Mutex::new([Ok("How much is an Aeron chair?".to_owned())].into()),
@@ -48,7 +53,8 @@ fn checking_turn(on: bool, first: Vec<net::Result<ChatEvent>>) -> Went {
         Arc::new(Instant::now),
     )
     .announcing(false)
-    .saying_checking(on);
+    .saying_checking(on)
+    .in_language(language);
     let labels = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -63,7 +69,10 @@ fn checking_turn(on: bool, first: Vec<net::Result<ChatEvent>>) -> Went {
         .into_iter()
         .filter(|label| label.starts_with("said:"))
         .collect();
-    let told = format!("you already said aloud \"{CHECKING}\"");
+    let told = format!(
+        "you already said aloud \"{}\"",
+        crate::language::fixed_in(language, CHECKING)
+    );
     let noted = script
         .asked
         .lock()
@@ -86,7 +95,7 @@ fn checking_turn(on: bool, first: Vec<net::Result<ChatEvent>>) -> Went {
 fn a_search_begun_with_nothing_said_is_begun_with_let_me_check() {
     for name in ["web_search", "fetch_page"] {
         assert_eq!(
-            checking_turn(true, calls(&[name])),
+            checking_turn(true, None, calls(&[name])),
             Went {
                 said: vec![format!("said:{CHECKING}"), format!("said: {ANSWER}")],
                 noted: true
@@ -110,7 +119,7 @@ fn no_checking_line_when_off_beside_its_own_words_or_without_a_search() {
         ("its own words", true, worded()),
         ("not a search", true, calls(&["get_weather"])),
     ] {
-        let went = checking_turn(on, first);
+        let went = checking_turn(on, None, first);
         assert!(!went.noted, "{why}: {went:?}");
         assert!(
             !went
@@ -122,6 +131,31 @@ fn no_checking_line_when_off_beside_its_own_words_or_without_a_search() {
         assert!(
             went.said.iter().any(|said| said.ends_with(ANSWER)),
             "{why}: {went:?}"
+        );
+    }
+}
+
+/// With an owner's language the lamp's own line is said in it, and the next
+/// round is told that line, never the English (#4473; `language::FIXED_LINES`
+/// since #4713), as the product turns the switch on (#4707).
+#[test]
+fn a_search_begun_with_nothing_said_is_begun_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    for language in [
+        Language::Vietnamese,
+        Language::Japanese,
+        Language::Chinese,
+        Language::Korean,
+    ] {
+        let line = fixed_in(Some(language), CHECKING);
+        assert_ne!(line, CHECKING, "{language:?} has its own words");
+        assert_eq!(
+            checking_turn(true, Some(language), calls(&["web_search"])),
+            Went {
+                said: vec![format!("said:{line}"), format!("said: {ANSWER}")],
+                noted: true
+            },
+            "{language:?}"
         );
     }
 }
