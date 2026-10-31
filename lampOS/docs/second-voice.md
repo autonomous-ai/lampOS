@@ -821,7 +821,8 @@ order is kept. A written turn is the same from the chat on.
     lamp said it (`short_done_note`), when the person's words plainly hold
     more (`asks_more`): cut into clauses at a sentence's end (not a point
     between digits), a comma or semicolon, or "and", "also", "then" or
-    "plus", with a clause of only thanks, a greeting, the name or "okay"
+    "plus" (not an "and" before "a half", "half" or "a quarter", "two and a
+    half minutes" as speech to text writes it), with a clause of only thanks, a greeting, the name or "okay"
     left out and a call's own words (a reminder's `text`) taken as its ask,
     it is more when a clause holds no word of a light, the volume or a timer,
     when a clause after the first is a question, or when there are more
@@ -832,6 +833,12 @@ order is kept. A written turn is the same from the chat on.
     "It's too bright.", "Make it warmer and brighter." (two calls) and "Make
     it warmer. Thanks!" end with them (Reviewer-three's P2s on #4726 and
     #4729).
+  - **The model is told to say nothing beside such a call**
+    (`worker::QUIET_WITH_CALL_NOTE`, with the at-once words on): its words
+    in that reply come before the result. If it speaks anyway and each call
+    did what was asked (lamp-actions' short `say`, or a timer set), a single
+    ask ends with those words, with no round 2. If a change didn't happen,
+    the next round says so.
   - **In English only:** those words are English, so with an owner's
     language chosen (`language::at_start()`: Vietnamese, Japanese, Chinese
     or Korean) such turns wait for the model's words as without the switch,
@@ -852,7 +859,18 @@ order is kept. A written turn is the same from the chat on.
   It rings at 12:03 pm." then "Two minutes — I'll nudge you at 12:03." (the
   first builder on #4710). The light and timer turns were 0.6–1.4 s faster,
   at Live's pace. So only the result's own words are said early now, and a
-  single ask ends with them.
+  single ask ends with them. The rerun on `c08b4c08f6` (14:48–15:33) held
+  the pace, 1.5–2.0 s against 2.6–3.5 s, and answered both halves of
+  "Brighter, and is it sunny?". Two lines were still said twice:
+  - "Warmest it is." then "I'm already as warm as I go": the model's own
+    words with the call, then a result of no change;
+  - "Timer set. It rings at 3:35 pm." then "Two and a half minutes…":
+    `asks_more` split at "two and a half".
+
+  So the model is now told to say nothing beside the call, a round whose
+  words came with calls that each did what was asked ends there, and a
+  fraction's "and" joins nothing (the first builder and Reviewer-three on
+  #4710).
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The

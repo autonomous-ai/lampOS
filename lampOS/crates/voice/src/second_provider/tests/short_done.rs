@@ -462,6 +462,83 @@ fn say_at_once_never_answers_a_keep_a_refusal_or_the_models_own_words() {
     }
 }
 
+/// The model's own words with calls that each did what was asked end a
+/// single ask: the next round would only say it again (the first builder's
+/// run of 31 Oct, 15:34). A change that didn't happen ("already"), or more
+/// asked, still asks the next round, which says so.
+#[test]
+fn the_models_own_words_with_calls_that_did_what_was_asked_end_a_single_ask() {
+    let again = || vec![vec![text("Brighter it is!"), Ok(ChatEvent::Done)]];
+    let worded = |words: &str, names: &[&str]| {
+        let mut first = vec![text(words)];
+        first.extend(calling(names));
+        first
+    };
+    assert_eq!(
+        turn_with(
+            true,
+            true,
+            "Make it brighter.",
+            worded("Brighter it is.", &["light_brighter"]),
+            again()
+        ),
+        Went {
+            said: said(&["Brighter it is."]),
+            asked: 1,
+            ran: 1,
+            noted: false
+        }
+    );
+    assert_eq!(
+        turn_with(
+            false,
+            true,
+            "Set a timer for two and a half minutes.",
+            worded("Two and a half minutes.", &["set_timer"]),
+            again()
+        )
+        .asked,
+        1
+    );
+    // Already orange: the change didn't happen, and the next round says so.
+    let already = vec![vec![text("It's already orange."), Ok(ChatEvent::Done)]];
+    let went = turn_with(
+        true,
+        true,
+        "Make it orange.",
+        worded("Orange it is.", &["light_colour"]),
+        already,
+    );
+    assert_eq!(went.asked, 2, "{went:?}");
+    assert!(
+        went.said
+            .iter()
+            .any(|said| said.ends_with("It's already orange."))
+    );
+    // More asked: the next round answers it.
+    let sunny = vec![vec![text("And yes, it is sunny."), Ok(ChatEvent::Done)]];
+    let went = turn_with(
+        true,
+        true,
+        "Brighter, and is it sunny?",
+        worded("Brighter it is.", &["light_brighter"]),
+        sunny,
+    );
+    assert_eq!(went.asked, 2, "{went:?}");
+    // Without the switch, as today: the next round runs.
+    assert_eq!(
+        turn_with(
+            true,
+            false,
+            "Make it brighter.",
+            worded("Brighter it is.", &["light_brighter"]),
+            again()
+        )
+        .asked,
+        2
+    );
+}
+
 /// The clock said on a 12-hour clock (Thirteen's P3 on #4700).
 #[test]
 fn a_clock_is_said_on_a_12_hour_clock() {
@@ -590,6 +667,15 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
             calls(&["light_warmer"]),
         ),
         ("Make it cozy.", calls(&["light_warmer", "light_dimmer"])),
+        (
+            "Set a timer for two and a half minutes.",
+            calls(&["set_timer"]),
+        ),
+        ("Set a timer for an hour and a half.", calls(&["set_timer"])),
+        (
+            "Remind me in one and a half hours to call.",
+            reminder("call"),
+        ),
     ] {
         assert!(!asks_more(one, &called), "{one}");
     }
@@ -603,6 +689,7 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
         "Make it warmer and brighter.",
         "Make it warmer, how warm is it outside?",
         "What's the weather and make it warmer.",
+        "Set a timer for two minutes and a half and tell me a joke.",
     ] {
         assert!(asks_more(more, &calls(&["light_warmer"])), "{more}");
     }
