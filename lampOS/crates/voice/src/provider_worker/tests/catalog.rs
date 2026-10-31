@@ -4,6 +4,13 @@
 //! with them, is renewed between turns, once, opened fresh; never while a
 //! turn is open, nor while a conversation is going on unless it brings back
 //! what the session was told it cannot do (Jarvis on #1513).
+//!
+//! Each test holds the rig's scenario clock (#1128) on a runtime that is not
+//! paused, so the worker's heartbeat bound (250 ms with nothing queued) and
+//! the rig's leases count the rig's ticks, not the host's time: a loaded
+//! runner that stalls the test between two heartbeats no longer ends the
+//! worker (ARM64 on 31 Oct: `provider.c.p` refused, the worker gone). The
+//! catalog's looks and bounds, and Tokio's own timers, stay on the host's.
 use super::*;
 use crate::session_tools::Given;
 use std::sync::Arc;
@@ -90,6 +97,7 @@ fn quiet() -> bool {
 /// after it is to be opened fresh, and the worker dials it.
 #[tokio::test]
 async fn a_catalog_that_gained_the_light_renews_the_session_between_turns_once() {
+    let _clock = logical_clock();
     let folder = Folder::new("gained");
     let (mut rig, given) = rig(&folder, quiet);
     let _dial = rig.ready().await;
@@ -146,6 +154,7 @@ async fn a_catalog_that_gained_the_light_renews_the_session_between_turns_once()
 /// of a kind it has taken away.
 #[tokio::test]
 async fn no_renewal_while_a_conversation_is_going_on() {
+    let _clock = logical_clock();
     for (name, now) in [
         (
             "talking-other",
@@ -169,6 +178,7 @@ async fn no_renewal_while_a_conversation_is_going_on() {
 /// works.
 #[tokio::test]
 async fn the_light_back_renews_while_a_conversation_is_going_on() {
+    let _clock = logical_clock();
     let folder = Folder::new("talking-light");
     let (mut rig, given) = rig(&folder, talking);
     let _dial = rig.ready().await;
@@ -192,6 +202,7 @@ async fn the_light_back_renews_while_a_conversation_is_going_on() {
 /// at the next gap, not after the 30 s bound with the lamp refusing.
 #[tokio::test]
 async fn the_light_back_soon_after_a_renewal_for_it_gone_renews_at_once() {
+    let _clock = logical_clock();
     let folder = Folder::new("back-soon");
     let (mut rig, given) = rig(&folder, quiet);
     let settings = crate::tools::Settings {
@@ -251,6 +262,7 @@ async fn the_light_back_soon_after_a_renewal_for_it_gone_renews_at_once() {
 /// (the reviewer on #1588).
 #[tokio::test]
 async fn a_light_gone_and_back_three_times_in_a_conversation_renews_once() {
+    let _clock = logical_clock();
     let folder = Folder::new("flap");
     let (mut rig, given) = rig(&folder, talking);
     let settings = crate::tools::Settings {
@@ -319,6 +331,7 @@ async fn a_light_gone_and_back_three_times_in_a_conversation_renews_once() {
 #[tokio::test]
 async fn the_light_back_renews_at_the_first_short_gap_between_owned_turns() {
     use lamp_turn_owner::AdmittedInput;
+    let _clock = logical_clock();
     let folder = Folder::new("short-gap");
     let (mut rig, given) = rig_looking(&folder, talking, Duration::from_millis(500));
     let _dial = rig.ready().await;
@@ -353,6 +366,7 @@ async fn the_light_back_renews_at_the_first_short_gap_between_owned_turns() {
 /// Nor while a person's turn is open: the person switch's own condition.
 #[tokio::test]
 async fn no_renewal_while_a_turn_is_open() {
+    let _clock = logical_clock();
     let folder = Folder::new("open");
     let (mut rig, given) = rig(&folder, quiet);
     let mut dial = rig.ready().await;
