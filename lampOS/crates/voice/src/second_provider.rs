@@ -3700,11 +3700,14 @@ impl Engine {
     /// was asked of a light, the volume or one timer is answered at once by
     /// the part that acted: the calls' own short line ([`short_done_line`],
     /// lamp-actions' `"say"` with `LAMP_SHORT_DONE`), or the timer's
-    /// [`timer_line`] from its own answer. The next round still runs, told
-    /// the lamp said it ([`short_done_note`]), for anything else asked; it
+    /// [`timer_line`] from its own answer. A light call that changed
+    /// nothing says its own "already" at once too (#4759). The next round
+    /// still runs, told the line was already said aloud
+    /// ([`said_at_once_note`]), for anything else asked ([`asks_more`]); it
     /// is no longer waited for. Never for a keep, a forget, a call that
-    /// needs a yes, or one refused, failed, held or unchanged: those turns
-    /// go on as without the switch. Before any turn only.
+    /// needs a yes, one refused, failed or held, or calls that differ with
+    /// one of them unchanged: those turns go on as without the switch.
+    /// Before any turn only.
     pub fn saying_at_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.say_at_once = on;
