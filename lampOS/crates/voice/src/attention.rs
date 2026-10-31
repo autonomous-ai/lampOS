@@ -5618,6 +5618,58 @@ mod tests {
         assert!(matches!(on, Some(Verdict::Hold(_))), "{on:?}");
     }
 
+    /// The switch's cost (the first builder on #3923, 31 Oct): someone's
+    /// "Lamp, …" begun within [`REPEAT_WITHIN_US`] of another person's line.
+    /// After a line ending in "…the lamp." only the name is the same, and
+    /// it calls by its text as before. Only a line whose last words are the
+    /// name and what follows it ("Just ask the lamp, what time is it.")
+    /// takes the text's call from "Lamp, what time is it?"; the name heard
+    /// in its sound by `lamp-name` still calls it.
+    #[test]
+    fn a_call_right_after_a_line_ending_in_the_name_still_calls() {
+        const S: u64 = 1_000_000;
+        let judged = |before: &str, line: &str, heard_at: Option<u64>| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ignore_name_in_passing(true);
+            attention.count_stand_alone_ins(true);
+            attention.not_calling_on_a_repeat(true);
+            attention.began_at(70, 7, 10 * S);
+            attention.heard(before);
+            attention.ended(70, 12 * S);
+            attention.first_output_busy(70, Room::Busy, false, false, None);
+            attention.began_at(71, 7, 12 * S + 300_000);
+            if let Some(at) = heard_at {
+                attention.name_heard(at);
+            }
+            attention.heard(line);
+            attention.ended(71, 14 * S);
+            (
+                attention.first_output_busy(71, Room::Busy, false, false, None),
+                attention.call_taken_as_a_repeat(),
+            )
+        };
+        let call = "Lamp, what time is it?";
+        for before in [
+            "Can you pass me the lamp.",
+            "I keep talking to the lamp",
+            "Ask the lamp.",
+        ] {
+            assert_eq!(
+                judged(before, call, None),
+                (Some(Verdict::Play(CALLED_IN_TEXT)), None),
+                "{before:?} then {call:?}"
+            );
+        }
+        // Two words the same: the text no longer calls, the hearing does.
+        let before = "Just ask the lamp, what time is it.";
+        let (verdict, taken) = judged(before, call, None);
+        assert!(matches!(verdict, Some(Verdict::Hold(_))), "{verdict:?}");
+        assert_eq!(taken, Some((5, 300_000)));
+        let (verdict, _) = judged(before, call, Some(12 * S + 300_000));
+        assert!(matches!(verdict, Some(Verdict::Play(_))), "{verdict:?}");
+    }
+
     /// The same when the line before's words are written late: the carry
     /// happens exactly when they are not back as the next line begins, and
     /// on the second route that line can even be judged before the one said
