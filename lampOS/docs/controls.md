@@ -67,7 +67,8 @@ the button and the reset are unchanged.
   on `controls/touch` and its source on `controls/touch_state`. Their
   readers (Voice's hand controls, onboarding and bus out, Expression,
   `lamp-setup`, the self-test's touch by hand, cloud skills' `touch`
-  trigger) see no strip event while the switch is off. Tests:
+  trigger, `lamp-skills`, whose runs a touch stops, and `lamp-control`,
+  which passes it on) see no strip event while the switch is off. Tests:
   `tests/it/touch_runtime.rs`
   (`the_strip_switch_off_means_no_strip_event_with_a_hand_on_it`,
   `the_strip_timing_is_the_boards_and_defaults_without_it`).
@@ -545,8 +546,12 @@ mean a newly acquired sample.
 ### Reader, startup and shutdown
 
 The new pins schema has `chip`, `buttons`, `head_pads`, `every_ms`, optional
-`reset`, optional `base` and optional `legacy_head` (false unless set; see
-above). Only chip 0 is allowed. Optional primary is line 99; reset is
+`reset`, optional `base`, optional `legacy_head` (false unless set; see
+above), and the optional head and strip timings (`head_qualify_ms`,
+`head_tap_min_ms`, `head_gap_ms`, `strip_qualify_ms`, `strip_release_ms`,
+`strip_stroke_ms`, `strip_sleep_ms`), `head_rest` and `privacy`
+(`crates/controls/src/touch_pins.rs`). Only chip 0 is allowed for the
+buttons and pads; `privacy` names its own chip. Optional primary is line 99; reset is
 active-low line 100, pulled up, in its own field. Head candidates are
 37/96/97/98, selected and polarized per unit. Names/lines are unique. The
 buttons match the Controls configuration's. The head pads are the pins
@@ -557,7 +562,10 @@ product's pins naming four. The pins decide the head pads; the settings
 only check the names both give. So a settings file naming none no longer
 keeps the head off beside pins that name some. A Controls that refused to
 start would close the microphones on the privacy route. The privacy
-switch, chip 1 line 9, remains Voice's. A base requires `base_selected_mask`
+switch, chip 1 line 9, is Controls' with `LAMP_PRIVACY_CONTROLS=on`, as the
+product's units set it: the pins file's `privacy`, and Voice leases the
+microphones from Controls ([privacy-switch.md](privacy-switch.md)). Without
+the switch it stays Voice's. A base requires `base_selected_mask`
 to exactly match its working
 electrodes (4095 for all twelve, 3823/0x0EEF for lamp-4ace's ten), and a complete
 explicit profile: twelve independently specified touch thresholds and twelve
@@ -573,8 +581,9 @@ number, not by position in the working list. Each release threshold is below
 that electrode's touch threshold.
 
 An I²C child does all reset, calibration and reads. The parent runs GPIO and
-the nonblocking socket, draining at most 32 acquisitions from each per 2 ms
-step. `controls/touch_state` is said at once when what a reader acts on
+the nonblocking socket, draining at most 32 acquisitions from each per
+step: 2 ms (`runtime::POLL_US`), or 1 ms (`privacy::STEP_US`) with the
+privacy route on, as in the product. `controls/touch_state` is said at once when what a reader acts on
 changes (a press, a release, a contact, a fault; its times aside: when it
 was said, and when each source was last read), with an event, and every
 100 ms otherwise, as declared. What only grows or moves while a hand stays
@@ -951,7 +960,7 @@ are simultaneous. If one configured input cannot be read, report the fault;
 do not fill its value with the previous sample. Omit truly absent optional
 inputs from configuration before starting instead of silently changing it.
 
-The runtime targets one step every 2 ms, drains at most 64 observations per
+The runtime targets one step every 2 ms (1 ms with the privacy route on), drains at most 64 observations per
 step, ages a sample after the adapter returns, and faults on a full drain.
 These are software budgets, not hard scheduling guarantees. `controls.lock`
 allows one process per bus root. The OS releases the lock when a process dies.
@@ -1059,8 +1068,9 @@ reading failed, the longest step 0.5 ms, and all three inputs at rest
 throughout. `controls/state` was published.
 
 **Running on lamp-4ace since 11:03 the same day**, as its own unit
-(`deploy/lamp-4ace/lamp-controls.service`), watching only: no `--enable`, so
-its gestures say `enabled:false` and nothing acts on them. Its two files sit
+(`deploy/lamp-4ace/lamp-controls.service`), watching only then: no `--enable`, so
+its gestures said `enabled:false` and nothing acted on them. That unit now
+passes `--enable --touch`. Its two files sit
 beside its build in `/opt/lampOS/controls/<sha>/`, because `/etc/lampOS` is
 root's alone and the first start, with them there, failed on "Permission
 denied". It says `controls/state` on the bus, and since 11:17 it writes one
@@ -1345,7 +1355,8 @@ apply. Replays open no GPIO, audio, I2C or Bus. Selected ordinary touch replay
 adds an optional `controls` state beside its existing touch output; privacy-only
 touch replay emits the ordinary Controls replay frames. Off output omits these
 additions. That replayed `controls` state models the button alone: a recording
-from pins with `legacy_head` (the product's) replays with no `head_active` and
+from pins with `legacy_head` (the product's then; its pins have none now,
+and it runs `serve --touch`) replays with no `head_active` and
 no head `Pet` there, though the live `controls/state` has both (the reviewer on
 #795).
 
@@ -1619,8 +1630,9 @@ the press-carrying inputs queued and not yet taken (`Shared::pressing`).
 The release sets the record's time to its look, best effort; without it
 the floor is the save's own write, a moment later.
 
-The switch stays off on the product until Monday's check with the owner, which
-tries a 3 s head hold in the window after the EBUSY run. There is no backstop that mutes:
+The switch stayed off on the product until a check with the owner, which
+tried a 3 s head hold in the window after the EBUSY run; the product's
+`lamp-voice.service` sets `LAMP_GUARD_NEVER_LISTENED=on` now (#4332). There is no backstop that mutes:
 a lamp that cannot start cannot hear, so muting it would only bring back a
 lamp muted after an update with nobody told. Tests:
 `hand_controls::tests::a_run_that_heard_nothing_releases_the_guard_and_is_counted`,
@@ -1898,8 +1910,8 @@ snapshots. EOF creates no fresh samples; feedback becomes stale.
 After First installs its adapter, start with shadow and record real acquisitions:
 
 ```sh
-lamp-controls serve --config /etc/lampos/controls.json --record /var/tmp/controls-real-20261014.jsonl --seconds 60
-lamp-controls replay --config /etc/lampos/controls.json --input /var/tmp/controls-real-20261014.jsonl --clock-id "$(cat /proc/sys/kernel/random/boot_id)" --enable --output /var/tmp/controls-real-replay-20261014.jsonl
+lamp-controls serve --config /etc/lampOS/controls/controls.json --record /var/tmp/controls-real-20261014.jsonl --seconds 60
+lamp-controls replay --config /etc/lampOS/controls/controls.json --input /var/tmp/controls-real-20261014.jsonl --clock-id "$(cat /proc/sys/kernel/random/boot_id)" --enable --output /var/tmp/controls-real-replay-20261014.jsonl
 ```
 
 Without the adapter, that serve command truthfully records Missing faults.
