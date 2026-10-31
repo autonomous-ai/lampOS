@@ -2820,7 +2820,12 @@ test does (#1512):
   checks. A published release fetched over the internet, checked with the
   stable key and switched at a quiet moment has run on real lamps: lamp-9adf
   8899 → 8999 → 9063, lamp-52e6 and lamp-0c89 (30 and 31 Oct), each
-  keeping its parts after the watch. Publication is now active, but independent verification with the
+  keeping its parts after the watch. A 7071 lamp's climb to a build that
+  asks `min_updater` 9 has run only on Tests' ARM64 rig, with 7071's own
+  binary and unit line against the live stable feed (7071 → 9063 and →
+  9136, #3689, 31 Oct), not on a real 7071 lamp. A lamp flashed with 7071
+  and set up at home would run it first. The ten customer lamps updated
+  past 7071 at the factory (the lead, #1711, 30 Oct). Publication is now active, but independent verification with the
   trusted public key and the attended acceptance run remain outstanding;
   the local trials do not complete them.
 - Independent trust and device acceptance of the published release. Real
