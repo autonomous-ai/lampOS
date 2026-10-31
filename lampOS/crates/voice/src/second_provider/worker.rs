@@ -3185,6 +3185,19 @@ pub fn serve(
         );
     }
     engine = engine.answering_short(short_done);
+    // A search begun with nothing said is begun with the lamp's own "Let me
+    // check." (`LAMP_SECOND_CHECKING_LINE=on`, #4684).
+    let checking_line = std::env::var(crate::second_provider::CHECKING_LINE_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if checking_line {
+        eprintln!(
+            "lamp-voice second: a round that begins a search with nothing said is begun with \"{}\" (LAMP_SECOND_CHECKING_LINE)",
+            crate::second_provider::CHECKING
+        );
+    }
+    engine = engine.saying_checking(checking_line);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)

@@ -667,6 +667,20 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     believe the person (`OWN_PRICE_NOTE`). No price read, or offers in two
     currencies: `note` says to give none from elsewhere
     (`OWN_PRICE_UNREAD_NOTE`).
+  - **Saying it checks** (`LAMP_SECOND_CHECKING_LINE=on`, off unless set;
+    #4684). On lamp-4ace on 31 Oct (build `7fa975266f`, the first builder's
+    run of #4684) "How much is the Autonomous ErgoChair Pro?" got its right
+    price 4.5 s after the words, with nothing said before: round 1's
+    `web_search` call came with no words, then the search, our page's read
+    and round 2. With the switch, a round with no words of its own that
+    calls `web_search` or `fetch_page`, with nothing said yet in the turn,
+    is begun with the lamp's own "Let me check." (`CHECKING`), said as the
+    search runs, and the next round is told it was said
+    (`said_once_note`). It is the lamp's line, spoken only when a search
+    really runs, so it never promises a search that isn't made (#4595's
+    case, line 3 of the same run). Each search also says in the journal how
+    long it took, and our page's read when there was one:
+    `web_search answered in N ms; our page's price read in M ms (read)`.
   - `openrouter`: OpenRouter's web plugin on Exa, `plugins: [{"id": "web",
     "engine": "exa", "mode": "instant", "max_results": 3}]` on the chat
     request, with `LAMP_SECOND_CHAT=openrouter` only. It searches before
