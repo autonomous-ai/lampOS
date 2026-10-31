@@ -2,8 +2,10 @@
 
 This experimental Rust library has its own SQLite database. No product crate
 uses it, no service starts it, and it changes nothing on a lamp. The library contains storage, validated consolidation, cue recall and
-registered ablations. Its benchmark adapter and isolated child-state API require
-the default-off `bench` feature. The approved design is in
+registered ablations. Its benchmark adapter is an ordinary binary target, listed
+as development-only in the release inventory and never packaged for a lamp.
+Only that binary can create disposable probe copies; the library has no copy or
+restore API. The approved design is in
 [memory-design.md](memory-design.md); the benchmark boundary is
 [memory-bench.md](memory-bench.md).
 
@@ -199,7 +201,7 @@ runner; a library cannot erase bytes copied by a caller.
 Build the isolated adapter from the repository root with its exact revision:
 
 ```sh
-LAMP_MEMORY_TIERS_REVISION=$(git rev-parse HEAD) cargo build --manifest-path lampOS/Cargo.toml -p lamp-memory-tiers --features bench --bin lamp-memory-tiers-arm
+LAMP_MEMORY_TIERS_REVISION=$(git rev-parse HEAD) cargo build --manifest-path lampOS/Cargo.toml -p lamp-memory-tiers --bin lamp-memory-tiers-arm
 ```
 
 A source-only build can set the same variable from its recorded source manifest.
@@ -218,6 +220,12 @@ process without retry; the runner records the failure and keeps its reservation.
 A storage error also ends the process, so an uncertain deletion cannot be
 followed by another answer using possibly stale state. It is recorded as a
 failed run, never a successful privacy result.
+The shared memory-text cap counts the UTF-8 owner-model, recalled context and
+memory-instruction text returned by the arm. Runner JSON framing is outside that
+cap and reported separately for every arm; it still belongs to the total model
+input and cost accounting. The 500-byte protocol regression covers text that fits
+while its serialized reply framing exceeds 500 bytes.
+
 The runner is the sole model-cost owner, including calls during isolated probes.
 Unknown provider usage is accepted without substituting zero; the runner keeps
 its full reservation. Owner ids accept the contract's 128-byte limit.
@@ -299,8 +307,6 @@ Run from `lampOS/`:
 cargo fmt --all --check
 cargo clippy -p lamp-memory-tiers --all-targets -- -D warnings
 cargo test -p lamp-memory-tiers
-cargo clippy -p lamp-memory-tiers --all-targets --features bench -- -D warnings
-cargo test -p lamp-memory-tiers --features bench
 cargo build --workspace
 ```
 
@@ -319,8 +325,8 @@ contention, fading, arm-manifest and subprocess protocol tests. A synthetic
 measures local recall only, not a voice turn or a live provider. On macOS x86_64
 with Rust 1.96.0, the first lookup after synthetic ingestion took 1.599 ms and
 the slowest of 20 subsequent lookups took 1.426 ms. The in-memory SQLite pages
-were populated by ingestion; this is not a cold-disk measurement. Feature-specific
-ARM64 and Linux clippy coverage must include `--features bench` explicitly.
+were populated by ingestion; this is not a cold-disk measurement. The ordinary
+workspace ARM64 build/tests and all-target Linux clippy include the adapter.
 
 Not yet shown: live extraction or billed cost, the three-run ledger scorecard
 against every baseline, real STT, held-back human review, cross-owner voice

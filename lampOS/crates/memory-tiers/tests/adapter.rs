@@ -1,4 +1,3 @@
-#![cfg(feature = "bench")]
 use serde_json::{Value, json};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -156,6 +155,9 @@ fn broker_citations_aggregate_cap_and_ordinary_forget_survive_sleep() {
             .unwrap()
             .len();
     assert!(snap_bytes + recall_bytes <= 500);
+    // Wire framing/citations are reported by the runner separately. They do
+    // not consume the common UTF-8 memory-text allowance.
+    assert!(snapshot["data"].to_string().len() + recall["data"].to_string().len() > 500);
     assert_eq!(recall["data"]["owner_model"], json!([]));
     p.end("q1");
     assert_eq!(
