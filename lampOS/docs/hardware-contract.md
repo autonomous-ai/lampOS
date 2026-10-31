@@ -226,8 +226,13 @@ Legacy `capture_still()` returns the latest frame on timeout even if it failed
 the freshness test. Do not claim freshness using that fallback. Legacy camera
 recovery can unbind/rebind USB; qualify composite-device effects before using
 it because a camera may share its USB device with a microphone. lampOS's
-lamp-eyes resets the ZVCAI camera (01da:5875) by USBDEVFS_RESET when it is
-stuck (#2126). The microphones lampOS uses are other USB devices (the voice's
+lamp-eyes resets the ZVCAI camera (01da:5875) when it is stuck: by
+USBDEVFS_RESET itself (#2126), which needs root's node under `/dev/bus/usb`,
+and on the product, whose eyes run as `lampos`, through the root helper
+behind `lamp-eyes-camera.socket`, which re-authorizes the device (sysfs
+`authorized` 0 then 1, as an unplug and a plug), asked after three failed
+opens and at most once a minute (#2892, `camera_helper.rs`). The
+microphones lampOS uses are other USB devices (the voice's
 Jieli 4c4a:4155 and the room's C-Media 0d8c:0014), so a reset of the camera
 cuts neither; whether 01da:5875 carries an audio interface of its own is to
 be read with `lsusb -t` on a lamp. Do not silently
