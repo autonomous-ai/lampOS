@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-30 11:04 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-31 11:13 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 90.8% over 76 rows. Quality 68.4% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 92.1% over 76 rows. Quality 67.8% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -27,7 +27,7 @@ Written by the first builder from the team's review page at 2026-10-30 11:04 (+0
 | Sleep, and waking on its name | 1.00 | #749 #714 | fourth, second |  |
 | Reminders, timers, memory across days | 1.00 | #748 #743 | — |  |
 | Setup for a home, 5 s reset | 0.95 | #806 #1209 #2861 #3579 | first, el | 26 Oct 20:3x, up from 0.85: shown on lamp-52e6 with build 7071 (the lead’s agent, 20:10–20:28). |
-| A safe shutdown from the app and a long press | 0.70 | #3697 #3698 #3713 #3735 | fifth, mobile | 29 Oct 07:0x, up from 0.5: the app’s path through setup’s helper landed (#3735, train 324, stable in 8389: answered first, refused during an update), and the voice restarted under a shutdown is fixed (#3982, closed). |
+| A safe shutdown from the app and a long press | 0.85 | #3697 #3698 #3713 #3735 | fifth, mobile | 30 Oct 22:0x, up from 0.7: the app’s Turn off button meets its done-when on product lamp-0c89 (three taps, each a clean off and a boot that listens; |
 | Touch strip and head pads | 0.95 | #711 #1362 #2445 #2460 #2857 | first, fifth | 27 Oct 15:1x: found on the tester’s 7071 lamps: a hand kept 3 s put the lamp to sleep unsaid, in onboarding’s touch and giving-way steps, and they reset it (#3747, #3749). |
 | Two people at the lamp | 1.00 | #829 #1158 #1278 | fourth | All merged: day and night bars (#1158, 11:49) and a follow-up within 20 s told it may follow on (#1278, 13:57). |
 | “Stop” over its own voice | 1.00 | #828 #1047 #1264 | fourth | Built: stop words heard over its voice (#1047, 09:11) and listening gaps in its pauses (#1264, 11:52), both off until measured. |
@@ -39,14 +39,14 @@ Written by the first builder from the team's review page at 2026-10-30 11:04 (+0
 | No internet at home | 1.00 | #830 #1242 #1256 #1247 | nine | 21 Oct 14:1x: its lamp runs passed on lamp-75c9 (Nine): the outage found with nobody speaking, the offline line once, “back online” after, and the unavailable face. |
 | Everything is a skill, core and installable, no one-off code | 0.85 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh, fifth, thirteen, fourth, ten | 24 Oct 08:4x, up from 0.72: this row’s note was stale. |
 | An owner makes their own skill | 0.90 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten, blue, fourteen, seventh | 30 Oct 11:0x, up from 0.83: the app’s make-a-skill screen is done (#2814 closed). |
-| A Skills Store to publish skills | 0.90 | #1698 #2801 #2802 | fourteen, mobile, backend3 | 30 Oct 11:0x, up from 0.6: the Store’s install from the app ran on a real lamp. |
+| A Skills Store to publish skills | 1.00 | #1698 #2801 #2802 | fourteen, mobile, backend3 | 31 Oct 11:1x, built: Take back ran too (Fourteen, 10:29, lamp-9adf on 9063): a made skill shared, approved, taken back by its owner and gone from the Store’s queue and downloads (Backend3). |
 | Updates over the internet, by themselves | 0.95 | #737 #1812 | migrate, second | 30 Oct 05:3x, unchanged: tonight found that a lamp on the 7071 image reaches stable in one jump, climbing to the new updater first. |
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, fourth, first, backend, third | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
 | A person brings their own DeepSeek and Deepgram keys, in setup or the app | 0.90 | #2094 #2845 #2846 | el, fourteen | 22 Oct 18:0x, up from 0.8: setup’s own-keys step passed on a freshly reset lamp-06c1 (El, #2845 closed). |
 | Lamp 2 in the Autonomous app | 1.00 | #1396 | mobile, backend | 20 Oct 11:4x, built: the app's Skills page and name and time zone (ecm-sds-mobile#8, #9) merged into the app's v3 after their tries on lamp-0c89. |
-| Speaks English, Japanese, Chinese or Korean, the owner’s choice in setup or the app | 0.00 | #3975 #4473 #4474 | seventh, mobile | 30 Oct 09:4x, new, from the lead’s proposal (#3975), approved today: the owner picks the language in setup or the app at any time, and the voice, onboarding, fixed lines and skills follow it. |
-| Talks with you naturally: turns, answers, web answers, the time | 0.92 | #694 | second, nine | 24 Oct 06:1x, up from 0.9: the two-turn fault’s fix is merged behind LAMP_SAME_SPEAKER_CARRIES, off (#3296, Sixth, train 62, df6830381). |
-| Hears its name, a bare “Lamp” too | 1.00 | #694 #725 | second, nine | Built; |
+| Speaks English, Japanese, Chinese or Korean, the owner’s choice in setup or the app | 0.70 | #3975 #4473 #4474 | seventh, mobile | 30 Oct 22:0x, up from 0: the lamp side is on lamp-voice (the voice, the fixed lines, onboarding’s walk, the name and the wait words in the owner’s language; |
+| Talks with you naturally: turns, answers, web answers, the time | 0.92 | #694 | nine | 24 Oct 06:1x, up from 0.9: the two-turn fault’s fix is merged behind LAMP_SAME_SPEAKER_CARRIES, off (#3296, Sixth, train 62, df6830381). |
+| Hears its name, a bare “Lamp” too | 1.00 | #694 #725 | nine | Built; |
 | Eye contact: turns to you and to its name, looks away to think, nods | 1.00 | #715 | fifth | Built |
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
 | Moves with its words while it speaks | 1.00 | #933 #1067 #1365 #2030 | thirteen | 20 Oct 09:4x, built: #1759 (with #1067’s sway) merged into lamp-voice after its try on lamp-52e6 with the lead, so every lamp nods and sways while it speaks, sparse as the lead chose. |
@@ -101,7 +101,7 @@ Written by the first builder from the team's review page at 2026-10-30 11:04 (+0
 | Cutting in | 0.55 | 0.75 | 25 Oct 19:0x, up from 0.5: on lamp-52e6 with the ship candidate’s own product switches (Seventh, played ElevenLabs lines, an empty room), every real cut-in stopped the story, 4 of 4, with no false stop; |
 | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.70 | 0.90 | 26 Oct 14:5x, up from 0.6: on 6999 (lamp-voice d5dc2e87f, #3517’s LAMP_NAME_STAYS_IN_ITS_LINE on) the busy scene’s desk talk was left alone 6 of 6, against 4 of 6 on 6919 and 6963: a name misheard in one colleague’s line… |
+| Not spoken to | 0.60 | 0.90 | 30 Oct 23:0x, down from 0.7: tonight’s five busy rounds on lamp-4ace (8999, the product unit checked switch by switch) left desk talk alone 16 of 26 times (5/6, 2/6, 4/6, 2/4, 3/4), not the 6 of 6 of 26 Oct. |
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.82 | 0.85 | 26 Oct 14:5x, up from 0.8: on 6999 every reminder set was said: one cut off by people talking is offered again and said (#3523, Third), and the next one triggers the reminders skill again, so no 10 s wait. |
