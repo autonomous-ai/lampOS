@@ -141,14 +141,16 @@ feels as a stuffy room; they are round figures, not a standard.
     lamp-air once        # the sensor's name and one reading, no bus
     lamp-air limit-clock --bus-number 0   # the bus at 100 kHz (root)
 
-Unit `lamp-air.service` in the first builder's deploy folder. Running on
+Unit `lamp-air.service`, in the product's units (`deploy/product/`) and
+lamp-4ace's and lamp-52e6's deploy folders. Running on
 lamp-4ace since 2026-10-14 17:43: CO2 1,856 to 1,872 ppm ("stuffy"), PM2.5
 102 to 105 ug/m3 in the office at work.
 
 ## What the creature does with it
 
 See [creature.md](creature.md). The voice's part, behind
-`LAMP_AIR_FACTS=on` in its unit (off unless set; `crates/voice/src/air_told.rs`;
+`LAMP_AIR_FACTS=on` in its unit (off unless set, and set in the product's
+voice unit; `crates/voice/src/air_told.rs`;
 on lamp-4ace since 2026-10-14, 18:46, when the room read 1,560 ppm, "stuffy";
 first told at 19:45 that evening, beside a played request for a story, and
 the model ended the story with "By the way, the air here is getting pretty
@@ -157,12 +159,13 @@ it reads `air/state` every five seconds; once the air has felt stuffy (or
 very stuffy) for ten minutes, the model is told so beside the next thing a
 person says to the lamp, in a room that is not busy, with leave to suggest
 a window once if it fits; not again for three hours. A reading older than
-30 s counts as no reading. The quiet droop and the light a shade dimmer
-are the Stuffy air skill (`skills/stuffy-air`, #1021, `docs/skills.md`),
-off unless installed and not yet run on a lamp.
+30 s counts as no reading. The quiet droop and the light a shade dimmer,
+and since 25 Oct one short line with them, are the Stuffy air skill
+(`skills/stuffy-air`, #1021, `docs/skills.md`), a core skill that install
+puts on every product lamp switched on (`install::PRODUCT_SKILLS`).
 
-The PM figures are read by two skills (#1684, `docs/skills.md`), held out
-of the product's install until measured: Smoky air (`skills/smoky-air`)
+The PM figures are read by two skills (#1684, `docs/skills.md`), installed
+but off until measured (`install::PRODUCT_SKILLS_OFF`): Smoky air (`skills/smoky-air`)
 says one exact line when PM2.5 jumps by 100 µg/m³ within three minutes to
 150 or more, and Dusty air (`skills/dusty-air`) one a day when it has been
 125 or more for an hour. Neither is a smoke alarm: the sensor has no VOC,
