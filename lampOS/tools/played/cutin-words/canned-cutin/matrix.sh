@@ -45,6 +45,24 @@ one g-other     "STUB_PLAYING=4ace" 'FAIL another lamp is PLAYING on #3336 \(or 
 one g-other-q   "STUB_PLAYING=4ace" 'QUIET: .*stopped early|QUIET: .*aborted, nothing ran.*Put-back'
 one g-self      "STUB_PLAYING=52e6" 'VERDICT: PASS' # the kit's own lamp PLAYING is not another lamp
 one g-other-arm "STUB_PLAYING=4ace STUB_AFTER=1 STUB_COUNT=$M/g-other-arm.calls" 'FAIL another lamp is PLAYING on #3336 \(or #3336 unreadable\) before arm P'
+# Drop-ins beside the kit's (ALLOW_DROPINS): an allowed one stays, any other is still refused, one sorting after is refused
+one g-allowed   "DRY_FOREIGN=zz-product-u.conf ALLOW_DROPINS=zz-product-u.conf" 'allowed /run drop-ins \(kept, ALLOW_DROPINS\): zz-product-u.conf$'
+one g-allowed-v "DRY_FOREIGN=zz-product-u.conf ALLOW_DROPINS=zz-product-u.conf" 'VERDICT: PASS'
+one g-disallow  "DRY_FOREIGN='zz-product-u.conf zz-cutin-check.conf' ALLOW_DROPINS=zz-product-u.conf" 'would stop here: another /run drop-in on lamp-voice: zz-cutin-check.conf$'
+one g-late      "DRY_FOREIGN=zzzzz-late.conf ALLOW_DROPINS=zzzzz-late.conf" 'would stop here: allowed drop-in zzzzz-late.conf sorts after'
+# No ffmpeg on PATH: real clips from `say` (AIFF), converted by afconvert and levelled by python3; then pre-levelled
+NOF=$M/no-ffmpeg-path; mkdir -p "$NOF"; P2=; i=0
+IFS=: read -ra DIRS <<<"$PATH"; for d in "${DIRS[@]}"; do i=$((i + 1))
+  if [[ -e $d/ffmpeg || -e $d/ffprobe ]]; then mkdir -p "$NOF/$i"; for f in "$d"/*; do [[ ${f##*/} == ffmpeg || ${f##*/} == ffprobe ]] || ln -sf "$f" "$NOF/$i/"; done; P2+=$NOF/$i:
+  else P2+=$d:; fi; done
+SAYW="PATH=${P2%:} DRY_TTS=yes TTS=$C/say-tts.sh WAVS=$M/say-clips"
+one n-noffmpeg   "$SAYW" 'clips: levelled by python3'
+one n-noffmpeg-v "$SAYW" 'VERDICT: PASS'
+mv=$(python3 -c 'import array,glob,math,sys,wave
+for f in sorted(glob.glob(sys.argv[1]+"/lev-18/*.wav")):
+  w=wave.open(f); a=array.array("h",w.readframes(w.getnframes())); print("%.1f" % (20*math.log10(math.sqrt(sum(x*x for x in a)/len(a))/32768)))' "$M/say-clips" | sort -u | tr '\n' ' ')
+printf '%s\t%s\t%s\t%s\n' "$([[ $mv == "-18.0 " ]] && echo PASS || echo FAIL)" n-level "the python3-levelled say clips" "mean volume (dB) of every clip: ${mv:-<none>}"
+one n-levelled   "$SAYW WAVS_LEVELLED=yes" 'clips: levelled by none'
 # TERM mid-try: real naps, TERM once a try's ask has started, time to the QUIET line
 ( OUT=$M/term DRY_REALNAP=1 ./row-cutin-words.sh >"$M/term.out" 2>"$M/term.err" ) & k=$!
 for i in $(seq 2400); do ls "$M"/term/scenarios/dry-*-ask.txt >/dev/null 2>&1 && break; sleep 0.1; done; sleep 2

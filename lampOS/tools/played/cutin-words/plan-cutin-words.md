@@ -36,8 +36,16 @@ C_TRIALS=5 O_TRIALS=5 L="ssh orangepi@lamp-4ace.local" SEQ=<installed> HARD_END=
   (`LAMP_SSH_TIMEOUT`).
 - **Levels** (`LEVEL_DB` −18, `SYSVOL` 90) were set on Sixth's Mac speaker. Another Mac plays louder or softer: each
   arm's hello must be heard, or the kit stops.
-- **Needs** on the Mac: bash, python3, ffmpeg/ffprobe, bc, gh (logged in; it posts on #3336), and ssh to the lamp
-  with sudo there.
+- **Levelling:** with ffmpeg/ffprobe (and bc) on PATH, ffmpeg levels the clips. Without them, `afconvert`
+  (built into macOS) converts each clip to 16-bit WAV, and a python3 stdlib gain brings it to the same mean volume,
+  hard-limited at 0.97 (it measures −18.0 dB, as ffmpeg does). A TTS stand-in may write AIFF (`say`) or WAV. With
+  `WAVS_LEVELLED=yes`, the clips in `WAVS` are already at level: they are only converted to 16-bit WAV.
+- **Another /run drop-in** on lamp-voice stops the run, unless it is named in `ALLOW_DROPINS` (space-separated, e.g.
+  `ALLOW_DROPINS="zz-product-u.conf"`). An allowed drop-in stays, and the put-back removes only the kit's. It must sort
+  before `zzzz-sixth-cutin.conf`, so that the kit's Environment lines win; otherwise the run stops. Its ExecStart, if
+  any, counts as the installed one. The log names the allowed drop-ins, and the arm proofs still apply.
+- **Needs** on the Mac: bash, python3, gh (logged in; it posts on #3336), and ssh to the lamp with sudo there.
+  ffmpeg is optional (see Levelling).
 
 ## Arms
 - **P:** the product unit as installed, untouched.
@@ -161,6 +169,11 @@ no lamp, no audio, no clips and no post, and prints one line per case. Seen on 3
 | camera | `NO_PERSON=` | `would stop here: manual check …` |
 | lamp-update switched | `DRY_SWITCHED=…` | `would stop here: lamp-update switched …` |
 | foreign drop-in | `DRY_FOREIGN=zz-cutin-check.conf` | `would stop here: another /run drop-in …` |
+| allowed drop-in | `DRY_FOREIGN=zz-product-u.conf ALLOW_DROPINS=zz-product-u.conf` | `allowed /run drop-ins (kept, ALLOW_DROPINS): zz-product-u.conf`, then `VERDICT: PASS` |
+| allowed plus another | `DRY_FOREIGN='zz-product-u.conf zz-cutin-check.conf'`, the same allow | `would stop here: another /run drop-in on lamp-voice: zz-cutin-check.conf` |
+| allowed, sorts after the kit's | `DRY_FOREIGN=zzzzz-late.conf ALLOW_DROPINS=zzzzz-late.conf` | `would stop here: allowed drop-in zzzzz-late.conf sorts after …` |
+| no ffmpeg | PATH without ffmpeg/ffprobe, `say` clips (AIFF, `canned-cutin/say-tts.sh`), `DRY_TTS=yes` | `clips: levelled by python3`, `VERDICT: PASS`, every clip −18.0 dB |
+| pre-levelled | the same, `WAVS_LEVELLED=yes` | `clips: levelled by none` |
 | hard end, refusal | `HARD_END=now+16` | `would stop here: the hard end … leaves 16 min, under the 44 min` |
 | hard end, stop | the same | `stopped at the hard end … before WO try 3` |
 | SEQ read empty once / twice / moved | `DRY_SEQFAIL=1` / `2` / `DRY_SEQ=9070` | the retry line / `the lamp left 9063 (now )` / `(now 9070)` |
