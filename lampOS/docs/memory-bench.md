@@ -535,7 +535,7 @@ validation. The development fixture contains 1,560 events (50 utterances and
 two session boundaries per day) and 200 questions. Its registration records
 hashes and the fixed eleven-arm candidate order; human review is still pending.
 
-From `lampOS/`, `cargo run -p lamp-memory-bench -- generate PERSONA NEW_DIRECTORY`
+From `lampOS/`, `cargo run -p lamp-memory-bench --features bench -- generate PERSONA NEW_DIRECTORY`
 writes separate observed events, evaluator-only answer keys/questions, and
 registration hashes. `validate DIRECTORY` checks those hashes, chronology,
 question schedules and citation eligibility. `score QUESTIONS ANSWERS` runs
@@ -568,6 +568,10 @@ run must settle outstanding accounting before a complete ledger/scorecard.
 protocol on two fictional component operations, without loading a persona,
 calling a model or producing a score. It checks the pinned revision, an empty
 sleep, snapshot/recall bounds, deletion invalidation and probe restoration.
+
+The executable is opt-in with `--features bench`, so the default product
+workspace does not build a new unclassified deployment binary. Feature-enabled
+formatting, strict clippy, tests and a native ARM64 run remain required.
 
 The orchestration CLI, in-tree arms, real speech-to-text cache, live provider
 transport, model rubric invocation and scorecard are still being implemented.

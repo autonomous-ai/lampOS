@@ -28,8 +28,8 @@ Files are deliberately separated:
 From `lampOS/`, reproduce into a new directory:
 
 ```sh
-cargo run -p lamp-memory-bench -- generate fixtures/memory-bench/development/persona.json /tmp/new-memory-month
-cargo run -p lamp-memory-bench -- validate /tmp/new-memory-month
+cargo run -p lamp-memory-bench --features bench -- generate fixtures/memory-bench/development/persona.json /tmp/new-memory-month
+cargo run -p lamp-memory-bench --features bench -- validate /tmp/new-memory-month
 ```
 
 Generation refuses an existing output directory. Compare the output files
