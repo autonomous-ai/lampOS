@@ -1633,6 +1633,29 @@ async fn an_empty_answer_to_a_line_said_by_name_is_asked_again_never_silence() {
     }
 }
 
+/// #4473 (Tests' P3 on #4723): with an owner's language, the line said
+/// after no words twice is in it, never English.
+#[tokio::test]
+async fn no_words_twice_is_said_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, what's my name?".to_owned())].into()),
+        chats: Mutex::new([vec![Ok(ChatEvent::Done)], vec![Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine
+        .in_language(Some(Language::Chinese))
+        .asking_again_for_no_words(true);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let out = turn(&mut engine).await;
+    let spoken: Vec<&String> = out.iter().filter(|o| o.starts_with("said:")).collect();
+    let words = format!("said:{}", fixed_in(Some(Language::Chinese), NO_WORDS_LINE));
+    assert_eq!(spoken, [&words], "{out:?}");
+}
+
 /// Words the heed judges not said to the lamp end the turn after them,
 /// with no chat asked; it is given the microphone's times of the line's
 /// first and last packets (#1014).
@@ -4772,6 +4795,43 @@ async fn a_look_waits_five_seconds_and_then_says_it_could_not_look() {
 /// A full look whose still never came arrives as the no-look note without
 /// `look`: it is a look all the same, with 5 s and the line, never a silent
 /// end at 3 s (the reviewer on #1154).
+/// #4473 (Tests' P3 on #4723): with an owner's language, a look that never
+/// began is said in it, never English.
+#[tokio::test(start_paused = true)]
+async fn a_look_that_never_began_is_said_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        chats: Mutex::new([vec![text("My eye was shut."), Ok(ChatEvent::Done)]].into()),
+        first_event_after: Some(Duration::from_secs(60)),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.in_language(Some(Language::Korean));
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 1,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::NO_LOOK_NOTE.into(),
+        look: false,
+        quoted: false,
+    });
+    let mut said = Vec::new();
+    loop {
+        match engine.next().await {
+            ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { .. } => break,
+            ProviderOutput::TurnFailed { .. } => panic!("failed"),
+            _ => {}
+        }
+    }
+    assert_eq!(said, [fixed_in(Some(Language::Korean), COULD_NOT_LOOK)]);
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_full_look_without_its_still_still_says_it_could_not_look() {
     let script = Arc::new(Script {
@@ -5524,7 +5584,9 @@ async fn the_down_lines_are_said_in_the_owners_language() {
         ..Script::default()
     });
     let (engine, _, _) = scripted(script);
-    let mut engine = engine.saying_when_down_in(true, Some(Language::Japanese));
+    let mut engine = engine
+        .in_language(Some(Language::Japanese))
+        .saying_when_down(true);
     let line = fixed_in(Some(Language::Japanese), DOWN_LINE);
     let again = fixed_in(Some(Language::Japanese), DOWN_LINE_AGAIN);
     // The scripted voice's audio carries its text's length.
@@ -10797,6 +10859,38 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
     )
     .await;
     assert_eq!(more.len(), 1, "{more:?}");
+}
+
+/// #4473 (Tests' P3 on #4723): with an owner's language, the answer to a
+/// stop said over the lamp is in it, its words and its clip, never English,
+/// and the model is still not asked.
+#[tokio::test]
+async fn a_stop_said_over_the_lamp_is_answered_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Stop them.".to_owned())].into()),
+        chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built
+        .in_language(Some(Language::Japanese))
+        .telling_cut_ins(true)
+        .ending_spoken_stops(true);
+    engine.submit(start_marked(1, true, false, false));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let out = turn(&mut engine).await;
+    let words = fixed_in(Some(Language::Japanese), crate::spoken_stop::LINE);
+    // The scripted voice's audio carries its text's length.
+    assert_ne!(words.len(), crate::spoken_stop::LINE.len());
+    assert!(out.contains(&format!("said:{words}")), "{out:?}");
+    assert!(out.contains(&format!("audio:{}", words.len())), "{out:?}");
+    assert!(
+        !out.iter().any(|o| o.contains(crate::spoken_stop::LINE)),
+        "{out:?}"
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
 }
 
 /// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's

@@ -228,11 +228,6 @@ pub const LOOKING: &str = "Let me look.";
 /// with nothing said (lamp-4ace on 31 Oct, #4684's run, line 1).
 pub const CHECKING: &str = "Let me check.";
 
-/// [`CHECKING`] as the lamp says it: in the owner's language
-/// (`language::FIXED_LINES`), English where none is chosen.
-fn checking_words() -> &'static str {
-    crate::language::fixed_in(crate::language::at_start(), CHECKING)
-}
 /// With Gemini's speech, the answer's first piece goes once this many words
 /// have come, if no sentence or clause ended sooner
 /// ([`Engine::cutting_first_words`]; the first builder on #1712: "cut at the
@@ -1153,6 +1148,9 @@ struct Shared {
     cue_after: Duration,
     /// [`DOWN_LINE`], when switched on.
     down: Option<Arc<DownLine>>,
+    /// The owner's language, read at start (`None`: English): every fixed
+    /// line this route says itself is said in it ([`Shared::fixed`], #4473).
+    language: Option<crate::language::Language>,
     /// A stop said over the lamp's answer is answered with
     /// [`crate::spoken_stop::LINE`], not asked of the model, its clip kept
     /// once rendered (`LAMP_SPOKEN_STOP_ENDS`, #3985).
@@ -2304,12 +2302,15 @@ struct DownLine {
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
-    /// The owner's language, its lines rendered in it (`None`: English).
-    language: Option<crate::language::Language>,
 }
 
 impl DownLine {
-    fn render(self: &Arc<Self>, services: &Arc<dyn Services>) {
+    /// Each line rendered in `language`, the owner's (`None`: English).
+    fn render(
+        self: &Arc<Self>,
+        services: &Arc<dyn Services>,
+        language: Option<crate::language::Language>,
+    ) {
         if self.rendering.swap(true, Ordering::AcqRel) {
             return;
         }
@@ -2329,7 +2330,7 @@ impl DownLine {
                 if !missing(slot) {
                     continue;
                 }
-                let words = crate::language::fixed_in(line.language, text);
+                let words = crate::language::fixed_in(language, text);
                 let clip = render_line(&services, words).await;
                 if clip.is_empty() {
                     continue;
@@ -2606,6 +2607,12 @@ fn whole_already(text: &str) -> bool {
 }
 
 impl Shared {
+    /// `english`, a fixed line, in the owner's language
+    /// (`language::FIXED_LINES`), English where none is chosen.
+    fn fixed(&self, english: &'static str) -> &'static str {
+        crate::language::fixed_in(self.language, english)
+    }
+
     /// Whether `request` was judged in a busy room: by the rule's hook, or
     /// else by this process's room now, as the Live worker reads its own.
     fn busy(&self, request: u64) -> bool {
@@ -2738,6 +2745,7 @@ impl Engine {
                 cues: None,
                 cue_after: CUE_AFTER,
                 down: None,
+                language: crate::language::at_start(),
                 spoken_stop_ends: false,
                 stop_line: Mutex::new(None),
                 announce: true,
@@ -4120,26 +4128,26 @@ impl Engine {
 
     /// A turn whose first round has not begun within its bound says
     /// [`DOWN_LINE`] (`LAMP_SECOND_DOWN_LINE=on`). Before any turn only.
-    pub fn saying_when_down(self, on: bool) -> Self {
-        self.saying_when_down_in(on, crate::language::at_start())
-    }
-
-    /// The same, its lines in `language` (`None`: English), as the owner's
-    /// language read at start gives them (#4473).
-    pub(crate) fn saying_when_down_in(
-        mut self,
-        on: bool,
-        language: Option<crate::language::Language>,
-    ) -> Self {
+    pub fn saying_when_down(mut self, on: bool) -> Self {
         if on {
             let shared = Arc::get_mut(&mut self.shared);
             debug_assert!(shared.is_some(), "the down line is set before any turn");
             if let Some(shared) = shared {
-                shared.down = Some(Arc::new(DownLine {
-                    language,
-                    ..DownLine::default()
-                }));
+                shared.down = Some(Arc::default());
             }
+        }
+        self
+    }
+
+    /// The owner's language in place of the one read at start (`None`:
+    /// English), for its fixed lines: a test's, as the environment is read
+    /// once per process.
+    #[cfg(test)]
+    pub(crate) fn in_language(mut self, language: Option<crate::language::Language>) -> Self {
+        let shared = Arc::get_mut(&mut self.shared);
+        debug_assert!(shared.is_some(), "the language is set before any turn");
+        if let Some(shared) = shared {
+            shared.language = language;
         }
         self
     }
@@ -4175,7 +4183,7 @@ impl Engine {
             cues.render(&self.shared.services);
         }
         if let Some(down) = &self.shared.down {
-            down.render(&self.shared.services);
+            down.render(&self.shared.services, self.shared.language);
         }
     }
 
@@ -4276,7 +4284,7 @@ impl Engine {
                 // can end before a slow relay's render does: once a start, the
                 // render can overlap a turn.
                 if let Some(down) = &self.shared.down {
-                    down.render(&self.shared.services);
+                    down.render(&self.shared.services, self.shared.language);
                 }
                 // The wait sounds too, as the line begins, not only once its
                 // words are heard: one rendered by the time the chat is due
@@ -6507,7 +6515,7 @@ async fn spoken(
             (shared.clock)(),
         );
         // In the owner's language, as its other fixed lines (#4473).
-        let line = crate::language::fixed_in(crate::language::at_start(), crate::spoken_stop::LINE);
+        let line = shared.fixed(crate::spoken_stop::LINE);
         eprintln!(
             "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{line}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)"
         );
@@ -9478,15 +9486,7 @@ async fn answer(
                                 "lamp-voice second: request {request} look round had not begun in {} ms; the lamp says it could not look",
                                 began.elapsed().as_millis()
                             );
-                            queue
-                                .push(
-                                    crate::language::fixed_in(
-                                        crate::language::at_start(),
-                                        COULD_NOT_LOOK,
-                                    )
-                                    .to_owned(),
-                                )
-                                .await?;
+                            queue.push(shared.fixed(COULD_NOT_LOOK).to_owned()).await?;
                             return Ok(());
                         }
                         Err(_) if fixed.is_some() => {
@@ -9955,12 +9955,7 @@ async fn answer(
                 if ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?
                     && !queue.started
                 {
-                    queue
-                        .push(
-                            crate::language::fixed_in(crate::language::at_start(), LOOKING)
-                                .to_owned(),
-                        )
-                        .await?;
+                    queue.push(shared.fixed(LOOKING).to_owned()).await?;
                 }
                 return Ok(());
             }
@@ -10009,7 +10004,7 @@ async fn answer(
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: no words again for a line begun with the lamp's name; said \"{NO_WORDS_LINE}\" (LAMP_NO_WORDS_AGAIN)"
                 );
-                queue.push(NO_WORDS_LINE.to_owned()).await?;
+                queue.push(shared.fixed(NO_WORDS_LINE).to_owned()).await?;
                 return Ok(());
             }
             if calls.is_empty() {
@@ -10067,9 +10062,9 @@ async fn answer(
             if checking {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round} searches with nothing said; said \"{}\" (LAMP_SECOND_CHECKING_LINE)",
-                    checking_words()
+                    shared.fixed(CHECKING)
                 );
-                queue.push(checking_words().to_owned()).await?;
+                queue.push(shared.fixed(CHECKING).to_owned()).await?;
             }
             messages.push(Message::assistant_calls_with(
                 Some(text),
@@ -10448,12 +10443,7 @@ async fn answer(
                 && ask_look(shared, request, heard || searching, (&name, args), note).await?
             {
                 if !queue.started {
-                    queue
-                        .push(
-                            crate::language::fixed_in(crate::language::at_start(), LOOKING)
-                                .to_owned(),
-                        )
-                        .await?;
+                    queue.push(shared.fixed(LOOKING).to_owned()).await?;
                 }
                 return Ok(());
             }
@@ -10515,7 +10505,7 @@ async fn answer(
                 messages.push(Message::system(note));
             }
             if checking {
-                messages.push(Message::system(said_once_note(checking_words())));
+                messages.push(Message::system(said_once_note(shared.fixed(CHECKING))));
             }
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
@@ -10849,7 +10839,7 @@ async fn answer(
     // Rendered after a turn is out, never beside its chat and speech on a
     // slow relay (Nine on #1195).
     if let Some(down) = &shared.down {
-        down.render(&shared.services);
+        down.render(&shared.services, shared.language);
     }
 }
 
