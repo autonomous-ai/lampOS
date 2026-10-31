@@ -39,6 +39,7 @@ on:
       - 'lampOS/docs/endpoint-pilot.md'
       - 'lampOS/docs/install.md'
       - 'lampOS/docs/memory.md'
+      - 'lampOS/docs/msgs.md'
       - 'lampOS/docs/skills.md'
       - 'lampOS/docs/switches.md'
       - 'lampOS/docs/updates.md'
