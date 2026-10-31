@@ -2085,9 +2085,13 @@ dependencies = [
  "jiff",
  "lamp-memory",
  "nix 0.29.0",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",
+ "tokio",
+ "webpki-roots 1.0.9",
 ]
 
 [[package]]

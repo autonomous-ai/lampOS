@@ -193,6 +193,30 @@ pub trait Provider {
     /// Network providers must enforce this deadline in their transport;
     /// checking only after a blocking call is not a timeout implementation.
     fn invoke(&mut self, call: &Call, deadline: Instant) -> Result<Reply>;
+    /// Taken once after an invocation, including a failed request. Kept out of
+    /// the arm's Reply wire shape. Recorded providers need no network evidence.
+    fn take_provenance(&mut self) -> Option<Provenance> {
+        None
+    }
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Provenance {
+    pub transport: String,
+    pub requested_model: String,
+    pub reported_model: Option<String>,
+    pub provider_request_id: Option<String>,
+    pub system_fingerprint: Option<String>,
+    pub finish_reason: Option<String>,
+    pub http_status: Option<u16>,
+    pub request_sha256: String,
+    pub response_sha256: String,
+    /// Relative directory inside this run's private provider-artifact folder.
+    pub artifact: String,
+    pub response_complete: bool,
+    pub evidence_complete: bool,
+    /// Only terminal provider usage, never inferred from returned text.
+    pub usage: Option<Usage>,
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct Receipt {
@@ -206,6 +230,8 @@ pub struct Receipt {
     /// Input rates conservatively include cached input at the ordinary rate.
     /// This is a budget debit, not an assertion about a provider's invoice.
     pub cost_basis: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<Provenance>,
 }
 type Audit = Box<dyn FnMut(&str, &Receipt) -> Result<()> + Send>;
 pub struct Client<P> {
@@ -305,6 +331,7 @@ impl<P: Provider> Client<P> {
             outcome: "uncertain".into(),
             usage: None,
             cost_basis: "conservative_token_debit".into(),
+            provenance: None,
         };
         if let Some(audit) = &mut self.audit
             && let Err(error) = audit("model_reserved", &receipt)
@@ -320,11 +347,21 @@ impl<P: Provider> Client<P> {
                 "model deadline expired while recording reservation",
             ))
         } else {
-            self.provider.invoke(call, deadline)
+            let result = self.provider.invoke(call, deadline);
+            receipt.provenance = self.provider.take_provenance();
+            result
         };
-        let result = dispatched.and_then(|reply| {
-            receipt.usage = reply.usage.clone();
-            if let Some(usage) = &reply.usage {
+        receipt.usage = dispatched
+            .as_ref()
+            .ok()
+            .and_then(|r| r.usage.clone())
+            .or_else(|| receipt.provenance.as_ref().and_then(|p| p.usage.clone()));
+        let evidence_failed = receipt
+            .provenance
+            .as_ref()
+            .is_some_and(|p| !p.evidence_complete);
+        let result = (|| {
+            if let Some(usage) = &receipt.usage {
                 let actual = match prices.charge(usage.input_tokens, usage.output_tokens) {
                     Ok(actual) => actual,
                     Err(error) => {
@@ -335,6 +372,11 @@ impl<P: Provider> Client<P> {
                         return Err(error);
                     }
                 };
+                let actual = if evidence_failed {
+                    actual.max(reserve)
+                } else {
+                    actual
+                };
                 self.charged = (self.charged - reserve).saturating_add(actual);
                 receipt.charged_microusd = actual;
                 receipt.outcome = "accounted".into();
@@ -343,15 +385,21 @@ impl<P: Provider> Client<P> {
                     receipt.outcome = "reservation_exceeded".into();
                     return Err(invalid("provider usage exceeded conservative reservation"));
                 }
-            } else {
+            } else if dispatched.is_ok() {
                 receipt.outcome = "usage_unknown".into();
             }
+            if evidence_failed {
+                self.poisoned = true;
+                receipt.outcome = "evidence_failed".into();
+                return Err(invalid("provider evidence failed; accounting stopped"));
+            }
+            let reply = dispatched?;
             if Instant::now() > deadline {
                 return Err(invalid("model response missed deadline"));
             }
             reply.validate(call, self.dimensions)?;
             Ok(reply)
-        });
+        })();
         let audited = self
             .audit
             .as_mut()

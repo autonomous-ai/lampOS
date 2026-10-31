@@ -39,6 +39,7 @@ fn plan(cap: u64) -> Plan {
 }
 fn reservation(number: u64, amount: u64) -> Receipt {
     Receipt {
+        provenance: None,
         call_number: number,
         request_hash: hash(format!("request-{number}").as_bytes()),
         reserved_microusd: amount,

@@ -292,7 +292,7 @@ impl Campaign {
                     charged: receipt.charged_microusd,
                     accounting_failed: matches!(
                         receipt.outcome.as_str(),
-                        "reservation_exceeded" | "accounting_overflow"
+                        "reservation_exceeded" | "accounting_overflow" | "evidence_failed"
                     ),
                 }
             }

@@ -8,6 +8,7 @@ pub mod corpus;
 pub mod diagnostics;
 pub mod files;
 pub mod ledger;
+pub mod live_http;
 pub mod model;
 pub mod model_worker;
 pub mod partial;
