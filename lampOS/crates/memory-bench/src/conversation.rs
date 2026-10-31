@@ -65,7 +65,7 @@ impl Conversation {
         }
         Ok(())
     }
-    pub fn messages(&self, query: &Query) -> Result<Vec<Value>> {
+    fn selected(&self, query: &Query) -> Result<Vec<&Event>> {
         query.validate()?;
         let mut selected = self
             .exchanges
@@ -81,9 +81,24 @@ impl Conversation {
             .take(12)
             .collect::<Vec<_>>();
         selected.reverse();
+        Ok(selected)
+    }
+    pub fn messages(&self, query: &Query) -> Result<Vec<Value>> {
         let mut messages = Vec::new();
-        for event in selected {
+        for event in self.selected(query)? {
             messages.push(json!({"role":"user","content":event.heard}));
+            if !event.said.is_empty() {
+                messages.push(json!({"role":"assistant","content":event.said}));
+            }
+        }
+        Ok(messages)
+    }
+    /// Same scope/window as ordinary history, with source IDs exposed so the
+    /// common answerer can cite an earlier completed exchange honestly.
+    pub fn evidence_messages(&self, query: &Query) -> Result<Vec<Value>> {
+        let mut messages = Vec::new();
+        for event in self.selected(query)? {
+            messages.push(json!({"role":"user","content":serde_json::to_string(&json!({"source_id":event.record_id,"at_unix_ms":event.at_unix_ms,"speaker":event.person,"person_id":event.person_id,"presence":event.presence,"heard":event.heard}))?}));
             if !event.said.is_empty() {
                 messages.push(json!({"role":"assistant","content":event.said}));
             }

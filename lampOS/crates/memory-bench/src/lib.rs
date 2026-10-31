@@ -64,3 +64,5 @@ pub fn invalid(message: impl Into<String>) -> Error {
 pub fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
+
+pub mod answering;

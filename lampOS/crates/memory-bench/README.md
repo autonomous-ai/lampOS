@@ -195,3 +195,20 @@ approved before scoring. It is stronger than the current product, which clears
 future recent history but retains the current request prefix and earlier tool
 results. Results must carry this privacy-relevant gap: the bench may improve the
 current-product setup's forgetting relative to the real lamp.
+
+The common answer loop permits eight model rounds and at most 48 calls in a
+batch, through the single run worker. It validates the complete offered batch
+against the currently advertised tools before dispatching any call. Opaque tool
+extensions and reasoning are preserved for the current batch. Every tool refreshes
+memory before the next answer request. Earlier tool-result bodies are replaced
+with a fixed content-free invalidation notice, and a new batch discards the prior
+batch's transcript. Forgetting discards the whole batch and skips its remaining
+calls; attempts, charges and call identities are never rolled back.
+
+Fresh tool-result text shares the memory cap with the next snapshot, recall and
+tool schemas. The runner requests only the remaining space and refuses overflow
+without truncating results. Within a structured result, arm-supplied keys and
+scalar text count as UTF-8; JSON punctuation, escaping and the runner's provenance
+envelope are separate overhead. The immediate conversation exposes source IDs
+using the existing same-person, same-presence and ten-minute/twelve-exchange
+selection. No answer-key evidence or setup label enters the answer request.
