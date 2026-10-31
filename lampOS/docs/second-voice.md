@@ -1688,11 +1688,14 @@ order is kept. A written turn is the same from the chat on.
   (`told`, since #1895), so it stands when that scope is the one the line
   is answered in. A line narrowed at its end, to the room, drops it as
   "the conversation changed", and the room's context is asked afresh
-  (`tests/music_scope.rs`: the speaking face that matches keeps the
+  (`crates/voice/src/second_provider/tests/music_scope.rs`: the speaking
+  face that matches keeps the
   prepared round, another's discards it).
   With `LAMP_PERSON_SCOPE_SEEN=on` a known person's line is never prepared
-  ("A line is a known person's only when …", below), so in the product
-  only a room's line can keep it. The journal says
+  ("A line is a known person's only when …", below). So with
+  `LAMP_SECOND_PREPARED=on` beside the product's switches, only a room's
+  line can keep it; the product unit leaves `LAMP_SECOND_PREPARED` off, so
+  no line is prepared there today. The journal says
   `request N: its chat is begun on the line's early words`, then `… is
   kept, begun T ms ago` or `… is dropped: <why>`. In a host test on the
   paused clock, with a 400 ms `Finalize` answer and a chat's 600 ms to its
