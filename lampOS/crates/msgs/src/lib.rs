@@ -869,11 +869,16 @@ impl Diagnostic {
         Self::new(Level::Ok, name, "stopped on purpose").with(Self::STATE, Self::STOPPING)
     }
 
-    /// Whether this report says its part is stopping on purpose.
+    /// Whether this report says its part is stopping on purpose. One at
+    /// `error` is not, whatever its facts say: the body's last report when
+    /// it stops on a fault (too warm, pushed against) says `state` =
+    /// `stopping` too, and is why it stopped, so lamp-health keeps it.
     pub fn is_stopping(&self) -> bool {
-        self.values
-            .iter()
-            .any(|value| value.key == Self::STATE && value.value == Self::STOPPING)
+        self.level != Level::Error
+            && self
+                .values
+                .iter()
+                .any(|value| value.key == Self::STATE && value.value == Self::STOPPING)
     }
 
     /// The same with one more fact beside it.
@@ -2223,6 +2228,15 @@ mod tests {
                 .with(Diagnostic::STATE, "running")
                 .is_stopping()
         );
+        // A part that stops on a fault is not stopping on purpose, though
+        // it says `stopping`: the body's last report, too warm.
+        let fault = Diagnostic::new(Level::Error, "body", "stopped: elbow is too warm")
+            .with(Diagnostic::STATE, Diagnostic::STOPPING);
+        assert!(!fault.is_stopping());
+        // Asked to stop is a warning and still on purpose.
+        let asked = Diagnostic::new(Level::Warn, "body", "stopped, as it was asked to")
+            .with(Diagnostic::STATE, Diagnostic::STOPPING);
+        assert!(asked.is_stopping());
     }
 
     #[test]
