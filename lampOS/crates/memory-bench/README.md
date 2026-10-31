@@ -281,3 +281,30 @@ fixture, an independently written held-back persona, the complete current-produc
 adapter, and live results. Rubric results will remain provisional until the human
 audit. The stronger forget restart used uniformly by this evaluator is documented
 beside results; the product's weaker current-round behavior is a separate gap.
+
+
+### Complete comparison card
+
+`campaign-card POLICY APPROVAL CAMPAIGN live` reads the campaign under its
+exclusive lock without appending or granting any spending. It also works when
+the budget is exhausted or stopped. The `fixture` variant always keeps accuracy
+scores null. Every registered setup has all three repetition slots, including
+not-started, failed, interrupted and invalid evidence; none becomes a zero or
+vanishes from an average.
+
+A completed run qualifies for a provisional three-run mean only when all three
+attempts have matching policy, registration, model, executable and shared-cache
+pins. The report rechecks saved adapter bytes, registered source files, raw
+provider artifacts, settled campaign charges and per-question coverage. It
+recomputes overall and question-kind means from the evaluation rows instead of
+trusting the terminal summary. Corrupted speech evidence marks that shared cache
+unavailable and every affected run invalid while keeping every setup visible.
+
+The card shows full-engine max-minus-min spread and each removal's mean loss
+for overall and each question kind. It prints optional tier populations/use
+counts, including evidence-only facts. Empty or unused tiers read `not exercised`;
+missing diagnostics read `unknown`. Fading remains unexercised by the month, and
+an aging result still needs its live prerequisite audit. Safety/privacy needs
+and human audit remain explicit retention criteria; the report never removes a
+tier automatically. Partial current-product coverage and the stronger common
+forget restart remain written beside the results.

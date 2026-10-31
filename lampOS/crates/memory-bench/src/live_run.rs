@@ -290,7 +290,7 @@ fn finish(mut worker: Worker, ledger: &Log, mode: Mode, result: Result<Value>) -
         }
     }
 }
-fn completed_cache(
+pub(crate) fn verified_cache(
     root: &Path,
     policy: &Policy,
     name: &str,
@@ -372,7 +372,7 @@ pub fn execute(
     )?));
     private_dir(&root.join("runs"))?;
     prior_attempts(root, policy, run, mode)?;
-    let (cache, cache_hash) = completed_cache(root, policy, &run.fixture, mode)?;
+    let (cache, cache_hash) = verified_cache(root, policy, &run.fixture, mode)?;
     let observed = crate::speech_cache::load_from_source(
         &cache,
         &source.files["events.jsonl"],

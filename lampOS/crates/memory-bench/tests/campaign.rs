@@ -341,3 +341,33 @@ fn reservation_binds_usage_kind_and_wrong_kind_cannot_refund_after_restart() {
         assert!(Campaign::open(&temp.0, plan(100), 1).is_err());
     }
 }
+
+#[test]
+fn stopped_or_exhausted_campaign_can_be_reported_without_granting_more_spending() {
+    let temp = Temp::new();
+    let mut c = Campaign::create(&temp.0, plan(100), 100).unwrap();
+    let mut r = reservation(1, 70);
+    c.audit("one", "model_reserved", &r).unwrap();
+    r.charged_microusd = 110;
+    r.usage = Some(Usage {
+        input_tokens: 100,
+        output_tokens: 10,
+    });
+    r.outcome = "reservation_exceeded".into();
+    assert!(c.audit("one", "model_completed", &r).is_err());
+    drop(c);
+    let before = fs::read(temp.0.join("costs.jsonl")).unwrap();
+    let mut c = Campaign::inspect(&temp.0, plan(100)).unwrap();
+    assert!(c.stopped());
+    assert_eq!(c.charged_microusd(), 110);
+    assert_eq!(c.run_accounting("one").calls, 1);
+    assert_eq!(c.run_accounting("one").settled_calls, 1);
+    assert_eq!(c.run_accounting("one").charged_microusd, 110);
+    assert!(c.check_plan(1).is_err());
+    assert!(
+        c.audit("two", "model_reserved", &reservation(1, 1))
+            .is_err()
+    );
+    drop(c);
+    assert_eq!(before, fs::read(temp.0.join("costs.jsonl")).unwrap());
+}

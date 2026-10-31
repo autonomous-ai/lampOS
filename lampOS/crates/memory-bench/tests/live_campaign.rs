@@ -459,6 +459,53 @@ fn fake_services_drive_shared_speech_then_complete_month_with_null_scores() {
         fs::read(path.join("source/events.jsonl")).unwrap(),
         fs::read(source().join("events.jsonl")).unwrap()
     );
+    let card = lamp_memory_bench::comparison::report(&p, approval(&p), &root, true).unwrap();
+    let setups = card["fixtures"][0]["setups"].as_array().unwrap();
+    assert_eq!(setups.len(), 15);
+    for setup in setups {
+        assert_eq!(setup["runs"].as_array().unwrap().len(), 3);
+        assert!(setup["three_run_summary"].is_null());
+    }
+    assert_eq!(setups[0]["runs"][0]["status"], "completed");
+    assert!(setups[0]["runs"][0]["scores"].is_null());
+    assert_eq!(setups[0]["runs"][1]["status"], "not started");
+    let executable = path.join("adapter");
+    let original = fs::read(&executable).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::write(&executable, b"tampered adapter").unwrap();
+    let invalid = lamp_memory_bench::comparison::report(&p, approval(&p), &root, true).unwrap();
+    assert_eq!(
+        invalid["fixtures"][0]["setups"][0]["runs"][0]["status"],
+        "invalid"
+    );
+    fs::write(&executable, original).unwrap();
+    let cache_path = root
+        .join("runs")
+        .join(live_run::speech_id("development"))
+        .join("cache");
+    let cache_manifest: Value = files::json_file(&cache_path.join("manifest.json")).unwrap();
+    let audio_hash = cache_manifest["entries"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap();
+    fs::write(
+        cache_path.join(audio_hash).join("response.jsonl"),
+        b"damaged speech evidence",
+    )
+    .unwrap();
+    let invalid = lamp_memory_bench::comparison::report(&p, approval(&p), &root, true).unwrap();
+    assert_eq!(invalid["fixtures"][0]["speech"]["status"], "unavailable");
+    assert_eq!(
+        invalid["fixtures"][0]["setups"].as_array().unwrap().len(),
+        15
+    );
+    assert_eq!(
+        invalid["fixtures"][0]["setups"][0]["runs"][0]["status"],
+        "invalid"
+    );
     let after = campaign::Campaign::open(&root, approval(&p), 1)
         .unwrap()
         .remaining_microusd();
@@ -482,4 +529,31 @@ fn fake_services_drive_shared_speech_then_complete_month_with_null_scores() {
         )
         .is_err()
     );
+}
+#[test]
+fn empty_campaign_card_keeps_all_registered_slots_and_refuses_a_substituted_parent() {
+    let d = Dir::new();
+    let p = policy();
+    let root = d.0.join("campaign");
+    live_run::initialize(&p, approval(&p), &root, true).unwrap();
+    let card = lamp_memory_bench::comparison::report(&p, approval(&p), &root, true).unwrap();
+    let setups = card["fixtures"][0]["setups"].as_array().unwrap();
+    assert_eq!(setups.len(), 15);
+    for setup in setups {
+        assert_eq!(setup["runs"].as_array().unwrap().len(), 3);
+        assert!(setup["three_run_summary"].is_null());
+        for run in setup["runs"].as_array().unwrap() {
+            assert_eq!(run["status"], "not started");
+            assert!(run["scores"].is_null());
+        }
+    }
+    assert_eq!(
+        card["fixtures"][0]["comparisons"].as_array().unwrap().len(),
+        11
+    );
+    fs::remove_dir(root.join("runs")).unwrap();
+    let other = d.0.join("other");
+    fs::DirBuilder::new().mode(0o700).create(&other).unwrap();
+    symlink(&other, root.join("runs")).unwrap();
+    assert!(lamp_memory_bench::comparison::report(&p, approval(&p), &root, true).is_err());
 }

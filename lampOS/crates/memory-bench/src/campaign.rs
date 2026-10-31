@@ -84,10 +84,17 @@ struct Reservation {
     request_hash: String,
     amount: u64,
     settled: bool,
+    charged: u64,
     billing: BillingKind,
 }
 /// Keep this handle alive for the whole run. The OS releases its exclusive
 /// lock on process exit, while the journal retains every uncertain charge.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct Accounting {
+    pub calls: u64,
+    pub settled_calls: u64,
+    pub charged_microusd: u64,
+}
 pub struct Campaign {
     file: File,
     plan: Plan,
@@ -149,6 +156,13 @@ impl Campaign {
     /// Reopening replays the complete journal. Partial/corrupt writes are a
     /// refusal, never a reason to reset the balance or repair the file silently.
     pub fn open(path: &Path, expected: Plan, planned: u64) -> Result<Self> {
+        let campaign = Self::inspect(path, expected)?;
+        campaign.check_plan(planned)?;
+        Ok(campaign)
+    }
+    /// Replay under the exclusive lock for reporting, including exhausted or
+    /// stopped campaigns. This grants no dispatch allowance and appends nothing.
+    pub fn inspect(path: &Path, expected: Plan) -> Result<Self> {
         expected.validate()?;
         let metadata = fs::symlink_metadata(path)?;
         if !metadata.is_dir() || metadata.permissions().mode() & 0o077 != 0 {
@@ -205,8 +219,21 @@ impl Campaign {
             campaign.previous = row.hash;
             campaign.sequence += 1;
         }
-        campaign.check_plan(planned)?;
         Ok(campaign)
+    }
+    pub fn stopped(&self) -> bool {
+        self.stopped
+    }
+    pub fn run_accounting(&self, run: &str) -> Accounting {
+        let mut result = Accounting::default();
+        for ((name, _), call) in &self.calls {
+            if name == run {
+                result.calls += 1;
+                result.settled_calls += u64::from(call.settled);
+                result.charged_microusd = result.charged_microusd.saturating_add(call.charged);
+            }
+        }
+        result
     }
     pub fn charged_microusd(&self) -> u64 {
         self.charged
@@ -255,6 +282,7 @@ impl Campaign {
                         request_hash: request_hash.clone(),
                         amount: *amount,
                         settled: false,
+                        charged: *amount,
                         billing: *billing,
                     },
                 );
@@ -278,6 +306,7 @@ impl Campaign {
                     ));
                 }
                 entry.settled = true;
+                entry.charged = *charged;
                 self.charged = (self.charged - entry.amount).saturating_add(*charged);
                 self.stopped |= *accounting_failed
                     || charged > reserved

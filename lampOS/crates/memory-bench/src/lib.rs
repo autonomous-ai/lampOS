@@ -71,3 +71,5 @@ pub mod trial;
 
 pub mod live_plan;
 pub mod live_run;
+
+pub mod comparison;
