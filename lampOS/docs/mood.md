@@ -184,7 +184,7 @@ observation. Both report whether the state changed meaningfully.
 `snapshot(now_us, sequence, session_id)` returns the checked wire state only
 at the engine's current time; it does not advance the clock. Event leases are
 half-open (`observed_us <= now_us < valid_until_us`), positive and no longer
-than 15 seconds. Each of the twelve event kinds has a strictly increasing
+than 15 seconds. Each of the fifteen event kinds (`EVENT_STREAMS`) has a strictly increasing
 observation watermark. Future, expired, duplicate, out-of-order and pre-sleep
 observations are rejected atomically.
 

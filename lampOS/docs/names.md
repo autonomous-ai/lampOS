@@ -27,7 +27,7 @@ what the thing does for the lamp, in the words the owner uses for it.
 | `crates/bus`, `lamp-bus` | How the lamp's programs tell each other what they sense and make of it, and the tool for looking at it ([bus.md](bus.md)). Not a service: a directory and a library. |
 | `crates/msgs`, `lamp-msgs` | The message types the bus's topics carry, defined once ([msgs.md](msgs.md)). A library. |
 | `crates/memory`, `lamp-memory`, `lamp-memory.service` | What the lamp remembers from one day to the next ([memory.md](memory.md)). |
-| `crates/policy`, `lamp-policy` | Decides what the lamp does. Its first decision is whether what was heard was said to the lamp, made in shadow mode: said on the bus and written down, with nothing acting on it ([policy.md](policy.md)). No unit yet. |
+| `crates/policy`, `lamp-policy` | Decides what the lamp does. Its first decision is whether what was heard was said to the lamp, made in shadow mode: said on the bus and written down, with nothing acting on it ([policy.md](policy.md)). Unit `lamp-policy.service` (the product's and lamp-4ace's); the product's acts on its hello decisions (`--act hello`), not on this one. |
 
 ## Deliberately not renamed
 
