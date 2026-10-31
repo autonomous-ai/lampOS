@@ -142,3 +142,104 @@ async fn forget_cancels_an_inflight_model_future() {
     f._store.forget_records(&[1]).unwrap();
     assert!(matches!(operation.await, Err(Error::Stale)));
 }
+
+const TOPICS: &str = r#"{"segments":[{"first_record_id":1,"last_record_id":1}]}"#;
+#[tokio::test]
+async fn topic_and_extraction_calls_share_one_budget_and_call_limit() {
+    let mut f = input();
+    f._store.owner_left(DAY_MS + 2).unwrap();
+    let topics = f._store.prepare_topics(DAY_MS + 3).unwrap().unwrap();
+    let mut client = ModelClient::new(
+        RecordedTransport::new(vec![reply(TOPICS), reply(EMPTY)], Duration::ZERO),
+        limits(),
+    )
+    .unwrap();
+    let (proposal, receipt) = client.propose_topics(&topics).await.unwrap();
+    assert_eq!(receipt.charged_microdollars, 140);
+    f._store.apply_topics(&topics, &proposal).unwrap();
+    let extraction = f
+        ._store
+        .prepare_sleep(DAY_MS + 3, PassKind::Nightly)
+        .unwrap()
+        .unwrap();
+    client.propose(&extraction).await.unwrap();
+    assert_eq!(client.spent_microdollars(), 280);
+    assert_eq!(client.calls(), 2);
+    assert!(matches!(
+        client.propose(&extraction).await,
+        Err(Error::Budget)
+    ));
+}
+
+#[tokio::test(start_paused = true)]
+async fn topic_timeout_retains_reservation_and_forget_cancels_inflight_call() {
+    let mut f = input();
+    f._store.owner_left(DAY_MS + 2).unwrap();
+    let topics = f._store.prepare_topics(DAY_MS + 3).unwrap().unwrap();
+    let mut client = ModelClient::new(
+        RecordedTransport::new(vec![reply(TOPICS)], Duration::from_secs(10)),
+        limits(),
+    )
+    .unwrap();
+    assert!(matches!(
+        client.propose_topics(&topics).await,
+        Err(Error::Timeout)
+    ));
+    assert!(client.spent_microdollars() > 140);
+    let operation = client.propose_topics(&topics);
+    tokio::pin!(operation);
+    tokio::select! {biased;result=&mut operation=>panic!("unexpected completion: {}",result.is_ok()),_=tokio::time::sleep(Duration::from_millis(1))=>{}}
+    f._store.forget_records(&[1]).unwrap();
+    assert!(matches!(operation.await, Err(Error::Stale)));
+    let mut fresh = ModelClient::new(
+        RecordedTransport::new(vec![reply(TOPICS)], Duration::ZERO),
+        limits(),
+    )
+    .unwrap();
+    assert!(matches!(
+        fresh.propose_topics(&topics).await,
+        Err(Error::Stale)
+    ));
+    assert_eq!(fresh.calls(), 0);
+}
+
+#[tokio::test]
+async fn topic_reply_and_reported_usage_cannot_exceed_the_smaller_allowance() {
+    let mut f = input();
+    f._store.owner_left(DAY_MS + 2).unwrap();
+    let topics = f._store.prepare_topics(DAY_MS + 3).unwrap().unwrap();
+    assert_eq!(topics.output_allowance().unwrap(), 119);
+    let mut excess_usage = reply(TOPICS);
+    excess_usage.usage.as_mut().unwrap().output_tokens = 120;
+    let mut excess_bytes = reply(&format!("{TOPICS}{}", " ".repeat(120)));
+    excess_bytes.usage = None;
+    for completion in [excess_usage, excess_bytes] {
+        let mut client = ModelClient::new(
+            RecordedTransport::new(vec![completion], Duration::ZERO),
+            limits(),
+        )
+        .unwrap();
+        assert!(matches!(
+            client.propose_topics(&topics).await,
+            Err(Error::Model(_))
+        ));
+        assert_eq!(client.calls(), 1);
+        assert!(client.spent_microdollars() > 140);
+    }
+}
+
+#[tokio::test]
+async fn topic_reply_whitespace_is_allowed_with_usage_within_the_token_ceiling() {
+    let mut f = input();
+    f._store.owner_left(DAY_MS + 2).unwrap();
+    let topics = f._store.prepare_topics(DAY_MS + 3).unwrap().unwrap();
+    let formatted = format!("{TOPICS}{}", " ".repeat(120));
+    assert!(formatted.len() > topics.output_allowance().unwrap() as usize);
+    let mut client = ModelClient::new(
+        RecordedTransport::new(vec![reply(&formatted)], Duration::ZERO),
+        limits(),
+    )
+    .unwrap();
+    let (result, _) = client.propose_topics(&topics).await.unwrap();
+    f._store.apply_topics(&topics, &result).unwrap();
+}

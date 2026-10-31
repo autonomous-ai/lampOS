@@ -32,7 +32,7 @@ mod types;
 
 pub use policy::Arm;
 pub use recall::*;
-pub use store::Store;
+pub use store::{Store, TOPIC_PROMPT, TopicInput, TopicProposal, TopicRange, TopicReport};
 pub use types::*;
 
 #[derive(Debug)]

@@ -17,9 +17,10 @@ pub enum Arm {
     TiersMinusNightlySleep,
     TiersMinusImportance,
     TiersMinusFading,
+    TiersSessionCuttingOnly,
 }
 impl Arm {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Tiers,
         Self::TiersMinusEpisodes,
         Self::TiersMinusLifeStory,
@@ -31,6 +32,7 @@ impl Arm {
         Self::TiersMinusNightlySleep,
         Self::TiersMinusImportance,
         Self::TiersMinusFading,
+        Self::TiersSessionCuttingOnly,
     ];
     pub fn name(self) -> String {
         serde_json::to_value(self)
@@ -53,9 +55,12 @@ impl Arm {
             Self::TiersMinusHowToBe => "taught rules and learned patterns removed",
             Self::TiersMinusAhead => "what is ahead removed",
             Self::TiersMinusFeelings => "feeling lines removed",
-            Self::TiersMinusNightlySleep => "nightly sleep disabled; weekly reflection retained",
+            Self::TiersMinusNightlySleep => {
+                "no consolidation of facts, lines and episode summaries; nightly topic-boundary pass still runs"
+            }
             Self::TiersMinusImportance => "importance does not affect ranking or fading",
             Self::TiersMinusFading => "episode detail does not fade",
+            Self::TiersSessionCuttingOnly => "session cutting only",
         }
     }
     pub fn includes_line(self, kind: LineKind) -> bool {

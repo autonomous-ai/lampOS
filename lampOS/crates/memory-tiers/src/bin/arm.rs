@@ -79,13 +79,13 @@ impl Wire {
         &mut self,
         id: &str,
         call: u64,
-        input: &SleepInput,
+        input: &str,
+        prompt: &str,
         weekly: bool,
         config: &Config,
     ) -> Result<String> {
-        let input = input.json()?;
         let call_id = format!("tiers-model-{call}");
-        self.write(&json!({"v":2,"id":id,"model_request":{"call_id":call_id,"kind":"chat","purpose":if weekly{"reflect"}else{"sleep"},"messages":[{"role":"system","content":PROMPT},{"role":"user","content":input}],"max_output_tokens":config.max_output_tokens,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}})).await?;
+        self.write(&json!({"v":2,"id":id,"model_request":{"call_id":call_id,"kind":"chat","purpose":if weekly{"reflect"}else{"sleep"},"messages":[{"role":"system","content":prompt},{"role":"user","content":input}],"max_output_tokens":config.max_output_tokens,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}})).await?;
         let response =
             tokio::time::timeout(Duration::from_millis(config.model_timeout_ms), self.read())
                 .await
@@ -115,7 +115,12 @@ impl Wire {
         let content = model["content"]
             .as_str()
             .ok_or(Error::Model("missing model content"))?;
-        SleepProposal::parse(content)?;
+        if prompt == TOPIC_PROMPT
+            && model["usage"].is_null()
+            && content.len() > config.max_output_tokens as usize
+        {
+            return Err(Error::Model("topic usage is unknown for an overlong reply"));
+        }
         Ok(content.into())
     }
 }
@@ -414,20 +419,23 @@ impl Adapter {
                         }
                         other if access.alone => {
                             let keep = matches!(other, Command::Remember);
-                            if let Some(id) = context.store.ingest(Incoming {
-                                text: event.heard,
-                                speaker: Speaker::Owner,
-                                at_ms: event.at_unix_ms,
-                                stt_confidence: event.stt_confidence,
-                                strength: Strength::Said,
-                                addressed_to_lamp: true,
-                                topic: event
-                                    .cues
-                                    .topic
-                                    .filter(|s| !s.trim().is_empty())
-                                    .unwrap_or_else(|| "conversation".into()),
-                                remember: keep && self.arm != Arm::TiersMinusImportance,
-                            })? {
+                            if let Some(id) = context.store.ingest_in_session(
+                                Incoming {
+                                    text: event.heard,
+                                    speaker: Speaker::Owner,
+                                    at_ms: event.at_unix_ms,
+                                    stt_confidence: event.stt_confidence,
+                                    strength: Strength::Said,
+                                    addressed_to_lamp: true,
+                                    topic: event
+                                        .cues
+                                        .topic
+                                        .filter(|s| !s.trim().is_empty())
+                                        .unwrap_or_else(|| "conversation".into()),
+                                    remember: keep && self.arm != Arm::TiersMinusImportance,
+                                },
+                                &event.session_id,
+                            )? {
                                 context.policy.records.insert(id, event.record_id.clone());
                                 sources.push(event.record_id.clone());
                                 if keep {
@@ -461,6 +469,41 @@ impl Adapter {
                 context.store.maintain(at, self.arm)?;
                 context.policy.clock = at;
                 invalidate_snapshot(&mut context.policy);
+                if kind == PassKind::Nightly
+                    && self.arm != Arm::TiersSessionCuttingOnly
+                    && let Some(input) = context
+                        .store
+                        .prepare_topics_with_output_limit(at, self.config.max_output_tokens)?
+                {
+                    self.model_calls = self.model_calls.checked_add(1).ok_or(Error::Budget)?;
+                    let topic_config = Config {
+                        max_output_tokens: input.output_allowance()?,
+                        ..self.config.clone()
+                    };
+                    let proposal = wire
+                        .propose(
+                            &request.id,
+                            self.model_calls,
+                            &input.json()?,
+                            TOPIC_PROMPT,
+                            false,
+                            &topic_config,
+                        )
+                        .await?;
+                    return match context.store.apply_topics(&input, &proposal) {
+                        Ok(report) => {
+                            let pending = report.pending || self.arm != Arm::TiersMinusNightlySleep;
+                            Ok(
+                                json!({"applied":true,"source_ids":source_ids(&context.policy,&input.records().iter().map(|r|r.id).collect::<Vec<_>>())?,
+                                    "reason":null,"pending":pending,"next_cursor":if pending{input.records().last().map(|r|format!("topics-after-{}",r.id))}else{None}}),
+                            )
+                        }
+                        Err(Error::Invalid(reason)) => Ok(
+                            json!({"applied":false,"source_ids":[],"reason":reason,"pending":true,"next_cursor":null}),
+                        ),
+                        Err(error) => Err(error),
+                    };
+                }
                 if self.arm == Arm::TiersMinusNightlySleep && kind == PassKind::Nightly {
                     context.policy.clock = at;
                     return Ok(
@@ -480,7 +523,8 @@ impl Adapter {
                     .propose(
                         &request.id,
                         self.model_calls,
-                        &input,
+                        &input.json()?,
+                        PROMPT,
                         kind == PassKind::Weekly,
                         &self.config,
                     )

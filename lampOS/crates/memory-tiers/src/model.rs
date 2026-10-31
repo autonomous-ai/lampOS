@@ -1,7 +1,10 @@
 //! One bounded model client for both nightly sleep and weekly reflection.
 //! A run owns its budget. Reserve the worst permitted request before transport;
 //! cancellation, timeout, malformed output and missing usage keep that reserve.
-use crate::{Error, MAX_INPUT_BYTES, MAX_OUTPUT_BYTES, Result, SleepInput, SleepProposal};
+use crate::{
+    Error, MAX_INPUT_BYTES, MAX_OUTPUT_BYTES, Result, SleepInput, SleepProposal, TOPIC_PROMPT,
+    TopicInput, TopicProposal,
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, future::Future, path::Path, time::Duration};
 
@@ -55,6 +58,7 @@ pub struct Usage {
 }
 #[derive(Clone)]
 pub struct Request {
+    pub prompt: &'static str,
     pub input: String,
     pub max_output_tokens: u32,
 }
@@ -98,15 +102,45 @@ impl<T: Transport> ModelClient<T> {
         self.calls
     }
     pub async fn propose(&mut self, input: &SleepInput) -> Result<(String, Receipt)> {
-        let json = input.json()?;
+        self.propose_json(
+            input.json()?,
+            PROMPT,
+            input.validity.clone(),
+            input.epoch,
+            false,
+            self.limits.max_output_tokens,
+        )
+        .await
+    }
+    pub async fn propose_topics(&mut self, input: &TopicInput) -> Result<(String, Receipt)> {
+        self.propose_json(
+            input.json()?,
+            TOPIC_PROMPT,
+            input.validity.clone(),
+            input.epoch,
+            true,
+            input.output_allowance()?,
+        )
+        .await
+    }
+    async fn propose_json(
+        &mut self,
+        json: String,
+        prompt: &'static str,
+        mut invalidation: tokio::sync::watch::Receiver<u64>,
+        epoch: u64,
+        topics: bool,
+        max_output_tokens: u32,
+    ) -> Result<(String, Receipt)> {
+        if max_output_tokens > self.limits.max_output_tokens {
+            return Err(Error::Invalid(
+                "prepare a smaller topic batch for this output ceiling",
+            ));
+        }
         // One token per UTF-8 byte plus 1024 tokens for provider message framing
         // is a deliberately conservative input bound, not a tokenizer estimate.
-        let input_bound = (json.len() + PROMPT.len() + 1024) as u64;
-        let reserve = cost(
-            input_bound,
-            self.limits.max_output_tokens as u64,
-            &self.limits,
-        )?;
+        let input_bound = (json.len() + prompt.len() + 1024) as u64;
+        let reserve = cost(input_bound, max_output_tokens as u64, &self.limits)?;
         let total = self.spent.checked_add(reserve).ok_or(Error::Budget)?;
         if total > self.limits.budget_microdollars || self.calls >= self.limits.max_calls {
             return Err(Error::Budget);
@@ -115,22 +149,34 @@ impl<T: Transport> ModelClient<T> {
         self.calls += 1;
         let start = std::time::Instant::now();
         let request = Request {
+            prompt,
             input: json,
-            max_output_tokens: self.limits.max_output_tokens,
+            max_output_tokens,
         };
-        let mut invalidation = input.validity.clone();
-        input.check_current()?;
+        current(&invalidation, epoch)?;
         let completion = tokio::select! {
             biased;
             _ = invalidation.changed() => return Err(Error::Stale),
             result = tokio::time::timeout(self.limits.timeout, self.transport.complete(request)) => result.map_err(|_| Error::Timeout)??,
         };
-        input.check_current()?;
-        SleepProposal::parse(&completion.json)?;
-        let charged = if let Some(usage) = &completion.usage {
-            if usage.input_tokens > input_bound
-                || usage.output_tokens > self.limits.max_output_tokens as u64
+        current(&invalidation, epoch)?;
+        if topics {
+            if completion.usage.is_none() && completion.json.len() > max_output_tokens as usize {
+                return Err(Error::Model("topic usage is unknown for an overlong reply"));
+            }
+            let proposal = TopicProposal::parse(&completion.json)?;
+            if serde_json::to_vec(&proposal)
+                .map_err(|_| Error::Model("invalid topic proposal"))?
+                .len()
+                > max_output_tokens as usize
             {
+                return Err(Error::Model("topic partition exceeds its batch allowance"));
+            }
+        } else {
+            SleepProposal::parse(&completion.json)?;
+        }
+        let charged = if let Some(usage) = &completion.usage {
+            if usage.input_tokens > input_bound || usage.output_tokens > max_output_tokens as u64 {
                 return Err(Error::Model("usage exceeded reserved token limits"));
             }
             cost(usage.input_tokens, usage.output_tokens, &self.limits)?
@@ -149,6 +195,12 @@ impl<T: Transport> ModelClient<T> {
             },
         ))
     }
+}
+fn current(validity: &tokio::sync::watch::Receiver<u64>, epoch: u64) -> Result<()> {
+    if validity.has_changed().is_err() || *validity.borrow() != epoch {
+        return Err(Error::Stale);
+    }
+    Ok(())
 }
 fn cost(input: u64, output: u64, limits: &Limits) -> Result<u64> {
     let numerator = (input as u128) * (limits.input_rate as u128)
@@ -257,7 +309,7 @@ impl Transport for RelayTransport {
         if request.input.len() > MAX_INPUT_BYTES {
             return Err(Error::Invalid("model input too large"));
         }
-        let body = serde_json::json!({"model":self.model,"messages":[{"role":"system","content":PROMPT},
+        let body = serde_json::json!({"model":self.model,"messages":[{"role":"system","content":request.prompt},
             {"role":"user","content":request.input}],"response_format":{"type":"json_object"},
             "max_tokens":request.max_output_tokens,"stream":false,"thinking":{"type":"disabled"}});
         let mut response = self

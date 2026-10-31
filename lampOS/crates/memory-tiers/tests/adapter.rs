@@ -83,6 +83,10 @@ impl ArmProcess {
         let v = self.request("probe_begin", json!({"probe_id":probe,"at_unix_ms":at}));
         assert_eq!(v["ok"], true, "{v}");
     }
+    fn end_session(&mut self, at: i64) {
+        let id = format!("session-end-{}", self.seq);
+        assert_eq!(self.request("ingest",json!({"event":{"record_id":id,"at_unix_ms":at,"session_id":"session-a","kind":"session_end","person":"owner","person_id":"owner-a","presence":"owner_alone","heard":"","said":"","stt_confidence":null,"cues":{"activity":"away","objects":[],"topic":null}}}))["ok"],true);
+    }
     fn end(&mut self, probe: &str) {
         assert_eq!(
             self.request("probe_end", json!({"probe_id":probe}))["ok"],
@@ -369,7 +373,7 @@ fn invalid_order_and_duplicate_ids_do_not_move_the_clock() {
     p.close();
 }
 #[test]
-fn all_arms_initialize_and_nightly_removal_makes_no_model_request() {
+fn all_arms_initialize_and_nightly_removal_skips_consolidation_for_open_sessions() {
     for arm in lamp_memory_tiers::Arm::ALL {
         let mut p = ArmProcess::new(&arm.name());
         assert_eq!(
@@ -381,6 +385,124 @@ fn all_arms_initialize_and_nightly_removal_makes_no_model_request() {
             let result = p.request("sleep", json!({"at_unix_ms":1100,"cadence":"nightly"}));
             assert_eq!(result["data"]["reason"], "not_applicable");
             assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 0);
+        }
+        p.close();
+    }
+}
+
+#[test]
+fn every_removal_keeps_topic_calls_and_session_only_keeps_old_prompt() {
+    let cuts=json!({"segments":[{"first_record_id":1,"last_record_id":1},{"first_record_id":2,"last_record_id":2}]}).to_string();
+    let empty = r#"{"facts":[],"lines":[],"episodes":[]}"#;
+    for arm in lamp_memory_tiers::Arm::ALL {
+        let mut p = ArmProcess::new(&arm.name());
+        p.ingest("source-1", "A blue notebook.", 1000);
+        p.ingest("source-2", "A fern needs water.", 1001);
+        p.end_session(1002);
+        if arm == lamp_memory_tiers::Arm::TiersSessionCuttingOnly {
+            let (call, result) = p.sleep(1100, empty);
+            assert_eq!(
+                call["model_request"]["messages"][0]["content"],
+                lamp_memory_tiers::model::PROMPT
+            );
+            assert_eq!(result["data"]["pending"], false);
+            assert_eq!(
+                p.inspect()["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+                1
+            );
+        } else {
+            let (call, result) = p.sleep(1100, &cuts);
+            assert_eq!(call["model_request"]["purpose"], "sleep");
+            assert_eq!(call["model_request"]["max_output_tokens"], 160);
+            assert_eq!(
+                call["model_request"]["messages"][0]["content"],
+                lamp_memory_tiers::TOPIC_PROMPT
+            );
+            assert_eq!(result["data"]["applied"], true, "{result}");
+            assert_eq!(
+                result["data"]["pending"],
+                arm != lamp_memory_tiers::Arm::TiersMinusNightlySleep
+            );
+            if arm != lamp_memory_tiers::Arm::TiersMinusNightlySleep {
+                let (call, result) = p.sleep(1100, empty);
+                assert_eq!(
+                    call["model_request"]["messages"][0]["content"],
+                    lamp_memory_tiers::model::PROMPT
+                );
+                assert_eq!(result["data"]["pending"], false);
+            }
+            let inspect = p.inspect();
+            assert_eq!(
+                inspect["data"]["stats"]["model_calls"],
+                if arm == lamp_memory_tiers::Arm::TiersMinusNightlySleep {
+                    1
+                } else {
+                    2
+                }
+            );
+            assert_eq!(inspect["data"]["stats"]["recall_misses"], 0);
+            assert_eq!(
+                inspect["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+                if arm == lamp_memory_tiers::Arm::TiersMinusEpisodes {
+                    0
+                } else {
+                    2
+                }
+            );
+        }
+        p.close();
+    }
+}
+
+#[test]
+fn probe_restoration_reverts_topic_membership_but_keeps_model_accounting() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "A blue notebook.", 1000);
+    p.ingest("source-2", "A fern needs water.", 1001);
+    p.end_session(1002);
+    p.begin("topic-probe", 1100);
+    let cuts=json!({"segments":[{"first_record_id":1,"last_record_id":1},{"first_record_id":2,"last_record_id":2}]}).to_string();
+    assert_eq!(p.sleep(1100, &cuts).1["data"]["applied"], true);
+    assert_eq!(
+        p.inspect()["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+        2
+    );
+    p.end("topic-probe");
+    let main = p.inspect();
+    assert_eq!(main["data"]["diagnostics"]["tiers"]["episodes"]["items"], 1);
+    assert_eq!(main["data"]["stats"]["model_calls"], 1);
+    assert_eq!(p.sleep(1100, &cuts).1["data"]["applied"], true);
+    assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 2);
+    p.close();
+}
+
+#[test]
+fn topic_ranges_cannot_cross_wire_sessions_even_if_an_end_event_was_missing() {
+    for arm in ["tiers", "tiers_session_cutting_only"] {
+        let mut p = ArmProcess::new(arm);
+        p.ingest("first-session-source", "First session words.", 1000);
+        let result=p.request("ingest",json!({"event":{"record_id":"second-session-source","at_unix_ms":1001,"session_id":"session-b","kind":"utterance","person":"owner","person_id":"owner-a","presence":"owner_alone","heard":"Second session words.","said":"","stt_confidence":null,"cues":{"activity":"at_desk","objects":[],"topic":null}}}));
+        assert_eq!(result["ok"], true);
+        let view = p.inspect();
+        assert_eq!(view["data"]["diagnostics"]["tiers"]["episodes"]["items"], 1);
+        if arm == "tiers" {
+            p.end_session(1002);
+            let (call, rejected) = p.sleep(
+                1100,
+                r#"{"segments":[{"first_record_id":1,"last_record_id":2}]}"#,
+            );
+            let input: Value = serde_json::from_str(
+                call["model_request"]["messages"][1]["content"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(input["records"].as_array().unwrap().len(), 1);
+            assert_eq!(rejected["data"]["applied"], false);
+            assert_eq!(
+                p.inspect()["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+                1
+            );
         }
         p.close();
     }

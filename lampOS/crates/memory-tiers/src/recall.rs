@@ -264,7 +264,12 @@ impl Store {
             ),
             (
                 "episode",
-                "SELECT id FROM episodes WHERE started_ms<=? ORDER BY id DESC LIMIT 8",
+                if query.arm == Arm::TiersSessionCuttingOnly {
+                    "SELECT id FROM episodes WHERE started_ms<=? ORDER BY id DESC LIMIT 8"
+                } else {
+                    // Offline cuts allocate new ids for old conversations.
+                    "SELECT id FROM episodes WHERE started_ms<=? ORDER BY started_ms DESC,id DESC LIMIT 8"
+                },
             ),
         ] {
             let mut statement = self.conn.prepare(sql)?;

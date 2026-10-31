@@ -294,12 +294,12 @@ population before a question can create memory and reports an empty or unused
 full-engine counterpart as `not exercised`, never as proof of no value.
 
 The ordered [arm manifest](../crates/memory-tiers/arm-manifest.json) registers
-all eleven arms before any candidate score. Every arm runs three times and is
+all twelve candidate arms before any candidate score. Every arm runs three times and is
 reported, including failures. Protocol name `tiers` is labelled `ours (tiers)`.
 The seven component removals are episodes, life story, facts/people/places,
 owner model, how-to-be, what is ahead, and feelings. The three mechanism removals
-are nightly sleep, importance, and fading. Nightly removal retains weekly
-reflection. Importance removal stores zero proposed importance, removes it
+are nightly consolidation, importance, and fading. Nightly removal retains the
+topic-boundary pass and weekly reflection. Importance removal stores zero proposed importance, removes it
 from ranking and treats all old episodes equally for fading.
 
 The facts arm is exactly **facts not recalled; kept only as evidence**.
@@ -374,3 +374,76 @@ against every baseline, real STT, held-back human review, cross-owner voice
 attribution, device first-audio latency, or any real-owner/lamp trial. Recorded
 proposals and scripted forgetting tests establish implementation behavior only.
 No product integration or device deployment is part of this phase.
+
+## Nightly topic boundaries
+
+Before consolidation, the full candidate now asks the same bounded model client
+to partition each closed capture session into topic episodes. The boundary-only
+prompt returns inclusive first/last record ids and no words, labels, quotes or
+chosen episode ids. Code validates the complete ordered partition before writing:
+no gap, overlap, reversal, unknown endpoint or crossing into another session is
+accepted. Contiguity means adjacency among surviving records, so forgotten record
+ids need not be consecutive integers. Open sessions remain untouched until their
+authorized ingestion boundary reports that the session ended or the owner left.
+The adapter records immutable wire-session membership separately from episode
+state. Segmentation never combines two wire sessions, even if a missing end
+event left them in one capture episode. This metadata changes no live recall
+or consolidation input, including in the session-only control. Library callers
+without wire ids use explicit capture closure as their session boundary.
+There is no model request on the live reply path.
+
+`prepare_topics` and `apply_topics` are separate from ordinary extraction. Topic
+progress is persisted independently of the processed-record cursor, so a session
+that spans a night still includes its earlier words when it closes. Each request
+contains at most 128 records and 64 KiB. Longer sessions continue with explicit
+before/after flags; the batch boundary is a hard topic boundary and cannot be
+merged by a later batch. That bounded approximation is measured, not hidden as a
+whole-session semantic judgment. A one-range response is valid when there is no
+supported topic change; an empty or partial partition is refused.
+
+The apply transaction rechecks source words, order, membership count, closure and
+privacy generation. It allocates episode ids, moves both stored representations
+of membership, preserves source ids, exact words, speech confidence, uncertainty,
+fact quotes, explicit importance and recall protection, and removes stale parent
+summaries and search entries. Residual boundaries are recomputed from remaining
+records so a later forget cannot leave a moved record’s timestamp behind.
+Recent-episode fallback uses actual time rather than newly allocated ids; the
+session-only control retains its prior ordering. Moved records become pending
+extraction so the
+following consolidation can summarize the new episodes. This may revisit words
+already extracted during a session that spanned nights; those calls and tokens
+remain charged. Forgetting cascades the partition metadata, invalidates an
+outstanding proposal, and removes empty episodes. It also clears inherited
+importance and recall protection across sibling partitions, so a forgotten
+explicit keep cannot continue influencing their ranking or fading. Schema 3 adds
+the code-owned capture membership and assignment tables to schema 2; it never
+resets fingerprints.
+
+The adapter returns after one bounded boundary batch with pending work, allowing
+the runner to drain it before ordinary nightly consolidation. Both kinds of call
+use the same broker, timeout and cumulative cost accounting. Weekly reflection
+can refresh summaries but never repartitions. Boundary calls add to the previous
+cost estimate; their measured request shapes must enter the registered cost table.
+
+The twelfth candidate setup, `tiers_session_cutting_only`, preserves the prior
+checkpoint's prompt and consolidation path. Every other candidate setup,
+including all ten removals, retains topic segmentation. The nightly-removal setup
+therefore means **no consolidation of facts, lines and episode summaries; nightly
+topic-boundary pass still runs**. Its weekly reflection remains enabled. The
+full engine and all removals must use the same segmented build for scoring; the
+three reference setups may be scored earlier. The new comparison and its reason
+were registered before any candidate score.
+
+Each boundary call uses a smaller output allowance: **64 plus the UTF-8 byte
+length of the compact JSON reply that makes every offered record a singleton**.
+For positive record ids this is `78 + sum(39 + 2 * decimal_digits(id))` tokens.
+One byte per token is a conservative bound rather than a tokenizer estimate;
+every compact valid partition fits. A six-record batch with one-digit ids gets
+324 tokens instead of 4,096. `prepare_topics_with_output_limit` also trims a batch
+at its caller's ceiling, preserving explicit continuation. The adapter uses its
+configured ceiling; the direct library default is 8,192. Partitions whose
+canonical encoding exceeds that allowance, or replies reporting
+more output tokens, are refused. Equivalent pretty JSON is allowed when reported
+usage fits; if usage is unknown and raw bytes exceed the token ceiling, the call
+is refused conservatively. Every reply also has the global 32 KiB limit. Unknown
+usage keeps the full reservation. The prompt and range reply shape are unchanged.

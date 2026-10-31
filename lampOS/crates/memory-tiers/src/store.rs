@@ -10,6 +10,8 @@ use std::{
     time::Duration,
 };
 use unicode_normalization::UnicodeNormalization;
+mod segmentation;
+pub use segmentation::*;
 
 /// One private database per owner. Callers drive scheduling; no background
 /// thread or model call can hold this connection while inference is running.
@@ -46,7 +48,7 @@ impl Store {
     fn from_connection(conn: Connection, owner: &str, fingerprint_key: [u8; 32]) -> Result<Self> {
         text_valid(owner, 128)?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version != 0 && version != 2 {
+        if version != 0 && version != 2 && version != 3 {
             return Err(Error::Invalid(
                 "unsupported database schema; no automatic fingerprint reset",
             ));
@@ -112,6 +114,22 @@ impl Store {
         Ok(())
     }
     pub fn ingest(&mut self, incoming: Incoming) -> Result<Option<i64>> {
+        self.ingest_with_session(incoming, None)
+    }
+    /// Capture source and immutable wire-session membership in one transaction.
+    pub fn ingest_in_session(
+        &mut self,
+        incoming: Incoming,
+        session_key: &str,
+    ) -> Result<Option<i64>> {
+        text_valid(session_key, 128)?;
+        self.ingest_with_session(incoming, Some(session_key))
+    }
+    fn ingest_with_session(
+        &mut self,
+        incoming: Incoming,
+        session_key: Option<&str>,
+    ) -> Result<Option<i64>> {
         let paused: bool = self
             .conn
             .query_row("SELECT paused FROM meta WHERE one=1", [], |r| r.get(0))?;
@@ -182,6 +200,9 @@ impl Store {
             "UPDATE records SET body=? WHERE id=?",
             params![encode(&record)?, id],
         )?;
+        if let Some(key) = session_key {
+            tx.execute("INSERT INTO capture_sessions VALUES(?,?)", params![id, key])?;
+        }
         index(&tx, "record", id, &record.text)?;
         tx.commit()?;
         Ok(Some(id))
@@ -875,6 +896,11 @@ impl Store {
             )?;
         }
         for id in &doomed {
+            // A partition inherits ranking/recall protection from its capture
+            // session. Forgetting any originating source conservatively clears
+            // that derived metadata on every sibling and residual parent.
+            tx.execute("UPDATE episodes SET importance=0,last_recalled_ms=0 WHERE id IN (SELECT topic_episode_id FROM topic_assignments WHERE session_episode_id IN (SELECT session_episode_id FROM topic_assignments WHERE record_id=? UNION SELECT episode_id FROM records WHERE id=?)) OR id IN (SELECT session_episode_id FROM topic_assignments WHERE record_id=? UNION SELECT episode_id FROM records WHERE id=?)",
+                params![id,id,id,id])?;
             tx.execute("DELETE FROM records WHERE id=?", [id])?;
         }
         // Keep no tombstone or erased record's timestamps. A mixed episode
