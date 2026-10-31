@@ -798,8 +798,9 @@ order is kept. A written turn is the same from the chat on.
   check is on the lamp: the day lines' timer and reminder at 4 of 4 runs,
   one confirmation each.
 - **With `LAMP_SECOND_SAY_WITH_CALL=on`, a call that changes something is
-  answered at once with the acting part's own words, its result** (off
-  unless set; #2135, the first builder's yes at 22:13 on 30 Oct). On
+  answered at once with the acting part's own words, its result** (on in
+  the product since 31 Oct, with `LAMP_SHORT_DONE=on` in lamp-actions'
+  unit; #2135, #4700, the first builder's yes on #4710 at 17:35). On
   lamp-4ace on 30 Oct (8999), `light_warmer`, `remember` and `set_timer`
   said nothing until their second chat round: round 1 took about 1.0–1.5 s
   to the call, and round 2 another 1.0–1.2 s, so 2.4–3.3 s to the first
@@ -874,7 +875,17 @@ order is kept. A written turn is the same from the chat on.
   So the model is now told to say nothing beside the call, a round whose
   words came with calls that each did what was asked ends there, and a
   fraction's "and" joins nothing (the first builder and Reviewer-three on
-  #4710).
+  #4710). The last run on `d06603109f` (16:48–17:33) said nothing twice.
+  Timers and reminders took 2.06–2.20 s against 2.95–3.27 s, said once in
+  the reminder's own words, and a real light change took 1.82–1.89 s. So
+  it's on in the product (the first builder's yes, 17:35).
+
+  **One slower case:** a light ask that can't change anything ("warmer" at
+  full orange, "too bright" at the lowest) gets no early words, since
+  nothing changed. Round 2 answers at 2.8–3.3 s, where with the switch off
+  the model answered from what it knew in 1.3–1.8 s. The follow-up is
+  lamp-actions' own words for a light that can't change ("That's as warm as
+  I go."), said at once.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
