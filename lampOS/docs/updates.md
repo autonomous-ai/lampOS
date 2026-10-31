@@ -2809,11 +2809,13 @@ test does (#1512):
 
 ## Not shown
 
-- A published release fetched over the internet, verified with the real
-  signing key, switched quietly and put back on failure, including an
-  attended run with the body. These remain
+- A published release put back on failure, and an attended run with the
+  body. These remain
   [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s acceptance
-  checks. Publication is now active, but independent verification with the
+  checks. A published release fetched over the internet, checked with the
+  stable key and switched at a quiet moment has run on real lamps: lamp-9adf
+  8899 → 8999 → 9063, lamp-52e6 and lamp-0c89 (30 and 31 Oct), each
+  keeping its parts after the watch. Publication is now active, but independent verification with the
   trusted public key and the attended acceptance run remain outstanding;
   the local trials do not complete them.
 - Independent trust and device acceptance of the published release. Real
@@ -2840,12 +2842,23 @@ test does (#1512):
   sandbox. No published build carries the image's files yet.
 - Settings and tmpfiles (`LAMP_UPDATE_APPLY`): tested on the Mac only
   (`apply.rs`, `tests/round.rs`), with lamp-update-apply called in the
-  round's place of systemd. The unit's sandbox, `systemd-tmpfiles` and
-  `systemctl restart` of a one-shot haven't run on a lamp. The product publisher now includes settings; a published carrier and an attended settings switch still need device acceptance.
+  round's place of systemd. On a real lamp, lamp-9adf's 8899 → 8999 round
+  (30 Oct 23:39:26, product unit, `LAMP_UPDATE_APPLY=on`) ran
+  `lamp-update-apply` inside its switch. It wrote the two settings that
+  build changed (`/etc/tmpfiles.d/lampos.conf` and the reset plan), kept
+  the lamp's own `controls-pins.json` ("this lamp's own; the build's is not
+  written"), and ended cleanly. Afterwards every other setting's SHA-256 was
+  the build's (Fourteen, #3997, 31 Oct 07:31). The 9063 round after it wrote
+  none, since 9063 changed none. Not read on a lamp: what
+  `systemd-tmpfiles` did with the new `lampos.conf`, and an attended
+  settings check.
 - Setup's reset plan (#806): tested on the Mac only (`tests/round.rs`,
   `tests/install.rs`): a lamp with the plan of 19 Oct or of 20 Oct 10:36
   (lamp-0c89's), updated by a round, ends with the build's and a backup.
-  No round carrying the plan has run on a lamp. The product publisher now includes it with settings; this does not claim an attended published-plan switch.
+  A round that changed the plan has run on a lamp: lamp-9adf's 8899 → 8999
+  wrote `/etc/lampOS/setup/reset-plan.json` (`cf1adcb3…` to `c0984e92…`, the
+  build's) at its switch (above). Not shown: a reset run on a plan a round
+  wrote.
 - The keeper,
   `lampos.target`, timers of no part, models and libraries a build does not carry,
   configuration under `/etc/lampOS` (but for `second.json`, above), and a
