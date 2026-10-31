@@ -5495,6 +5495,49 @@ async fn the_first_turn_after_a_start_says_the_down_line() {
     );
 }
 
+/// #4473: an owner who chose another language hears the down lines in it,
+/// never in English: the first turn's line, then the shorter one within
+/// the minute, each rendered from the fixed lines.
+#[tokio::test(start_paused = true)]
+async fn the_down_lines_are_said_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(2)
+                .collect(),
+        ),
+        chats: Mutex::new([vec![], vec![]].into()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down_in(true, Some(Language::Japanese));
+    let line = fixed_in(Some(Language::Japanese), DOWN_LINE);
+    let again = fixed_in(Some(Language::Japanese), DOWN_LINE_AGAIN);
+    // The scripted voice's audio carries its text's length.
+    assert_ne!(line.len(), DOWN_LINE.len());
+    assert_ne!(again.len(), DOWN_LINE_AGAIN.len());
+    let heard = |text: &str| format!("audio:{}", text.len());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let first = sent(&mut engine).await;
+    assert!(
+        first.contains(&heard(line)) && !first.contains(&heard(DOWN_LINE)),
+        "the first turn: {first:?}"
+    );
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let second = sent(&mut engine).await;
+    assert!(
+        second.contains(&heard(again)) && !second.contains(&heard(DOWN_LINE_AGAIN)),
+        "within the minute: {second:?}"
+    );
+}
+
 /// The rule is told which request a turn goes on from (`continues`): the one
 /// begun just before it, in its session; in another session, none (the
 /// reviewer on #1226).
