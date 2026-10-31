@@ -464,3 +464,72 @@ fn storage_failure_ends_the_run_before_any_later_answer() {
         1
     );
 }
+
+#[test]
+fn probe_files_are_private_removed_and_preserve_prior_forgetting() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("original", "Remember my blue notebook.", 1000);
+    p.ingest("forget", "Forget everything", 1100);
+    p.begin("probe-a", 1200);
+    let children: Vec<_> = std::fs::read_dir(p._dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.is_dir())
+        .collect();
+    assert_eq!(children.len(), 1);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for path in [
+            children[0].clone(),
+            children[0].join("tiers.sqlite"),
+            children[0].join("tiers.sqlite.forget-key"),
+        ] {
+            assert_eq!(
+                std::fs::metadata(path).unwrap().permissions().mode() & 0o077,
+                0
+            );
+        }
+    }
+    assert_eq!(
+        p.ingest("repeat-probe", "Remember my blue notebook.", 1300)["data"]["source_ids"],
+        json!([])
+    );
+    p.ingest("probe-only", "Remember the paper crane.", 1400);
+    p.end("probe-a");
+    assert!(!children[0].exists());
+    assert_eq!(p.inspect()["data"]["retained_record_ids"], json!([]));
+    assert_eq!(
+        p.ingest("repeat-main", "Remember my blue notebook.", 1200)["data"]["source_ids"],
+        json!([])
+    );
+    p.close();
+}
+
+#[test]
+fn failed_probe_cleanup_ends_run_without_overwriting_main_store() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("original", "Remember my blue notebook.", 1000);
+    p.begin("probe-a", 1100);
+    p.ingest("forget", "Forget everything", 1200);
+    let scratch = std::fs::read_dir(p._dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.is_dir())
+        .unwrap();
+    // Substitute a regular file so removing a directory fails on every host,
+    // including CI running as root where permissions do not induce a failure.
+    std::fs::rename(&scratch, p._dir.path().join("quarantined-child")).unwrap();
+    std::fs::write(&scratch, b"injected cleanup failure").unwrap();
+    let reply = p.request("probe_end", json!({"probe_id":"probe-a"}));
+    assert_eq!(reply["ok"], false);
+    assert!(!p.child.wait().unwrap().success());
+    let main =
+        lamp_memory_tiers::Store::open(p._dir.path().join("tiers.sqlite"), "owner-a").unwrap();
+    assert_eq!(
+        main.records(lamp_memory_tiers::Access::OWNER_ALONE)
+            .unwrap()
+            .len(),
+        1
+    );
+}
