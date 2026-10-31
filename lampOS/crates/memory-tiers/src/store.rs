@@ -1,5 +1,6 @@
 use crate::{Error, Result, schema, types::*};
 use hmac::{Hmac, Mac};
+use jiff::ToSpan;
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use sha2::Sha256;
 use std::io::{Read, Write};
@@ -1041,13 +1042,25 @@ fn pending_records(
             params![encode(&Speaker::Owner)?, now_ms, MAX_RECORDS],
         )
     } else {
+        let zone: String = conn.query_row(
+            "SELECT value FROM settings WHERE name='time_zone'",
+            [],
+            |r| r.get(0),
+        )?;
+        let week_start = jiff::Timestamp::from_millisecond(now_ms)
+            .and_then(|at| at.in_tz(&zone))
+            .and_then(|at| at.checked_sub(7.days()))
+            .map_err(|_| Error::Invalid("weekly calendar boundary out of range"))?
+            .timestamp()
+            .as_millisecond()
+            .max(0);
         records_where(
             conn,
             "SELECT body FROM records WHERE speaker=? AND at_ms<=? AND at_ms>=? AND id>(SELECT cursor FROM weekly_progress WHERE cycle=?) AND id<=(SELECT last_id FROM weekly_progress WHERE cycle=?) ORDER BY id LIMIT ?",
             params![
                 encode(&Speaker::Owner)?,
                 now_ms,
-                now_ms.saturating_sub(7 * DAY_MS),
+                week_start,
                 cycle,
                 cycle,
                 MAX_RECORDS
