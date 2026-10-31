@@ -163,6 +163,10 @@ Environment=LAMP_CUT_IN_TOLD=on
 # "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985).
 Environment=LAMP_SPOKEN_STOP_ENDS=on
 Environment=LAMP_SECOND_SAID_ONCE=on
+# A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
+# English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
+# against 2.95-3.27 s, a real light change 1.82-1.89 s, nothing said twice (the first builder on #4710, 17:35).
+Environment=LAMP_SECOND_SAY_WITH_CALL=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by

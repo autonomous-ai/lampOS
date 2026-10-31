@@ -29,6 +29,10 @@ StateDirectoryMode=0700
 Environment=LAMP_OUTPUT_CAPS_DIR=/var/lib/lampos-output-caps
 Environment=LAMP_SCHEDULE_TOOLS=on
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
+# A light or volume change it made is answered short, with its own words ("Warmer."), which the voice says at once
+# (LAMP_SECOND_SAY_WITH_CALL, #2135, #4700). Here only: the voice's own unit leaves LAMP_SHORT_DONE off, so with an
+# owner's language chosen it never says these English words.
+Environment=LAMP_SHORT_DONE=on
 ExecStart=/opt/lampOS/actions/current/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=2s

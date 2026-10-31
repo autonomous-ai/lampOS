@@ -203,7 +203,9 @@ could not confirm my speaker's volume changed.", "I asked for it but could
 not confirm my light changed.", and for anything not offered "I can't do
 that."
 
-**Short after a change (`LAMP_SHORT_DONE=on`, off unless set).** A light or
+**Short after a change (`LAMP_SHORT_DONE=on`, on in the product's
+lamp-actions unit since 31 Oct for the voice's answer at once,
+`LAMP_SECOND_SAY_WITH_CALL`; the voice's own unit leaves it off).** A light or
 volume call that changed the lamp is answered with what was established and
 `"next": "It is done. About this change, say only a word or two, in your own
 words and not the same each time. Answer anything else they asked as you
