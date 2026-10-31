@@ -210,9 +210,10 @@ A record kept in `--out` but refused by the place also exits 2:
 - one already there: nothing to copy;
 - a lamp folder that is a link to elsewhere, which is never followed: no
   copy is offered either;
-- a place that can't make hard links: it says so with the `--out` path to
-  copy there by hand once the place can take it, since the same run can't
-  be made again. A record is put in place by a hard
+- any other refusal, such as a place that can't make hard links or one that
+  refuses the write: it says so with the `--out` path to copy there by hand
+  once the place can take it, since the same run can't be made again. A
+  record is put in place by a hard
   link from a part file, so it's never half there and never replaces
   another, and many shares (SMB, most FUSE and NAS mounts) don't make them.
   The place must.
