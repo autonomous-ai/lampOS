@@ -818,8 +818,10 @@ pub(crate) fn timer_line(
 /// one, so it leans to more. The words are cut into clauses at a sentence's
 /// end (not a point between digits, "2.5"), a comma or semicolon, and
 /// "and", "also", "then" or "plus"; a clause of only thanks, a greeting, the
-/// name or "okay" asks nothing; a call's own words ("take out the trash and
-/// recycling", a reminder's `text`) are its ask. It is more when a clause
+/// name or "okay" asks nothing, nor does a greeting and one word, the name
+/// however it was heard ("Hey Lynn," for "Hey Lamp,": candidate 9276 on
+/// lamp-4ace, the first builder on #4710, 21:4x); a call's own words ("take
+/// out the trash and recycling", a reminder's `text`) are its ask. It is more when a clause
 /// holds no word of a light, the volume or a timer ("what's the weather"),
 /// when a clause after the first is a question ("Make it cozy, what's on my
 /// calendar today?", where "on" alone would pass), or when there are more
@@ -832,10 +834,12 @@ pub(crate) fn timer_line(
 /// the first builder on #4710).
 pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
     const JOINING: [&str; 4] = ["and", "also", "then", "plus"];
-    const FILLER: [&str; 17] = [
-        "thanks", "thank", "you", "please", "okay", "ok", "cheers", "lamp", "hey", "hi", "great",
-        "cool", "now", "so", "oh", "much", "very",
+    const FILLER: [&str; 18] = [
+        "thanks", "thank", "you", "please", "okay", "ok", "cheers", "lamp", "hey", "hi", "hello",
+        "great", "cool", "now", "so", "oh", "much", "very",
     ];
+    // A clause of one of these and one more word calls the lamp by its name.
+    const GREETING: [&str; 5] = ["hey", "hi", "hello", "okay", "ok"];
     const ASKING: [&str; 21] = [
         "what", "what's", "whats", "how", "how's", "when", "where", "who", "who's", "why", "which",
         "whose", "is", "are", "can", "could", "will", "would", "do", "does", "tell",
@@ -898,7 +902,8 @@ pub(crate) fn asks_more(said: &str, calls: &[net::ToolCall]) -> bool {
                 continue;
             }
             let last = word.is_none();
-            if clause.iter().any(|word| !FILLER.contains(word)) {
+            let called = clause.len() == 2 && GREETING.contains(&clause[0]);
+            if !called && clause.iter().any(|word| !FILLER.contains(word)) {
                 clauses += 1;
                 let changes = clause.iter().any(|word| {
                     TURNING.contains(word) || CHANGING.iter().any(|stem| word.starts_with(stem))
@@ -941,6 +946,18 @@ pub(crate) fn spoken_clock(clock: &str) -> Option<String> {
 pub(crate) fn short_done_note(line: &str) -> String {
     format!(
         "(For you to know, not to answer: the lamp itself says \"{line}\" for this change, so say nothing about it. If they asked for anything else in the same words, answer only that. If they asked for nothing else, reply with nothing at all: no words.)"
+    )
+}
+
+/// The note the round after an answer at once is asked with
+/// (`LAMP_SECOND_SAY_WITH_CALL`): the acting part's `line` was already said
+/// aloud and heard, as [`said_once_note`] tells the model's own words. Told
+/// only that the lamp "says" it ([`short_done_note`]), round 2 said each of
+/// three "already"s again in its own words on candidate 9276 ("Already as
+/// warm as I go — that's my limit.", the first builder on #4710, 21:4x).
+pub(crate) fn said_at_once_note(line: &str) -> String {
+    format!(
+        "(For you to know, not to answer: the lamp itself already said aloud \"{line}\" for this, and the person heard it. Do not say it again, in other words, or say what changed or didn't. If they asked for anything else in the same words, answer only that. If they asked for nothing else, reply with nothing at all: no words.)"
     )
 }
 /// Whether a spoken turn's words were said to the lamp, judged before they
@@ -10569,7 +10586,7 @@ async fn answer(
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
                 );
-                messages.push(Message::system(short_done_note(line)));
+                messages.push(Message::system(said_at_once_note(line)));
             } else if let Some(line) = short {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" kept while the next round says whether more was asked (LAMP_SHORT_DONE)"
@@ -10591,7 +10608,7 @@ async fn answer(
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: the timer is set; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
                 );
-                messages.push(Message::system(short_done_note(&line)));
+                messages.push(Message::system(said_at_once_note(&line)));
             } else if may_end_worded
                 && short_told.len() == calls.len()
                 // Every call made its change: words over one that changed
