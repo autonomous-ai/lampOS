@@ -1413,8 +1413,8 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   `systemctl` and `systemd-tmpfiles` themselves were not run.
 - No build carries the voice's turn-end model and ONNX Runtime library, the
   eyes' four models (YuNet and SFace; Face Mesh V2 and Blendshape V2, which
-  only `--mouth-model` and `--seems-blendshapes` read, off in the product,
-  #1671) or the name's models. `install` fetches each that is
+  `--mouth-model` and `--seems-blendshapes` read, both on in the product's
+  `lamp-eyes.service` since #2799) or the name's models. `install` fetches each that is
   missing (#811, from lamp-06c1) from `deploy/product/models.json`: where
   it goes, its URL, size and SHA-256, the runtime's library out of its
   pinned release archive with `tar`. Each is written under a temporary name
@@ -1425,9 +1425,9 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   ours, `models-2026-10-16`, with each model's licence beside it (the first
   builder on #811, 2026-10-16 13:58; the fifth made it). The voice's four
   recorded lines and their manifest are in `notices-2026-10-20`, placed in
-  `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). It is a draft until
-  #811 ships, so until it is published every fetch says the model could not
-  be had. One that cannot be had is said and the install goes on. What
+  `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). Both releases
+  are published (`models-2026-10-16` since 26 Oct). A model that cannot be
+  had is said and the install goes on. What
   install placed is recorded by SHA-256 as the settings are, so when
   `models.json` moves a pin, the earlier model it placed is replaced (its
   part checks the new pin and would refuse the old); one already there that
