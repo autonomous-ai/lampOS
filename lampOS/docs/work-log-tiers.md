@@ -1,5 +1,44 @@
 # Tiers work log
 
+## 2026-10-31: calendar reflection and private benchmark probes
+
+Ready for lamp-voice: no; both implementation pull requests need their current
+head gates/readers before promotion.
+
+Store [PR #4750](https://github.com/autonomous-ai/lampOS/pull/4750) is at
+`1c9d4cd17`. Weekly reflection now looks back seven calendar days in the
+owner's named time zone, with spring/fall DST regressions. All 35 store/model
+tests, strict host clippy, formatting, workspace build and source-only tests
+pass. Linux clippy is green; native ARM64 is still running on this correction.
+The two readers were told the exact small change from their previous head.
+
+Adapter [PR #4756](https://github.com/autonomous-ai/lampOS/pull/4756) is at
+`e2e74a15e` and includes that calendar fix. Broker/storage failures stop the
+run, and isolated probe copies now live only in the development executable.
+The library has no public copy, restore or connection-import entry point.
+Private child files are removed before resuming the original store; cleanup
+failure ends the process without overwriting the main database. Three API
+compile-fail tests pass; the fork test was also shown to fail with the former
+public API restored. A read-only peer audit found no blocking issue.
+
+On macOS x86_64 Rust 1.96.0, all 62 functional tests plus three compile-fail
+tests pass, including source-only checks outside the repository. Formatting,
+strict clippy with default and bench features, and workspace build pass.
+The benchmark builder independently passed a twelve-operation v2 smoke on
+`df9af5447`, with no model calls, scores or deadline misses. This validates
+protocol integration only. Current native feature coverage, live model/STT
+runs and the baseline plus eleven-arm three-run ledger scorecards remain open.
+
+The lead chose ordinary development binary targets for existing CI coverage.
+The shared development-only inventory request includes both lamp-memory-bench
+and lamp-memory-tiers-arm; deployment edits belong to its owner. Until that
+entry lands, the adapter retains its feature requirement. No product crate,
+deployment or lamp was changed. Live relay access remains a live-run dependency,
+while independent implementation work continues.
+
+Most likely wrong remains semantic forgetting/paraphrase and model overstatement;
+the pending bench must measure them instead of treating host tests as scores.
+
 ## 2026-10-31: store review and benchmark v2 checkpoint
 
 Ready for lamp-voice: yes ([PR #4750](https://github.com/autonomous-ai/lampOS/pull/4750), store/sleep only).
