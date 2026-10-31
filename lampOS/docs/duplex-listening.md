@@ -458,6 +458,25 @@ lamp-52e6 on 29 Oct (8474) two people talking with office noise 7 dB under
 the asker cut a long answer within about 40 s (`duplex_commit` 343 ms
 after its yield, `hearing_margin_db` 3.9).
 
+**With `LAMP_CUT_IN_LATE_YIELD=on` (off unless set), a yield made late in
+a person's speech over the lamp commits on stillness.** Over the lamp's
+voice most of a plain question can be heard as `Under` (the detector's
+score on the cancelled signal under 0.5), so the 7 consecutive `Over`
+blocks of the onset come only as it ends. Nothing is `Clear` for 30 blocks
+after the yield (`clear_after_blocks`) while the lamp's sound dies away;
+by then the person has finished, and 40 `Still` blocks resume the answer.
+With the switch, a yield with at least 14 `Over` blocks
+(`LATE_YIELD_OVER_BLOCKS`), onset run included, in the 150 blocks up to
+and including the one that made it (`LATE_YIELD_WINDOW_BLOCKS`) commits
+where stillness would resume it (`Interruption::commit_late_yields`). Its
+deadline still resumes it; talk well under the asker
+(`LAMP_CUT_IN_NEAR_ASKER`) and a yield awaiting or holding its words are
+as before, and `duplex_commit` gives `late_yield`. On lamp-c0a4 on 31 Oct,
+every cut-in switch off, "Wait, what was the keeper's name?" over a story
+was dropped 3 times in 27 played cut-ins, with 15, 17 and 20 `Over` blocks
+in that window; the lamp's own voice had 7-8, side remarks at most 11, and
+"What was that?" 7-8.
+
 **With `LAMP_CUT_IN_COUNTS_REAL=on` (#2602, off unless set), only the
 lamp's own voice counts as a fruitless yield.** A resume counts toward
 `FRUITLESS_YIELDS` only when its yield's evidence window points at the
@@ -1337,6 +1356,8 @@ functions:
 | `with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in` | With the switch: 3,000 blocks of the lamp's own voice, a 25-block word, and 1,000 blocks of voice unexplained before the lamp's sound is found again after a third aside, none a yield |
 | `with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more` | With the switch: four tries that resume cost two more yields, then none |
 | `talk_well_under_the_asker_is_the_rooms_and_resumes_the_answer` (`turn_taking.rs`) | `LAMP_CUT_IN_NEAR_ASKER=on`: talk 8 dB under the asker resumes the answer, 2 dB under commits; no asker's level, or the switch off, commits |
+| `a_yield_late_in_a_question_commits_on_stillness_with_the_switch`, `a_yield_not_late_in_speech_resumes_with_the_switch`, `a_late_yield_resumes_at_its_deadline_and_for_the_room_behind_the_asker` (`lamp-audio`) | `LAMP_CUT_IN_LATE_YIELD=on`: lamp-c0a4's dropped question (17 scattered `Over`, then the onset, 2 `Own`, 18 `Under`, 44 `Still`) commits, and resumes without the switch; the onset alone, 11 `Over`, the deadline and talk under the asker resume |
+| `a_question_yielded_to_late_commits_with_the_switch` (`turn_taking.rs`) | `LAMP_CUT_IN_LATE_YIELD=on`: the same question through the mask commits; the switch off resumes |
 | `with_counts_real_two_plain_asides_leave_a_third_line_heard` | `LAMP_CUT_IN_COUNTS_REAL=on`: two asides heard plainly, then a third line 5 s after, which commits and ends the story; off, not heard |
 | `with_counts_real_the_lamps_own_voice_twice_still_falls_back` | With the switch: two yields whose windows the render mostly explains count, and a third line 5 s after makes no yield |
 | `with_counts_real_unknown_alone_is_not_the_lamps_own_voice` | With the switch: two yields with plain onsets and 60 `Unknown` blocks after don't count as the lamp's own voice, and the third line commits |
