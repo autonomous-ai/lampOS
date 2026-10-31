@@ -3,7 +3,7 @@
 Everything here is fictional. The development persona has 40 facts, twelve
 traits, ten changed facts, two explicit forget requests, six appointments,
 visitors and decoys. The generator emits thirty days with fifty utterances
-plus session start/end events per day. Its 200 questions include twelve
+in eight conversations across four desk visits per day (2,220 events total). Its 200 questions include twelve
 three-turn appointment probes. No arm has been scored against this material.
 
 Registration version 2 adds three day-9 wrong-person probes, replacing three
@@ -13,6 +13,18 @@ to owner. True speaker identity exists only in the evaluator key. The hard
 gate is zero owner facts or owner-model lines learned from those records;
 missing inspection evidence cannot establish a pass. Version 1 remains in
 the repository history; no scored run preceded this change.
+
+Registration version 3 revises only timing, boundary events and the resulting
+question eligibility lists before any score: 2–12 exchanges per conversation,
+3–30 seconds apart, with long gaps and observed arrivals/departures. Persona,
+owner utterance content/IDs, question wording/scoring and answer keys stay unchanged.
+Empty companion replies become a deterministic rotation of “Got it.”, “Okay.”
+and “I hear you.”, shared by all setups. They add no facts or promises and
+cost no model calls. This month does not test real lamp replies or promises.
+The prior nine-minute spacing falsely split every utterance into a product
+conversation. Consolidation remains 30 nightly and four weekly passes.
+The facts and ahead removal names now match the adapter manifest, with no
+change in component meaning or order. Prior plumbing attempts remain retained.
 
 Files are deliberately separated:
 

@@ -4,7 +4,7 @@ use crate::{
     protocol::*,
     score::{Question, Rule},
 };
-use jiff::{civil::Date, tz::TimeZone};
+use jiff::{Timestamp, civil::Date, tz::TimeZone};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -169,11 +169,27 @@ pub struct Corpus {
     pub answer_key: Vec<Evidence>,
     pub questions: Vec<Question>,
 }
+impl Corpus {
+    /// Consolidation follows local calendar days, never conversation count.
+    pub fn day_end_records(&self) -> Result<BTreeSet<String>> {
+        let zone = TimeZone::get(&self.persona.timezone)
+            .map_err(|_| invalid("unknown persona timezone"))?;
+        let mut last_by_day = BTreeMap::new();
+        for e in &self.events {
+            let ms = i64::try_from(e.at_unix_ms).map_err(|_| invalid("timestamp overflow"))?;
+            let day = Timestamp::from_millisecond(ms)
+                .map_err(|_| invalid("timestamp out of range"))?
+                .to_zoned(zone.clone())
+                .date();
+            last_by_day.insert(day, e.record_id.clone());
+        }
+        Ok(last_by_day.into_values().collect())
+    }
+}
 fn event(persona: &Persona, day: u32, line: u32, kind: EventKind, heard: String) -> Result<Event> {
-    let minute = line * 9;
     Ok(Event {
         record_id: format!("d{day:02}-{line:03}"),
-        at_unix_ms: persona.at(day, 9 + (minute / 60) as i8, (minute % 60) as i8)?,
+        at_unix_ms: persona.at(day, 9, 0)?,
         session_id: format!("d{day:02}-desk"),
         kind,
         person: Person::Owner,
@@ -189,18 +205,82 @@ fn event(persona: &Persona, day: u32, line: u32, kind: EventKind, heard: String)
         },
     })
 }
+fn timed_day(persona: &Persona, day: u32, utterances: Vec<Event>) -> Result<Vec<Event>> {
+    // Rotate lengths across days without consulting any question or gold field.
+    // Each adjacent pair of conversations belongs to one visit to the desk.
+    const LENGTHS: [usize; 8] = [2, 8, 4, 12, 6, 3, 10, 5];
+    const STARTS: [(i8, i8); 8] = [
+        (9, 0),
+        (9, 35),
+        (10, 25),
+        (11, 40),
+        (13, 10),
+        (14, 30),
+        (15, 20),
+        (16, 40),
+    ];
+    let mut source = utterances.into_iter();
+    let mut out = Vec::new();
+    for (index, (hour, minute)) in STARTS.into_iter().enumerate() {
+        let session = format!("d{day:02}-c{:02}", index + 1);
+        let start = persona.at(day, hour, minute)?
+            + (persona
+                .seed
+                .wrapping_add(u64::from(day) * 13 + index as u64 * 7)
+                % 11)
+                * 60_000;
+        let marker = |kind, at, suffix: &str| -> Result<Event> {
+            let mut e = event(persona, day, 0, kind, String::new())?;
+            e.record_id = format!("{session}-{suffix}");
+            e.session_id = session.clone();
+            e.at_unix_ms = at;
+            if kind == EventKind::Leave {
+                e.presence = Presence::Unknown;
+            }
+            Ok(e)
+        };
+        if index % 2 == 0 {
+            let mut e = marker(EventKind::Arrive, start - 30_000, "arrive")?;
+            if index == 0 {
+                e.record_id = format!("d{day:02}-000");
+            }
+            out.push(e);
+        }
+        out.push(marker(EventKind::SessionStart, start - 3_000, "start")?);
+        let mut at = start;
+        for exchange in 0..LENGTHS[(index + day as usize - 1) % LENGTHS.len()] {
+            if exchange > 0 {
+                at += (3 + persona
+                    .seed
+                    .wrapping_add(u64::from(day) * 11 + index as u64 * 17 + exchange as u64 * 19)
+                    % 28)
+                    * 1_000;
+            }
+            let mut e = source.next().ok_or_else(|| invalid("short day script"))?;
+            e.at_unix_ms = at;
+            e.session_id = session.clone();
+            out.push(e);
+        }
+        out.push(marker(EventKind::SessionEnd, at + 45_000, "end")?);
+        if index % 2 == 1 {
+            let mut e = marker(EventKind::Leave, at + 46_000, "leave")?;
+            if index == 7 {
+                e.record_id = format!("d{day:02}-051");
+            }
+            out.push(e);
+        }
+    }
+    if source.next().is_some() {
+        return Err(invalid("long day script"));
+    }
+    Ok(out)
+}
 pub fn generate(persona: Persona) -> Result<Corpus> {
     persona.validate()?;
     let mut events = Vec::new();
     let mut evidence = Vec::new();
     for day in 1..=30 {
-        events.push(event(
-            &persona,
-            day,
-            0,
-            EventKind::SessionStart,
-            String::new(),
-        )?);
+        let mut utterances = Vec::new();
         for line in 1..=50 {
             let index = (persona
                 .seed
@@ -297,6 +377,13 @@ pub fn generate(persona: Persona) -> Result<Corpus> {
                 tr = None;
             }
             let mut e = event(&persona, day, line, EventKind::Utterance, heard)?;
+            // Shared scripted acknowledgements complete input exchanges without
+            // model-dependent history, new facts, promises or inferred sentiment.
+            e.said = ["Got it.", "Okay.", "I hear you."][(persona
+                .seed
+                .wrapping_add(u64::from(day) * 7 + u64::from(line) * 11)
+                % 3) as usize]
+                .into();
             if visitor {
                 e.person = Person::Visitor;
                 e.person_id = None;
@@ -315,15 +402,9 @@ pub fn generate(persona: Persona) -> Result<Corpus> {
                 },
             });
             e.validate()?;
-            events.push(e);
+            utterances.push(e);
         }
-        events.push(event(
-            &persona,
-            day,
-            51,
-            EventKind::SessionEnd,
-            String::new(),
-        )?);
+        events.extend(timed_day(&persona, day, utterances)?);
     }
     let questions = questions(&persona, &events, &evidence)?;
     Ok(Corpus {

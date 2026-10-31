@@ -1,13 +1,18 @@
 {
+  "arm_name_revision": {
+    "reason": "Align adapter manifest names; component meanings and order unchanged.",
+    "tiers_minus_facts_people_places": "tiers_minus_facts",
+    "tiers_minus_whats_ahead": "tiers_minus_ahead"
+  },
   "candidate_label": "ours (tiers)",
   "candidate_order": [
     "tiers",
     "tiers_minus_episodes",
     "tiers_minus_life_story",
-    "tiers_minus_facts_people_places",
+    "tiers_minus_facts",
     "tiers_minus_owner_model",
     "tiers_minus_how_to_be",
-    "tiers_minus_whats_ahead",
+    "tiers_minus_ahead",
     "tiers_minus_feelings",
     "tiers_minus_nightly_sleep",
     "tiers_minus_importance",
@@ -19,9 +24,9 @@
   "fictional": true,
   "files": {
     "answer-key.jsonl": "2bf2c2a3c72093e43bb569639ee154d304602f2307d07bc62fe0bfbfef8bdf14",
-    "events.jsonl": "ae4b6eaa8878af4dd81eda74550fd4628c6cd17980ae7a75f0202171b65e6180",
+    "events.jsonl": "638f418a71453a64f56eb840f91435ce1a45bd032dea12f21bebd21dd2f86248",
     "persona.json": "19d74b5e7377c89d947cd6f924a515b2a0d0b84757e204e66d5b07779b3e82cc",
-    "questions.jsonl": "3a3a983d71ed7af7582fc5d18534e15cba51597a615d94684af2610e4706429f"
+    "questions.jsonl": "78056903d8fe6afd5af29c36cc22ebf62f672dcf246ef81a3ec9c1766ad2a6fd"
   },
   "human_audit": "pending",
   "judge": "required for rubric scores; recorded tests are not live results",
@@ -34,13 +39,42 @@
     "forgetting_enforcement"
   ],
   "scorers": "src/score.rs and tests/guards.rs committed before scored runs",
+  "scripted_replies": {
+    "before_any_score": true,
+    "choices": [
+      "Got it.",
+      "Okay.",
+      "I hear you."
+    ],
+    "limitations": "No new facts or promises. This month does not test the lamp's actual replies or its own promises.",
+    "reason": "Complete answered exchanges for product journaling without model-dependent history or extra model calls.",
+    "selection": "deterministic seed/day/line rotation, identical for every setup"
+  },
   "seed": 731,
   "snapshot_ms": 300,
   "status": "draft_pending_human_review",
   "timezone": "Asia/Ho_Chi_Minh",
+  "timing_revision": {
+    "before_any_score": true,
+    "conversations_per_day": 8,
+    "date": "2026-10-31",
+    "exchange_gap_seconds": [
+      3,
+      30
+    ],
+    "exchanges_per_conversation": [
+      2,
+      12
+    ],
+    "nightly": "after the final event of each local calendar day",
+    "reason": "Nine-minute spacing incorrectly made every utterance a product conversation and biased time-based episode boundaries.",
+    "unchanged": "persona, owner utterance content and IDs, question content and scoring, answer key; eligible source lists include new boundary events",
+    "visits_per_day": 4,
+    "weekly": "after every seventh local calendar day"
+  },
   "transcripts": "not_yet_recorded",
   "utterances_per_day": 50,
-  "version": 2,
+  "version": 3,
   "wrong_person_gate": "zero owner facts or owner-model lines learned from the second resident's default-owner records; missing inspection evidence is unmeasured, never a pass",
   "wrong_person_records": [
     "d08-020",

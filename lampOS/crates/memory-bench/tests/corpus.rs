@@ -15,7 +15,7 @@ fn fictional_month_is_repeatable_and_questions_never_cite_future_records() {
     let a = corpus::generate(persona()).unwrap();
     let b = corpus::generate(persona()).unwrap();
     files::validate(&a).unwrap();
-    assert_eq!(a.events.len(), 1560);
+    assert_eq!(a.events.len(), 2220);
     assert_eq!(a.questions.len(), 200);
     assert_eq!(
         serde_json::to_vec(&a).unwrap(),
@@ -33,6 +33,46 @@ fn fictional_month_is_repeatable_and_questions_never_cite_future_records() {
     assert!(files::validate(&modified).is_err());
 }
 #[test]
+fn conversations_are_bursts_with_arrivals_departures_and_daily_sleep_boundaries() {
+    use lamp_memory_bench::protocol::EventKind;
+    let c = corpus::generate(persona()).unwrap();
+    let mut lengths = std::collections::BTreeMap::<String, Vec<u64>>::new();
+    for e in &c.events {
+        if e.kind == EventKind::Utterance {
+            assert!(["Got it.", "Okay.", "I hear you."].contains(&e.said.as_str()));
+            lengths
+                .entry(e.session_id.clone())
+                .or_default()
+                .push(e.at_unix_ms);
+        }
+    }
+    assert_eq!(lengths.len(), 240);
+    for times in lengths.values() {
+        assert!((2..=12).contains(&times.len()));
+        assert!(
+            times
+                .windows(2)
+                .all(|w| (3_000..=30_000).contains(&(w[1] - w[0])))
+        );
+    }
+    for kind in [EventKind::Arrive, EventKind::Leave] {
+        assert_eq!(c.events.iter().filter(|e| e.kind == kind).count(), 120);
+    }
+    assert_eq!(c.day_end_records().unwrap().len(), 30);
+    for day in 1..=30 {
+        let groups = lengths
+            .iter()
+            .filter(|(id, _)| id.starts_with(&format!("d{day:02}-")))
+            .map(|(_, v)| v)
+            .collect::<Vec<_>>();
+        assert!(
+            groups
+                .windows(2)
+                .all(|w| w[1][0] - w[0].last().unwrap() > 600_000)
+        );
+    }
+}
+#[test]
 fn local_days_follow_dst_instead_of_adding_twenty_four_hours() {
     let mut p = persona();
     p.timezone = "America/New_York".into();
@@ -42,6 +82,10 @@ fn local_days_follow_dst_instead_of_adding_twenty_four_hours() {
         23 * 60 * 60 * 1000
     );
     assert_eq!(p.local_date(10).unwrap().to_string(), "2030-03-10");
+    p.seed = u64::MAX;
+    let c = corpus::generate(p).unwrap();
+    files::validate(&c).unwrap();
+    assert_eq!(c.day_end_records().unwrap().len(), 30);
 }
 #[test]
 fn event_input_cannot_smuggle_an_answer_key() {

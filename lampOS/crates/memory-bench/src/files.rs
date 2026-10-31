@@ -18,10 +18,10 @@ pub const ARMS: [&str; 11] = [
     "tiers",
     "tiers_minus_episodes",
     "tiers_minus_life_story",
-    "tiers_minus_facts_people_places",
+    "tiers_minus_facts",
     "tiers_minus_owner_model",
     "tiers_minus_how_to_be",
-    "tiers_minus_whats_ahead",
+    "tiers_minus_ahead",
     "tiers_minus_feelings",
     "tiers_minus_nightly_sleep",
     "tiers_minus_importance",
@@ -78,11 +78,14 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
     .into_iter()
     .map(|name| Ok((name, hash(&fs::read(path.join(name))?))))
     .collect::<Result<BTreeMap<_, _>>>()?;
-    let registration = json!({"version":2,"protocol_version":2,"status":"draft_pending_human_review","fictional":true,
+    let registration = json!({"version":3,"protocol_version":2,"status":"draft_pending_human_review","fictional":true,
         "question_count":200,"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
         "seed":corpus.persona.seed,"files":hashes,"scorers":"src/score.rs and tests/guards.rs committed before scored runs",
         "candidate_order":ARMS,"repetitions":3,"candidate_label":"ours (tiers)",
         "facts_removal":"facts not recalled; kept only as evidence",
+        "timing_revision":{"date":"2026-10-31","before_any_score":true,"reason":"Nine-minute spacing incorrectly made every utterance a product conversation and biased time-based episode boundaries.","conversations_per_day":8,"exchanges_per_conversation":[2,12],"exchange_gap_seconds":[3,30],"visits_per_day":4,"nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day","unchanged":"persona, owner utterance content and IDs, question content and scoring, answer key; eligible source lists include new boundary events"},
+        "scripted_replies":{"before_any_score":true,"choices":["Got it.","Okay.","I hear you."],"selection":"deterministic seed/day/line rotation, identical for every setup","reason":"Complete answered exchanges for product journaling without model-dependent history or extra model calls.","limitations":"No new facts or promises. This month does not test the lamp's actual replies or its own promises."},
+        "arm_name_revision":{"tiers_minus_facts_people_places":"tiers_minus_facts","tiers_minus_whats_ahead":"tiers_minus_ahead","reason":"Align adapter manifest names; component meanings and order unchanged."},
         "retained_safety_rules":["source_provenance","forgetting_enforcement"],
         "wrong_person_records":["d08-020","d08-021","d08-022"],
         "wrong_person_gate":"zero owner facts or owner-model lines learned from the second resident's default-owner records; missing inspection evidence is unmeasured, never a pass",
@@ -127,7 +130,7 @@ pub fn read_corpus(path: &Path) -> Result<Corpus> {
 }
 pub fn validate(corpus: &Corpus) -> Result<()> {
     corpus.persona.validate()?;
-    if corpus.events.len() != 30 * 52 || corpus.questions.len() != 200 {
+    if corpus.events.len() != 30 * 74 || corpus.questions.len() != 200 {
         return Err(invalid("corpus dimensions differ from plan"));
     }
     let mut records = BTreeMap::new();

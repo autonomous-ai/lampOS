@@ -184,7 +184,7 @@ pub fn run_with_adapter(
         transcript_hash: None,
         timezone: corpus.persona.timezone.clone(),
         model: "fixed-recorded-answer-plumbing-only".into(),
-        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8,"runner_revision":revision,"consolidation_fixture_hash":hash(EMPTY_CONSOLIDATION.as_bytes()),"consolidation":"fixed empty synthetic proposal; no learned content or accuracy claim","weekly":"after every seventh local session end"}),
+        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8,"runner_revision":revision,"consolidation_fixture_hash":hash(EMPTY_CONSOLIDATION.as_bytes()),"consolidation":"fixed empty synthetic proposal; no learned content or accuracy claim","nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day"}),
         budget_microusd: 1_000_000_000,
         seed: corpus.persona.seed,
     };
@@ -234,6 +234,7 @@ pub fn run_with_adapter(
         let mut probes = 0;
         let mut turns = 0;
         let mut nights = 0;
+        let day_ends = corpus.day_end_records()?;
         for event in &corpus.events {
             let ingested = operation(
                 &mut runner,
@@ -246,7 +247,7 @@ pub fn run_with_adapter(
                 ),
             )?;
             recent.record(event, effect(&ingested.data)?)?;
-            if event.kind == EventKind::SessionEnd {
+            if day_ends.contains(&event.record_id) {
                 drain_sleep(&mut runner, &mut client, &logfile, event, "nightly")?;
                 nights += 1;
                 if nights % 7 == 0 {
