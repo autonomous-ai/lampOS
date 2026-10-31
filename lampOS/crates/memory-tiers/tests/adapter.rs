@@ -135,6 +135,114 @@ fn proposal() -> String {
     json!({"facts":[{"key":"note","claim":"May prefer a blue notebook.","record_ids":[1],"strength":"said","kind":"preference","true_since_ms":1000,"true_until_ms":null,"supersedes":null}],"lines":[{"replaces":null,"kind":"owner_model","text":"May prefer a blue notebook.","fact_ids":[],"fact_keys":["note"]}],"episodes":[]}).to_string()
 }
 #[test]
+fn diagnostics_are_count_only_and_usage_survives_probe_restoration() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "Maybe I prefer a blue notebook.", 1000);
+    p.sleep(1100, &proposal());
+    let before = p.inspect();
+    assert_eq!(before["v"], 2);
+    assert_eq!(before["data"]["diagnostics"]["schema"], "tier-usage-v1");
+    let before = &before["data"]["diagnostics"]["tiers"];
+    assert_eq!(before["facts"]["items"], 1);
+    assert_eq!(before["owner_model"]["items"], 1);
+    for metrics in before.as_object().unwrap().values() {
+        let keys: std::collections::BTreeSet<_> = metrics
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            keys,
+            ["items", "text_bytes", "recall_calls", "snapshot_calls"]
+                .into_iter()
+                .collect()
+        );
+        assert_eq!(metrics["recall_calls"], 0);
+        assert_eq!(metrics["snapshot_calls"], 0);
+    }
+    assert!(!before.to_string().contains("notebook"));
+    p.begin("diagnostic-probe", 1200);
+    let snapshot = p.query("snapshot", "diagnostic-probe", 1200, 4096);
+    let recall = p.query("recall", "diagnostic-probe", 1200, 4096);
+    assert!(snapshot["data"].get("diagnostics").is_none());
+    assert!(recall["data"].get("diagnostics").is_none());
+    let used = p.inspect();
+    assert_eq!(
+        used["data"]["diagnostics"]["tiers"]["owner_model"]["snapshot_calls"],
+        1
+    );
+    assert_eq!(
+        used["data"]["diagnostics"]["tiers"]["facts"]["recall_calls"],
+        1
+    );
+    assert_eq!(p.query("snapshot", "diagnostic-probe", 1200, 1)["ok"], true);
+    assert_eq!(p.query("recall", "diagnostic-probe", 1200, 1)["ok"], true);
+    assert_eq!(
+        p.inspect()["data"]["diagnostics"],
+        used["data"]["diagnostics"]
+    );
+    p.ingest("temporary-forget", "Forget everything", 1300);
+    let empty = p.inspect();
+    assert_eq!(empty["data"]["diagnostics"]["tiers"]["facts"]["items"], 0);
+    assert_eq!(
+        empty["data"]["diagnostics"]["tiers"]["owner_model"]["items"],
+        0
+    );
+    p.end("diagnostic-probe");
+    assert_eq!(
+        p.inspect()["data"]["diagnostics"],
+        used["data"]["diagnostics"]
+    );
+    let denied = p.request("inspect", json!({"person_id":"other-owner"}));
+    assert!(denied["data"].get("diagnostics").is_none());
+    p.close();
+}
+
+#[test]
+fn diagnostics_separate_proof_rows_from_recallable_facts() {
+    let mut p = ArmProcess::new("tiers_minus_facts");
+    p.ingest("source-1", "Maybe I prefer a blue notebook.", 1000);
+    p.sleep(1100, &proposal());
+    let initial = p.inspect();
+    let tiers = &initial["data"]["diagnostics"]["tiers"];
+    assert_eq!(tiers["facts"]["items"], 0);
+    assert_eq!(tiers["facts"]["text_bytes"], 0);
+    assert_eq!(tiers["evidence_only_facts"]["items"], 1);
+    assert!(tiers["evidence_only_facts"]["text_bytes"].as_u64().unwrap() > 0);
+    assert_eq!(tiers["owner_model"]["items"], 1);
+    p.begin("proof-probe", 1200);
+    p.query("snapshot", "proof-probe", 1200, 4096);
+    p.query("recall", "proof-probe", 1200, 4096);
+    let used = p.inspect();
+    for tier in ["facts", "evidence_only_facts"] {
+        assert_eq!(
+            used["data"]["diagnostics"]["tiers"][tier]["recall_calls"],
+            0
+        );
+        assert_eq!(
+            used["data"]["diagnostics"]["tiers"][tier]["snapshot_calls"],
+            0
+        );
+    }
+    assert_eq!(
+        used["data"]["diagnostics"]["tiers"]["owner_model"]["snapshot_calls"],
+        1
+    );
+    p.end("proof-probe");
+    p.ingest("forget", "Forget everything", 1300);
+    let erased = p.inspect();
+    assert_eq!(
+        erased["data"]["diagnostics"]["tiers"]["evidence_only_facts"]["items"],
+        0
+    );
+    assert_eq!(
+        erased["data"]["diagnostics"]["tiers"]["owner_model"]["items"],
+        0
+    );
+    p.close();
+}
+#[test]
 fn child_exit_wait_is_bounded_when_adapter_keeps_running() {
     let mut p = ArmProcess::new("tiers");
     let start = Instant::now();

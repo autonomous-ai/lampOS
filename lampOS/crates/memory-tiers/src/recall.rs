@@ -9,6 +9,8 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     time::{Duration, Instant},
 };
+mod diagnostics;
+pub use diagnostics::{TierPopulation, memory_tier};
 
 pub const RECALL_BUDGET: Duration = Duration::from_millis(200);
 pub const SNAPSHOT_BUDGET: Duration = Duration::from_millis(300);

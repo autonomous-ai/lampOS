@@ -919,7 +919,7 @@ fn private_file(path: &Path) -> Result<std::fs::File> {
     Ok(options.open(path)?)
 }
 
-fn valid_time(time: i64) -> Result<()> {
+pub(crate) fn valid_time(time: i64) -> Result<()> {
     if !(0..=253_402_300_799_999).contains(&time) {
         return Err(Error::Invalid("invalid absolute timestamp"));
     }

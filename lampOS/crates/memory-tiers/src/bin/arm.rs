@@ -1,4 +1,6 @@
 //! Bench-only JSON-lines adapter. No listener, credentials or direct provider.
+#[path = "arm/diagnostics.rs"]
+mod diagnostics;
 #[path = "arm/probe.rs"]
 mod probe;
 use lamp_memory_tiers::{model::PROMPT, *};
@@ -214,6 +216,7 @@ struct Adapter {
     config: Config,
     requests: BTreeSet<String>,
     model_calls: u64,
+    usage: diagnostics::Usage,
     closed: bool,
 }
 impl Default for Adapter {
@@ -228,6 +231,7 @@ impl Default for Adapter {
             config: Config::default(),
             requests: BTreeSet::new(),
             model_calls: 0,
+            usage: diagnostics::Usage::default(),
             closed: false,
         }
     }
@@ -644,6 +648,7 @@ impl Adapter {
                 context.policy.recalls += 1;
                 context.policy.misses += u64::from(result.timed_out);
                 let sources = source_ids(&context.policy, &result.source_ids())?;
+                self.usage.observe(&result, snapshot);
                 if snapshot {
                     context.policy.snapshot_bytes = result.bytes;
                     context.policy.snapshot_sources = result.source_ids().into_iter().collect();
@@ -681,8 +686,13 @@ impl Adapter {
                     &context.policy,
                     &records.iter().map(|r| r.id).collect::<Vec<_>>(),
                 )?;
+                let diagnostics = self.usage.inspect(context.store.tier_population(
+                    Access::OWNER_ALONE,
+                    context.policy.clock,
+                    self.arm,
+                )?);
                 Ok(
-                    json!({"owner_model":lines,"retained_record_ids":retained,"stats":{"records":records.len(),"last_context_bytes":context.policy.last_bytes,"snapshot_bytes":context.policy.snapshot_bytes,"last_recall_timed_out":context.policy.last_timed_out,"recalls":context.policy.recalls,"recall_misses":context.policy.misses,"model_calls":self.model_calls,"arm_description":self.arm.description()}}),
+                    json!({"owner_model":lines,"retained_record_ids":retained,"stats":{"records":records.len(),"last_context_bytes":context.policy.last_bytes,"snapshot_bytes":context.policy.snapshot_bytes,"last_recall_timed_out":context.policy.last_timed_out,"recalls":context.policy.recalls,"recall_misses":context.policy.misses,"model_calls":self.model_calls,"arm_description":self.arm.description()},"diagnostics":diagnostics}),
                 )
             }
             "close" => {
