@@ -153,6 +153,9 @@ const VIETNAMESE: Lexicon = Lexicon {
     put_off: &[
         "có lẽ",
         "có thể",
+        "có khi",
+        // "Probably"; "chắc chắn" ("surely") is taken out before it is read.
+        "chắc",
         "để mình nghĩ",
         "để tôi nghĩ",
         "để em nghĩ",
@@ -307,6 +310,9 @@ const JAPANESE: Lexicon = Lexicon {
         "えっと",
         "そうですね",
         "でも",
+        "けど",
+        "かも",
+        "まだ",
         "うーん",
         "ふうん",
         "たぶん",
@@ -429,7 +435,11 @@ const CHINESE: Lexicon = Lexicon {
         "但是",
         "可是",
         "也许",
+        "或许",
         "可能",
+        "不过",
+        "再说",
+        "还没",
         "嗯",
         "呃",
         "以后再",
@@ -860,7 +870,15 @@ impl Lexicon {
         let asks = text.contains('?')
             || text.contains('？')
             || (self.question.iter().any(|mark| line.contains(mark)) && !self.bare_yes(&line));
-        let puts_off = self.any(&line, self.put_off);
+        // A put-off inside a longer yes is none: vi "chắc chắn" ("surely")
+        // holds "chắc" ("probably").
+        let longer: Vec<&str> = self
+            .strict_yes
+            .iter()
+            .copied()
+            .filter(|word| word.contains(' '))
+            .collect();
+        let puts_off = self.any(&self.without(&line, &longer).0, self.put_off);
         let greets = self.any(&line, self.greet);
         let again = self.any(&line, self.again);
         // What is left to hold a yes or a no.
@@ -869,7 +887,9 @@ impl Lexicon {
         let (rest, phrase) = self.without(&answer, self.yes_phrases);
         let (ungreeted, _) = self.without(&rest, self.greet);
         let refuses = self.any(&rest, self.no);
-        let agrees = !puts_off && (phrase || self.any_yes(&ungreeted, self.yes)) && !refuses;
+        // A yes asked back ("可以吗", "いいですか") is no consent either.
+        let agrees =
+            !asks && !puts_off && (phrase || self.any_yes(&ungreeted, self.yes)) && !refuses;
         let size = self.size(&line);
         let (timed, _) = self.without(&line, self.greet);
         let names_a_time = self.any(&timed, self.when) || timed.chars().any(|c| c.is_numeric());
@@ -1613,6 +1633,12 @@ mod tests {
                     "Có khi",
                     "Chắc là được",
                     "Vâng, để sau nhé",
+                    "Có, có khi",
+                    "Có, chắc vậy",
+                    "Được, chưa chắc",
+                    "Có, nhưng để sau",
+                    "Vâng, lát nữa",
+                    "Có, không biết nữa",
                 ][..],
             ),
             (
@@ -1631,6 +1657,14 @@ mod tests {
                     "はい、説明してください",
                     "はい、わかんない",
                     "はい、後で",
+                    "はい、たぶん",
+                    "うん、多分",
+                    "はい、かも",
+                    "はい、でも",
+                    "はい、いいけど",
+                    "はい、あとで",
+                    "はい、まだ",
+                    "はい、わからない",
                 ][..],
             ),
             (
@@ -1648,6 +1682,14 @@ mod tests {
                     "好的，你先解释一下",
                     "好，或许吧",
                     "好，以后再说",
+                    "好，也许",
+                    "好的，可能吧",
+                    "可以，但是",
+                    "好，不过",
+                    "好，等一下",
+                    "好，再说吧",
+                    "好，不知道",
+                    "好，还没",
                 ][..],
             ),
             (
@@ -1682,13 +1724,11 @@ mod tests {
         ] {
             for line in lines {
                 let read = read(language, line);
-                // Neither the consent's yes nor any answer to the hello.
+                // Neither the consent's yes nor any answer to the hello,
+                // nor the yes that ends "who you are" (a Korean customer's
+                // review of #4506, A1, and #4768's P1 in each language).
                 assert_eq!(read.yes_or_no, None, "{language:?}: {line}");
-                // In Korean, nor the yes that ends "who you are" (a Korean
-                // customer's review of #4506, A1).
-                if language == Language::Korean {
-                    assert!(!read.agrees, "{language:?}: {line}");
-                }
+                assert!(!read.agrees, "{language:?}: {line}");
                 assert!(!read.hello_yes && !read.about_hello, "{language:?}: {line}");
             }
         }
@@ -1699,6 +1739,27 @@ mod tests {
             (Language::Korean, "아니요"),
         ] {
             assert_eq!(read(language, no).yes_or_no, Some(false), "{language:?}");
+        }
+        // A plain yes still agrees.
+        for (language, lines) in [
+            (
+                Language::Vietnamese,
+                &[
+                    "Có",
+                    "Được",
+                    "Chắc chắn",
+                    "Chắc chắn rồi",
+                    "Được mà",
+                    "Có mà",
+                ][..],
+            ),
+            (Language::Japanese, &["はい", "うん", "もちろん"][..]),
+            (Language::Chinese, &["好的", "可以", "是的", "当然"][..]),
+            (Language::Korean, &["네", "좋아요"][..]),
+        ] {
+            for line in lines {
+                assert!(read(language, line).agrees, "{language:?}: {line}");
+            }
         }
     }
 
