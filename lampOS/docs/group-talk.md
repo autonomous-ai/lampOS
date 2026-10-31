@@ -108,7 +108,8 @@ seconds; a story can be stopped once they have passed. The cost is that the
 person who asked cannot stop it in those four seconds either.
 
 **A short sound does not cut off an answer still to come
-(`LAMP_WAIT_KEEPS_ANSWER=on`, #1123; off unless set).** On lamp-52e6 on
+(`LAMP_WAIT_KEEPS_ANSWER=on`, #1123; off unless set, and set in the product's
+voice unit).** On lamp-52e6 on
 2026-10-16 (the sixth, 16:5x), short sounds with no words, 0.6 to 1.4 s
 long, admitted 1.4 to 2.6 s after a question, ended 4 of 10 waiting answers
 as `user_interrupted` on the backup voice, whose answers begin later. The
@@ -463,7 +464,8 @@ per route, it counts:
   `wait_stop_to_cancel_ms`.
 
 It prints counts, category names and numbers only, never a word heard or
-said; a journal line near these (wait, stop, request, route) that it does
+said; a journal line near these (wait, stop, request, route, cut,
+interrupt; `waiting_cuts::NEAR`) that it does
 not know is counted as `unclassified`, unprinted. Not countable: a short
 follow-up lost with `on` (it is let go unheard, so whether it had words is
 never known), and a stop the person went on from (#1352: it takes the turn
@@ -514,7 +516,8 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
       of the three it needs. So a very short line may still wait as the
       room's; the lamp run should note the eyes' rate.
     - **The reader:** the coordinator reads the eyes' faces every 100 ms off
-      the audio path (`speaking_faces::read_from`), only with the switch.
+      the audio path (`speaking_faces::read_from`), only with either switch
+      (`LAMP_OWN_LINE_KEEPS` or `LAMP_OWN_LINE_OVER_TALK`).
       It keeps passing ids and two booleans, and nothing past 30 s.
     - **It needs the eyes to judge speaking while the sound waits:**
       `LAMP_EYES_SPEAKING=on` with the mouth model running. With
@@ -705,7 +708,8 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
 
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
 answer is awaited** (`crates/voice/src/asker_first.rs`, #829; off unless
-set, and `record` to judge it without acting). On lamp-4ace in the busy
+set, and `record` to judge it without acting, as the product's voice unit
+runs it). On lamp-4ace in the busy
 office at 14:21 on 2026-10-16, "Hey Lamp, I got the job today!" had no
 answer yet 4.7 s after it ended. Then "¿Qué?" from across the room was
 taken as a new request and replaced it (`user_interrupted`): the floor
