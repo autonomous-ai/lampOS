@@ -27,7 +27,9 @@ the lamp.
   `lamp-` with no suffix (`SelfTest::is_own_name`, El on #3073). Absent too
   from runs before it: those still read (`#[serde(default)]`), with no lamp.
 - `/var/lib/lamp-selftest/<started>.json` (`--dir`, both units) for each run, the newest 20
-  kept, with `latest.json` and `latest.txt` (one line a part) beside them.
+  kept, with `latest.json` and `latest.txt` (one line a part) beside them;
+  a run with no `--dir`, as the factory's, keeps them in
+  `/var/lib/lampOS/selftest` (`report::DIR`).
   Each file is written whole and renamed, so a power cut leaves no half
   report.
 
@@ -127,8 +129,10 @@ added over the air").
 `lamp-health` then carries the newest run in `lamp/health`, so a part that failed since is said
 before its person finds out. The factory's run and an on-demand one are started by hand.
 
-Exit status: 0 every part passed or is not fitted, 1 a part failed, 3 a
-part could not be checked, 2 the arguments were wrong.
+Exit status: 0 every part passed or is not fitted, or a first-boot run was
+left for the next time because the voice stayed in a turn; 1 a part failed,
+or the bus could not be opened; 3 a part could not be checked; 2 the
+arguments were wrong.
 
 ## Shown on lamps
 
