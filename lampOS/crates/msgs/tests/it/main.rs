@@ -4,6 +4,7 @@ mod activity;
 mod arrival;
 mod bus;
 mod controls;
+mod doc;
 mod expression;
 mod expression_rest;
 mod logging;
