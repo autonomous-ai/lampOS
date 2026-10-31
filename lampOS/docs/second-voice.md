@@ -880,12 +880,13 @@ order is kept. A written turn is the same from the chat on.
   the reminder's own words, and a real light change took 1.82–1.89 s. So
   it's on in the product (the first builder's yes, 17:35).
 
-  **One slower case:** a light ask that can't change anything ("warmer" at
-  full orange, "too bright" at the lowest) gets no early words, since
-  nothing changed. Round 2 answers at 2.8–3.3 s, where with the switch off
-  the model answered from what it knew in 1.3–1.8 s. The follow-up is
-  lamp-actions' own words for a light that can't change ("That's as warm as
-  I go."), said at once.
+  **One slower case, since closed:** in that run a light ask that couldn't
+  change anything ("warmer" at full orange, "too bright" at the lowest) got
+  no early words. Round 2 answered at 2.8–3.3 s, where with the switch off
+  the model answered from what it knew in 1.3–1.8 s. Since #4759,
+  lamp-actions gives such a call its own words ("I'm already as warm as I
+  go.", `lamp_actions::already_say`), and they're said at once too. The
+  model's own words over it still ask round 2, which says nothing changed.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
