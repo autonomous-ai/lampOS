@@ -1,5 +1,42 @@
 # Tiers work log
 
+## 2026-10-31: ordinary adapter target and runner integration
+
+Store/sleep ready for review: yes at `1c9d4cd17` in
+[PR #4750](https://github.com/autonomous-ai/lampOS/pull/4750). Native ARM64
+run 41194104866 passed 12,972 tests, including all 35 crate tests, and Linux
+clippy passed. Reviewer-three recorded READ-OK; the other read is pending.
+
+Recall/adapter ready for promotion: no, exact-head native gates and readers
+are still pending at `66b96bb73` in
+[PR #4756](https://github.com/autonomous-ai/lampOS/pull/4756). The adapter is
+now an ordinary binary target. Under the first builder's explicit narrow
+permission, its name alone was added to the development inventory, which is
+never packaged. No other deployment entry or device changed.
+
+All 63 functional tests and three compile-fail API tests pass with default
+features on macOS x86_64 Rust 1.96.0 and in a source-only copy. Formatting,
+strict all-target clippy, workspace build and classification of all 49 current
+workspace lamp binaries pass. A UTF-8 exact-cap regression failed at 253 bytes
+versus 251 before removing snapshot separators that were never returned;
+it now passes. The 500-byte subprocess case also distinguishes returned text
+from serialized framing. No public library copy/restore constructor exists.
+
+Runner integration against Bench `2885ca9f3` passes: all eleven arms pass
+its public smoke (132 operations, zero model calls and zero memory deadline
+misses). A separate synthetic fixture passes two brokered sleep calls across
+probe restoration with both receipts retained: 400 microdollars at the test
+rate. Its 500-byte request returns 451 memory-text bytes and reports 212
+framing bytes separately, 663 rendered bytes total. These are deterministic
+protocol/accounting checks; no live invoice, persona score or hidden-answer
+inspection is involved.
+
+The reviewer accepted the private-child forgetting semantics; scored
+forgetting-persistence cases must occur in the main session, as Bench owns.
+The live runner, real STT/model access, full baselines and eleven-arm three-run
+ledger scorecard remain dependencies for the overall assignment. Most likely
+wrong remains semantic forgetting and model overstatement, to be measured.
+
 ## 2026-10-31: calendar reflection and private benchmark probes
 
 Ready for lamp-voice: no; both implementation pull requests need their current
