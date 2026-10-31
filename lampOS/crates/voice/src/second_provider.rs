@@ -2261,6 +2261,8 @@ struct DownLine {
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
+    /// The owner's language, its lines rendered in it (`None`: English).
+    language: Option<crate::language::Language>,
 }
 
 impl DownLine {
@@ -2284,7 +2286,8 @@ impl DownLine {
                 if !missing(slot) {
                     continue;
                 }
-                let clip = render_line(&services, text).await;
+                let words = crate::language::fixed_in(line.language, text);
+                let clip = render_line(&services, words).await;
                 if clip.is_empty() {
                     continue;
                 }
@@ -4074,12 +4077,25 @@ impl Engine {
 
     /// A turn whose first round has not begun within its bound says
     /// [`DOWN_LINE`] (`LAMP_SECOND_DOWN_LINE=on`). Before any turn only.
-    pub fn saying_when_down(mut self, on: bool) -> Self {
+    pub fn saying_when_down(self, on: bool) -> Self {
+        self.saying_when_down_in(on, crate::language::at_start())
+    }
+
+    /// The same, its lines in `language` (`None`: English), as the owner's
+    /// language read at start gives them (#4473).
+    pub(crate) fn saying_when_down_in(
+        mut self,
+        on: bool,
+        language: Option<crate::language::Language>,
+    ) -> Self {
         if on {
             let shared = Arc::get_mut(&mut self.shared);
             debug_assert!(shared.is_some(), "the down line is set before any turn");
             if let Some(shared) = shared {
-                shared.down = Some(Arc::default());
+                shared.down = Some(Arc::new(DownLine {
+                    language,
+                    ..DownLine::default()
+                }));
             }
         }
         self
@@ -9414,7 +9430,15 @@ async fn answer(
                                 "lamp-voice second: request {request} look round had not begun in {} ms; the lamp says it could not look",
                                 began.elapsed().as_millis()
                             );
-                            queue.push(COULD_NOT_LOOK.to_owned()).await?;
+                            queue
+                                .push(
+                                    crate::language::fixed_in(
+                                        crate::language::at_start(),
+                                        COULD_NOT_LOOK,
+                                    )
+                                    .to_owned(),
+                                )
+                                .await?;
                             return Ok(());
                         }
                         Err(_) if fixed.is_some() => {

@@ -239,6 +239,45 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "잠깐 확인해 볼게요.",
         ],
     ),
+    // Its down lines (`LAMP_SECOND_DOWN_LINE`) and a look that never began
+    // (`LAMP_SECOND_LOOK`), both on in the product: said in the owner's
+    // language too, never English to an owner who chose another (#4473).
+    (
+        crate::second_provider::DOWN_LINE,
+        [
+            "Xin lỗi, giờ mình đang nghĩ hơi chậm. Lát nữa hỏi lại mình nhé.",
+            "ごめんね、今ちょっと考えるのが遅くなってるんだ。少ししたらもう一度聞いてね。",
+            "抱歉，我现在反应有点慢。过一会儿再问我吧。",
+            "미안해요, 지금 생각이 좀 느려요. 조금 있다가 다시 물어봐 주세요.",
+        ],
+    ),
+    (
+        crate::second_provider::DOWN_LINE_AGAIN,
+        [
+            "Vẫn còn chậm, xin lỗi nhé.",
+            "まだ遅いんだ、ごめんね。",
+            "还是有点慢，抱歉。",
+            "아직 느려요, 미안해요.",
+        ],
+    ),
+    (
+        crate::second_provider::DOWN_LINE_CANNOT,
+        [
+            "Xin lỗi, giờ mình chưa trả lời được.",
+            "ごめんね、今は答えられないんだ。",
+            "抱歉，我现在没法回答。",
+            "미안해요, 지금은 대답할 수 없어요.",
+        ],
+    ),
+    (
+        crate::second_provider::COULD_NOT_LOOK,
+        [
+            "Mình không nhìn rõ được.",
+            "よく見えなかったよ。",
+            "我没看清楚。",
+            "잘 안 보였어요.",
+        ],
+    ),
 ];
 
 impl Language {
@@ -545,7 +584,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 10);
+        assert_eq!(FIXED_LINES.len(), 14);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
