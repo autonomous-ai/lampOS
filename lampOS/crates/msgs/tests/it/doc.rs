@@ -1,6 +1,6 @@
-//! docs/msgs.md names every message type this crate declares, so a type
-//! added without its row is caught here: six were missing on 1 Nov 2026
-//! (#4809).
+//! docs/msgs.md has a table row for every message type this crate
+//! declares, so a type added without its row is caught here: six were
+//! missing on 1 Nov 2026 (#4809). A name in prose alone is no row.
 use std::{fs, path::Path};
 
 /// Every `lamp_msgs/<Name>` a `const TYPE` in `src/` declares, by name.
@@ -27,7 +27,7 @@ fn declared(dir: &Path, names: &mut Vec<String>) {
 }
 
 #[test]
-fn msgs_md_names_every_message_type_the_crate_declares() {
+fn msgs_md_has_a_row_for_every_message_type_the_crate_declares() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut names = Vec::new();
     declared(&root.join("src"), &mut names);
@@ -35,7 +35,10 @@ fn msgs_md_names_every_message_type_the_crate_declares() {
     let doc = fs::read_to_string(root.join("../../docs/msgs.md")).unwrap();
     let missing: Vec<&String> = names
         .iter()
-        .filter(|name| !doc.contains(&format!("`{name}`")))
+        .filter(|name| {
+            !doc.lines()
+                .any(|line| line.starts_with(&format!("| `{name}` |")))
+        })
         .collect();
-    assert!(missing.is_empty(), "msgs.md names none of {missing:?}");
+    assert!(missing.is_empty(), "msgs.md has no row for {missing:?}");
 }
