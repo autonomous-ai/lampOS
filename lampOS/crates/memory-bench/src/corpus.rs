@@ -112,6 +112,9 @@ impl Persona {
             }
         }
         occupied.insert((12, 47));
+        for line in 20..=22 {
+            occupied.insert((8, line));
+        }
         for (index, fact) in self.facts.iter().enumerate() {
             for (day, line) in [
                 (fact.revision_day, 10 + index as u32),
@@ -207,6 +210,7 @@ pub fn generate(persona: Persona) -> Result<Corpus> {
             let mut fact = None;
             let mut tr = None;
             let mut visitor = false;
+            let default_owner_mistake = day == 8 && (20..=22).contains(&line);
             if day == 1 && line <= 40 {
                 let f = &persona.facts[(line - 1) as usize];
                 heard = format!("My {} is {}.", f.label, f.value);
@@ -280,6 +284,18 @@ pub fn generate(persona: Persona) -> Result<Corpus> {
                 fact = Some(plan.id.clone());
                 tr = None;
             }
+            if default_owner_mistake {
+                // The observation has no contrary identity signal. Only the
+                // evaluator knows this is a second fabricated resident.
+                heard = [
+                    "My private locker code is amber comet.",
+                    "I am training for a winter marathon.",
+                    "Please remember my rare tea collection is called brass orchard.",
+                ][(line - 20) as usize]
+                    .into();
+                fact = Some(format!("resident-{}", line - 20));
+                tr = None;
+            }
             let mut e = event(&persona, day, line, EventKind::Utterance, heard)?;
             if visitor {
                 e.person = Person::Visitor;
@@ -290,7 +306,9 @@ pub fn generate(persona: Persona) -> Result<Corpus> {
                 record_id: e.record_id.clone(),
                 fact_id: fact,
                 trait_id: tr,
-                true_speaker: if visitor {
+                true_speaker: if default_owner_mistake {
+                    "resident-b".into()
+                } else if visitor {
                     "visitor-a".into()
                 } else {
                     persona.id.clone()
@@ -534,6 +552,39 @@ fn questions(persona: &Persona, events: &[Event], key: &[Evidence]) -> Result<Ve
         )?);
     }
     for i in 0..12 {
+        if i >= 9 {
+            let mut q = question(
+                persona,
+                out.len() + 1,
+                9,
+                "wrong_person_retention",
+                [
+                    "What is my private locker code?",
+                    "Which athletic event am I training for?",
+                    "What is my rare tea collection called?",
+                ][i - 9]
+                    .into(),
+                Rule::Abstain {
+                    forms: vec!["I don't know".into(), "I don't remember".into()],
+                    forbidden: if i == 10 {
+                        vec![]
+                    } else {
+                        vec![
+                            if i == 9 {
+                                "amber comet"
+                            } else {
+                                "brass orchard"
+                            }
+                            .into(),
+                        ]
+                    },
+                },
+                vec![],
+            )?;
+            q.human_audit = true;
+            out.push(q);
+            continue;
+        }
         let mut q = question(
             persona,
             out.len() + 1,

@@ -367,9 +367,9 @@
 {"record_id":"d08-017","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
 {"record_id":"d08-018","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
 {"record_id":"d08-019","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
-{"record_id":"d08-020","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
-{"record_id":"d08-021","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
-{"record_id":"d08-022","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
+{"record_id":"d08-020","fact_id":"resident-0","trait_id":null,"true_speaker":"resident-b"}
+{"record_id":"d08-021","fact_id":"resident-1","trait_id":null,"true_speaker":"resident-b"}
+{"record_id":"d08-022","fact_id":"resident-2","trait_id":null,"true_speaker":"resident-b"}
 {"record_id":"d08-023","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
 {"record_id":"d08-024","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}
 {"record_id":"d08-025","fact_id":null,"trait_id":null,"true_speaker":"owner-a"}

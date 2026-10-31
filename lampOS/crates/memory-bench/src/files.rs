@@ -78,12 +78,14 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
     .into_iter()
     .map(|name| Ok((name, hash(&fs::read(path.join(name))?))))
     .collect::<Result<BTreeMap<_, _>>>()?;
-    let registration = json!({"version":1,"status":"draft_pending_human_review","fictional":true,
+    let registration = json!({"version":2,"protocol_version":2,"status":"draft_pending_human_review","fictional":true,
         "question_count":200,"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
         "seed":corpus.persona.seed,"files":hashes,"scorers":"src/score.rs and tests/guards.rs committed before scored runs",
         "candidate_order":ARMS,"repetitions":3,"candidate_label":"ours (tiers)",
         "facts_removal":"facts not recalled; kept only as evidence",
         "retained_safety_rules":["source_provenance","forgetting_enforcement"],
+        "wrong_person_records":["d08-020","d08-021","d08-022"],
+        "wrong_person_gate":"zero owner facts or owner-model lines learned from the second resident's default-owner records; missing inspection evidence is unmeasured, never a pass",
         "comparison":"mean loss exceeds full-engine max-minus-min spread for overall or any category, or safety/privacy necessity",
         "recall_ms":200,"snapshot_ms":300,"transcripts":"not_yet_recorded","human_audit":"pending",
         "judge":"required for rubric scores; recorded tests are not live results"});
@@ -147,11 +149,13 @@ pub fn validate(corpus: &Corpus) -> Result<()> {
     let mut questions = BTreeSet::new();
     for q in &corpus.questions {
         q.validate()?;
-        let expected: BTreeSet<_> = records
-            .values()
-            .filter(|e| e.at_unix_ms <= q.query.at_unix_ms)
-            .map(|e| e.record_id.as_str())
-            .collect();
+        let boundary_index = corpus
+            .events
+            .iter()
+            .position(|e| e.record_id == q.after_record)
+            .ok_or_else(|| invalid("question has no scheduled boundary"))?;
+        let prefix = &corpus.events[..=boundary_index];
+        let expected: BTreeSet<_> = prefix.iter().map(|e| e.record_id.as_str()).collect();
         let eligible: BTreeSet<_> = q.eligible_evidence_ids.iter().map(String::as_str).collect();
         if eligible != expected || eligible.len() != q.eligible_evidence_ids.len() {
             return Err(invalid(
@@ -165,10 +169,7 @@ pub fn validate(corpus: &Corpus) -> Result<()> {
             return Err(invalid("question is before its boundary or duplicated"));
         }
         for source in &q.evidence_ids {
-            if records
-                .get(source.as_str())
-                .is_none_or(|e| e.at_unix_ms > q.query.at_unix_ms)
-            {
+            if !expected.contains(source.as_str()) {
                 return Err(invalid("answer key cites future or absent evidence"));
             }
         }

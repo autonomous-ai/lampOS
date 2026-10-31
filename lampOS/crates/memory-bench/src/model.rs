@@ -57,9 +57,14 @@ impl Call {
                     if !["system", "user", "assistant", "tool"].contains(&role) {
                         return Err(invalid("invalid message role"));
                     }
-                    if !m
+                    let tool_only = role == "assistant"
+                        && m.get("tool_calls")
+                            .and_then(Value::as_array)
+                            .is_some_and(|calls| !calls.is_empty());
+                    if !(m
                         .get("content")
                         .is_some_and(|c| c.is_string() || c.is_null())
+                        || tool_only && m.get("content").is_none())
                     {
                         return Err(invalid("message content must be text or null"));
                     }
@@ -71,6 +76,15 @@ impl Call {
             Self::Embedding { .. } => {}
         }
         Ok(())
+    }
+    pub fn arm_permitted(&self) -> bool {
+        let purpose = match self {
+            Self::Chat { purpose, .. } | Self::Embedding { purpose, .. } => purpose,
+        };
+        matches!(
+            purpose,
+            Purpose::Extract | Purpose::Sleep | Purpose::Reflect | Purpose::Retrieve
+        )
     }
     pub fn request_hash(&self) -> Result<String> {
         Ok(hash(&serde_json::to_vec(self)?))
@@ -103,6 +117,8 @@ pub struct Usage {
 #[serde(deny_unknown_fields)]
 pub struct Reply {
     pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_details: Option<Value>,
     #[serde(default)]
     pub tool_calls: Vec<Value>,
     #[serde(default)]
@@ -146,6 +162,7 @@ impl Reply {
                         .iter()
                         .any(|v| v.len() != dimensions || v.iter().any(|n| !n.is_finite()))
                     || self.content.is_some()
+                    || self.reasoning_details.is_some()
                     || !self.tool_calls.is_empty()
                     || self.usage.as_ref().is_some_and(|u| u.output_tokens != 0)
                 {
@@ -185,7 +202,12 @@ pub struct Receipt {
     pub charged_microusd: u64,
     pub request_bytes: usize,
     pub outcome: String,
+    pub usage: Option<Usage>,
+    /// Input rates conservatively include cached input at the ordinary rate.
+    /// This is a budget debit, not an assertion about a provider's invoice.
+    pub cost_basis: String,
 }
+type Audit = Box<dyn FnMut(&str, &Receipt) -> Result<()> + Send>;
 pub struct Client<P> {
     provider: P,
     chat_prices: Prices,
@@ -196,6 +218,7 @@ pub struct Client<P> {
     next_call: u64,
     poisoned: bool,
     receipts: Vec<Receipt>,
+    audit: Option<Audit>,
 }
 impl<P: Provider> Client<P> {
     pub fn new(provider: P, prices: Prices, limit_microusd: u64) -> Result<Self> {
@@ -212,7 +235,17 @@ impl<P: Provider> Client<P> {
             next_call: 0,
             poisoned: false,
             receipts: Vec::new(),
+            audit: None,
         })
+    }
+    /// A run attaches its append-and-sync ledger here. If either write fails,
+    /// stop the client; no unrecorded new dispatch is allowed.
+    pub fn with_audit(
+        mut self,
+        audit: impl FnMut(&str, &Receipt) -> Result<()> + Send + 'static,
+    ) -> Self {
+        self.audit = Some(Box::new(audit));
+        self
     }
     pub fn with_embeddings(mut self, prices: Prices, dimensions: usize) -> Result<Self> {
         if dimensions == 0
@@ -231,6 +264,9 @@ impl<P: Provider> Client<P> {
     }
     pub fn receipts(&self) -> &[Receipt] {
         &self.receipts
+    }
+    pub fn stopped(&self) -> bool {
+        self.poisoned
     }
     pub fn call(&mut self, call: &Call, deadline: Instant) -> Result<Reply> {
         if self.poisoned || self.next_call >= 100_000 {
@@ -267,8 +303,27 @@ impl<P: Provider> Client<P> {
             charged_microusd: reserve,
             request_bytes: serde_json::to_vec(call)?.len(),
             outcome: "uncertain".into(),
+            usage: None,
+            cost_basis: "conservative_token_debit".into(),
         };
-        let result = self.provider.invoke(call, deadline).and_then(|reply| {
+        if let Some(audit) = &mut self.audit
+            && let Err(error) = audit("model_reserved", &receipt)
+        {
+            self.poisoned = true;
+            return Err(error);
+        }
+        let dispatched = if Instant::now() >= deadline {
+            self.charged -= reserve;
+            receipt.charged_microusd = 0;
+            receipt.outcome = "expired_before_dispatch".into();
+            Err(invalid(
+                "model deadline expired while recording reservation",
+            ))
+        } else {
+            self.provider.invoke(call, deadline)
+        };
+        let result = dispatched.and_then(|reply| {
+            receipt.usage = reply.usage.clone();
             if let Some(usage) = &reply.usage {
                 let actual = match prices.charge(usage.input_tokens, usage.output_tokens) {
                     Ok(actual) => actual,
@@ -297,7 +352,15 @@ impl<P: Provider> Client<P> {
             reply.validate(call, self.dimensions)?;
             Ok(reply)
         });
+        let audited = self
+            .audit
+            .as_mut()
+            .map_or(Ok(()), |audit| audit("model_completed", &receipt));
         self.receipts.push(receipt);
+        if let Err(error) = audited {
+            self.poisoned = true;
+            return Err(error);
+        }
         result
     }
 }

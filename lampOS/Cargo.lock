@@ -2072,6 +2072,7 @@ name = "lamp-memory-bench"
 version = "0.1.0"
 dependencies = [
  "jiff",
+ "nix 0.29.0",
  "serde",
  "serde_json",
  "sha2",

@@ -1,10 +1,16 @@
 //! A pre-registered, fictional-month memory evaluation. No hardware access.
+pub mod conversation;
 pub mod corpus;
 pub mod files;
 pub mod ledger;
 pub mod model;
+pub mod model_worker;
 pub mod protocol;
+pub mod runner;
 pub mod score;
+pub mod session;
+pub mod smoke;
+pub mod transport;
 
 use sha2::{Digest, Sha256};
 use std::{fmt, io};

@@ -92,3 +92,39 @@ fn unsupported_truth_timelines_and_colliding_deletions_are_refused() {
     p.facts[38].forget_day = Some(11);
     assert!(p.validate().is_err());
 }
+#[test]
+fn later_query_time_cannot_authorize_sources_after_the_ingestion_boundary() {
+    let mut c = corpus::generate(persona()).unwrap();
+    c.questions[0].after_record = c.events[0].record_id.clone();
+    assert!(files::validate(&c).is_err());
+}
+#[test]
+fn a_second_resident_is_observed_as_owner_without_revealing_the_true_speaker() {
+    let c = corpus::generate(persona()).unwrap();
+    for id in ["d08-020", "d08-021", "d08-022"] {
+        let event = c.events.iter().find(|e| e.record_id == id).unwrap();
+        assert_eq!(event.person, lamp_memory_bench::protocol::Person::Owner);
+        assert_eq!(
+            event.presence,
+            lamp_memory_bench::protocol::Presence::OwnerAlone
+        );
+        assert_eq!(event.person_id.as_deref(), Some(c.persona.id.as_str()));
+        assert!(!serde_json::to_string(event).unwrap().contains("resident-b"));
+        assert_eq!(
+            c.answer_key
+                .iter()
+                .find(|e| e.record_id == id)
+                .unwrap()
+                .true_speaker,
+            "resident-b"
+        );
+    }
+    assert_eq!(
+        c.questions
+            .iter()
+            .filter(|q| q.category == "wrong_person_retention" && q.human_audit)
+            .count(),
+        3
+    );
+    files::validate(&c).unwrap();
+}

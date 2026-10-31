@@ -6,6 +6,14 @@ visitors and decoys. The generator emits thirty days with fifty utterances
 plus session start/end events per day. Its 200 questions include twelve
 three-turn appointment probes. No arm has been scored against this material.
 
+Registration version 2 adds three day-9 wrong-person probes, replacing three
+visitor disclosure probes while retaining 200 questions. On day 8 a fabricated
+second resident supplies three statements while the observed label defaults
+to owner. True speaker identity exists only in the evaluator key. The hard
+gate is zero owner facts or owner-model lines learned from those records;
+missing inspection evidence cannot establish a pass. Version 1 remains in
+the repository history; no scored run preceded this change.
+
 Files are deliberately separated:
 
 - `persona.json`: evaluator input to the generator; never passed to an arm.
@@ -31,7 +39,8 @@ questions and the day-20-and-later updated-value questions; it rejects
 incompatible dates and colliding scripted events. Its persona declares an
 IANA timezone; it does not simulate dates by adding fixed 24-hour intervals.
 
-`eligible_evidence_ids` allows citations to any observed past record;
+`eligible_evidence_ids` allows citations to the ingested prefix ending at the
+question's `after_record`, not later records before its query timestamp;
 `evidence_ids` identifies the specific rubric's source material. These are
 not the same: a correct follow-up may legitimately cite another past plan.
 The appointment probes use a topic cue to disambiguate which plan they test.

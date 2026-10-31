@@ -314,3 +314,58 @@ fn a_bad_followup_cannot_enter_a_registered_question() {
     q.followups[0].max_context_bytes = usize::MAX;
     assert!(q.validate().is_err());
 }
+#[test]
+fn a_durable_reservation_precedes_dispatch_and_failed_logging_stops_the_client() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let observed = calls.clone();
+    let stages = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let recorded = stages.clone();
+    let mut client = Client::new(
+        Counting {
+            calls: calls.clone(),
+            fail: false,
+        },
+        prices(),
+        10_000,
+    )
+    .unwrap()
+    .with_audit(move |stage, receipt| {
+        if stage == "model_reserved" {
+            assert_eq!(observed.load(Ordering::SeqCst), 0);
+            assert!(receipt.reserved_microusd > 0);
+        } else {
+            assert_eq!(observed.load(Ordering::SeqCst), 1);
+            assert_eq!(receipt.usage.as_ref().unwrap().input_tokens, 1);
+        }
+        recorded.lock().unwrap().push(stage.to_string());
+        Ok(())
+    });
+    client
+        .call(&call(), Instant::now() + Duration::from_secs(1))
+        .unwrap();
+    assert_eq!(
+        *stages.lock().unwrap(),
+        ["model_reserved", "model_completed"]
+    );
+    let mut client = Client::new(
+        Counting {
+            calls: calls.clone(),
+            fail: false,
+        },
+        prices(),
+        10_000,
+    )
+    .unwrap()
+    .with_audit(|_, _| Err(lamp_memory_bench::invalid("synthetic disk failure")));
+    assert!(
+        client
+            .call(&call(), Instant::now() + Duration::from_secs(1))
+            .is_err()
+    );
+    assert!(
+        client
+            .call(&call(), Instant::now() + Duration::from_secs(1))
+            .is_err()
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}

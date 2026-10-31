@@ -6,6 +6,12 @@ use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
 fn run(args: &[String]) -> Result<()> {
     match args {
+        [command, adapter, arm, revision, state] if command == "smoke" => {
+            println!(
+                "{}",
+                lamp_memory_bench::smoke::run(Path::new(adapter), arm, revision, Path::new(state))?
+            );
+        }
         [command, persona, destination] if command == "generate" => {
             let persona = files::json_file(Path::new(persona))?;
             let corpus = corpus::generate(persona)?;
@@ -50,7 +56,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         _ => {
             return Err(invalid(
-                "usage: lamp-memory-bench generate PERSONA NEW_DIRECTORY | validate DIRECTORY | verify-ledger DIRECTORY | score QUESTIONS_JSONL ANSWERS_JSONL",
+                "usage: lamp-memory-bench generate PERSONA NEW_DIRECTORY | validate DIRECTORY | verify-ledger DIRECTORY | score QUESTIONS_JSONL ANSWERS_JSONL | smoke ADAPTER ARM FULL_REVISION NEW_STATE_DIRECTORY",
             ));
         }
     }

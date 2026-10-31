@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::{BufRead, Write};
 
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
+pub fn supported_version(v: u32) -> bool {
+    matches!(v, 1 | 2)
+}
 pub const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
 pub const RECALL_MS: u64 = 200;
 pub const SNAPSHOT_MS: u64 = 300;
@@ -59,7 +62,7 @@ impl Request {
         }
     }
     pub fn validate(&self) -> Result<()> {
-        if self.v != VERSION || !valid_id(&self.id) || !self.data.is_object() {
+        if !supported_version(self.v) || !valid_id(&self.id) || !self.data.is_object() {
             return Err(invalid("invalid request version, id, or data"));
         }
         Ok(())
@@ -110,7 +113,7 @@ impl Response {
         }
     }
     pub fn checked(self, expected: &str) -> Result<Value> {
-        if self.v != VERSION
+        if !supported_version(self.v)
             || self.id != expected
             || self.ok != self.data.is_some()
             || self.ok == self.error.is_some()
@@ -125,6 +128,22 @@ impl Response {
             ))),
             _ => Err(invalid("response data must be an object")),
         }
+    }
+}
+
+/// Absent on old v1 records, never defaulted to a successful clear.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ForgetEffect {
+    pub ran: bool,
+    pub suppress_confirmation: bool,
+}
+impl ForgetEffect {
+    pub fn validate(&self) -> Result<()> {
+        if self.suppress_confirmation && !self.ran {
+            return Err(invalid("suppressed confirmation without a forget"));
+        }
+        Ok(())
     }
 }
 
@@ -207,6 +226,79 @@ pub struct Query {
     pub heard: String,
     pub cues: Cues,
     pub max_context_bytes: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Init {
+    pub run_id: String,
+    pub arm: String,
+    pub state_dir: String,
+    pub owner_id: String,
+    pub timezone: String,
+    pub at_unix_ms: u64,
+    pub config: Value,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Ingest {
+    pub event: Event,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Sleep {
+    pub at_unix_ms: u64,
+    pub cadence: String,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Forget {
+    pub at_unix_ms: u64,
+    pub person_id: String,
+    pub record_ids: Vec<String>,
+    pub text: String,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProbeBegin {
+    pub probe_id: String,
+    pub at_unix_ms: u64,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProbeEnd {
+    pub probe_id: String,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryData {
+    pub query: Query,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Tool {
+    pub probe_id: String,
+    pub name: String,
+    pub arguments: Value,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Inspect {
+    pub person_id: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Snapshot {
+    pub owner_model: Vec<ModelLine>,
+    pub source_ids: Vec<String>,
+    pub memory_instructions: String,
+}
+impl Snapshot {
+    pub fn prompt_bytes(&self) -> usize {
+        self.memory_instructions.len()
+            + self.owner_model.iter().map(|l| l.text.len()).sum::<usize>()
+    }
 }
 impl Query {
     pub fn validate(&self) -> Result<()> {
