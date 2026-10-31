@@ -1,9 +1,9 @@
 use serde_json::{Value, json};
 use std::{
     io::{BufRead, BufReader, Write},
-    process::{Child, ChildStdin, Command, Stdio},
+    process::{Child, ChildStdin, Command, ExitStatus, Stdio},
     sync::mpsc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 struct ArmProcess {
     child: Child,
@@ -26,7 +26,7 @@ impl ArmProcess {
         let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-memory-tiers-arm"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::inherit())
             .spawn()
             .unwrap();
         let input = child.stdin.take().unwrap();
@@ -105,7 +105,24 @@ impl ArmProcess {
     fn close(&mut self) {
         let v = self.request("close", json!({}));
         assert_eq!(v["ok"], true, "{v}");
-        assert!(self.child.wait().unwrap().success());
+        assert!(self.wait_exit().success());
+    }
+    fn wait_exit_with_timeout(&mut self, timeout: Duration) -> Option<ExitStatus> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Some(status) = self.child.try_wait().expect("read child status") {
+                return Some(status);
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+            std::thread::sleep(remaining.min(Duration::from_millis(10)));
+        }
+    }
+    fn wait_exit(&mut self) -> ExitStatus {
+        self.wait_exit_with_timeout(Duration::from_secs(10))
+            .expect("adapter exits within 10 seconds")
     }
 }
 impl Drop for ArmProcess {
@@ -116,6 +133,18 @@ impl Drop for ArmProcess {
 }
 fn proposal() -> String {
     json!({"facts":[{"key":"note","claim":"May prefer a blue notebook.","record_ids":[1],"strength":"said","kind":"preference","true_since_ms":1000,"true_until_ms":null,"supersedes":null}],"lines":[{"replaces":null,"kind":"owner_model","text":"May prefer a blue notebook.","fact_ids":[],"fact_keys":["note"]}],"episodes":[]}).to_string()
+}
+#[test]
+fn child_exit_wait_is_bounded_when_adapter_keeps_running() {
+    let mut p = ArmProcess::new("tiers");
+    let start = Instant::now();
+    assert!(
+        p.wait_exit_with_timeout(Duration::from_millis(20))
+            .is_none()
+    );
+    assert!(start.elapsed() < Duration::from_secs(2));
+    assert_eq!(p.inspect()["ok"], true);
+    p.close();
 }
 #[test]
 fn broker_citations_aggregate_cap_and_ordinary_forget_survive_sleep() {
@@ -257,6 +286,7 @@ fn visitor_and_unknown_presence_cannot_retain_or_read_owner_context() {
     assert_eq!(visitor["data"]["accepted"], false);
     let result=p.request("recall",json!({"query":{"probe_id":"visitor-probe","at_unix_ms":1200,"person":"owner","person_id":"owner-a","presence":"unknown","heard":"blue notebook","cues":{"activity":null,"objects":[],"topic":null},"max_context_bytes":16384}}));
     assert_eq!(result["data"]["context"], "");
+    assert_eq!(p.inspect()["data"]["stats"]["recall_misses"], 0);
     assert_eq!(
         p.inspect()["data"]["retained_record_ids"],
         json!(["owner-record"])
@@ -275,7 +305,7 @@ fn broker_refusal_preserves_records_and_terminates_without_retry() {
     let refusal = p.read();
     assert_eq!(refusal["ok"], false);
     assert_eq!(refusal["error"]["code"], "model");
-    assert!(!p.child.wait().unwrap().success());
+    assert!(!p.wait_exit().success());
     let store =
         lamp_memory_tiers::Store::open(p._dir.path().join("tiers.sqlite"), "owner-a").unwrap();
     assert_eq!(
@@ -293,9 +323,11 @@ fn broker_timeout_is_bounded_and_never_retries() {
     p.start("sleep", json!({"at_unix_ms":1100,"cadence":"nightly"}));
     let call = p.read();
     assert!(call["model_request"].is_object());
+    let start = Instant::now();
     let refusal = p.read();
+    assert!(start.elapsed() < Duration::from_secs(2));
     assert_eq!(refusal["error"]["code"], "timeout");
-    assert!(!p.child.wait().unwrap().success());
+    assert!(!p.wait_exit().success());
 }
 
 #[test]
@@ -368,6 +400,9 @@ fn same_session_forget_discards_the_runner_snapshot_before_reuse() {
     assert_eq!(refreshed["data"]["owner_model"], json!([]));
     assert_eq!(recall["data"]["context"], "");
     assert_eq!(refreshed["data"]["memory_instructions"], "");
+    // The adapter's counter includes both snapshot and recall requests.
+    let stats = p.inspect();
+    assert_eq!(stats["data"]["stats"]["recall_misses"], 0);
     p.end("same-session");
     p.close();
 }
@@ -455,7 +490,7 @@ fn storage_failure_ends_the_run_before_any_later_answer() {
         p.output.recv_timeout(Duration::from_secs(2)),
         Err(mpsc::RecvTimeoutError::Disconnected)
     ));
-    assert!(!p.child.wait().unwrap().success());
+    assert!(!p.wait_exit().success());
     let store =
         lamp_memory_tiers::Store::open(p._dir.path().join("tiers.sqlite"), "owner-a").unwrap();
     assert_eq!(
@@ -525,7 +560,7 @@ fn failed_probe_cleanup_ends_run_without_overwriting_main_store() {
     std::fs::write(&scratch, b"injected cleanup failure").unwrap();
     let reply = p.request("probe_end", json!({"probe_id":"probe-a"}));
     assert_eq!(reply["ok"], false);
-    assert!(!p.child.wait().unwrap().success());
+    assert!(!p.wait_exit().success());
     let main =
         lamp_memory_tiers::Store::open(p._dir.path().join("tiers.sqlite"), "owner-a").unwrap();
     assert_eq!(
