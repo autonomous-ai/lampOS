@@ -57,10 +57,7 @@ Environment=LAMP_REPORTS=on
 Environment=LAMP_SKILLS_STORE=off
 EnvironmentFile=-/etc/lampOS/skills/store.env
 Environment=LAMP_APP_UPDATE=on
-# The app's Turn off (#3697, #3698, docs/shutdown.md): `system.shutdown`, asked of setup's change helper,
-# which refuses while an update installs. Set in lamp-cloud, Controls, Voice and lamp-setup-reset together,
-# every part that reads it (switches.md). On since Mobile's three clean offs on lamp-0c89 (30 Oct, #3698).
-Environment=LAMP_SHUTDOWN=on
+# LAMP_SHUTDOWN stays off until the button's check on a product lamp (#3697); the first builder, 31 Oct.
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

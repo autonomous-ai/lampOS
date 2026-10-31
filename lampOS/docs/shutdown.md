@@ -64,10 +64,14 @@ For the button it is set on three units: Controls
 (`lamp-controls.service`), the voice (`lamp-voice.service`, which hands it to
 its ring worker, and to its provider worker so a model with no
 `prepare_to_unplug` says to turn it off from the app first, #4595, unplug.md) and setup's watcher (`lamp-setup-reset.service`).
-The product sets it `on` in those three and in `lamp-cloud.service`, after the app's
-Turn off was shown on lamp-0c89 (#3698); setup's
-`every_product_unit_whose_part_reads_the_shutdown_switch_turns_it_on` fails if a part
-that reads it has no unit setting it.
+The product leaves it off in all four, those three and `lamp-cloud.service`,
+until the button's 5 to 15 s hold, beside the 2 to 5 s mute on the same
+button, is checked on a product lamp (#3697). The app's Turn off was shown
+on lamp-0c89 (#3698) and was on with it in #4633; it comes back with the
+switch. Setup's
+`the_product_sets_the_shutdown_switch_in_every_unit_whose_part_reads_it_or_in_none`
+fails if the product sets it in some of those units and not the others, or
+if a part that reads it has no unit listed.
 
 ## The request
 
