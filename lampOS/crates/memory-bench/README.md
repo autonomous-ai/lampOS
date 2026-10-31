@@ -222,3 +222,62 @@ in the product journal. Such exchanges cannot supply a later memory citation.
 This clarification is registered in live policy v2; original scripted ingestion
 still reaches every setup. Recorded execution can exercise the judge transport,
 but emits no question score and keeps every per-kind mean null.
+
+
+### Approved campaign commands
+
+The live executor is separate from approval. The owner-approved public policy
+pins the runner and adapter SHA-256 digests and revisions, the evaluation-policy
+hash, fixture registrations and audio manifests, both provider routes/models,
+dated prices, per-run allowances, speech allowances, three repetitions and the
+complete setup order. `validate-policy POLICY live` prints its canonical hash
+and total planned allowance without granting permission or contacting a service.
+The approval JSON contains `policy_sha256` and `approved_cap_microusd` supplied
+from that explicit decision. A changed setting requires a new reviewed policy;
+the command never infers approval from environment keys or a cost estimate.
+
+```
+lamp-memory-bench campaign-init POLICY APPROVAL NEW_CAMPAIGN live
+lamp-memory-bench campaign-speech POLICY APPROVAL CAMPAIGN FIXTURE SOURCE AUDIO live
+lamp-memory-bench campaign-run POLICY APPROVAL CAMPAIGN RUN_SPEC live
+```
+
+`RUN_SPEC` names `fixture`, `arm`, `repetition` (1–3), `fixture_directory` and
+`adapter_executable`. The policy types in `src/live_plan.rs` define the full JSON
+format; unknown fields are refused. The month order is the three reference arms
+followed by all twelve Tiers setups. Each setup's three repetitions precede the
+next setup. The optional aging profile admits only full Tiers and no-fading;
+it is outside the current two-month plan unless expressly added to the approval.
+All admitted Tiers setups must use one identical executable, revision and argument
+list. Adapter configuration is empty; the registered setup name selects behavior.
+
+Commands refuse a plan above the cap, stale pins, a different running binary,
+out-of-order or repeated attempts, and a non-private run directory before calling
+a provider. Each fixture has one shared speech attempt and immutable cache; each
+setup/repetition has one deterministic directory and accounting identity. A failed
+or interrupted attempt remains visible and cannot be retried under a fresh balance.
+The campaign's exclusive, durable journal reserves cost before dispatch. It keeps
+unknown charges after failure and refuses further work at its hard spending stop.
+No command follows redirects or retries a service request automatically.
+
+Keys are read only from `LAMP_BENCH_CHAT_KEY` and `LAMP_BENCH_SPEECH_KEY`; neither
+belongs in a policy, command argument, output or repository. The adapter inherits
+no environment credentials. Before spawning it, the runner copies the exact
+verified executable into the private run folder; registered source bytes are also
+preserved and consumed from that verified snapshot. The shared speech cache is
+revalidated against those bytes and the pinned speech route/audio manifest.
+These process boundaries are for trusted reviewed adapters, not an OS sandbox.
+
+Replace the last argument with `fixture` only for offline checks. Both URLs must
+then use literal loopback addresses, and the clients use fixed dummy credentials.
+The same accounting, protocol, speech cache, chronological replay and blind judge
+paths run, but all reported accuracy means remain null and every run is labelled
+`plumbing check`. A fixture cache cannot qualify a live run. Tests use synthetic
+40 ms audio and fake HTTP/WebSocket servers; they establish no speech quality,
+model quality, paid-service availability or acoustic latency.
+
+Current missing gates remain owner approval/keys, human review of the development
+fixture, an independently written held-back persona, the complete current-product
+adapter, and live results. Rubric results will remain provisional until the human
+audit. The stronger forget restart used uniformly by this evaluator is documented
+beside results; the product's weaker current-round behavior is a separate gap.

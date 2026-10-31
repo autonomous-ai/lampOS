@@ -35,7 +35,7 @@ pub struct Config {
     pub context_tokens: u64,
 }
 impl Config {
-    fn validate(&self, fixture: bool) -> Result<Url> {
+    pub(crate) fn validate(&self, fixture: bool) -> Result<Url> {
         let url =
             Url::parse(&self.endpoint).map_err(|_| invalid("invalid public chat endpoint"))?;
         let loopback = url

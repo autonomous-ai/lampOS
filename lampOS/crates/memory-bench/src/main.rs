@@ -4,8 +4,76 @@ use lamp_memory_bench::{
 };
 use serde_json::json;
 use std::{collections::BTreeMap, path::Path};
+fn fixture_mode(mode: &str) -> Result<bool> {
+    match mode {
+        "fixture" => Ok(true),
+        "live" => Ok(false),
+        _ => Err(invalid("mode must be live or fixture")),
+    }
+}
 fn run(args: &[String]) -> Result<()> {
     match args {
+        [command, policy, approval, campaign, mode] if command == "campaign-init" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            println!(
+                "{}",
+                lamp_memory_bench::live_run::initialize(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [command, policy, approval, campaign, run, mode] if command == "campaign-run" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            let run = files::json_file(Path::new(run))?;
+            println!(
+                "{}",
+                lamp_memory_bench::live_run::execute(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    &run,
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [
+            command,
+            policy,
+            approval,
+            campaign,
+            fixture,
+            source,
+            audio,
+            mode,
+        ] if command == "campaign-speech" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            println!(
+                "{}",
+                lamp_memory_bench::live_run::create_speech(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    fixture,
+                    Path::new(source),
+                    Path::new(audio),
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [command, policy, mode] if command == "validate-policy" => {
+            let policy: lamp_memory_bench::live_plan::Policy = files::json_file(Path::new(policy))?;
+            policy.validate(fixture_mode(mode)?)?;
+            println!(
+                "{}",
+                json!({"policy_sha256":policy.hash()?,"planned_microusd":policy.planned_microusd()?,"approval_granted":false,"scores":null})
+            );
+        }
         [command, month, scenario, destination] if command == "generate-aging" => {
             let corpus = lamp_memory_bench::aging::write(
                 Path::new(month),
@@ -148,7 +216,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         _ => {
             return Err(invalid(
-                "usage: lamp-memory-bench generate PERSONA NEW_DIRECTORY | validate DIRECTORY | verify-ledger DIRECTORY | score QUESTIONS_JSONL ANSWERS_JSONL | smoke ADAPTER ARM FULL_REVISION NEW_STATE_DIRECTORY",
+                "usage: lamp-memory-bench validate-policy POLICY MODE | campaign-init POLICY APPROVAL NEW_CAMPAIGN MODE | campaign-speech POLICY APPROVAL CAMPAIGN FIXTURE SOURCE AUDIO MODE | campaign-run POLICY APPROVAL CAMPAIGN RUN_SPEC MODE | generate PERSONA NEW_DIRECTORY | validate DIRECTORY | verify-ledger DIRECTORY | score QUESTIONS_JSONL ANSWERS_JSONL | smoke ADAPTER ARM FULL_REVISION NEW_STATE_DIRECTORY",
             ));
         }
     }

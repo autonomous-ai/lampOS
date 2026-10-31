@@ -164,13 +164,46 @@ pub fn create(
     fixture: bool,
     worker: &mut Worker,
 ) -> Result<Value> {
-    config.validate(fixture)?;
-    directory(audio_dir)?;
-    directory(provider_artifacts)?;
     let source = read(events_file, MAX_INPUT)?;
     let audio_bytes = read(&audio_dir.join("audio.jsonl"), MAX_INPUT)?;
-    let events: Vec<Event> = lines(&source)?;
-    let audio: Vec<Audio> = lines(&audio_bytes)?;
+    create_from_inputs(
+        Inputs {
+            source_events: &source,
+            audio_manifest: &audio_bytes,
+            audio_directory: audio_dir,
+        },
+        provider_artifacts,
+        output,
+        config,
+        fixture,
+        worker,
+    )
+}
+pub struct Inputs<'a> {
+    pub source_events: &'a [u8],
+    pub audio_manifest: &'a [u8],
+    pub audio_directory: &'a Path,
+}
+/// Use the exact registered bytes already pinned by the campaign preflight.
+pub fn create_from_inputs(
+    inputs: Inputs<'_>,
+    provider_artifacts: &Path,
+    output: &Path,
+    config: live_speech::Config,
+    fixture: bool,
+    worker: &mut Worker,
+) -> Result<Value> {
+    config.validate(fixture)?;
+    let source = inputs.source_events;
+    let audio_bytes = inputs.audio_manifest;
+    let audio_dir = inputs.audio_directory;
+    if source.len() as u64 > MAX_INPUT || audio_bytes.len() as u64 > MAX_INPUT {
+        return Err(invalid("prepared speech inputs exceed bound"));
+    }
+    directory(audio_dir)?;
+    directory(provider_artifacts)?;
+    let events: Vec<Event> = lines(source)?;
+    let audio: Vec<Audio> = lines(audio_bytes)?;
     validate_mapping(&events, &audio)?;
     fs::DirBuilder::new().mode(0o700).create(output)?;
     File::open(
@@ -180,8 +213,8 @@ pub fn create(
             .unwrap_or(Path::new(".")),
     )?
     .sync_all()?;
-    save(&output.join("source-events.jsonl"), &source)?;
-    save(&output.join("audio.jsonl"), &audio_bytes)?;
+    save(&output.join("source-events.jsonl"), source)?;
+    save(&output.join("audio.jsonl"), audio_bytes)?;
     let mut entries = BTreeMap::new();
     let mut transcripts = vec![];
     let mut model_revision = None;
@@ -288,8 +321,8 @@ pub fn create(
         version: 1,
         fixture,
         config,
-        events_hash: hash(&source),
-        audio_manifest_hash: hash(&audio_bytes),
+        events_hash: hash(source),
+        audio_manifest_hash: hash(audio_bytes),
         transcript_hash: hash(&transcript_bytes),
         observed_hash: hash(&observed_bytes),
         model_revision: model_revision.ok_or_else(|| invalid("empty speech corpus"))?,
@@ -339,6 +372,19 @@ pub fn load(
     expected_manifest_hash: &str,
     require_live: bool,
 ) -> Result<Vec<Event>> {
+    let source = read(source_events, MAX_INPUT)?;
+    load_from_source(output, &source, expected_manifest_hash, require_live)
+}
+/// Recheck saved evidence against immutable, already registered source bytes.
+pub fn load_from_source(
+    output: &Path,
+    source: &[u8],
+    expected_manifest_hash: &str,
+    require_live: bool,
+) -> Result<Vec<Event>> {
+    if source.len() as u64 > MAX_INPUT {
+        return Err(invalid("source events exceed cache bound"));
+    }
     directory(output)?;
     if fs::metadata(output)?.permissions().mode() & 0o077 != 0 {
         return Err(invalid("speech cache is not private"));
@@ -351,20 +397,19 @@ pub fn load(
     if manifest.version != 1 || require_live && manifest.fixture {
         return Err(invalid("speech cache mode cannot qualify this run"));
     }
-    let source = read(source_events, MAX_INPUT)?;
     let preserved = read(&output.join("source-events.jsonl"), MAX_INPUT)?;
     let audio_bytes = read(&output.join("audio.jsonl"), MAX_INPUT)?;
     let transcript_bytes = read(&output.join("transcripts.jsonl"), MAX_INPUT)?;
     let observed_bytes = read(&output.join("observed-events.jsonl"), MAX_INPUT)?;
     if source != preserved
-        || hash(&source) != manifest.events_hash
+        || hash(source) != manifest.events_hash
         || hash(&audio_bytes) != manifest.audio_manifest_hash
         || hash(&transcript_bytes) != manifest.transcript_hash
         || hash(&observed_bytes) != manifest.observed_hash
     {
         return Err(invalid("speech cache content differs from manifest"));
     }
-    let events: Vec<Event> = lines(&source)?;
+    let events: Vec<Event> = lines(source)?;
     let audio: Vec<Audio> = lines(&audio_bytes)?;
     let transcripts: Vec<Transcript> = lines(&transcript_bytes)?;
     validate_mapping(&events, &audio)?;
@@ -453,6 +498,27 @@ pub fn load(
         ));
     }
     Ok(observed)
+}
+
+/// Settings are returned only from the exact pinned complete manifest. Callers
+/// also use load_from_source to validate the files and provider evidence.
+pub struct Settings {
+    pub config: live_speech::Config,
+    pub audio_manifest_hash: String,
+}
+pub fn settings(output: &Path, expected_hash: &str) -> Result<Settings> {
+    let bytes = read(&output.join("manifest.json"), MAX_INPUT)?;
+    if hash(&bytes) != expected_hash {
+        return Err(invalid("cache settings differ from pinned manifest"));
+    }
+    let manifest: Manifest = serde_json::from_slice(&bytes)?;
+    if manifest.version != 1 {
+        return Err(invalid("unsupported cache settings version"));
+    }
+    Ok(Settings {
+        config: manifest.config,
+        audio_manifest_hash: manifest.audio_manifest_hash,
+    })
 }
 
 #[cfg(test)]
