@@ -831,7 +831,7 @@ fn prune_sources(context: &mut Context) -> Result<()> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     if run().await.is_err() {
-        eprintln!("tiered memory adapter stopped after a protocol or broker failure");
+        eprintln!("tiered memory adapter stopped after a protocol, broker or storage failure");
         std::process::exit(1);
     }
 }
@@ -844,7 +844,14 @@ async fn run() -> Result<()> {
     while let Some(value) = wire.read().await? {
         let request: Request = parse(value)?;
         let response = adapter.dispatch(&request, &mut wire).await;
-        let fatal = matches!(&response, Err(Error::Timeout | Error::Model(_)));
+        let fatal = matches!(
+            &response,
+            Err(Error::Timeout
+                | Error::Model(_)
+                | Error::Database(_)
+                | Error::Io(_)
+                | Error::Stale)
+        );
         let response = match response {
             Ok(data) => json!({"v":request.v,"id":request.id,"ok":true,"data":data}),
             Err(error) => {
