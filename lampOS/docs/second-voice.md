@@ -224,11 +224,12 @@ each line plays exactly as before.
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 | The second route's own words before a look, and before a search with `LAMP_SECOND_CHECKING_LINE` | `second_provider::LOOKING` ("Let me look."), `CHECKING` ("Let me check.") | said as the turn's text, in English | the owner's words (`language::fixed_in`), and the next round is told those words were said (Thirteen's P2 on #4707) |
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
+| The second route's answer to a stop said over it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on) | the owner's words, rendered and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, fourteen today (`FIXED_LINES`), then the English two
+lines first, fifteen today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
