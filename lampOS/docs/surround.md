@@ -1,5 +1,11 @@
 # Starting, setting up and maintaining a lamp
 
+**Not the product's path.** `lamp-surround` runs on no lamp
+([deploy/product/README.md](../deploy/product/README.md)): a product lamp is
+set up by `lamp-setup` ([setup.md](setup.md)) and updated by `lamp-update`
+([updates.md](updates.md)), with the reset plan in `lamp-setup`. This page is
+the design and the host-tested crate of task 12, kept as a record.
+
 ## What exists and what we take
 
 V1 has working setup and recovery paths with a substantial failure history.
@@ -347,7 +353,7 @@ tests with its two pre-existing long soaks ignored. Strict all-target Clippy,
 formatting, workspace build and nine browser-script tests passed. A separate
 source-only copy built the entire workspace and passed the same 263 all-feature
 tests and nine script tests. Task integration is recorded in
-[Third's log](work-log-third.md). Tests include real
+[Third's log](https://github.com/autonomous-ai/lampOS/blob/lamp-third/lampOS/docs/work-log-third.md). Tests include real
 private Unix sockets, scripted NetworkManager calls, signed TUF fixtures,
 state-machine power-cut replay, private filesystem failures, strict HTTP
 origin/session/bounds and the actual browser script. These are development
