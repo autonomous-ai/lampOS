@@ -518,9 +518,14 @@ legacy observation age; it does not convert transcripts into audio timing.
 | `schedule/due` / `ScheduleDue` | Schedule: with an `alive` part, a notice newly due wakes a sleeping lamp, once for each delivery |
 | The local time of day (not a topic) | `serve --zone system` or `--utc-offset-minutes N` itself, at start and every minute; `import` with either, from a recording's wall clock. Only sleep reads it |
 | `controls/touch`, `controls/touch_state` | Only with `serve --head-touch`: the head's Stroke, Hold and Tap, and whether that hand is still there (#711) |
-| `voice/mute` / `VoiceMute` | Only with `serve --head-touch`: asleep while the voice's mute says `sleep`, awake when it opens; muted (not `sleep`), a tap gets no look up, until it says open, however late; kept 3 s for sleep ([alive.md](alive.md), "The head"; #711) |
+| `voice/mute` / `VoiceMute` | With `serve --head-touch` or rest requests (`LAMP_REST_REQUESTS=on`, so a sleep by hand is followed with the head animation off): asleep while the voice's mute says `sleep`, awake when it opens; muted (not `sleep`), a tap gets no look up, until it says open, however late; kept 3 s for sleep ([alive.md](alive.md), "The head"; #711) |
 | `voice/privacy` / `MicrophonePrivacy` | With `serve --head-touch` or rest requests, read at intake and final planning, never subscribed: the last lease said is the switch open only when it is valid and says `physical_muted: false`, or `no_slide` (a lamp with no slide has no switch to close); anything else, however late, is the privacy switch closed, and a tap gets no look up. A successful read with nothing ever said is open; an envelope or I/O read error is closed, including at the final planning boundary. Said only on the Controls privacy route (`LAMP_PRIVACY_CONTROLS=on` or `no-slide`) ([alive.md](alive.md); #711; [privacy-switch.md](privacy-switch.md)) |
 | `light/command` | Actions: the user's lasting on/color/level setting. No light request is emitted before a valid setting is known |
+| `mood/state` / `MoodState` | Mood, read (never subscribed) at most four times a second: the breath and liveliness it gives the rest ([mood.md](mood.md)) |
+| `lamp/pause` / `Pause` | The keeper, read as the body reads it ([keeper.md](keeper.md)): paused, nothing new is sent (below) |
+| `lamp/online` / `Online` | Only with `--offline-face`, read once a second: the offline face |
+| `expression/rest_request`, `expression/sleep_claim` | Only with `LAMP_REST_REQUESTS=on` (the product's): a part's rest asked for, and the `night-sleep` skill's claim on the night (#940) |
+| `body/unplug_request`, `body/unplug_state` | Only with `LAMP_UNPLUG=on`: the unplug's ask and the body's state ([unplug.md](unplug.md)) |
 
 The existing `voice/state` does not carry the private BodyLink's pre-audio
 speaking state or duplex-yield mapping, so it cannot substitute for the
@@ -795,7 +800,9 @@ channel and does not change type or ownership.
 | Topic / type | Subscriber and action |
 |---|---|
 | `expression/body` / `ExpressionBody` | Body: bounded relative offsets or a stillness request. The current consumer takes head pitch/roll and base yaw, ignores arms and the optional normalized gaze, and stirs settled rest only with `--rest-glance on` (the product's) |
-| `expression/light` / `ExpressionLight` | Voice's ring owner: draw the face and brightness multiplier using the included persistent `Light` setting; preserve off and explicit settings |
+| `expression/light` / `ExpressionLight` | Meant for Voice's ring owner, which does not read it yet (above): draw the face and brightness multiplier using the included persistent `Light` setting; preserve off and explicit settings |
+| `expression/rest_state` / `ExpressionRestState` | With `LAMP_REST_REQUESTS=on` (the product's): the receipt for each rest asked for, taken or refused with a reason |
+| `expression/unplug_state` | With `LAMP_UNPLUG=on`: Expression's answer to the unplug ([unplug.md](unplug.md)) |
 | `expression/state` / `ExpressionState` | Operator/model/recorder: enabled/shadow, planned behaviors, missing inputs and warnings; not proof of execution |
 | `diagnostics` / `Diagnostic` | Health: readiness, accepted/refused input, transport losses/errors and measured host service-loop time |
 
@@ -897,8 +904,8 @@ These are written inputs, not lamp recordings. The
 [`rest_replay` tests](../crates/expression/tests/it/rest_replay.rs) also exercise
 loss, expiry, shadow mode, real local bus adaptation and the built CLI.
 Their isolated healthy-status case supplies an authored zero body lag;
-the shipped catalogue leaves lag unknown, so the CLI still reports that
-missing measurement. A refused interval in the two adversarial fixtures is
+the shipped catalogue then left lag unknown, so the CLI reported that
+missing measurement; the product's catalogue now sets `body_lag_us` 300000. A refused interval in the two adversarial fixtures is
 the intended result, not permission to ignore refusals in a lamp recording.
 
 The recent-level addendum uses the separate `recent-playout-fixture` clock:
@@ -939,7 +946,7 @@ and run the resulting `recent_playout_cost` binary without a source checkout.
 ## Verification and lamp checklist
 
 Host gate results and source identity are recorded in
-[Third's log](work-log-third.md). Tests use injected clocks for behavior,
+[Third's log](https://github.com/autonomous-ai/lampOS/blob/lamp-third/lampOS/docs/work-log-third.md). Tests use injected clocks for behavior,
 real temporary Unix sockets for transport, and separate processes for CLI
 and ownership checks. A replay establishes planned timing only.
 
@@ -999,7 +1006,7 @@ JSON serialization to a sink. Catalogue parsing, I/O, hardware and physical
 timing are outside that boundary. The reported warm median is the upper
 middle sorted sample (`warm_runs / 2`); the first iteration is not a measure
 of process startup. Task 18's measured results and final gate
-belong in [Third's log](work-log-third.md).
+belong in [Third's log](https://github.com/autonomous-ai/lampOS/blob/lamp-third/lampOS/docs/work-log-third.md).
 
 **Task 18 host results, 2026-10-14.** On that same development Mac, with
 Rust/Cargo 1.96.0, formatting, strict all-target Clippy for all 14 touched or
@@ -1095,7 +1102,7 @@ settled-rest offsets only with `--rest-glance on`.
 Host tests and authored replays do not establish physical motion, camera
 calibration, optical latency, acoustic onset/cancellation, safe motor
 trajectories or acceptable expressiveness. Published robot studies are not
-lampOS measurements. Body lag remains unknown; the new fixtures are written,
+lampOS measurements. Body lag was unknown then (the product's catalogue now sets 300 ms); the new fixtures are written,
 not captured from the lamp. Transport age estimates cannot repair clock
 steps or recover receipt timing. First owns the remaining lamp-4ace wiring
 and observation; Fifth now owns Body and its separate lamp qualification.
