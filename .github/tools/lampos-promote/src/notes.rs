@@ -332,7 +332,7 @@ pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
                 .any(|end| name.ends_with(end));
             if path.is_file() && (unit || name.ends_with(".env")) {
                 let text = fs::read_to_string(&path)?;
-                if installed(&text) {
+                if installed(&name, &text) {
                     files.insert(name, text);
                 }
             }
@@ -341,16 +341,30 @@ pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
     Ok(files)
 }
 
-/// Whether `lamp-update install` places a file with this text, as this
-/// build carries it.
-fn installed(text: &str) -> bool {
-    use lamp_update::install::{EXIT_NOTE, PRODUCT, SETTINGS, STORE_SETTINGS, TMPFILES};
+/// Whether `lamp-update install` places this file, as this build carries
+/// it: its name and its text both (Second's P3 on #4666), so a hand drop-in
+/// that happens to hold an installed file's text is not taken for it. A
+/// unit by its name; a setting, the exit note and the tmpfiles conf by the
+/// last part of the path install writes them to.
+fn installed(name: &str, text: &str) -> bool {
+    use lamp_update::install::{
+        EXIT_NOTE, PRODUCT, SETTINGS, STORE_SETTINGS, TMPFILES, TMPFILES_PATH,
+    };
+    let file = |path: &str| path.rsplit('/').next().unwrap_or(path).to_owned();
     PRODUCT
         .iter()
-        .chain(SETTINGS)
-        .chain(STORE_SETTINGS)
-        .any(|(_, placed)| *placed == text)
-        || [EXIT_NOTE, TMPFILES].contains(&text)
+        .map(|(unit, placed)| ((*unit).to_owned(), *placed))
+        .chain(
+            SETTINGS
+                .iter()
+                .chain(STORE_SETTINGS)
+                .map(|(path, placed)| (file(path), *placed)),
+        )
+        .chain([
+            ("exit-note.conf".to_owned(), EXIT_NOTE),
+            (file(TMPFILES_PATH), TMPFILES),
+        ])
+        .any(|(placed_name, placed)| placed_name == name && placed == text)
 }
 
 /// One `gh` call's standard output, or why not.

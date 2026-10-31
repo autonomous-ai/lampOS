@@ -180,7 +180,7 @@ the `### Built but not on yet` part. It lists each `switches.md` row counted
 `until` or `now` whose switch no product file turns on, read from the
 units themselves (`Environment=` lines, `ExecStart` flags and the settings'
 `.env` files in `deploy/product`), not from the row's "Product unit" cell.
-Only files `lamp-update install` places are read, matched by their text: a
+Only files `lamp-update install` places are read, matched by name and text: a
 file there that install never places is on no lamp. So `LAMP_OWN_KEYS`,
 set only in `own-keys-voice.conf`, which a test lamp gets by hand, is
 listed.
