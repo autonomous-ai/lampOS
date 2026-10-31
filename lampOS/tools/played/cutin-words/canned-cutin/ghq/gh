@@ -1,0 +1,10 @@
+#!/bin/bash
+# gh stand-in for the other-lamp gate (DRY matrix): `gh api .../3336/comments` prints one {created_at, body} line.
+# STUB_PLAYING=xxxx: a PLAYING lamp-xxxx from now, no QUIET after it; else a QUIET lamp-4ace. STUB_AFTER=n (counted in STUB_COUNT): the first n
+# calls read quiet (to pass the start gate and refuse before an arm). Anything else is recorded, never sent.
+[ "$1" = api ] || { printf '%s %s\n' "$(date +%H:%M:%S)" "$*" >>"${GH_STUB_OUT:-/dev/null}"; exit 0; }
+n=0; f=${STUB_COUNT:-/dev/null}; [ -f "$f" ] && n=$(cat "$f"); echo $((n + 1)) >"$f"
+now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+if [ -n "${STUB_PLAYING:-}" ] && [ "$n" -ge "${STUB_AFTER:-0}" ]; then
+  printf '{"created_at":"%s","body":"PLAYING lamp-%s %s–about +30 min, a played row"}\n' "$now" "$STUB_PLAYING" "$(date +%H:%M)"
+else printf '{"created_at":"%s","body":"QUIET lamp-4ace %s"}\n' "$now" "$(date +%H:%M)"; fi

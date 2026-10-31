@@ -129,6 +129,12 @@ These you can run on their own:
   failed, or the drop-in could not be taken off. Its stand-in test is
   `cutin-test.sh`.
 
+- `cutin-words/row-cutin-words.sh`, about 26 minutes, under its own lamp-lock (#3997 step 2): an A/B
+  of the installed lamp-voice with and without the wordless cut-in hold (`LAMP_STOP_WORDS=heard`,
+  `LAMP_BACKCHANNEL_HOLDS=on`): real cut-ins, the answer's own tail, and the time to yield. It posts
+  PLAYING and QUIET on #3336 and puts the lamp back itself. Its plan, settings and DRY matrix are in
+  `cutin-words/plan-cutin-words.md`.
+
 - `calendar.sh LABEL FIXTURE`, about 4 minutes (#751, "Email, calendar
   and other connectors, through hand-overs"): "Hey Lamp, what's on my
   calendar today?" is handed over to the computer's agent, which is the

@@ -12,9 +12,10 @@ $PLAYED_OUT/scenarios/ (PLAYED_OUT defaults to ~/lamp-played). The lamp is reach
 lamp is changed."""
 import hashlib, json, os, subprocess, sys, time
 HOME = os.path.expanduser('~'); V = os.environ.get('PLAYED_OUT') or HOME + '/lamp-played'
-# The lamp, through the kit's lamp_ssh (its settings come from the environment), with the 5 s connect time this always had.
+# The lamp, through the kit's lamp_ssh (its settings come from the environment), with a 5 s connect time unless
+# LAMP_SSH_TIMEOUT says otherwise.
 SSH = [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lamp_ssh')]
-SSH_ENV = dict(os.environ, LAMP_SSH_TIMEOUT='5')
+SSH_ENV = dict(os.environ, LAMP_SSH_TIMEOUT=os.environ.get('LAMP_SSH_TIMEOUT') or '5')
 RATE = os.environ.get('LAMP_SAY_RATE', '185')
 
 def wav_for(voice, text):
