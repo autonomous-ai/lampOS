@@ -278,6 +278,16 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "잘 안 보였어요.",
         ],
     ),
+    // Its answer to a stop said over it (`LAMP_SPOKEN_STOP_ENDS`, on).
+    (
+        crate::spoken_stop::LINE,
+        [
+            "Được rồi, mình dừng ở đây nhé.",
+            "わかった、ここでやめるね。",
+            "好的，我就说到这儿。",
+            "알겠어요, 여기서 멈출게요.",
+        ],
+    ),
 ];
 
 impl Language {
@@ -584,7 +594,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 14);
+        assert_eq!(FIXED_LINES.len(), 15);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
