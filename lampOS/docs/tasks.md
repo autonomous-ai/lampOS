@@ -30,14 +30,16 @@ runtime dependency. All source remains inside the standalone `lampOS/` tree.
 The current CLI cannot prove completion of the particular lamp request. Every
 successful local response therefore carries `completion: "unverified"`.
 `idle`, text saying “done,” and a successful process exit never change that.
-There is no automatic completion announcement in this implementation.
+A finished agent's news is told by the voice once the watch sees it idle
+(below, "The lamp as chief of staff"), still as unverified.
 
 ## Ownership and switches
 
 `lamp-tasks serve` returns `enabled:false` before opening a store, reading a
 target file, constructing an adapter, accessing a clock, or creating workers.
-`--enable` starts the private service. It does not confirm a task. There is no
-automatic deployment, service unit, startup wiring or Voice tool registration.
+`--enable` starts the private service. It does not confirm a task. The
+product's `lamp-tasks.service` starts it with `--enable`, and its
+`lamp-voice.service` starts after it.
 
 The operator supplies an existing Harness executable and a target allowlist.
 The model can choose an alias and task text; it cannot choose an executable,
@@ -111,9 +113,7 @@ when it is idle as `harness reply` does (openharness#2157, the person's
   never new: the words may be in the session already.
 - **Not routed:** Devin Cloud, whose sessions are in Devin's cloud.
 - **Which session:** the router picks among every session on the target's
-  computer, so the read-back's agent may not be the one that takes it. It
-  goes with `LAMP_TASKS_SHORT_CONFIRM=on`, whose yes is "Should I send it
-  to your computer?" and names no agent or session.
+  computer, so the read-back's agent may not be the one that takes it.
 - **Tests:** `tests/harness.rs`
   `with_route_the_router_is_asked_first_and_its_pick_is_the_tasks_agent`;
   `engine::tests::a_task_that_joined_the_persons_session_is_told_and_never_closed`,
@@ -141,7 +141,8 @@ must be prepared/confirmed again after restart, even if an alias was remapped.
 
 The request socket permits preparation, inspection, cancellation before an
 attempt, and an explicit observation request. Only the separate Voice socket
-permits `confirm`, `claim_speech`, `ack_speech` and `told`. Both sockets and their
+permits `confirm`, `claim_speech`, `ack_speech`, `told` and the five
+`sign_in_*` ops (`Request::trusted`). Both sockets and their
 parent are private to the service user. This separation is an integration
 boundary, not authentication against another process with that same UID.
 Actions must expose only the public operations to the model. First must wire
@@ -193,8 +194,9 @@ uncertain and reported-spoken history remains. Old confirmations and speech
 attestations cannot cross the newly generated service session.
 
 `cancel` only cancels a prepared or queued local task before its attempt.
-It returns `remote_cancelled:false`. There is no remote cancel, close, resend,
-follow-up, permission reply, automatic observation retry, or automatic polling.
+It returns `remote_cancelled:false`. There is no remote cancel. The product
+runs the watch (`--watch`, the default) and closes a told harness
+(`--close-told`), and `--route` takes follow-ups: each is below.
 A person can explicitly request a new observation of an accepted agent.
 
 ## Wire interface
@@ -240,7 +242,7 @@ inspection evidence, not a playback grant.
 | `sign_in_state` | none | With `serve --sign-in-by-code` only, trusted: the sign-in's code, the email it asks about, or how it ended; `none` before any |
 | `sign_in_asked` | `id`, `request` | With `serve --sign-in-by-code` only, trusted: the voice heard the question "Sign in as …?" said whole for sign-in `id`, in its request `request` (`not_asking`, `not_this_sign_in` otherwise) |
 | `sign_in_answer` | `answer`: `yes` or `no`; `request` | With `serve --sign-in-by-code` only, trusted: the person's spoken answer, in the voice's request `request`, passed on only while Harness asks (`not_asking`), once the question was told in an earlier request (`not_told`) and within two minutes of it (`too_late`) |
-| `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation was heard whole, in its model's own words ([#1390](#closing-a-finished-harness-1390-serve---close-told-off-unless-set)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
+| `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation was heard whole, in its model's own words ([#1390](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
 
 The [protocol](../crates/tasks/src/protocol.rs) and
 [engine](../crates/tasks/src/engine.rs) define the serialized fields and error
@@ -255,8 +257,11 @@ for a mutation. It is not evidence that no commit or dispatch occurred.
 
 ## Harness adapter
 
-Only six argv forms are constructed, without a shell; `ps` only with
-`serve --progress` and `wait` only with `serve --push-wait`:
+These argv forms are constructed, without a shell; `ps` only with
+`serve --progress` and `wait` only with `serve --push-wait`. The adapter
+also builds `route`, `machines engines`, `reply`, `auth status`, `start`
+and `login --code` (`crates/tasks/src/harness.rs`), each in its own
+section below:
 
 ```text
 harness machines --json
@@ -587,7 +592,7 @@ started once its answer is told:
   thread and the second voice, through `Route::Tasks`); the
   provider worker's `an_answer_with_news_hands_its_key_on_once_it_is_sent`;
   `coordinator::tests::say::news_answered_to_a_question_rides_on_its_own_turn`.
-- **The voice's `tests/news_told.rs`, with a real `lamp-tasks` on its
+- **The voice's `tests/it/news_told.rs`, with a real `lamp-tasks` on its
   sockets:**
   - `news_heard_whole_closes_the_harness_it_was_of` (news taken to tell
     closes nothing, with the clock past three close retries);
@@ -622,7 +627,9 @@ started once its answer is told:
 | Diagnostics | Once a second (`report_every`; tests pass less), with early readiness changes; owner stale after 1,500 ms |
 
 There are seven service threads including main: four clients, the storage
-owner and the CLI worker. Clients never run Harness. The CLI worker never
+owner and the CLI worker; with `--push-wait` (the product's), one
+`tasks-wait` thread more for each machine, and sign-in's reader threads
+while one runs. Clients never run Harness. The CLI worker never
 holds the ledger. Main publishes the standard `diagnostics` type as `tasks`,
 with readiness, CLI-busy, counts, queue refusals and publication failures.
 It publishes no task text and no automatic result delivery topic. A stalled
@@ -677,11 +684,11 @@ now reads the state of the release after it:
   requests, `conflict` for the rest).
 - **A newer `schema`** is a change no older build may read (the rule
   below says which changes those are). A build
-  that finds a `schema` above its own (2) keeps the store as it is,
+  that finds a `schema` above its own (4) keeps the store as it is,
   renamed `tasks.sqlite3.newer-<schema>-<unix seconds>` in the same folder
   (Harness's `HOME` beside it is not touched), and starts with an empty
   store and a new store id, with one line: `tasks: storage was written by a
-  newer build (schema N, this build reads 2); it is set aside as …, and
+  newer build (schema N, this build reads 4); it is set aside as …, and
   this build starts with an empty store`. The tasks it was following are
   forgotten by the lamp; their harnesses go on in Harness. The kept file is
   whole, so the newer build can be put back on it by hand.
@@ -763,7 +770,8 @@ and child cleanup before replacement. Do not restart an owner inside the same
 surviving process. Terminal error reporting waits at most 10 ms for its one
 writer before process exit; a blocked log sink cannot hold that error path.
 
-No history garbage collector or remote close/archive operation is implemented.
+No history garbage collector or archive operation is implemented; a told
+harness is closed with `--close-told` (above).
 Capacity stops admission rather than forgetting ambiguous work or resetting
 speech history. Account, local Harness identity, operator target, store reset
 and personal-data erasure need First's explicit reconciliation/reset wiring.
@@ -1089,7 +1097,9 @@ transcript readers (openharness `cli/src/engines/devin/`). So `ps`, `show` and
 - **It may ask before it writes.** With no auto mode, Devin works in its own
   default. An agent waiting for the person is told as now: "Devin is
   waiting for you on your computer".
-- **The store's `schema` is 2 only while it holds a Devin task:** a
+- **The store's `schema` is 2 only while it holds a Devin task** and no
+  newer engine's (it is written as the highest any task needs, 4 with a
+  Hermes task and 3 with a Devin Cloud one, `schema_needed`): a
   target's engine may be `devin`, a new value in a stored enum. A store
   with only Codex, Claude or OpenCode work stays schema 1 and is written as
   1, so a rollback to a build from before keeps the person's hand-overs. A
@@ -1588,7 +1598,7 @@ used only to say it.
   (store, task, observation) goes into `/var/lib/lampOS/voice/tasks-told`
   (`LAMP_TASKS_TOLD`), read again on each pass. With `--close-told`,
   once its turn is heard whole, a task's observation is also marked `told`
-  in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-off-unless-set).
+  in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit).
 - **Asked** (`check_agent_task`). "How's it going?" or "what did Claude Code
   say?" is answered at once from what was last seen, with no new read; a
   finished answer heard this way is kept as told, so it is not told again
@@ -1606,7 +1616,8 @@ used only to say it.
 
 The voice's side is on wherever the tasks part is (`LAMP_TASKS_DIR`). The
 watch was `--watch` for its first run on lamp-4ace (00:49 on 2026-10-15) and
-is the default since; `--no-watch` turns it off (`docs/joining.md`).
+is the default since; `--no-watch` turns it off
+([switches.md](switches.md)).
 
 ### The first run end to end on lamp-4ace (2026-10-15, 00:49 to 00:56)
 
@@ -1673,7 +1684,7 @@ check read that page first. Now the tasks part is read with a 64 KiB bound
 answer (16 KiB) with what it was asked (4 KiB). The test of "how is it
 going?" now serves a page of over 9,000 bytes.
 
-### Told when a skill asks (#939, (c), off unless `LAMP_TASK_NEWS=skill`)
+### Told when a skill asks (#939, (c), `LAMP_TASK_NEWS=skill`, on in the product)
 
 The Task news skill (Jarvis, #1021) triggers on `tasks/status` and moves and
 lights with the news; the voice tells each piece once, as above, in the
@@ -1806,7 +1817,7 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     the declined task's note still stood beside them;
   - "yes, and also …" isn't shown cleanly yet.
 
-### A lead-in before a call (#799, off unless `LAMP_TOOL_LEAD_IN=on`)
+### A lead-in before a call (#799, `LAMP_TOOL_LEAD_IN=on`, on in the product)
 
 A turn in which the model calls `start_agent_task` or `confirm_agent_task`
 began 1.8 to 2.9 s after the end of speech on lamp-4ace on 2026-10-15, against
@@ -2106,10 +2117,10 @@ route's news test holds the turn heard to the news's, and
 holds the number `send_heard` tells the tasks part to that turn's (the
 reviewer's P3 1).
 
-### A skill made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
+### A skill made by voice (#1685, `LAMP_MAKE_SKILL=on`, on in the product)
 
 The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
-`make_skill(request)` ([skills.md](skills.md#made-by-voice-1685-off-unless-lamp_make_skillon)).
+`make_skill(request)` ([skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
 - **The prepare.** It goes as `start_agent_task`'s does: `prepare`, then
   `confirm_agent_task` on the person's yes, within 120 s, as the same
   pending work. Its `text` is the brief and the request (at most 180 bytes)
@@ -2130,7 +2141,7 @@ The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
   other stores ([setup.md](setup.md)).
 - **Without the switch** a `make_skill` call does nothing.
 
-### Asked of the staff, done by the lamp (#854, off unless `LAMP_TASKS_ASKED=on`)
+### Asked of the staff, done by the lamp (#854, `LAMP_TASKS_ASKED=on`, on in the product)
 
 On lamp-4ace on 2026-10-15 at 20:15 and 20:16 (one session, synthetic
 voice), "Hey Lamp, can you ask Claude Code to write a short story about a lamp
@@ -2255,7 +2266,7 @@ with the read-back. **Not shown yet.** Most likely wrong: the note alone may
 not hold the stories in a session that has already handed over, which only
 `handovers.sh` shows.
 
-### Named in the words, told in time (off unless `LAMP_STAFF_NOTE=on`)
+### Named in the words, told in time (`LAMP_STAFF_NOTE=on`, on in the product)
 
 On lamp-4ace on 2026-10-16 (stack36, `LAMP_TASKS_WHO=on`,
 `LAMP_TASKS_ASKED=on`) "Hey Lamp, ask Codex to write a haiku about coffee."
@@ -2322,9 +2333,9 @@ With `LAMP_STAFF_NOTE=on` (the provider worker's `--staff-note`, after
 - **The journal** says which each match was, for counting on a lamp:
   "request N: named Codex in time; the model is told" or "request N: named
   Codex after its input was closed; the model is not told". A request told
-  in time whose later words name more says that apart ("named Codex once its
-  input was closed, after its note; the model keeps the note it had"), so a
-  count sees each request once. Nothing of what
+  in time whose later words name more says the second line too (the model
+  keeps the note it had), so a count from the journal sees such a request
+  twice. Nothing of what
   was said is written: only which of the staff. **Decided** (the first
   builder, #1173): they are counted on lamp-4ace through one battery with
   the switch on. If late is common, the next step is what `second_look`
@@ -2424,7 +2435,7 @@ the work ("ask Codex to …", "have Claude Code …"), and nobody named is Claud
 Code. Off unless the voice's unit sets `LAMP_TASKS_WHO=on` (`--tasks-who`
 for the provider worker), for its first minute on lamp-4ace; once that has
 passed, it is to become the default, as `docs/joining.md` asks and the issue
-says.
+says. The product's voice unit sets it on; the code's default is still off.
 
 **What exists and what was taken.** `lamp-tasks` already took one target per
 alias, each with its engine (`claude` or `codex`), 1 to 8 of them; the voice
@@ -2480,7 +2491,9 @@ before it binds a task, is not seen: a receipt that does not leaves the task
   lower case (so "Code X" is "codex"), and only when it is one member's
   name, a close form of it, or its alias, and nobody else's: `claudecode`,
   `claude`, `cloudcode`, `cloud` for Claude Code; `codex`, `codecs`, `codec`
-  for Codex; `opencode` for OpenCode. None of these is close to another
+  for Codex; `opencode` for OpenCode; `devin`, `devon` for Devin and Devin
+  Cloud; `hermes`, `herms`, `hermez`, `hermess`, `hermies` for Hermes
+  (`agent_tasks::KINDS`). None of these is close to another
   engine's, and a form of an engine that is not among the staff names
   nobody. Anything else ("code", "Cursor") prepares nothing and sends
   nothing to the tasks part; the model is told "Nothing was done: nobody by
@@ -2511,7 +2524,8 @@ after `--tasks-make-skill`, and only with `--tasks-who`). With it, once the
 staff are read:
 
 - `who` is offered even with one of the staff, as an enum of every agent the
-  voice knows (Claude Code, Codex, OpenCode), and its description
+  voice knows (`agent_names()`: Claude Code, Codex, OpenCode, Devin and
+  Hermes), and its description
   says who is set up: "Set up on this lamp: Claude Code, and nobody else. If
   they named another of these, give that name: you will be told it isn't
   set up, and nothing goes to anyone else."
@@ -2524,7 +2538,8 @@ staff are read:
   "ask Codex" is noted as a hand-over where only Claude Code is set up.
 - nobody named is the default, as before; one of the staff named gets it.
 
-Not run on a lamp yet.
+Checked on lamp-75c9 on 22 Oct, and on in the product
+(`LAMP_TASKS_NAMED_ONLY=on` in `lamp-voice.service`).
 
 **Without the switch, nothing changes.** Tests show that with it off, or on
 with the staff not yet read, or on with one target `office` for Claude Code,
@@ -2603,8 +2618,9 @@ at once.
    voice goes to `office` as before.
 3. **Room in the store.** `printf '%s\n' '{"op":"status"}' | lamp-tasks
    request --socket /run/lampos-tasks/request.sock`: `summary.retained` must
-   be 13 or less. The store keeps 16 tasks, every prepared one included, and
-   has no clean-up; this run prepares three.
+   be 13 or less. The store keeps 16 tasks, every prepared one included; a full
+   store lets its oldest finished task go, and refuses only when all 16 are
+   still going; this run prepares three.
 4. **Switch on.** Keep the old file, write the new one with the id it holds,
    and restart the tasks part (its watch is on unless `--no-watch`, so the
    news comes unasked):
@@ -2875,7 +2891,7 @@ identity run it, and `serde_json` reads it.
   | `unread` | The tasks watched whose progress has not been read yet in this run, in order; left out when none |
   | `run` | Which run of the tasks part counted these changes: when it began to read progress, in milliseconds since 1970. Counts begin again at each run |
   | `task` | The task's number (`get_task`, `get_progress`) |
-  | `engine` | Who has it: `claude` or `codex`, as its target names it |
+  | `engine` | Who has it, as its target names it: `claude`, `codex`, `opencode`, `devin`, `devin_cloud` or `hermes` (`EngineKind::bus_name`) |
   | `state` | `working`, `idle`, `needs_input`, `starting`, `installing`, `stopped`, `offline`, `failed`, `unknown`, or `missing` when the agent is not in the list (stopped, or gone). A state Harness may add later is `unknown` |
   | `working_s` | Seconds since it was handed over, if that was in this boot |
   | `last_active_unix_ms` | When Harness last saw the agent do anything |
@@ -3086,8 +3102,9 @@ is set, `LAMP_TASKS_DIR`, as for all task news).
   tasks part began counting again), or when they come back at or past the
   decision's minute (#765 review, 2026-10-15).
 - **The note**, one written turn, through `task_news::fitted` so it fits the
-  transport's 1,024 bytes (the progress line cut first, then the task's
-  words): who (Claude Code or Codex), the task (300 characters), the
+  transport's 1,024 bytes (the task's words cut to 100 characters first,
+  then the progress line, then the rest of the task's words): who (the
+  agent's name), the task (300 characters), the
   progress line (400), the signs not yet put in a note for this task in
   words ("the tests pass", "a pull request was opened"), and about how many
   minutes it has been at it. Asked for: one short natural sentence, the way
@@ -3120,10 +3137,10 @@ the voice listens on `tasks/status` all the same, with one socket of its
 own, only for a task newly settled, which has the settled news read at once
 ("Telling", above):
 `without_the_switch_no_progress_is_listened_for_asked_or_kept`
-(`crates/voice/tests/progress_news.rs`), which also shows that only `on`
+(`crates/voice/tests/it/progress_news.rs`), which also shows that only `on`
 turns it on.
 
-**Shown on the development Mac**, in `crates/voice/tests/progress_news.rs`
+**Shown on the development Mac**, in `crates/voice/tests/it/progress_news.rs`
 on a bus of the test's own, with a stand-in for the tasks socket and the
 policy's own loop (`run_with_progress`, acting, with a stand-in judge that
 says yes): a change on `tasks/status`, then the policy's `say_now`, then one
