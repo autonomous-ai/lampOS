@@ -19,8 +19,8 @@ Installed skill definitions and callers of the local tool socket remain trusted;
 this check does not exclude another local process with bus write access.
 
 The composite step requires `body = true`, `speak = true`, and explicit read
-grants for `body/unplug_request`, `body/unplug_state`, `expression/unplug_state`
-and `ring/unplug_state`. The loader validates every grant; runtime admission
+grants for `body/unplug_request`, `body/unplug_state`, `expression/unplug_state`,
+`ring/unplug_state` and `body/unplug_cancel` (`READ_TOPICS`). The loader validates every grant; runtime admission
 and the dedicated request/ready-speech paths check the run's captured grants
 again. Failure speech also requires `speak`. No light action or camera access
 is granted by this skill.
