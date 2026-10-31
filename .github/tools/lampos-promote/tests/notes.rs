@@ -363,6 +363,37 @@ fn on_this_repository_no_switch_the_product_turns_on_is_counted_waiting() {
     );
 }
 
+/// The real page and units: each row is counted as the product has it. A
+/// row counted `off` is one no product file turns on, and one counted `on`
+/// is turned on by a product file or on by its code's default
+/// ([`ON_UNSET`]). On 31 Oct `LAMP_STALLS` was counted `off` with the
+/// product unit turning it on since 17 Oct, and `LAMP_DECLINE_SILENT` `on`
+/// with no unit setting it (#4735).
+#[test]
+fn on_this_repository_each_switch_is_counted_as_the_product_has_it() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let rows = notes::rows(&page);
+    assert!(rows.len() > 300, "only {} rows read", rows.len());
+    let wrong: Vec<String> = rows
+        .iter()
+        .filter_map(|row| match (row.counted.as_str(), on.get(&row.switch)) {
+            ("off", Some(file)) => Some(format!("{}: counted `off`, but {file} turns it on", row.switch)),
+            ("on", None) if row.product.as_deref() != Some(ON_UNSET) => Some(format!(
+                "{}: counted `on`, but no product file turns it on and its Product unit cell isn't {ON_UNSET:?}",
+                row.switch
+            )),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "docs/switches.md's Counted as, against the product files:\n{}",
+        wrong.join("\n")
+    );
+}
+
 /// The real page: every switch the notes list has a plain line in its
 /// [`PLAIN`] table, one short sentence a person can read, with no switch
 /// name, flag or code (the first builder on #3976, 29 Oct 23:4x).

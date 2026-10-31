@@ -168,12 +168,22 @@ pub fn turned_on(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     on
 }
 
-/// Every row of the page's switch tables counted `until` or `now` whose
-/// switch isn't in `on`, in the page's order, each switch once. A row whose
-/// "Product unit" cell is exactly [`ON_UNSET`] is on by its code's default,
-/// and is not listed.
-pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
-    let plain = plain_lines(page);
+/// One row of the page's switch tables that names a switch.
+pub struct Row {
+    /// The name of its table.
+    pub part: &'static str,
+    pub switch: String,
+    /// Its **Counted as**: `on`, `now`, `until`, `off` or `setting`.
+    pub counted: String,
+    /// Its "Values and default" cell.
+    values: String,
+    /// Its "Product unit" cell, if its table has one.
+    pub product: Option<String>,
+}
+
+/// Every row of the page's switch tables that names a switch, in the
+/// page's order.
+pub fn rows(page: &str) -> Vec<Row> {
     let mut found = Vec::new();
     let mut part = None;
     let mut header = false;
@@ -203,26 +213,43 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
         if row.len() < 3 || row[0].starts_with("---") {
             continue;
         }
-        let product = product_at
-            .and_then(|at| row.get(at))
-            .map(|cell| (*cell).to_owned());
         let Some(switch) = switch_of(row[0]) else {
             continue;
         };
-        let counted = row.last().copied().unwrap_or_default();
-        if !WAITING.contains(&counted)
-            || on.contains_key(&switch)
-            || product.as_deref() == Some(ON_UNSET)
-            || found.iter().any(|w: &Waiting| w.switch == switch)
+        found.push(Row {
+            part,
+            switch,
+            counted: row.last().copied().unwrap_or_default().to_owned(),
+            values: row[1].to_owned(),
+            product: product_at
+                .and_then(|at| row.get(at))
+                .map(|cell| (*cell).to_owned()),
+        });
+    }
+    found
+}
+
+/// Every row of the page's switch tables counted `until` or `now` whose
+/// switch isn't in `on`, in the page's order, each switch once. A row whose
+/// "Product unit" cell is exactly [`ON_UNSET`] is on by its code's default,
+/// and is not listed.
+pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
+    let plain = plain_lines(page);
+    let mut found: Vec<Waiting> = Vec::new();
+    for row in rows(page) {
+        if !WAITING.contains(&row.counted.as_str())
+            || on.contains_key(&row.switch)
+            || row.product.as_deref() == Some(ON_UNSET)
+            || found.iter().any(|w| w.switch == row.switch)
         {
             continue;
         }
         found.push(Waiting {
-            part,
-            plain: plain.get(&switch).cloned(),
-            switch,
-            words: words_of(row[1]),
-            product,
+            part: row.part,
+            plain: plain.get(&row.switch).cloned(),
+            words: words_of(&row.values),
+            product: row.product,
+            switch: row.switch,
         });
     }
     found
