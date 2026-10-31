@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS records (
     at_ms INTEGER NOT NULL, speaker TEXT NOT NULL, body TEXT NOT NULL,
     processed INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS episode_sources (
+    episode_id INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    PRIMARY KEY(episode_id,record_id)
+);
 CREATE INDEX IF NOT EXISTS records_pending ON records(processed,speaker,id);
 CREATE INDEX IF NOT EXISTS records_episode ON records(episode_id,id);
 CREATE TABLE IF NOT EXISTS facts (
