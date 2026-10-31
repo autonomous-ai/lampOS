@@ -60,6 +60,8 @@ mod product_companions;
 mod restart_order;
 #[path = "round/restart_quiet.rs"]
 mod restart_quiet;
+#[path = "round/self_after_parts.rs"]
+mod self_after_parts;
 #[path = "round/self_cuts.rs"]
 mod self_cuts;
 #[path = "round/self_recovery.rs"]

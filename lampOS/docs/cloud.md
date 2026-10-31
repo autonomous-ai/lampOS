@@ -1324,11 +1324,13 @@ end. Those outcomes in a round with no `started` told are not alerts.
 names two round ends `self-switched` (`round::Outcome::kind`), and the alert
 can't tell them apart:
 - **`SelfSwitched`:** the parts switched to `to` *and* lamp-update took the
-  newer self the build carries, in one round. Nearly every build so far
-  carries a lamp-update with a new hash, so on a self-updating product lamp
-  this, not `done`, is how most updates end: `started`, `self-switched`,
-  then `self-confirmed`. `done` comes only from a round whose lamp-update is
-  unchanged (Second, on #4370's run, 30 Oct). A round whose parts were
+  newer self the build carries, in one round. It ends so whenever the build
+  carries a lamp-update other than the running one. Builds are reproducible,
+  but a promote spans many builds: 9 of the 10 stable promotes since 8327
+  changed lamp-update's hash (8545 kept 8525's). So on a self-updating
+  product lamp this, not `done`, is how most updates end: `started`,
+  `self-switched`, then `self-confirmed`. `done` comes only from a round
+  whose lamp-update is unchanged (Second, on #4370's run, 30 Oct). A round whose parts were
   already on `to` (`UpToDate`) ends the same way when lamp-update is not
   yet on that build's own self, e.g. after an `install` or a self put back
   (`round.rs`, `run.own`): there too the parts run `to`.
