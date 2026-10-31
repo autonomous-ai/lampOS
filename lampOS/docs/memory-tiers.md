@@ -266,6 +266,33 @@ fail tests enforce that boundary. A process crash may leave a private child
 directory in the runner-owned scratch directory, which the runner must dispose of
 after the run. This is synthetic benchmark state, not a product restore facility.
 
+Contract 2.1 keeps the wire envelope at `v: 2` and adds optional, count-only
+`diagnostics` to authorized `inspect` replies. Its `tier-usage-v1` schema reports
+`items`, `text_bytes`, `recall_calls` and `snapshot_calls` per component, plus
+`record`. Missing values mean unknown. The facts-removal arm also reports
+`evidence_only_facts`: these rows support other components, but their use
+counters are always zero and the ordinary facts population is zero.
+
+Population is the current store's query-independent eligible inventory before
+matching, candidate limits and byte selection. It shares recall's evidence,
+expiry, time and arm checks without expiring, fading, acknowledging or otherwise
+mutating memory. Measurement uses a 500 ms cooperative budget; an incomplete scan reports
+null population metrics rather than partial totals. Stored UTF-8 text excludes
+rendered labels, timestamps, JSON and indexes. Facts include their claim and
+copied quote texts; lines include their own text; summarized episodes include
+gist and detail. Raw episode fallback has one eligible episode but zero stored
+episode bytes, since its words are counted in `record`. Capture pause still
+allows inspection of existing authorized memory.
+
+Usage counts a tier once per recall or snapshot response that returns nonempty
+text after byte-cap selection and internal deadline checks. These counters live
+outside probe state and survive restoration. `inspect` does not increment them.
+They never affect ranking, importance, aging or any memory decision, and never
+enter model or judge prompts or scores. They measure returned text, not speech
+delivery or the runner's acceptance of a late response. The runner samples
+population before a question can create memory and reports an empty or unused
+full-engine counterpart as `not exercised`, never as proof of no value.
+
 The ordered [arm manifest](../crates/memory-tiers/arm-manifest.json) registers
 all eleven arms before any candidate score. Every arm runs three times and is
 reported, including failures. Protocol name `tiers` is labelled `ours (tiers)`.
@@ -281,6 +308,14 @@ never recalled by that arm. All arms preserve provenance, owner attribution,
 uncertainty and forgetting. Prompts and bounds stay the same; code filters the
 removed outputs. The manifest also records the agreed three-run-spread test
 for keeping or removing a tier. No score has yet been used to select a tier.
+The registered development month does not reach the 90-day fading threshold;
+fading is labelled **not exercised by this month**, and its removal still runs.
+Its keep/drop decision requires the separately registered aging test with
+closed, low-importance episodes carrying detail, maintenance after day 90, and
+later questions. Supplied-topic episode cutting remains a library test; the
+month supplies no topic labels or desk-object lists. Its activity signal and
+4,096-byte memory allowance belong to the benchmark registration; full history
+is the context-limited ceiling and no-memory adds no memory text.
 
 ## Model transport and cost
 
