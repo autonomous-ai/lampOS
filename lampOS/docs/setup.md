@@ -196,7 +196,7 @@ lamp-setup reset-now`). That unit, in this order:
    `lamp-records`, the updater with its apply, the boot's Wi-Fi
    restore, and an office lamp's `lamp-peek`, which a reboot kept off by
    its setup condition and which would otherwise keep port 80 from setup's
-   page after a start in place (#4536; not started again until the next
+   page after a start in place (#4574; not started again until the next
    boot). What starts them (`reset::STARTERS`: the helpers' and the
    skills' sockets, the records' timer, the updater's way back, its timer
    and a worker already running, which can restart the updater for a pending
