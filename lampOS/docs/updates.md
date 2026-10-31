@@ -1265,7 +1265,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | the second route's settings | `install`'s own lines, as it says them ("The second route's services in a round") |
 | **The product skills** | |
 | `put back …: …; a core skill's files are the build's` | a core skill's file the lamp changed, put back once it's written |
-| `placed N files of the product skills` | the build's skills written: in the switch, or alone when the build changes no part (`place_alone`) |
+| `placed N files of the product skills` | the build's skills written: in the switch, or alone when the build changes no part (`place_alone`). N counts the files written or put back this round (`product_skills::backs`), not the bundle's: one already the build's is only recorded, and a switch that writes none says nothing (9063 to 9276, 31 Oct: 4, `pose`'s two and `welcome-back`'s two) |
 | **The switch** (`switch`) | |
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
 | `switching to build N` | the parts' switch begins |
