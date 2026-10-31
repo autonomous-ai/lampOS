@@ -88,7 +88,9 @@ turns on, read as the stable notes read the units (any value but off is
 on). Its row keeps the check it named, in its own words (Reviewer-two's P3
 on #4662). The same tests fail on a row counted `off` that such a file turns on, and on
 one counted `on` that none does, unless its **Product unit** is `on (unset)`:
-on by its code's default, with nothing set (#4735 found one of each).
+on by its code's default, with nothing set (#4735 found one of each). And a
+`LAMP_*` that such a file turns on has a row, unless this page's left-out
+list in "How to read it" names it (#4755 added the two that had none).
 
 On 17 October this section proposed `LAMP_LOOK_FULL=on` with `lamp-eyes
 --full-look` now, and named as the quickest wins among "off until"
