@@ -1,5 +1,42 @@
 # Tiers work log
 
+## 2026-10-31: reviewed adapter and pre-score coverage audit
+
+Recall/adapter code is ready for review at `38a822541` in
+[PR #4756](https://github.com/autonomous-ai/lampOS/pull/4756), now undrafted.
+Native ARM64 run 41200748151 passed 13,003 tests (107 skipped) plus doctests;
+strict Linux clippy run 41200748106 passed. All 65 host functional tests,
+three API tests, formatting, clippy, workspace build and 18 source-only
+subprocess tests passed. Tests recorded READ-OK; the privacy re-read is pending.
+The final change strengthens the test harness: empty privacy results must have
+zero deadline misses, expected exits have a bound, stderr is preserved, and the
+broker timeout is measured. Engine sources match the verified month at
+`444ac6b66`. The pinned macOS executable and checksum were shared for reuse.
+
+The structure-only audit at registration `3d8be60e8` covered all fourteen
+setups without inspecting question or answer text. The 29.32-day event stream
+cannot exercise the 90-day fading rule. Query topic, activity and object cues
+were absent, and only one observed person identity was present. The recorded
+candidate held 240 closed episodes, seven explicit statement facts and no
+modeled lines; successful plumbing does not establish modeled-tier value.
+Its 1 MiB allowance did not stress the observed 2,085-byte memory text.
+
+Before any score, the lead ruled: keep the month and fading threshold, register
+a separate aging test through about 120 days, add the product's seat-based
+activity signal, use a 4,096-byte memory allowance except the full-history
+ceiling, and mark empty or unused counterparts as not exercised. No topic or
+object labels are to be added. A second known person remains a declared gap.
+Per-tier inventory and recall/snapshot use are optional count-only contract
+2.1 diagnostics, never prompts or scores; proof-only fact rows are separate.
+
+That next concern is on `tiers/usage-diagnostics`, based on the green head.
+The first 76 functional tests and three API tests passed; its final gates are
+not complete. The shared Mac now has one build slot, acquired atomically at
+`/Users/d/harnesses/worktrees/autonomous-os/.lamp-build-slot`; require 15 GiB
+free after acquiring it. Preserve pinned executables, clean only the owner's
+build output, and release the slot after each checkpoint. Live scores and the
+complete current-product baseline remain unfulfilled acceptance evidence.
+
 ## 2026-10-31: owner departure and regenerated-month evidence
 
 Engine `444ac6b66` in [PR #4756](https://github.com/autonomous-ai/lampOS/pull/4756)
