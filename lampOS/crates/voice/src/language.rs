@@ -11,7 +11,9 @@
 //! - the character's "Always speak English" becomes the chosen language's
 //!   ([`instruction`]); the call name stays "Lamp";
 //! - ElevenLabs speaks with [`SPEECH_MODEL`], which speaks all four, in the
-//!   language's voice from V1's table ([`Language::voice`]);
+//!   language's voice from V1's table ([`Language::voice`]); Korean keeps the
+//!   voice's own model, English's, in a voice of its own (Kanna,
+//!   [`Language::speech_model`]);
 //! - the English-only gates follow it: a cut-in with no English word is no
 //!   fragment, a turn heard in another script is asked again (#926) only in
 //!   a Latin-script language (Vietnamese), and the stop stream listens only
@@ -29,8 +31,8 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_LANGUAGE_FILE";
 /// The language last announced, one code a line; absent is English.
 pub const SAID_PATH: &str = "/var/lib/lampOS/voice/language-said";
 
-/// The ElevenLabs model for every language but English: it speaks ja, zh
-/// and ko (`docs/second-voice.md`, "The owner's language").
+/// The ElevenLabs model for Vietnamese, Japanese and Chinese
+/// (`docs/second-voice.md`, "The owner's language").
 pub const SPEECH_MODEL: &str = "eleven_flash_v2_5";
 
 /// The longest file taken: a code and a newline, with room to spare.
@@ -93,16 +95,26 @@ impl Language {
         }
     }
 
-    /// V1's first voice for it (`system/domain/device.go`'s
-    /// `elevenLabsVoicesByLang`), by its name in `net::tts`'s table. V1 had
-    /// no Korean voice: Korean keeps the lamp's own.
-    pub fn voice(self) -> Option<&'static str> {
+    /// Its voice, by its name in `net::tts`'s table: V1's first
+    /// (`system/domain/device.go`'s `elevenLabsVoicesByLang`) for vi, ja and
+    /// zh. V1 had no Korean voice: Kanna is a Korean native speaker's pick
+    /// from a listening test (#4473, 30 Oct).
+    pub fn voice(self) -> &'static str {
         match self {
-            Self::Vietnamese => Some("Ngan"),
-            Self::Japanese => Some("Shizuka"),
-            Self::Chinese => Some("Amy"),
-            Self::Korean => None,
+            Self::Vietnamese => "Ngan",
+            Self::Japanese => "Shizuka",
+            Self::Chinese => "Amy",
+            Self::Korean => "Kanna",
         }
+    }
+
+    /// The ElevenLabs model it is spoken with: [`SPEECH_MODEL`], or `None`
+    /// to keep the voice's own, English's (the product's
+    /// `eleven_v4_turbo`), with the speech tags English gets. Korean keeps
+    /// it: [`SPEECH_MODEL`] drops the pitch at the end of a Korean sentence,
+    /// and v4 ends it naturally (the same listening test).
+    pub fn speech_model(self) -> Option<&'static str> {
+        (self != Self::Korean).then_some(SPEECH_MODEL)
     }
 
     /// Whether the stop stream has words for it: #2939's Vietnamese
