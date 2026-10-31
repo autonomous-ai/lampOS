@@ -732,11 +732,16 @@
   },
   "contingency_fraction": 0.25,
   "aging_test": {
-    "status": "registered before scoring; not priced",
+    "status": "separate estimate available; excluded from month totals",
     "included_in_totals": false,
     "target_days": 120,
     "reason": "The month cannot exercise fading beyond the unchanged 90-day threshold.",
-    "runs": 6
+    "runs": 6,
+    "estimate": "aging-cost-estimate.json",
+    "six_runs_with_contingency": {
+      "flash": 29.6561540625,
+      "pro": 106.1270309625
+    }
   },
   "recommended_flash_campaign_cap_usd": 600,
   "recommended_flash_cap_per_persona_usd": 300,

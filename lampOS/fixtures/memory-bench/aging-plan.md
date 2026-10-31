@@ -81,3 +81,34 @@ aging event or question bytes. The audit inspected no answer or question
 text. It establishes age opportunity only: empty recorded consolidation
 cannot establish fading coverage, and a live run still needs the content,
 importance and recent-recall prerequisites above.
+
+
+## Separate planning estimate
+
+The [aging estimate](aging-cost-estimate.json) prices the verified, independently
+supplied full-engine [recorded ledger](recorded-runs/aging-v2/tiers-peer/index.json)
+on runner `6420a2f49` and adapter `7d6d0a236`. It contains 346 boundary calls,
+146 consolidation calls and 42 answer calls. Boundary calls reserve 104,815
+output tokens. These fixed replies establish plumbing only, with no score
+and no fading coverage.
+
+Using the same dated rates and allowances as the [month estimate](cost-estimate.md),
+model plus judge planning cost is $1.69 Flash or $6.46 Pro per run. Six aging
+runs add **$29.66 Flash or $106.13 Pro**, including the three-times model-only
+learned-state allowance, one speech cache and 25% contingency. The no-fading
+setup is provisionally assumed to have the same workload; its live request
+sizes are not measured. This separate scope is excluded from the proposed
+$600 month campaign cap and needs its own spending decision.
+
+File-only speech sizing covers all 1,712 utterances: 70.199 minutes before
+cache deduplication (20.714 minutes over 226 distinct files). The estimate
+uses the larger duration, $0.632 at the configured $0.009/minute STT rate.
+The [audio metadata](aging/audio-cost-manifest.jsonl) pins each script and
+measured file hash; no audio or real transcription is committed.
+
+The longest audio is 66.804 seconds. The pinned runner's preparation command
+currently refuses audio beyond 60 seconds, so a separate bounded file-only
+measurement was needed for this estimate. The failed preparation is retained
+locally. The live speech implementation must support and test a sufficient
+explicit duration bound before this fixture can be scored; the registered
+text and timing are unchanged.
