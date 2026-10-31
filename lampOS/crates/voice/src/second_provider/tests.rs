@@ -57,6 +57,9 @@ struct Script {
     unsaid: &'static [&'static str],
     /// Speech of this sentence never ends.
     endless: Option<&'static str>,
+    /// Speech of this sentence is this many samples, in whole packets: a
+    /// line as long as the lamp's voice says it.
+    lasting: Option<(&'static str, usize)>,
     /// Held by every live stream: dropped streams let go of it.
     token: Arc<()>,
     /// How many times the voice was asked to make ready ([`Services::warm`]).
@@ -254,6 +257,15 @@ impl Services for Script {
                 tokio::time::sleep(Duration::from_millis(1)).await;
                 packet
             })
+            .boxed();
+        }
+        if let Some((sentence, samples)) = self.lasting
+            && sentence == text
+        {
+            return stream::iter(
+                (0..samples.div_ceil(PACKET_SAMPLES))
+                    .map(move |at| Ok(vec![7; PACKET_SAMPLES.min(samples - at * PACKET_SAMPLES)])),
+            )
             .boxed();
         }
         let delay = if self.slow == Some(text.as_str()) {
@@ -5535,6 +5547,32 @@ async fn the_down_lines_are_said_in_the_owners_language() {
     assert!(
         second.contains(&heard(again)) && !second.contains(&heard(DOWN_LINE_AGAIN)),
         "within the minute: {second:?}"
+    );
+}
+
+/// Reviewer-three's P2 on #4723: a down line longer than the old 4 s bound
+/// is kept whole, so it is never cut before "ask me again". The Japanese
+/// line is about 6 s (5.97 s in the macOS voice); lamp-c0a4 logged the
+/// English at 4000 ms on 30 Oct, the old bound exactly. A voice that never
+/// ends is still stopped at the bound.
+#[tokio::test(start_paused = true)]
+async fn a_down_line_of_six_seconds_is_kept_whole() {
+    use crate::language::{Language, fixed_in};
+    let line = fixed_in(Some(Language::Japanese), DOWN_LINE);
+    let samples = 6 * 24_000;
+    assert!(samples > 4 * 24_000);
+    let lasting: Arc<dyn Services> = Arc::new(Script {
+        lasting: Some((line, samples)),
+        ..Script::default()
+    });
+    assert_eq!(render_line(&lasting, line).await.len(), samples);
+    let endless: Arc<dyn Services> = Arc::new(Script {
+        endless: Some(line),
+        ..Script::default()
+    });
+    assert_eq!(
+        render_line(&endless, line).await.len(),
+        DOWN_LINE_MOST_SAMPLES
     );
 }
 

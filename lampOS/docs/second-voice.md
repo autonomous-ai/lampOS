@@ -550,7 +550,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   relay answers. The first can overlap one turn once a start: a line said
   over the lamp's voice also begins one, and a short line can end before a
   slow relay's render does. It is
-  kept in memory (at most 4 s), so it can still be said when the chat no
+  kept in memory (at most 8 s, so the longest line, about 6 s in Japanese,
+  is never cut before "ask me again"; the old 4 s cut the English on
+  lamp-c0a4 on 30 Oct, Reviewer-three's P2 on #4723), so it can still be said when the chat no
   longer answers. A render that fails is journaled (`the down line could
   not be said`) and tried again after the next turn. A minute counts from
   when it was played, not from a try that failed. It goes as audio only,
