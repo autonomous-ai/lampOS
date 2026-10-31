@@ -1174,16 +1174,25 @@ pub(crate) mod tests {
 
     /// How often a lease-freshness test tries again when the host stalled
     /// past PRIVACY_FRESH_US (50 ms) before it could look: an attempt like
-    /// that says nothing either way. Twenty, a pause after each, so the
-    /// attempts span a busy host's stall of a few seconds rather than a
-    /// quarter of one; a whole-lib run on a loaded Mac stalled five back to
-    /// back (#1569, Reviewer-three's row, 30 Oct). A reader or watch that
+    /// that says nothing either way. Twenty, with [`after_a_stall`]'s pause
+    /// after each, so the attempts span a busy host's stall rather than a
+    /// quarter of a second; a whole-lib run on a loaded Mac stalled five back
+    /// to back (#1569, Reviewer-three's row, 30 Oct). A reader or watch that
     /// never finds the lease still fails every attempt. The two
     /// first-second resync tests take the same: with ten tries back to back,
     /// a whole-lib run on this Mac failed the kept-lease one in 2 of 2 runs
     /// (#1569, 30 Oct).
     const STALLED_ATTEMPTS: usize = 20;
-    const AFTER_A_STALL: Duration = Duration::from_millis(100);
+
+    /// The pause after a test's `stalls`-th stalled attempt (1 for the
+    /// first): 100 ms, doubling to 1.6 s, so twenty attempts span about 25 s.
+    /// With a flat 100 ms they spanned about 3 s, and a whole-lib run on a
+    /// loaded Mac stalled all twenty, in the lease watch's test and the
+    /// kept-lease one (#1569, Reviewer-two's runs, 31 Oct). An attempt that
+    /// passes waits for none of it.
+    fn after_a_stall(stalls: usize) -> Duration {
+        Duration::from_millis(100 << (stalls.clamp(1, 5) - 1))
+    }
     use std::sync::atomic::AtomicU64;
 
     /// A controller of a new boot, its microphones and camera as given at
@@ -1578,7 +1587,7 @@ pub(crate) mod tests {
         // attempt in which the host stalled that long between the publish and
         // the read says nothing either way, so it is made again on a new bus
         // ([`STALLED_ATTEMPTS`], #1569).
-        for _ in 0..STALLED_ATTEMPTS {
+        for stalls in 1..=STALLED_ATTEMPTS {
             let root = Root(PathBuf::from(format!(
                 "/tmp/vpb-{}-{}",
                 std::process::id(),
@@ -1621,7 +1630,7 @@ pub(crate) mod tests {
                 assert_eq!(read.unwrap(), Some(lease));
                 return;
             }
-            thread::sleep(AFTER_A_STALL);
+            thread::sleep(after_a_stall(stalls));
         }
         panic!(
             "the host stalled past the lease's freshness in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts"
@@ -1656,7 +1665,7 @@ pub(crate) mod tests {
         // A lease still lives 50 ms. An attempt in which the host stalled
         // past envelope or payload freshness says nothing about resync,
         // so it is made again on a new bus, up to [`STALLED_ATTEMPTS`] times
-        // with [`AFTER_A_STALL`] after each (#1569). The
+        // with [`after_a_stall`]'s pause after each (#1569). The
         // fixture's separate publication period does not extend those
         // bounds or turn an expired lease into permission.
         let stalled = |error: &io::Error| {
@@ -1738,7 +1747,7 @@ pub(crate) mod tests {
                             tries < STALLED_ATTEMPTS,
                             "the host stalled in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts: {error}"
                         );
-                        thread::sleep(AFTER_A_STALL);
+                        thread::sleep(after_a_stall(tries));
                     }
                 }
             }
@@ -1854,7 +1863,7 @@ pub(crate) mod tests {
                 tries < STALLED_ATTEMPTS,
                 "the host stalled in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts: {error}"
             );
-            thread::sleep(AFTER_A_STALL);
+            thread::sleep(after_a_stall(tries));
         }
     }
 
@@ -1916,7 +1925,7 @@ pub(crate) mod tests {
         // attempt in which the host stalled that long before the watch found
         // it says nothing either way, so it is made again on a new bus
         // ([`STALLED_ATTEMPTS`], #1569).
-        for _ in 0..STALLED_ATTEMPTS {
+        for stalls in 1..=STALLED_ATTEMPTS {
             let root = Root(PathBuf::from(format!(
                 "/tmp/vpw-{}-{}",
                 std::process::id(),
@@ -1971,7 +1980,7 @@ pub(crate) mod tests {
                 thread::sleep(Duration::from_millis(1));
             };
             if !found {
-                thread::sleep(AFTER_A_STALL);
+                thread::sleep(after_a_stall(stalls));
                 continue;
             }
             let going = Arc::new(AtomicBool::new(true));
