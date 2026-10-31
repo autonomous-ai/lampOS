@@ -2013,7 +2013,7 @@ model is given `make_skill(request)` (`crates/voice/src/made_skill.rs`). What
 happens:
 
 1. **Handed over as any work.** The voice prepares a hand-over with the
-   tasks part ([tasks.md](tasks.md#a-skill-made-by-voice-1685-off-unless-lamp_make_skillon)).
+   tasks part ([tasks.md](tasks.md#a-skill-made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
    Its text is the brief, then the person's request:
    - The brief is fixed words: the skill format and what a made skill may
      use. So the computer's agent needs no skill creator of its own.
