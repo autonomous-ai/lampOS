@@ -216,8 +216,8 @@ owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`),
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
-equal, Laugh glance parked out of both): twenty-six folders are installed,
-seventeen enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+equal, Laugh glance parked out of both): twenty-eight folders are installed,
+nineteen enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is on: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)), with Expression's
@@ -284,23 +284,21 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp tells each session 31 functions of the 32 a session takes
-(`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
-Dance's (`crates/update/tests/functions.rs`, which fails if one is left out
-or the count changes). On the product's route each chat request adds the
-web search's `web_search`, the 32nd, and leaves out its `fetch_page`, so
-`dance` reaches the model
-(`a_product_chat_request_offers_dance_at_the_bound`). At the bound a core
+product lamp has 39 functions of its own: the voice's own 21 (with
+`LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them),
+the actions part's 17 and Dance's (`PRODUCT_FUNCTIONS` in
+`crates/update/tests/functions.rs`, which fails if one is left out or the
+count changes). On the product's route a chat request takes 48
+(`second_provider::MAX_TOOLS`), and each offers every one, with the
+search's `web_search` and `fetch_page`
+(`a_product_lamp_declares_every_function_it_has_within_the_bound`,
+`a_product_chat_request_offers_dance_at_the_bound`). At the bound a core
 skill's function is never the one cut (the owner's rule, on #2614): a chat
 request leaves out the search's `fetch_page`, then `the_time` (asked only
 for elsewhere), then the skills' functions that are not a core skill's,
 the last first, then `web_search`; a Live session only the skills'
 not a core skill's. Core skills say theirs in the skills' tools file's
-`core` list (`lamp_skills::tools_file`). The product's voice has
-`LAMP_REPORTS=on` (#2862), two more of the voice's own, `reports_stop` and
-`reports_state`: 37 of the lamp's own in all on the product's route, which
-offers every one, the fetch among them
-(`a_product_lamp_declares_every_function_it_has_within_the_bound`). A Live
+`core` list (`lamp_skills::tools_file`). A Live
 session (a per-lamp drop-in, not the product's route) is cut to 32, and its
 error line names `reports_state`; `reports_stop` and `dance` stay
 (`with_reports_on_dance_stays_at_the_bound`). The built-in
@@ -329,8 +327,8 @@ install keeps it in `/var/lib/lampos-skills-state/on` and writes its
 
 The core `onboarding` folder is installed too. It contributes no model tool;
 its privacy invitation bridge remains inactive without the voice's explicit
-onboarding switch, Controls' privacy receipts (`LAMP_PRIVACY_CONTROLS=on`,
-which the product unit doesn't set), valid hardware profile and pending
+onboarding switch, Controls' privacy receipts (`LAMP_PRIVACY_CONTROLS=on`;
+the product's voice and controls units set both switches), valid hardware profile and pending
 invitation. Private progress lives under `/var/lib/lampOS/voice/onboarding/`;
 factory reset wipes that state, not the skill package.
 
@@ -594,10 +592,11 @@ reads itself:
   install copies V1's `llm_api_key` once (step 6). The factory writes none.
 - The zone data in `/usr/share/zoneinfo`, and `/etc/timezone` or
   `/etc/localtime`.
-- For setup (#806): nginx installed and not enabled, with the setup site;
-  V1's built setup page in `/usr/share/nginx/html/setup`; V1's radio scripts
-  `device-ap-mode` and `device-sta-mode` with hostapd and dnsmasq, as
-  `scripts/imager/build-orangepi.sh` writes them; no
+- For setup (#806): nginx installed, not enabled and with no site, for
+  setup's `free_port` to stop (setup serves its own page,
+  `fixtures/serve-own-page.json`); V1's radio scripts `device-ap-mode` and
+  `device-sta-mode` with hostapd and dnsmasq, as
+  `scripts/imager/build-orangepi-v2.sh` writes them; no
   `/var/lib/lampos-setup/done`.
 - None of the old runtime's units running (`hal`, `os-server`,
   `led-boot`, `led-shutdown`): the voice refuses to start beside them
@@ -782,10 +781,10 @@ run `lamp-body` since power-on is otherwise held, torque on, and the rest
 read refuses it. Found held, a written step 1 asks, lets it go with a body
 run that only starts and stops (a head resting outside its start window is let go at once, torque off only, only by a run given `--folded-arm SHOULDER,ELBOW` with the arm found within 20 counts of it; the folded counts must come from a read the person confirmed was folded, never from this run's own read of where the arm is now; step 1 passes none, so there it is refused, nothing written, #1682), and reads it then; dry, it says so. Written, steps 2 and 4 also ask first; each is refused
 without a console. On GPIO head pads the touch step runs `discover-head`
-with `lamp-controls` stopped, and writes the two lines that each gave two
-touches, with their polarity (pull-up for active-low, pull-down for
+with `lamp-controls` stopped, and writes the lines that each gave two
+touches or one long hold, two to four of them, with their polarity (pull-up for active-low, pull-down for
 active-high, so a line with nothing on it reads as not touched), the rest of
-the pins file kept; anything but two such lines writes nothing. On an MPR121
+the pins file kept; fewer than two such lines writes nothing. On an MPR121
 it calibrates. Either way `lamp-controls` is started again however the step
 ends, and dry it only says what it would run, without stopping
 `lamp-controls`. A listening voice that loses the privacy switch ends its
@@ -843,7 +842,7 @@ product does it with systemd alone (#811):
 
 | Unit | Runs | Does |
 |---|---|---|
-| `lamp-setup.service` | at boot, `WantedBy=multi-user.target`, only while `/var/lib/lampos-setup/done` is missing and setup's two settings exist | the hotspot and V1's setup page until the home's Wi-Fi and the person's settings are saved; then writes the marker |
+| `lamp-setup.service` | at boot, `WantedBy=multi-user.target`, only while `/var/lib/lampos-setup/done` is missing and setup's two settings exist | the hotspot and setup's own page until the home's Wi-Fi and the person's settings are saved; then writes the marker |
 | `lampos-setup-done.path` | at boot, `WantedBy=multi-user.target` | starts `lampos.target` once the marker exists: the moment setup writes it, and at every later boot |
 | `lamp-setup-reset.service` | in the target, after setup | the reset button held 5 s: stops the lamp, wipes, removes the marker, and starts setup again in place with no reboot (#4500; it reboots if that fails, setup.md). Sandboxed (#3710): it writes only its subscriber's socket under `/run/lampos-bus` (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`), and hands the reset to `lamp-setup-wipe` through `systemd-run` (the plan's `detach`), which runs outside it. So it needs a plan with `detach`, as every plan a build ships has (the install test checks it): a plan kept by hand without one, which only a keeper-installed lamp can have (`crates/keeper/src/profile.rs`, a hand-changed plan is kept), would reset inside this read-only unit, fail on its journal and restart without wiping; give such a plan the shipped `detach` |
 | `lamp-waking.service` | early at boot, `WantedBy=sysinit.target`, only once the marker exists, and with every start of the voice (`lamp-voice.service` wants it and starts after it, #2848) | the waking face until the voice asks for the ring (#1681, [ring-choreography.md](ring-choreography.md), "The waking face"); off unless `LAMP_WAKING_FACE=on`, and then it exits at once. Sandboxed (#3710): `ProtectSystem=strict` with nothing written but its runtime directory and the ring's `/dev/spidev3.0`, `ProtectHome`, `NoNewPrivileges`; no `PrivateTmp`, which would order it after the /tmp mounts and delay first light |
@@ -1068,8 +1067,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      With it, on lamp-75c9 at 15:13, the manager's `HOME` was the folder
      (PAM didn't set it back), and Harness's service installed and ran
      (`installed`, `registered`, `running`).
-   - **Only that manager:** it runs nothing but Harness. The 13 other
-     product units that run as `lampos` keep the `HOME` systemd gives them
+   - **Only that manager:** it runs nothing but Harness. The 17 other
+     product units that run as `lampos`, all but tasks, which sets its own, keep the `HOME` systemd gives them
      from the user database. Changing `lampos`'s passwd home would have
      moved all of them into the tasks part's folder (the first builder,
      14:58). No unit of
@@ -1125,8 +1124,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      there by hand is never installed over). The Harness there is kept,
      and hand-overs go on with it; only signing in by voice waits.
    - **Each step is bounded** (`world::query`, group-safe): `systemctl`
-     and Harness's service steps 120 s, Harness's installer, which fetches,
-     15 min, `id -u` 5 s and `harness version` 30 s. One that runs past its
+     and Harness's service steps 120 s (`id -u` too), Harness's installer,
+     which fetches, 15 min, and `harness version` 30 s, its `id -u` with it. One that runs past its
      bound is an error naming it and the bound. A `harness version` past
      30 s is not known rather than missing: the Harness there is kept as it
      is, never installed over, and it is asked again on the next run
@@ -1608,7 +1607,7 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   lamp has run the product unit with them yet, and Reminders and Task news
   have not run as skills on any lamp.
 - Bedtime and Morning (#1672): an installed skill that is disabled.
-  Host installation tests check that only eight skills are active, the new
+  Host installation tests check that nineteen skills are active, the new
   skill is absent from the live catalog, and the Skills and Actions units
   declare their private durable paths without enabling any new switch.
   The directories' creation by systemd and the routine's behavior on a lamp
