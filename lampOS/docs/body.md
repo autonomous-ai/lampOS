@@ -2204,6 +2204,12 @@ as root) is how a seated lamp gets its standing file without the factory:
   `voice/heard` and `voice/said` read as the subscriber `first_stand`;
   without them, or with `LAMP_FIRST_STAND_SPOKEN=off` in the unit's
   environment, the ask is the touch-only one and the touch alone is the yes.
+  So too when the owner's language is not English (`vi`, `ja`, `zh` or `ko`
+  in the voice's file, which the unit names with `LAMP_LANGUAGE_FILE`;
+  `first_stand::takes_touch_alone`): the spoken yes is heard by English
+  words only (Fourth's finding on #4710). The touch-only ask and "Okay, here
+  I go." are then said in the owner's words (second-voice.md, "The fixed
+  lines"); English is as before.
 - **The stand.** `steps.sh`'s body step:
   1. `lamp-body.service` is stopped and the lamp is read at rest. A lamp
      held with torque on is first let go by a body run.

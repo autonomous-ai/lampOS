@@ -1444,6 +1444,15 @@ fn serve_client(
                     Words::Cached(text) => {
                         request.words = Words::Sound(recordings.cached(text)?);
                     }
+                    // A fixed line asked as text, the first stand's (#4710),
+                    // in the owner's words (#4473 (c)).
+                    Words::Text(text) => {
+                        if let Some(owners) =
+                            crate::language::at_start().and_then(|language| language.fixed(text))
+                        {
+                            request.words = Words::Text(owners.to_owned());
+                        }
+                    }
                     Words::Quoted(_) if !ADDON_SAY.load(std::sync::atomic::Ordering::Relaxed) => {
                         return Err(format!("add-on says are off ({ADDON_SAY_ENVIRONMENT})"));
                     }
