@@ -311,21 +311,25 @@ fn the_short_line_needs_every_call_marked_and_worded() {
 /// said at once, before the next round, and that round's words follow; the
 /// line is never held for it (lamp-4ace on 31 Oct: the model's own words
 /// came with the call 1 time in 8, and round 2 always ran).
+/// With one ask, the part's own words end the turn: the next round is not
+/// asked, so it cannot say the change again in other words (lamp-4ace on 31
+/// Oct, the first builder on #4710).
 #[test]
 fn with_say_at_once_the_parts_own_words_come_first_and_the_next_rounds_follow() {
+    let again = || vec![vec![text("Brighter it is!"), Ok(ChatEvent::Done)]];
     assert_eq!(
         turn_with(
             true,
             true,
             "Make it brighter.",
             calling(&["light_brighter"]),
-            vec![nothing()]
+            again()
         ),
         Went {
             said: said(&["Brighter."]),
-            asked: 2,
+            asked: 1,
             ran: 1,
-            noted: true
+            noted: false
         }
     );
     // More asked: the short line first, then the rest, where without it
@@ -359,25 +363,50 @@ fn with_say_at_once_the_parts_own_words_come_first_and_the_next_rounds_follow() 
         .said,
         said(&[sunny])
     );
-    // A timer: its own clock, said with or without LAMP_SHORT_DONE.
+    // A timer: its own clock, said with or without LAMP_SHORT_DONE, and a
+    // reminder named as one; with one ask the turn ends with it.
     for short in [false, true] {
-        assert_eq!(
-            turn_with(
-                short,
-                true,
+        for (heard, line) in [
+            (
                 "Set a timer for ten minutes.",
-                calling(&["set_timer"]),
-                vec![nothing()]
+                "Timer set. It rings at 7:52 am.",
             ),
-            Went {
-                said: said(&["Timer set. It rings at 7:52 am."]),
-                asked: 2,
-                ran: 1,
-                noted: true
-            },
-            "short {short}"
-        );
+            (
+                "Remind me in ten minutes to stretch.",
+                "I'll remind you at 7:52 am.",
+            ),
+        ] {
+            assert_eq!(
+                turn_with(short, true, heard, calling(&["set_timer"]), again()),
+                Went {
+                    said: said(&[line]),
+                    asked: 1,
+                    ran: 1,
+                    noted: false
+                },
+                "short {short}: {heard}"
+            );
+        }
     }
+    // A timer and more: the next round answers the rest.
+    assert_eq!(
+        turn_with(
+            false,
+            true,
+            "Set a timer for ten minutes and is it sunny?",
+            calling(&["set_timer"]),
+            more()
+        ),
+        Went {
+            said: vec![
+                "said:Timer set. It rings at 7:52 am.".to_owned(),
+                format!("said: {sunny}")
+            ],
+            asked: 2,
+            ran: 1,
+            noted: true
+        }
+    );
     // Off: a timer's turn waits for round 2's words, as today.
     assert_eq!(
         turn_with(
@@ -463,8 +492,17 @@ fn the_timer_line_is_its_own_clock_or_none() {
     };
     let committed = json!({"status": "committed", "clock": "07:52"});
     assert_eq!(
-        timer_line(&[call("set_timer")], std::slice::from_ref(&committed)).as_deref(),
+        timer_line(
+            &[call("set_timer")],
+            std::slice::from_ref(&committed),
+            false
+        )
+        .as_deref(),
         Some("Timer set. It rings at 7:52 am.")
+    );
+    assert_eq!(
+        timer_line(&[call("set_timer")], std::slice::from_ref(&committed), true).as_deref(),
+        Some("I'll remind you at 7:52 am.")
     );
     for (why, calls, told) in [
         (
@@ -493,6 +531,33 @@ fn the_timer_line_is_its_own_clock_or_none() {
             vec![committed.clone(), committed.clone()],
         ),
     ] {
-        assert_eq!(timer_line(&calls, &told), None, "{why}");
+        for reminded in [false, true] {
+            assert_eq!(timer_line(&calls, &told, reminded), None, "{why}");
+        }
+    }
+}
+
+/// One ask or more, as the person's words say it (#2135): a word that joins
+/// asks or a second sentence is more; the rest is one.
+#[test]
+fn a_line_asks_more_with_a_joining_word_or_a_second_sentence() {
+    for one in [
+        "Make it brighter.",
+        "Remind me in two minutes to stretch.",
+        "Set a timer for one minute",
+        "Hey Lamp, warmer please.",
+        "Can you turn it down?",
+    ] {
+        assert!(!asks_more(one), "{one}");
+    }
+    for more in [
+        "Brighter, and is it sunny?",
+        "Set a timer for ten minutes. What's the weather?",
+        "Dim the light, then tell me a joke.",
+        "Make it warmer, also how are you?",
+        "Turn it down too.",
+        "AND what time is it",
+    ] {
+        assert!(asks_more(more), "{more}");
     }
 }
