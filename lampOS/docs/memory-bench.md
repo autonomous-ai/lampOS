@@ -36,6 +36,14 @@ storage and socket behavior, but not the unchanged production executable's
 wall clock, production startup, or acoustic timing. Verify the adapter's
 clock boundaries before claiming a complete accelerated month.
 
+The voice client currently also reads private wall-clock/timezone sources,
+and its observation and running-summary queues expose no drain/checkpoint
+barrier. A test-only clock and checkpoint interface is proposed to the voice
+owner as Bench-P2. Until those boundaries are covered and verified, the arm
+is named **partial current product**, never the complete baseline. Its results
+cannot satisfy the `lampos_today` acceptance gate or support a claimed win
+over today's product.
+
 ## A fictional month and a hidden answer key
 
 The development persona contains roughly 40 facts and 12 traits, expressed
@@ -159,6 +167,38 @@ Run each arm three times with fresh state. Record order, seeds, model identity,
 all failed attempts, and spread by question kind. Candidate ablations use the
 same inputs and budget; do not improve an ablation's prompt after seeing its
 score. Treat an unavailable outside arm as unmeasured, never as zero accuracy.
+
+### Registered candidate removals
+
+Registered on 31 October, before any candidate score: the protocol name is
+`tiers`; its scorecard label is **ours (tiers)**. Run and report all eleven
+candidate arms in this order, three repetitions each:
+
+1. `tiers`: the full engine.
+2. `tiers_minus_episodes`: remove episodes.
+3. `tiers_minus_life_story`: remove chapters and events.
+4. `tiers_minus_facts_people_places`: remove facts and people/place links.
+5. `tiers_minus_owner_model`: remove the owner model.
+6. `tiers_minus_how_to_be`: remove taught and learned behavior memory.
+7. `tiers_minus_whats_ahead`: remove prospective memory.
+8. `tiers_minus_feelings`: remove feeling tags.
+9. `tiers_minus_nightly_sleep`: remove nightly consolidation.
+10. `tiers_minus_importance`: remove importance scoring.
+11. `tiers_minus_fading`: remove detail fading.
+
+Each removal changes that component or mechanism alone. All arms retain
+source provenance and forgetting enforcement: these are safety rules, not
+optional tiers. Report every registered arm, including failures and missing
+results; do not discard an inconvenient arm after seeing its scores.
+
+A component earns its place when removing it lowers the overall score or
+any question kind's score by more than the full engine's own three-run
+spread, or when it is needed for a safety/privacy result. Use the mean of
+each arm's three runs for the comparison and the full engine's max-minus-min
+range for that same metric as its spread. A component that adds cost without
+a qualifying score gain or safety/privacy need goes. Preserve the per-kind
+results and audit status so this rule cannot hide a lost safety result in an
+overall average.
 
 ## JSON-lines arm contract, draft v1
 
@@ -291,6 +331,11 @@ other arms may return empty tools/instructions. Their differences are recorded.
 view. `probe_end` restores all durable and in-memory state, including caches,
 follow-up marks, forget fingerprints, consolidation cursors, and counters
 used by the memory policy. No nested probes.
+Implementation uses private synthetic child state: discard the probe's copy
+rather than restoring old data over the main store. Product code must expose
+no snapshot/restore socket or flag. Any separately owned test-only voice
+hook must be excluded from product builds and refuse a pre-forget snapshot
+over newer forget state unless the deletion is replayed first.
 A runner aborts rather than continue if isolation or restoration fails.
 Probe restoration never restores or refunds global model cost, reservations,
 request identities, or ledger history. Those remain monotonic across probes.
