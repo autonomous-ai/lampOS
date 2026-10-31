@@ -27,6 +27,9 @@ pub struct MemoryPrompt {
     pub tools: Vec<Value>,
     pub snapshot_missed: bool,
     pub recall_missed: bool,
+    pub recall_skipped: bool,
+    pub memory_text_bytes: usize,
+    pub framing_bytes: usize,
     epoch: u64,
 }
 impl MemoryPrompt {
@@ -91,6 +94,21 @@ impl Runner {
             ),
             client,
         )?;
+        // A single child cannot accept recall while its late snapshot drains.
+        // Let the answer proceed empty within the snapshot budget; the owned
+        // background drain is reconciled before the next stateful operation.
+        if snapshot.missed_deadline {
+            return Ok(MemoryPrompt {
+                text: String::new(),
+                tools: Vec::new(),
+                snapshot_missed: true,
+                recall_missed: false,
+                recall_skipped: true,
+                memory_text_bytes: 0,
+                framing_bytes: 0,
+                epoch,
+            });
+        }
         let recall = self.execute(
             Request::new(
                 format!("recall-{epoch}"),
@@ -101,7 +119,14 @@ impl Runner {
         )?;
         let snapshot_value: Snapshot = serde_json::from_value(snapshot.data)?;
         let recall_value: Recall = serde_json::from_value(recall.data)?;
-        let empty = snapshot_value.prompt_bytes() == 0 && recall_value.prompt_bytes()? == 0;
+        let memory_text_bytes = snapshot_value
+            .prompt_bytes()
+            .checked_add(recall_value.prompt_bytes()?)
+            .ok_or_else(|| invalid("memory text byte overflow"))?;
+        if memory_text_bytes > query.max_context_bytes {
+            return Err(invalid("combined memory text exceeds prompt cap"));
+        }
+        let empty = memory_text_bytes == 0;
         let text = if empty {
             String::new()
         } else {
@@ -115,16 +140,18 @@ impl Runner {
         } else {
             serde_json::to_vec(&recall_value.tools)?.len()
         };
-        if text.len().saturating_add(tool_bytes) > query.max_context_bytes {
-            return Err(invalid(
-                "combined rendered memory and tools exceed prompt cap",
-            ));
-        }
+        let framing_bytes = text
+            .len()
+            .saturating_add(tool_bytes)
+            .saturating_sub(memory_text_bytes);
         Ok(MemoryPrompt {
             text,
             tools: recall_value.tools,
             snapshot_missed: snapshot.missed_deadline,
             recall_missed: recall.missed_deadline,
+            recall_skipped: false,
+            memory_text_bytes,
+            framing_bytes,
             epoch,
         })
     }

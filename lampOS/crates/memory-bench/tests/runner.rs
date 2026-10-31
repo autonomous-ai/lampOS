@@ -453,3 +453,94 @@ fn slow_reservation_cannot_dispatch_after_deadline_or_hold_the_caller() {
     assert_eq!(account.charged_microusd, 0);
     assert_eq!(account.receipts[0].outcome, "expired_before_dispatch");
 }
+
+#[test]
+fn late_snapshot_does_not_delay_the_answer_while_waiting_to_send_recall() {
+    let dir = Directory::new();
+    let script = response("r1", init_reply())
+        + &response("r2", json!({"isolated":true}))
+        + "IFS= read -r line; /bin/sleep 1;\n"
+        + &output(
+            serde_json::to_value(Response::success(
+                "snapshot-3",
+                serde_json::to_value(Snapshot::default()).unwrap(),
+            ))
+            .unwrap(),
+        )
+        + &response("recall-3", serde_json::to_value(Recall::default()).unwrap());
+    let mut runner = runner(&script, &dir);
+    let (mut client, _) = client(Duration::ZERO);
+    runner.execute(init(&dir.0), &mut client).unwrap();
+    runner.execute(begin(), &mut client).unwrap();
+    let query: QueryData = recall().decode().unwrap();
+    let started = Instant::now();
+    let memory = runner.memory(&query.query, &mut client).unwrap();
+    assert!(
+        started.elapsed() < Duration::from_millis(650),
+        "snapshot drain held the answer"
+    );
+    assert!(memory.snapshot_missed);
+    assert!(memory.text.is_empty());
+}
+
+#[test]
+fn small_memory_cap_counts_utf8_text_and_not_runner_framing() {
+    let dir = Directory::new();
+    let snapshot = Snapshot {
+        memory_instructions: "é".repeat(32),
+        ..Snapshot::default()
+    };
+    let recall_value = Recall {
+        context: "漢".repeat(16),
+        memory_instructions: "a".repeat(16),
+        ..Recall::default()
+    };
+    assert_eq!(
+        snapshot.prompt_bytes() + recall_value.prompt_bytes().unwrap(),
+        128
+    );
+    let script = response("r1", init_reply())
+        + &response("r2", json!({"isolated":true}))
+        + &response("snapshot-3", serde_json::to_value(snapshot).unwrap())
+        + &response("recall-3", serde_json::to_value(recall_value).unwrap());
+    let mut runner = runner(&script, &dir);
+    let (mut client, _) = client(Duration::ZERO);
+    runner.execute(init(&dir.0), &mut client).unwrap();
+    runner.execute(begin(), &mut client).unwrap();
+    let mut query: QueryData = recall().decode().unwrap();
+    query.query.max_context_bytes = 128;
+    let memory = runner.memory(&query.query, &mut client).unwrap();
+    assert!(memory.text.len() > 128);
+    assert_eq!(memory.memory_text_bytes, 128);
+    assert_eq!(memory.framing_bytes, memory.text.len() - 128);
+}
+
+#[test]
+fn combined_memory_text_still_cannot_exceed_the_small_cap() {
+    let dir = Directory::new();
+    let script = response("r1", init_reply())
+        + &response("r2", json!({"isolated":true}))
+        + &response(
+            "snapshot-3",
+            serde_json::to_value(Snapshot {
+                memory_instructions: "a".repeat(64),
+                ..Snapshot::default()
+            })
+            .unwrap(),
+        )
+        + &response(
+            "recall-3",
+            serde_json::to_value(Recall {
+                context: "b".repeat(65),
+                ..Recall::default()
+            })
+            .unwrap(),
+        );
+    let mut runner = runner(&script, &dir);
+    let (mut client, _) = client(Duration::ZERO);
+    runner.execute(init(&dir.0), &mut client).unwrap();
+    runner.execute(begin(), &mut client).unwrap();
+    let mut query: QueryData = recall().decode().unwrap();
+    query.query.max_context_bytes = 128;
+    assert!(runner.memory(&query.query, &mut client).is_err());
+}

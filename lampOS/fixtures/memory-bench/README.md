@@ -102,3 +102,10 @@ calls; live tool-round and rubric-judge orchestration remain separate work.
 Speech preparation and a frozen real transcription cache are still required
 before any spoken-input result. Recorded month checks use clean text and
 cannot satisfy the baseline acceptance check.
+
+For the Tiers adapter's broker and small-cap regression, run the
+`tiers_broker_fixture` example with its absolute executable path and a new
+absolute state directory. It requires the two synthetic sleep calls to
+remain charged across probe restoration and a 500-byte memory-text response
+to pass regardless of the runner's separately reported JSON framing. This
+fixture contains only a made-up notebook preference and never scores an arm.

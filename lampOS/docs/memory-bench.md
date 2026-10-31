@@ -250,7 +250,9 @@ its complete response is available. A separate session-start `snapshot` has
 **300 ms**, matching the product note budget. The arm returns empty memory
 when its budget expires; an answer never waits for late recall or a late
 snapshot. The runner also enforces these deadlines, ignores late content,
-and records a miss. At most one request stays in flight while its terminal
+and records a miss. If a snapshot misses, recall is skipped for that answer
+and separately reported; it must not wait for the snapshot drain before
+sending another request. At most one request stays in flight while its terminal
 response is drained under the outer watchdog; no late response can become
 the next question's memory. These are host contract boundaries, not proof of
 first-audio latency on a lamp.
@@ -328,6 +330,11 @@ A query:
 `owner_model` is an array of `{text, source_ids}`. The requested context bound
 counts all UTF-8 text memory adds to the prompt: context, owner-model text,
 memory instructions, textual tool schemas, and subsequent tool results.
+Count the UTF-8 bytes of those returned strings, not Unicode characters.
+Runner-added JSON framing, escaping and provenance envelopes are reported
+separately and never charged to an arm. A 128-byte memory response remains
+valid when the runner renders it into a larger JSON prompt; 129 bytes of
+actual memory text still exceed that cap.
 The base character prompt is outside this cap and identical across arms.
 The snapshot is reused within its session, counted once; recall must not
 duplicate it. After every `ingest`, `sleep`, `forget`, or `tool`, the runner discards all
