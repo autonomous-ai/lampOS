@@ -56,7 +56,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
 INSERT INTO search(search,rank) VALUES('secure-delete',1);
 CREATE TRIGGER IF NOT EXISTS record_forget BEFORE DELETE ON records BEGIN
     DELETE FROM facts WHERE id IN (SELECT fact_id FROM fact_sources WHERE record_id=old.id);
-    UPDATE episodes SET topic='[forgotten episode]',gist='',detail='',importance=0
+    UPDATE episodes SET topic='',gist='',detail='',importance=0
       WHERE id=old.episode_id;
     DELETE FROM search WHERE (kind='record' AND item_id=old.id)
        OR (kind='episode' AND item_id=old.episode_id);
@@ -68,5 +68,5 @@ END;
 CREATE TRIGGER IF NOT EXISTS line_forget BEFORE DELETE ON lines BEGIN
     DELETE FROM search WHERE kind='line' AND item_id=old.id;
 END;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 "#;

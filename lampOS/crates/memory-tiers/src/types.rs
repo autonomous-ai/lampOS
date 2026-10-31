@@ -101,8 +101,8 @@ pub struct Record {
 }
 
 /// Input from an authorized ingestion boundary. A visitor, overheard line or
-/// paused session is not retained. Unknown speaker lines can be retained as
-/// unsure, but never become evidence or leave the store in a sleep request.
+/// paused session is not retained. Unknown speaker lines are also dropped;
+/// only an attributed owner line can become evidence.
 #[derive(Clone, Debug)]
 pub struct Incoming {
     pub text: String,

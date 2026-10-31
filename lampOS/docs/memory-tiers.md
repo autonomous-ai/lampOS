@@ -48,10 +48,10 @@ Unknown confidence remains `None`; it is not converted to a guessed number.
 | Episode | Topic/presence boundary, time, importance, gist and code-copied detail. Topic changes and owner departure close it; silence alone does not. |
 | Fact | Claim, exact source quotes, source ids, speakers, times, confidence, strength, kind, validity interval, expiry and superseded fact id. |
 | Memory line | Typed row with fact ids: owner model, chapter, event, person, place, taught rule, learned pattern, ahead or feeling. Removing a cited fact drops the entire dependent line. |
-| Fingerprint | SHA-256 of normalized forgotten text/overlaps; no original words. |
+| Fingerprint | Keyed HMAC-SHA256 of normalized forgotten text/overlaps; guessing requires the separate key. |
 | Progress | Nightly processed markers, weekly cursor/high-water mark, and cumulative owner-model rewrite accounting for the local day. |
 
-Visitor and overheard speech is not retained. Assistant and unsure lines may
+Visitor, uncertain-speaker, and overheard speech is not retained. Assistant lines may
 remain in the record but are never evidence and are not sent as source records
 to the sleep model. Owner reads require `Access { owner: true, alone: true }`;
 all other access receives empty results. The host application must establish
@@ -124,12 +124,24 @@ the next implementation, not demonstrated by this first one.
 `forget_records` and `forget_fact` remove source rows and all affected facts,
 lines and search entries in one transaction. Independent duplicate claims are
 also removed. A dependent line is discarded as a whole; unrelated facts cited
-by that line remain. Affected episode summaries/detail are cleared. The source
+by that line remain. Affected episode summaries/detail are cleared. Empty episodes are deleted;
+a mixed episode keeps only the time boundaries of surviving records. No
+forgotten-episode marker or erased record timestamp remains in that row. The source
 record is the deletion granularity; this API does not surgically remove a word
 from a longer utterance.
 
 Fingerprints are checked on ingestion, before sleep, and on proposed derived
-text. They use Unicode normalization, case folding by lowercase conversion,
+text. They are HMAC-SHA256 digests under a random 32-byte key in a separate
+0600 `<database>.forget-key` file. A copied database alone cannot confirm a
+guess against a digest. A copy of both files can; this is not encryption or
+a defense against an attacker controlling the process. Missing or mismatched
+keys fail closed, never silently reset the forget history. Fingerprints last
+for the lifetime of this owner store so expiry cannot re-enable an erased
+claim. A deliberate full reset must close the store and delete both the database
+and its key file; a newly created store gets a new key and loses the old
+forget protection. The library has no automatic reset operation. Schema 2
+refuses unreleased schema-1 stores instead of silently migrating unsalted
+fingerprints. They use Unicode normalization, case folding by lowercase conversion,
 whole text and five-word overlaps; shorter forgotten strings are also detected
 inside later text. This can conservatively reject an unrelated repeated phrase.
 It is not semantic matching of arbitrary paraphrases. The benchmark must measure

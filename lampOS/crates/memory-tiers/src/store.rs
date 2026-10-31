@@ -1,6 +1,8 @@
 use crate::{Error, Result, schema, types::*};
+use hmac::{Hmac, Mac};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
+use std::io::{Read, Write};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -13,6 +15,7 @@ use unicode_normalization::UnicodeNormalization;
 pub struct Store {
     pub(crate) conn: Connection,
     owner: String,
+    fingerprint_key: [u8; 32],
     validity: tokio::sync::watch::Sender<u64>,
     _lock: Option<std::fs::File>,
 }
@@ -28,20 +31,24 @@ impl Store {
         let lock = private_file(Path::new(&lock_path))?;
         lock.try_lock()
             .map_err(|_| Error::Invalid("database is already open"))?;
+        let populated = std::fs::metadata(path).is_ok_and(|m| m.len() > 0);
+        let fingerprint_key = load_fingerprint_key(path, populated)?;
         let database = private_file(path)?;
         drop(database);
-        let mut store = Self::from_connection(Connection::open(path)?, owner)?;
+        let mut store = Self::from_connection(Connection::open(path)?, owner, fingerprint_key)?;
         store._lock = Some(lock);
         Ok(store)
     }
     pub fn in_memory(owner: &str) -> Result<Self> {
-        Self::from_connection(Connection::open_in_memory()?, owner)
+        Self::from_connection(Connection::open_in_memory()?, owner, random_key()?)
     }
-    fn from_connection(conn: Connection, owner: &str) -> Result<Self> {
+    fn from_connection(conn: Connection, owner: &str, fingerprint_key: [u8; 32]) -> Result<Self> {
         text_valid(owner, 64)?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 1 {
-            return Err(Error::Invalid("newer database schema"));
+        if version != 0 && version != 2 {
+            return Err(Error::Invalid(
+                "unsupported database schema; no automatic fingerprint reset",
+            ));
         }
         conn.busy_timeout(Duration::from_millis(25))?;
         conn.execute_batch(schema::SQL)?;
@@ -51,8 +58,22 @@ impl Store {
         if saved != owner {
             return Err(Error::Invalid("database belongs to another owner"));
         }
+        let key_check = digest(&fingerprint_key, "memory-tiers fingerprint key check v1");
+        conn.execute(
+            "INSERT OR IGNORE INTO settings VALUES('fingerprint_key_check',?)",
+            [&key_check],
+        )?;
+        let saved_check: String = conn.query_row(
+            "SELECT value FROM settings WHERE name='fingerprint_key_check'",
+            [],
+            |r| r.get(0),
+        )?;
+        if saved_check != key_check {
+            return Err(Error::Invalid("fingerprint key does not match store"));
+        }
         Ok(Self {
             conn,
+            fingerprint_key,
             owner: owner.into(),
             validity: tokio::sync::watch::channel(0).0,
             _lock: None,
@@ -93,7 +114,10 @@ impl Store {
         let paused: bool = self
             .conn
             .query_row("SELECT paused FROM meta WHERE one=1", [], |r| r.get(0))?;
-        if paused || !incoming.addressed_to_lamp || incoming.speaker == Speaker::Visitor {
+        if paused
+            || !incoming.addressed_to_lamp
+            || matches!(incoming.speaker, Speaker::Visitor | Speaker::Unsure)
+        {
             return Ok(None);
         }
         text_valid(&incoming.text, MAX_RECORD_BYTES)?;
@@ -108,7 +132,7 @@ impl Store {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if blocked(&tx, &incoming.text)? {
+        if blocked(&tx, &self.fingerprint_key, &incoming.text)? {
             return Ok(None);
         }
         let open: Option<(i64, String)> = tx
@@ -248,7 +272,7 @@ impl Store {
             episodes: Vec::new(),
         };
         for record in candidates {
-            if blocked(&tx, &record.text)? {
+            if blocked(&tx, &self.fingerprint_key, &record.text)? {
                 continue;
             }
             input.records.push(record);
@@ -288,7 +312,9 @@ impl Store {
             "SELECT body FROM facts WHERE active=1 ORDER BY id DESC LIMIT 64",
             [],
         )? {
-            if input.facts.iter().any(|f| f.id == value.id) || blocked(&tx, &value.claim)? {
+            if input.facts.iter().any(|f| f.id == value.id)
+                || blocked(&tx, &self.fingerprint_key, &value.claim)?
+            {
                 continue;
             }
             input.facts.push(value);
@@ -343,7 +369,9 @@ impl Store {
                     r.get(0)
                 })
                 .optional()?;
-            if current.as_deref() != Some(encode(source)?.as_str()) || blocked(&tx, &source.text)? {
+            if current.as_deref() != Some(encode(source)?.as_str())
+                || blocked(&tx, &self.fingerprint_key, &source.text)?
+            {
                 return Err(Error::Stale);
             }
             sources.insert(source.id, source);
@@ -363,7 +391,7 @@ impl Store {
             if keys.contains_key(&p.key) {
                 return Err(Error::Invalid("duplicate fact key"));
             }
-            if blocked(&tx, &p.claim)? {
+            if blocked(&tx, &self.fingerprint_key, &p.claim)? {
                 return Err(Error::Invalid("forgotten fact"));
             }
             unique_nonempty(&p.record_ids)?;
@@ -515,7 +543,7 @@ impl Store {
             } else {
                 p.text
             };
-            if blocked(&tx, &text)? {
+            if blocked(&tx, &self.fingerprint_key, &text)? {
                 return Err(Error::Invalid("forgotten memory line"));
             }
             if let Some(id) = p.replaces {
@@ -585,7 +613,8 @@ impl Store {
             }
             text_valid(&p.gist, MAX_TEXT_BYTES)?;
             unique_nonempty(&p.record_ids)?;
-            if !(0.0..=1.0).contains(&p.importance) || blocked(&tx, &p.gist)? {
+            if !(0.0..=1.0).contains(&p.importance) || blocked(&tx, &self.fingerprint_key, &p.gist)?
+            {
                 return Err(Error::Invalid("invalid episode summary"));
             }
             let mut detail = String::new();
@@ -638,7 +667,7 @@ impl Store {
         let body: String =
             tx.query_row("SELECT body FROM records WHERE id=?", [id], |r| r.get(0))?;
         let record: Record = decode(&body)?;
-        if record.speaker != Speaker::Owner || blocked(&tx, &record.text)? {
+        if record.speaker != Speaker::Owner || blocked(&tx, &self.fingerprint_key, &record.text)? {
             return Err(Error::Invalid("explicit keep requires current owner words"));
         }
         if let Some(until) = until_ms {
@@ -752,7 +781,7 @@ impl Store {
                 .iter()
                 .find(|r| r.id == *id)
                 .ok_or(Error::Invalid("unknown record to forget"))?;
-            fingerprint(&tx, &r.text)?;
+            fingerprint(&tx, &self.fingerprint_key, &r.text)?;
         }
         let all_facts = facts_where(&tx, "SELECT body FROM facts", [])?;
         let all_lines = lines_where(&tx, "SELECT body FROM lines", [])?;
@@ -768,40 +797,42 @@ impl Store {
                 affected_episodes.len(),
             );
             for r in &all {
-                if (doomed.contains(&r.id) || blocked(&tx, &r.text)?) && doomed.insert(r.id) {
-                    fingerprint(&tx, &r.text)?;
+                if (doomed.contains(&r.id) || blocked(&tx, &self.fingerprint_key, &r.text)?)
+                    && doomed.insert(r.id)
+                {
+                    fingerprint(&tx, &self.fingerprint_key, &r.text)?;
                 }
             }
             for f in &all_facts {
                 if f.quotes.iter().any(|q| doomed.contains(&q.record_id))
                     || affected.contains(&f.id)
-                    || blocked(&tx, &f.claim)?
+                    || blocked(&tx, &self.fingerprint_key, &f.claim)?
                 {
                     if affected.insert(f.id) {
-                        fingerprint(&tx, &f.claim)?;
+                        fingerprint(&tx, &self.fingerprint_key, &f.claim)?;
                     }
                     for quote in &f.quotes {
                         if doomed.insert(quote.record_id) {
-                            fingerprint(&tx, &quote.text)?;
+                            fingerprint(&tx, &self.fingerprint_key, &quote.text)?;
                         }
                     }
                 }
             }
             for line in &all_lines {
                 if (line.fact_ids.iter().any(|id| affected.contains(id))
-                    || blocked(&tx, &line.text)?)
+                    || blocked(&tx, &self.fingerprint_key, &line.text)?)
                     && affected_lines.insert(line.id)
                 {
-                    fingerprint(&tx, &line.text)?;
+                    fingerprint(&tx, &self.fingerprint_key, &line.text)?;
                 }
             }
             for ep in &all_episodes {
                 if (ep.record_ids.iter().any(|id| doomed.contains(id))
-                    || (!ep.gist.is_empty() && blocked(&tx, &ep.gist)?))
+                    || (!ep.gist.is_empty() && blocked(&tx, &self.fingerprint_key, &ep.gist)?))
                     && affected_episodes.insert(ep.id)
                     && !ep.gist.is_empty()
                 {
-                    fingerprint(&tx, &ep.gist)?;
+                    fingerprint(&tx, &self.fingerprint_key, &ep.gist)?;
                 }
             }
             if before
@@ -822,7 +853,10 @@ impl Store {
             tx.execute("DELETE FROM lines WHERE id=?", [id])?;
         }
         for id in &affected_episodes {
-            tx.execute("UPDATE episodes SET topic='[forgotten episode]',gist='',detail='',importance=0 WHERE id=?",[id])?;
+            tx.execute(
+                "UPDATE episodes SET topic='',gist='',detail='',importance=0 WHERE id=?",
+                [id],
+            )?;
             tx.execute(
                 "DELETE FROM search WHERE kind='episode' AND item_id=?",
                 [id],
@@ -830,6 +864,12 @@ impl Store {
         }
         for id in &doomed {
             tx.execute("DELETE FROM records WHERE id=?", [id])?;
+        }
+        // Keep no tombstone or erased record's timestamps. A mixed episode
+        // contains only the boundaries of its surviving records.
+        for id in &affected_episodes {
+            tx.execute("DELETE FROM episodes WHERE id=? AND NOT EXISTS(SELECT 1 FROM records WHERE episode_id=?)", params![id,id])?;
+            tx.execute("UPDATE episodes SET started_ms=(SELECT min(at_ms) FROM records WHERE episode_id=?), ended_ms=CASE WHEN ended_ms IS NULL THEN NULL ELSE (SELECT max(at_ms) FROM records WHERE episode_id=?) END,last_recalled_ms=0 WHERE id=?", params![id,id,id])?;
         }
         tx.execute(
             "UPDATE meta SET generation=generation+1,revision=revision+1 WHERE one=1",
@@ -857,7 +897,7 @@ fn private_file(path: &Path) -> Result<std::fs::File> {
         use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
         options.mode(0o600);
         if std::fs::symlink_metadata(path)
-            .is_ok_and(|m| m.file_type().is_symlink() || m.permissions().mode() & 0o077 != 0)
+            .is_ok_and(|m| !m.is_file() || m.permissions().mode() & 0o077 != 0)
         {
             return Err(Error::Invalid(
                 "database and lock files must be private regular files",
@@ -953,7 +993,7 @@ fn index(conn: &Connection, kind: &str, id: i64, text: &str) -> Result<()> {
     )?;
     Ok(())
 }
-fn hashes(text: &str, query: bool) -> BTreeSet<String> {
+fn hashes(key: &[u8; 32], text: &str, query: bool) -> BTreeSet<String> {
     let normalized: String = text.nfkc().flat_map(char::to_lowercase).collect();
     let words: Vec<_> = normalized
         .split(|c: char| !c.is_alphanumeric())
@@ -968,21 +1008,21 @@ fn hashes(text: &str, query: bool) -> BTreeSet<String> {
     chunks
         .into_iter()
         .filter(|s| !s.is_empty())
-        .map(|s| format!("{:x}", Sha256::digest(s.as_bytes())))
+        .map(|s| digest(key, &s))
         .collect()
 }
-fn blocked(conn: &Connection, text: &str) -> Result<bool> {
+fn blocked(conn: &Connection, key: &[u8; 32], text: &str) -> Result<bool> {
     let mut stmt =
         conn.prepare_cached("SELECT EXISTS(SELECT 1 FROM fingerprints WHERE digest=?)")?;
-    for hash in hashes(text, true) {
+    for hash in hashes(key, text, true) {
         if stmt.query_row([hash], |r| r.get::<_, bool>(0))? {
             return Ok(true);
         }
     }
     Ok(false)
 }
-fn fingerprint(conn: &Connection, text: &str) -> Result<()> {
-    for hash in hashes(text, false) {
+fn fingerprint(conn: &Connection, key: &[u8; 32], text: &str) -> Result<()> {
+    for hash in hashes(key, text, false) {
         conn.execute("INSERT OR IGNORE INTO fingerprints VALUES(?)", [hash])?;
     }
     Ok(())
@@ -1067,4 +1107,42 @@ fn episode_row(conn: &Connection, id: i64) -> Result<Episode> {
             })
         },
     )?)
+}
+
+fn random_key() -> Result<[u8; 32]> {
+    let mut key = [0; 32];
+    rustls::crypto::ring::default_provider()
+        .secure_random
+        .fill(&mut key)
+        .map_err(|_| Error::Invalid("secure random unavailable"))?;
+    Ok(key)
+}
+fn digest(key: &[u8; 32], text: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("fixed HMAC key length");
+    mac.update(text.as_bytes());
+    format!("{:x}", mac.finalize().into_bytes())
+}
+fn load_fingerprint_key(path: &Path, populated: bool) -> Result<[u8; 32]> {
+    let mut key_path = path.as_os_str().to_os_string();
+    key_path.push(".forget-key");
+    let key_path = Path::new(&key_path);
+    if populated && !key_path.try_exists()? {
+        return Err(Error::Invalid(
+            "existing store is missing its fingerprint key",
+        ));
+    }
+    let mut file = private_file(key_path)?;
+    let len = file.metadata()?.len();
+    if len == 0 && !populated {
+        let key = random_key()?;
+        file.write_all(&key)?;
+        file.sync_all()?;
+        return Ok(key);
+    }
+    if len != 32 {
+        return Err(Error::Invalid("invalid fingerprint key file"));
+    }
+    let mut key = [0; 32];
+    file.read_exact(&mut key)?;
+    Ok(key)
 }
