@@ -2,7 +2,8 @@
 
 `lamp-records` keeps **recognized, closed voice service diagnostics** within
 configured age and allocated-size limits. It is an independent timer job,
-disabled in the supplied configuration. It does not own conversation memory,
+off in its built-in default and its example, and on in the product's file
+("On a product lamp", below). It does not own conversation memory,
 read transcripts, stop voice, or wait on the spoken path.
 
 ## What exists and what we take
