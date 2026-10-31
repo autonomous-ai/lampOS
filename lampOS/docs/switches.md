@@ -590,6 +590,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_NAME_REPEAT_NOT_A_CALL` | A desk remark about the lamp that the transcript repeats is no longer taken as calling it. |
 | `LAMP_SECOND_FEW_TOOLS` | Nothing you'd notice: answers start with fewer abilities loaded; remembering takes one extra step. |
 | `LAMP_NAMED_ALWAYS` | In a busy room, the lamp answers anyone who starts with "Lamp," while someone faces it. |
+| `LAMP_DECLINE_SILENT` | When the lamp decides a line wasn't said to it, it stays silent, with no half-started answer, and doesn't take it as the start of a conversation. |
 | `LAMP_SAME_SPEAKER_CARRIES` | In a busy room, the lamp keeps talking with the same person by face and voice, and lets others' lines pass. |
 | `LAMP_BUSY_CALLED_STRICT` | In a busy room with nobody facing it, the lamp ignores words that only sound like its name, like "Mom". |
 | `LAMP_REMARK_ABOUT_IT` | In a busy room, the lamp stays quiet when people talk about it, like "that lamp is cute," rather than to it. |
@@ -638,7 +639,6 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MEMORY_EARLY_WORDS` | If the lamp recognises you partway through a talk, what you said earlier in it is remembered as yours. |
 | `LAMP_MEMORY_FOLLOWS_FACE` | When you save your face mid-conversation, what you said just before is remembered as yours, not the room's. |
 | `LAMP_MEMORY_STABLE_ID` | If you change your name with the lamp, it keeps everything it remembered about you under the new name. |
-| `LAMP_FORGET_ASKED` | The lamp forgets things only when you ask it to, and checks with you before forgetting everything. |
 | `LAMP_MEMORY_FORGET_ABOUT` | Asking the lamp to forget what you said about something forgets just those things and nothing else. |
 | `LAMP_MEMORY_LINK_USED` | Forgetting one thing no longer takes unrelated talk from the same conversation with it. |
 | `LAMP_MEMORY_RECALL_V2` | You can ask the lamp what you talked about on a certain day or last week, and its recall is more precise. |
