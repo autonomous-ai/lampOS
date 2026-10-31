@@ -1,3 +1,19 @@
+## 2026-10-31 12:5x ICT — #4700's 4ace run, #4726 and #4729; #4723's down line cut at 4 s; no builds while the Mac is short of disk
+
+**`4ACE RUN #4700` (the first builder, 12:05):** with `LAMP_SECOND_SAY_WITH_CALL` on, the light and timer turns were 0.6–1.4 s faster, at Live's pace. There were two faults, though. "Warmer it is." then "Already at my cosiest orange": the model's words with the call, the switch's first half, came before the result, and `SAY_WITH_CALL_NOTE`'s own example was the phrase it copied. And a reminder was said twice and called a timer.
+
+**#4726** (Reviewer-three's READ-OK, train 454): the first half is dropped, so only the acting part's result is said early. A single ask ends with it, and a `set_timer` asked with "remind" says "I'll remind you at …". A control shows the run's double confirmation when round 2 always runs.
+
+**#4729:** Reviewer-three's P2s on `asks_more`, taken twice. Single asks were read as more ("too bright", two changes, "2.5", a thanks), and then a clause taking two calls ("make it cozy") hid a question. It now leans to more: any clause without a light, volume or timer word, or a question after the first clause, is another ask. It's checked standalone with `rustc --test` and `clippy-driver`, and its CI is the crate's gate.
+
+**#4723:** Reviewer-three's HOLD. The down line's clip was capped at 4 s, so the Japanese (about 6 s) was cut, and so was today's English (lamp-c0a4 logged exactly 4000 ms). The cap is now 8 s, with a whole-clip test. The HOLD was lifted, Tests read it again, and train 452 was dropped for it. It's now in train 454.
+
+**#4718:** the first builder's yes in Seventh's place, but `gh pr ready` is refused in this session, so it waits on them to undraft it.
+
+**#4337's played check passed** on lamp-4ace (12:06). First stand's ask and yes stay English with an owner's language; that's reported to Seventh.
+
+**Disk:** the office Mac fell under 6 GiB. My 62 GB build folder waits on a person's yes (the lead, via the first builder on #1711). Until then I build nothing here.
+
 ## 2026-10-31 11:4x ICT — #4713 and #4715 land; the night-sleep race (#4718); fixed lines in the owner's language (#4723)
 
 **Landed in train 450:** #4715 (the catalog tests on the rig's clock) and #4713 ("Let me look." and "Let me check." in the owner's language). Reviewer-two's P3 on #4715, a clause in `logical_clock()`'s doc, is #4720, with their READ-OK, in train 451.
