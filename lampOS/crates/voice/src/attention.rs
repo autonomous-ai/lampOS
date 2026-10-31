@@ -5668,6 +5668,11 @@ mod tests {
         assert_eq!(taken, Some((5, 300_000)));
         let (verdict, _) = judged(before, call, Some(12 * S + 300_000));
         assert!(matches!(verdict, Some(Verdict::Play(_))), "{verdict:?}");
+        // At the rule's least, the name and one word more (Reviewer-three's
+        // P3 on #4701).
+        let (verdict, taken) = judged("You talk to the lamp, what.", call, None);
+        assert!(matches!(verdict, Some(Verdict::Hold(_))), "{verdict:?}");
+        assert_eq!(taken, Some((2, 300_000)));
     }
 
     /// The same when the line before's words are written late: the carry
