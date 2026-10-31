@@ -68,7 +68,7 @@ impl ArmProcess {
     fn start(&mut self, op: &str, data: Value) -> String {
         self.seq += 1;
         let id = format!("r{}", self.seq);
-        self.send(json!({"v":1,"id":id,"op":op,"data":data}));
+        self.send(json!({"v":2,"id":id,"op":op,"data":data}));
         id
     }
     fn request(&mut self, op: &str, data: Value) -> Value {
@@ -97,7 +97,7 @@ impl ArmProcess {
         let id = self.start("sleep", json!({"at_unix_ms":at,"cadence":"nightly"}));
         let call = self.read();
         assert!(call["model_request"].is_object(), "{call}");
-        self.send(json!({"v":1,"id":id,"model_response":{"call_id":call["model_request"]["call_id"],"ok":true,"content":proposal,"tool_calls":[],"usage":{"input_tokens":100,"output_tokens":100}}}));
+        self.send(json!({"v":2,"id":id,"model_response":{"call_id":call["model_request"]["call_id"],"ok":true,"content":proposal,"tool_calls":[],"usage":{"input_tokens":100,"output_tokens":100}}}));
         (call, self.read())
     }
     fn inspect(&mut self) -> Value {
@@ -225,7 +225,7 @@ fn invalid_order_and_duplicate_ids_do_not_move_the_clock() {
     );
     let id = p.start("inspect", json!({"person_id":"owner-a"}));
     assert_eq!(p.read()["ok"], true);
-    p.send(json!({"v":1,"id":id,"op":"inspect","data":{"person_id":"owner-a"}}));
+    p.send(json!({"v":2,"id":id,"op":"inspect","data":{"person_id":"owner-a"}}));
     assert_eq!(p.read()["ok"], false);
     p.close();
 }
@@ -269,7 +269,7 @@ fn broker_refusal_preserves_records_and_terminates_without_retry() {
     p.ingest("source-1", "Maybe a blue notebook.", 1000);
     let id = p.start("sleep", json!({"at_unix_ms":1100,"cadence":"nightly"}));
     let call = p.read();
-    p.send(json!({"v":1,"id":id,"model_response":{"call_id":call["model_request"]["call_id"],"ok":false,"error":{"code":"budget","message":"recorded budget refusal"}}}));
+    p.send(json!({"v":2,"id":id,"model_response":{"call_id":call["model_request"]["call_id"],"ok":false,"error":{"code":"budget","message":"recorded budget refusal"}}}));
     let refusal = p.read();
     assert_eq!(refusal["ok"], false);
     assert_eq!(refusal["error"]["code"], "model");
@@ -367,5 +367,74 @@ fn same_session_forget_discards_the_runner_snapshot_before_reuse() {
     assert_eq!(recall["data"]["context"], "");
     assert_eq!(refreshed["data"]["memory_instructions"], "");
     p.end("same-session");
+    p.close();
+}
+
+#[test]
+fn unknown_usage_keeps_the_runner_as_cost_owner() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "Maybe I prefer a blue notebook.", 1000);
+    let id = p.start("sleep", json!({"at_unix_ms":1100,"cadence":"nightly"}));
+    let call = p.read();
+    p.send(json!({"v":2,"id":id,"model_response":{"call_id":call["model_request"]["call_id"],"ok":true,"content":proposal(),"tool_calls":[],"usage":null}}));
+    let result = p.read();
+    assert_eq!(result["data"]["applied"], true);
+    assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 1);
+    p.close();
+}
+
+#[test]
+fn v2_forget_effects_drive_recent_history_without_guessing_intent() {
+    let mut p = ArmProcess::new("tiers");
+    let ordinary = p.ingest("source-1", "Maybe I prefer a blue notebook.", 1000);
+    assert_eq!(ordinary["v"], 2);
+    assert_eq!(
+        ordinary["data"]["forget_effect"],
+        json!({"ran":false,"suppress_confirmation":false})
+    );
+    let refused = p.ingest("empty-target", "Forget my", 1100);
+    assert_eq!(
+        refused["data"]["forget_effect"],
+        json!({"ran":false,"suppress_confirmation":false})
+    );
+    let no_match = p.ingest("no-match", "Forget the diamond lock.", 1200);
+    assert_eq!(
+        no_match["data"]["forget_effect"],
+        json!({"ran":true,"suppress_confirmation":false})
+    );
+    let mut recent = vec!["Earlier exchange containing the blue notebook."];
+    let erased = p.ingest("erase", "Forget the blue notebook.", 1300);
+    assert_eq!(
+        erased["data"]["forget_effect"],
+        json!({"ran":true,"suppress_confirmation":true})
+    );
+    // A minimal v2 consumer uses only actual effects, never text/intent labels.
+    if erased["data"]["forget_effect"]["ran"] == true {
+        recent.clear();
+    }
+    if erased["data"]["forget_effect"]["suppress_confirmation"] != true {
+        recent.push("The scripted confirmation.");
+    }
+    assert!(recent.is_empty());
+    assert_eq!(p.inspect()["data"]["retained_record_ids"], json!([]));
+    p.close();
+}
+#[test]
+fn direct_forget_reports_effects_and_v1_is_never_upgraded() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "Remember an orange pencil.", 1000);
+    let result = p.request(
+        "forget",
+        json!({"at_unix_ms":1100,"person_id":"owner-a","record_ids":["source-1"],"text":""}),
+    );
+    assert_eq!(
+        result["data"]["forget_effect"],
+        json!({"ran":true,"suppress_confirmation":true})
+    );
+    p.send(json!({"v":1,"id":"old-v1","op":"inspect","data":{"person_id":"owner-a"}}));
+    let old = p.read();
+    assert_eq!(old["v"], 1);
+    assert_eq!(old["ok"], false);
+    assert!(old.get("data").is_none());
     p.close();
 }
