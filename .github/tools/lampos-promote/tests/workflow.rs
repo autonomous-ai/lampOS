@@ -154,3 +154,40 @@ fn the_promotion_runs_the_promoter_and_the_notes_name_their_binary() {
         "{notes}"
     );
 }
+
+/// The notes' "Built but not on yet" is read at the promoted build's own
+/// commit, the receipt's (`Receipt::commit`, from the signed manifest), and
+/// the notes binary is built there: the checkout is lamp-voice's head at
+/// dispatch, which may be past the build (9276 on 31 Oct: the list would
+/// have left out `LAMP_WINDOW_FROM_START`, turned on after it, Second on
+/// #4710). The commit is taken only as 40 hex digits.
+#[test]
+fn the_notes_are_read_at_the_promoted_builds_commit() {
+    let workflow = include_str!("../../../workflows/lampos-arm64.yml");
+    let notes = workflow
+        .split("- name: fill the stable notes' built-but-not-on part\n")
+        .nth(1)
+        .unwrap()
+        .split("\n\n")
+        .next()
+        .unwrap();
+    let at = |text: &str| {
+        notes
+            .find(text)
+            .unwrap_or_else(|| panic!("the notes' step lacks {text}: {notes}"))
+    };
+    let commit = at("[\"commit\"])' \"$RUNNER_TEMP/promotion-receipt.json\")");
+    let checked = at("[[ \"$commit\" =~ ^[0-9a-f]{40}$ ]] || {");
+    let fetched = at("git fetch --depth 1 origin \"$commit\"");
+    let added = at("git worktree add --detach \"$RUNNER_TEMP/promoted\" \"$commit\"");
+    let entered = at("cd \"$RUNNER_TEMP/promoted\"");
+    let run = at("--bin lampos-notes -- --sequence \"$PROMOTE_SEQUENCE\"");
+    assert!(
+        commit < checked
+            && checked < fetched
+            && fetched < added
+            && added < entered
+            && entered < run,
+        "{notes}"
+    );
+}
