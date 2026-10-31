@@ -288,6 +288,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "알겠어요, 여기서 멈출게요.",
         ],
     ),
+    // What it says when a line by name gets no words twice
+    // (`LAMP_NO_WORDS_AGAIN`, off in the product; Tests' P3 on #4723).
+    (
+        crate::second_provider::NO_WORDS_LINE,
+        [
+            "Xin lỗi, mình bị mất lời rồi. Bạn hỏi lại mình được không?",
+            "ごめんね、言葉が出てこなかった。もう一度聞いてくれる？",
+            "抱歉，我刚才一下子说不出话了。你能再问我一次吗？",
+            "미안해요, 말이 막혔어요. 다시 물어봐 줄래요?",
+        ],
+    ),
 ];
 
 impl Language {
@@ -594,7 +605,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 15);
+        assert_eq!(FIXED_LINES.len(), 16);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }

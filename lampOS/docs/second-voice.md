@@ -225,11 +225,12 @@ each line plays exactly as before.
 | The second route's own words before a look, and before a search with `LAMP_SECOND_CHECKING_LINE` | `second_provider::LOOKING` ("Let me look."), `CHECKING` ("Let me check.") | said as the turn's text, in English | the owner's words (`language::fixed_in`), and the next round is told those words were said (Thirteen's P2 on #4707) |
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 | The second route's answer to a stop said over it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on) | the owner's words, rendered and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
+| The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, fifteen today (`FIXED_LINES`), then the English two
+lines first, sixteen today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -252,7 +253,12 @@ Tests: `language::tests::each_fixed_line_has_its_words_in_each_language`,
 `failure_notice::offline_lines_are_said_in_the_owners_language_when_kept_and_english_otherwise`,
 `notices::loading_tests::the_owners_language_adds_no_notice_kind_and_keys_the_product_words`,
 `sleep_asked::tests::the_model_is_told_the_line_in_the_owners_language`,
-`second_provider::tests::the_down_lines_are_said_in_the_owners_language`.
+`second_provider::tests::the_down_lines_are_said_in_the_owners_language`,
+`a_stop_said_over_the_lamp_is_answered_in_the_owners_language`,
+`a_look_that_never_began_is_said_in_the_owners_language` and
+`no_words_twice_is_said_in_the_owners_language`. The route reads the
+language once, at start, into one field (`Shared::fixed`), which a test sets
+(`Engine::in_language`).
 Not heard yet: no line has been rendered or listened to on a lamp, and the
 words want a native speaker's check.
 
@@ -879,7 +885,8 @@ order is kept. A written turn is the same from the chat on.
   answer in a few words or say it can't
   (`second_provider::NO_WORDS_AGAIN_NOTE`). If that round has no words
   either, the lamp says "Sorry, I lost my words there. Could you ask me
-  again?" (`second_provider::NO_WORDS_LINE`). A turn that called anything
+  again?" (`second_provider::NO_WORDS_LINE`; in the owner's language when
+  one is chosen, "The fixed lines"). A turn that called anything
   ends as before, since a call's answer may tell the model to say nothing
   (a held call, a search stopped by a hand, a stay after unplugging). A
   line without the name ends as before too: the model may leave room talk
