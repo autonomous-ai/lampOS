@@ -179,11 +179,13 @@ systemd has no pause. Each part honours one itself, when the keeper asks:
 | voice | Takes no new turn. A turn under way is finished, the person is not cut off. The microphone stays as the privacy switch has it |
 | body | Goes to rest (folds, if it stands), sends no new goal, and holds there |
 | Expression | Holds still: no new requests; those already sent run out |
+| skills | A run under way sends no further step: no next clip, a show stops before its next frame, a search ends |
+| addons | The judge drops every suggestion: `the lamp is paused` |
 | eyes, name, memory, actions, policy, controls, health | Nothing: none of them moves or speaks by itself |
 
 Resume undoes it. A stop by the keeper is: pause, wait until the voice has
-been quiet (task 12's 45 s, [surround.md](surround.md), "the owner
-protocol"), then `systemctl stop lampos.target`. `systemctl stop` alone
+been quiet (task 12's 45 s, [surround.md](surround.md), "Startup and first
+setup"), then `systemctl stop lampos.target`. `systemctl stop` alone
 does not pause: the body still folds on its way down, but the voice may be
 ended mid-word.
 
@@ -196,7 +198,9 @@ lamp leaves them folded and resting until it is next started (install.md,
 #2818). `lamp-keeper stop
 lamp` pauses, waits up to 45 s for `voice/state` to say resting, stops
 `lampos.target`, and then clears the pause, so that the lamp is not paused
-when it is next started.
+when it is next started. Setup's shutdown says `lamp-keeper pause` too,
+before it stops the target ([shutdown.md](shutdown.md)); a lamp with no
+keeper is said so, and its body rests as it stops.
 
 **Who honours it now.** The body: it reads the kept value at most once a
 second; paused, every mood it is told is rest, and gestures, looks,
@@ -223,6 +227,13 @@ in the session record. Expression, paused, publishes nothing on
 `expression/body` or `expression/light`; what it sent runs out with its
 200 ms lease, and the next request after resume is the planner's own.
 With nothing said on `lamp/pause` both do exactly what they did before.
+
+Skills and addons read `lamp/pause` too. A skill's run looks at it as it goes
+(`body_stopped` in `lamp-skills`): paused, it sends no next clip and no step
+after it, a light show stops before its next frame and a search ends, each
+saying why, `the lamp was paused` ([skills.md](skills.md)). The addons
+judge drops a suggestion while the lamp is paused, as while it is private or
+asleep ([addons.md](addons.md)).
 
 ## A restart asked from the app (#2193)
 
