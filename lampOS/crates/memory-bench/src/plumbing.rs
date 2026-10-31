@@ -184,7 +184,7 @@ pub fn run_with_adapter(
         transcript_hash: None,
         timezone: corpus.persona.timezone.clone(),
         model: "fixed-recorded-answer-plumbing-only".into(),
-        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8,"runner_revision":revision,"consolidation_fixture_hash":hash(EMPTY_CONSOLIDATION.as_bytes()),"consolidation":"fixed empty synthetic proposal; no learned content or accuracy claim","nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day"}),
+        config: json!({"label":"plumbing check","scores":null,"executable_hash":hash(&fs::read(&executable)?),"recorded_reply_hash":hash(&fs::read(recorded_reply)?),"speech":"not transcribed; text fixture only","tool_rounds":8,"runner_revision":revision,"consolidation_fixture_hash":hash(EMPTY_CONSOLIDATION.as_bytes()),"consolidation":"fixed empty synthetic proposal; no learned content or accuracy claim","nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day","protocol_minor":MINOR_VERSION,"memory_cap_policy":"4096 bytes; none must return no text; full history has no selection cap and must fit transport and pinned model context"}),
         budget_microusd: 1_000_000_000,
         seed: corpus.persona.seed,
     };
@@ -234,6 +234,7 @@ pub fn run_with_adapter(
         let mut probes = 0;
         let mut turns = 0;
         let mut nights = 0;
+        let mut coverage = crate::diagnostics::Coverage::default();
         let day_ends = corpus.day_end_records()?;
         for event in &corpus.events {
             let ingested = operation(
@@ -260,6 +261,21 @@ pub fn run_with_adapter(
                 .iter()
                 .filter(|q| q.after_record == event.record_id)
             {
+                let before = operation(
+                    &mut runner,
+                    &mut client,
+                    &logfile,
+                    Request::new(
+                        format!("inspect-before-{}", question.id),
+                        Op::Inspect,
+                        json!({"person_id":corpus.persona.id}),
+                    ),
+                )?;
+                log(
+                    &logfile,
+                    "tier_population_before_probe",
+                    json!({"question":question.id,"diagnostics":before.data.get("diagnostics"),"scores":null}),
+                )?;
                 operation(
                     &mut runner,
                     &mut client,
@@ -275,7 +291,17 @@ pub fn run_with_adapter(
                     .chain(&question.followups)
                     .enumerate()
                 {
-                    let memory = runner.memory(query, &mut client)?;
+                    let mut memory_query = query.clone();
+                    if arm == "full_history" {
+                        // No selection/truncation budget for the ceiling arm.
+                        // This is the existing bounded transport limit; live
+                        // execution must separately check the model context.
+                        memory_query.max_context_bytes = 1_048_576;
+                    }
+                    let memory = runner.memory(&memory_query, &mut client)?;
+                    if arm == "none" && memory.memory_text_bytes != 0 {
+                        return Err(invalid("no-memory arm returned memory text"));
+                    }
                     memory.require_current(&runner)?;
                     log(
                         &logfile,
@@ -350,6 +376,10 @@ pub fn run_with_adapter(
                         json!({"person_id":corpus.persona.id}),
                     ),
                 )?;
+                coverage.observe(
+                    before.data.get("diagnostics"),
+                    inspection.data.get("diagnostics"),
+                )?;
                 log(
                     &logfile,
                     "plumbing_inspection",
@@ -376,7 +406,7 @@ pub fn run_with_adapter(
             Request::new("close", Op::Close, json!({})),
         )?;
         Ok(
-            json!({"label":"plumbing check","arm":arm,"events":corpus.events.len(),"questions":probes,"answer_turns":turns,"nights":nights,"weekly_passes":nights/7,"categories":categories,"scores":null,"live_model_calls":0,"speech_transcribed":false}),
+            json!({"label":"plumbing check","arm":arm,"events":corpus.events.len(),"questions":probes,"answer_turns":turns,"nights":nights,"weekly_passes":nights/7,"categories":categories,"tier_usage":coverage,"coverage_gaps":["fading not exercised by this month","no second identified person","no delivered-recall acknowledgement"],"scores":null,"live_model_calls":0,"speech_transcribed":false}),
         )
     })();
     drop(runner);
@@ -413,5 +443,31 @@ pub fn scorecard(paths: &[String]) -> Result<Value> {
         let final_entry = entries.last().ok_or_else(|| invalid("empty run ledger"))?;
         rows.push(json!({"run_id":manifest.run_id,"arm":manifest.arm,"status":verified.terminal,"label":"plumbing check","details":final_entry.data,"scores":null}));
     }
-    Ok(json!({"label":"plumbing checks; no accuracy scores","runs":rows}))
+    let full = rows
+        .iter()
+        .find(|r| r["arm"] == "tiers")
+        .and_then(|r| r.pointer("/details/tier_usage"))
+        .map(|v| serde_json::from_value::<crate::diagnostics::Coverage>(v.clone()))
+        .transpose()?;
+    for row in &mut rows {
+        let tier = match row["arm"].as_str().unwrap_or("") {
+            "tiers_minus_episodes" => Some("episodes"),
+            "tiers_minus_life_story" => Some("life_story"),
+            "tiers_minus_facts" => Some("facts"),
+            "tiers_minus_owner_model" => Some("owner_model"),
+            "tiers_minus_how_to_be" => Some("how_to_be"),
+            "tiers_minus_ahead" => Some("ahead"),
+            "tiers_minus_feelings" => Some("feelings"),
+            _ => None,
+        };
+        if let Some(tier) = tier {
+            row["removal_coverage"] = json!(full.as_ref().map_or("unknown", |c| c.exercise(tier)));
+        }
+        if row["arm"] == "tiers_minus_fading" {
+            row["removal_coverage"] = json!("not exercised by this month");
+        }
+    }
+    Ok(
+        json!({"label":"plumbing checks; no accuracy scores","coverage_gaps":["no second identified person","no delivered-recall acknowledgement"],"runs":rows}),
+    )
 }

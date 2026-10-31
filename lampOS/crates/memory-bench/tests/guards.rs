@@ -369,3 +369,22 @@ fn a_durable_reservation_precedes_dispatch_and_failed_logging_stops_the_client()
     );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn evidence_only_facts_are_visible_with_zero_use_and_never_silent_unknown() {
+    use lamp_memory_bench::protocol::Diagnostics;
+    let mut v = serde_json::json!({"schema":"tier-usage-v1","tiers":{"evidence_only_facts":{"items":7,"text_bytes":120,"recall_calls":0,"snapshot_calls":0}}});
+    let d: Diagnostics = serde_json::from_value(v.clone()).unwrap();
+    d.validate().unwrap();
+    assert_eq!(
+        serde_json::to_value(d).unwrap()["tiers"]["evidence_only_facts"]["items"],
+        7
+    );
+    v["tiers"]["evidence_only_facts"]["recall_calls"] = serde_json::json!(1);
+    assert!(
+        serde_json::from_value::<Diagnostics>(v)
+            .unwrap()
+            .validate()
+            .is_err()
+    );
+}

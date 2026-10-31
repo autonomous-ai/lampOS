@@ -174,3 +174,33 @@ unmeasured live-path allowances. The [recorded run evidence](recorded-runs/regis
 retains all fourteen completed month checks and interrupted attempts. These
 checks have null scores and do not establish memory quality. Fading is **not
 exercised by this month**; the separate aging test remains to be registered.
+
+Registration v4 changes only seat activity and query byte limits. The
+[coverage preservation report](development/coverage-revision.json) verifies
+unchanged facts, questions, scoring, source links, timestamps and answer keys.
+The script provides only `at_desk`, `head_down` and `away`; it provides no topic
+labels or object lists. Each second conversation in a visit is scripted head
+down; isolated probe visits use a posture rotation independent of query
+content. All memory setups receive 4,096 bytes; no-memory must return none.
+Full history retains all eligible history as a ceiling and must fit the
+pinned model context. Its current 1 MiB transport limit causes refusal, never
+truncation; the live context check is still outstanding.
+
+The [minor diagnostics contract](tier-diagnostics.md) keeps prior v2 responses
+readable. Counts are metadata only, sampled before each probe and afterward.
+Population created by the probe itself gives no population credit. Missing
+diagnostics are unknown; an empty or unused full-engine tier makes its
+removal not exercised. Proof-only facts are printed separately with zero use
+counters. The reports retain the second-known-person and delivered-recall
+acknowledgement gaps. The v3 recorded evidence and cost projection stay pinned
+to that earlier registration and are not relabelled as v4 results.
+
+The retained [v3 coverage audit](coverage-audit-v3.json) and
+[structural counts](month-structure-v3.json) contain no question or answer text.
+They distinguish structural opportunity from accepted learned content. The
+new seat cues and cap address two gaps; they do not make empty life-story,
+owner-model, behavior, ahead or feeling tiers into tested components. Typed
+plan expiry and importance-dependent selection also require actual eligible
+content. Topic/object labels, a second identified person and delivered-recall
+protection remain absent. Sparse aging activity will be scheduled on each
+calendar day so nightly/weekly maintenance cannot drift to active-day cadence.

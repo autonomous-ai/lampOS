@@ -5,6 +5,8 @@ use serde_json::Value;
 use std::io::{BufRead, Write};
 
 pub const VERSION: u32 = 2;
+/// Additive inspection diagnostics; the v2 wire envelope is unchanged.
+pub const MINOR_VERSION: u32 = 1;
 pub fn supported_version(v: u32) -> bool {
     matches!(v, 1 | 2)
 }
@@ -288,6 +290,40 @@ pub struct Tool {
 #[serde(deny_unknown_fields)]
 pub struct Inspect {
     pub person_id: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TierUsage {
+    pub items: Option<u64>,
+    pub text_bytes: Option<u64>,
+    pub recall_calls: Option<u64>,
+    pub snapshot_calls: Option<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Diagnostics {
+    pub schema: String,
+    pub tiers: std::collections::BTreeMap<String, TierUsage>,
+}
+impl Diagnostics {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema != "tier-usage-v1"
+            || self.tiers.len() > 64
+            || self.tiers.keys().any(|name| !valid_id(name))
+        {
+            return Err(invalid("invalid metadata-only tier diagnostics"));
+        }
+        if self
+            .tiers
+            .get("evidence_only_facts")
+            .is_some_and(|t| t.recall_calls != Some(0) || t.snapshot_calls != Some(0))
+        {
+            return Err(invalid("evidence-only facts cannot report prompt use"));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

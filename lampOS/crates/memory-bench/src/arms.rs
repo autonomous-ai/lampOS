@@ -45,6 +45,8 @@ pub struct Basic {
     key: Hmac<Sha256>,
     state: History,
     main: Option<(String, History)>,
+    // Run accounting survives probe restoration and never affects memory.
+    recall_calls: u64,
 }
 fn words(text: &str) -> Vec<String> {
     text.split(|c: char| !c.is_alphanumeric())
@@ -89,6 +91,7 @@ impl Basic {
             key,
             state: History::default(),
             main: None,
+            recall_calls: 0,
         };
         arm.persist()?;
         Ok(arm)
@@ -222,6 +225,9 @@ impl MemoryArm for Basic {
                 "full history does not fit; truncation is forbidden".into(),
             ));
         }
+        if !recall.context.is_empty() {
+            self.recall_calls = self.recall_calls.saturating_add(1);
+        }
         Ok(recall)
     }
     fn inspect(&self, person: &str) -> Result<Value> {
@@ -234,8 +240,13 @@ impl MemoryArm for Basic {
         } else {
             vec![]
         };
+        let tiers = if self.kind == BasicKind::FullHistory && person == self.owner {
+            json!({"full_history":{"items":retained.len(),"text_bytes":self.state.events.iter().map(|e|e.heard.len()+e.said.len()).sum::<usize>(),"recall_calls":self.recall_calls,"snapshot_calls":0}})
+        } else {
+            json!({})
+        };
         Ok(
-            json!({"owner_model":[],"retained_record_ids":retained,"stats":{"records":self.state.events.len(),"stored_bytes":serde_json::to_vec(&self.state)?.len(),"forget_matching":"lexical_topic_and_exact_keyed_fingerprint","model_calls":0}}),
+            json!({"owner_model":[],"retained_record_ids":retained,"diagnostics":{"schema":"tier-usage-v1","tiers":tiers},"stats":{"records":self.state.events.len(),"stored_bytes":serde_json::to_vec(&self.state)?.len(),"forget_matching":"lexical_topic_and_exact_keyed_fingerprint","model_calls":0}}),
         )
     }
     fn begin_probe(&mut self, id: &str, _at: u64) -> Result<()> {

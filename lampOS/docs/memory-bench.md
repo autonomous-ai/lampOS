@@ -215,7 +215,54 @@ a qualifying score gain or safety/privacy need goes. Preserve the per-kind
 results and audit status so this rule cannot hide a lost safety result in an
 overall average.
 
-## JSON-lines arm contract, draft v2
+### Coverage revision before scoring: 31 October 2026
+
+Registration v4 adds only product-observable seat activity and the realistic
+memory-text budget, preserving facts, questions, scoring and answer keys.
+Events carry `at_desk`, `head_down` or `away`: the second conversation of a
+visit is scripted with the owner looking down, and departures are away.
+Isolated probe visits use a fixed posture rotation independent of question
+content. These are synthetic stage directions using the product's
+`room/activity` vocabulary, not recordings of the eyes or inferred topics.
+Topic remains null and object lists remain empty. Cutting episodes on a
+supplied topic label is not tested; memories must infer topic changes themselves.
+
+Every memory setup has a **4,096-byte UTF-8 text cap**, including owner model,
+recalled text and memory instructions. No-memory returns no memory text.
+Full history remains a separate ceiling without memory selection or
+truncation; its entire prompt must fit the pinned model context. Bounded
+transport overflow is reported as unsupported, never treated as permission
+to trim history. The current recorded transport admits at most 1 MiB of
+memory text; this is not evidence of a live context-window check.
+
+The development month has one identified person. It exercises visitors and a
+wrongly attributed second resident, but no second correctly identified person.
+That gap is reserved for the held-back persona or a later fixture. Delivered
+recall acknowledgement is also absent from the adapter, so the month does not
+test the mechanism that protects recently delivered memories from fading.
+Both gaps remain visible beside results.
+
+Fading is **not exercised by this month**, which spans about 29 days. Its
+strictly-greater-than-90-day threshold stays unchanged. The no-fading setup
+still runs and is reported, but this month cannot decide its retention.
+A separately registered same-owner aging test must extend sparse activity to
+about 120 days, contain accepted low-importance episodes with real detail
+and retained gists, run sleep maintenance after day 90 and ask later questions.
+It must test old gist retention and recent-fact recall under trivia pressure,
+with a high-importance control. Merely advancing a recall timestamp is
+insufficient. Original records remain available, so ordinary retrieval and
+explicit-history access must be distinguished. Sparse dates require daily
+maintenance and weekly calendar boundaries, not every seventh active day.
+
+All setup comparisons require metadata coverage checks: an empty or unused
+removed tier reads **not exercised**, never **no value**. Missing diagnostics
+read **unknown**. Timestamp and structure checks precede scoring and never
+use answer quality to decide which setups to keep.
+
+## JSON-lines arm contract, draft v2.1
+
+The wire envelope remains version 2. Minor version 2.1 adds only optional
+inspection diagnostics; old responses still parse.
 
 This is the boundary for an in-tree or external memory adapter. It deliberately
 uses no Rust crate dependency across implementations. The first fixture and
@@ -655,3 +702,65 @@ facts or promises. This is also registered before scoring: the month does
 **not** test the lamp's own promises or its real replies. Those require a
 separate future fixture. Recorded empty consolidation proposals still only
 exercise interfaces; synthetic usage is not a bill.
+
+### Optional inspection diagnostics (minor version 2.1)
+
+Minor revision only: the wire envelope stays `v: 2`; all prior response shapes
+remain readable. Add one optional `diagnostics` member to `inspect` response
+`data`. It never reaches an answer, extraction or judge prompt and is never
+scored. Missing diagnostics or a missing tier means unknown, never zero.
+
+```json
+{
+  "diagnostics": {
+    "schema": "tier-usage-v1",
+    "tiers": {
+      "episodes": {
+        "items": 240,
+        "text_bytes": 10240,
+        "recall_calls": 7,
+        "snapshot_calls": 0
+      },
+      "life_story": {
+        "items": 0,
+        "text_bytes": 0,
+        "recall_calls": 0,
+        "snapshot_calls": 0
+      }
+    }
+  }
+}
+```
+
+Each metric is an unsigned integer or null when the adapter cannot measure
+it. Tier identifiers for Tiers are `episodes`, `life_story`, `facts`,
+`owner_model`, `how_to_be`, `ahead`, `feelings`; adapters may add their own
+identifiers such as `record`, `full_history`, `talk_notes`, `running_summary`.
+The metric object has exactly these four members; no text, source identifiers,
+queries, claims, tags or deleted-word fingerprints are permitted.
+
+`items` and `text_bytes` describe the current isolated store's eligible tier
+content at inspection time, excluding evidence-only fact rows in the facts
+removal. They are occupancy, not cumulative creation totals. UTF-8 bytes count
+stored tier text, not SQLite/index/JSON overhead; null is better than a guess.
+
+`recall_calls` and `snapshot_calls` are cumulative since init, counting calls
+that returned at least one nonempty text item from that tier after the adapter's
+byte-cap selection. Count a tier once per call, not once per item. These
+counters survive probe restoration and are diagnostic-only accounting: never
+use them for ranking, importance, aging or memory decisions. They do not mean
+that the runner accepted a late response or that speech was delivered.
+
+Bench inspects the main store before each probe and the isolated store after
+it; diagnostics are retained in the ledger. Population eligibility uses the
+pre-probe sample, avoiding credit for facts created by the question itself.
+Usage deltas come from the two samples and include both recall and snapshot.
+Report a removal as `not exercised` when its full-engine counterpart never
+has eligible population or never supplies text to memory prompts. Missing
+measurements mean `unknown`. This classification cannot turn an equal score
+into proof that a tier has no value. The runner separately reports deadline
+misses and delivered-recall acknowledgement remains an explicit gap.
+
+The `evidence_only_facts` identifier is permitted only in the facts-removal
+setup. It reports retained proof rows separately from the disabled `facts`
+tier. Both use counters are always zero; this is not recallable fact content.

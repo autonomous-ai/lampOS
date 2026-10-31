@@ -443,6 +443,10 @@ fn validate_response(request: &Request, data: &Value) -> Result<()> {
             array(data, "source_ids")?;
         }
         Op::Inspect => {
+            if let Some(value) = data.get("diagnostics") {
+                let diagnostics: Diagnostics = serde_json::from_value(value.clone())?;
+                diagnostics.validate()?;
+            }
             let _: Vec<ModelLine> = serde_json::from_value(
                 data.get("owner_model")
                     .cloned()

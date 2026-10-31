@@ -78,9 +78,10 @@ pub fn write_corpus(path: &Path, corpus: &Corpus) -> Result<()> {
     .into_iter()
     .map(|name| Ok((name, hash(&fs::read(path.join(name))?))))
     .collect::<Result<BTreeMap<_, _>>>()?;
-    let registration = json!({"version":3,"protocol_version":2,"status":"draft_pending_human_review","fictional":true,
+    let registration = json!({"version":4,"protocol_version":2,"protocol_minor":1,"status":"draft_pending_human_review","fictional":true,
         "question_count":200,"days":30,"utterances_per_day":50,"timezone":corpus.persona.timezone,
         "seed":corpus.persona.seed,"files":hashes,"scorers":"src/score.rs and tests/guards.rs committed before scored runs",
+        "coverage_revision":{"date":"2026-10-31","before_any_score":true,"reason":"Give memory only product-observable activity and a realistic prompt budget; prevent empty or unused tier removals from being treated as evidence of no value.","activity":"Scripted at_desk, head_down and away from visit stage directions; probe posture rotates independently of question content.","topic":null,"objects":[],"memory_text_bytes":4096,"no_memory":"no memory text","full_history":"ceiling; no memory-selection cap, complete prompt must fit pinned model context; transport overflow is unsupported, never truncation","diagnostics":"optional metadata-only tier-usage-v1 on inspection; unknown when absent; never scored","gaps":["fading not exercised by this month","no second identified person","no delivered-recall acknowledgement","no supplied-topic episode split","no supplied object labels"]},
         "candidate_order":ARMS,"repetitions":3,"candidate_label":"ours (tiers)",
         "facts_removal":"facts not recalled; kept only as evidence",
         "timing_revision":{"date":"2026-10-31","before_any_score":true,"reason":"Nine-minute spacing incorrectly made every utterance a product conversation and biased time-based episode boundaries.","conversations_per_day":8,"exchanges_per_conversation":[2,12],"exchange_gap_seconds":[3,30],"visits_per_day":4,"nightly":"after the final event of each local calendar day","weekly":"after every seventh local calendar day","unchanged":"persona, owner utterance content and IDs, question content and scoring, answer key; eligible source lists include new boundary events"},

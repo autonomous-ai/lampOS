@@ -19,17 +19,37 @@
     "tiers_minus_fading"
   ],
   "comparison": "mean loss exceeds full-engine max-minus-min spread for overall or any category, or safety/privacy necessity",
+  "coverage_revision": {
+    "activity": "Scripted at_desk, head_down and away from visit stage directions; probe posture rotates independently of question content.",
+    "before_any_score": true,
+    "date": "2026-10-31",
+    "diagnostics": "optional metadata-only tier-usage-v1 on inspection; unknown when absent; never scored",
+    "full_history": "ceiling; no memory-selection cap, complete prompt must fit pinned model context; transport overflow is unsupported, never truncation",
+    "gaps": [
+      "fading not exercised by this month",
+      "no second identified person",
+      "no delivered-recall acknowledgement",
+      "no supplied-topic episode split",
+      "no supplied object labels"
+    ],
+    "memory_text_bytes": 4096,
+    "no_memory": "no memory text",
+    "objects": [],
+    "reason": "Give memory only product-observable activity and a realistic prompt budget; prevent empty or unused tier removals from being treated as evidence of no value.",
+    "topic": null
+  },
   "days": 30,
   "facts_removal": "facts not recalled; kept only as evidence",
   "fictional": true,
   "files": {
     "answer-key.jsonl": "2bf2c2a3c72093e43bb569639ee154d304602f2307d07bc62fe0bfbfef8bdf14",
-    "events.jsonl": "638f418a71453a64f56eb840f91435ce1a45bd032dea12f21bebd21dd2f86248",
+    "events.jsonl": "c3907c45f95ab8995d7676d4c7e6a56bbff4742b8239b301401d27de1a51276a",
     "persona.json": "19d74b5e7377c89d947cd6f924a515b2a0d0b84757e204e66d5b07779b3e82cc",
-    "questions.jsonl": "78056903d8fe6afd5af29c36cc22ebf62f672dcf246ef81a3ec9c1766ad2a6fd"
+    "questions.jsonl": "42804de74599aad78d49656e558b039dbe8d4021748057a706a9198c825ab1d9"
   },
   "human_audit": "pending",
   "judge": "required for rubric scores; recorded tests are not live results",
+  "protocol_minor": 1,
   "protocol_version": 2,
   "question_count": 200,
   "recall_ms": 200,
@@ -74,7 +94,7 @@
   },
   "transcripts": "not_yet_recorded",
   "utterances_per_day": 50,
-  "version": 3,
+  "version": 4,
   "wrong_person_gate": "zero owner facts or owner-model lines learned from the second resident's default-owner records; missing inspection evidence is unmeasured, never a pass",
   "wrong_person_records": [
     "d08-020",

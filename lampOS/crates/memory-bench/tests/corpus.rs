@@ -195,3 +195,35 @@ fn forgetting_persistence_controls_are_in_the_main_stream_before_every_probe() {
         assert!(q.followups.is_empty());
     }
 }
+
+#[test]
+fn cues_are_only_scripted_seat_states_and_memory_queries_use_four_kibibytes() {
+    let c = corpus::generate(persona()).unwrap();
+    let states = c
+        .events
+        .iter()
+        .map(|e| e.cues.activity.as_deref().unwrap())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        states,
+        std::collections::BTreeSet::from(["away", "at_desk", "head_down"])
+    );
+    for e in &c.events {
+        assert!(e.cues.topic.is_none() && e.cues.objects.is_empty());
+        if e.kind == lamp_memory_bench::protocol::EventKind::Leave {
+            assert_eq!(e.cues.activity.as_deref(), Some("away"));
+        }
+    }
+    for q in c
+        .questions
+        .iter()
+        .flat_map(|q| std::iter::once(&q.query).chain(&q.followups))
+    {
+        assert_eq!(q.max_context_bytes, 4096);
+        assert!(matches!(
+            q.cues.activity.as_deref(),
+            Some("at_desk" | "head_down")
+        ));
+        assert!(q.cues.topic.is_none() && q.cues.objects.is_empty());
+    }
+}

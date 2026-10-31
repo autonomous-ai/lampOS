@@ -193,3 +193,22 @@ fn reference_processes_pass_the_same_twelve_operation_contract() {
         assert_eq!(result["scores"], serde_json::Value::Null);
     }
 }
+
+#[test]
+fn full_history_diagnostic_usage_survives_probe_restoration() {
+    let d = Dir::new();
+    let mut a = Basic::open(BasicKind::FullHistory, "owner-a".into(), &d.0).unwrap();
+    a.ingest(event("a", "My notebook is blue.")).unwrap();
+    a.begin_probe("q1", NOW).unwrap();
+    a.recall(query()).unwrap();
+    a.end_probe("q1").unwrap();
+    let inspected = a.inspect("owner-a").unwrap();
+    assert_eq!(
+        inspected["diagnostics"]["tiers"]["full_history"]["recall_calls"],
+        1
+    );
+    assert_eq!(
+        inspected["diagnostics"]["tiers"]["full_history"]["items"],
+        1
+    );
+}

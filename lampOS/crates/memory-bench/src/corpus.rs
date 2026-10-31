@@ -237,6 +237,16 @@ fn timed_day(persona: &Persona, day: u32, utterances: Vec<Event>) -> Result<Vec<
             if kind == EventKind::Leave {
                 e.presence = Presence::Unknown;
             }
+            e.cues.activity = Some(
+                if kind == EventKind::Leave {
+                    "away"
+                } else if index % 2 == 1 {
+                    "head_down"
+                } else {
+                    "at_desk"
+                }
+                .into(),
+            );
             Ok(e)
         };
         if index % 2 == 0 {
@@ -259,6 +269,17 @@ fn timed_day(persona: &Persona, day: u32, utterances: Vec<Event>) -> Result<Vec<
             let mut e = source.next().ok_or_else(|| invalid("short day script"))?;
             e.at_unix_ms = at;
             e.session_id = session.clone();
+            // The second conversation in each visit is scripted with the
+            // owner looking down at the desk. This is a visible seat state,
+            // not a topic, object label or inferred psychological activity.
+            e.cues.activity = Some(
+                if index % 2 == 1 {
+                    "head_down"
+                } else {
+                    "at_desk"
+                }
+                .into(),
+            );
             out.push(e);
         }
         out.push(marker(EventKind::SessionEnd, at + 45_000, "end")?);
@@ -442,8 +463,21 @@ fn question(
             person_id: Some(persona.id.clone()),
             presence: Presence::OwnerAlone,
             heard,
-            cues: Cues::default(),
-            max_context_bytes: 1_048_576,
+            cues: Cues {
+                // A probe starts a separate scripted desk visit. Every third
+                // visit has the owner looking down at their notes; the rest
+                // look up. Stage directions never consult gold answers.
+                activity: Some(
+                    if n.is_multiple_of(3) {
+                        "head_down"
+                    } else {
+                        "at_desk"
+                    }
+                    .into(),
+                ),
+                ..Cues::default()
+            },
+            max_context_bytes: 4096,
         },
         rule,
         followups: Vec::new(),

@@ -24,6 +24,8 @@ pub struct Partial {
     state: State,
     main: Option<(String, State)>,
     sequence: u64,
+    recall_calls: u64,
+    snapshot_calls: u64,
 }
 impl Partial {
     pub fn open(init: &Init) -> Result<Self> {
@@ -42,6 +44,8 @@ impl Partial {
             },
             main: None,
             sequence: 0,
+            recall_calls: 0,
+            snapshot_calls: 0,
         };
         drop(arm.store()?);
         Ok(arm)
@@ -155,6 +159,9 @@ impl MemoryArm for Partial {
         if sources.is_empty() {
             return Ok(Snapshot::default());
         }
+        if snapshot["note"].as_str().is_some_and(|s| !s.is_empty()) {
+            self.snapshot_calls = self.snapshot_calls.saturating_add(1);
+        }
         Ok(Snapshot {
             owner_model: vec![ModelLine {
                 text: snapshot["note"]
@@ -205,6 +212,9 @@ impl MemoryArm for Partial {
             ..Recall::default()
         };
         r.check_bound(q.max_context_bytes)?;
+        if !r.context.is_empty() {
+            self.recall_calls = self.recall_calls.saturating_add(1);
+        }
         Ok(r)
     }
     fn inspect(&self, person: &str) -> Result<Value> {
@@ -222,8 +232,13 @@ impl MemoryArm for Partial {
                 }
             }
         }
+        let tiers = if person == self.owner {
+            json!({"record":{"items":retained.len(),"text_bytes":null,"recall_calls":self.recall_calls,"snapshot_calls":self.snapshot_calls},"talk_notes":{"items":null,"text_bytes":null,"recall_calls":null,"snapshot_calls":null},"running_summary":{"items":null,"text_bytes":null,"recall_calls":null,"snapshot_calls":null}})
+        } else {
+            json!({})
+        };
         Ok(
-            json!({"owner_model":[],"retained_record_ids":retained,"stats":{"label":"partial current product","complete_baseline":false,"voice_observations":false,"voice_talk_notes":false,"voice_running_summary":false,"voice_forget_dispatch":false,"stored_bytes":fs::metadata(self.state.path.join(DATABASE))?.len(),"model_calls":0}}),
+            json!({"owner_model":[],"retained_record_ids":retained,"diagnostics":{"schema":"tier-usage-v1","tiers":tiers},"stats":{"label":"partial current product","complete_baseline":false,"voice_observations":false,"voice_talk_notes":false,"voice_running_summary":false,"voice_forget_dispatch":false,"stored_bytes":fs::metadata(self.state.path.join(DATABASE))?.len(),"model_calls":0}}),
         )
     }
     fn begin_probe(&mut self, id: &str, at: u64) -> Result<()> {

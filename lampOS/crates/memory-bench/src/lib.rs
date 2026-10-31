@@ -3,6 +3,7 @@ pub mod arm_server;
 pub mod arms;
 pub mod conversation;
 pub mod corpus;
+pub mod diagnostics;
 pub mod files;
 pub mod ledger;
 pub mod model;
