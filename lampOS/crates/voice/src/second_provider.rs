@@ -282,8 +282,12 @@ fn passing(status: u16) -> bool {
     status == 429 || status >= 500
 }
 pub const DOWN_LINE_EVERY: Duration = Duration::from_secs(60);
-/// The kept line is at most 4 s of speech.
-const DOWN_LINE_MOST_SAMPLES: usize = 4 * 24_000;
+/// The kept line is at most 8 s of speech, so the longest is never cut
+/// before "ask me again": the Japanese down line is about 6 s (5.97 s in the
+/// macOS voice, Reviewer-three's P2 on #4723), and the English reached the
+/// old 4 s bound on lamp-c0a4 on 30 Oct (`the down line is 4000 ms`), cut.
+/// Three kept lines are at most about 1.2 MB.
+const DOWN_LINE_MOST_SAMPLES: usize = 8 * 24_000;
 /// The sounds, said by this route's own voice, so at the reply's level.
 pub const CUE_WORDS: [&str; 3] = ["Hmm.", "Mm.", "Hm."];
 /// A sound is at most 0.6 s, its last 30 ms faded out.
@@ -2292,7 +2296,7 @@ impl DownLine {
                     continue;
                 }
                 if text == DOWN_LINE {
-                    // The real length, for whether the 4 s cap ever cuts it
+                    // The real length, for whether the cap ever cuts it
                     // (the reviewer on #1195).
                     eprintln!(
                         "lamp-voice second: the down line is {} ms",
