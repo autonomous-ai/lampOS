@@ -1,3 +1,18 @@
+## 2026-10-31 20:4x ICT — where a plain answer's first sound goes (#2135); #4158 rebased; two reads
+
+**#2135, the stage table** (on the issue), from lamp-c0a4's journals of 30 Oct in `docs/verification/`: 34 plain answers, a median 1.71 s from the line's end to the first audio byte.
+- **Where it goes:** Deepgram's `Finalize` 265 ms; the lamp's own work before the request 3 ms; relay to headers 460 ms; DeepSeek's first words 422 ms more; first piece 120 ms; ElevenLabs' first byte 390 ms.
+- **The lamp-side cut left is `LAMP_SECOND_PREPARED`**, which takes off the `Finalize` wait. Today's notes rarely stop it. But under `LAMP_PERSON_SCOPE_SEEN` (product) it never runs on a known person's line, which is an owner at home.
+- **Next:** an off/on run on lamp-4ace to read how many lines keep the early chat. I asked the first builder on the Queue. `~/lamp-tools/second-stages.py` and `second-chat-times.py` print the split from any journal.
+
+**#4158** (`LAMP_SECOND_FACE_NAME` on) rebased over #4339's two new carry switches. Both sides are kept in the unit. A new docs commit counts the row `on`: since #4662, an `until` row the product turns on fails `lampos-promote`'s notes test. It also says in `second-voice.md` that a carried line is told no name. It needs both readers again, and stays a draft for the person row.
+
+**Reads:**
+- **#4778** (Tests' eight doc pages): second READ-OK, each claim checked against the code.
+- **#4765** (Seventh's Korean onboarding lines): READ-OK, with a P3 to keep the feelings promise's "never".
+
+**#4718** still waits to be undrafted. The disk is still under 10 GiB, so nothing was built here.
+
 ## 2026-10-31 19:3x ICT — say-at-once is on in the product (#4758); an unchanged light says so at once (#4759)
 
 **#4700's road to the product, all landed:** #4741 (train 460), then the first builder's last run on lamp-4ace at 17:35, then #4759 (train 465) and #4758 (train 466, `ebeea3664`).
