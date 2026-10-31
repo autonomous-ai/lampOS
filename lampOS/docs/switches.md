@@ -590,7 +590,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_NAME_REPEAT_NOT_A_CALL` | A desk remark about the lamp that the transcript repeats is no longer taken as calling it. |
 | `LAMP_SECOND_FEW_TOOLS` | Nothing you'd notice: answers start with fewer abilities loaded; remembering takes one extra step. |
 | `LAMP_NAMED_ALWAYS` | In a busy room, the lamp answers anyone who starts with "Lamp," while someone faces it. |
-| `LAMP_DECLINE_SILENT` | When the lamp decides a line wasn't said to it, it stays silent, with no half-started answer, and doesn't take it as the start of a conversation. |
+| `LAMP_DECLINE_SILENT` | When the lamp decides a line wasn't said to it, it stays silent and doesn't start a conversation. |
 | `LAMP_SAME_SPEAKER_CARRIES` | In a busy room, the lamp keeps talking with the same person by face and voice, and lets others' lines pass. |
 | `LAMP_BUSY_CALLED_STRICT` | In a busy room with nobody facing it, the lamp ignores words that only sound like its name, like "Mom". |
 | `LAMP_REMARK_ABOUT_IT` | In a busy room, the lamp stays quiet when people talk about it, like "that lamp is cute," rather than to it. |
