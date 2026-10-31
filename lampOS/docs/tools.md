@@ -749,10 +749,11 @@ and made up what became of the work. Two causes, both mended:
   start_agent_task (1036 bytes described)`, `tools::admitted`; a name given
   twice and a function past 32 are left out the same way). A test holds
   every description under the limit for every combination of the switches
-  with one, two or three of the staff
+  with none, one, two, three or four of the staff (the fourth Devin)
   (`every_description_fits_the_service_whatever_the_switches`), and another
   every function of the voice's own with all its switches on. The lead-in
-  sentence is the shortest that says it (1,005 bytes with three of the staff).
+  sentence is the shortest that says it (1,005 bytes with three of the staff, and 1,014 with the staff's note,
+  `LAMP_STAFF_NOTE`, as `agent_tasks::CHOSE_NOTED` says).
 - The read-back and its question were asked for before the call. Now only
   the read-back is, as a statement, "then call it at once", and the
   question comes from the answer. The functions, their

@@ -72,8 +72,9 @@ leave its original catalog and dispatch unchanged. Voice separately gates
 the same declarations and routing; enabling Actions alone is insufficient.
 `LAMP_SCHEDULE_SOCKET` selects the absolute Schedule socket, defaulting to
 `/run/lampos-schedule/call.sock` only when enabled. A disabled configuration
-does not inspect that setting or connect to Schedule. No deployment file is
-changed by this integration.
+does not inspect that setting or connect to Schedule. The product's
+`lamp-actions.service` and `lamp-voice.service` both set
+`LAMP_SCHEDULE_TOOLS=on`.
 
 ```sh
 LAMP_SCHEDULE_TOOLS=on \
@@ -91,9 +92,9 @@ honest failure when called. It does not disable unrelated volume/light calls.
 | `set_timer` | `text`, whole `seconds` | Set with an elapsed `After` deadline |
 | `set_reminder` | `text`, exact `time` in `HH:MM`; optional `day`, `zone`, `fold` | Set one civil `At` deadline |
 | `repeat_reminder` | `text`, `time`, `every` (`daily` or `weekly`); `weekday` required only for weekly; optional `zone` | Set a local daily/weekly recurrence |
-| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own; each item says when it was set (`set_day`, `set_clock`), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
-| `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series, only the line's own |
-| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own |
+| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own and the room's timers; each item says when it was set (`set_day`, `set_clock`), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
+| `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series, only the line's own or the room's timer (one set with nobody sure, for 2 h at most; [schedule.md](schedule.md)) |
+| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own or the room's timer |
 
 Each schedule call on the socket may carry a fourth key, `caller`
 (`lamp_actions::schedule::Caller`, `{"asker":{"person","owner"},"setter"}`),
