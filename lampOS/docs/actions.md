@@ -221,10 +221,16 @@ reply-time table). A creature changes its light, then says so in a word,
 and not the same word every time (the character file; Third on #1520). A
 call that changed nothing (`Outcome::Already`: "My light is already
 orange.", "My speaker is already as loud as it is allowed to go.", or
-"My speaker is muted." for quieter while muted) is said
-as before, since there is no change to be the answer (the reviewer and
-Third on #1520), and so is a call not done; the app's two calls are numbers
-as before. The journal says so once at start: `lamp-actions: the light's
+"My speaker is muted." for quieter while muted) is never answered as if it
+had changed (the reviewer and Third on #1520). With the switch it carries
+`"already": true`, `"next": "Nothing changed: it already was so. …"`
+(`lamp_actions::SHORT_ALREADY_NEXT`) and its own words, `"say"`
+(`lamp_actions::already_say`: "I'm already as warm as I go.", "…as bright",
+"…as dim", "…as cool", "…as loud", "…as quiet", else "It already is.").
+The voice says them at once: on lamp-4ace on 31 Oct, a light that couldn't
+change waited 2.8–3.3 s for the next round without them (the first builder
+on #4710, 17:35). A call not done is said as before, and the app's two calls
+are numbers as before. The journal says so once at start: `lamp-actions: the light's
 and the volume's calls are answered short (LAMP_SHORT_DONE)`. Its measure on
 lamp-4ace is the model's first audio after our answer plus the reply's
 length, before and after, in the same hour, with a two-part line and

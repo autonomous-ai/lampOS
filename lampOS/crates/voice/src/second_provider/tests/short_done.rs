@@ -18,6 +18,11 @@ fn told(name: &str) -> Value {
             json!({"error": "I asked for it but could not confirm my light changed."})
         }
         "light_colour" => json!({"result": "My light is already orange."}),
+        // An "already" from today's lamp-actions: marked, with its own words
+        // (the first builder on #4710, 17:35).
+        "light_cooler" => {
+            json!({"result": "My light is already as cool as it goes.", "already": true, "next": "Nothing changed: it already was so.", "say": "I'm already as cool as I go."})
+        }
         // lamp-actions' schedule, committed (`schedule.rs`'s answer).
         "set_timer" => {
             json!({"status": "committed", "id": 1, "due_unix_ms": 1_792_454_700_000_u64, "local": "2026-10-31T07:52:00+07:00", "clock": "07:52"})
@@ -536,6 +541,60 @@ fn the_models_own_words_with_calls_that_did_what_was_asked_end_a_single_ask() {
         )
         .asked,
         2
+    );
+}
+
+/// A light that can't change (the first builder's run of 31 Oct, 17:35:
+/// 2.8 to 3.3 s waiting for the next round): its own words that it already
+/// is are said at once and end a single ask. But the model's own words over
+/// it still ask the next round, which says nothing changed, and calls that
+/// differ, one of them unchanged, are never answered "Done.".
+#[test]
+fn a_light_that_cant_change_says_so_at_once_but_never_ends_on_the_models_words() {
+    let again = || {
+        vec![vec![
+            text("Nothing more to give, I'm afraid."),
+            Ok(ChatEvent::Done),
+        ]]
+    };
+    assert_eq!(
+        turn_with(
+            true,
+            true,
+            "Make it cooler.",
+            calling(&["light_cooler"]),
+            again()
+        ),
+        Went {
+            said: said(&["I'm already as cool as I go."]),
+            asked: 1,
+            ran: 1,
+            noted: false
+        }
+    );
+    let mut worded = vec![text("Cooler it is.")];
+    worded.extend(calling(&["light_cooler"]));
+    let went = turn_with(true, true, "Make it cooler.", worded, again());
+    assert_eq!(went.asked, 2, "{went:?}");
+    let went = turn_with(
+        true,
+        true,
+        "Make it brighter and cooler.",
+        calling(&["light_brighter", "light_cooler"]),
+        again(),
+    );
+    assert_eq!(went.asked, 2, "{went:?}");
+    assert!(
+        !went.said.iter().any(|said| said.contains("Done.")),
+        "{went:?}"
+    );
+    assert_eq!(
+        short_done_line(&[told("light_cooler")]),
+        Some("I'm already as cool as I go.")
+    );
+    assert_eq!(
+        short_done_line(&[told("light_brighter"), told("light_cooler")]),
+        None
     );
 }
 

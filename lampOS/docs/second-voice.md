@@ -808,8 +808,12 @@ order is kept. A written turn is the same from the chat on.
     the volume,** each one answered short by lamp-actions (its `say`, with
     `LAMP_SHORT_DONE=on` in `lamp-actions.service`), says the calls' own
     line ("Warmer.", "Done." when they differ) as soon as the calls are
-    answered. A change that didn't happen ("already") carries no `say`, so
-    nothing is said early and the next round says why.
+    answered. A change that didn't happen is marked `"already"` and says
+    so in its own words ("I'm already as warm as I go.",
+    `lamp_actions::already_say`), at once too. The model's own words over
+    it never end the turn: the next round says nothing changed. Calls that
+    differ, one of them unchanged, get no early line. An older lamp-actions'
+    "already" carries no `say`, and the next round says why.
   - **A round whose one call set a timer, committed,** says "Timer set. It
     rings at 7:52 pm." with the schedule's own `clock`, the local time it
     rings, on a 12-hour clock as the lamp's other words are, so the time
