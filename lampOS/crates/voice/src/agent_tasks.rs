@@ -5449,7 +5449,7 @@ pub(crate) mod tests {
     /// 2026-10-16, with work asked of the staff, two of them to choose from
     /// and the lead-in, `start_agent_task` was 1,036 bytes, and nothing was
     /// called in either round. Every combination of the switches fits, with
-    /// one, two or three of the staff.
+    /// none, one, two, three or four of the staff (the fourth Devin).
     #[test]
     fn every_description_fits_the_service_whatever_the_switches() {
         let three = vec![
