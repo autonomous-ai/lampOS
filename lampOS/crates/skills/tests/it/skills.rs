@@ -4767,10 +4767,14 @@ fn a_held_dim_asked_of_the_policy(moved: bool) -> (SkillEvent, Option<SkillEvent
                 light.level += 1;
             }
             shown.publish_json(1, &light).unwrap();
+            // Counted before it is answered: the run's `done` follows the
+            // answer to its give-back, so a call counted after the answer
+            // could come after the test had read the calls (1 of 2 on a
+            // pull request's ARM64 run on 31 Oct).
+            let _ = called.send(line);
             (&stream)
                 .write_all(b"{\"ok\":true,\"result\":{}}\n")
                 .unwrap();
-            let _ = called.send(line);
         }
     });
     // The Policy stood in for: the ask is told, and answered `say_now`
