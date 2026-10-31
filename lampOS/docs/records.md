@@ -703,7 +703,8 @@ cargo build --workspace --offline
 
 There were **96 passing tests** (87 library, five CLI, four integration),
 zero failures and one normally ignored release timing test, run separately
-above. No workspace crate depends on `lamp-records`. The workspace also built
+above. No workspace crate depended on `lamp-records` then; `lamp-settings`
+does now (`crates/settings/Cargo.toml`). The workspace also built
 before this task. Socket tests required the local sandbox's bind restriction
 to be lifted; they did not contact a device.
 
@@ -732,9 +733,10 @@ cross-target checking, not ARM execution or a linked release build.
 
 Under ARM64 user-mode emulation (`qemu-aarch64` 7.2, as in a local podman
 gate), `openat2` is not implemented (ENOSYS), and the store refuses to run
-without it. The 23 tests that open a store (22 in `store.rs` and
-`public_tree_pipeline_dry_then_apply_keeps_live_memory_and_outside_link`)
-probe for it once, and on ENOSYS print why and stop (#1210). With `CI` set
+without it. Every test that opens a store (those in `store.rs`,
+`main.rs`'s `cleanup_on_sets_aside_a_newer_report_and_still_removes_an_expired_session`
+and `public_tree_pipeline_dry_then_apply_keeps_live_memory_and_outside_link`)
+probes for it once, and on ENOSYS prints why and stops (#1210). With `CI` set
 they fail instead, so the real ARM64 runner, whose kernel has `openat2`,
 always runs them.
 
@@ -800,7 +802,7 @@ The voice's processes are now named once, in
 commands (`serve`, `directed`, `directed-fixture`, `camera-inspect`,
 `provider-check`, `schedule-consumer`, `worker`, and the read-only reports
 run by hand, `short-turns`, `stt-check`, `marked`, `turn-times`, `stalls`,
-`probe-cascade`, `probe-cache`, `probe-tools`), its worker
+`probe-cascade`, `probe-cache`, `probe-tools`, `probe-reminders`), its worker
 roles
 (`capture`, `speaker`, `provider`, `second`, `camera`, `ring`, `privacy`,
 `probe`) and its helpers (`lamp-turn-end`). Both crates use that list:
