@@ -9,8 +9,9 @@ use std::time::Duration;
 
 /// The switch for the ways a person asks to turn the lamp off (#3697,
 /// `docs/shutdown.md`): `on` exactly; off unless set. Read by Controls (the
-/// primary button's hold), Voice's ring worker (the warning while held) and
-/// `lamp-setup watch-reset` (which starts the shutdown).
+/// primary button's hold), Voice's ring worker (the warning while held),
+/// lamp-cloud (the app's turn off) and `lamp-setup watch-reset` (which
+/// starts the shutdown).
 pub const SHUTDOWN_SWITCH: &str = "LAMP_SHUTDOWN";
 /// The primary button released after this long asks to turn the lamp off,
 /// with [`SHUTDOWN_SWITCH`] on (V1's shutdown hold, HAL-5.7).
