@@ -223,11 +223,12 @@ each line plays exactly as before.
 | Offline, service down, back online | `language::PROVIDER_UNAVAILABLE`, `VOICE_SERVICE_UNREACHABLE`, `BACK_ONLINE` | the notices release's English file | the cache's line when kept (`FailureNotices::owners_line`), the English file otherwise |
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 | The second route's own words before a look, and before a search with `LAMP_SECOND_CHECKING_LINE` | `second_provider::LOOKING` ("Let me look."), `CHECKING` ("Let me check.") | said as the turn's text, in English | the owner's words (`language::fixed_in`), and the next round is told those words were said (Thirteen's P2 on #4707) |
+| The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, ten today (`FIXED_LINES`), then the English two
+lines first, fourteen today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -249,7 +250,8 @@ Tests: `language::tests::each_fixed_line_has_its_words_in_each_language`,
 `say::tests::the_owners_language_is_played_when_kept_and_english_otherwise`,
 `failure_notice::offline_lines_are_said_in_the_owners_language_when_kept_and_english_otherwise`,
 `notices::loading_tests::the_owners_language_adds_no_notice_kind_and_keys_the_product_words`,
-`sleep_asked::tests::the_model_is_told_the_line_in_the_owners_language`.
+`sleep_asked::tests::the_model_is_told_the_line_in_the_owners_language`,
+`second_provider::tests::the_down_lines_are_said_in_the_owners_language`.
 Not heard yet: no line has been rendered or listened to on a lamp, and the
 words want a native speaker's check.
 
@@ -539,7 +541,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   and `(again, the shorter line)` for the second. The three lines are
   rendered together, each until it is kept: one whose render failed is asked
   again after the next turn, and until the short one is kept the long one is
-  said in its place, never silence (Third's P2 on #3771). The line is said once by this route's own voice as the first spoken line
+  said in its place, never silence (Third's P2 on #3771). With an owner's
+  language other than English they are rendered in its words ("The fixed
+  lines", #4473), as is `COULD_NOT_LOOK`. The line is said once by this route's own voice as the first spoken line
   begins (before its chat, #1195's run on lamp-52e6, 21 Oct: the first turn
   after a start was silent otherwise), or after a turn is out, while the
   relay answers. The first can overlap one turn once a start: a line said
