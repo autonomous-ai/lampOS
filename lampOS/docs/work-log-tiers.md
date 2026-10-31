@@ -1,5 +1,36 @@
 # Tiers work log
 
+## 2026-10-31: owner departure and regenerated-month evidence
+
+Engine `444ac6b66` in [PR #4756](https://github.com/autonomous-ai/lampOS/pull/4756)
+passes native ARM64 run 41198582162 (13,002 tests, 107 skipped, plus doctests)
+and strict Linux clippy run 41198582167. Host formatting, all-target clippy,
+64 functional tests plus three API compile-fail tests, workspace build and
+the source-only suite passed. The departure guard now requires the same owner
+identity as capture. Its paced regression failed before the correction and
+passes after it. No product caller or device changed.
+
+The full candidate completed the regenerated month with runner and registration
+`3d8be60e8`: 2,220 events, 200 questions, 224 answer turns, 30 nightly passes and
+four weekly passes. All eight pending weekly batches drained and all 200 probe
+restorations completed. Snapshot and recall deadline misses were both zero.
+The ledger verifies as completed with 4,536 entries and final hash
+`e8ec1921da76e4aaafaec55433f632d27b83f4bdfb16d1d0aea0062b0b19cfb3`.
+The lead received its summary and manifest/events bundle, excluding the private
+database and key. Fixed replies and empty consolidation made 266 recorded calls,
+zero live calls, with no transcription or scores. Hidden answers were not read.
+
+Ready for the whole assignment: no. The code has the native gates; review
+follow-up tightens empty-result deadline assertions and bounds child exit waits
+before scoring. Real model/STT access, the complete product baseline, and the
+registered eleven-arm three-run scorecard remain outstanding. Most likely wrong
+remains semantic forgetting and claims that overstate their evidence.
+
+The shared-machine disk rule is now explicit: retain pinned executables and
+ledgers, use one build directory, require 15 GiB free before long work, and clean
+rebuildable output after each pushed checkpoint. Cleaning this worktree removed
+31.5 GiB of Cargo output and left 25 GiB free; all run evidence was retained.
+
 ## 2026-10-31: ordinary adapter target and runner integration
 
 Store/sleep ready for review: yes at `1c9d4cd17` in
