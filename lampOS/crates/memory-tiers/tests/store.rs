@@ -95,11 +95,7 @@ fn forget_clears_sources_views_and_inflight_result() {
             .unwrap()
             .is_none()
     );
-    assert!(
-        s.episodes(Access::OWNER_ALONE).unwrap()[0]
-            .detail
-            .is_empty()
-    );
+    assert!(s.episodes(Access::OWNER_ALONE).unwrap().is_empty());
 }
 #[test]
 fn visitor_assistant_and_unsure_never_prove_owner_facts() {
@@ -112,7 +108,13 @@ fn visitor_assistant_and_unsure_never_prove_owner_facts() {
     let other = s.ingest(r).unwrap().unwrap();
     let mut r = incoming("I might be the other person.");
     r.speaker = Speaker::Unsure;
-    s.ingest(r).unwrap();
+    assert!(s.ingest(r).unwrap().is_none());
+    assert!(
+        s.records(Access::OWNER_ALONE)
+            .unwrap()
+            .iter()
+            .all(|r| r.speaker != Speaker::Unsure)
+    );
     let owner = s
         .ingest(incoming("I prefer a quiet room."))
         .unwrap()
@@ -536,4 +538,71 @@ fn learned_pattern_requires_two_distinct_owner_sources() {
         s.lines(Access::OWNER_ALONE).unwrap()[0].kind,
         LineKind::LearnedPattern
     );
+}
+
+#[test]
+fn fingerprints_need_the_private_key_and_survive_reopening() {
+    use sha2::{Digest, Sha256};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("memory.sqlite");
+    let key_path = dir.path().join("memory.sqlite.forget-key");
+    {
+        let mut s = Store::open(&path, "fictional-owner").unwrap();
+        let id = s.ingest(incoming("4731")).unwrap().unwrap();
+        s.forget_records(&[id]).unwrap();
+        assert!(s.episodes(Access::OWNER_ALONE).unwrap().is_empty());
+    }
+    let bytes = std::fs::read(&path).unwrap();
+    let plain = format!("{:x}", Sha256::digest(b"4731"));
+    assert!(!bytes.windows(plain.len()).any(|w| w == plain.as_bytes()));
+    let key = std::fs::read(&key_path).unwrap();
+    assert_eq!(key.len(), 32);
+    assert!(!bytes.windows(key.len()).any(|w| w == key.as_slice()));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(&key_path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+    {
+        let mut s = Store::open(&path, "fictional-owner").unwrap();
+        assert!(
+            s.ingest(incoming("The number is 4731 today."))
+                .unwrap()
+                .is_none()
+        );
+    }
+    let copy = dir.path().join("copy.sqlite");
+    std::fs::copy(&path, &copy).unwrap();
+    assert!(Store::open(&copy, "fictional-owner").is_err());
+    std::fs::write(&key_path, [0u8; 32]).unwrap();
+    assert!(Store::open(&path, "fictional-owner").is_err());
+    // A deliberate full reset removes both files after closing the store.
+    std::fs::remove_file(&path).unwrap();
+    std::fs::remove_file(&key_path).unwrap();
+    let mut reset = Store::open(&path, "fictional-owner").unwrap();
+    assert_ne!(std::fs::read(&key_path).unwrap(), key);
+    assert!(reset.ingest(incoming("4731")).unwrap().is_some());
+}
+
+#[test]
+fn forgotten_episode_boundaries_only_describe_survivors() {
+    let mut s = store();
+    let id = s
+        .ingest(incoming("The hidden number is 4731."))
+        .unwrap()
+        .unwrap();
+    let mut survivor = incoming("A quiet afternoon with a book.");
+    survivor.at_ms += 1_000;
+    s.ingest(survivor).unwrap();
+    s.owner_left(NOW + 2_000).unwrap();
+    s.forget_records(&[id]).unwrap();
+    let episodes = s.episodes(Access::OWNER_ALONE).unwrap();
+    assert_eq!(episodes.len(), 1);
+    assert_eq!(episodes[0].started_ms, NOW + 1_000);
+    assert_eq!(episodes[0].ended_ms, Some(NOW + 1_000));
+    assert!(episodes[0].topic.is_empty());
+    assert!(episodes[0].gist.is_empty());
 }

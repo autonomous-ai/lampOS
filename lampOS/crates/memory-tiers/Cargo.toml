@@ -9,6 +9,7 @@ publish.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+hmac = "0.12"
 rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
 unicode-normalization = "0.1"
 lamp-local-time = { path = "../local-time" }
