@@ -1674,14 +1674,15 @@ fn made_note(
     )))
 }
 
-/// Who the work went to, as the person calls them.
+/// Who the work went to, as the person calls them: the name the voice knows
+/// the engine's agent by (`agent_tasks::KINDS`), so every engine it hands
+/// work to is named in its news (a Hermes task was told as Claude Code's);
+/// Claude Code, the default target's, for a task naming no known engine.
 pub(crate) fn who(task: &Value) -> &'static str {
-    match task["target"]["engine"].as_str() {
-        Some("codex") => "Codex",
-        Some("opencode") => "OpenCode",
-        Some("devin" | "devin-cloud") => "Devin",
-        _ => "Claude Code",
-    }
+    task["target"]["engine"]
+        .as_str()
+        .and_then(crate::agent_tasks::name_of)
+        .unwrap_or("Claude Code")
 }
 
 /// Where the rest of a task's answer is: "their MacBook Air" for a computer
@@ -2964,6 +2965,7 @@ mod tests {
             ("claude", "Claude Code"),
             ("codex", "Codex"),
             ("opencode", "OpenCode"),
+            ("hermes", "Hermes"),
         ] {
             let told = note(&own(), &task(engine, json!([])), &waiting, 0).unwrap();
             assert_eq!(
@@ -2977,6 +2979,25 @@ mod tests {
             );
             assert!(!told.contains("What it last said") && !told.contains("ask its question"));
         }
+    }
+
+    /// News names the agent of every engine the voice hands work to: a
+    /// Hermes task was told as Claude Code's. A task naming no engine the
+    /// voice knows is the default target's, Claude Code.
+    #[test]
+    fn news_names_every_engine_the_voice_hands_work_to() {
+        for (engine, name) in [
+            ("claude", "Claude Code"),
+            ("codex", "Codex"),
+            ("opencode", "OpenCode"),
+            ("devin", "Devin"),
+            ("devin-cloud", "Devin"),
+            ("hermes", "Hermes"),
+        ] {
+            assert_eq!(who(&json!({"target":{"engine":engine}})), name, "{engine}");
+        }
+        assert_eq!(who(&json!({"target":{}})), "Claude Code");
+        assert_eq!(who(&json!({"target":{"engine":"cursor"}})), "Claude Code");
     }
 
     /// The other states' notes are byte for byte what they were before
