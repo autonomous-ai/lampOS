@@ -196,7 +196,8 @@ attestations cannot cross the newly generated service session.
 `cancel` only cancels a prepared or queued local task before its attempt.
 It returns `remote_cancelled:false`. There is no remote cancel. The product
 runs the watch (`--watch`, the default) and closes a told harness
-(`--close-told`), and `--route` takes follow-ups: each is below.
+(`--close-told`); with `--route` (not in the product's unit), follow-ups
+are routed. Each is below.
 A person can explicitly request a new observation of an accepted agent.
 
 ## Wire interface
