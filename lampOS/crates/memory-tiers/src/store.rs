@@ -634,6 +634,16 @@ impl Store {
                 "UPDATE episodes SET gist=?,detail=?,importance=max(importance,?) WHERE id=?",
                 params![p.gist, detail, p.importance, p.episode_id],
             )?;
+            tx.execute(
+                "DELETE FROM episode_sources WHERE episode_id=?",
+                [p.episode_id],
+            )?;
+            for source in &p.record_ids {
+                tx.execute(
+                    "INSERT INTO episode_sources VALUES(?,?)",
+                    params![p.episode_id, source],
+                )?;
+            }
             index(&tx, "episode", p.episode_id, &p.gist)?;
         }
         if input.kind == PassKind::Nightly {
@@ -853,6 +863,7 @@ impl Store {
             tx.execute("DELETE FROM lines WHERE id=?", [id])?;
         }
         for id in &affected_episodes {
+            tx.execute("DELETE FROM episode_sources WHERE episode_id=?", [id])?;
             tx.execute(
                 "UPDATE episodes SET topic='',gist='',detail='',importance=0 WHERE id=?",
                 [id],
@@ -1145,4 +1156,21 @@ fn load_fingerprint_key(path: &Path, populated: bool) -> Result<[u8; 32]> {
     let mut key = [0; 32];
     file.read_exact(&mut key)?;
     Ok(key)
+}
+
+#[cfg(feature = "bench")]
+impl Store {
+    /// Test-only isolated child. The original connection stays alive and is
+    /// never replaced from an old copy. Costs and request identities belong to
+    /// the runner, outside this copy. This API is absent from default builds.
+    pub fn bench_fork(&self) -> Result<Self> {
+        let mut conn = Connection::open_in_memory()?;
+        {
+            let backup = rusqlite::backup::Backup::new(&self.conn, &mut conn)?;
+            if backup.step(-1)? != rusqlite::backup::StepResult::Done {
+                return Err(Error::Invalid("probe snapshot incomplete"));
+            }
+        }
+        Self::from_connection(conn, &self.owner, self.fingerprint_key)
+    }
 }

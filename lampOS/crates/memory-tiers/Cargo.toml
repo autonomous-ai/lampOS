@@ -5,12 +5,15 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+bench = ["rusqlite/backup", "tokio/io-std", "tokio/io-util"]
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 hmac = "0.12"
-rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
+rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint", "hooks"] }
 unicode-normalization = "0.1"
 lamp-local-time = { path = "../local-time" }
 tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "sync"] }
@@ -25,3 +28,8 @@ tokio = { version = "=1.53.1", features = ["test-util", "net", "io-util"] }
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "lamp-memory-tiers-arm"
+path = "src/bin/arm.rs"
+required-features = ["bench"]
