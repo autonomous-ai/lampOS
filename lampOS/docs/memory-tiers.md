@@ -43,6 +43,8 @@ This library does not recognize a face or voice and does not infer a different
 speaker from a model's output. `Incoming` includes an explicit addressed-to-lamp
 flag, topic, absolute timestamp, source strength and optional speech confidence.
 Unknown confidence remains `None`; it is not converted to a guessed number.
+The adapter closes an episode on departure/session end only when both the
+observed owner label and person id match this store, as speech capture requires.
 
 | Stored item | Evidence and lifetime |
 |---|---|
