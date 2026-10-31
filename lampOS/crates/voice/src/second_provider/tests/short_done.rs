@@ -756,8 +756,12 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
             "Remind me in one and a half hours to call.",
             reminder("call"),
         ),
-        // The name however it was heard, after a greeting (candidate 9276
-        // on lamp-4ace: "Lamp" as "Lynn", the first builder on #4710, 21:4x).
+        // The lamp called, its name set off however it was heard: candidate
+        // 9276 on lamp-4ace heard macOS `say`'s "Hey Lamp" as "Amen.",
+        // "Hey, Lynn." and "Hey, man." (the first builder on #4710, 21:4x).
+        ("Amen. Make it warmer. Then", calls(&["light_warmer"])),
+        ("Hey, Lynn. It's too bright.", calls(&["light_dimmer"])),
+        ("Hey, man. Make it warmers.", calls(&["light_warmer"])),
         ("Hey Lynn, it's too bright.", calls(&["light_dimmer"])),
         (
             "Hey Lynn, make it warmer. Thanks!",
@@ -768,7 +772,6 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
             calls(&["set_timer"]),
         ),
         ("Hello, make it warmer.", calls(&["light_warmer"])),
-        // Or a letter from "lamp", whatever its case.
         ("hey lamb, make it warmer.", calls(&["light_warmer"])),
         ("Okay lam, make it brighter.", calls(&["light_brighter"])),
     ] {
@@ -788,10 +791,11 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
         "Hey Lynn, what's the weather?",
         "Hey Lynn, make it warmer, what's the weather?",
         "Hey there Lynn, make it warmer.",
-        // A word after "okay" that speech to text didn't write as a name is
-        // an ask (Reviewer-three's P3 on #4789).
+        // Never past the line's first word, before a question mark, or a
+        // word of an ask (Reviewer-three's P3 on #4789).
         "Make it warmer. Okay music.",
-        "Okay weather, make it warmer.",
+        "Weather? Make it warmer.",
+        "Music, and make it warmer.",
     ] {
         assert!(asks_more(more, &calls(&["light_warmer"])), "{more}");
     }
@@ -809,12 +813,12 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
     }
 }
 
-/// Candidate 9276 on lamp-4ace (the first builder on #4710, 21:4x): each of
-/// three lights at its limit said its "already" at once, then round 2 said it
-/// again ("Already as warm as I go — that's my limit."). With "Lamp" heard
-/// as "Lynn", the greeting is the name, so a single ask ends with the
-/// at-once line; and a round still asked after one is told the line was said
-/// aloud, never only that the lamp says it.
+/// Candidate 9276 on lamp-4ace (the first builder on #4710, 21:4x): lights
+/// at their limit said their "already" at once, then round 2 said it again
+/// ("Already as warm as I go — that's my limit."). "Hey Lamp" was heard as
+/// "Amen." and "Hey, Lynn.": the name set off asks nothing, so a single ask
+/// ends with the at-once line; and a round still asked after one is told
+/// the line was said aloud, never only that the lamp says it.
 #[test]
 fn an_already_said_at_once_is_said_once() {
     let again = || {
@@ -825,8 +829,9 @@ fn an_already_said_at_once_is_said_once() {
     };
     let line = "I'm already as cool as I go.";
     for heard in [
+        "Amen. Make it cooler. Then",
+        "Hey, Lynn. It's too warm.",
         "Hey Lynn, make it cooler. Thanks!",
-        "Hey Lynn, it's too warm.",
         "Okay Lamb, make it cooler.",
     ] {
         assert_eq!(
