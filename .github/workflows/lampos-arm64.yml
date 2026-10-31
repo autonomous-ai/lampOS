@@ -99,6 +99,7 @@ on:
       - 'lampOS/docs/install.md'
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/switches.md'
+      - 'lampOS/docs/updates.md'
       - '.github/workflows/lampos-arm64.yml'
       - '.github/scripts/lampos-pr-crates.py'
       - '.github/scripts/lampos-source-times.py'
