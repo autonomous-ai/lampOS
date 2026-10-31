@@ -190,12 +190,12 @@ candidate arms in this order, three repetitions each:
 1. `tiers`: the full engine.
 2. `tiers_minus_episodes`: remove episodes.
 3. `tiers_minus_life_story`: remove chapters and events.
-4. `tiers_minus_facts_people_places`: **facts not recalled; kept only as
+4. `tiers_minus_facts`: **facts not recalled; kept only as
    evidence**. Remove facts and people/place links from recall and prompt
    text, retaining proof rows so the remaining components can be checked.
 5. `tiers_minus_owner_model`: remove the owner model.
 6. `tiers_minus_how_to_be`: remove taught and learned behavior memory.
-7. `tiers_minus_whats_ahead`: remove prospective memory.
+7. `tiers_minus_ahead`: remove prospective memory.
 8. `tiers_minus_feelings`: remove feeling tags.
 9. `tiers_minus_nightly_sleep`: remove nightly consolidation.
 10. `tiers_minus_importance`: remove importance scoring.
@@ -250,7 +250,9 @@ its complete response is available. A separate session-start `snapshot` has
 **300 ms**, matching the product note budget. The arm returns empty memory
 when its budget expires; an answer never waits for late recall or a late
 snapshot. The runner also enforces these deadlines, ignores late content,
-and records a miss. At most one request stays in flight while its terminal
+and records a miss. If a snapshot misses, recall is skipped for that answer
+and separately reported; it must not wait for the snapshot drain before
+sending another request. At most one request stays in flight while its terminal
 response is drained under the outer watchdog; no late response can become
 the next question's memory. These are host contract boundaries, not proof of
 first-audio latency on a lamp.
@@ -328,6 +330,11 @@ A query:
 `owner_model` is an array of `{text, source_ids}`. The requested context bound
 counts all UTF-8 text memory adds to the prompt: context, owner-model text,
 memory instructions, textual tool schemas, and subsequent tool results.
+Count the UTF-8 bytes of those returned strings, not Unicode characters.
+Runner-added JSON framing, escaping and provenance envelopes are reported
+separately and never charged to an arm. A 128-byte memory response remains
+valid when the runner renders it into a larger JSON prompt; 129 bytes of
+actual memory text still exceed that cap.
 The base character prompt is outside this cap and identical across arms.
 The snapshot is reused within its session, counted once; recall must not
 duplicate it. After every `ingest`, `sleep`, `forget`, or `tool`, the runner discards all
@@ -518,10 +525,46 @@ consenting real-owner trials and a human diary of useful or awkward memory
 moments are separate evidence. Neither step is authorized by this host-only
 benchmark task.
 
+## Pre-score timing revision (31 October)
+
+Registration version 3 replaces nine-minute spacing between all utterances.
+That spacing made each line its own conversation under the product's
+45-second idle boundary and biased any engine that groups episodes by time.
+No score was seen before this revision. The earlier recorded runs remain
+superseded plumbing evidence, including failed attempts.
+
+Each day now has eight conversations and four visits to the desk. Conversation
+lengths rotate the fixed sequence 2, 8, 4, 12, 6, 3, 10, 5 across days; together
+they contain the same fifty utterances in the same order. Successive exchanges
+are 3–30 seconds apart. Conversations start around 09:00, 09:35, 10:25, 11:40,
+13:10, 14:30, 15:20 and 16:40, with deterministic 0–10 minute offsets. Gaps are
+longer than ten minutes. Each pair of conversations has an observed owner
+arrival and departure. The session end is 45 seconds after its final exchange.
+Local calendar construction continues to support daylight-saving zones.
+
+The persona, owner-spoken text, utterance identities, answer key, question wording,
+query times, gold answers, rubrics and category counts are unchanged. Only
+question eligibility lists expand to include the new observed boundary events.
+The final daily boundary retains its original identity. The registration pins
+new event and question-file hashes before any scored run; human review is still
+pending. Nightly and weekly work follow dates, not the new conversation count.
+The two removal names now match the adapter manifest: `tiers_minus_facts` and
+`tiers_minus_ahead`; their registered meanings and order are unchanged.
+
+The previously empty companion replies now rotate deterministically among
+“Got it.”, “Okay.” and “I hear you.” using the seed, day and line. All setups
+receive identical answered exchanges, enabling product journaling without
+extra foreground model calls or histories that vary by setup. They add no
+facts or promises. This is also registered before scoring: the month does
+**not** test the lamp's own promises or its real replies. Those require a
+separate future fixture. Recorded empty consolidation proposals still only
+exercise interfaces; synthetic usage is not a bill.
+
 ## What was not shown
 
-The month, approximately 200 questions, scorers, executable contract, cached
-speech-to-text pass, live baseline scores, independent persona, human audit,
-and real-device latency remain to be implemented or measured. No baseline
-number is claimed by this plan. Relay access and an explicit run cost ceiling
+The month, 200 questions, scorers and executable contract are implemented on
+the separate benchmark branch, with recorded plumbing checks only. Real
+speech-to-text, live baseline scores, an independent persona, human audit and
+real-device latency remain to be implemented or measured. No baseline number
+is claimed by this plan. Relay access and an explicit run cost ceiling
 are needed before live calls; they do not block recorded-output tests.
