@@ -100,6 +100,9 @@ struct Lamp {
     /// One servo neither takes nor answers this many register writes, as
     /// one just given power does.
     deaf: Option<(usize, u8)>,
+    /// One servo takes this many register writes but its answer to each is
+    /// lost on the wire.
+    mute: Option<(usize, u8)>,
     /// A hand moves one servo toward a position at 100 counts a second,
     /// whatever its goal: from, until, servo, position. Its load is a
     /// strain of the same time.
@@ -187,6 +190,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             may_take_hold: false,
             drops_goal: None,
             deaf: None,
+            mute: None,
             hand: None,
             hands: Vec::new(),
             misreads: Vec::new(),
@@ -488,6 +492,13 @@ impl Lamp {
                     }
                     self.registers.push((id, address, data));
                     self.register_times.push(self.time.get());
+                    if let Some((index, left)) = self.mute
+                        && usize::from(id) - 1 == index
+                        && left > 0
+                    {
+                        self.mute = Some((index, left - 1));
+                        continue;
+                    }
                     self.answer(id, &[]);
                 }
                 other => panic!("an instruction this body must never send: {other:#04x}"),
@@ -2115,6 +2126,31 @@ fn a_torque_off_that_fails_part_way_puts_torque_back_on_the_joint_it_let_go() {
         lamp.registers
             .iter()
             .filter(|(id, address, _)| *id == 2 && *address == 40)
+            .map(|(_, _, bytes)| bytes[0])
+            .collect::<Vec<_>>(),
+        [0, 1]
+    );
+}
+
+/// A torque-off the elbow takes but whose answer is lost: the elbow is
+/// still counted as holding, yet it is limp, so torque comes back on it too.
+#[test]
+fn a_torque_off_whose_answer_is_lost_still_puts_torque_back_on_that_joint() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(5));
+    lamp.mute = Some((2, 1));
+    let mut report = spare_report();
+    let result = {
+        let mut bus = Bus::new(&mut lamp, &mut clock, Some(lamp_4ace_standing()));
+        bus.samples().unwrap();
+        release_arm(&mut bus, &mut report)
+    };
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(report.arm_releases, 0);
+    assert_eq!((lamp.servos[1].torque, lamp.servos[2].torque), (1, 1));
+    assert_eq!(
+        lamp.registers
+            .iter()
+            .filter(|(id, address, _)| *id == 3 && *address == 40)
             .map(|(_, _, bytes)| bytes[0])
             .collect::<Vec<_>>(),
         [0, 1]
