@@ -1,3 +1,13 @@
+## 2026-11-01 18:14 ICT — train 501 gates green; scoped source reads
+
+Ready for lamp-voice: no (#4848 needs TWO READS; #4782 needs its lamp replay).
+
+- Rebased both authored patches unchanged onto train 501 `b29980d3b1`. Exact #4848 `f644d9fb36` passed ARM64 41299186841: 8,996 selected tests / 57 skipped plus doc/process checks, with all three combined regression functions passing. Linux Clippy 41299186741 and docs passed. TWO READS remain; no active second reader has yet acknowledged. Body and PR comment record current evidence.
+- Exact #4782 `4aebdd4f56` passed ARM64 41299196046, Linux Clippy 41299195997 and docs. Still draft for the first builder's off/on search replay and unit evidence comment. Both native watch processes completed successfully.
+- Additional scoped source read of #4753 `f17c747a0`: actual ForgetEffect.ran clears copied recent/model/tool context and remaining batch calls; accounting remains monotonic. No boundary discrepancy found. Optional independent ran/suppress test cases suggested. Not full READ-OK, no execution/live calls/spending claim.
+- Additional scoped source read of #4519 `592b342fa0`: lost-ACK recovery attempts both ARM joints; fake mute applies and records the torque-off before dropping its reply. Nonblocking wording P3: recovery writes can fail or be inhibited for unplug, so docs should describe attempted recovery rather than guarantee no limp joint. Reviewer-lead's HOLD remains theirs; no full READ-OK, Cargo run or lamp claim.
+- Queued-speech implementation remains ordered after #4848 lands. Legacy sync finding remains reported, not assigned. Main tracked worktree unchanged; no device access.
+
 ## 2026-11-01 17:37 ICT — both current train-500 gates green
 
 Ready for lamp-voice: no (#4848 needs TWO READS; #4782 needs its lamp replay).
