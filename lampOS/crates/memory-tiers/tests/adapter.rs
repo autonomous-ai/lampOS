@@ -561,6 +561,37 @@ fn broker_timeout_is_bounded_and_never_retries() {
 }
 
 #[test]
+fn an_over_cap_night_is_skipped_and_the_next_night_still_applies() {
+    let mut p = ArmProcess::new("tiers");
+    assert_eq!(
+        p.ingest("source-1", "Maybe I prefer a blue notebook.", 1000)["ok"],
+        true
+    );
+    let facts: Vec<Value> = (0..33)
+        .map(|i| json!({"key":format!("note-{i}"),"claim":"May prefer a blue notebook.","record_ids":[1],"strength":"said","kind":"preference","true_since_ms":1000,"true_until_ms":null,"supersedes":null}))
+        .collect();
+    let over = json!({"facts":facts,"lines":[],"episodes":[]}).to_string();
+    let (_, skipped) = p.sleep(1100, &over);
+    assert_eq!(skipped["ok"], true, "{skipped}");
+    assert_eq!(skipped["data"]["applied"], false);
+    assert_eq!(skipped["data"]["pending"], false);
+    assert_eq!(skipped["data"]["next_cursor"], Value::Null);
+    assert_eq!(skipped["data"]["source_ids"], json!([]));
+    assert!(
+        skipped["data"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("too many proposals"),
+        "{skipped}"
+    );
+    let (_, next) = p.sleep(1200, &proposal());
+    assert_eq!(next["ok"], true, "{next}");
+    assert_eq!(next["data"]["applied"], true);
+    assert_eq!(next["data"]["source_ids"], json!(["source-1"]));
+    assert_eq!(p.inspect()["data"]["stats"]["skipped_sleeps"], 1);
+    p.close();
+}
+#[test]
 fn bounded_sleep_reports_pending_and_rejection_keeps_the_batch() {
     let mut p = ArmProcess::new("tiers");
     for i in 0..129 {
@@ -580,7 +611,10 @@ fn bounded_sleep_reports_pending_and_rejection_keeps_the_batch() {
     assert_eq!(first["data"]["source_ids"].as_array().unwrap().len(), 128);
     let (_, rejected) = p.sleep(2000, &proposal());
     assert_eq!(rejected["data"]["applied"], false);
-    assert_eq!(rejected["data"]["pending"], true);
+    // A refused night is skipped with no pending work (the runner refuses pending work
+    // without a cursor); its batch stays for the next night.
+    assert_eq!(rejected["data"]["pending"], false);
+    assert_eq!(rejected["data"]["next_cursor"], Value::Null);
     assert_eq!(
         p.ingest("backdated", "An earlier observation.", 1900)["ok"],
         false

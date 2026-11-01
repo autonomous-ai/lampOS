@@ -16,6 +16,7 @@ if uncertain, save nothing. Retain conditions and exceptions. Never delete.
 Change owner-model lines individually and only with evidence; at most a quarter.
 Taught rules will be copied verbatim by code. Learned patterns need repeated evidence.
 Return exactly one json object with arrays facts, lines, episodes. Empty arrays are valid.
+At most 32 facts, 32 lines and 32 episodes; keep the strongest.
 Fact: {key,claim,record_ids,strength,kind,true_since_ms,true_until_ms,supersedes}.
 strength: said|maybe|plan. kind: identity|preference|habit|statement|plan|appointment.
 Line: {replaces,kind,text,fact_ids,fact_keys}. Use facts already offered or keys from

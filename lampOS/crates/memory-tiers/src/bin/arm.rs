@@ -221,6 +221,7 @@ struct Adapter {
     config: Config,
     requests: BTreeSet<String>,
     model_calls: u64,
+    skipped_sleeps: u64,
     usage: diagnostics::Usage,
     closed: bool,
 }
@@ -236,10 +237,16 @@ impl Default for Adapter {
             config: Config::default(),
             requests: BTreeSet::new(),
             model_calls: 0,
+            skipped_sleeps: 0,
             usage: diagnostics::Usage::default(),
             closed: false,
         }
     }
+}
+/// A sleep the store refused: not applied, and no pending work, since the
+/// runner refuses pending work without a cursor; the records stay eligible.
+fn skipped_night(reason: &str) -> Value {
+    json!({"applied":false,"source_ids":[],"reason":format!("skipped night: {reason}"),"pending":false,"next_cursor":null})
 }
 fn parse<T: serde::de::DeserializeOwned>(value: Value) -> Result<T> {
     serde_json::from_value(value).map_err(|_| Error::Invalid("invalid operation data"))
@@ -498,9 +505,10 @@ impl Adapter {
                                     "reason":null,"pending":pending,"next_cursor":if pending{input.records().last().map(|r|format!("topics-after-{}",r.id))}else{None}}),
                             )
                         }
-                        Err(Error::Invalid(reason)) => Ok(
-                            json!({"applied":false,"source_ids":[],"reason":reason,"pending":true,"next_cursor":null}),
-                        ),
+                        Err(Error::Invalid(reason)) => {
+                            self.skipped_sleeps += 1;
+                            Ok(skipped_night(reason))
+                        }
                         Err(error) => Err(error),
                     };
                 }
@@ -529,7 +537,18 @@ impl Adapter {
                         &self.config,
                     )
                     .await?;
-                let proposal = self.arm.filter_proposal(&proposal)?;
+                // A proposal the store refuses (too many, too large, a bad schema) is a
+                // skipped night: nothing of it is applied, its records stay for the
+                // next night, and the run goes on (the bench, 2 Nov: one over-cap
+                // night ended a whole Tiers setup).
+                let proposal = match self.arm.filter_proposal(&proposal) {
+                    Ok(proposal) => proposal,
+                    Err(Error::Invalid(reason)) => {
+                        self.skipped_sleeps += 1;
+                        return Ok(skipped_night(reason));
+                    }
+                    Err(error) => return Err(error),
+                };
                 match context.store.apply_sleep(&input, &proposal) {
                     Ok(report) => {
                         let sources = source_ids(
@@ -542,9 +561,10 @@ impl Adapter {
                             json!({"applied":true,"source_ids":sources,"reason":null,"pending":report.pending,"next_cursor":if report.pending {input.records().last().map(|r|format!("after-{}",r.id))}else{None}}),
                         )
                     }
-                    Err(Error::Invalid(reason)) => Ok(
-                        json!({"applied":false,"source_ids":[],"reason":reason,"pending":true,"next_cursor":null}),
-                    ),
+                    Err(Error::Invalid(reason)) => {
+                        self.skipped_sleeps += 1;
+                        Ok(skipped_night(reason))
+                    }
                     Err(error) => Err(error),
                 }
             }
@@ -736,7 +756,7 @@ impl Adapter {
                     self.arm,
                 )?);
                 Ok(
-                    json!({"owner_model":lines,"retained_record_ids":retained,"stats":{"records":records.len(),"last_context_bytes":context.policy.last_bytes,"snapshot_bytes":context.policy.snapshot_bytes,"last_recall_timed_out":context.policy.last_timed_out,"recalls":context.policy.recalls,"recall_misses":context.policy.misses,"model_calls":self.model_calls,"arm_description":self.arm.description()},"diagnostics":diagnostics}),
+                    json!({"owner_model":lines,"retained_record_ids":retained,"stats":{"records":records.len(),"last_context_bytes":context.policy.last_bytes,"snapshot_bytes":context.policy.snapshot_bytes,"last_recall_timed_out":context.policy.last_timed_out,"recalls":context.policy.recalls,"recall_misses":context.policy.misses,"model_calls":self.model_calls,"skipped_sleeps":self.skipped_sleeps,"arm_description":self.arm.description()},"diagnostics":diagnostics}),
                 )
             }
             "close" => {
