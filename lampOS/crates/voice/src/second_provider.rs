@@ -651,6 +651,16 @@ pub const BUSY_ENDS_SOONER_ENVIRONMENT: &str = "LAMP_BUSY_ENDS_SOONER";
 /// else (the owner's P1 on Queue #3126, `worker::Heeding::carrying_the_same_speaker`).
 pub const SAME_SPEAKER_CARRIES_ENVIRONMENT: &str = "LAMP_SAME_SPEAKER_CARRIES";
 
+/// Where the worker reads whether, with the same-voice check, a line in
+/// another voice than the conversation's is held for itself while the
+/// conversation goes on for its caller: `on`, and nothing else (#4306,
+/// `worker::Heeding::keeping_the_conversation_past_another_voice`). Off, one
+/// such line ends the conversation, as #829 made it: on lamp-4ace on 2 Nov
+/// (00:09–00:30, rUSV1–3) the product's unit with the speaker model left
+/// desk lines alone 6, 6 and 5 of 6 but answered talk 7, 7 and 1 of 12,
+/// the caller's own next lines held as no conversation going on.
+pub const OTHER_VOICE_KEEPS_CONVERSATION_ENVIRONMENT: &str = "LAMP_OTHER_VOICE_KEEPS_CONVERSATION";
+
 /// Where the worker reads whether a line is in a known person's scope only
 /// when their own face was seen speaking it, else the room's: `on`, and
 /// nothing else, with `LAMP_SECOND_SPEAKING_FACE` ([`Engine::scoping_by_sight`],
