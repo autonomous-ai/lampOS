@@ -24,6 +24,9 @@ use std::{
 };
 
 pub(crate) mod query;
+#[cfg(test)]
+mod skill_reset_tests;
+mod skill_staging;
 
 /// The product plan's journal, read by Wi-Fi's restore of an old network
 /// ([`wifi_restore_allowed`]).
@@ -296,6 +299,102 @@ pub trait Effects {
     fn forget(&mut self, argv: &[String]) -> io::Result<()> {
         self.run(argv)
     }
+    /// The skills a person put on from a package removed,
+    /// [`remove_installed_skills`] in [`SKILLS`]; how many.
+    fn remove_installed_skills(&mut self) -> io::Result<usize>;
+}
+
+/// The product's skills folder (`lamp_update::product_skills::FOLDER`).
+pub const SKILLS: &str = lamp_update::product_skills::FOLDER;
+
+/// What a skill put on from a package keeps beside it,
+/// `lamp_skills::package::INSTALLED_FROM`, named here so the reset needs no
+/// skills crate, and with it no voice (Third on the branch, 1 Nov 11:30); a
+/// test holds the two equal.
+pub const INSTALLED_FROM: &str = ".package.json";
+
+/// A reset's one pending skill, renamed before deletion so neither the
+/// selection mark nor the person's chosen folder name is needed to resume.
+const SKILL_PENDING: &str = ".reset-skill-pending";
+
+/// Each skill in `folder` a person put on from a package, made by voice
+/// (`LAMP_MAKE_SKILL`) or from the Store, removed with its folder: it holds
+/// [`INSTALLED_FROM`], which a skill that comes with
+/// the lamp never does, so the lamp's own stay, as install and each round
+/// put them back. A made skill is the person's, and it outlived the plan's
+/// wipes (the Queue, #4710, 1 Nov 02:4x). Not a plan path: the plan empties
+/// a path and keeps it, and a plan field this build doesn't know refuses
+/// the whole reset. Each selected folder is renamed to [`SKILL_PENDING`]
+/// and its parent synced before deleting contents. Resume always finishes
+/// that pending folder, even without its package mark. Installer staging
+/// and retired folders are selected by their
+/// reserved names, even before a package mark was written. A link is passed
+/// over and a missing folder removes nothing. Returns removed folders in order.
+pub fn remove_installed_skills(folder: &Path) -> io::Result<Vec<PathBuf>> {
+    remove_installed_skills_with(folder, &mut || Ok(()))
+}
+
+// The callback lets tests interrupt the actual deletion traversal, including
+// inside nested folders and immediately after the package mark is unlinked.
+fn remove_installed_skills_with(
+    folder: &Path,
+    after_remove: &mut impl FnMut() -> io::Result<()>,
+) -> io::Result<Vec<PathBuf>> {
+    let entries = match fs::read_dir(folder) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let mut skills = Vec::new();
+    let pending = folder.join(SKILL_PENDING);
+    for entry in entries {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            if entry.file_name() == SKILL_PENDING {
+                return Err(io::Error::other("reset's pending skill is not a directory"));
+            }
+            continue;
+        }
+        let skill = entry.path();
+        if skill == pending
+            || entry
+                .file_name()
+                .to_str()
+                .is_some_and(skill_staging::left_by_a_run)
+        {
+            skills.push(skill);
+            continue;
+        }
+        match fs::symlink_metadata(skill.join(INSTALLED_FROM)) {
+            Ok(_) => skills.push(skill),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    // Finish a prior interruption before reusing the single pending place.
+    skills.sort_by_key(|skill| (skill != &pending, skill.clone()));
+    if skills.is_empty() {
+        return Ok(skills);
+    }
+    let parent = open_dir(folder)?;
+    for skill in &skills {
+        if skill != &pending {
+            rustix::fs::renameat(&parent, skill.file_name().unwrap(), &parent, SKILL_PENDING)?;
+            after_remove()?;
+        }
+        // No contents are touched until the deletion decision and removal
+        // of the person's folder name are durable. A retry needs no marker.
+        rustix::fs::fsync(&parent)?;
+        after_remove()?;
+        let dir = open_dir(&pending)?;
+        empty_with(&dir, after_remove)?;
+        rustix::fs::fsync(&dir)?;
+        after_remove()?;
+        rustix::fs::unlinkat(&parent, SKILL_PENDING, AtFlags::REMOVEDIR)?;
+        after_remove()?;
+        rustix::fs::fsync(&parent)?;
+    }
+    Ok(skills)
 }
 
 /// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
@@ -343,6 +442,9 @@ impl Effects for System {
     fn forget(&mut self, argv: &[String]) -> io::Result<()> {
         run_within(argv, crate::wifi::QUERY_TIMEOUT)
     }
+    fn remove_installed_skills(&mut self) -> io::Result<usize> {
+        remove_installed_skills(Path::new(SKILLS)).map(|removed| removed.len())
+    }
 }
 
 /// `argv` run and killed with its children once `most` has passed
@@ -367,6 +469,10 @@ pub enum Step {
     Wiped(PathBuf),
     MarkerRemoved,
     JournalRemoved,
+    /// Skills put on from a package removed, [`remove_installed_skills`]: by
+    /// count, never by name, since a made skill's name is the person's words
+    /// and the journal outlives the reset (Reviewer-two's P3 on the branch).
+    InstalledSkillsRemoved,
     /// Setup and what a boot starts, started in place of a reboot (#4500).
     Started,
     Rebooting,
@@ -422,6 +528,11 @@ fn is_dir(stat: &rustix::fs::Stat) -> bool {
 
 /// Remove everything inside the open directory, by handle.
 fn empty(dir: &OwnedFd) -> io::Result<()> {
+    empty_with(dir, &mut || Ok(()))
+}
+
+/// Empty by handle, with an interruption point after each removed entry.
+fn empty_with(dir: &OwnedFd, after_remove: &mut impl FnMut() -> io::Result<()>) -> io::Result<()> {
     let mut names = Vec::new();
     for entry in rustix::fs::Dir::read_from(dir)? {
         let name = entry?.file_name().to_owned();
@@ -434,11 +545,12 @@ fn empty(dir: &OwnedFd) -> io::Result<()> {
         if is_dir(&stat) {
             let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
             let child = rustix::fs::openat(dir, name.as_c_str(), flags, Mode::empty())?;
-            empty(&child)?;
+            empty_with(&child, after_remove)?;
             rustix::fs::unlinkat(dir, name.as_c_str(), AtFlags::REMOVEDIR)?;
         } else {
             rustix::fs::unlinkat(dir, name.as_c_str(), AtFlags::empty())?;
         }
+        after_remove()?;
     }
     Ok(())
 }
@@ -880,6 +992,11 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         wipe(&path.with_extension(STAGED))?;
         wipe(path)?;
         steps.push(Step::Wiped(path.clone()));
+    }
+    let removed = effects.remove_installed_skills()?;
+    if removed > 0 {
+        eprintln!("lamp-setup: reset: removed {removed} skills put on from a package");
+        steps.push(Step::InstalledSkillsRemoved);
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {
