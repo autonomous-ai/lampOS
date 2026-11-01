@@ -1066,6 +1066,7 @@ person's key or the account's password.
 for f in /var/lib/lampos-setup/done /etc/lampOS/voice/credential \
          /etc/lampOS/policy/jev.key /etc/lampOS/person/name \
          /etc/localtime /etc/timezone /etc/lampOS/zone.env \
+         /etc/lampOS/setup/language \
          /etc/lampOS/setup/backend.json /etc/lampOS/setup/reports.json \
          /etc/wpa_supplicant/wpa_supplicant-wlan0.conf; do
   sudo stat -c '%a %U %n' "$f" 2>/dev/null || echo "missing $f"
@@ -1089,11 +1090,12 @@ readlink /etc/localtime
 | `/etc/lampOS/setup/backend.json` (the app's link) | 600 root, **only when the app's request carried a whole link** | wiped |
 | `/etc/lampOS/setup/reports.json` (the answer on reports, #1683) | 644 root, at every setup, a no included, unless the write failed | wiped |
 | `/etc/lampOS/setup/display-name` (the lamp's name in the app, #1959) | not written by setup; 644 root after a `device.rename` from the app | wiped |
+| `/etc/lampOS/voice/own` (the person's own keys, #2094) | absent; with `LAMP_OWN_KEYS=on` (off in the product), a 700 root folder with each key that worked when checked, 600 | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
 
 Setup saves them in this order: the name, the zone, the language, the backend's link, the
-answer on reports, the key, then the marker. So a marker means all the others were written, but
-the backend's link and the answer on reports: those are best effort, and a marker with no
+answer on reports, the key, the person's own keys, then the marker. So a marker means all the others were written, but
+the backend's link, the answer on reports and the own keys: those are best effort, and a marker with no
 `backend.json` is what a failed write leaves (its journal line is below). The
 reset plan (`reset-plan-product.json`) also wipes the person's stores
 (memory, faces, a labelled session's face reads (`seems.log`) and the glance log (`glance.log`), tasks and Harness's sign-in, schedule, the Policy's and
