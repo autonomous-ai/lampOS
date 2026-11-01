@@ -244,11 +244,32 @@ fn missing_turns_and_future_gold_sources_fail_before_dispatch() {
     );
 }
 #[test]
-fn malformed_or_wrong_rubric_judgments_are_incomplete_and_still_charged() {
+fn malformed_judge_replies_score_zero_with_audit_and_are_still_charged() {
+    // Not the registered judge JSON (here an extra field): policy `invalid_output`.
+    let (mut worker, _) = worker(
+        json!({"awarded":[true,true,true],"explanation":"extra","evidence_ids":[],"arm":"leak"}),
+    );
+    let result = evaluation::evaluate(
+        &question(false),
+        &[answer("test")],
+        &[source()],
+        "UTC",
+        &mut worker,
+    )
+    .unwrap();
+    assert_eq!(result.score.fraction, Some(0.0));
+    assert!(result.score.needs_audit && !result.score.needs_judge);
+    assert_eq!(result.score.reason, evaluation::MALFORMED_JUDGE);
+    assert!(result.judge.is_none() && result.judge_request_hash.is_some());
+    let account = worker.finish(deadline()).unwrap();
+    assert_eq!(account.receipts.len(), 1);
+    assert_eq!(account.charged_microusd, 2);
+}
+#[test]
+fn wrong_rubric_judgments_are_incomplete_and_still_charged() {
     for bad in [
         json!({"awarded":[true],"explanation":"short","evidence_ids":["source-a"]}),
         json!({"awarded":[true,true,true],"explanation":"unsupported","evidence_ids":["future-source"]}),
-        json!({"awarded":[true,true,true],"explanation":"extra","evidence_ids":[],"arm":"leak"}),
     ] {
         let (mut worker, _) = worker(bad);
         assert!(

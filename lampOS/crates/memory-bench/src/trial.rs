@@ -119,6 +119,8 @@ impl Trial<'_> {
         let mut audit = Vec::new();
         let mut probes = 0;
         let mut turns = 0;
+        let mut malformed_answers = 0;
+        let mut malformed_judgments = 0;
         let mut nights = 0;
         let ends = self.corpus.day_end_records()?;
         let memory_mode = match self.arm {
@@ -150,6 +152,7 @@ impl Trial<'_> {
                 let mut conversation = recent.clone();
                 let mut answers = Vec::<Answer>::new();
                 let mut recorded = Vec::new();
+                let mut any_malformed = false;
                 for (index, query) in std::iter::once(&question.query)
                     .chain(&question.followups)
                     .enumerate()
@@ -187,6 +190,10 @@ impl Trial<'_> {
                     };
                     conversation.record(&exchange, final_effect)?;
                     recorded.push(!final_effect.suppress_confirmation);
+                    if result.malformed {
+                        any_malformed = true;
+                        malformed_answers += 1;
+                    }
                     answers.push(result.answer);
                     turns += 1;
                 }
@@ -211,14 +218,21 @@ impl Trial<'_> {
                     }
                 }
                 if self.mode == Mode::Live {
-                    let evaluated = evaluation::evaluate_with_history(
-                        question,
-                        &answers,
-                        &recorded,
-                        &self.corpus.events,
-                        &self.corpus.persona.timezone,
-                        ops.worker,
-                    )?;
+                    let evaluated = if any_malformed {
+                        evaluation::malformed(evaluation::MALFORMED_ANSWER, None)
+                    } else {
+                        evaluation::evaluate_with_history(
+                            question,
+                            &answers,
+                            &recorded,
+                            &self.corpus.events,
+                            &self.corpus.persona.timezone,
+                            ops.worker,
+                        )?
+                    };
+                    if evaluated.score.reason == evaluation::MALFORMED_JUDGE {
+                        malformed_judgments += 1;
+                    }
                     if evaluated.score.needs_audit {
                         audit.push(question.id.clone());
                     }
@@ -286,7 +300,7 @@ impl Trial<'_> {
             (kind,json!({"questions":values.len(),"mean":mean,"scored":values.iter().flatten().count()}))
         }).collect();
         Ok(
-            json!({"label":if self.mode==Mode::Live {"live; provisional pending human audit"}else{"plumbing check"},"arm":self.arm,"events":self.observed.len(),"questions":probes,"answer_turns":turns,"nights":nights,"weekly_passes":nights/7,"by_kind":by_kind,"overall":overall,"human_audit":audit,"tier_usage":coverage,"fixture_profile":self.corpus.profile,"coverage_gaps":["no second identified person","no delivered-recall acknowledgement",if matches!(self.corpus.profile,Profile::Month){"fading not exercised by this month"}else{"fading requires live metadata audit"},"current-product in-turn forgetting is weaker than the uniform bench restart"],"score_status":if self.mode==Mode::Live{"provisional"}else{"no scores"}}),
+            json!({"label":if self.mode==Mode::Live {"live; provisional pending human audit"}else{"plumbing check"},"arm":self.arm,"events":self.observed.len(),"questions":probes,"answer_turns":turns,"malformed_answers":malformed_answers,"malformed_judgments":malformed_judgments,"nights":nights,"weekly_passes":nights/7,"by_kind":by_kind,"overall":overall,"human_audit":audit,"tier_usage":coverage,"fixture_profile":self.corpus.profile,"coverage_gaps":["no second identified person","no delivered-recall acknowledgement",if matches!(self.corpus.profile,Profile::Month){"fading not exercised by this month"}else{"fading requires live metadata audit"},"current-product in-turn forgetting is weaker than the uniform bench restart"],"score_status":if self.mode==Mode::Live{"provisional"}else{"no scores"}}),
         )
     }
 }

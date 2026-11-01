@@ -630,6 +630,10 @@ pub fn preliminary_report(
         if row["status"] == "completed" {
             let entries: Vec<Entry> = files::lines(&path.join("events.jsonl"))?;
             row["reported_models"] = json!(reported_models(&entries)?);
+            if let Some(result) = entries.last().map(|e| &e.data) {
+                row["malformed_answers"] = result["malformed_answers"].clone();
+                row["malformed_judgments"] = result["malformed_judgments"].clone();
+            }
             ledgers.insert(arm.clone(), entries);
         }
         setups.push(json!({"arm":arm,"label":label(arm),"revision":policy.adapters[arm].revision,"executable_sha256":policy.adapters[arm].executable_sha256,"run":row}));

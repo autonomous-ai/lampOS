@@ -183,8 +183,12 @@ or dialogue; they never establish independent owner facts. Fixed probe questions
 remain scripted input, separate from the generated answer.
 
 Exact, date, abstention, forbidden-claim and citation checks take precedence over
-the judge. Malformed answers or judgments remain incomplete, without silent repair
-or a numeric score. Rubric results remain provisional pending human audit. The
+the judge. An answer reply that is empty, whitespace, not the registered JSON or
+out of bounds is recorded as a malformed answer; its question scores 0 with audit
+and no judge call. A malformed judge reply scores its question 0 with audit. Both
+are counted in the run summary and on the card (`malformed_answers`,
+`malformed_judgments`); nothing is repaired or retried. A failed call still leaves
+the attempt incomplete. Rubric results remain provisional pending human audit. The
 existing scorer rules, original questions and answer keys are unchanged. Unit
 fixtures test wrong and contradictory answers; they are not benchmark results.
 

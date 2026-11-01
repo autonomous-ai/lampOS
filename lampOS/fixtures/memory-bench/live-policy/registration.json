@@ -12,7 +12,7 @@
   "multi_turn": "all turns scored together; not just the last answer",
   "probe_citations": "an answer may cite a source from the main prefix or an earlier completed exchange in its own isolated probe, never a future or current exchange; restoration removes probe sources",
   "deterministic_precedence": "exact/date/abstention/forbidden claims and unsupported citations cannot be overruled by the judge",
-  "invalid_output": "failed or malformed answer/judge output leaves the trial incomplete; no numerical score, silent repair or unregistered retry",
+  "invalid_output": "an answer reply that is empty, whitespace, not the registered JSON or out of bounds is recorded as a malformed answer and its question scores 0 with audit, with no judge call; a malformed judge reply scores its question 0 with audit; both are counted in the run summary; a failed call still leaves the trial incomplete; no silent repair or unregistered retry",
   "human_audit": "rubric scores are provisional until audited; preserve every registered audit and suspected privacy failure",
   "judge_sources": "gold and eligible candidate-cited scripted records plus fixed probe questions; generated candidate answers have explicit IDs and can witness timing or dialogue, never establish independent owner facts",
   "forget_restart": "after an actual forget attempt, drop the current round and all cached memory, take a fresh snapshot and restart from the current question plus a content-free forget-status note; apply uniformly to every setup",
