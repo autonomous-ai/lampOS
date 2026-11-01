@@ -1,5 +1,52 @@
 # Bench work log
 
+## 1 November 2026: preliminary one-run kind and lamp runbook
+
+Ready for lamp-voice: no
+
+Taken from the Lead on 1 November, for the owner's ask to test the new
+memory the lamp way: the generated month, then recall questions, for no
+memory, full history, partial current product and the full Tiers engine,
+one run each, under a $40 cap.
+
+Code `f17c747a000256d3af006fdf1d576eb4073e35b8` on `bench/memory-bench`
+([PR #4753](https://github.com/autonomous-ai/lampOS/pull/4753), still a
+draft) adds a `preliminary` policy kind: one repetition, the `development`
+fixture only, exactly those four setups. Every manifest, result and failure
+says `preliminary: one run, development month, not the registered score`.
+`preliminary-card` shows each run with the registered slot checks, the
+reported chat models, spend and ten example questions chosen by registration
+order alone. `campaign-card` refuses a preliminary policy, and a preliminary
+ledger in a registered slot reads `invalid` there
+(`score_card_refuses_a_preliminary_ledger`). The field is omitted when false,
+so registered policy hashes are unchanged. No registered rule, fixture,
+question or scorer changed; the held-back persona was not used.
+`crates/memory-bench/preliminary/policy.template.json` is the policy the
+lamp runbook fills ($39 of allowances under a $40 approval); a test keeps it
+valid.
+
+Validation on macOS (Intel), Rust 1.96.0, from `lampOS/`, on `f17c747a0`:
+`cargo fmt --all --check` pass; strict clippy for the crate, all targets,
+pass; `cargo test -q -p lamp-memory-bench` 159 passed, 0 failed;
+`cargo build -q --workspace` pass. The fake chat server in
+`tests/live_campaign.rs` now lives 15 minutes, not 5: with two fake-service
+months at once the binary took 6.6 minutes, and both month tests failed with
+"chat connection or headers failed" before the change and pass after. The
+build output was cleaned and the shared build slot released.
+
+The Swarm Mac has no relay key in any documented place (no lamp key file, no
+simulator config, no builder note). The owner moved the run to the first
+builder on lamp-4ace through its relay route:
+[runbook](https://github.com/autonomous-ai/lampOS/pull/4753#issuecomment-6555107923).
+No real service call or score exists from this builder.
+
+Most likely wrong here: the reported model name is pinned from one tiny call
+at run time; the 1,048,576-token context assumed for `deepseek-flash` may be
+larger than the relay allows, which would leave late full-history answers
+unsupported, as registered; the Tiers adapter must be built with its
+revision stamped (CI's artifact reports `unversioned`); the month's audio
+needs a Mac's `say`.
+
 ## 31 October 2026: offline execution and complete comparison (#4745)
 
 Ready for lamp-voice: no
