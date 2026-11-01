@@ -1707,6 +1707,8 @@ fn second_route_worker_environment(
         crate::unfinished_words::ENVIRONMENT,
         // Read by the second route's same-voice check (#2602).
         crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+        // The asker's likeness, measured only, for Jev's fit (#4306).
+        crate::second_provider::LIKE_ASKER_MEASURE_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
@@ -1865,6 +1867,7 @@ mod tests {
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+            crate::second_provider::LIKE_ASKER_MEASURE_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
