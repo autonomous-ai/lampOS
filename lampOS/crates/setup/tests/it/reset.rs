@@ -1591,6 +1591,42 @@ fn check_reads_the_product_plan_install_places() {
     }
 }
 
+/// setup.md's "The person's data, which reset wipes" is the docs' list of
+/// what a reset wipes, and it had fallen twelve stores behind the plan
+/// (`seems.log`, `skills-dev`, the Wi-Fi's file, …). Each path the product
+/// plan wipes is named there,
+/// whole or as a folder (`/var/lib/lampos-eyes/`) with its rest in backticks
+/// (`seems.log`).
+#[test]
+fn setup_md_names_every_store_the_product_plan_wipes() {
+    let plan: serde_json::Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/setup.md");
+    let doc = fs::read_to_string(doc).unwrap();
+    let section = doc
+        .split("\n## The person's data, which reset wipes\n")
+        .nth(1)
+        .and_then(|rest| rest.split("\n## ").next())
+        .expect("docs/setup.md has \"The person's data, which reset wipes\"");
+    let unnamed: Vec<&str> = plan["wipe"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|path| path.as_str().unwrap())
+        .filter(|path| {
+            !section.contains(path)
+                && !path.match_indices('/').any(|(at, _)| {
+                    section.contains(&path[..=at])
+                        && section.contains(&format!("`{}`", &path[at + 1..]))
+                })
+        })
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "docs/setup.md's \"The person's data, which reset wipes\" leaves out {unnamed:?}"
+    );
+}
+
 /// #3710: lamp-setup-reset.service is read-only but the bus, so an enabled
 /// watcher whose plan has no `detach` would run the reset in there and wipe
 /// nothing after the button. It is refused at start instead, before the bus
