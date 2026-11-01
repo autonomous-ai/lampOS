@@ -641,14 +641,14 @@ rule (`PUTS_OFF`, `PUTS_OFF_TOGETHER`, short or firm) made strict. English
 keeps its own rules (#4469, #4480). An hour
 counts with its own "o'clock" (十時, 十点, 열 시, mười giờ), since that is
 already the time cue English needs a "from" or an "at" for. With the nudge
-on, of the other languages only Korean takes a name from the line (the one
-word left once "내 이름은", "나", "저는" and the like are out), so in the
-rest none is asked back and the model keeps "who you are". The Korean name
-drops its copula ending: 민수예요, 민준이에요, 민수입니다 and the casual
-vocative 민수야 and 민준이야 are 민수 and 민준, not "민수야 님". 야 goes only
-after a syllable with no final consonant and 이야 only after one with it,
-a stem of one syllable keeps its 야 ("수야"), and a name ending in 아 keeps
-it ("지아예요" is 지아).
+on, no name is taken from a line in another language, so none is asked back
+and the model keeps "who you are". In Korean, the name `remember_my_face`
+keeps (and the owner's name "who you are" keeps and greets) drops the casual
+vocative copula (`language::without_vocative`, a Korean commenter's note on
+#4473): 민수야 and 민준이야 are 민수 and 민준, not "민수야 님". 야 goes only
+after a syllable with no final consonant and 이야 only after one with it; a
+stem of one syllable keeps its 야 ("수야"), and a name ending in 아 keeps it
+("지아"). The name is checked against what was heard as said.
 
 | Words | vi | ja | zh | ko |
 |---|---|---|---|---|
