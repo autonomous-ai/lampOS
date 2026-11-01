@@ -710,3 +710,40 @@ fn rejected_sse_is_checked_for_escaped_credentials() {
         assert!(client.stopped());
     }
 }
+#[test]
+fn a_whitespace_only_json_mode_stream_is_a_reply_not_a_transport_failure() {
+    // DeepSeek's JSON mode streamed 16 spaces with finish_reason "stop" on the
+    // first live preliminary run (1 Nov); the answer loop records it as malformed.
+    let temp = Temp::new();
+    let raw = wire(
+        &[
+            event(
+                json!({"role":"assistant","content":""}),
+                Value::Null,
+                Value::Null,
+            ),
+            event(json!({"content":"        "}), Value::Null, Value::Null),
+            event(json!({"content":"        "}), Value::Null, Value::Null),
+            event(
+                json!({"content":""}),
+                json!("stop"),
+                json!({"prompt_tokens":391,"completion_tokens":4,"total_tokens":395}),
+            ),
+        ],
+        true,
+    );
+    let mut server = Server::new(
+        "200 OK",
+        "text/event-stream; charset=utf-8",
+        raw,
+        true,
+        Duration::ZERO,
+    );
+    let mut client = client(&server, &temp);
+    let reply = client
+        .call(&call(), Instant::now() + Duration::from_secs(3))
+        .unwrap();
+    assert_eq!(reply.content.as_deref(), Some(" ".repeat(16).as_str()));
+    assert!(reply.tool_calls.is_empty());
+    server.finish();
+}
