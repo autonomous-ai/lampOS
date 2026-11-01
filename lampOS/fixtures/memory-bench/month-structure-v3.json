@@ -1,0 +1,67 @@
+{
+  "registration_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+  "event_count": 2220,
+  "kind": {
+    "arrive": 120,
+    "session_start": 240,
+    "utterance": 1500,
+    "session_end": 240,
+    "leave": 120
+  },
+  "person": {
+    "owner": 2213,
+    "visitor": 7
+  },
+  "presence": {
+    "owner_alone": 2093,
+    "unknown": 120,
+    "others": 7
+  },
+  "sessions": 240,
+  "anonymous_person_ids": 1,
+  "event_cues": {
+    "topic": 0,
+    "activity": 2220,
+    "objects": 0
+  },
+  "utterance_cues": {
+    "topic": 0,
+    "activity": 1500,
+    "objects": 0
+  },
+  "event_span_days": 29.319351851851852,
+  "question_count": 200,
+  "query_count": 224,
+  "categories": {
+    "recall": 40,
+    "when": 20,
+    "changed_facts": 20,
+    "across_days": 20,
+    "understanding": 24,
+    "preferences": 20,
+    "ahead": 12,
+    "not_knowing": 12,
+    "visitors": 9,
+    "wrong_person_retention": 3,
+    "forgetting": 10,
+    "decoys": 10
+  },
+  "query_person": {
+    "owner": 215,
+    "visitor": 9
+  },
+  "query_presence": {
+    "owner_alone": 215,
+    "others": 9
+  },
+  "query_cues": {
+    "topic": 0,
+    "activity": 0,
+    "objects": 0
+  },
+  "query_time_span_days": 28.370486111111113,
+  "context_caps": [
+    1048576
+  ],
+  "anchor_matches": 200
+}

@@ -1,0 +1,262 @@
+use lamp_memory_bench::{
+    Result, corpus, files, invalid, ledger,
+    score::{Answer, Question},
+};
+use serde_json::json;
+use std::{collections::BTreeMap, path::Path};
+fn fixture_mode(mode: &str) -> Result<bool> {
+    match mode {
+        "fixture" => Ok(true),
+        "live" => Ok(false),
+        _ => Err(invalid("mode must be live or fixture")),
+    }
+}
+fn run(args: &[String]) -> Result<()> {
+    match args {
+        [command, policy, approval, campaign, mode] if command == "campaign-card" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            println!(
+                "{}",
+                lamp_memory_bench::comparison::report(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [command, policy, approval, campaign, mode] if command == "preliminary-card" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            println!(
+                "{}",
+                lamp_memory_bench::comparison::preliminary_report(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [command, policy, approval, campaign, mode] if command == "campaign-init" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            println!(
+                "{}",
+                lamp_memory_bench::live_run::initialize(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [command, policy, approval, campaign, run, mode] if command == "campaign-run" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            let run = files::json_file(Path::new(run))?;
+            println!(
+                "{}",
+                lamp_memory_bench::live_run::execute(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    &run,
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [
+            command,
+            policy,
+            approval,
+            campaign,
+            fixture,
+            source,
+            audio,
+            mode,
+        ] if command == "campaign-speech" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            println!(
+                "{}",
+                lamp_memory_bench::live_run::create_speech(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    fixture,
+                    Path::new(source),
+                    Path::new(audio),
+                    fixture_mode(mode)?
+                )?
+            );
+        }
+        [command, policy, mode] if command == "validate-policy" => {
+            let policy: lamp_memory_bench::live_plan::Policy = files::json_file(Path::new(policy))?;
+            policy.validate(fixture_mode(mode)?)?;
+            println!(
+                "{}",
+                json!({"policy_sha256":policy.hash()?,"planned_microusd":policy.planned_microusd()?,"approval_granted":false,"scores":null})
+            );
+        }
+        [command, month, scenario, destination] if command == "generate-aging" => {
+            let corpus = lamp_memory_bench::aging::write(
+                Path::new(month),
+                Path::new(scenario),
+                Path::new(destination),
+            )?;
+            println!(
+                "{}",
+                json!({"events":corpus.events.len(),"questions":corpus.questions.len(),"days":corpus.day_end_records()?.len(),"status":"registered aging fixture; not scored"})
+            );
+        }
+        [
+            command,
+            fixture,
+            output,
+            arm,
+            revision,
+            registration,
+            recorded,
+            adapter,
+            adapter_revision,
+        ] if command == "plumbing-external" => println!(
+            "{}",
+            lamp_memory_bench::plumbing::run_with_adapter(
+                Path::new(fixture),
+                Path::new(output),
+                arm,
+                revision,
+                registration,
+                Path::new(recorded),
+                lamp_memory_bench::plumbing::AdapterSpec {
+                    executable: Path::new(adapter),
+                    args: vec![],
+                    revision: adapter_revision
+                }
+            )?
+        ),
+        [command, source, cache, pin, mode] if command == "verify-speech-cache" => {
+            let live = match mode.as_str() {
+                "live" => true,
+                "fixture" => false,
+                _ => return Err(invalid("cache mode must be live or fixture")),
+            };
+            let events = lamp_memory_bench::speech_cache::load(
+                Path::new(cache),
+                Path::new(source),
+                pin,
+                live,
+            )?;
+            println!(
+                "{}",
+                json!({"verified":true,"events":events.len(),"mode":mode,"manifest_sha256":pin,"scores":null})
+            );
+        }
+        [command, events, destination, voice, rate] if command == "speech-prepare" => println!(
+            "{}",
+            lamp_memory_bench::speech::prepare(
+                Path::new(events),
+                Path::new(destination),
+                voice,
+                rate.parse().map_err(|_| invalid("invalid TTS rate"))?
+            )?
+        ),
+        [
+            command,
+            fixture,
+            output,
+            arm,
+            revision,
+            registration,
+            recorded,
+        ] if command == "plumbing" => println!(
+            "{}",
+            lamp_memory_bench::plumbing::run(
+                Path::new(fixture),
+                Path::new(output),
+                arm,
+                revision,
+                registration,
+                Path::new(recorded)
+            )?
+        ),
+        [command, paths @ ..] if command == "plumbing-card" && !paths.is_empty() => {
+            println!("{}", lamp_memory_bench::plumbing::scorecard(paths)?)
+        }
+        [command, revision] if command == "arm" => {
+            lamp_memory_bench::arm_server::serve(
+                &mut std::io::stdin().lock(),
+                &mut std::io::stdout().lock(),
+                revision,
+            )?;
+        }
+        [command, adapter, arm, revision, state] if command == "smoke" => {
+            println!(
+                "{}",
+                lamp_memory_bench::smoke::run(Path::new(adapter), arm, revision, Path::new(state))?
+            );
+        }
+        [command, persona, destination] if command == "generate" => {
+            let persona = files::json_file(Path::new(persona))?;
+            let corpus = corpus::generate(persona)?;
+            files::write_corpus(Path::new(destination), &corpus)?;
+            println!(
+                "{}",
+                json!({"events":corpus.events.len(),"questions":corpus.questions.len(),"categories":corpus::counts(&corpus),"status":"generated; not scored; human review pending"})
+            );
+        }
+        [command, directory] if command == "validate" => {
+            let corpus = files::read_corpus(Path::new(directory))?;
+            println!(
+                "{}",
+                json!({"valid":true,"events":corpus.events.len(),"questions":corpus.questions.len(),"categories":corpus::counts(&corpus)})
+            );
+        }
+        [command, directory] if command == "verify-ledger" => println!(
+            "{}",
+            serde_json::to_string(&ledger::verify(Path::new(directory))?)?
+        ),
+        [command, questions, answers] if command == "score" => {
+            let questions: Vec<Question> = files::lines(Path::new(questions))?;
+            let answers: Vec<AnswerRow> = files::lines(Path::new(answers))?;
+            let mut by_id = BTreeMap::new();
+            for row in answers {
+                if by_id.insert(row.id, row.answer).is_some() {
+                    return Err(invalid("duplicate answer"));
+                }
+            }
+            if by_id.len() != questions.len() {
+                return Err(invalid("answer count differs from registered questions"));
+            }
+            for q in questions {
+                let a = by_id
+                    .remove(&q.id)
+                    .ok_or_else(|| invalid("missing answer"))?;
+                println!(
+                    "{}",
+                    json!({"id":q.id,"category":q.category,"score":q.score(&a)?})
+                );
+            }
+        }
+        _ => {
+            return Err(invalid(
+                "usage: lamp-memory-bench campaign-card POLICY APPROVAL CAMPAIGN MODE | preliminary-card POLICY APPROVAL CAMPAIGN MODE | validate-policy POLICY MODE | campaign-init POLICY APPROVAL NEW_CAMPAIGN MODE | campaign-speech POLICY APPROVAL CAMPAIGN FIXTURE SOURCE AUDIO MODE | campaign-run POLICY APPROVAL CAMPAIGN RUN_SPEC MODE | generate PERSONA NEW_DIRECTORY | validate DIRECTORY | verify-ledger DIRECTORY | score QUESTIONS_JSONL ANSWERS_JSONL | smoke ADAPTER ARM FULL_REVISION NEW_STATE_DIRECTORY",
+            ));
+        }
+    }
+    Ok(())
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AnswerRow {
+    id: String,
+    answer: Answer,
+}
+fn main() {
+    if let Err(error) = run(&std::env::args().skip(1).collect::<Vec<_>>()) {
+        eprintln!("lamp-memory-bench: {error}");
+        std::process::exit(1);
+    }
+}
