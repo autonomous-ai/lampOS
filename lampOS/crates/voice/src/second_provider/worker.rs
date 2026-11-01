@@ -3508,6 +3508,19 @@ pub fn serve(
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
+        // With the same-voice check, another voice's line is held for
+        // itself and ends nothing of the conversation
+        // (`LAMP_OTHER_VOICE_KEEPS_CONVERSATION=on`, #4306).
+        if std::env::var(crate::second_provider::OTHER_VOICE_KEEPS_CONVERSATION_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a line in another voice than the conversation's is held for itself, and the conversation goes on for its caller, its voice learnt from the caller only (LAMP_OTHER_VOICE_KEEPS_CONVERSATION)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.keeping_the_conversation_past_another_voice();
+            }
+        }
         // A camera close or a mute: no face id outlives it.
         let forgets = heeding.clone();
         engine = engine.forgetting_on_privacy(Box::new(move || {
@@ -5444,6 +5457,9 @@ pub(crate) struct Heeding {
     busy_called_strict: bool,
     /// `LAMP_REMARK_ABOUT_IT=on` ([`crate::remark_about_it`]).
     remark_about_it: bool,
+    /// `LAMP_OTHER_VOICE_KEEPS_CONVERSATION=on`
+    /// ([`Self::keeping_the_conversation_past_another_voice`]).
+    other_voice_keeps: bool,
     /// The last line held as a remark about the lamp ([`Self::remarked`]).
     remarked: Option<u64>,
     /// A remark held and no line judged since ([`Self::judged_verdict`]).
@@ -6318,6 +6334,7 @@ impl Heeding {
             chain_untied: Vec::new(),
             busy_called_strict: false,
             remark_about_it: false,
+            other_voice_keeps: false,
             remarked: None,
             after_remark: false,
             held_in_conversation_us: None,
@@ -6597,6 +6614,22 @@ impl Heeding {
     /// (`LAMP_REMARK_ABOUT_IT=on`, [`crate::remark_about_it`]).
     pub(crate) fn holding_remarks_about_it(&mut self) {
         self.remark_about_it = true;
+    }
+
+    /// With the same-voice check, a line in another voice than the
+    /// conversation's is held for itself, and the conversation, its voice
+    /// and its windows go on for its caller: no other voice ends it, a print
+    /// come late included, and the conversation's voice is learnt from its
+    /// caller only, as with `LAMP_SAME_VOICE_CALLER_ONLY`
+    /// (`LAMP_OTHER_VOICE_KEEPS_CONVERSATION=on`, #4306). On lamp-4ace on 2
+    /// Nov the caller's own follow-ups scored 0.26 to 0.58 against their
+    /// voice and other people's lines -0.02 to 0.24 (rUMEAS1–3).
+    pub(crate) fn keeping_the_conversation_past_another_voice(&mut self) {
+        self.other_voice_keeps = true;
+        self.voices = self.voices.take().map(|voices| voices.callers_only(true));
+        if let Ok(mut room) = crate::room_told::room().lock() {
+            room.keep_the_conversation_past_another_voice(true);
+        }
     }
 
     /// A face turned to the lamp counts as nobody turned to it when the eyes
@@ -7229,8 +7262,9 @@ impl Heeding {
     pub(crate) fn checking_the_voice(&mut self, printer: Box<dyn crate::same_voice::Printer>) {
         self.voices = Some(
             crate::same_voice::Voices::new(printer).callers_only(
-                std::env::var(crate::same_voice::CALLER_ONLY_ENVIRONMENT)
-                    .is_ok_and(|value| value == "on"),
+                self.other_voice_keeps
+                    || std::env::var(crate::same_voice::CALLER_ONLY_ENVIRONMENT)
+                        .is_ok_and(|value| value == "on"),
             ),
         );
     }
@@ -7338,6 +7372,13 @@ impl Heeding {
         // statement right after someone else's line may be said to them
         // ("Yes, give me five minutes.", Thirteen's P2 on #4534), and the
         // late print ends the conversation for it as without the switch.
+        if self.other_voice_keeps
+            && let Some(late) = at.late_other.take()
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: request {late}'s voice, known after its answer, was another's: held for itself, it ends nothing; the conversation goes on for its caller (LAMP_OTHER_VOICE_KEEPS_CONVERSATION)"
+            );
+        }
         if remarks
             && (self.attention.asks_a_question() || self.attention.called_in_its_words())
             && let Some(late) = at.late_other.take()
@@ -7399,9 +7440,15 @@ impl Heeding {
         let (going_on, other, same) = match at.likeness {
             _ if at.late_other.is_some() => (false, false, false),
             Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
-                eprintln!(
-                    "lamp-voice second: request {request}: another voice than the conversation's (cosine {likeness:.2}): no conversation is going on for it"
-                );
+                if self.other_voice_keeps {
+                    eprintln!(
+                        "lamp-voice second: request {request}: another voice than the conversation's (cosine {likeness:.2}): held; the conversation goes on for its caller (LAMP_OTHER_VOICE_KEEPS_CONVERSATION)"
+                    );
+                } else {
+                    eprintln!(
+                        "lamp-voice second: request {request}: another voice than the conversation's (cosine {likeness:.2}): no conversation is going on for it"
+                    );
+                }
                 (false, true, false)
             }
             Some(likeness) if under_the_mark && remarks => {
@@ -13493,6 +13540,112 @@ mod tests {
             line(&mut unchecked, 2, -1, "And what about tomorrow?"),
             None
         );
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// #4306: with `LAMP_OTHER_VOICE_KEEPS_CONVERSATION`, a line in another
+    /// voice than the conversation's is held for itself and the caller's
+    /// next line, a statement, still goes on; two such lines in a row end
+    /// nothing either. Without it the statement after another voice's line
+    /// is talk past the lamp and held, as #829 made it (lamp-4ace on 2 Nov,
+    /// rUSV1–3: talk 7, 7 and 1 of 12 with the speaker model on).
+    #[test]
+    fn another_voice_held_keeps_the_conversation_for_its_caller() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is the
+        /// caller's voice, -1 another's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let said = (10_000_000, 11_000_000);
+        let line = |heeding: &mut Heeding, request: u64, voice: i16, words: &str| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+            let held = heeding.heed(request, said, words, None);
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person(words, true, Instant::now());
+            if held.is_none() {
+                thread.lamp(request, "Sure.", Instant::now());
+            }
+            held
+        };
+        let fresh = |keeps: bool| {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                *room = crate::room_told::RoomTold::new();
+                room.count_only_talk(true);
+            }
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.checking_the_voice(Box::new(Voice::default()));
+            if keeps {
+                heeding.keeping_the_conversation_past_another_voice();
+            }
+            heeding
+        };
+        let call = "Lamp, I want to cook something new.";
+        let coffee = "Do you want coffee? I'm going downstairs.";
+        let latte = "Yes please, a latte, no sugar.";
+        let chicken = "Something with chicken, maybe. Nothing too hard.";
+        // With the switch: the other voice is held, the caller goes on.
+        let mut heeding = fresh(true);
+        assert_eq!(line(&mut heeding, 1, 1, call), None);
+        assert!(
+            line(&mut heeding, 2, -1, coffee).is_some(),
+            "another voice held"
+        );
+        assert_eq!(
+            line(&mut heeding, 3, 1, chicken),
+            None,
+            "the caller's statement goes on after another voice's line"
+        );
+        // Two other lines in a row end nothing either.
+        assert!(
+            line(&mut heeding, 4, -1, coffee).is_some(),
+            "another voice held"
+        );
+        assert!(
+            line(&mut heeding, 5, -1, latte).is_some(),
+            "another voice held"
+        );
+        assert_eq!(
+            line(&mut heeding, 6, 1, chicken),
+            None,
+            "still the caller's conversation"
+        );
+        // Without it, the statement after another voice's line is talk past the lamp.
+        let mut heeding = fresh(false);
+        assert_eq!(line(&mut heeding, 1, 1, call), None);
+        assert!(
+            line(&mut heeding, 2, -1, coffee).is_some(),
+            "another voice held"
+        );
+        assert!(
+            line(&mut heeding, 3, 1, chicken).is_some(),
+            "without the switch, another voice's line ended the conversation"
+        );
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 

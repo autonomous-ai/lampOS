@@ -2880,6 +2880,19 @@ after a take-over, but now for every turn:
   the route judges a line once its words are final, so its print is
   usually back by then. Test:
   `worker::tests::another_voice_going_on_is_held_and_the_conversations_own_goes_on`.
+  With `LAMP_OTHER_VOICE_KEEPS_CONVERSATION=on` (off until its played check,
+  #4306) such a line is held for itself and ends nothing: "request N:
+  another voice than the conversation's (cosine …): held; the conversation
+  goes on for its caller". The room counts it as no talk, a late print of
+  another voice ends nothing, and the conversation's voice is learnt from
+  its caller only, as with `LAMP_SAME_VOICE_CALLER_ONLY`, so the caller's
+  next line, a statement too, goes on. On lamp-4ace on 2 Nov (rUSV1–3) the
+  product's unit with the speaker model left desk lines alone 6, 6 and 5 of
+  6 but answered talk 7, 7 and 1 of 12, because one other voice ended the
+  caller's conversation. Measured with answers unchanged (rUMEAS1–3), the
+  caller's own follow-ups scored 0.26 to 0.58 and other people's lines
+  -0.02 to 0.24. Test:
+  `worker::tests::another_voice_held_keeps_the_conversation_for_its_caller`.
 - **How to take what it heard** (`worker::SPOKEN_NOTE`, spoken turns
   only, after the character): the ears turn some words into others, names
   and places most of all; a question plainly about the weather, a price, a

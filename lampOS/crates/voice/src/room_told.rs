@@ -179,6 +179,10 @@ pub struct RoomTold {
     /// ended the conversation, no talk left unanswered
     /// ([`Self::ended_only_by_another_voice`]).
     other_voice_only: bool,
+    /// A line held as another voice is held for itself and ends nothing of
+    /// the conversation (`LAMP_OTHER_VOICE_KEEPS_CONVERSATION`,
+    /// [`Self::keep_the_conversation_past_another_voice`]).
+    other_voice_keeps: bool,
     /// When watching began.
     watching_since_us: Option<u64>,
     /// A line said over the lamp's reply and left unanswered is not counted
@@ -234,6 +238,7 @@ impl RoomTold {
             talk_since_spoke: 0,
             talk_counted: 0,
             other_voice_only: false,
+            other_voice_keeps: false,
             watching_since_us: None,
             cut_ins_not_talk: false,
             over_the_lamp: VecDeque::new(),
@@ -384,6 +389,14 @@ impl RoomTold {
         self.talk_only = on;
     }
 
+    /// A line held as another voice than the conversation's ends nothing of
+    /// it: held for itself, it is no talk past the lamp
+    /// (`LAMP_OTHER_VOICE_KEEPS_CONVERSATION`, #4306). Off, it ends the
+    /// conversation as talk left unanswered does (#829).
+    pub fn keep_the_conversation_past_another_voice(&mut self, on: bool) {
+        self.other_voice_keeps = on;
+    }
+
     /// Keep lines said over the lamp's reply out of the count from now on
     /// ([`CUT_INS_ENVIRONMENT`]).
     pub fn leave_cut_ins_out(&mut self, on: bool) {
@@ -434,6 +447,12 @@ impl RoomTold {
     /// ([`Self::ended_only_by_another_voice`], #829).
     pub fn another_voice_held(&mut self, request: u64) {
         if self.sound == Some(request) {
+            return;
+        }
+        // `LAMP_OTHER_VOICE_KEEPS_CONVERSATION`: held by the lamp's own rule,
+        // it is no talk, and the conversation goes on for its caller.
+        if self.other_voice_keeps {
+            self.held(request);
             return;
         }
         if self.talk_only {
