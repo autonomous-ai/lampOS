@@ -1,3 +1,14 @@
+## 2026-11-01 17:22 ICT — forget-state regressions pass; train 500 rebases; memory-store read
+
+Ready for lamp-voice: no (#4848 and #4782 await required external evidence).
+
+- A deeper #4848 review found earlier remember state could suppress a fresh offer after forgetting or bypass a fresh keep-claim correction. Reset memory-keep/correction state while preserving the existing confirmation allowance from other completed calls. Four engine scenarios cover fresh offer, unsupported hard claim, timer confirmation and a fresh correction after an earlier unsupported claim. The combined marker scenario remains too. Actual-classifier preconditions and source review passed.
+- `a1b9471c30` passed ARM64 41295641292: 8,996 selected tests / 57 skipped plus doc/process checks, with all three new test functions explicitly passing. Linux Clippy 41295641362 and docs passed. Intermediate `063a5b6304` ARM64 41294848196 was cancelled by the later push, not a failed test; its Clippy passed.
+- Rebased unchanged onto train 500 (`c4d931b63a`, only memory design/bench docs) as `1afc977f1a`; range-diff identical. Current ARM64 41296982004 and Clippy 41296982008 pending, docs passed. Two full external reads remain. Asked again for the named active Bench successor/alternate on the PR. Provider-queue implementation stays after this lands; the measurement design now explicitly uses actual tool-return admission and disjoint emitted/unretired frame counts.
+- #4782 `8d1e13ab0a` passed ARM64 41294922857, Clippy 41294922848 and docs. Rebased unchanged onto train 500 as `b00c0e1afd`; ARM64 41296930803 and Clippy 41296930790 pending, docs passed. Still draft for the off/on lamp replay.
+- Full additional READ-OK #4750 `1c9d4cd17`: store/model/types/schema, tests and docs. Exact SQL cascade/isolation/search/rollback checks passed on SQLite 3.51.2. Verified its native run 41194104866 directly: 12,972 passed / 107 skipped, including all 35 memory-tiers cases; Clippy 41194104905 green. No fresh local Cargo suite. Nonblocking P3s: timeout wording covers transport rather than total operation, and cancellation tests could observe transport-future drop plus pause cases. Tests remains the assigned external reader. No new P1/P2 or device/model/billing claim.
+- Legacy-store sync finding remains separately reported; the SQLite path propagates directory sync errors. No implementation or broadened product-path allegation. Main worktree unchanged, disk 6.3 GiB free, no device action.
+
 ## 2026-11-01 16:53 ICT — train 499 forget integration and legacy sync finding
 
 Ready for lamp-voice: no (#4848 and #4782); #4847 landed in train 499.
