@@ -105,10 +105,15 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 
 From lamp-4ace's units: memory `/var/lib/lampos-memory`, faces
 `/var/lib/lampos-eyes/people.json`, its exact interrupted-write siblings
-`people.json.new` and `people.json.repair.new` in the same directory, and
-what the eyes set aside beside it
-(`/var/lib/lampos-eyes/set-aside`, #1505), tasks `/var/lib/lampos-tasks/store` (and its
-targets), schedule `/var/lib/lampos-schedule/store`, voice sessions
+`people.json.new` and `people.json.repair.new` in the same directory, the
+faces from photos not yet confirmed (`people.json.from-photos`, only with
+`--photo-dir`), what the eyes set aside beside it
+(`/var/lib/lampos-eyes/set-aside`, #1505), a labelled session's face reads
+(`seems.log`) and the glance log (`glance.log`) in the same folder, tasks
+`/var/lib/lampos-tasks/store` and their targets (`targets.json` beside it), the
+skills' state `/var/lib/lampos-skills-state` (daily routine claims included),
+the pushed skills and the owner's yes to them `/var/lib/lampOS/skills-dev`, the
+lasting light and volume limits `/var/lib/lampos-output-caps`, schedule `/var/lib/lampos-schedule/store`, voice sessions
 `/var/lib/lampOS/voice/sessions`, reminder delivery
 `/var/lib/lampOS/voice/schedule-delivery`, the conversation thread
 `/run/lampos-voice/thread.json`, the voice's first-output log
@@ -129,14 +134,19 @@ and `logs`: the sign-in, the pairings and what they left; not `.harness`
 whole, which is Harness itself, its CLI and its own Node, and not the
 Harness service `install` set up, #934; Nine on #1016), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
-16:13), the name, the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration and the setup marker. Kept: the
+16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
+name (`/etc/lampOS/person/name`), the owner's place from the app
+(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
+the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts, and physical privacy.
 
 Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
 checkpoint and transient handoff files share its root-owned 0700 directory.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
-0640 root:lampos so lamp-ears can read it; both reset plans wipe that file.
+0640 root:lampos so lamp-ears can read it, and the face expressions yes
+(`LAMP_FACE_EXPRESSIONS_ASK`) is `/var/lib/lampOS/consent/face-expressions.json`
+beside it; both reset plans wipe both files.
 The product unit names that canonical file and turns `LAMP_ONBOARDING` on.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.
