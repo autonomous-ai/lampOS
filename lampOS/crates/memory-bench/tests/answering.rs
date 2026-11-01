@@ -491,3 +491,49 @@ fn extra_adapter_fields_cannot_bypass_memory_text_accounting() {
     drop(calls);
     assert_eq!(finish(worker), 2);
 }
+#[test]
+fn malformed_answer_replies_are_recorded_not_fatal() {
+    // DeepSeek's JSON mode answered 16 spaces on the first live preliminary run
+    // (1 Nov), which stopped the whole setup; now it is a recorded malformed answer.
+    // A reply with no text at all stays a failed call, refused by the model layer.
+    for content in [
+        Some(" ".repeat(16)),
+        Some(String::new()),
+        Some("not json".to_string()),
+        Some(r#"{"answer":"x"}"#.to_string()),
+    ] {
+        let dir = Directory::new();
+        let tail = respond(snapshot("model")) + &respond(recall(vec![]));
+        let reply = Reply {
+            content: content.clone(),
+            usage: Some(Usage {
+                input_tokens: 391,
+                output_tokens: 4,
+            }),
+            ..Reply::default()
+        };
+        let (mut worker, _seen) = worker(vec![reply]);
+        let mut runner = setup(&dir, &mut worker, tail);
+        let mut recent = Conversation::default();
+        let mut logged = Vec::new();
+        let turn = Answerer {
+            runner: &mut runner,
+            worker: &mut worker,
+            recent: &mut recent,
+            timezone: "UTC",
+            mode: MemoryMode::Bounded,
+        }
+        .answer(&query(), |kind, _| {
+            logged.push(kind.to_string());
+            Ok(())
+        })
+        .unwrap();
+        assert!(turn.malformed, "{content:?}");
+        assert!(turn.answer.answer.is_empty() && !turn.answer.abstain);
+        assert!(
+            logged.iter().any(|k| k == "answer_malformed"),
+            "{content:?}"
+        );
+        assert_eq!(finish(worker), 1);
+    }
+}
