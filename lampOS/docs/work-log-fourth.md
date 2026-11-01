@@ -1,3 +1,12 @@
+## 2026-11-01 16:53 ICT — train 499 forget integration and legacy sync finding
+
+Ready for lamp-voice: no (#4848 and #4782); #4847 landed in train 499.
+
+- #4847 `f4b95813b9` and the independently read #4721 landed as `9cee7a9da`. #4848 rebased onto that train, clears `answered_at_once` at the admitted-forget reset, and adds the combined regression: an immediate Brighter answer and its note, then forget, then an exact literal marker answer in the fresh round. Current pushed head `063a5b6304`. Rust 1.96.0 rustfmt and diff checks pass; ARM64 41294848196 and Linux Clippy 41294848177 running, docs passed. The new test has not yet executed; two full reads remain. No new Cargo build with 6.3 GiB free against the shared 6 GiB reserve.
+- #4782’s train-498 head `e4f6b08bf7` passed ARM64 41292554788, Linux Clippy 41292554859 and docs. Rebased onto train 499 as `8d1e13ab0a`, range-diff identical; fresh ARM64 41294922857 and Clippy 41294922848 pending. Still draft for the first builder’s off/on search replay.
+- Found and reproduced a separate legacy Store durability gap: exact extracted `sync_dir`/`replace` source silently ignores directory-sync failure. A write/execute-only private directory permits unlink but its sync open returns PermissionDenied; the deletion still returns Ok. Rust 1.96.0 standalone probe with strict warnings passed; fixture restored permissions and cleaned up. No power-cut resurrection claim. Product uses SQLite `--memory-days`, so this is not a claimed product-path fault. Reported Queue 6556369450 for ordering; no repository implementation. Memory source matches current train.
+- The bounded memory/records/Lean documentation audit found no verified mismatch. Main worktree remains untouched apart from pre-existing untracked files. No device action.
+
 ## 2026-11-01 16:37 ICT — train 498 gates, two independent reads, speech-tail boundary
 
 Ready for lamp-voice: #4847 is non-draft with green gates; exact-head read carry requested. #4848 and #4782 remain no.
