@@ -3585,7 +3585,8 @@ impl Engine {
     }
 
     /// `LAMP_HOLDING_ANSWER=on` (`--holding-answer`), as on Live: a spoken
-    /// turn whose whole answer only asks the person to wait ("One moment.",
+    /// turn answered only by asking the person to wait ("One moment.") or
+    /// ending with a promise to check ("Let me check the price.",
     /// `holding_answer::holding_only`), with nothing called in any round,
     /// sends `ProviderOutput::HoldingAnswer` before its idle `TurnComplete`,
     /// and the coordinator asks the route once to go on
@@ -10915,7 +10916,8 @@ async fn answer(
         request,
         ended.as_ref().ok().map(|(_, whole)| whole.as_str()),
     );
-    // Only asking the person to wait ("One moment."), with nothing called:
+    // Only asking the person to wait ("One moment."), or ending with a
+    // promise to check ("Let me look."), with nothing called:
     // the coordinator asks this route to go on, as it asks Gemini
     // (`LAMP_HOLDING_ANSWER`, `crate::holding_answer`; the first builder's
     // 22:54 on #1722). Only for someone who spoke.
