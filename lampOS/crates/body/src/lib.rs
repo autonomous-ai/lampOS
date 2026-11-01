@@ -32,6 +32,7 @@ pub mod linux;
 #[cfg(any(target_os = "linux", test))]
 pub mod name_in;
 pub mod pause_in;
+pub mod peaks;
 pub mod sleep_in;
 pub mod stand_in;
 
@@ -54,6 +55,7 @@ pub mod runtime;
 pub mod trajectory;
 pub mod units;
 pub mod unplug;
+pub mod unseat_in;
 
 /// The most a lamp may raise its head's pitch stall bound to
 /// (`--head-stall-load`, `body::Limits::head_stall_load`): under the head's

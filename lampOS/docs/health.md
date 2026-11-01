@@ -513,6 +513,12 @@ in the lamp's health.
 
     board  hottest 65 °C (cpub_thermal_zone)  load 0.10  memory 12% used  disk 14% free  up 2 d 12 h
 
+The body's warnings are listed in [body.md](body.md), "On the bus". With
+`LAMP_BODY_STRAIN_GUARD=on` (#4501) they include a joint warming fast, a
+long strain, a stand that never lifted, and a lamp seated after a second
+hot or strained sit-down within an hour: `body` stays `warn` until a person
+holds its head a second, a self-test starts, or the body is started again.
+
 What its first minutes on the lamp showed:
 
 - **The board runs warm.** Its eight zones, as it names them, with the
