@@ -40,6 +40,7 @@ on:
       - 'lampOS/docs/install.md'
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/msgs.md'
+      - 'lampOS/docs/setup.md'
       - 'lampOS/docs/skills.md'
       - 'lampOS/docs/switches.md'
       - 'lampOS/docs/updates.md'
