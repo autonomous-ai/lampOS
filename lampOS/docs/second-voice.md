@@ -2853,6 +2853,18 @@ after a take-over, but now for every turn:
   Not here, as it has no part on this route: the Policy's hold of a line
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once
   answered). The busy-room battery on lamp-4ace is its check.
+- **The asker's likeness, measured only** (`LAMP_LIKE_ASKER_MEASURE=on`
+  beside `LAMP_SAME_VOICE_MODEL`, #4306): the model's prints go to a
+  measuring `Voices` instead of the check below, which stays off as with no
+  model. It is fed the same sounds and told the same verdicts, so the
+  conversation's asker is kept as the check keeps it. Each line judged
+  inside a conversation is journalled before its verdict is told: "request
+  N: like the asker 0.43 (LAMP_LIKE_ASKER_MEASURE)", a cosine, never a print
+  or a name. No rule reads it, so nothing the lamp answers changes, and
+  Jev's `like_asker` (#4630) can be fitted on rounds whose answers are the
+  product's own. With `LAMP_ADDRESSED` the same value goes on
+  `attention/addressed`. The second route only; Live doesn't read it. Test:
+  `worker::tests::measuring_the_asker_holds_no_line_and_measures_each_one`.
 - **The same-voice check** (`LAMP_SAME_VOICE_MODEL`, beside
   `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live, and
   only as the lamp's only voice (a standby beside Live loads none). Here

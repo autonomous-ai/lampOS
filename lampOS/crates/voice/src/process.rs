@@ -1707,6 +1707,8 @@ fn second_route_worker_environment(
         crate::unfinished_words::ENVIRONMENT,
         // Read by the second route's same-voice check (#2602).
         crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+        // The asker's likeness, measured only, for Jev's fit (#4306).
+        crate::second_provider::LIKE_ASKER_MEASURE_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
@@ -1865,6 +1867,7 @@ mod tests {
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+            crate::second_provider::LIKE_ASKER_MEASURE_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
@@ -2494,6 +2497,7 @@ mod tests {
                     || name == crate::second_provider::NAME_START_USUAL_ENVIRONMENT
                     || name == crate::second_provider::WINDOW_FROM_START_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
+                    || name == crate::second_provider::LIKE_ASKER_MEASURE_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
@@ -2639,6 +2643,7 @@ mod tests {
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
+                    "LAMP_LIKE_ASKER_MEASURE=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FOLLOWS_FACE=on",

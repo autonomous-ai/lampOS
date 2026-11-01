@@ -3275,15 +3275,25 @@ pub fn serve(
             .is_ok_and(|value| value == "on");
         // The same-voice check (#829): its child loads its model now. Only
         // as the lamp's only voice: a standby beside Live loads none.
-        let hears = checking_the_voice_for(
-            &heeding,
-            files.same_voice.clone().filter(|_| route.only_voice),
-            files.spoken_to || quiet_same_one || not_own || crate::follows_face::on(),
-            |model| {
-                crate::same_voice::Prints::beside_voice(model)
-                    .map(|prints| Box::new(prints) as Box<dyn crate::same_voice::Printer>)
-            },
-        );
+        // `LAMP_LIKE_ASKER_MEASURE=on` (#4306): the prints measure the asker
+        // only, and the check stays off, as with no model.
+        let measure = std::env::var(crate::second_provider::LIKE_ASKER_MEASURE_ENVIRONMENT)
+            .is_ok_and(|value| value == "on");
+        let start = |model| {
+            crate::same_voice::Prints::beside_voice(model)
+                .map(|prints| Box::new(prints) as Box<dyn crate::same_voice::Printer>)
+        };
+        let model = files.same_voice.clone().filter(|_| route.only_voice);
+        let hears = if measure {
+            measuring_the_asker_for(&heeding, model, start)
+        } else {
+            checking_the_voice_for(
+                &heeding,
+                model,
+                files.spoken_to || quiet_same_one || not_own || crate::follows_face::on(),
+                start,
+            )
+        };
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
         // #1722).
@@ -5413,6 +5423,13 @@ pub(crate) struct Heeding {
     /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
     /// [`Self::checking_the_voice`]), as the Live worker keeps it.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
+    /// The same prints made only to measure how alike each line is to the
+    /// conversation's asker (`LAMP_LIKE_ASKER_MEASURE=on`, #4306,
+    /// [`Self::measuring_the_asker`]): journalled, read by no rule.
+    measuring: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
+    /// The last line measured and its likeness to the asker, as journalled.
+    #[cfg(test)]
+    measured: Option<(u64, f32)>,
     /// #829's conversation check reads [`Self::voices`] only beside
     /// `LAMP_SPOKEN_TO` ([`Self::as_the_only_voice`]); without it the prints
     /// feed only [`Self::someone_else`] (#2428).
@@ -5643,6 +5660,38 @@ fn checking_the_voice_for(
             false
         }
         (_, None) => false,
+    }
+}
+
+/// [`checking_the_voice_for`] with `LAMP_LIKE_ASKER_MEASURE=on` (#4306): the
+/// child made by `start` with `model` measures how alike each line is to
+/// the conversation's asker, for Jev's fit, and the same-voice check stays
+/// off. Whether the voice is heard.
+fn measuring_the_asker_for(
+    heeding: &Mutex<Heeding>,
+    model: Option<PathBuf>,
+    start: impl FnOnce(PathBuf) -> std::io::Result<Box<dyn crate::same_voice::Printer>>,
+) -> bool {
+    let Some(model) = model else {
+        eprintln!(
+            "lamp-voice second: LAMP_LIKE_ASKER_MEASURE needs LAMP_SAME_VOICE_MODEL: nothing measured"
+        );
+        return false;
+    };
+    match start(model) {
+        Ok(printer) => {
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.measuring_the_asker(printer);
+            }
+            eprintln!(
+                "lamp-voice second: how alike each line is to the conversation's asker is measured and journalled, read by no rule; the same voice is not judged (LAMP_LIKE_ASKER_MEASURE)"
+            );
+            true
+        }
+        Err(error) => {
+            eprintln!("lamp-voice second: the asker's likeness is not measured: {error}");
+            false
+        }
     }
 }
 
@@ -6307,6 +6356,9 @@ impl Heeding {
             sure_other_samples: CARRY_SURE_OTHER_SPEECH_SAMPLES,
             began_over: None,
             voices: None,
+            measuring: None,
+            #[cfg(test)]
+            measured: None,
             voice_ends_going_on: false,
             named_always: false,
             named_faced: None,
@@ -7235,6 +7287,28 @@ impl Heeding {
         );
     }
 
+    /// [`Self::checking_the_voice`]'s prints made only to measure how alike
+    /// each line is to the conversation's asker (`LAMP_LIKE_ASKER_MEASURE=on`,
+    /// #4306): fed the same sounds and told the same verdicts, so the asker
+    /// is kept as the check keeps it, and read by no rule. Each line judged
+    /// inside a conversation is journalled with its cosine to the asker,
+    /// never its print or a name.
+    pub(crate) fn measuring_the_asker(&mut self, printer: Box<dyn crate::same_voice::Printer>) {
+        self.measuring = Some(
+            crate::same_voice::Voices::new(printer).callers_only(
+                std::env::var(crate::same_voice::CALLER_ONLY_ENVIRONMENT)
+                    .is_ok_and(|value| value == "on"),
+            ),
+        );
+    }
+
+    /// The last line [`Self::measuring_the_asker`] measured, and how alike
+    /// it was to the asker.
+    #[cfg(test)]
+    pub(crate) fn measured(&self) -> Option<(u64, f32)> {
+        self.measured
+    }
+
     /// A spoken line's sound, for the same-voice check: judged only if it
     /// began with the lamp quiet, as on Live.
     pub(crate) fn hear(&mut self, request: u64, heard: crate::second_provider::Heard<'_>) {
@@ -7248,17 +7322,19 @@ impl Heeding {
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
         }
-        let Some(voices) = self.voices.as_mut() else {
-            return;
-        };
-        match heard {
-            Heard::Began {
-                over_the_lamps_voice,
-            } => voices.began(request, !over_the_lamps_voice),
-            // The wait sound is in its first samples: no print.
-            Heard::BeganOverTheWaitSound => voices.began(request, false),
-            Heard::Samples(samples) => voices.heard(request, samples),
-            Heard::Ended => voices.ended(request),
+        for voices in [self.voices.as_mut(), self.measuring.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            match &heard {
+                Heard::Began {
+                    over_the_lamps_voice,
+                } => voices.began(request, !over_the_lamps_voice),
+                // The wait sound is in its first samples: no print.
+                Heard::BeganOverTheWaitSound => voices.began(request, false),
+                Heard::Samples(samples) => voices.heard(request, samples),
+                Heard::Ended => voices.ended(request),
+            }
         }
     }
 
@@ -8620,8 +8696,11 @@ impl Heeding {
                 thread.going_on(Instant::now())
             })
             .unwrap_or_default();
-            said.like_asker =
-                crate::addressed::like_asker(self.voices.as_mut(), said.request, going_on);
+            said.like_asker = crate::addressed::like_asker(
+                self.voices.as_mut().or(self.measuring.as_mut()),
+                said.request,
+                going_on,
+            );
             attention.set_addressed(said.addressed);
             if said.addressed {
                 eprintln!(
@@ -9340,6 +9419,35 @@ impl Heeding {
                 attention.called_for_itself()
             };
             voices.decided(request, played, seen.going_on && !new_call);
+        }
+        // `LAMP_LIKE_ASKER_MEASURE` (#4306): how alike this line is to the
+        // conversation's asker, read before its verdict is told (a line let
+        // out for itself becomes the asker), journalled, read by no rule.
+        if let (Some(measuring), Some(_)) = (self.measuring.as_mut(), verdict) {
+            let going_on = crate::thread::current(self.thread.as_deref(), |thread| {
+                thread.going_on(Instant::now())
+            })
+            .unwrap_or_default();
+            if let Some(like) =
+                crate::addressed::like_asker(Some(&mut *measuring), request, going_on)
+            {
+                #[cfg(test)]
+                {
+                    self.measured = Some((request, like));
+                }
+                eprintln!(
+                    "lamp-voice second: request {request}: like the asker {like:.2} (LAMP_LIKE_ASKER_MEASURE)"
+                );
+            }
+            if spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces) {
+                measuring.seen_from_the_caller(request);
+            }
+            let new_call = if measuring.is_callers_only() {
+                called
+            } else {
+                attention.called_for_itself()
+            };
+            measuring.decided(request, played, seen.going_on && !new_call);
         }
         // The verdict for the room this route keeps (`super::room`), and a
         // call let out, which ends the count of talk past the lamp; a line
@@ -13493,6 +13601,85 @@ mod tests {
             line(&mut unchecked, 2, -1, "And what about tomorrow?"),
             None
         );
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// `LAMP_LIKE_ASKER_MEASURE` (#4306): the prints measure how alike each
+    /// line is to the conversation's asker and hold nothing. A line in
+    /// another voice going on is still answered, measured low, and the
+    /// asker's own measured high; without it nothing is measured.
+    #[test]
+    fn measuring_the_asker_holds_no_line_and_measures_each_one() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: 1 is A's
+        /// voice, -1 B's.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let said = (10_000_000, 11_000_000);
+        let line = |heeding: &mut Heeding, request: u64, voice: i16, words: &str| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+            heeding.hear(request, Heard::Ended);
+            let held = heeding.heed(request, said, words, None);
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person(words, true, Instant::now());
+            if held.is_none() {
+                thread.lamp(request, "Sure.", Instant::now());
+            }
+            held
+        };
+        let fresh = || {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            crate::room_told::room()
+                .lock()
+                .unwrap()
+                .count_only_talk(true);
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding
+        };
+        let mut heeding = fresh();
+        heeding.measuring_the_asker(Box::new(Voice::default()));
+        // A calls the lamp: A is the asker. No conversation yet: nothing.
+        assert_eq!(line(&mut heeding, 1, 1, "Lamp, what time is it?"), None);
+        assert_eq!(heeding.measured(), None);
+        // B, going on in another voice: answered, as with no check, and
+        // measured unlike the asker.
+        assert_eq!(line(&mut heeding, 2, -1, "And what about tomorrow?"), None);
+        assert_eq!(heeding.measured(), Some((2, 0.0)));
+        // A again: like the asker.
+        assert_eq!(line(&mut heeding, 3, 1, "And the day after?"), None);
+        assert_eq!(heeding.measured(), Some((3, 1.0)));
+        // Without it, nothing is measured.
+        let mut unmeasured = fresh();
+        assert_eq!(line(&mut unmeasured, 1, 1, "Lamp, what time is it?"), None);
+        assert_eq!(
+            line(&mut unmeasured, 2, -1, "And what about tomorrow?"),
+            None
+        );
+        assert_eq!(unmeasured.measured(), None);
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 

@@ -596,6 +596,15 @@ pub const DECLINE_SILENT_ENVIRONMENT: &str = "LAMP_DECLINE_SILENT";
 /// #1722, `Heeding::not_counting_own_answers`).
 pub const GOING_ON_NOT_OWN_ENVIRONMENT: &str = "LAMP_GOING_ON_NOT_OWN";
 
+/// Where the worker reads whether the same-voice prints are made only to
+/// measure how alike each line is to the conversation's asker, for Jev's
+/// `like_asker` (#4306): `on`, and nothing else. With it and
+/// `LAMP_SAME_VOICE_MODEL`, each line judged inside a conversation is
+/// journalled with that cosine and no rule reads it: the same-voice check
+/// stays off, as with no model, so nothing the lamp answers changes
+/// (`worker::Heeding::measuring_the_asker`).
+pub const LIKE_ASKER_MEASURE_ENVIRONMENT: &str = "LAMP_LIKE_ASKER_MEASURE";
+
 /// Where the worker reads whether, in a busy room with nobody turned to the
 /// lamp, the text shows a call only as the name set off as one or with the
 /// name heard (#1712): `on`, and nothing else
