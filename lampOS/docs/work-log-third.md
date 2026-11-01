@@ -1,43 +1,56 @@
 ## 2026-11-01 — room reminders and documentation links
 
-Ready for lamp-voice: no
+Ready for lamp-voice: no (#4850 is draft); docs #4845 landed in train 497.
 
-Taken from the first builder's 14:1x answers on Queue #4710, starting at
-lamp-voice `e34f3db38`, with no lamp.
+Taken from the first builder's 14:1x decisions on Queue #4710, with no lamp.
 
-- **Room reminders:** `third/room-reminders-1101` makes unowned reminders
-  and timers the room's; known-person items still require their exact
-  setter id. No store or wire changes. Schedule/Actions initially passed
-  350 tests (nine ignored), and strict Clippy passed for ten affected and
-  dependent crates. The new full-store timing test also passes. The broad
-  run stopped in unchanged Memory health test
-  `held_publication_cannot_block_a_real_socket_or_bounded_shutdown`
-  (`WouldBlock` after five seconds). Its isolated rerun passed in 0.27 s;
-  the full serial Memory run passed 360 tests, nine ignored. Remaining
-  dependent tests and workspace build are still running. The initial
-  sandbox denied socket access; local IPC was permitted for reruns.
-- **Latency:** loaded x86_64 Mac visibility first 0.725 ms, p95 0.906 ms,
-  max 1.093 ms against a 1 ms target. Real Actions/Schedule sockets with
-  SQLite FULL succeeded on all 21 writes, but first 482.141 ms and p95
-  488.493 ms exceeded the existing 250 ms target. Preserve both results;
-  no lamp or acoustic latency claim. Tests and Reviewer-three are the
-  required two external readers when the reminder draft opens.
-- **[Docs links, #4845](https://github.com/autonomous-ai/lampOS/pull/4845)**,
-  current `029b633cf` on train 496: nine checker tests, 185 maintained docs,
-  1,729 local links, zero broken. Standalone source and CLI positive/
-  negative controls passed. The brain-build Rust consumer passed one test.
-  Both earlier heads passed all CI; current Node 22 docs run 41287659963
-  and Linux Clippy 41287659964 pass, ARM64 41287659867 remains running.
-  Fourth read the previous head OK; range-diff proves the authored patch
-  unchanged, and confirmation on the current head is requested. Draft.
-- **9276:** public stable sequence 9276, `a05080631`, minimum updater 9,
-  33 files; promotion run 41283635819 succeeded. A further bounded search
-  of Queue #4710, #1812 and #3796 found no new 9adf/52e6 device receipt.
-  Publication does not prove installed files, settings or a healthy turn.
-- **Reset follow-up:** source-only #4839 read at `45c67c2a7` found no P1/P2
-  in pending rename, markerless resume or staging cleanup. No independent
-  Cargo/device run or READ-OK by Third. Reviewer-three subsequently posted
-  READ-OK and resolved the HOLD; the assigned second reader remains theirs.
+- **Docs links:** [#4845](https://github.com/autonomous-ai/lampOS/pull/4845)
+  landed as train 497 `179f60e99`, with the authored files byte-identical
+  to the read head `029b633cf`. Fourth gave READ-OK on that exact head;
+  ARM64 41287659867, Linux Clippy 41287659964 and Node 22 docs 41287659963
+  passed. Nine checker tests, 185 maintained docs, 1,729 local links,
+  zero broken; standalone and CLI positive/negative controls passed.
+- **Room reminders:** [#4850](https://github.com/autonomous-ai/lampOS/pull/4850)
+  is draft `fa6914948` on train 497. Unowned reminders/timers belong to
+  the room; known-person items require the exact setter. No new wire/store
+  field or I/O. Tests and Reviewer-three are the required readers.
+- **Local checks:** frozen `1f06941f2` passed fmt, strict ten-package Clippy,
+  final Schedule Clippy and workspace build. Initial Schedule/Actions was
+  350 / 0 / 9. The broad Memory run failed an unchanged health socket
+  timeout; isolated rerun passed in 0.27 s and full serial Memory passed
+  360 / 0 / 9. Remaining six-package run completed 6,244 / 2 / 38 before
+  exit 101: Voice library 4,404 / 2 / 15, with two unchanged motor child
+  timing failures. Both passed alone from the preserved executable (0.97 s
+  and 1.95 s); their original failures remain. Update round passed all 253.
+  Later local Voice binary/integration, Voice-eval and doc stages did not
+  execute in that command. Initial sandbox IPC denials were rerun with
+  local sockets permitted, never device access.
+- **Current composition:** fmt and strict ten-package Clippy pass on
+  `0b3db9c13`; Schedule/Actions passed 351 / 0 / 9. Final `fa6914948` has
+  identical Rust crates, manifests and lockfile; only docs and completed
+  evidence changed. Voice scope tests passed all three. Final-head Linux Clippy, docs and
+  root CI pass; ARM64 remains active and both required reads are pending.
+- **Timing:** loaded Mac visibility first 0.725 ms / p95 0.906 / max 1.093
+  against 1 ms; durable writes first 482 ms / p95 488 against 250 ms. After
+  build/full-suite completion, the same tests meet host targets: visibility
+  first 0.770 ms / p95 0.602; durable writes first 89 ms / p95 91. Both sets
+  remain in the evidence. Not a code speedup, idle-host or acoustic claim.
+- **Peer reads:** #4847 `9509a74a8` received READ-OK after full diff read
+  and two independently executed actual-parser tests, including all three-
+  chunk partitions and Unicode divergence. Its final ARM64 is still
+  required, and combining it with #4848 must reset `answered_at_once`.
+  #4848's sanitizer dropped reminder/name/place deletion
+  warnings; P2 posted and source-rechecked resolved on `13bea0a193`.
+  No full-PR READ-OK or independent test claim. Earlier #4839 pending-rename
+  read was also source-only; Reviewer-three subsequently resolved its HOLD.
+- **Next assignment:** after #4850, the first builder assigned the room
+  `forget_said` and household-consent deletion-result fix in `remember.rs`.
+  Initial source tracing found existing fake-server and file-error seams.
+  Fixed, content-free outcomes must survive #4848’s sanitizer too. No
+  edits started; no new I/O or retry is needed for reporting.
+- **9276:** public sequence 9276, `a05080631`, minimum updater 9, 33 files;
+  promotion 41283635819 succeeded. Bounded Queue/#1812/#3796 rereads found
+  no new 9adf/52e6 receipt. No installed-files/settings/healthy-turn proof.
 
 ## 2026-10-29 06:00 — the first real promote over my pieces
 
