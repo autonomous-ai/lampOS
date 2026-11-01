@@ -35,22 +35,60 @@ the tool policy does not qualify. Reminder output is excluded in the worker;
 the coordinator also excludes every turn started by the lamp itself, including
 reminders, skills, news and camera follow-ups.
 
-Matching ignores ASCII case, surrounding terminal punctuation and repeated
-whitespace. The complete text must be one of:
+`holding_answer::holding_only` takes an answer in one of two ways. Both
+ignore ASCII case and repeated whitespace.
+
+**A wait phrase, as the whole answer.** Terminal punctuation aside, the
+complete text must be one of:
 
 - “let me think”, “let me think for a moment”, “let me think for a second”;
 - “one moment”, “just one moment”, “one second”, “just a second”, “just a moment”;
-- “give me a second”, “give me a moment”;
-- “let me check”, “let me check that”, “let me check that one”, “let me
-  check on that”, “let me look that up”, “let me look it up”, “let me find
-  out”: a check promised with no call. On lamp-4ace on 31 Oct “Let me check
-  that one.” about an Aeron chair was the whole answer, with no search
-  (#4684's line 3); the continuation lets the search be made.
+- “give me a second”, “give me a moment”.
 
-A quotation, any added words, or a phrase followed by the answer does not
-match. “Let me see” is excluded even on its own: it can invite someone to
-show a drawing or object instead of promising an answer. No transcript is
-added to the coordinator's diagnostic record.
+A quotation, any added words, a repeat, or a phrase followed by the answer
+does not match.
+
+**A check promised in the last sentence** (#4711). Earlier sentences may
+be anything, such as a clarifying question. The last sentence must start
+with one of these openers, followed by its end or a space: “let me check”,
+“let me look”, “let me find”, “let me search”, “let me see how / what / if /
+whether”, “I'll check / look / find / search”, “I will check / look / find /
+search”. “I’ll” with a curly apostrophe counts. The lamp-4ace run of 31 Oct
+had three such promises with no call, all missed by the earlier whole-phrase
+list: “Hmm — Herman Miller's Aeron, right? Let me look.”, “Let me see how it's
+going.” and “Hmm, "Aaron Chan" — do you mean the Aeron chair? Let me check the
+price.” The continuation lets the promised search be made.
+
+The promise never qualifies when:
+
+- the answer ends with a question mark (“Let me check the price, shall I?”,
+  or a question alone);
+- the answer follows it, in a later sentence (“Let me check. It's $1,895.”)
+  or in the same one, after a colon, semicolon, comma or dash (“Let me check:
+  it's $1,895.”);
+- it is quoted, or the opener is only part of a word (“checkmate”).
+
+A sentence ends at `.`, `!`, `?` or `…` followed by a space, so “$1.5” does
+not split one. “Let me know…” and “let me think about it” are not openers.
+
+Two choices, read from the code:
+
+- **“Let me see”** counts only with what it will see (“how”, “what”, “if”,
+  “whether”). A bare “Let me see.”, “Let me see it.” or “Let me see that.”
+  stays out: it is a filler, or it invites someone to show a drawing or an
+  object.
+- **“Let me look.”** counts. It is also the second route's own `LOOKING`
+  line, but the lamp says that line only in a turn that called a look (the
+  model's `LOOK_CALL` or a skill's look step), and every call disqualifies
+  the turn. The route's own “Let me check.” (`CHECKING`) is likewise said
+  only with a search call. On Live, the check reads Gemini's output
+  transcript, which never holds the lamp's own lines. So a model's “Let me
+  look.” with no call is a promise left unkept.
+
+The answer is checked in English only. In another language a promise does
+not match and the turn ends as before. On Live, an answer longer than the
+256 kept bytes never qualifies, so a long answer ending in a promise is not
+taken. No transcript is added to the coordinator's diagnostic record.
 
 ## When the continuation may start
 
@@ -89,8 +127,9 @@ every other flag (`Engine::holding_answers`). The route answers each turn
 whole, so the check is made there once the turn's words are out:
 
 - **Qualifies:** a spoken request, with nothing called in any round, whose
-  words said, all of its sentences joined, match the same list
-  (`holding_answer::holding_only`).
+  words said, all of its sentences joined, are a holding answer by the same
+  rule (`holding_answer::holding_only`): a wait phrase as the whole answer,
+  or a check promised in the last sentence.
 - **Then** `ProviderOutput::HoldingAnswer` goes for the request and the
   session it was begun in, before its idle `TurnComplete`, as the Live
   worker sends it. The coordinator's continuation is the same: once the

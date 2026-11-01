@@ -1,4 +1,5 @@
-//! A bounded observation of a reply that only asks the person to wait.
+//! A bounded observation of a reply that only asks the person to wait, or
+//! ends promising a check it never called.
 //!
 //! This never sends input or grants speech. The coordinator decides whether
 //! one continuation can still be asked on the session that said the phrase.
@@ -155,8 +156,9 @@ impl Tracker {
     }
 }
 
-/// Whole phrases only. Punctuation and whitespace may surround a short
-/// holding phrase; extra words, an answer, or a quotation never qualify.
+/// A holding answer: either the whole answer is a short wait phrase, or its
+/// last sentence promises a check (`promises_a_check`). Either way the
+/// caller has already required that nothing was called in the turn.
 pub(crate) fn holding_only(text: &str) -> bool {
     let normalized = text
         .trim_matches(|c: char| c.is_whitespace() || matches!(c, '.' | '!' | '?' | '…'))
@@ -164,7 +166,9 @@ pub(crate) fn holding_only(text: &str) -> bool {
         .collect::<Vec<_>>()
         .join(" ")
         .to_ascii_lowercase();
-    matches!(
+    // Whole phrases only: punctuation and whitespace may surround one;
+    // extra words, an answer, a repeat or a quotation never qualify.
+    let waiting = matches!(
         normalized.as_str(),
         "let me think"
             | "let me think for a moment"
@@ -176,17 +180,66 @@ pub(crate) fn holding_only(text: &str) -> bool {
             | "just a moment"
             | "give me a second"
             | "give me a moment"
-            // A check promised with no call (#4684's line 3 on lamp-4ace on
-            // 31 Oct: "Let me check that one." about an Aeron chair, then
-            // nothing): the one continuation lets the search be made.
-            | "let me check"
-            | "let me check that"
-            | "let me check that one"
-            | "let me check on that"
-            | "let me look that up"
-            | "let me look it up"
-            | "let me find out"
-    )
+    );
+    waiting || promises_a_check(text)
+}
+
+/// Promise openers for an answer's last sentence (#4711). "let me see" only
+/// with what it will see: bare "Let me see." is a filler or asks to be
+/// shown something. "let me look" counts: the lamp's own `LOOKING` line is
+/// only said in a turn that called a look, so a model's "Let me look." with
+/// no call is a promise left unkept.
+const PROMISES: &[&str] = &[
+    "let me check",
+    "let me look",
+    "let me find",
+    "let me search",
+    "let me see how",
+    "let me see what",
+    "let me see if",
+    "let me see whether",
+    "i'll check",
+    "i'll look",
+    "i'll find",
+    "i'll search",
+    "i will check",
+    "i will look",
+    "i will find",
+    "i will search",
+];
+
+/// The answer's last sentence promises to check, look, see or find out, and
+/// says nothing after it: any earlier sentence may be anything (the lamp-4ace
+/// run of 31 Oct: "…do you mean the Aeron chair? Let me check the price.").
+/// A question at the end, or the answer given in the same sentence ("Let me
+/// check: it's $1,895.") or after it, never qualifies.
+fn promises_a_check(text: &str) -> bool {
+    let text = text.trim();
+    if text.ends_with('?') {
+        return false;
+    }
+    let body = text.trim_end_matches(['.', '!', '…']);
+    // A sentence ends at a terminator followed by a space, so "$1.5" or
+    // "4.5 s" never splits one.
+    let last = body
+        .char_indices()
+        .rev()
+        .find(|&(at, c)| {
+            matches!(c, '.' | '!' | '?' | '…')
+                && body[at + c.len_utf8()..].starts_with(char::is_whitespace)
+        })
+        .map_or(body, |(at, c)| &body[at + c.len_utf8()..]);
+    let last = last
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+        .replace('’', "'");
+    !last.contains([':', ';', ',', '—', '–', '"', '“'])
+        && PROMISES.iter().any(|opener| {
+            last.strip_prefix(opener)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+        })
 }
 
 #[cfg(test)]
@@ -274,14 +327,72 @@ mod tests {
             "Let me see: four",
             "one moment; the answer is four",
             "Let me think. Let me think.",
-            // A check with its answer, or a look (the lamp's own
-            // `LOOKING`), is no holding answer.
+            // A check with its answer is no holding answer. "Let me look."
+            // and "Let me check the light" moved to the promises (#4711):
+            // a promise left unkept with no call is what the continuation
+            // is for.
             "Let me check: it's $1,895.",
             "Let me check that one. It's about $1,800.",
-            "Let me look.",
-            "Let me check the light",
         ] {
             assert!(!holding_only(phrase), "{phrase}");
+        }
+    }
+
+    #[test]
+    fn a_last_sentence_promising_a_check_is_a_holding_answer() {
+        for phrase in [
+            // The first builder's lamp-4ace run, 31 Oct (#4711).
+            "Let me look.",
+            "Let me see how it's going.",
+            "Hmm, \"Aaron Chan\" — do you mean the Aeron chair? Let me check the price.",
+            // #4684's price lines, the promises (that run's first two made
+            // their search, so the call keeps them out).
+            "Let me check.",
+            "I'll check that for you.",
+            "Hmm — Herman Miller's Aeron, right? Let me look.",
+            "I’ll look it up",
+            "Let me check the light",
+            "Let me see if it's open.",
+        ] {
+            assert!(holding_only(phrase), "{phrase}");
+        }
+        for phrase in [
+            // #4684's price lines, the answers.
+            "$499 on Autonomous's own page for the ErgoChair Pro.",
+            "Four hundred ninety-nine dollars, straight from Autonomous's own page.",
+            "Then $449 it is — …I'm not going to argue with the page.",
+            "Ah, then 449 it is — the page in front of you wins. My search must've pulled an older price.",
+            // A check followed by its answer.
+            "Let me check. It's $1,895.",
+            "Let me check — it's $1,895.",
+            "Let me check... it's 499.",
+            // A bare "let me see" may ask to be shown something.
+            "Let me see.",
+            "Let me see it.",
+            "Let me see that!",
+            // A question, alone or last.
+            "Do you mean the Aeron chair?",
+            "Let me check the price, shall I?",
+            "Let me know if you need anything.",
+            "\"Let me check\"",
+            "Let me checkmate you.",
+        ] {
+            assert!(!holding_only(phrase), "{phrase}");
+        }
+    }
+
+    #[test]
+    fn a_promise_after_a_call_in_the_turn_is_not_holding() {
+        let line = "Hmm, \"Aaron Chan\" — do you mean the Aeron chair? Let me check the price.";
+        for call in [false, true] {
+            let mut track = Tracker::default();
+            let of = lineage(1, 2);
+            start(&mut track, of);
+            text(&mut track, of, line);
+            if call {
+                track.called(of);
+            }
+            assert_eq!(finish(&mut track, of), (!call).then_some(of));
         }
     }
 
