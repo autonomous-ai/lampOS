@@ -2369,10 +2369,13 @@ impl Onboarding {
         // Only the first line after the lamp has asked its question.
         if led.step == Step::WhoYouAre && led.spoke && !led.name_heard {
             led.name_heard = true;
-            // ponytail: no name is taken from a line in another language, so
-            // none is asked back and the model keeps the step; the nudge is
-            // off in the product. Read names there if the nudge is turned on.
-            led.name = language.is_none().then(|| name_in(text)).flatten();
+            // ponytail: of the other languages only Korean takes a name from
+            // the line; in the rest none is asked back and the model keeps
+            // the step. The nudge is off in the product.
+            led.name = match language {
+                None => name_in(text),
+                Some(language) => in_language::read(language, text).name,
+            };
         }
         if led.confirm == Confirm::Asked(None) {
             led.confirm = Confirm::Asked(reading(language, text).yes_or_no);
@@ -3751,6 +3754,8 @@ fn reading(language: Option<crate::language::Language>, text: &str) -> in_langua
         // ([`puts_off_the_hello`]) is the walk's to wait for (Reviewer-three's
         // P2s on #4480).
         holds_hello: again || text.contains('?') || puts_off_the_hello(&words),
+        // English takes its name by `name_in`.
+        name: None,
     }
 }
 
