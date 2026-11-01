@@ -975,8 +975,51 @@ pub(crate) fn short_done_note(line: &str) -> String {
 /// warm as I go — that's my limit.", the first builder on #4710, 21:4x).
 pub(crate) fn said_at_once_note(line: &str) -> String {
     format!(
-        "(For you to know, not to answer: the lamp itself already said aloud \"{line}\" for this, and the person heard it. Do not say it again, in other words, or say what changed or didn't. If they asked for anything else in the same words, answer only that. If they asked for nothing else, reply with nothing at all: no words.)"
+        "(For you to know, not to answer: the lamp itself already said aloud \"{line}\" for this, and the person heard it. Do not say it again, in other words, or say what changed or didn't. If they asked for anything else in the same words, answer only that. If there is no further answer, return exactly {SILENT_AFTER_MARKER}, a control marker the lamp does not speak. Do not write Nothing or describe your silence instead of that marker; ordinary words, including Nothing when it answers a further question, are still spoken.)"
     )
+}
+
+/// An explicit end after the acting part already answered. Ordinary words,
+/// including "Nothing." as an answer to a further question, stay words.
+const SILENT_AFTER_MARKER: &str = "<no_further_answer>";
+
+/// Only a possible leading marker waits for more text, at most the marker's
+/// length. Divergent text is released in that same chunk; no round is added.
+#[derive(Default)]
+struct SilentAfter {
+    held: String,
+    decided: bool,
+}
+
+impl SilentAfter {
+    fn piece(&mut self, piece: String) -> String {
+        if self.decided {
+            return piece;
+        }
+        let piece = if self.held.is_empty() {
+            piece.trim_start()
+        } else {
+            piece.as_str()
+        };
+        let mut text = std::mem::take(&mut self.held);
+        text.push_str(piece);
+        if let Some(rest) = text.strip_prefix(SILENT_AFTER_MARKER) {
+            self.decided = true;
+            return rest.to_owned();
+        }
+        if SILENT_AFTER_MARKER.starts_with(&text) {
+            self.held = text;
+            return String::new();
+        }
+        self.decided = true;
+        text
+    }
+
+    /// An incomplete marker is ordinary text, not a reason to lose words.
+    fn finish(&mut self) -> String {
+        self.decided = true;
+        std::mem::take(&mut self.held)
+    }
 }
 /// Whether a spoken turn's words were said to the lamp, judged before they
 /// are answered: `(request, (began_us, ended_us), heard)` to why it is not
@@ -3678,15 +3721,17 @@ impl Engine {
     }
 
     /// `LAMP_SECOND_SAY_WITH_CALL=on` ([`SAY_WITH_CALL_ENVIRONMENT`],
-    /// #2135): a round with no words of its own whose calls all did what
-    /// was asked of a light, the volume or one timer is answered at once by
+    /// #2135): a round with no words of its own whose calls all give a short
+    /// result for a light, the volume or one timer is answered at once by
     /// the part that acted: the calls' own short line ([`short_done_line`],
     /// lamp-actions' `"say"` with `LAMP_SHORT_DONE`), or the timer's
-    /// [`timer_line`] from its own answer. The next round still runs, told
-    /// the lamp said it ([`short_done_note`]), for anything else asked; it
-    /// is no longer waited for. Never for a keep, a forget, a call that
-    /// needs a yes, or one refused, failed, held or unchanged: those turns
-    /// go on as without the switch. Before any turn only.
+    /// [`timer_line`] from its own answer. A marked `already` result with
+    /// its own words is eligible too. A single ask ends there; for anything
+    /// else asked, the next round runs with [`said_at_once_note`], which
+    /// says the line was heard and gives [`SILENT_AFTER_MARKER`] for no
+    /// further answer. Never for a keep, a forget, a call that needs a yes,
+    /// or one refused, failed or held: those turns go on as without the
+    /// switch. Before any turn only.
     pub fn saying_at_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.say_at_once = on;
@@ -9502,6 +9547,9 @@ async fn answer(
         // whether the request held more (the Reviewer-lead's P2 on #2930):
         // said only if that round adds no words and no calls.
         let mut short_line: Option<String> = None;
+        // Only rounds told that the acting part already answered may use
+        // the nonspoken marker. It never changes an ordinary first round.
+        let mut answered_at_once = false;
         // Whether a `remember` of this request kept something, and whether
         // a reply that said it kept something with none was asked again
         // once ([`crate::remember::claims_a_keep`], finding K on #3504).
@@ -9544,6 +9592,7 @@ async fn answer(
             let mut calls = Vec::new();
             let mut reasoning = None;
             let mut called_us = 0;
+            let mut silent_after = answered_at_once.then(SilentAfter::default);
             // A reply's opening, held until it is known whether it says
             // something was kept; one that does is held to the round's end,
             // when its calls say whether it was. Not while something of
@@ -9715,6 +9764,13 @@ async fn answer(
                 }
                 match event {
                     ChatEvent::Text(piece) => {
+                        let piece = match silent_after.as_mut() {
+                            Some(silent) => silent.piece(piece),
+                            None => piece,
+                        };
+                        if piece.is_empty() {
+                            continue;
+                        }
                         text.push_str(&piece);
                         // A call narrated as words: its sentence goes, and
                         // what follows it is the reply.
@@ -9822,6 +9878,15 @@ async fn answer(
                 }
                 round -= 1;
                 continue;
+            }
+            // A partial marker has not reached the other opening filters
+            // yet. Give it to their normal end-of-round path too.
+            if let Some(silent) = silent_after.as_mut() {
+                let rest = silent.finish();
+                if !rest.is_empty() {
+                    text.push_str(&rest);
+                    aloud_held.get_or_insert_default().push_str(&rest);
+                }
             }
             // The round ended with its opening still not known whether it
             // narrates a call: whole now. A narration is not said.
@@ -10605,6 +10670,7 @@ async fn answer(
                     "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
                 );
                 messages.push(Message::system(said_at_once_note(line)));
+                answered_at_once = true;
             } else if let Some(line) = short {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: every call answered short; \"{line}\" kept while the next round says whether more was asked (LAMP_SHORT_DONE)"
@@ -10627,6 +10693,7 @@ async fn answer(
                     "lamp-voice second: request {request} chat round {round}: the timer is set; \"{line}\" said at once, and the next round is asked only for what else was asked (LAMP_SECOND_SAY_WITH_CALL)"
                 );
                 messages.push(Message::system(said_at_once_note(&line)));
+                answered_at_once = true;
             } else if may_end_worded
                 && short_told.len() == calls.len()
                 // Every call made its change: words over one that changed
