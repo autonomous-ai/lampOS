@@ -2400,18 +2400,30 @@ mod tests {
             "wss://api.elevenlabs.io/v1/text-to-speech/a3AkyqGG4v8Pg7SWQ0Y3/stream-input?model_id=eleven_flash_v2_5&output_format=pcm_24000&inactivity_timeout=60"
         );
         assert_eq!((direct.header, direct.value.as_str()), ("xi-api-key", "k"));
-        // Korean's voice is asked for by its id (#4473).
+        // Korean's voice is asked for by its id (#4473), on the dialogue
+        // socket a product lamp's `eleven_v4_turbo` opens, whose URL names
+        // no voice: the id goes in the opening and in each piece.
         let korean = socket_request(
             "https://api.elevenlabs.io/v1/",
             "k",
             Some(crate::language::Language::Korean.voice()),
-            None,
+            Some(DIALOGUE_MODEL),
         )
         .unwrap();
+        assert_eq!(korean.shape, SocketShape::Dialogue);
         assert!(
-            korean.url.contains("/text-to-speech/5I7B1di44aCL15NkP0jn/"),
+            !korean.url.contains("5I7B1di44aCL15NkP0jn"),
             "{}",
             korean.url
+        );
+        assert_eq!(korean.voice, "5I7B1di44aCL15NkP0jn");
+        assert_eq!(
+            korean.opening(),
+            json!({"voices": ["5I7B1di44aCL15NkP0jn"]})
+        );
+        assert_eq!(
+            korean.messages("Hi.").unwrap()[0]["inputs"][0]["voice_id"],
+            "5I7B1di44aCL15NkP0jn"
         );
         for (voice, model) in [(Some("a/b"), None), (None, Some("m&x")), (None, Some(""))] {
             assert_eq!(socket_request(PROXY, "k", voice, model), Err(Error::Url));
