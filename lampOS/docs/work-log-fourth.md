@@ -1,3 +1,15 @@
+## 2026-11-01 15:54 ICT — deletion outcomes retained; replay and independent reads
+
+Ready for lamp-voice: no ([#4848](https://github.com/autonomous-ai/lampOS/pull/4848), [#4847](https://github.com/autonomous-ai/lampOS/pull/4847)).
+
+- Both branches are on train 497 (`179f60e99`). #4848 is `13bea0a193`; #4847 is `9509a74a8e`. Range-diff confirms each rebase preserved its authored patch. Fresh native CI and independent reads remain.
+- Third found that #4848 dropped reminder/setup-name/place failure outcomes, allowing an overbroad complete-deletion claim. Fixed statuses now retain only success, kept or uncertain states; absent means unreported. Explicit failure/uncertainty downgrades `everything=true`. Five actual-helper tests and strict standalone Clippy pass. Restoring the old sanitizer fails all three new regressions. Rustfmt and diff checks pass. Reviewer-three and Bench's successor still have the two reads.
+- The revised helper's ordinary fixture (16 KiB instruction, 1 KiB question, 0/4/16 statuses, 10,000 samples each) measured first use 49.512 µs, largest sample 731.311 µs. Excludes deletion/network/speech/destruction and does not time every warning branch; Message mirrored and unused classifiers stubbed. No lamp latency claim.
+- Prior #4848 head `08693889c` passed ARM64 41289058740 and Linux clippy 41289058752. Earlier `62c8fd887` passed 8,975 selected / 57 skipped on ARM64 41287177418. Mac dependent execution finished 40 prebuilt executables: 2,002 passes and 24 ignores. Update install and round each hit the wrapper's 600-second limit; incomplete locally. Original full-run failures and unrun local doc tests remain recorded above/below; no clean full-local-suite claim.
+- #4847's `f436d0965` passed ARM64 41287797821 (8,976 selected / 57 skipped, including final two regressions) and Linux clippy 41287798179. First builder approved its lamp-4ace replay rUX4847-1536: warmer-plus-thanks and too-bright each said their already-result once and ended. The warmer/freezing line made no call, so the marker path was not exercised; no double or stray speech heard. Third was asked for an independent read.
+- Independent READ-OK: #4839 `45c67c2a7`, source plus 29 injected interruption/retry probes, with nonblocking P3 to reject relative helper paths; #4845 carried unchanged to `029b633cf`, nine checker tests and clean 1,725-link scan. #4845 landed in train 497.
+- Queued old TTS/UNSAID cancellation stays a separate next piece after #4848 lands. When #4847 and #4848 meet, the forget boundary must clear `answered_at_once`. No device access.
+
 ## 2026-11-01 15:02 ICT — forget inside a turn and an unspoken follow-up
 
 Ready for lamp-voice: no ([#4848](https://github.com/autonomous-ai/lampOS/pull/4848), [#4847](https://github.com/autonomous-ai/lampOS/pull/4847)).
