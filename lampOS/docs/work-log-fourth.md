@@ -1,3 +1,15 @@
+## 2026-11-01 15:02 ICT — forget inside a turn and an unspoken follow-up
+
+Ready for lamp-voice: no ([#4848](https://github.com/autonomous-ai/lampOS/pull/4848), [#4847](https://github.com/autonomous-ai/lampOS/pull/4847)).
+
+- **#4848, `62c8fd887`:** after an admitted memory forget returns, later model rounds use configured character/language, the current text-only question and content-free outcomes. Copied memory, earlier exchanges, pictures and tool payloads go; old remaining calls are skipped. Held yes, uncertain and partial outcomes are covered. Friday's `remember.rs` is unchanged. Reviewer-three and Bench's successor have the two reads.
+- **#4847, `4a64777bd`:** the raw warmer replay's extra “Nothing.” now has an explicit nonspoken end marker. The parser preserves ordinary answers, handles split markers and adds no chat round. Exact recorded words and the known greeting/name heuristic miss are pinned. The prompt still needs the first builder's live-model replay. When the fixes meet, the forget boundary must clear `answered_at_once` too.
+- **Local forget gates:** formatting and strict clippy for voice plus all dependent crates passed on train 495. Workspace build passed before the rebase. Voice's full lib run had 4,407 passes, four failures and 15 ignores: one new fixture's confirmation wording was corrected (22 held-forget tests then passed), and three skill-packaging timeouts passed isolated (42 / 0 / 1). Final forget-focused tests passed 10; other voice targets passed 286, with six ignored. Dependent tests hit a macOS socket-path limit and are continuing from prebuilt binaries with `/tmp`. This is not a clean full-suite claim; doc tests remain unrun locally.
+- **Local silence gates:** formatting and diff checks passed; 15 initial short-done tests and isolated parser tests/clippy passed before two final test additions. The current full gate is CI's: the shared disk crossed its 6 GiB reserve. Only this run's audited new cache/build artifacts were removed, restoring the reserve; inherited cache was left alone.
+- **Latency:** actual forget helper, 16 KiB instruction / 1 KiB question / 0, 4 or 16 prior statuses, 10,000 samples each: process-first 46 µs, largest 147 µs. This excludes network, deletion, speech and output destruction, and uses a mirrored Message with unused classifiers stubbed. Marker parser median 0.514 µs / p99 0.737 µs, with a 3.558 ms outlier; no strict 1 ms worst-case or device claim.
+- **Next:** the first builder assigned queued speech and `UNSAID` carry cancellation as a separate PR after #4848 lands. That limitation is explicit in #4848. No device access.
+- **#4718:** verified its existing green ARM64 and Linux-clippy runs, undrafted with the first builder's prior yes, and it landed in train 495. Both new branches are on that train. CI and fresh reads are pending; neither is ready.
+
 ## 2026-10-31 20:4x ICT — where a plain answer's first sound goes (#2135); #4158 rebased; two reads
 
 **#2135, the stage table** (on the issue), from lamp-c0a4's journals of 30 Oct in `docs/verification/`: 34 plain answers, a median 1.71 s from the line's end to the first audio byte.
