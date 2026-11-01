@@ -1,11 +1,9 @@
 //! Whose reminders a voice line hears and changes (Reviewer-three's
 //! after-merge P2 on #4527, the first builder's (a)). Each reminder keeps
 //! who set it, as a memory person id; a question about "my" reminders lists
-//! only the asker's own, and `cancel_reminder` / `snooze_reminder` by id act
-//! only on the asker's own. One set with nobody sure (set before this, or by
-//! an unknown face or the room's line) is heard and changed only on the
-//! owner's line, as the typed setup name is told only there (#4476,
-//! [`crate::person::owner_ids`]). No switch: it only narrows who hears what.
+//! the asker's own and the room's reminders. Changes by id follow the same
+//! rule. One set with nobody sure (including older unowned items) belongs
+//! to the room; a known person's item remains private to that person.
 //!
 //! Who that is follows memory's scope ([`crate::memory_scope`]):
 //! - the **setter** is the person a keep in the line would be written for at

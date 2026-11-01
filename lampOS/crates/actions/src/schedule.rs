@@ -115,8 +115,8 @@ pub fn catalog() -> Vec<Function> {
 /// on #4527, the first builder's (a)): whose reminders it hears, cancels and
 /// snoozes ([`Asker`]), and who a reminder it sets is kept as. Sent by the
 /// voice beside each call on the executive's socket; a call without one is
-/// nobody's: it hears and changes none of anyone's, and what it sets is the
-/// owner's line's. The app's own calls ([`Adapter::call`],
+/// the room's: it hears and changes unowned items only, and what it sets
+/// belongs to the room. The app's own calls ([`Adapter::call`],
 /// [`Adapter::call_plain`]) take none and see every item, as the owner's.
 #[derive(Clone, Debug, Default, Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
