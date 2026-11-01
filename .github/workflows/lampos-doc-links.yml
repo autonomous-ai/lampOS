@@ -1,0 +1,31 @@
+name: lampOS documentation links
+
+on:
+  pull_request:
+    branches: [lamp-voice]
+    paths:
+      - 'lampOS/docs/**'
+      - '.github/scripts/docs-links/**'
+      - '.github/workflows/lampos-doc-links.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: Local documentation files and anchors
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Markdown parser and GitHub heading slugger
+        working-directory: .github/scripts/docs-links
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check the checker, then the maintained docs
+        working-directory: .github/scripts/docs-links
+        run: |
+          npm test
+          npm run check
