@@ -1,3 +1,12 @@
+## 2026-11-01 16:17 ICT — all current gates green; dated build-row read
+
+Ready for lamp-voice: yes (#4847 `9509a74a8`); no (#4848 `13bea0a193`, #4782 `2645cbe6c3`).
+
+- #4848 ARM64 41290602796 passed 8,980 selected tests / 57 skipped plus doc/process checks; all three new deletion-status regressions passed. Linux Clippy 41290602861 and docs passed. The two full reads and integration after #4847 remain.
+- #4782 passed ARM64 41290788143, Linux Clippy 41290788115 and docs 41290788117. Still draft for the first builder's off/on search replay and the unit's evidence comment.
+- READ-OK #4721 `84fe782067`: independently parsed 76 build rows (69.97 / 76 → 92.1%), 17 quality rows (11.52 / 17 → 67.8%) and three excluded mood rows (1.17 / 3 → 39.0%); 16/26 desk count agrees. Checked shutdown evidence on #3698 and Store evidence on the Queue. Nonblocking P3: the cited Store take-back was while waiting for review, not after approval as the row says. This is a dated snapshot read, not independent device reproduction.
+- Main worktree remains unchanged apart from its pre-existing untracked `.harness/` and `capture.pcap`. No device access or deployment.
+
 ## 2026-11-01 16:08 ICT — unspoken follow-up ready
 
 Ready for lamp-voice: yes ([#4847](https://github.com/autonomous-ai/lampOS/pull/4847), `9509a74a8`).
