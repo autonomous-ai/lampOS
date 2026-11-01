@@ -1,0 +1,32 @@
+{
+  "visibility": {
+    "boundary": "Engine::answer ListSet entry to returned JSON; full 128-item store, pending-only room reader",
+    "first_ns": 769731,
+    "limits": "In-memory persistence; no IPC, disk write, provider, voice input or lamp; startup excluded",
+    "machine_arch": "x86_64",
+    "machine_os": "macos",
+    "repeated_count": 100,
+    "repeated_max_ns": 690733,
+    "repeated_p50_ns": 382338,
+    "repeated_p95_ns": 601687,
+    "target_ns": 1000000
+  },
+  "actions": {
+    "boundary": "client entry before real Actions socket connect to parsed durable Schedule response through Actions",
+    "cold_scope": "first mutation after both newly started host services published readiness; process/store startup excluded",
+    "failures": 0,
+    "first_us": 89148,
+    "fixture": "real Actions server and real Schedule service, private SQLite FULL store, injected Schedule clock; no provider or lamp",
+    "machine_arch": "x86_64",
+    "machine_os": "macos",
+    "pending_only_list_max_us": 9302,
+    "pending_only_list_p50_us": 5966,
+    "repeated_count": 20,
+    "repeated_max_us": 93215,
+    "repeated_p50_us": 86958,
+    "repeated_p95_us": 91348,
+    "target_is_not_a_functional_assertion": true,
+    "target_us": 250000,
+    "total_count": 21
+  }
+}

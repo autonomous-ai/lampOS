@@ -1288,7 +1288,7 @@ const ANN: &str = "p-0123456789abcdef";
 const BO: &str = "p-fedcba9876543210";
 
 /// A reminder `person` set, due at 08:10, 600 s after [`WALL`]: a
-/// reminder, since every line sees the room's timers.
+/// reminder rather than an elapsed timer.
 fn set_by(engine: &mut Engine<Disk>, at: &ClockSample, text: &str, person: Option<&str>) -> u64 {
     set_when(
         engine,
@@ -1355,12 +1355,10 @@ fn listed(engine: &mut Engine<Disk>, at: &ClockSample, asker: Option<Asker>) -> 
         .collect()
 }
 
-/// #4527's P2, the first builder's (a): each reminder keeps who set it; a
-/// line hears only its own, and one set with nobody sure only on the
-/// owner's line. A request with no asker (the app, the due reminder's own
-/// reads) sees them all.
+/// Every line hears its own and the room's reminders. The app and delivery
+/// readers, with no asker, retain their whole-store view.
 #[test]
-fn each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_person_ones() {
+fn each_line_lists_its_own_reminders_and_the_rooms() {
     let at = now(0);
     let mut e = open(Disk::default(), &at);
     set_by(&mut e, &at, "Ann's pills", Some(ANN));
@@ -1368,19 +1366,22 @@ fn each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_per
     set_by(&mut e, &at, "Water the plant", None);
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), false))),
-        ["Ann's pills"]
+        ["Ann's pills", "Water the plant"]
     );
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(BO), false))),
-        ["Bo's call"]
+        ["Bo's call", "Water the plant"]
     );
     // The owner is Ann: hers and the no-person one, never Bo's.
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), true))),
         ["Ann's pills", "Water the plant"]
     );
-    // An unknown face, or the room's line: nothing of anyone's.
-    assert!(listed(&mut e, &at, Some(asker(None, false))).is_empty());
+    // An unknown face hears the room's reminder, never a known person's.
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(None, false))),
+        ["Water the plant"]
+    );
     assert_eq!(listed(&mut e, &at, None).len(), 3);
     // Its count of what is set and not yet due is the line's own.
     let page = e
@@ -1394,7 +1395,7 @@ fn each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_per
             &at,
         )
         .unwrap();
-    assert_eq!(page["not_yet_due"], 1);
+    assert_eq!(page["not_yet_due"], 2);
 }
 
 #[test]
@@ -1406,7 +1407,7 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
     for (id, guest) in [
         (ann, asker(Some(BO), false)),
         (ann, asker(None, false)),
-        (room, asker(Some(BO), false)),
+        (ann, asker(Some(BO), true)),
     ] {
         let refused = e
             .answer(
@@ -1437,7 +1438,7 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
         .unwrap_err();
     assert_eq!(refused.code, "not_found");
     assert_eq!(listed(&mut e, &due_at, None).len(), 2);
-    // Ann snoozes her own, and the owner cancels the no-person one.
+    // Ann snoozes her own, and an unknown speaker cancels the room's.
     e.answer(
         Request::Snooze {
             guard: guard(&e),
@@ -1453,7 +1454,7 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
         Request::Cancel {
             guard: guard(&e),
             id: room,
-            asker: Some(asker(Some(ANN), true)),
+            asker: Some(asker(None, false)),
         },
         &due_at,
     )
@@ -1461,13 +1462,10 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
     assert_eq!(listed(&mut e, &due_at, None), ["Ann's pills"]);
 }
 
-/// The room's timers (option 1 on #4656's after-merge P2, bounded by
-/// Reviewer-three's P1 and Third's line on #4668): a line with no face
-/// seen, at the stove, hears and cancels a timer set by nobody for two hours
-/// at most. It never hears a person's timer, a reminder, or a relative
-/// reminder set further out, a person's or nobody's.
+/// All unowned items belong to the room, including long relative reminders.
+/// Known-person items stay private regardless of duration or owner status.
 #[test]
-fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one() {
+fn the_room_hears_unowned_timers_of_any_duration_but_never_a_persons() {
     let at = now(0);
     let mut e = open(Disk::default(), &at);
     let weeks = || When::After {
@@ -1482,14 +1480,25 @@ fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one(
     set_when(&mut e, &at, "Roast", None, When::After { seconds: 7_200 });
     set_when(&mut e, &at, "Bread", None, When::After { seconds: 7_201 });
     let room = asker(None, false);
-    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Pasta", "Roast"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(room.clone())),
+        ["Pasta", "Renew the visa", "Roast", "Bread"]
+    );
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(BO), false))),
-        ["Pasta", "Roast"]
+        ["Pasta", "Renew the visa", "Roast", "Bread"]
     );
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), false))),
-        ["Pasta", "Tea", "Ann's pills", "Ann's prescription", "Roast"]
+        [
+            "Pasta",
+            "Tea",
+            "Ann's pills",
+            "Ann's prescription",
+            "Renew the visa",
+            "Roast",
+            "Bread"
+        ]
     );
     // The owner's line hears every one set by nobody, as before.
     assert_eq!(
@@ -1510,7 +1519,10 @@ fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one(
         assert_eq!(cancel(&mut e, id).unwrap_err().code, "not_found", "{id}");
     }
     cancel(&mut e, pasta).unwrap();
-    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Roast"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(room.clone())),
+        ["Renew the visa", "Roast", "Bread"]
+    );
     // A person's timer keeps its setter: Ann's forget takes it with hers.
     let forgot = e
         .answer(
@@ -1563,7 +1575,7 @@ fn a_persons_forget_cancels_every_reminder_they_set_and_survives_a_reopen() {
     assert_eq!(listed(&mut e, &at, None), ["Bo's call", "Water the plant"]);
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(BO), false))),
-        ["Bo's call"]
+        ["Bo's call", "Water the plant"]
     );
 }
 
@@ -1572,7 +1584,7 @@ fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_se
     let at = now(0);
     let disk = Disk::default();
     let mut e = open(disk.clone(), &at);
-    // A reminder: a short timer set by nobody is every line's.
+    // Existing unowned reminders become room-visible without rewriting them.
     set_by(&mut e, &at, "Call Maria", None);
     set_by(&mut e, &at, "Ann's pills", Some(ANN));
     drop(e);
@@ -1582,10 +1594,13 @@ fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_se
     assert!(stored["items"][0].get("person").is_none());
     assert_eq!(stored["items"][1]["person"], ANN);
     let mut e = open(disk, &at);
-    assert_eq!(listed(&mut e, &at, Some(asker(None, true))), ["Call Maria"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(None, false))),
+        ["Call Maria"]
+    );
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), false))),
-        ["Ann's pills"]
+        ["Call Maria", "Ann's pills"]
     );
     // A setter that is not a person id is refused, never stored.
     let refused = e
@@ -1600,4 +1615,104 @@ fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_se
         )
         .unwrap_err();
     assert_eq!(refused.code, "bad_request");
+}
+
+/// A room reminder can be snoozed and its whole repeating series cancelled
+/// without a known speaker, including after reopening the persisted store.
+#[test]
+fn the_rooms_repeating_reminder_can_be_snoozed_and_cancelled_after_reopen() {
+    let at = now(0);
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &at);
+    let room = set_when(
+        &mut e,
+        &at,
+        "Water the plant",
+        None,
+        When::Daily {
+            time: "08:10".into(),
+            zone: None,
+        },
+    );
+    set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    let due_at = now(600_000);
+    e.tick(&due_at).unwrap();
+    let delivery = get(&mut e, &due_at, room)["delivery"].as_u64().unwrap();
+    e.answer(
+        Request::Snooze {
+            guard: guard(&e),
+            id: room,
+            delivery,
+            seconds: 60,
+            asker: Some(asker(None, false)),
+        },
+        &due_at,
+    )
+    .unwrap();
+    drop(e);
+    let mut e = open(disk, &due_at);
+    assert_eq!(
+        listed(&mut e, &due_at, Some(asker(None, false))),
+        ["Water the plant"]
+    );
+    e.answer(
+        Request::Cancel {
+            guard: guard(&e),
+            id: room,
+            asker: Some(asker(Some(BO), false)),
+        },
+        &due_at,
+    )
+    .unwrap();
+    assert!(listed(&mut e, &due_at, Some(asker(None, false))).is_empty());
+    assert_eq!(
+        listed(&mut e, &due_at, Some(asker(Some(ANN), false))),
+        ["Ann's pills"]
+    );
+}
+
+/// At the store bound, a room reader counts all unowned entries without
+/// exposing the known person's entries. Timing is evidence, not a flaky gate.
+#[test]
+fn a_full_store_keeps_room_counts_private_and_measures_visibility_latency() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    for index in 0..MAX_ITEMS {
+        set_by(&mut e, &at, "Reminder", (index % 2 == 0).then_some(ANN));
+    }
+    let mut samples = Vec::new();
+    for _ in 0..101 {
+        let start = std::time::Instant::now();
+        let page = e
+            .answer(
+                Request::ListSet {
+                    after_id: 0,
+                    limit: 8,
+                    pending_only: true,
+                    asker: Some(asker(None, false)),
+                },
+                &at,
+            )
+            .unwrap();
+        samples.push(start.elapsed().as_nanos());
+        assert_eq!(page["not_yet_due"], MAX_ITEMS / 2);
+        assert!(page["items"].as_array().unwrap().is_empty());
+    }
+    let first = samples.remove(0);
+    samples.sort_unstable();
+    eprintln!(
+        "room_visibility_timing {}",
+        json!({
+            "boundary": "Engine::answer ListSet entry to returned JSON; full 128-item store, pending-only room reader",
+            "machine_os": std::env::consts::OS,
+            "machine_arch": std::env::consts::ARCH,
+            "first_ns": first,
+            "repeated_count": samples.len(),
+            "repeated_p50_ns": samples[49],
+            "repeated_p95_ns": samples[94],
+            "repeated_max_ns": samples[99],
+            "target_ns": 1_000_000,
+            "limits": "In-memory persistence; no IPC, disk write, provider, voice input or lamp; startup excluded"
+        })
+    );
 }

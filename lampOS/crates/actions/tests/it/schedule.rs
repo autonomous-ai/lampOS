@@ -1149,16 +1149,10 @@ fn texts(list: &Value) -> Vec<String> {
         .collect()
 }
 
-/// Reviewer-three's after-merge P2 on #4527, the first builder's (a): two
-/// people each asking "my reminders" hear their own; an unknown face hears
-/// none; the owner hears theirs and the ones set with nobody sure; a
-/// guest's cancel or snooze by the owner's id is refused as not found; a
-/// call without its caller is nobody's. A short timer set by nobody is
-/// every line's (option 1 on #4656's after-merge P2): the unknown face
-/// hears and cancels the one it set, and never a relative reminder set
-/// three weeks out (Reviewer-three's P1 on #4668).
+/// Through both real servers, callers see their own and the room's items,
+/// including long relative reminders. Other people's items stay inaccessible.
 #[test]
-fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_server() {
+fn each_person_hears_their_own_and_the_rooms_reminders_through_the_real_server() {
     let schedule = Schedule::new();
     let actions = Actions::new(Some(schedule.adapter()));
     let owner = caller(Some(ANN), true);
@@ -1180,15 +1174,15 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
     let plant = set("Water the plant", &unknown);
     let list = |who: &Value| actions.call_as("list_reminders", json!({}), who.clone());
     assert_eq!(texts(&list(&owner)), ["Ann's pills", "Water the plant"]);
-    assert_eq!(texts(&list(&bo)), ["Bo's call"]);
-    assert!(texts(&list(&unknown)).is_empty());
-    // Not due yet, the line's own count: Bo is told of his one only.
+    assert_eq!(texts(&list(&bo)), ["Bo's call", "Water the plant"]);
+    assert_eq!(texts(&list(&unknown)), ["Water the plant"]);
+    // Not due yet: Bo is told of his own and the room's reminder.
     let due = actions.call_as("list_reminders", json!({"pending_only":true}), bo.clone());
-    assert_eq!(due["result"]["not_yet_due"], 1, "{due}");
-    // A call without its caller is nobody's.
+    assert_eq!(due["result"]["not_yet_due"], 2, "{due}");
+    // A call without its caller has only the room's view.
     let bare = actions.raw(json!({"op":"call","name":"list_reminders","args":{}}));
-    assert!(texts(&bare).is_empty());
-    for (id, who) in [(pills, &bo), (pills, &unknown), (plant, &bo)] {
+    assert_eq!(texts(&bare), ["Water the plant"]);
+    for (id, who) in [(pills, &bo), (pills, &unknown)] {
         let refused = actions.call_as("cancel_reminder", json!({"id":id}), who.clone());
         assert_eq!(refused["code"], "not_found", "{refused}");
     }
@@ -1212,10 +1206,9 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
         owner.clone(),
     );
     assert_eq!(snoozed["result"]["status"], "committed", "{snoozed}");
-    let cancelled = actions.call_as("cancel_reminder", json!({"id":plant}), owner.clone());
+    let cancelled = actions.call_as("cancel_reminder", json!({"id":plant}), unknown.clone());
     assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
-    // At the stove, no face seen: the timer it sets it hears and cancels,
-    // and never the relative reminder three weeks out, or a reminder.
+    // With no face seen, both short timers and long reminders are the room's.
     let pasta = actions.call_as(
         "set_timer",
         json!({"text":"Pasta","seconds":600}),
@@ -1228,8 +1221,15 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
         unknown.clone(),
     );
     assert_eq!(weeks["result"]["status"], "committed", "{weeks}");
-    assert_eq!(texts(&list(&unknown)), ["Pasta"]);
+    assert_eq!(texts(&list(&unknown)), ["Pasta", "Renew the visa"]);
     let cancelled = actions.call_as("cancel_reminder", json!({"id":pasta}), unknown.clone());
+    assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+    assert_eq!(texts(&list(&unknown)), ["Renew the visa"]);
+    let cancelled = actions.call_as(
+        "cancel_reminder",
+        json!({"id":weeks["result"]["id"]}),
+        bo.clone(),
+    );
     assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
     assert!(texts(&list(&unknown)).is_empty());
 }

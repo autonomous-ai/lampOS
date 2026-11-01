@@ -105,7 +105,7 @@ struct Item {
     pending: Option<Pending>,
     /// Who set it, as a memory person id (#4527's P2, (a)): optional stored
     /// metadata, so no `schema` bump. An item stored before it, or set with
-    /// nobody sure, has none and is the owner's line's ([`Asker::may_see`]).
+    /// nobody sure, has none and belongs to the room ([`Asker::may_see`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     person: Option<String>,
 }
@@ -121,31 +121,13 @@ impl Item {
     fn timer(&self) -> bool {
         self.deadline.elapsed.is_some()
     }
-
-    /// A timer the room hears ([`visible`]): set with nobody sure, for at
-    /// most [`ROOM_TIMER_MS`] from when it was set.
-    fn rooms(&self) -> bool {
-        self.person.is_none()
-            && self.timer()
-            && self.deadline.unix_ms.saturating_sub(self.created_unix_ms) <= ROOM_TIMER_MS
-    }
 }
 
-/// The longest a timer set with nobody sure may run and still be the room's:
-/// a kitchen timer is minutes, a roast's an hour or two. `set_timer` also
-/// sets relative reminders, up to a year out ("in three weeks, renew my
-/// prescription", Reviewer-three's P1 and Third's line on #4668), and a
-/// longer one is kept as a reminder is.
-const ROOM_TIMER_MS: i64 = 2 * 3_600_000;
-
-/// Whether `asker`, if any, may see `item`: no asker sees everything, and
-/// every line sees the room's timers. A timer set with nobody sure, for two
-/// hours at most, is the room's (option 1 on #4656's after-merge P2): asked
-/// after from the stove with no face in view, and said aloud to whoever is
-/// there when it's due. A timer a person set stays theirs, as their
-/// relative reminders do, and their forget cancels it.
+/// Every line sees reminders and timers set with no sure person. A known
+/// person's items remain theirs alone. No asker is the app or delivery
+/// reader, which keeps its existing whole-store view.
 fn visible(asker: Option<&Asker>, item: &Item) -> bool {
-    item.rooms() || asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
+    asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
 }
 
 /// A setter's person id as memory makes them: `p-` and 16 hex digits.
@@ -1161,7 +1143,7 @@ fn find(state: &State, id: u64) -> Result<usize, Error> {
         .position(|i| i.id == id)
         .ok_or_else(|| err("not_found", "That reminder or timer is no longer active."))
 }
-/// [`find`] for a line that may see only its own ([`Asker::may_see`]): one
+/// [`find`] for a line that may see its own and the room's items ([`Asker::may_see`]): one
 /// it may not see is not found, never named as someone else's.
 fn find_for(state: &State, id: u64, asker: Option<&Asker>) -> Result<usize, Error> {
     let index = find(state, id)?;
