@@ -2497,6 +2497,7 @@ mod tests {
                     || name == crate::second_provider::NAME_START_USUAL_ENVIRONMENT
                     || name == crate::second_provider::WINDOW_FROM_START_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
+                    || name == crate::second_provider::LIKE_ASKER_MEASURE_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
@@ -2642,6 +2643,7 @@ mod tests {
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
+                    "LAMP_LIKE_ASKER_MEASURE=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FOLLOWS_FACE=on",
