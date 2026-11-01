@@ -170,6 +170,10 @@ Environment=LAMP_SECOND_SAID_ONCE=on
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
 # against 2.95-3.27 s, a real light change 1.82-1.89 s, nothing said twice (the first builder on #4710, 17:35).
 Environment=LAMP_SECOND_SAY_WITH_CALL=on
+# A search begun with nothing said is begun with the lamp's own "Let me check.", in the owner's language, said as the
+# search runs, and the next round is told it was said (#4684, #4707): on lamp-4ace on 31 Oct (7fa975266f) a price came
+# right but 4.5 s after the words, with nothing said first. Never said without a search, or beside the model's own words.
+Environment=LAMP_SECOND_CHECKING_LINE=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by
