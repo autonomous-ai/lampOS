@@ -1,5 +1,5 @@
 # lampOS policy: what it would decide about each thing heard, beside what the lamp did
-# (lampOS/docs/policy.md). It decides nothing yet.
+# (lampOS/docs/policy.md). Only its hello decisions act (--act hello), as Welcome back's gate.
 # Template: replace every @NAME@ (README.md here).
 # Type=simple until it calls the keeper's helper.
 [Unit]
@@ -19,7 +19,15 @@ Nice=5
 # The key stays readable by root alone; systemd hands the service its own copy.
 LoadCredential=jev.key:/etc/lampOS/policy/jev.key
 StateDirectory=lampos-policy
-ExecStart=/opt/lampOS/policy/@POLICY_SHA256@/lamp-policy --key-file ${CREDENTIALS_DIRECTORY}/jev.key --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus
+# --zone system: the hour of its decisions in the lamp's own zone, as setup points /etc/localtime (#820).
+# --hello --act hello --gate: the Policy's hello gate answers Welcome back's ask on skills/ask, asked
+# even with LAMP_SKILLS_ASK=skip; acting, its say_now alone says the hello (the first builder, 30 Oct,
+# on the launch testers' findings). --hello-by-rule: the hello is decided by the hard rules alone
+# (never over talk, twenty minutes between hellos, one an hour to each person), a pass is say_now at
+# once with no wait for the model; the judge is asked only in shadow, logged, never acting (the first
+# builder, 30 Oct, on #4625, as #4305 took Jev out of what the lamp does). Every other question stays
+# off or in shadow.
+ExecStart=/opt/lampOS/policy/@POLICY_SHA256@/lamp-policy --zone system --hello --act hello --gate --hello-by-rule --key-file ${CREDENTIALS_DIRECTORY}/jev.key --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

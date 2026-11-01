@@ -217,6 +217,24 @@ struct Script {
     /// The second route fails each turn before any audio, as its worker
     /// does when its speech to text or chat cannot be reached.
     second_fails: Option<Fault>,
+    /// With `second_fails`, only this many of the route's requests fail;
+    /// the ones after are answered: the service is back.
+    second_fails_first: Option<usize>,
+    /// With `second_fails`, this many of the lamp's written notes fail too,
+    /// their chat refused; a line the lamp says itself asks no chat, so it
+    /// never fails and is told `OwnWordsSaid`, as the engine tells it.
+    second_refuses_notes: usize,
+    /// More lines, of 60 capture frames each, beginning at these frames.
+    speak_at: &'static [u64],
+    /// The second route's requests, by the count ended, in which speech to
+    /// text heard no words: told idle at End, no chat asked.
+    second_unheard: &'static [usize],
+    /// The second route's requests, by the count ended, that fail only
+    /// slow: no answer in time, no refusal of the service's.
+    second_slow: &'static [usize],
+    /// The recorded failure lines, an offline and a voice service one
+    /// among them (`FailureNotices::synthetic_offline`); none without.
+    notices: bool,
     /// This peer reads Stop and keeps its process running (#1620).
     ignores_stop: Option<&'static str>,
     /// The scenario's own bound, past which capture reports a fault.
@@ -310,6 +328,12 @@ impl Script {
             open_name: false,
             call_takes_next: false,
             second_fails: None,
+            second_fails_first: None,
+            second_refuses_notes: 0,
+            speak_at: &[],
+            second_unheard: &[],
+            second_slow: &[],
+            notices: false,
             ignores_stop: None,
             limit: LIMIT,
             silent: false,
@@ -539,6 +563,8 @@ struct Peers {
     second_looked: bool,
     /// Look's turns the second route has answered (`Script::look_answers`).
     look_turns: usize,
+    /// Written notes refused (`Script::second_refuses_notes`).
+    notes_refused: usize,
     /// The capture frame the murmur began at (`Script::murmur`).
     murmur_at: Option<u64>,
     /// The capture frame the push began at (`Script::push`).
@@ -571,7 +597,12 @@ impl Peers {
                     .is_some_and(|offset| (offset..offset + 60).contains(&frame))
                 || self
                     .murmur_at
-                    .is_some_and(|at| (at..at + 2).contains(&frame)))
+                    .is_some_and(|at| (at..at + 2).contains(&frame))
+                || self
+                    .script
+                    .speak_at
+                    .iter()
+                    .any(|at| (*at..at + 60).contains(&frame)))
     }
 
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
@@ -1090,6 +1121,21 @@ impl Peers {
                         }
                         Written::Said(packets) => {
                             queued.push_back(started);
+                            let own = crate::onboarding::own_words(&text).is_some();
+                            if !live && own {
+                                queued.push_back(ProviderOutput::OwnWordsSaid { request });
+                            } else if !live
+                                && let Some(reason) = self.script.second_fails
+                                && self.notes_refused < self.script.second_refuses_notes
+                            {
+                                self.notes_refused += 1;
+                                queued.push_back(ProviderOutput::TurnFailed {
+                                    request,
+                                    stage: FailedStage::AwaitingResponse,
+                                    reason,
+                                });
+                                continue;
+                            }
                             let before = self.peers[index].queued.len();
                             // Alone, a look's turn or the look's note is
                             // answered as the script says.
@@ -1190,7 +1236,32 @@ impl Peers {
                         }
                         continue;
                     }
-                    if !live && let Some(reason) = self.script.second_fails {
+                    if !live && self.script.second_unheard.contains(&self.ended.len()) {
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::TurnComplete {
+                                request,
+                                idle: true,
+                            });
+                        continue;
+                    }
+                    if !live && self.script.second_slow.contains(&self.ended.len()) {
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::TurnFailed {
+                                request,
+                                stage: FailedStage::AwaitingResponse,
+                                reason: Fault::ResponseTimeout,
+                            });
+                        continue;
+                    }
+                    if !live
+                        && let Some(reason) = self.script.second_fails
+                        && self
+                            .script
+                            .second_fails_first
+                            .is_none_or(|first| self.ended.len() <= first)
+                    {
                         self.peers[index]
                             .queued
                             .push_back(ProviderOutput::TurnFailed {
@@ -1574,6 +1645,11 @@ fn hand_stop_state(at_us: u64) -> lamp_msgs::ControlsState {
 
 fn run(script: Script) -> Run {
     let limit = script.limit;
+    let notices = if script.notices {
+        FailureNotices::synthetic_offline()
+    } else {
+        FailureNotices::none()
+    };
     let directory = SessionDirectory::create().unwrap();
     let mut peers = Vec::new();
     let mut spawn = |role| {
@@ -1784,6 +1860,7 @@ fn run(script: Script) -> Run {
         second_session: 0,
         second_looked: false,
         look_turns: 0,
+        notes_refused: 0,
         murmur_at: None,
         pushed_at: None,
         last_hand_publish_us: None,
@@ -1828,7 +1905,7 @@ fn run(script: Script) -> Run {
         &mut reply,
         &mut None,
         &Termination::inactive(),
-        &FailureNotices::none(),
+        &notices,
         &mut controls,
         &mut None,
     );
@@ -6259,4 +6336,496 @@ fn a_real_coordinator_transcript_is_projected_before_shared_storage() {
         assert_eq!(shared["turn"], original["turn"]);
         assert_eq!(shared["at_us"], original["at_us"]);
     }
+}
+
+/// `LAMP_SIGNED_OUT=on`, signed out after the first line was answered: the lamp
+/// says the line once with nothing asked, lines heard within its bound get the
+/// breath alone, and no turn is sent after the first.
+#[test]
+fn a_signed_out_lamp_says_so_once_and_bounds_it_when_talked_to_and_sends_nothing() {
+    let _one = super::pilot_faults::one_session();
+    super::super::signed_out::set_for_test(Some(|since_us| lamp_msgs::AccountState {
+        signed_out: since_us >= 15_000_000,
+        for_s: 0,
+    }));
+    let run = run(Script {
+        second: false,
+        only: true,
+        notices: true,
+        speak_at: &[3_000, 5_000],
+        mute_at_frame: Some(6_000),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::signed_out::set_for_test(None);
+    run.assert_clean();
+    let started = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(started.len(), 1, "{started:?}\n{}", run.summary());
+    let turns = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == 44)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        turns.len(),
+        1,
+        "once unasked, the lines heard after it within the bound: {}",
+        run.summary()
+    );
+    let own = run
+        .events("input_admitted")
+        .into_iter()
+        .filter(|event| event["admission_basis"] == "signed_out")
+        .count();
+    assert_eq!(own, 1, "{}", run.summary());
+}
+
+/// `LAMP_SIGNED_OUT=on` with nobody at the lamp and nobody talking: the line
+/// isn't said to an empty room.
+#[test]
+fn a_signed_out_lamp_says_nothing_to_an_empty_room() {
+    let _one = super::pilot_faults::one_session();
+    super::super::signed_out::set_for_test(Some(|_| lamp_msgs::AccountState {
+        signed_out: true,
+        for_s: 0,
+    }));
+    let run = run(Script {
+        second: false,
+        only: true,
+        notices: true,
+        silent: true,
+        mute_at_frame: Some(6_000),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::signed_out::set_for_test(None);
+    let own = run
+        .events("input_admitted")
+        .into_iter()
+        .filter(|event| event["admission_basis"] == "signed_out")
+        .count();
+    assert_eq!(own, 0, "{}", run.summary());
+}
+
+/// The state cleared: the lines before it are held, the one after it is sent.
+#[test]
+fn a_lamp_signed_in_again_sends_its_turns() {
+    let _one = super::pilot_faults::one_session();
+    super::super::signed_out::set_for_test(Some(|since_us| lamp_msgs::AccountState {
+        signed_out: since_us < 30_000_000,
+        for_s: 0,
+    }));
+    let run = run(Script {
+        second: false,
+        only: true,
+        notices: true,
+        // The first line and this one (20 s) held, then sent (50 s).
+        speak_at: &[2_000, 5_000],
+        mute_at_frame: Some(6_000),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::signed_out::set_for_test(None);
+    run.assert_clean();
+    let started = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(started.len(), 1, "{started:?}\n{}", run.summary());
+}
+
+/// #4265 (`LAMP_SECOND_REFUSED_HOLD=on`), as lamp-52e6 ran it on 30 Oct:
+/// the second route alone, its first turn refused for its quota, so the
+/// refusal starts at once and the lines heard within the minute are held,
+/// never sent. A line heard past the minute is sent, the service is back
+/// and answers it, and that answer ends the refusal: the line after it,
+/// seconds later, is sent and answered too, not held.
+#[test]
+fn a_refusal_holds_lines_for_its_minute_then_a_line_is_sent_and_its_answer_ends_the_refusal() {
+    let _one = super::pilot_faults::one_session();
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        // Held (20 s), sent past the minute (75 s), then sent again (85 s).
+        speak_at: &[2_000, 7_500, 8_500],
+        mute_at_frame: Some(9_500),
+        limit: Duration::from_secs(100),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    run.assert_clean();
+    let started: Vec<u64> = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        started.len(),
+        3,
+        "the refused line, the try past the minute and the line after it: {started:?}\n{}",
+        run.summary()
+    );
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 2, "{answered:?}\n{}", run.summary());
+    let held = run
+        .events("input_admitted")
+        .into_iter()
+        .filter(|event| event["local_only"] == true)
+        .count();
+    assert_eq!(held, 1, "the line within the minute: {}", run.summary());
+}
+
+/// #4265 as lamp-52e6 ran it on 30 Oct: connections refused, so a refusal
+/// starts on the second refused turn in a row; the recorded voice service
+/// line plays for the line held after it, and the person speaks over it.
+/// A line heard past the minute is still taken and sent, the service is
+/// back and answers it, and the line after it is sent too.
+#[test]
+fn a_refusal_on_refused_connections_whose_line_is_spoken_over_still_sends_the_line_past_its_minute()
+{
+    let _one = super::pilot_faults::one_session();
+    for (turn_taking, echo_evidence) in [
+        (TurnTaking::V1Baseline, false),
+        (TurnTaking::VadOnly, false),
+        (TurnTaking::Duplex, true),
+    ] {
+        super::super::model_refusing::set_for_test(Some(true));
+        let run = run(Script {
+            turn_taking,
+            echo_evidence,
+            second: false,
+            only: true,
+            second_fails: Some(Fault::Transport),
+            second_fails_first: Some(2),
+            notices: true,
+            // Refused again (10 s); held, its line spoken over (20 s, 20.7 s);
+            // sent past the minute (80 s), then sent again (90 s).
+            speak_at: &[1_000, 2_000, 2_070, 8_000, 9_000],
+            mute_at_frame: Some(10_000),
+            limit: Duration::from_secs(110),
+            ..Script::question(Live::Answer(12))
+        });
+        super::super::model_refusing::set_for_test(None);
+        run.assert_clean();
+        let started: Vec<u64> = dedup(
+            &run.seen
+                .second
+                .iter()
+                .filter(|input| matches!(input, ProviderInput::Start { .. }))
+                .map(request_of)
+                .collect::<Vec<_>>(),
+        );
+        let finished: Vec<_> = run
+            .events("turn_finished")
+            .into_iter()
+            .map(|event| {
+                (
+                    event["turn"].clone(),
+                    event["outcome"].clone(),
+                    event["failure_notice"].clone(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            started.len(),
+            4,
+            "{turn_taking:?} {started:?}\n{finished:?}\n{}",
+            run.summary()
+        );
+        let answered = run
+            .seen
+            .chunks
+            .iter()
+            .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+            .map(|chunk| chunk.turn)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            answered.len(),
+            2,
+            "{turn_taking:?} {answered:?}\n{finished:?}\n{}",
+            run.summary()
+        );
+        assert!(
+            run.seen
+                .chunks
+                .iter()
+                .any(|chunk| chunk.accepted && chunk.value == 55),
+            "the voice service line played: {finished:?}"
+        );
+    }
+}
+
+/// #4265 as lamp-52e6 ran it on 30 Oct (turns 13 and 17 of its trace): the
+/// minute's try went to a short sound of the room, sent, its speech to
+/// text hearing no words, so no chat asked the model; the person's ask a
+/// few seconds after it was held for another minute, and so each ask was.
+/// A line in which no words were heard tells nothing of the service: the
+/// ask after it is still sent, the service answers it, and the refusal
+/// ends.
+#[test]
+fn a_refusals_try_spent_on_a_line_with_no_words_still_sends_the_ask_after_it() {
+    let _one = super::pilot_faults::one_session();
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        // Past the minute: the room's sound, sent and heard as no words
+        // (75 s), then the person's ask (80 s), then another (90 s).
+        speak_at: &[7_500, 8_000, 9_000],
+        second_unheard: &[2],
+        mute_at_frame: Some(10_000),
+        limit: Duration::from_secs(110),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    run.assert_clean();
+    let started: Vec<u64> = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        started.len(),
+        4,
+        "the refused line, the unheard one and both asks: {started:?}\n{}",
+        run.summary()
+    );
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 2, "{answered:?}\n{}", run.summary());
+}
+
+/// #4265 (the Reviewer-lead's P3 on #4483): past the minute, a line is
+/// sent and its turn fails only slow, no answer in time. A slow turn is no
+/// refusal: it tries nothing and holds nothing, so the ask a few seconds
+/// after it is sent too, the service answers it, and the refusal ends.
+#[test]
+fn a_refusals_line_past_its_minute_that_fails_only_slow_holds_nothing_and_the_next_is_sent() {
+    let _one = super::pilot_faults::one_session();
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        // Past the minute: a line sent that fails slow (75 s), then the
+        // person's ask (80 s), then another (90 s).
+        speak_at: &[7_500, 8_000, 9_000],
+        second_slow: &[2],
+        mute_at_frame: Some(10_000),
+        limit: Duration::from_secs(110),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    run.assert_clean();
+    let started: Vec<u64> = dedup(
+        &run.seen
+            .second
+            .iter()
+            .filter(|input| matches!(input, ProviderInput::Start { .. }))
+            .map(request_of)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        started.len(),
+        4,
+        "the refused line, the slow one and both asks: {started:?}\n{}",
+        run.summary()
+    );
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 2, "{answered:?}\n{}", run.summary());
+}
+
+/// A skill's say while the model service refuses (#4265, the lead's call
+/// on #1711), on the second route alone, the refusal begun by its first
+/// turn's quota: the say and the person's lines that follow, as the run
+/// gave them.
+fn a_say_while_refused(
+    words: crate::say::Words,
+    refused_notes: usize,
+    speak_at: &'static [u64],
+    seconds: u64,
+) -> (Run, Vec<crate::say::Answer>) {
+    let (says, answered) =
+        crate::say::Says::words_for_test("stretch", words, crate::say::URGENT_FROM);
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    super::super::model_refusing::set_for_test(Some(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        written: Written::Said(12),
+        second_fails: Some(Fault::QuotaExceeded),
+        second_fails_first: Some(1),
+        second_refuses_notes: refused_notes,
+        speak_at,
+        mute_at_frame: Some(seconds * 100 - 500),
+        limit: Duration::from_secs(seconds),
+        ..Script::question(Live::Answer(12))
+    });
+    super::super::model_refusing::set_for_test(None);
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    run.assert_clean();
+    let answered = answered.try_iter().collect();
+    (run, answered)
+}
+
+/// The say's turn and how long after the refused first turn it was
+/// admitted.
+fn said_after_refusal(run: &Run) -> (u64, u64) {
+    let refused_at = run.events("turn_finished")[0]["at_us"].as_u64().unwrap();
+    let say = run
+        .events("input_admitted")
+        .into_iter()
+        .find(|event| event["admission_basis"] == "skill_says")
+        .unwrap_or_else(|| panic!("no say: {}", run.summary()));
+    (
+        say["turn"].as_u64().unwrap(),
+        say["at_us"].as_u64().unwrap().saturating_sub(refused_at),
+    )
+}
+
+fn held_lines(run: &Run) -> usize {
+    run.events("input_admitted")
+        .into_iter()
+        .filter(|event| event["local_only"] == true)
+        .count()
+}
+
+/// A say with its own fixed words (a `text`) needs no model: while turns
+/// are held it is said as the lamp's own line, its words as they are and
+/// no chat asked. That is no answer of the model's: the person's line
+/// after it, within the minute, is still held.
+#[test]
+fn a_says_fixed_words_are_said_while_refused_and_end_no_refusal() {
+    use crate::say::{Answer, Outcome, Words};
+    let _one = super::pilot_faults::one_session();
+    let (run, answered) = a_say_while_refused(
+        Words::Text("Time to stretch.".into()),
+        0,
+        // Within the minute: held.
+        &[2_500],
+        40,
+    );
+    let own = crate::onboarding::said_as_is("Time to stretch.").unwrap();
+    let said: Vec<u64> = run
+        .seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Written { request, text, .. } if *text == own => Some(*request),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(said.len(), 1, "{}", run.summary());
+    let (turn, after_us) = said_after_refusal(&run);
+    assert_eq!(turn, said[0]);
+    assert!(
+        after_us < super::super::model_refusing::TRY_AGAIN_EVERY_US,
+        "{after_us}"
+    );
+    assert_eq!(run.played(turn), vec![SECOND; 48]);
+    assert!(
+        matches!(
+            answered.as_slice(),
+            [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+        ),
+        "{answered:?}"
+    );
+    assert_eq!(held_lines(&run), 1, "{}", run.summary());
+}
+
+/// A note the model must word waits while turns are held, as a spoken line
+/// does, and is sent with the minute's try. Its chat refused again, the
+/// try is spent: the person's line after it is held for another minute.
+#[test]
+fn a_note_that_needs_the_model_waits_for_the_refusals_try_and_its_refusal_spends_it() {
+    use crate::say::Words;
+    let _one = super::pilot_faults::one_session();
+    let (run, _) = a_say_while_refused(
+        Words::Note("Remind the person to stretch.".into()),
+        1,
+        // Past the minute, after the note's refused try: held.
+        &[8_000],
+        100,
+    );
+    let (_, after_us) = said_after_refusal(&run);
+    assert!(
+        after_us >= super::super::model_refusing::TRY_AGAIN_EVERY_US,
+        "the note was sent {after_us} µs after the refusal: {}",
+        run.summary()
+    );
+    assert_eq!(held_lines(&run), 1, "{}", run.summary());
+}
+
+/// A note the model must word ends no refusal by being there: it waits, so
+/// the person's line within the minute is held. Sent with the minute's
+/// try and answered, it ends the refusal, and the line after it is sent
+/// and answered.
+#[test]
+fn a_note_that_needs_the_model_ends_a_refusal_only_once_answered() {
+    use crate::say::Words;
+    let _one = super::pilot_faults::one_session();
+    let (run, _) = a_say_while_refused(
+        Words::Note("Remind the person to stretch.".into()),
+        0,
+        // Within the minute: held; past it, after the note's answer: sent.
+        &[2_500, 8_500],
+        100,
+    );
+    let (note, after_us) = said_after_refusal(&run);
+    assert!(
+        after_us >= super::super::model_refusing::TRY_AGAIN_EVERY_US,
+        "{after_us}: {}",
+        run.summary()
+    );
+    assert_eq!(held_lines(&run), 1, "{}", run.summary());
+    let answered = run
+        .seen
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.accepted && chunk.value == SECOND && chunk.turn != note)
+        .map(|chunk| chunk.turn)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(answered.len(), 1, "{answered:?}\n{}", run.summary());
 }

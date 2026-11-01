@@ -927,8 +927,8 @@ this room" until someone asks to be recognised.
 - **Said.** With `--known-file` (on lamp-4ace `/run/lampos-eyes/known`,
   beside the socket), the name of the known person at the lamp is kept
   there and renewed every two seconds while they are there. The file is
-  removed when nobody is near (with `LAMP_FACE_FULL_CROP=on`, once the hold
-  is over, [below](#held-through-a-miss-lamp_face_full_cropon-3126)). With `LAMP_MEMORY_STABLE_ID=on` the
+  removed when nobody is near (with `LAMP_FACE_FULL_CROP=on` or
+  `LAMP_FACE_KNOWN_HOLD=on`, once the hold is over, [below](#held-through-a-miss-lamp_face_full_cropon-3126)). With `LAMP_MEMORY_STABLE_ID=on` the
   person's memory id is on the line after the name (`NAME\nID\n`,
   `lamp_msgs::known`); off, the name alone, as before. Every reader (the
   voice's `known_faces`, the skills' `known::name_in`) reads the first
@@ -956,6 +956,9 @@ this room" until someone asks to be recognised.
   - With `--known-file`, `tellable` beside it (mode 0600) holds the names of
     those who said yes, one a line, rewritten at start and after every
     request on the socket. So a no, a forget or a rename is there at once.
+    The same names are not written again (#4493): the voice takes the
+    file's time as a change of who said yes, which makes its face cache
+    cold, so a `who` or `list` ask leaves the file as it was.
     There's no file when nobody said yes. A new remembering, even under a
     name that had a yes, starts without one: the prints are whoever is at
     the lamp then, so the voice asks again. The reset wipes their record,
@@ -1046,7 +1049,11 @@ analysis on #3126). With the switch on:
   `who` and the known file, if they matched within the last 4 s
   (`who::KNOWN_HOLD`, `who::Held`): one missed check, two seconds on, keeps
   them, and the next lets them go, so someone who leaves is let go within
-  4 s of their last match. A held check does not count a visit. Someone
+  4 s of their last match. A held check does not count a visit, and it
+  leaves the known file's words and `known-face` as they were and only
+  sets its modified time to now (`who::renew_known`, #4493): the voice
+  takes the file as fresh for 3 s after it was written, so without the
+  renewal it stopped naming a held face a second before the next check. Someone
   else matched, or a face from a photo, replaces them at once. An unknown
   face ends the hold too: a near face that printed and matched nobody keeps
   the held name only if it is still at least 0.30 alike to that person's
@@ -1062,6 +1069,12 @@ analysis on #3126). With the switch on:
   relies on the 0.30 bar alone, and an unprinted near face lets go at once.
 - **The camera closed lets them go at once**: the name and the known file
   go as it closes, held or not.
+
+`LAMP_FACE_KNOWN_HOLD=on` (off unless set, #4493) gives the same hold
+without the full-frame crop, for a lamp that keeps the shrunk picture's
+prints: on lamp-52e6 on 27 Oct each missed check removed the known file
+and the next match wrote it back, and the voice journaled its face cache
+cold each time (8 to 23 times a run).
 
 Off, nothing changes: each miss lets go, as before. The lamp check: on
 lamp-52e6, the lead's face from a seat with the switch on and off, the

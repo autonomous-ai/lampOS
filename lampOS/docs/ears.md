@@ -35,8 +35,8 @@ The voice keeps mic2 to itself; the two parts never share a device.
 |---|---|---|---|
 | `ears/level` | `RoomSound` | latest, every 100 ms | The last 100 ms in dBFS; the room's quiet (the tenth percentile of the last 30 s heard while the lamp was not speaking; none for the first two seconds); whether the lamp's own voice is in it |
 | `ears/sudden` | `SuddenSound` | event | Its loudest 20 ms, the quiet it rose out of, how long it stayed 10 dB over the quiet in the 300 ms it was watched, whether that was under 200 ms ("short": a knock, a clap) or not (a voice, a chair, music), and how long ago it began |
-| `diagnostics` | `Diagnostic` | every second | `ears`: ok, or an error with why the microphone does not open; the quiet now, how many sudden sounds, overruns |
-| `ears/classes` | `SoundClasses` | latest, every 500 ms | Only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with the person's stored yes ([privacy-switch.md](privacy-switch.md)): speech, music and laughter scores of the last patch, or why there are none (below, and [sound-events.md](sound-events.md)) ; `own_voice` `present` for a window the lamp spoke into, else `unknown` ([sound-events.md](sound-events.md)) |
+| `diagnostics` | `Diagnostic` | every second | `ears`: ok, or an error with why the microphone does not open; the quiet now, how many sudden sounds, overruns. With `LAMP_PRIVACY_CONTROLS=on` (the product's), always ok, "microphone observed open" or "closed", with `privacy_controls`, `capture_open_observed`, `capture_observed_us`, `capture_clock_id` and `capture_failures` (`privacy_runtime.rs`) |
+| `ears/classes` | `SoundClasses` | latest, every 500 ms | Only with `LAMP_EARS_CLASSES=on` and `LAMP_PRIVACY_CONTROLS=on`, or `no-slide` with the person's stored yes ([privacy-switch.md](privacy-switch.md)): speech, music, laughter, door and footsteps scores (#2562) of the last patch, or why there are none (below, and [sound-events.md](sound-events.md)) ; `own_voice` `present` for a window the lamp spoke into, else `unknown` ([sound-events.md](sound-events.md)) |
 
 **When a sound is sudden.** A 20 ms block at least 30 dB over the quiet
 (`--rise-db`, 10 to 60) and at least -40 dBFS, after 200 ms that averaged under 10 dB over the quiet.
@@ -56,8 +56,9 @@ a living thing. One of the 52 rose more than 30 dB (-18.1 dBFS out of
 
     lamp-ears --device plug:device_micro1 --rise-db 30 --bus-root /run/lampos-bus
 
-Unit `lamp-ears.service` (in the first builder's deploy folder for
-lamp-4ace). **The capture level is pinned** before ears starts:
+Unit `lamp-ears.service`. **The capture level is pinned** in the product's
+unit (`deploy/product/lamp-ears.service`; lamp-4ace's own does not) before
+ears starts:
 `amixer -c device_cmedia sset Mic capture 4` (-8 dB), the level lamp-4ace's
 numbers here were measured at (#694). A lamp left at another level hears
 another room: lamp-75c9 at capture 20 (+8 dB) read its quiet at -37.6 dBFS
@@ -77,8 +78,7 @@ or new worker is created. Any other value, an empty one included, does the same,
 as in Controls and Voice, so a mistyped unit never stops Ears; a value other
 than empty or `off` is named in one journal line, since the room microphone then
 ignores the switch. `check FILE...` is unchanged.
-This is a repository implementation behind explicit enablement, not a claim that
-the installed service or hardware has been changed.
+The product's unit sets `LAMP_PRIVACY_CONTROLS=on`.
 
 When enabled, Ears starts with its microphone closed and consumes the declared
 `voice/privacy` topic (`lamp_msgs/MicrophonePrivacy`, version 1, latest, published
@@ -191,8 +191,8 @@ Taken: level and onset now; a classifier only when a behaviour needs one.
   in general: one half hour with people (above) separated the owner at the
   desk from people farther off, and not from someone at the desk talking to
   someone else.
-- Any reaction: nothing listens to `ears/sudden` yet. The glance is
-  Expression's, behind a switch, next.
+- Any reaction: Expression's startle (#2822, played from an installed
+  skill's file) and Mood read `ears/sudden`.
 - The thresholds: chosen, then to be set from what the lamp hears in the
   office.
 
@@ -266,11 +266,13 @@ publisher can enforce after handing a block to a subscriber.
 
 ## Optional room sound classes (#1669)
 
-`LAMP_EARS_CLASSES=on` (exactly `on`) scores speech, music and laughter with
-a pinned YAMNet and publishes them on `ears/classes`. It is off unless set,
-and runs only with `LAMP_PRIVACY_CONTROLS=on`, a lamp with a slide; otherwise,
-`no-slide` included ([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)),
-one journal line says no classifier runs. `LAMP_EARS_CLASSES_MODEL` is the absolute path to
+`LAMP_EARS_CLASSES=on` (exactly `on`) scores speech, music, laughter, a door
+and footsteps (#2562) with a pinned YAMNet and publishes them on
+`ears/classes`. It is off unless set, and runs only with
+`LAMP_PRIVACY_CONTROLS=on`, a lamp with a slide, or with `no-slide`
+([privacy-switch.md](privacy-switch.md#a-lamp-with-no-slide-no-slide)) and
+the person's stored yes (`/var/lib/lampOS/consent/room-sounds.json`,
+`classes::start`); otherwise one journal line says no classifier runs. `LAMP_EARS_CLASSES_MODEL` is the absolute path to
 `yamnet.onnx`, with `yamnet.data` beside it; both must match their pinned
 SHA256 or the topic says `invalid_model`. No unit sets either.
 
@@ -282,4 +284,7 @@ writes nothing; any gap, mute, epoch or fence change, overflow or age past
 2 s purges it. The Bus pump publishes a score only while that era still
 holds authority and the result is under 2 s old. The retention, timing and
 measurements are in [sound-events.md](sound-events.md), "The publisher
-behind LAMP_EARS_CLASSES". Nothing consumes the topic yet.
+behind LAMP_EARS_CLASSES". Guard mode's watch reads the topic
+(`skills/src/watch.rs`, arrivals by sound only with `LAMP_GUARD_SOUNDS=on`,
+which no unit sets), and so does the control door's watch
+(`control/src/watch.rs`).

@@ -26,6 +26,7 @@ from typing import Any, Literal
 from lampos import Lamp, LampError, schema
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
+from pydantic import AnyUrl
 
 # The body's clips a client may name, less the two the lamp refuses through
 # this door: `idle` is the lamp's own life, and `scanning` sweeps a room like
@@ -44,6 +45,16 @@ STOP_ASKED = "stop asked"
 MOST_WAIT_S = 120
 # What `lamp://events/recent` keeps.
 RECENT_EVENTS = 50
+# What the events stream (`lamp://events`, `lamp_events`) keeps.
+STREAM_EVENTS = 200
+# The state an event changes, so a client subscribed to it is told.
+STATE_OF_EVENT = {
+    "person.arrived": "presence",
+    "person.left": "presence",
+    "person.stood_up": "presence",
+    "person.facing": "presence",
+    "lamp.changed": "lamp",
+}
 STATES = ("presence", "light", "mood", "lamp")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
@@ -66,7 +77,10 @@ LIMIT_KIND = {
     "look": "motion",
     "light": "light",
     "say": "say",
+    "sound": "say",
     "express": "express",
+    "play": "motion",
+    "joints": "joints",
 }
 
 
@@ -187,6 +201,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # action never ended is listed only until then (the Reviewer-lead's P3
     # on #3802).
     leases: dict[str, float] = {}
+    # The body lease the action tools hold now, if any (`with_body_lease`).
+    body_now: list[str] = []
     # The one `lamp_follow_hand` running, if any (a `Following`, True while it
     # starts, or STOP_ASKED when a stop came while it started): a second is
     # `busy`, and `lamp_follow_stop` or `lamp_stop` ends it (folded from
@@ -225,16 +241,30 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         except LampError as error:
             raise refused(error) from error
 
-    async def with_body_lease(op: str, **fields: Any) -> str:
+    async def with_body_lease(op: str, named: bool = False, **fields: Any) -> str:
         """`op` under a body lease of its own, released at `done` or left to
         lapse; a lease another holds, or one the lamp suspends, is the
-        tool's error, never retried."""
+        tool's error, never retried. `named`: the op names its lease
+        (`joints`)."""
         limits.take(op)
-        try:
-            taken = await lamp.request("lease.take", parts=["body"], for_ms=ACTION_LEASE_MS, why=why)
-        except LampError as error:
-            raise refused(error) from error
-        lease = taken["lease"]
+        # A body lease this server still holds, from an action the body took
+        # (`{"to": "body"}`, left to lapse), is renewed and used again: the
+        # lamp refuses a second take even from its own holder (`busy`), so a
+        # tool called right after another would fail.
+        lease = None
+        if body_now and leases.get(body_now[0], 0) > clock():
+            try:
+                await lamp.request("lease.renew", lease=body_now[0], for_ms=ACTION_LEASE_MS)
+                lease = body_now[0]
+            except LampError:
+                leases.pop(body_now[0], None)
+        if lease is None:
+            try:
+                taken = await lamp.request("lease.take", parts=["body"], for_ms=ACTION_LEASE_MS, why=why)
+            except LampError as error:
+                raise refused(error) from error
+            lease = taken["lease"]
+        body_now[:] = [lease]
         leases[lease] = clock() + ACTION_LEASE_MS / 1000
         ended: asyncio.Future = asyncio.get_running_loop().create_future()
 
@@ -242,15 +272,26 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             if event.get("ev") == "lease" and event.get("lease") == lease and event.get("state") in ("lost", "suspended"):
                 if not ended.done():
                     ended.set_result(("lease", event.get("state"), event.get("why")))
-            elif event.get("ev") == "done" and event.get("re") == sent.get("re") and not ended.done():
+            elif event.get("ev") == "done" and event.get("re") == asked and not ended.done():
                 ended.set_result(("done", event.get("how"), event.get("why")))
 
+        if named:
+            fields["lease"] = lease
         sent: dict = {}
+        # The request's id, told before it's sent (`request`'s `on_id`): a
+        # `done` can come before its answer is read here, as the fake's `play`
+        # does.
+        asked: int | None = None
+
+        def note(id_: int) -> None:
+            nonlocal asked
+            asked = id_
+
         lamp.on("lease", follow)
         lamp.on("done", follow)
         try:
             try:
-                sent.update(await lamp.request(op, **fields))
+                sent.update(await lamp.request(op, on_id=note, **fields))
             except LampError as error:
                 # The action was refused: its lease is let go of at once.
                 if not ended.done():
@@ -281,12 +322,14 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 what, how, _ = ended.result()
                 if what == "done" or how == "suspended":
                     leases.pop(lease, None)
+                    body_now[:] = [held for held in body_now if held != lease]
                     try:
                         await lamp.request("lease.release", lease=lease)
                     except LampError:
                         pass
                 elif how == "lost":
                     leases.pop(lease, None)
+                    body_now[:] = [held for held in body_now if held != lease]
 
     # Only what this computer may read is promised (blue's P3 on #3802).
     state_words = {
@@ -408,6 +451,34 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             elbow), the first and last all 0, one every `step_ms` (40 to 1000), lasting 1.5 to 10 s. The body checks it."""
             return await with_body_lease("move", step_ms=step_ms, frames=frames)
 
+        @server.tool()
+        async def lamp_play(name: str) -> str:
+            """Play a recorded move by its name (lowercase letters, digits, - and _). The body checks
+            it as any move. A lamp that doesn't route `play` yet says so, as the tool's error."""
+            return await with_body_lease("play", name=name)
+
+        @server.tool()
+        async def lamp_joints(
+            within_ms: int = 1_000,
+            pitch: float | None = None,
+            roll: float | None = None,
+            yaw: float | None = None,
+            shoulder: float | None = None,
+            elbow: float | None = None,
+        ) -> str:
+            """Aim the joints you name, in degrees (−180 to 180), reached within `within_ms`
+            (up to 5,000): head `pitch` and `roll`, base `yaw`, `shoulder` and `elbow`. At least one.
+            The body bounds each step as it does every move. A lamp that doesn't route `joints` yet
+            says so, as the tool's error."""
+            targets = {
+                name: value
+                for name, value in (("pitch", pitch), ("roll", roll), ("yaw", yaw), ("shoulder", shoulder), ("elbow", elbow))
+                if value is not None
+            }
+            if not targets:
+                raise ToolError("bad_request: lamp_joints needs at least one of pitch, roll, yaw, shoulder, elbow")
+            return await with_body_lease("joints", named=True, targets=targets, within_ms=within_ms)
+
     if allowed("light"):
 
         @server.tool()
@@ -432,6 +503,15 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 raise ToolError("bad_request: at most 300 characters")
             await act("say", text=text)
             return "said"
+
+        @server.tool()
+        async def lamp_sound(name: str) -> str:
+            """Play a short sound by its name (lowercase letters, digits, - and _): `hum`, the lamp's
+            own short hum, is the only one in this release. Like `lamp_say`, not while the lamp is in
+            quiet hours, private or talking. A lamp that doesn't route sound yet says so, as the
+            tool's error."""
+            await act("sound", name=name)
+            return f"{name} played"
 
     if allowed("body", "look"):
 
@@ -554,6 +634,90 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     def held_leases() -> list[str]:
         """The leases this server holds now."""
         return held()
+
+    # The events stream: every event the grants let this computer hear but
+    # `phrase.heard` (which needs its own phrases, `lamp_wait_for`), each with
+    # a running `seq`. It starts at the first `lamp_events` or subscription
+    # and runs while the server does. A client subscribed to `lamp://events`,
+    # or to the state an event changes, gets `notifications/resources/updated`
+    # for it. Any event the lamp adds to the schema (a camera's or a
+    # microphone's, metrics) joins it with its grant in EVENT_NEEDS.
+    streamed = [
+        event for event in schema.events() if event != "phrase.heard" and allowed(*filter(None, [EVENT_NEEDS.get(event)]))
+    ]
+    stream: collections.deque = collections.deque(maxlen=STREAM_EVENTS)
+    seq = [0]
+    arrived = [asyncio.Event()]
+    streaming: list[bool] = []
+    subscribers: dict[str, set] = collections.defaultdict(set)
+
+    def heard_any(event: dict) -> None:
+        seq[0] += 1
+        stream.append({"seq": seq[0], **event})
+        arrived[0].set()
+        arrived[0] = asyncio.Event()
+        uris = ["lamp://events"]
+        if event.get("ev") in STATE_OF_EVENT:
+            uris.append(f"lamp://state/{STATE_OF_EVENT[event['ev']]}")
+        for uri in uris:
+            for session in list(subscribers.get(uri, ())):
+                asyncio.ensure_future(session.send_resource_updated(AnyUrl(uri)))
+
+    async def start_stream() -> None:
+        if streaming:
+            return
+        streaming.append(True)
+        for event in streamed:
+            try:
+                await lamp.on(event, heard_any)
+            except LampError:
+                # An event the lamp doesn't say yet is left out, not fatal.
+                lamp.off(event, heard_any)
+
+    @server.resource("lamp://events", mime_type="application/json")
+    async def events_stream() -> dict:
+        """The events heard since the stream started, newest last, each with its `seq`, and
+        `latest`, the newest `seq`. Subscribe to it to be told of each new one."""
+        await start_stream()
+        return {"events": list(stream), "latest": seq[0]}
+
+    @server.tool()
+    async def lamp_events(since: int = 0, wait_s: float = 0) -> dict:
+        """The events the lamp said after `since` (a `seq`; 0 for all kept), newest last, and `latest`.
+        With `wait_s` (120 at most), waits that long for one if none is there yet. Every event the
+        grants let this computer hear, but phrases (`lamp_wait_for` takes those): presence, hands,
+        touch, the button, the lamp's state, sounds."""
+        await start_stream()
+        if seq[0] <= since and wait_s > 0:
+            waiting = arrived[0]
+            try:
+                await asyncio.wait_for(waiting.wait(), min(wait_s, MOST_WAIT_S))
+            except asyncio.TimeoutError:
+                pass
+        return {"events": [event for event in stream if event["seq"] > since], "latest": seq[0]}
+
+    low = server._mcp_server
+
+    @low.subscribe_resource()
+    async def subscribe(uri) -> None:
+        subscribers[str(uri)].add(low.request_context.session)
+        await start_stream()
+
+    @low.unsubscribe_resource()
+    async def unsubscribe(uri) -> None:
+        subscribers[str(uri)].discard(low.request_context.session)
+
+    # The mcp library says `subscribe: false` even with a handler; this
+    # server takes subscriptions, so it says so.
+    capabilities = low.get_capabilities
+
+    def with_subscribe(*args: Any, **kwargs: Any):
+        said = capabilities(*args, **kwargs)
+        if said.resources is not None:
+            said.resources.subscribe = True
+        return said
+
+    low.get_capabilities = with_subscribe  # type: ignore[method-assign]
 
     return server
 

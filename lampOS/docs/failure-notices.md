@@ -56,7 +56,7 @@ No wording or voice has been approved.
 
 | Field | Rule |
 |---|---|
-| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) or `wifi_recovering` (#3743: the recovery hotspot's line, asked the same way by `lamp-setup recover`, `setup.md`, "When the saved network is gone") |
+| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`), `signed_out` (`LAMP_SIGNED_OUT`), `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) or `wifi_recovering` (#3743: the recovery hotspot's line, asked the same way by `lamp-setup recover`, `setup.md`, "When the saved network is gone") |
 | `language` | A BCP 47 tag, matched exactly. `en` does not satisfy `en-US` |
 | `transcript` | The words in the recording, 1 to 240 bytes, no control characters. Kept for records and review; never sent anywhere to be spoken |
 | `voice`, `voice_revision` | What produced the recording, 1 to 64 bytes each |
@@ -185,7 +185,7 @@ retirement as `turn_lost`. With no recording provisioned the turn is
 **Back online.** When the link is ready again after an outage in which the
 line was said, "I'm back online." (`back_online`) is owed for 60 s
 (`BACK_ONLINE_OWED_US`). It is said once by a turn the lamp takes for itself
-with no input (`commit_back_online`, local-only like the offline turn), only
+with no input (`commit_own_line`, local-only like the offline turn; it says the signed-out line too), only
 when nothing holds the lamp (no turn, nothing queued or pending, not paused,
 the microphone allowed) and the room is quiet as for a reminder. Someone
 answered first, a new outage, or the minute passing let it go unsaid. Both
@@ -205,7 +205,12 @@ turn again (its generation completes; an onboarding line's own words, said on
 a failed chat, #4263, are no answer), speech is admitted as
 a local-only turn, as in a service-down outage below: the
 `voice_service_unreachable` recording once a refusal, the offline breath,
-nothing sent. One turn is sent every minute to find the service back. The
+nothing sent. A minute after the last refused turn, the lines are sent
+again to find the service back, until one's chat is refused and holds the
+turns for another minute. A line sent then that asks the model nothing (its
+speech to text heard no words, or it was no speech) is no try: on
+lamp-52e6 on 30 Oct the room's short sounds took each minute's try, and
+every ask after them was held. The
 journal says each kind once a refusal, and the voice's health warns with
 the kinds and minutes (`bus_out::model_refusing`). The fault carries no HTTP
 status, so a 400 counts with the other 4xx. Setup waits too
@@ -218,7 +223,12 @@ give-up and quiet, twice at most. A step that would end failed or not
 available meanwhile is held as `later`, offered again only 30 minutes on,
 so a long refusal leaves setup's steps `later`. The model's own answer ends
 the refusal; an onboarding line said in its own words (`OwnWordsSaid`) does
-not. Off unless set.
+not. A skill's say (the lead's call on #1711): while turns are held, one
+with fixed words (`text`) is said as they are with no chat asked and ends
+nothing; a `note` or `quoted` line, which the model must word, waits as a
+spoken line does, for the minute's try or its own expiry
+([speaking-first.md](speaking-first.md)). On in the product
+(`deploy/product/lamp-voice.service`); off unless set.
 
 ## Service down: the internet answers, the voice service doesn't (#830)
 
@@ -249,12 +259,59 @@ answering, speech over the service line's playback can reach the second
 voice's speech-to-text, as speech over any of the lamp's speech can; that is
 inside heard-always's own scope.
 
+## Signed out: the lamp's login is no longer accepted
+
+With `LAMP_SIGNED_OUT=on`, in `lamp-voice`'s and `lamp-cloud`'s environments,
+a lamp removed and added again says why it has gone quiet. `lamp-cloud` decides
+(`cloud.md`, "Signed out") and says so on `account/state`; the voice reads it
+once a second (`coordinator/signed_out.rs`). A spoken reply needs that same
+login, so the words can only come from a kept recording: "I've been signed out.
+Please set me up again in the app."
+
+- **Once a spell, with nothing asked, to someone at the lamp.** A turn the lamp
+  takes for itself (`commit_own_line`, as "back online" is), when someone is
+  there or spoke just now (`reminders::someone_here`), nothing holds the lamp,
+  the microphones are allowed and the room is quiet as for a reminder. So it
+  isn't said at night or to an empty room: if nobody comes within a minute
+  (`UNASKED_OWED_US`) it is let go, and the line said when someone talks covers
+  the rest. It counts as said once the speaker has taken some of it or it
+  retired: a Stop before that leaves it owed. A state that goes missing and comes
+  back in the same spell owes nothing more. A spell already 5 minutes old when the voice first reads it
+  (`SAID_UNASKED_WITHIN_S`) is a voice restarted in it, and is not said again
+  unasked; `lamp-cloud` keeps the spell's start across its own restarts.
+- **Again when someone talks, at most once in 5 minutes** (`HEARD_LINE_EVERY_US`).
+  Each line of speech heard is a local-only turn; the first in that time says
+  it, so a TV beside a lamp that can't sign back in doesn't get it after every
+  sentence. Other lines, a sound let through and a scrap too short to be a
+  request get the offline breath alone.
+- **Nothing is sent.** No turn goes to the service, and nothing the lamp starts
+  itself (a reminder, a setup step, a skill's ask) begins: they wait as while
+  paused. Unlike a refusal (above) there is no minute's try: only `lamp-cloud`
+  ending the spell lets turns go again.
+- **Ends** when `account/state` says signed in, or stops being said: a stopped
+  or older `lamp-cloud` never holds a turn. No "back online" follows.
+- With no recording, a person who spoke gets the sigh below, under the same
+  bound, and the lamp's own turn is silent and let go. `failure_notice_capability` says `signed_out`. The
+  voice's health warns while it lasts (`bus_out::signed_out`).
+
+**Not yet on a lamp.** No clip is rendered or pinned: a notices release with
+`signed_out` goes onto a lamp only with, or after, a build that knows the kind,
+as for the kinds above. In the owner's language the line comes from the speech
+cache when it was kept before the login was refused, and from the file
+otherwise. Off unless set.
+
+**What is not stopped:** with the Live route, the provider link's own
+reconnecting; and the speech cache's retries of lines it has not rendered, which
+stay bounded as they are. The product's second route opens its connections only
+as a line begins, so a held line opens none.
+
 ## Verified, and not
 
-Host, `crates/audio/tests/it/notice.rs`, 7 tests: an exact load; every
+Host, `crates/audio/tests/it/notice.rs`, 9 tests: an exact load; every
 manifest-level failure; test assets refused in production; one faulty asset
 refusing only itself; format, length and silence checks at both bounds; a
-linked asset; malformed names and text.
+linked asset; malformed names and text; and the Wi-Fi lost and recovering
+lines, each a kind of its own.
 
 Not done: native qualification of the optional live playback integration.
 
@@ -284,6 +341,17 @@ changed, hold the reset button for five seconds."). A lamp plays the clip, so
 the new words arrive from the next notices release. The new line renders at
 13.37 s in the lamp's voice, over an older loader's 10 s, so that release goes
 out with or after the build that allows 15 s (above).
+
+**In the owner's language (#4473 (c)).** On a lamp whose owner's language
+is not English (second-voice.md, "The fixed lines"), `provider_unavailable`,
+`voice_service_unreachable`, `back_online`, `wifi_lost` and
+`wifi_recovering` are said from the voice's speech cache in that language
+when it keeps them (rendered at start in the lamp's voice, read again each
+time the line is chosen), and from the files above otherwise. The release
+and its manifest are untouched and no kind is added: the cached line is
+recorded under the release's kind, its `wav_sha256` `speech-cache:<key>`.
+`turn_lost` has no words of its own and is unchanged. An English lamp plays
+the files exactly as before.
 
 `wifi_recovering` (#3743, the words agreed with Sixth on #3020) is new: no
 clip is rendered or pinned yet. It is under 10 s, but its kind is new, so its
@@ -329,8 +397,10 @@ lines, which say why, are still the answer: the product's come from
 `lamp-voice directed` and `lamp-voice serve` accept the paired options
 `--failure-notice-dir ABS_PATH --failure-notice-language TAG`. Both must be
 explicit. Omission preserves silent failure behavior. Fixture-provider and
-child-worker commands reject these options. This integration selects only
-`turn_lost` in the exact requested language, requires `approval: production`,
+child-worker commands reject these options. This integration loads seven
+kinds, `turn_lost`, `provider_unavailable`, `back_online`,
+`voice_service_unreachable`, `wifi_lost`, `wifi_recovering` and `signed_out`
+(`FailureNotices::load_with_approval`), in the exact requested language, requires `approval: production`,
 and loads it once before starting audio workers. It never synthesizes,
 downloads, resamples, or opens a second speaker. A missing or refused recording
 is visible in `failure_notice_capability`; active ticks perform no asset I/O.

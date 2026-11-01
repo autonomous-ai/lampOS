@@ -364,7 +364,7 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
   own name or through `use_skill`, a text's call to Dance is refused and
   the skills are never asked; a text runs one that doesn't move; at the
   lamp, Dance runs.
-- `crates/voice/tests/typed_memory.rs`: with Sam in view, a spoken
+- `crates/voice/tests/it/typed_memory.rs`: with Sam in view, a spoken
   `remember` is kept as Sam's, and a typed `remember` and `recall` ask the
   room's memory alone.
 - `agent_tasks::tests::a_typed_yes_counts_only_in_the_chat_that_asked_and_soon`,

@@ -56,6 +56,39 @@ pub fn name_in(path: &Path, fresh: Duration) -> Option<String> {
     (name.len() <= MOST_NAME_BYTES).then(|| name.to_owned())
 }
 
+/// The memory's id of the known person in the known file at `path`, if
+/// it is no older than `fresh`: the eyes' id on its second line when it is
+/// one a skill's ask may carry (`p-` and 16 hex digits), else
+/// [`lamp_msgs::known::person_id`] of the name, as memory keys them. Never
+/// the name: the Policy is told whom a hello is for, not who they are.
+pub fn person_in(path: &Path, fresh: Duration) -> Option<String> {
+    let age = std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|modified| SystemTime::now().duration_since(modified).ok())?;
+    if age > fresh {
+        return None;
+    }
+    let text = std::fs::read_to_string(path).ok()?;
+    let (name, id) = lamp_msgs::known::read_known(&text)?;
+    Some(match id {
+        Some(id) if askable(id) => id.to_owned(),
+        _ => lamp_msgs::known::person_id(name),
+    })
+}
+
+/// Whether `id` is one a skill's ask may carry, as `lamp_msgs::SkillAsk`'s
+/// check wants it: `p-` and 16 lowercase hex digits, without the eyes' `-N`
+/// for a shared one. Any other shape would be dropped by the Policy, and
+/// with it the hello.
+fn askable(id: &str) -> bool {
+    id.len() == 18
+        && id.starts_with("p-")
+        && id[2..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,6 +122,53 @@ mod tests {
             Some("Alpha"),
             "within 5 s"
         );
+    }
+
+    /// The first builder, 30 Oct: a hello is asked for whom it is, by the
+    /// memory's id, never the name: the eyes' id when there is one an ask
+    /// may carry, else the id of the name; nothing for nobody known.
+    #[test]
+    fn the_person_a_hello_is_for_is_the_memorys_id_never_the_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = dir.path().join("known");
+        let fresh = Duration::from_secs(5);
+        assert_eq!(person_in(&known, fresh), None, "no file: nobody known");
+        std::fs::write(&known, "Alpha\n").unwrap();
+        assert_eq!(
+            person_in(&known, fresh),
+            Some(lamp_msgs::known::person_id("Alpha"))
+        );
+        std::fs::write(&known, "Alpha\np-be9688998f085098\n").unwrap();
+        assert_eq!(
+            person_in(&known, fresh).as_deref(),
+            Some("p-be9688998f085098")
+        );
+        // A shared id's `-2` is not an ask's shape: the name's id instead.
+        std::fs::write(&known, "Alpha\np-be9688998f085098-2\n").unwrap();
+        assert_eq!(
+            person_in(&known, fresh),
+            Some(lamp_msgs::known::person_id("Alpha"))
+        );
+        // Nor is any other 18 bytes the ask's check would drop (the
+        // Reviewer-lead on #4625): the name's id instead, never no hello.
+        for odd in [
+            "p-BE9688998F085098",
+            "q-be9688998f085098",
+            "p-be9688998f08509z",
+        ] {
+            std::fs::write(&known, format!("Alpha\n{odd}\n")).unwrap();
+            let person = person_in(&known, fresh);
+            assert_ne!(person.as_deref(), Some(odd));
+            assert!(person.is_none_or(|id| askable(&id)), "{odd}");
+        }
+        let old = SystemTime::now() - Duration::from_secs(10);
+        std::fs::File::options()
+            .write(true)
+            .open(&known)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        assert_eq!(person_in(&known, fresh), None, "stale: nobody known");
     }
 
     /// #1997: the names Who was here may say are the eyes' `tellable`

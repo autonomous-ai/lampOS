@@ -253,6 +253,15 @@ struct Kind {
     heard: &'static [&'static str],
 }
 
+/// The name the person calls `engine`'s agent by (`devin-cloud` is Devin),
+/// or `None` for an engine the voice doesn't know.
+pub(crate) fn name_of(engine: &str) -> Option<&'static str> {
+    KINDS
+        .iter()
+        .find(|kind| kind.engine == engine)
+        .map(|kind| kind.name)
+}
+
 /// The agents the lamp hands work to, as the person calls them: what the
 /// second route's speech to text listens for (`second_provider::net::key_terms`).
 pub fn agent_names() -> Vec<&'static str> {
@@ -2497,6 +2506,25 @@ fn guard(status: &Value, request_id: String) -> Option<Value> {
     let store = status.get("store_id")?.as_str()?;
     let revision = status.get("revision")?.as_u64()?;
     Some(json!({"store_id": store, "revision": revision, "request_id": request_id}))
+}
+
+/// Whether the tasks part in `tasks` has a computer to hand work to: its
+/// `targets` answered `ok` with at least one target within `deadline`.
+/// Unreachable, refused or empty is no (fourteen-P15: the app shows "Make a
+/// skill" only on a lamp whose Harness has a computer).
+pub fn has_a_target(tasks: &Path, deadline: Duration) -> bool {
+    ask(
+        &tasks.join("request.sock"),
+        &json!({"op":"targets"}),
+        deadline,
+    )
+    .is_some_and(|answer| {
+        answer.get("ok") == Some(&json!(true))
+            && answer
+                .get("targets")
+                .and_then(Value::as_array)
+                .is_some_and(|targets| !targets.is_empty())
+    })
 }
 
 fn ask(socket: &Path, line: &Value, deadline: Duration) -> Option<Value> {
@@ -5421,7 +5449,7 @@ pub(crate) mod tests {
     /// 2026-10-16, with work asked of the staff, two of them to choose from
     /// and the lead-in, `start_agent_task` was 1,036 bytes, and nothing was
     /// called in either round. Every combination of the switches fits, with
-    /// one, two or three of the staff.
+    /// none, one, two, three or four of the staff (the fourth Devin).
     #[test]
     fn every_description_fits_the_service_whatever_the_switches() {
         let three = vec![

@@ -183,6 +183,7 @@ it) or `if_choice` (the tool's values it runs for).
 | `sound` | `sound = "NAME"`: `sounds/NAME.wav`; not with a tool | `speak` |
 | (none) | `cue = "hum"`: the lamp's own hum; not with a tool | `speak` |
 | (none) | `look = true`: the full look's picture to the model; tool only | `camera` (format 1's `look` still gives it: "The camera", below) |
+| (none) | `stand = N`: a percent of the lamp's own stand, 1 to 100, kept until the next ask; tool only | `body` |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,

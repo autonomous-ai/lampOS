@@ -39,10 +39,13 @@ pub enum Command {
     /// Which function DeepSeek calls for each light-and-volume follow-up
     /// line (`lamp-voice probe-tools`, #1712): counts only, run by hand.
     ProbeTools,
+    /// Which function DeepSeek calls first for a question about a reminder
+    /// (`lamp-voice probe-reminders`, #4527): counts only, run by hand.
+    ProbeReminders,
 }
 
 impl Command {
-    pub const ALL: [Command; 15] = [
+    pub const ALL: [Command; 16] = [
         Command::Serve,
         Command::Directed,
         Command::DirectedFixture,
@@ -58,6 +61,7 @@ impl Command {
         Command::ProbeCascade,
         Command::ProbeCache,
         Command::ProbeTools,
+        Command::ProbeReminders,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -77,6 +81,7 @@ impl Command {
             Command::ProbeCascade => "probe-cascade",
             Command::ProbeCache => "probe-cache",
             Command::ProbeTools => "probe-tools",
+            Command::ProbeReminders => "probe-reminders",
         }
     }
 

@@ -1254,6 +1254,11 @@
         "show": {
           "$ref": "#/$defs/plain_name"
         },
+        "stand": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
         "propose": {
           "$ref": "#/$defs/propose"
         }

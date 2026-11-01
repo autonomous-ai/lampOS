@@ -338,7 +338,7 @@ off guard" the voice's say service (`LAMP_SAY=on`).
   the tools file are the new words, off first, inside the provider's 1024
   and 256 bytes; off, they are `SKILL.md`'s and `skill.toml`'s byte for
   byte; other skills' tools unchanged either way.
-- `skills/guard-mode/tests/`: eleven written cases replayed through the
+- `skills/guard-mode/tests/`: fourteen cases replayed through the
   watch, arrivals by sound taken as with `LAMP_GUARD_SOUNDS=on` ([tests/README.md](../skills/guard-mode/tests/README.md)). A
   replay looks at no time between messages, so one `light/reached` holds
   there: the 30 s rule and the 12 hours are the program's, tested in

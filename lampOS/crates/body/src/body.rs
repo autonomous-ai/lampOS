@@ -593,6 +593,10 @@ pub struct Asked {
     /// Paused by the keeper (`lamp/pause`): a gesture asked is dropped and
     /// said, and nothing else is taken.
     pub paused: bool,
+    /// The share of its stand a person asked for by voice
+    /// (`body/stand_asked`, #4135), 0.01 to 1.0, in place of the stand's
+    /// own `share` while it is kept. None: as made.
+    pub stand_share: Option<f32>,
     /// A hand held on the head put the lamp to sleep (`voice/mute` with the
     /// reason `sleep`, `crate::sleep_in`, #1362): it folds now, whoever is
     /// in front of it, and a gesture asked is dropped and said.
@@ -642,6 +646,7 @@ impl Asked {
         called: false,
         still: true,
         paused: true,
+        stand_share: None,
         asleep: false,
         woken: false,
         toward: None,
@@ -664,6 +669,7 @@ impl Asked {
         called: false,
         still: true,
         paused: false,
+        stand_share: None,
         asleep: true,
         woken: false,
         toward: None,
@@ -3869,6 +3875,7 @@ pub(crate) fn run_looking(
         called: false,
         still: false,
         paused: false,
+        stand_share: None,
         asleep: false,
         woken: false,
         toward: None,
@@ -5601,7 +5608,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 && cannot_lift.is_none()
                 && seated.is_none()
             {
-                up.share
+                asked_now
+                    .stand_share
+                    .map_or(up.share, |asked| asked.min(up.share))
             } else {
                 0.0
             };
@@ -5703,7 +5712,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // A gesture is for a lamp standing still at its full height.
         let upright = leaving.is_none()
             && !blind
-            && standing.is_some_and(|up| up.share >= 1.0 && stand >= 1.0 && stand_velocity == 0.0);
+            && standing.is_some_and(|up| {
+                asked_now
+                    .stand_share
+                    .map_or(up.share, |asked| asked.min(up.share))
+                    >= 1.0
+                    && stand >= 1.0
+                    && stand_velocity == 0.0
+            });
         // Anything alive that stands with nothing to do shifts a little
         // now and then, not on a clock: after a wait drawn at random, and each
         // time a different small move (`crate::idle`). It stops the moment there is something to do:

@@ -14,4 +14,4 @@ args = { colour = "warm" }
 
 [[expect]]
 call = "say"
-args = { note = "They are back at their desk. Greet them in one short line, by name if you know it.", priority = 5, expires_ms = 60000 }
+args = { note = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.", priority = 5, expires_ms = 60000 }

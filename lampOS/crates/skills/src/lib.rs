@@ -721,6 +721,9 @@ struct StepFile {
     /// A fixed local WAV for a spoken tool request, after its confirmation.
     requested_audio: Option<String>,
     look: Option<bool>,
+    /// The body's stand a person asked for, a percent of its own stand
+    /// (#4135): read as a plain integer so that one out of range is told.
+    stand: Option<i64>,
     /// `"say"`: this step and every one after it wait for the say to end.
     after: Option<String>,
     /// The name of the trigger this step is made for; for every one without.
@@ -1323,6 +1326,7 @@ impl Permissions {
             | Call::Gesture(_)
             | Call::Move(_)
             | Call::Mood { .. }
+            | Call::Stand(_)
             | Call::Rest(_) => ("body", self.body),
             Call::Light { .. }
             | Call::Relative { .. }
@@ -1640,6 +1644,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
             || step.requested_audio.is_some()
             || step.look.is_some()
             || step.show.is_some()
+            || step.stand.is_some()
             || step.after.is_some()
             || step.if_choice.is_some()
         {
@@ -1727,6 +1732,9 @@ pub struct Skill {
     pub enabled: bool,
     pub limits: Option<routine::Limits>,
     pub needs: Vec<String>,
+    /// The computer that pushed it over lamp-control, for a skill in the
+    /// developer folder ([`PUSHED_DIR`]); `None` for every other skill.
+    pub pushed_by: Option<String>,
     /// Core or installable.
     pub kind: SkillKind,
     /// Its version, if `skill.toml` says one.
@@ -2320,6 +2328,11 @@ pub enum Call {
         /// voice listening to someone, and the run with it.
         until_spoken: bool,
     },
+    /// The stand a person asked for, a percent of the body's own (#4135):
+    /// one [`lamp_msgs::StandAsked`] on `body/stand_asked`, kept by the bus
+    /// until the next. Made only with [`lamp_body::stand_in::ENVIRONMENT`]
+    /// on in lamp-skills' environment.
+    Stand(u8),
     /// A colour, to the actions part's `light_colour`, then stepped to its
     /// level; held for its while in a run with no say. With `keep`, it is
     /// the person's light, set as they asked and never given back (#1679).
@@ -2520,6 +2533,7 @@ impl Call {
             }
             Self::Gesture(name) => ("body.gesture", json!({ "gesture": name })),
             Self::Move(clip) => ("body.move", json!({ "move": clip.name })),
+            Self::Stand(share) => ("body.stand", json!({ "share": share })),
             Self::Mood {
                 mood,
                 lasting_us,
@@ -3107,6 +3121,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 && step.rest.is_none()
                 && step.look.is_none()
                 && step.requested_audio.is_none()
+                && step.stand.is_none()
                 && step.after.is_none()
                 && step.on.is_none()
                 && step.if_choice.is_none()
@@ -3123,6 +3138,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 && step.rest.is_none()
                 && step.look.is_none()
                 && step.say.is_none()
+                && step.stand.is_none()
                 && step.on.is_none()
                 && step.if_choice.is_none()
                 && step.show.is_none()
@@ -3689,10 +3705,11 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             && step.requested_audio.is_none()
             && step.look.is_none()
             && step.show.is_none()
+            && step.stand.is_none()
             && step.propose.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show or propose"
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand or propose"
                     .into(),
             );
         }
@@ -3735,7 +3752,9 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                     || step.requested_audio.is_some()
                     || step.look.is_some()
                 {
-                    return Err("a step for some choices only makes body, light or show".into());
+                    return Err(
+                        "a step for some choices only makes body, light, show or stand".into(),
+                    );
                 }
                 Some(Only::Choice(values.clone()))
             }
@@ -3893,6 +3912,23 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 ));
             }
             steps.push(Step::Call(call));
+        }
+        if let Some(share) = step.stand {
+            let least = i64::from(lamp_msgs::StandAsked::LEAST);
+            let most = i64::from(lamp_msgs::StandAsked::MOST);
+            if !(least..=most).contains(&share) {
+                return Err(format!(
+                    "stand = {share}: a percent of the lamp's own stand, {least} to {most}"
+                ));
+            }
+            // Kept until the next ask or power-up: only a person asks it.
+            if !asked_alone {
+                return Err(
+                    "stand only in a skill started by its tool alone: a stand is kept, so only a person asks it"
+                        .into(),
+                );
+            }
+            steps.push(Step::Call(Call::Stand(share as u8)));
         }
         if let Some(show) = step.show {
             if !asked_alone {
@@ -4298,6 +4334,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     let skill = Skill {
         name,
         description,
+        pushed_by: None,
         enabled: file.enabled,
         limits: file.limits.map(routine::LimitsFile::checked).transpose()?,
         needs: file.needs,
@@ -4736,6 +4773,138 @@ fn pattern_of(file: PatternFile, level: Option<u8>) -> Result<LightPattern, Stri
     Ok(pattern)
 }
 
+/// The developer folder: skills a paired computer pushed over lamp-control
+/// (`docs/control.md`, "Skills pushed from a computer"), apart from the
+/// Store's and the core skills, written only by the manage helper.
+pub const PUSHED_DIR: &str = "/var/lib/lampOS/skills-dev";
+
+/// Who pushed a skill, `{"computer": NAME, ...}`, which the manage helper
+/// writes into the skill's folder (a dot file: never part of the skill).
+pub const PUSHED_FROM: &str = ".pushed.json";
+
+/// The `[budget] group` a folder's `skill.toml` names, read on its own,
+/// at most 64 KiB and never through a link: `None` without one.
+fn budget_group_in(folder: &Path) -> Option<String> {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    let mut text = String::new();
+    fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(folder.join("skill.toml"))
+        .and_then(|file| file.take(65_536).read_to_string(&mut text))
+        .ok()?;
+    let table: toml::Table = toml::from_str(&text).ok()?;
+    table
+        .get("budget")?
+        .get("group")?
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// The computer a pushed skill's [`PUSHED_FROM`] names, read without
+/// following a link and at most 1 KiB; "a computer" when it says none.
+fn pushed_by(folder: &Path) -> String {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    #[derive(Deserialize)]
+    struct From {
+        computer: String,
+    }
+    let mut text = Vec::new();
+    fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(folder.join(PUSHED_FROM))
+        .and_then(|file| file.take(1024).read_to_end(&mut text))
+        .ok()
+        .and_then(|_| serde_json::from_slice::<From>(&text).ok())
+        .map(|from| {
+            from.computer
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(64)
+                .collect::<String>()
+        })
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "a computer".to_owned())
+}
+
+/// The topics a pushed skill may read: presence, the protocol's `look`
+/// grant, and those the protocol's events take with no grant (`time`,
+/// `lamp.changed`, `touch`). Not `voice/heard`, `name/heard` or
+/// `ears/classes`: the protocol's `hear` and `sound` wait for the skill
+/// format's phrase and class lists, since a format 1 topic gives every one
+/// (Fourteen on #3869).
+pub const PUSHED_TOPICS: [&str; 6] = [
+    "humans/faces/tracked",
+    "room/stood_up",
+    LOCAL_CLOCK_TOPIC,
+    "voice/state",
+    "lamp/pause",
+    "controls/touch",
+];
+
+/// Why a pushed skill may not run, held to the protocol's grants
+/// (`docs/control.md`, "Skills pushed from a computer"); `None` if it may.
+/// The manage helper checks the same at install, and this check holds a
+/// folder put there by any other path to it too.
+pub fn pushed_refuses(skill: &Skill) -> Option<String> {
+    let permissions = &skill.permissions;
+    if skill.kind != SkillKind::Installable {
+        return Some(format!(
+            "a pushed skill is installable, never kind = \"{}\"",
+            skill.kind.name()
+        ));
+    }
+    let beyond = [
+        ("actions", !permissions.actions.is_empty()),
+        ("messages", permissions.messages),
+        ("known_faces", permissions.known_faces),
+        ("who", permissions.who),
+        ("output_limits", permissions.output_limits),
+        ("propose", !permissions.propose.is_empty()),
+        ("say", permissions.say.is_some()),
+        ("core", !permissions.core.is_empty()),
+    ];
+    if let Some((what, _)) = beyond.iter().find(|(_, asked)| *asked) {
+        return Some(format!(
+            "a pushed skill may not ask {what}: only the protocol's grants"
+        ));
+    }
+    if let Some(topic) = permissions
+        .topics
+        .iter()
+        .find(|topic| !PUSHED_TOPICS.contains(&topic.as_str()))
+    {
+        return Some(format!(
+            "a pushed skill may not read {topic}: only presence and the topics no grant needs"
+        ));
+    }
+    None
+}
+
+/// Every enabled skill under `root` and, with `pushed`, the developer
+/// folder's, and why each other folder did not load ([`load_each_with`]).
+pub fn load_all_with(root: &Path, pushed: Option<Pushed>) -> (Vec<Skill>, Vec<String>) {
+    let (mut skills, mut errors) = (Vec::new(), Vec::new());
+    for (folder, loaded) in load_each_with(root, pushed) {
+        match loaded {
+            Ok(skill) if skill.enabled => skills.push(skill),
+            Ok(_) => {}
+            Err(why) => errors.push(format!("{}: {why}", folder.display())),
+        }
+    }
+    (skills, errors)
+}
+
+/// The developer folder, and the pushed skills the owner said yes to
+/// seeing the picture (`--state-dir`'s [`ON_FILE`]): one that sees it is
+/// held off without that yes.
+#[derive(Clone, Copy)]
+pub struct Pushed<'a> {
+    pub dir: &'a Path,
+    pub picture_yes: &'a BTreeSet<String>,
+}
+
 /// Every enabled skill under `root`, and why each other folder did not
 /// load. Disabled skills are still validated and reserve their tool names
 /// in the complete inventory ([`load_each`]).
@@ -4760,6 +4929,12 @@ pub fn load_all(root: &Path) -> (Vec<Skill>, Vec<String>) {
 /// the model, and no second skill of a name is passed over without a word
 /// ([`tools_file`] and [`Engine::tool`] would give the name to the first).
 pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
+    load_each_with(root, None)
+}
+
+/// The skill folders under `root`, sorted, but those whose name begins
+/// with a dot.
+fn folders_in(root: &Path) -> Vec<PathBuf> {
     let mut folders: Vec<PathBuf> = fs::read_dir(root)
         .into_iter()
         .flatten()
@@ -4769,22 +4944,91 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
         .filter(|path| path.is_dir())
         .collect();
     folders.sort();
-    let mut loaded: Vec<(PathBuf, Result<Skill, String>)> = folders
+    folders
+}
+
+/// [`load_each`], and with `pushed` the developer folder's skills after
+/// `root`'s: each held to [`pushed_refuses`], said as pushed by its
+/// computer, never with the name of a skill under `root`, and claiming its
+/// tool's name only after every skill under `root` has, so a pushed skill
+/// never takes a core or Store skill's function.
+pub fn load_each_with(
+    root: &Path,
+    pushed: Option<Pushed>,
+) -> Vec<(PathBuf, Result<Skill, String>)> {
+    let mut loaded: Vec<(PathBuf, Result<Skill, String>)> = folders_in(root)
         .into_iter()
         .map(|folder| {
             let skill = load(&folder);
             (folder, skill)
         })
         .collect();
+    let here = loaded.len();
+    // The `[budget]` groups the skills under `root` use: a pushed skill
+    // never joins one, so it can't spend a group's hour (the Reviewer-lead's
+    // P2 on #3879: a pushed `wellbeing` member quieting sip-of-water).
+    // Read from each folder's own `skill.toml`, whether it loads or not, as
+    // a tool's name is kept: a lamp skill that fails to load just then still
+    // holds its group (the Reviewer-lead's P3 on #3879).
+    let groups: BTreeSet<String> = loaded
+        .iter()
+        .filter_map(|(folder, skill)| match skill {
+            Ok(skill) => skill.budget.as_ref().map(|(group, _)| group.clone()),
+            Err(_) => budget_group_in(folder),
+        })
+        .collect();
+    if let Some(pushed) = pushed {
+        for folder in folders_in(pushed.dir) {
+            let name = folder
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned());
+            let taken = loaded[..here].iter().any(|(other, _)| {
+                other
+                    .file_name()
+                    .map(|other| other.to_string_lossy().into_owned())
+                    == name
+            });
+            let skill = if taken {
+                Err("a skill of that name is already on the lamp: a pushed skill never takes its place".to_owned())
+            } else {
+                load(&folder).and_then(|mut skill| {
+                    if let Some(why) = pushed_refuses(&skill) {
+                        return Err(why);
+                    }
+                    if let Some((group, _)) = skill.budget.as_ref().filter(|(group, _)| groups.contains(group)) {
+                        return Err(format!(
+                            "its [budget] group {group:?} is a skill's on the lamp: a pushed skill never joins one"
+                        ));
+                    }
+                    skill.pushed_by = Some(pushed_by(&folder));
+                    // Held off for the owner's yes: a push never grants the
+                    // picture (#3859's split, #3869).
+                    if skill.permissions.sees_picture() && !pushed.picture_yes.contains(&skill.name)
+                    {
+                        skill.enabled = false;
+                    }
+                    Ok(skill)
+                })
+            };
+            loaded.push((folder, skill));
+        }
+    }
     // Each tool's name, and the skill that has it.
     // With, for a `[stop]` function, the `[budget]` group of its skill: a
     // `[stop]` may be shared by the skills of one group (#1685), one
     // function for them all.
     let mut taken: BTreeMap<String, (String, SkillKind, Option<String>)> = BTreeMap::new();
-    for kind in [SkillKind::Core, SkillKind::Installable, SkillKind::Addon] {
+    // Every skill under `root` by kind, core first; then the pushed ones.
+    let passes = [
+        (SkillKind::Core, false),
+        (SkillKind::Installable, false),
+        (SkillKind::Addon, false),
+        (SkillKind::Installable, true),
+    ];
+    for (kind, pushed_pass) in passes {
         for (_, result) in &mut loaded {
             let Ok(skill) = result else { continue };
-            if skill.kind != kind {
+            if skill.kind != kind || skill.pushed_by.is_some() != pushed_pass {
                 continue;
             }
             let group = skill.budget.as_ref().map(|(group, _)| group.clone());
@@ -4803,6 +5047,9 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
                 functions.iter().find_map(|(tool, shared)| {
                     taken
                         .get(tool)
+                        // A pushed skill shares a `[stop]` only within its own
+                        // group, and never joins a group of a skill under
+                        // `root` (above), so it never shares one with them.
                         .filter(|(_, _, theirs)| shared.is_none() || theirs != shared)
                         .map(|owner| (tool, shared, owner))
                 })
@@ -5247,8 +5494,10 @@ impl Engine {
         self
     }
 
-    /// `skip_ask`: act without asking the Policy (`LAMP_SKILLS_ASK=skip`).
-    /// Without it, or `asking_the_policy`, nothing a skill starts is done.
+    /// `skip_ask`: act without asking the Policy (`LAMP_SKILLS_ASK=skip`),
+    /// but for a skill whose `[ask]` is the Policy's `hello`, which is
+    /// asked still ([`asks_anyway`]). Without it, or `asking_the_policy`,
+    /// nothing a skill starts is done.
     pub fn new(skills: Vec<Skill>, skip_ask: bool) -> Self {
         Self {
             generation: Arc::new(()),
@@ -5960,18 +6209,20 @@ impl Engine {
 
     /// The skill whose tool `name` is and what the model is told of a call
     /// while its run is under way, if such a call is refused: a run with no
-    /// pose to hold again and no look to take again has nothing to do again
-    /// (a dance plays on). Refused before [`Engine::tool`], it is no run:
+    /// pose to hold again, no stand to ask again and no look to take again
+    /// has nothing to do again (a dance plays on). Refused before [`Engine::tool`], it is no run:
     /// `[again]`'s while does not begin again from it.
     pub fn refused_under_way(&self, name: &str) -> Option<(&str, &str)> {
         self.skills
             .iter()
             .find(|skill| skill.tool.as_deref() == Some(name))
             .filter(|skill| {
-                !skill
-                    .steps
-                    .iter()
-                    .any(|(_, step)| matches!(step, Step::Call(Call::Mood { .. } | Call::Look)))
+                !skill.steps.iter().any(|(_, step)| {
+                    matches!(
+                        step,
+                        Step::Call(Call::Mood { .. } | Call::Look | Call::Stand(_))
+                    )
+                })
             })
             .map(|skill| (skill.name.as_str(), skill.still.as_str()))
     }
@@ -7231,7 +7482,7 @@ impl Engine {
                     }
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.
-                    if nudge && !self.ask_policy {
+                    if nudge && !(self.ask_policy || asks_anyway(skill, self.skip_ask)) {
                         nudged(&mut self.nudges, &self.latest, skill, now_us);
                     }
                     // Its end is told even if the Policy says no: with no
@@ -7442,6 +7693,19 @@ fn question(skill: &Skill) -> Value {
     json!({ "skill": skill.name, "act": act })
 }
 
+/// Whether a skill is asked of the Policy with `LAMP_SKILLS_ASK=skip`: one
+/// whose `[ask]` is the Policy's `hello` (Welcome back), so that its hard
+/// rules, among them one hello an hour to the same person, hold on every
+/// lamp (the first builder, 30 Oct, on the launch testers' findings). Every
+/// other skill acts at once under skip, as before.
+pub fn asks_anyway(skill: &Skill, skip_ask: bool) -> bool {
+    skip_ask && skill.policy == HELLO
+}
+
+/// The Policy's question asked even with `LAMP_SKILLS_ASK=skip`
+/// ([`asks_anyway`]).
+pub const HELLO: &str = "hello";
+
 /// A trigger held: with `(skip_ask, ask_policy)`, the Policy is asked
 /// `question` and the calls wait for its answer, or the ask is skipped and
 /// they are made, or neither, and nothing is done. The calls are made only
@@ -7495,7 +7759,7 @@ fn decide(
         queue: false,
         from: None,
     };
-    if ask_policy {
+    if ask_policy || asks_anyway(skill, skip_ask) {
         return run(events, made(), Some(question));
     }
     if !skip_ask {

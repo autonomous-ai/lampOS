@@ -102,3 +102,16 @@ CREATE TABLE IF NOT EXISTS speakers (
     speaker TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS speakers_by ON speakers(speaker);
+-- The reviewer-three's P1 on #4479: a kept thing's or an observation's
+-- source exchanges by id in its scope, kept past those exchanges' expiry,
+-- so a talk note (which never expires) still goes with a forget of a fact
+-- from the same exchanges once the exchanges and their `sources` links are
+-- gone. Filled from `sources` before any exchange expires (`maintain`) and
+-- read only by a forget. Its rows go with the entry. Older builds pass this
+-- table over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS origins (
+    rid INTEGER NOT NULL REFERENCES entries(rid) ON DELETE CASCADE,
+    origin INTEGER NOT NULL,
+    PRIMARY KEY(rid,origin)
+);
+CREATE INDEX IF NOT EXISTS origins_by ON origins(origin);

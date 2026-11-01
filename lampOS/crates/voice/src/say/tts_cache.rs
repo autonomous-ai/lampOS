@@ -5,8 +5,16 @@
 //! route's, ElevenLabs through the relay, its voice and model), kept as a
 //! WAV named by the SHA-256 of `voice|model|language|text`, and played from
 //! there on every later ask, with no network. [`WARM`] is rendered at start,
-//! so the first shutdown is said from the cache even offline.
+//! so the first shutdown is said from the cache even offline, and so is a
+//! hand's hold's sleep line (#3748, `LAMP_SLEEP_LINE`).
+//!
+//! For an owner's language other than English (#4473 (c),
+//! `crate::language`), the lamp's fixed lines in that language are warmed
+//! first ([`TtsCache::warm_lines`]) and played from here by their English
+//! words ([`TtsCache::owners_kept`]); a line not kept yet is said in
+//! English, as before. English warms and plays exactly [`WARM`].
 use super::SOUND_RATE;
+use crate::language::Language;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -19,17 +27,27 @@ use std::{
 /// Where the rendered lines are kept: the voice's own state (root's, 0700).
 pub const DIR: &str = "/var/lib/lampOS/voice/tts-cache";
 /// At most this many lines are kept; past it a line is rendered and played
-/// but not stored. Only root's cache-flagged lines come here, a handful.
-pub const MOST_FILES: usize = 16;
+/// but not stored. Only the lamp's own fixed lines come here: [`WARM`] and
+/// seven lines in each of four other languages (#4473 (c)), with room for a
+/// change of voice.
+pub const MOST_FILES: usize = 48;
 /// The longest line kept: 20 s at the speaker's rate.
 pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
 /// The longest one rendering may take.
 pub const RENDER_WITHIN: Duration = Duration::from_secs(5);
 /// Rendered at start, after the speech service is configured, until each is
-/// kept: the safe shutdown's line, one source with the shutdown.
-pub const WARM: &[&str] = &[lamp_msgs::GOING_TO_SLEEP];
-/// How often an unrendered [`WARM`] line is tried again (offline at start).
+/// kept: the safe shutdown's line, one source with the shutdown, then the
+/// hold's sleep line (#3748), read by the coordinator with [`TtsCache::kept`].
+pub const WARM: &[&str] = &[lamp_msgs::GOING_TO_SLEEP, lamp_msgs::SLEEP_LINE];
+/// How soon an unrendered warm line is first tried again (offline at
+/// start); each later try waits twice as long, up to [`WARM_EVERY_MOST`].
 const WARM_EVERY: Duration = Duration::from_secs(60);
+/// The longest wait between tries: a lamp offline for days asks the speech
+/// service at most once an hour.
+const WARM_EVERY_MOST: Duration = Duration::from_secs(3_600);
+
+/// Why a line that rendered empty or too long is not played.
+const REFUSED: &str = "not in the speech cache, and rendered empty or too long";
 
 /// Renders a line to 24 kHz mono samples, or says why not.
 pub type Render = Box<dyn Fn(&str) -> Result<Vec<i16>, String> + Send + Sync>;
@@ -39,8 +57,14 @@ pub struct TtsCache {
     /// `voice|model|language`, the key's prefix.
     identity: String,
     render: Render,
+    /// The owner's language, when not English (#4473 (c)).
+    owners: Option<Language>,
     /// One render at a time, so a line asked while it warms is rendered once.
-    rendering: Mutex<()>,
+    /// Held while rendering, so a line asked while it warms is rendered
+    /// once. It holds the lines that rendered empty or past [`MOST_FRAMES`]:
+    /// a render is the same each time, so they are never sent again in this
+    /// process (Thirteen's P2 on #4523).
+    rendering: Mutex<std::collections::HashSet<String>>,
 }
 
 impl std::fmt::Debug for TtsCache {
@@ -61,8 +85,40 @@ impl TtsCache {
             dir: dir.into(),
             identity: format!("{voice}|{model}|{language}"),
             render,
-            rendering: Mutex::new(()),
+            owners: None,
+            rendering: Mutex::new(std::collections::HashSet::new()),
         }
+    }
+
+    /// The owner's language, `None` for English: the fixed lines it warms
+    /// and plays ([`Self::warm_lines`], [`Self::owners_kept`]).
+    pub fn speaking(mut self, owners: Option<Language>) -> Self {
+        self.owners = owners;
+        self
+    }
+
+    /// The lines warmed at start: the owner's fixed lines first, when the
+    /// owner's language is not English, then [`WARM`], the English fallback.
+    pub fn warm_lines(&self) -> Vec<&'static str> {
+        self.owners
+            .into_iter()
+            .flat_map(Language::fixed_lines)
+            .chain(WARM.iter().copied())
+            .collect()
+    }
+
+    /// The fixed line `english` in the owner's language, if it is kept:
+    /// never rendered here. None for English, for a line with no
+    /// translation, and for one not kept yet: the caller says the English.
+    pub fn owners_kept(&self, english: &str) -> Option<Vec<i16>> {
+        self.kept(self.owners_words(english)?.1)
+    }
+
+    /// The owner's language and its words for the fixed line `english`;
+    /// none for English or a line with no translation.
+    pub fn owners_words(&self, english: &str) -> Option<(Language, &'static str)> {
+        let owners = self.owners?;
+        Some((owners, owners.fixed(english)?))
     }
 
     /// The file name's stem: hex SHA-256 of `voice|model|language|text`.
@@ -83,17 +139,25 @@ impl TtsCache {
         if let Some(samples) = read(&path) {
             return Ok(samples);
         }
-        let _one = self
+        let mut refused = self
             .rendering
             .lock()
             .unwrap_or_else(|held| held.into_inner());
         if let Some(samples) = read(&path) {
             return Ok(samples);
         }
+        if refused.contains(text) {
+            return Err(REFUSED.into());
+        }
         let samples = (self.render)(text)
             .map_err(|why| format!("not in the speech cache, and not rendered: {why}"))?;
         if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
-            return Err("not in the speech cache, and rendered empty or too long".into());
+            eprintln!(
+                "lamp-voice: a line for the speech cache rendered empty or past {} s: not asked again",
+                MOST_FRAMES / SOUND_RATE
+            );
+            refused.insert(text.to_owned());
+            return Err(REFUSED.into());
         }
         if let Err(why) = self.store(&path, &samples) {
             eprintln!("lamp-voice: a line rendered for the speech cache was not kept: {why}");
@@ -101,11 +165,34 @@ impl TtsCache {
         Ok(samples)
     }
 
-    /// Each of `lines` rendered and kept, unless it is already.
+    /// `text`'s samples if kept already, never rendered here: for a caller
+    /// that must not wait on the speech service (#3748).
+    pub fn kept(&self, text: &str) -> Option<Vec<i16>> {
+        read(&self.path(text))
+    }
+
+    /// The sleep line (`lamp_msgs::SLEEP_LINE`, #3748) if kept: the owner's
+    /// words when kept, else the English. Never rendered here. The one
+    /// lookup for a hand's hold and a sleep asked aloud alike.
+    pub fn sleep_line(&self) -> Option<Vec<i16>> {
+        self.owners_kept(lamp_msgs::SLEEP_LINE)
+            .or_else(|| self.kept(lamp_msgs::SLEEP_LINE))
+    }
+
+    /// Each of `lines` rendered and kept, unless it is already: every one
+    /// tried, so one that fails (too long) never keeps the rest from being
+    /// kept; the first failure is returned.
+    ///
+    /// A line that rendered empty or too long is done with: it is not
+    /// kept, and not tried again, so it never holds the warming open.
     pub fn warm(&self, lines: &[&str]) -> Result<(), String> {
         lines
             .iter()
-            .try_for_each(|line| self.samples(line).map(drop))
+            .map(|line| match self.samples(line) {
+                Err(why) if why == REFUSED => Ok(()),
+                other => other.map(drop),
+            })
+            .fold(Ok(()), Result::and)
     }
 
     /// Written whole or not at all: the lamp is unplugged after a shutdown.
@@ -162,8 +249,14 @@ fn read(path: &Path) -> Option<Vec<i16>> {
 /// The cache over the second route's speech service, when it is configured
 /// (`LAMP_VOICE_SECOND_CONFIG`), with [`WARM`] rendered on a thread of its
 /// own, tried again every minute until kept. Without it, none: a cached ask
-/// is refused and its asker says the words another way.
+/// is refused and its asker says the words another way. Made once per
+/// process: the say service and the hold's sleep line (#3748) share it.
 pub fn from_environment() -> Option<Arc<TtsCache>> {
+    static SHARED: std::sync::OnceLock<Option<Arc<TtsCache>>> = std::sync::OnceLock::new();
+    SHARED.get_or_init(made_from_environment).clone()
+}
+
+fn made_from_environment() -> Option<Arc<TtsCache>> {
     use crate::second_provider::net::{Tts, default_model, voice_name};
     let config = match crate::second_config::load_from_env().and_then(|config| {
         config
@@ -204,20 +297,25 @@ pub fn from_environment() -> Option<Arc<TtsCache>> {
             }
         })
     });
-    let cache = Arc::new(TtsCache::new(DIR, &voice, &model, &language, render));
+    let cache = Arc::new(
+        TtsCache::new(DIR, &voice, &model, &language, render).speaking(crate::language::at_start()),
+    );
     let warming = Arc::clone(&cache);
     let _ = std::thread::Builder::new()
         .name("say-tts-warm".into())
         .spawn(move || {
+            let lines = warming.warm_lines();
             let mut told = false;
-            while let Err(why) = warming.warm(WARM) {
+            let mut every = WARM_EVERY;
+            while let Err(why) = warming.warm(&lines) {
                 if !told {
-                    eprintln!("lamp-voice: the speech cache's lines are not rendered yet, tried each minute: {why}");
+                    eprintln!("lamp-voice: the speech cache's lines are not rendered yet, tried again after a minute, then less often, at most hourly: {why}");
                     told = true;
                 }
-                std::thread::sleep(WARM_EVERY);
+                std::thread::sleep(every);
+                every = (every * 2).min(WARM_EVERY_MOST);
             }
-            eprintln!("lamp-voice: the speech cache holds its {} line(s)", WARM.len());
+            eprintln!("lamp-voice: the speech cache holds its {} line(s)", lines.len());
         });
     Some(cache)
 }
@@ -300,13 +398,110 @@ mod tests {
     }
 
     #[test]
-    fn warm_renders_the_shutdown_line_once() {
+    fn warm_renders_the_shutdown_line_and_the_sleep_line_once() {
+        assert_eq!(WARM, [lamp_msgs::GOING_TO_SLEEP, lamp_msgs::SLEEP_LINE]);
         let dir = scratch("warm");
         let (cache, calls) = counted(&dir, "Rachel");
+        assert_eq!(cache.kept(lamp_msgs::SLEEP_LINE), None);
         cache.warm(WARM).unwrap();
         cache.warm(WARM).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
         assert!(cache.path(lamp_msgs::GOING_TO_SLEEP).is_file());
+        assert_eq!(
+            cache.kept(lamp_msgs::SLEEP_LINE),
+            Some(vec![lamp_msgs::SLEEP_LINE.len() as i16; 2_400])
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2, "kept never renders");
+    }
+
+    /// #4473 (c): English warms exactly [`WARM`] and has no line of the
+    /// owner's; another language warms its seven fixed lines first, then
+    /// [`WARM`] for the fallback, each under a key of its own words.
+    #[test]
+    fn the_owners_language_warms_its_own_lines_first_and_english_is_as_today() {
+        let dir = scratch("owners");
+        let (english, _) = counted(&dir, "Rachel");
+        assert_eq!(english.warm_lines(), WARM);
+        english.warm(&english.warm_lines()).unwrap();
+        assert_eq!(english.owners_kept(lamp_msgs::SLEEP_LINE), None);
+        assert_eq!(english.owners_words(lamp_msgs::SLEEP_LINE), None);
+        for language in [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+        ] {
+            let dir = scratch(&format!("owners-{}", language.code()));
+            let (cache, calls) = counted(&dir, "Rachel");
+            let cache = cache.speaking(Some(language));
+            let lines = cache.warm_lines();
+            assert_eq!(lines.len(), 18 + WARM.len(), "{language:?}");
+            assert_eq!(&lines[18..], WARM);
+            let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
+            assert_eq!(lines[1], words);
+            assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));
+            // Not kept yet: none, never rendered here; the caller says English.
+            assert_eq!(cache.owners_kept(lamp_msgs::SLEEP_LINE), None);
+            assert_eq!(calls.load(Ordering::SeqCst), 0);
+            cache.warm(&lines).unwrap();
+            assert_eq!(
+                cache.owners_kept(lamp_msgs::SLEEP_LINE),
+                Some(vec![words.len() as i16; 2_400])
+            );
+            assert_eq!(cache.owners_kept("Hello."), None, "not a fixed line");
+        }
+    }
+
+    /// One line that cannot be kept never keeps the rest from being kept.
+    #[test]
+    fn warm_tries_every_line_and_returns_the_first_failure() {
+        let dir = scratch("warm_every");
+        let render: Render = Box::new(|text: &str| {
+            if text == "too long" {
+                Err("too long".into())
+            } else {
+                Ok(vec![1; 2_400])
+            }
+        });
+        let cache = TtsCache::new(&dir, "Rachel", "m", "en", render);
+        assert!(cache.warm(&["too long", "Hi."]).is_err());
+        assert!(cache.kept("Hi.").is_some());
+    }
+
+    /// Thirteen's P2 on #4523: a line that renders past the cap is sent to
+    /// the speech service once, not on every round, and the warming ends;
+    /// a failed render (offline) is tried again.
+    #[test]
+    fn a_line_rendered_too_long_is_asked_for_once() {
+        let dir = scratch("too_long");
+        let calls = Arc::new(AtomicUsize::new(0));
+        let seen = Arc::clone(&calls);
+        let offline = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let down = Arc::clone(&offline);
+        let render: Render = Box::new(move |text: &str| {
+            seen.fetch_add(1, Ordering::SeqCst);
+            if text == "Hi." && down.load(Ordering::SeqCst) {
+                Err("offline".into())
+            } else if text == "long" {
+                Ok(vec![1; MOST_FRAMES as usize + 1])
+            } else {
+                Ok(vec![1; 2_400])
+            }
+        });
+        let cache = TtsCache::new(&dir, "Rachel", "m", "en", render);
+        assert!(cache.warm(&["long", "Hi."]).is_err(), "Hi. is offline");
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        offline.store(false, Ordering::SeqCst);
+        cache.warm(&["long", "Hi."]).unwrap();
+        cache.warm(&["long", "Hi."]).unwrap();
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            3,
+            "long asked once, Hi. twice"
+        );
+        assert_eq!(cache.samples("long").unwrap_err(), REFUSED);
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+        assert!(cache.kept("long").is_none());
     }
 
     #[test]

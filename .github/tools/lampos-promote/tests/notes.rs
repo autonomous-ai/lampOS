@@ -4,7 +4,10 @@ use lampos_promote::notes::{
     self, DEVELOPERS, HEADING, ON_UNSET, PLAIN, PLAIN_MOST, Waiting, placed, plain_lines, section,
     turned_on, waiting,
 };
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 const PAGE: &str = "\
 # Switches
@@ -296,6 +299,194 @@ fn on_this_repository_a_switch_on_by_default_is_not_listed() {
             );
         }
     }
+}
+
+/// The real page and units: a file in `deploy/product` that install never
+/// places turns nothing on, so `LAMP_OWN_KEYS`, set only in the own-keys
+/// drop-in a test lamp gets by hand, is listed as not on yet.
+#[test]
+fn on_this_repository_a_file_install_never_places_turns_nothing_on() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    assert!(lamp_os.join("deploy/product/own-keys-voice.conf").is_file());
+    let files = notes::product_files(&lamp_os).unwrap();
+    for left_out in [
+        "own-keys-voice.conf",
+        "lamp-keeper-restart.socket",
+        "lamp-setup-keys@.service",
+    ] {
+        assert!(!files.contains_key(left_out), "{left_out} is read");
+    }
+    assert!(files.contains_key("exit-note.conf") && files.contains_key("store.conf"));
+    let on = turned_on(&files);
+    assert!(!on.contains_key("LAMP_OWN_KEYS"));
+    assert!(
+        waiting(&page, &on)
+            .iter()
+            .any(|w| w.switch == "LAMP_OWN_KEYS")
+    );
+}
+
+/// A file counts as placed only by the name install places it under: a hand
+/// drop-in holding an installed unit's text word for word is not read
+/// (Second's P3 on #4666).
+#[test]
+fn a_file_with_an_installed_text_under_another_name_is_not_read() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let voice = std::fs::read_to_string(lamp_os.join("deploy/product/lamp-voice.service")).unwrap();
+    let copy = tempfile::tempdir().unwrap();
+    let product = copy.path().join("deploy/product");
+    std::fs::create_dir_all(product.join("settings")).unwrap();
+    std::fs::write(product.join("lamp-voice.service"), &voice).unwrap();
+    std::fs::write(product.join("hand-voice.conf"), &voice).unwrap();
+    let files = notes::product_files(copy.path()).unwrap();
+    assert!(files.contains_key("lamp-voice.service"));
+    assert!(!files.contains_key("hand-voice.conf"));
+}
+
+/// The real page and units: no switch a product file turns on is counted
+/// `until` or `now`, which say it waits off for a check, so the page's
+/// counts of what waits are what's off (Reviewer-two's P3 on #4662).
+#[test]
+fn on_this_repository_no_switch_the_product_turns_on_is_counted_waiting() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let counted_waiting: Vec<String> = waiting(&page, &BTreeMap::new())
+        .into_iter()
+        .filter_map(|w| {
+            on.get(&w.switch)
+                .map(|file| format!("{} ({file})", w.switch))
+        })
+        .collect();
+    assert!(
+        counted_waiting.is_empty(),
+        "counted `until` or `now` in docs/switches.md, but on in the product; count them `on`:\n{}",
+        counted_waiting.join("\n")
+    );
+}
+
+/// The real page and units: each row is counted as the product has it. A
+/// row counted `off` is one no product file turns on, and one counted `on`
+/// is turned on by a product file or on by its code's default
+/// ([`ON_UNSET`]). On 31 Oct `LAMP_STALLS` was counted `off` with the
+/// product unit turning it on since 17 Oct, and `LAMP_DECLINE_SILENT` `on`
+/// with no unit setting it (#4735).
+#[test]
+fn on_this_repository_each_switch_is_counted_as_the_product_has_it() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let rows = notes::rows(&page);
+    assert!(rows.len() > 300, "only {} rows read", rows.len());
+    let wrong: Vec<String> = rows
+        .iter()
+        .filter_map(|row| match (row.counted.as_str(), on.get(&row.switch)) {
+            ("off", Some(file)) => Some(format!("{}: counted `off`, but {file} turns it on", row.switch)),
+            ("on", None) if row.product.as_deref() != Some(ON_UNSET) => Some(format!(
+                "{}: counted `on`, but no product file turns it on and its Product unit cell isn't {ON_UNSET:?}",
+                row.switch
+            )),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "docs/switches.md's Counted as, against the product files:\n{}",
+        wrong.join("\n")
+    );
+}
+
+/// The real page: a row whose proposed product default is off until a
+/// check is never counted `off`. It is `until` while it waits, or `on` once
+/// a product file turns it on (the test above). Counted `off`, it is left out
+/// of `waiting` and so of the stable notes' "Built but not on yet": on 31 Oct
+/// six rows were, the voice-asked stand among them (Second's #4787).
+#[test]
+fn on_this_repository_no_switch_waiting_on_a_check_is_counted_off() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let rows = notes::rows(&page);
+    let waiting_on_a_check = |row: &&notes::Row| {
+        row.proposed.as_deref().is_some_and(|cell| {
+            cell.trim_start_matches(['*', '_', '`', ' '])
+                .to_lowercase()
+                .starts_with("off until")
+        })
+    };
+    assert!(
+        rows.iter().filter(waiting_on_a_check).count() > 100,
+        "the Proposed product default column was not read"
+    );
+    let wrong: Vec<String> = rows
+        .iter()
+        .filter(waiting_on_a_check)
+        .filter(|row| row.counted == "off")
+        .map(|row| format!("{} ({})", row.switch, row.part))
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "counted `off` in docs/switches.md, but its Proposed product default is off until a check; count it `until`:\n{}",
+        wrong.join("\n")
+    );
+}
+
+/// The real page and units: every `LAMP_*` a product file turns on has a
+/// row in the page's switch tables, unless the page's own left-out list
+/// ("How to read it": paths, sockets and test hooks, as `LAMP_*_SOCKET`)
+/// names it. On 31 Oct `LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` were on in
+/// `lamp-update.service` with no row (Tests-P1, #4755).
+#[test]
+fn on_this_repository_each_switch_a_product_file_turns_on_has_a_row() {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
+    let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
+    let list = page
+        .split_once("Paths, sockets and test hooks (")
+        .and_then(|(_, after)| after.split_once(')'))
+        .map(|(list, _)| list)
+        .expect("switches.md says which names it leaves out");
+    let left_out: Vec<&str> = list
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|name| name.starts_with("LAMP_"))
+        .collect();
+    assert!(left_out.len() >= 5, "only {left_out:?} read as left out");
+    let rows: BTreeSet<String> = notes::rows(&page)
+        .into_iter()
+        .map(|row| row.switch)
+        .collect();
+    let on = turned_on(&notes::product_files(&lamp_os).unwrap());
+    let missing: Vec<String> = on
+        .iter()
+        .filter(|(name, _)| name.starts_with("LAMP_") && !rows.contains(*name))
+        .filter(|(name, _)| !left_out.iter().any(|pattern| matches(pattern, name)))
+        .map(|(name, file)| format!("{name} ({file})"))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "turned on by a product file, with no row in docs/switches.md and not in its left-out list:\n{}",
+        missing.join("\n")
+    );
+}
+
+/// Whether `name` matches `pattern`, where each `*` stands for any run of
+/// characters (`LAMP_*_SOCKET`).
+fn matches(pattern: &str, name: &str) -> bool {
+    let parts: Vec<&str> = pattern.split('*').collect();
+    let Some(mut rest) = name.strip_prefix(parts[0]) else {
+        return false;
+    };
+    for (index, part) in parts.iter().enumerate().skip(1) {
+        if index == parts.len() - 1 {
+            return rest.ends_with(part);
+        }
+        match rest.find(part) {
+            Some(at) => rest = &rest[at + part.len()..],
+            None => return false,
+        }
+    }
+    rest.is_empty()
 }
 
 /// The real page: every switch the notes list has a plain line in its

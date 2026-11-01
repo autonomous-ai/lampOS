@@ -1,0 +1,14 @@
+{
+  "name": "lampos-doc-links",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test check.test.mjs",
+    "check": "node check.mjs ../../../lampOS"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "github-slugger": "2.0.0",
+    "markdown-it": "15.0.3"
+  }
+}

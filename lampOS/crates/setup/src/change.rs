@@ -23,7 +23,11 @@
 //!   kilometre ([`lamp_msgs::owner_place::fit`]) and kept root's, 0600; the
 //!   voice reads it again for each question that needs a place, so nothing
 //!   restarts and a clear holds from the next question. `lamp-cloud` sends
-//!   it only with `LAMP_OWNER_PLACE=on`.
+//!   it only with `LAMP_OWNER_PLACE=on`;
+//! - the owner's language (`/etc/lampOS/setup/language`, #4473): one code,
+//!   root's, 0644, as setup writes it. The voice reads it at start, so once
+//!   it changed the voice is restarted when it rests between turns (5 s, at
+//!   most [`REST_MOST`]), as the app's restart waits ([`when_rested`]).
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -54,6 +58,8 @@ pub enum Change {
     Zone(String),
     /// The owner's place, rounded; `None` clears it.
     OwnerPlace(Option<lamp_msgs::owner_place::Place>),
+    /// The owner's language: one of [`crate::serve::LANGUAGES`].
+    Language(&'static str),
 }
 
 /// A control character, a line or paragraph separator, or a mark that turns
@@ -76,8 +82,9 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 }
 
 /// The one line `lamp-cloud` sends, checked against `config`: exactly
-/// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`, or
-/// `{"owner_place": {"name", "lat", "lon", "set_at"}}` (`null` clears it).
+/// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
+/// `{"language": s}`, or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
+/// (`null` clears it).
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -112,6 +119,9 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
             }
             Ok(Change::Zone(zone.to_owned()))
         }
+        "language" => crate::serve::language(text.ok_or(crate::serve::LANGUAGE_REFUSED)?)
+            .map(Change::Language)
+            .ok_or_else(|| crate::serve::LANGUAGE_REFUSED.into()),
         // Rounded again here, whatever lamp-cloud sent: root's copy of the
         // rule is the one that writes.
         "owner_place" if given.is_null() => Ok(Change::OwnerPlace(None)),
@@ -129,6 +139,8 @@ pub struct Done {
     pub data: Value,
     /// `lamp-schedule` must take the new zone: `zone.env` changed.
     pub restart_schedule: bool,
+    /// The voice must take the new language: the language file changed.
+    pub restart_voice: bool,
     /// The journal's line: what changed, never a name.
     pub said: String,
 }
@@ -155,6 +167,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"name": name}),
                 restart_schedule: false,
+                restart_voice: false,
                 said: format!(
                     "the person's name was changed ({} characters)",
                     name.chars().count()
@@ -166,6 +179,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"name": ""}),
                 restart_schedule: false,
+                restart_voice: false,
                 said: "the person's name was removed".into(),
             })
         }
@@ -174,6 +188,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"name": name}),
                 restart_schedule: false,
+                restart_voice: false,
                 said: format!(
                     "the lamp's name in the app was changed ({} characters)",
                     name.chars().count()
@@ -187,6 +202,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"timezone": zone}),
                 restart_schedule: before != after,
+                restart_voice: false,
                 // A zone is no one's name: said, as setup's own line says it.
                 said: format!("the time zone is now {zone}"),
             })
@@ -200,7 +216,19 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!(place),
                 restart_schedule: false,
+                restart_voice: false,
                 said: "the owner's place was set".into(),
+            })
+        }
+        Change::Language(code) => {
+            let before = fs::read(&config.language).ok();
+            files.language(code)?;
+            let after = fs::read(&config.language).ok();
+            Ok(Done {
+                data: json!({"language": code}),
+                restart_schedule: false,
+                restart_voice: before != after,
+                said: format!("the language is now {code}"),
             })
         }
         Change::OwnerPlace(None) => {
@@ -208,6 +236,7 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             Ok(Done {
                 data: json!({"cleared": true}),
                 restart_schedule: false,
+                restart_voice: false,
                 said: "the owner's place was cleared".into(),
             })
         }
@@ -234,6 +263,40 @@ pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done
             None,
         ),
     }
+}
+
+/// [`answer`], with lamp-update's lock in `records` for a new language
+/// (#4473, Fourth's P2 on #4485): the voice restarts after it, and a round
+/// puts its build back when a unit it watches restarts within its watch.
+/// So the lock is taken before anything is written; held by an update,
+/// the change is refused with the restart's words and nothing is written.
+/// Otherwise it is given back with the reply, to hold through the voice's
+/// restart, or let go at once when there is none (the same language).
+pub fn answer_holding(
+    line: &str,
+    config: &Config,
+    enabled: bool,
+    records: &lamp_update::records::Records,
+) -> (Value, Option<Done>, Option<lamp_update::records::Lock>) {
+    let language = enabled
+        && matches!(
+            parse(line.trim_end_matches(['\n', '\r']), config),
+            Ok(Change::Language(_))
+        );
+    if !language {
+        let (reply, done) = answer(line, config, enabled);
+        return (reply, done, None);
+    }
+    let lock = match lamp_keeper::restart::update_lock(records) {
+        Ok(lock) => lock,
+        Err(why) => return (json!({ "refused": why }), None, None),
+    };
+    let (reply, done) = answer(line, config, enabled);
+    let held = done
+        .as_ref()
+        .filter(|done| done.restart_voice)
+        .map(|_| lock);
+    (reply, done, held)
 }
 
 /// The app's restart and shutdown (`system.reboot`, `system.shutdown`;
@@ -271,6 +334,16 @@ pub fn restart_when_rested(
     ears: &mut impl Ears,
     restart: impl FnOnce() -> Result<(), String>,
 ) -> String {
+    when_rested(ears, "lampos.target", restart)
+}
+
+/// [`restart_when_rested`] for any `unit`, named in what it says: the
+/// voice after a new language too (#4473).
+pub fn when_rested(
+    ears: &mut impl Ears,
+    unit: &str,
+    restart: impl FnOnce() -> Result<(), String>,
+) -> String {
     let waited = match wait_for_rest(ears, lamp_update::quiet::BETWEEN_TURNS, REST_MOST) {
         Ok(()) => "the voice rested".to_owned(),
         Err(why) => format!(
@@ -279,8 +352,8 @@ pub fn restart_when_rested(
         ),
     };
     match restart() {
-        Ok(()) => format!("{waited}; lampos.target restarted"),
-        Err(why) => format!("{waited}; lampos.target could not be restarted: {why}"),
+        Ok(()) => format!("{waited}; {unit} restarted"),
+        Err(why) => format!("{waited}; {unit} could not be restarted: {why}"),
     }
 }
 

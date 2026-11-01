@@ -1,6 +1,8 @@
 //! The engine against scripted services: no network.
 use super::*;
 
+mod checking_line;
+mod cut_to_a_person;
 mod decline_silent;
 mod held_consent;
 mod held_forget;
@@ -55,6 +57,9 @@ struct Script {
     unsaid: &'static [&'static str],
     /// Speech of this sentence never ends.
     endless: Option<&'static str>,
+    /// Speech of this sentence is this many samples, in whole packets: a
+    /// line as long as the lamp's voice says it.
+    lasting: Option<(&'static str, usize)>,
     /// Held by every live stream: dropped streams let go of it.
     token: Arc<()>,
     /// How many times the voice was asked to make ready ([`Services::warm`]).
@@ -252,6 +257,15 @@ impl Services for Script {
                 tokio::time::sleep(Duration::from_millis(1)).await;
                 packet
             })
+            .boxed();
+        }
+        if let Some((sentence, samples)) = self.lasting
+            && sentence == text
+        {
+            return stream::iter(
+                (0..samples.div_ceil(PACKET_SAMPLES))
+                    .map(move |at| Ok(vec![7; PACKET_SAMPLES.min(samples - at * PACKET_SAMPLES)])),
+            )
             .boxed();
         }
         let delay = if self.slow == Some(text.as_str()) {
@@ -1335,6 +1349,105 @@ async fn not_for_me_ends_the_turn_in_silence() {
     assert!(calls.lock().unwrap().is_empty());
 }
 
+/// lamp-06c1, 30 Oct: 13 replies opened "Calling not_for_me." or
+/// "Calling recall about X.", 8 with no call in their round, and each was
+/// said and kept as the lamp's line. The narration is never said, nor
+/// given to the next round: alone it is the decline it names, or asked
+/// once more for the call; beside a call or other words, those go on.
+#[tokio::test]
+async fn a_call_narrated_as_words_is_never_said() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let cases: Vec<(Chats, Vec<&str>, usize)> = vec![
+        // Alone, in two pieces: the decline, in silence.
+        (
+            vec![vec![
+                text("Calling not_"),
+                text("for_me."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec![],
+            1,
+        ),
+        // Beside the real call: the decline.
+        (
+            vec![vec![
+                text("Calling not_for_me."),
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    NOT_FOR_ME,
+                    json!({}),
+                )])),
+                Ok(ChatEvent::Done),
+            ]],
+            vec![],
+            1,
+        ),
+        // With the answer after it: the answer alone.
+        (
+            vec![vec![
+                text("Calling recall about Lily. "),
+                text("She's coming on Sunday."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec!["said:She's coming on Sunday."],
+            1,
+        ),
+        // Alone, another function: asked once more, and that is said.
+        (
+            vec![
+                vec![
+                    text("Calling recall about what we played."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A capitals quiz."), Ok(ChatEvent::Done)],
+            ],
+            vec!["said:A capitals quiz."],
+            2,
+        ),
+        // Ordinary words that begin so are said.
+        (
+            vec![vec![
+                text("Calling your sister first is a good idea."),
+                Ok(ChatEvent::Done),
+            ]],
+            vec!["said:Calling your sister first is a good idea."],
+            1,
+        ),
+    ];
+    for (chats, said_expected, rounds) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("The lunch is not finishing.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&str> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(String::as_str)
+            .collect();
+        assert_eq!(said, said_expected, "{labels:?}");
+        assert!(
+            !labels
+                .iter()
+                .any(|label| label.contains("Calling not") || label.contains("Calling recall")),
+            "{labels:?}"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), rounds, "{labels:?}");
+        // The round asked again is told why, and never given the narration.
+        if rounds == 2 {
+            let again = format!("{:?}", asked[1]);
+            assert!(again.contains("only described a function call"), "{again}");
+            assert!(!again.contains("Calling recall"), "{again}");
+        }
+    }
+}
+
 /// #2191, `LAMP_NAMED_ALWAYS=on`: in a turn the hook says began with the
 /// lamp's name, said to a face turned to the lamp, the model's `not_for_me`
 /// is not taken: it is asked once more, told it was called, and its answer is
@@ -1518,6 +1631,29 @@ async fn an_empty_answer_to_a_line_said_by_name_is_asked_again_never_silence() {
             "{case}"
         );
     }
+}
+
+/// #4473 (Tests' P3 on #4723): with an owner's language, the line said
+/// after no words twice is in it, never English.
+#[tokio::test]
+async fn no_words_twice_is_said_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, what's my name?".to_owned())].into()),
+        chats: Mutex::new([vec![Ok(ChatEvent::Done)], vec![Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine
+        .in_language(Some(Language::Chinese))
+        .asking_again_for_no_words(true);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let out = turn(&mut engine).await;
+    let spoken: Vec<&String> = out.iter().filter(|o| o.starts_with("said:")).collect();
+    let words = format!("said:{}", fixed_in(Some(Language::Chinese), NO_WORDS_LINE));
+    assert_eq!(spoken, [&words], "{out:?}");
 }
 
 /// Words the heed judges not said to the lamp end the turn after them,
@@ -4659,6 +4795,43 @@ async fn a_look_waits_five_seconds_and_then_says_it_could_not_look() {
 /// A full look whose still never came arrives as the no-look note without
 /// `look`: it is a look all the same, with 5 s and the line, never a silent
 /// end at 3 s (the reviewer on #1154).
+/// #4473 (Tests' P3 on #4723): with an owner's language, a look that never
+/// began is said in it, never English.
+#[tokio::test(start_paused = true)]
+async fn a_look_that_never_began_is_said_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        chats: Mutex::new([vec![text("My eye was shut."), Ok(ChatEvent::Done)]].into()),
+        first_event_after: Some(Duration::from_secs(60)),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.in_language(Some(Language::Korean));
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 1,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::NO_LOOK_NOTE.into(),
+        look: false,
+        quoted: false,
+    });
+    let mut said = Vec::new();
+    loop {
+        match engine.next().await {
+            ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { .. } => break,
+            ProviderOutput::TurnFailed { .. } => panic!("failed"),
+            _ => {}
+        }
+    }
+    assert_eq!(said, [fixed_in(Some(Language::Korean), COULD_NOT_LOOK)]);
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_full_look_without_its_still_still_says_it_could_not_look() {
     let script = Arc::new(Script {
@@ -5391,6 +5564,77 @@ async fn the_first_turn_after_a_start_says_the_down_line() {
     assert!(
         second.contains(&again) && !second.contains(&line),
         "within the minute: {second:?}"
+    );
+}
+
+/// #4473: an owner who chose another language hears the down lines in it,
+/// never in English: the first turn's line, then the shorter one within
+/// the minute, each rendered from the fixed lines.
+#[tokio::test(start_paused = true)]
+async fn the_down_lines_are_said_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(2)
+                .collect(),
+        ),
+        chats: Mutex::new([vec![], vec![]].into()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine
+        .in_language(Some(Language::Japanese))
+        .saying_when_down(true);
+    let line = fixed_in(Some(Language::Japanese), DOWN_LINE);
+    let again = fixed_in(Some(Language::Japanese), DOWN_LINE_AGAIN);
+    // The scripted voice's audio carries its text's length.
+    assert_ne!(line.len(), DOWN_LINE.len());
+    assert_ne!(again.len(), DOWN_LINE_AGAIN.len());
+    let heard = |text: &str| format!("audio:{}", text.len());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let first = sent(&mut engine).await;
+    assert!(
+        first.contains(&heard(line)) && !first.contains(&heard(DOWN_LINE)),
+        "the first turn: {first:?}"
+    );
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let second = sent(&mut engine).await;
+    assert!(
+        second.contains(&heard(again)) && !second.contains(&heard(DOWN_LINE_AGAIN)),
+        "within the minute: {second:?}"
+    );
+}
+
+/// Reviewer-three's P2 on #4723: a down line longer than the old 4 s bound
+/// is kept whole, so it is never cut before "ask me again". The Japanese
+/// line is about 6 s (5.97 s in the macOS voice); lamp-c0a4 logged the
+/// English at 4000 ms on 30 Oct, the old bound exactly. A voice that never
+/// ends is still stopped at the bound.
+#[tokio::test(start_paused = true)]
+async fn a_down_line_of_six_seconds_is_kept_whole() {
+    use crate::language::{Language, fixed_in};
+    let line = fixed_in(Some(Language::Japanese), DOWN_LINE);
+    let samples = 6 * 24_000;
+    assert!(samples > 4 * 24_000);
+    let lasting: Arc<dyn Services> = Arc::new(Script {
+        lasting: Some((line, samples)),
+        ..Script::default()
+    });
+    assert_eq!(render_line(&lasting, line).await.len(), samples);
+    let endless: Arc<dyn Services> = Arc::new(Script {
+        endless: Some(line),
+        ..Script::default()
+    });
+    assert_eq!(
+        render_line(&endless, line).await.len(),
+        DOWN_LINE_MOST_SAMPLES
     );
 }
 
@@ -10479,6 +10723,44 @@ async fn asked_with(
     script.asked.lock().unwrap().clone()
 }
 
+/// `LAMP_UNTIED_GOING_ON` (Sixth's P2 on #4562): a line let out only as the
+/// conversation going on and begun over the lamp's answer is told it may be
+/// people's talk and not that it cut in when it has no tie to the lamp
+/// (`Engine::telling_the_untied`); a tied one, or one without the switch,
+/// keeps its cut-in note beside the conversation's.
+#[tokio::test]
+async fn an_untied_line_begun_over_the_answer_is_not_told_it_cut_in() {
+    let cut_in = Message::system(crate::cut_in_told::NOTE);
+    let alone = Message::system(worker::CONVERSATION_ALONE);
+    let words = "Did you send the slides to Sam yet?";
+    let asked = |untied: Option<bool>| {
+        asked_with(
+            words,
+            move |engine| {
+                let engine = engine
+                    .telling_cut_ins(true)
+                    .noting_the_conversation_alone(Arc::new(|_| Some(worker::CONVERSATION_ALONE)));
+                match untied {
+                    Some(untied) => engine.telling_the_untied(Arc::new(move |_| untied)),
+                    None => engine,
+                }
+            },
+            start_marked(1, true, false, false),
+            false,
+            false,
+        )
+    };
+    let untied = asked(Some(true)).await;
+    assert!(!untied[0].contains(&cut_in), "{:?}", untied[0]);
+    assert!(untied[0].contains(&alone), "{:?}", untied[0]);
+    assert_eq!(untied[0].last(), Some(&Message::user(words)));
+    for (untied, why) in [(Some(false), "tied"), (None, "without the switch")] {
+        let told = asked(untied).await;
+        assert!(told[0].contains(&cut_in), "{why}: {:?}", told[0]);
+        assert!(told[0].contains(&alone), "{why}: {:?}", told[0]);
+    }
+}
+
 /// #1712, item 4 of the first builder's 20:15 (`LAMP_CUT_IN_TOLD`): a line
 /// begun over the lamp's audible answer is told it cut in, beside its
 /// words, as the Live route tells it; not without the switch, and the
@@ -10577,6 +10859,38 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
     )
     .await;
     assert_eq!(more.len(), 1, "{more:?}");
+}
+
+/// #4473 (Tests' P3 on #4723): with an owner's language, the answer to a
+/// stop said over the lamp is in it, its words and its clip, never English,
+/// and the model is still not asked.
+#[tokio::test]
+async fn a_stop_said_over_the_lamp_is_answered_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Stop them.".to_owned())].into()),
+        chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built
+        .in_language(Some(Language::Japanese))
+        .telling_cut_ins(true)
+        .ending_spoken_stops(true);
+    engine.submit(start_marked(1, true, false, false));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let out = turn(&mut engine).await;
+    let words = fixed_in(Some(Language::Japanese), crate::spoken_stop::LINE);
+    // The scripted voice's audio carries its text's length.
+    assert_ne!(words.len(), crate::spoken_stop::LINE.len());
+    assert!(out.contains(&format!("said:{words}")), "{out:?}");
+    assert!(out.contains(&format!("audio:{}", words.len())), "{out:?}");
+    assert!(
+        !out.iter().any(|o| o.contains(crate::spoken_stop::LINE)),
+        "{out:?}"
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
 }
 
 /// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's

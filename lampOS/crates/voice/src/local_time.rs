@@ -696,6 +696,49 @@ pub fn night_here() -> bool {
     here().is_some_and(|(file, now)| night_taken(unset, &file, now))
 }
 
+/// What every hello is told after the part of the day ([`hello_told`]).
+pub const HELLO_ONLY: &str = "Say only a hello and their name if you know it: no weather, no day or date, no time, no question and no offer.";
+
+/// What a hello's note (Welcome back's, `who = true`) is told of the time:
+/// the part of the day at `now` in the zone of this compiled zone file, as
+/// [`words`] calls it, and to say a hello and the name only. At 15:42 on
+/// lamp-4ace a hello said "Evening" (the model picked the part itself) and
+/// added the weather, the weekday and "how's it going"; the first builder,
+/// 30 Oct, on the launch testers' findings: the part of the day from the
+/// lamp's local time, never the model's own. At night, or with no zone or
+/// time to work it out from, it names no part of the day at all.
+pub fn hello_told(file: Option<&[u8]>, now: i64) -> String {
+    let part = file
+        .and_then(|file| words(file, now))
+        .map(|(.., part)| part);
+    let when = match part {
+        Some("in the morning") => Some("the morning"),
+        Some("in the afternoon") => Some("the afternoon"),
+        Some("in the evening") => Some("the evening"),
+        _ => None,
+    };
+    match (part, when) {
+        (_, Some(when)) => format!(
+            "\n\n(It is {when} here now: if you name the part of the day, it is {when}, never another. {HELLO_ONLY})"
+        ),
+        (Some(_), None) => format!(
+            "\n\n(It is night here now: do not name the part of the day, just say hello. {HELLO_ONLY})"
+        ),
+        (None, _) => format!(
+            "\n\n(You do not know the part of the day here: do not name it, just say hello. {HELLO_ONLY})"
+        ),
+    }
+}
+
+/// [`hello_told`] for this machine, now: no part of the day while its clock
+/// is known not to be set ([`unset`]) or its zone cannot be read.
+pub fn hello_told_here() -> String {
+    match here().filter(|_| !unset_here()) {
+        Some((file, now)) => hello_told(Some(&file), now),
+        None => hello_told(None, 0),
+    }
+}
+
 fn here() -> Option<(Vec<u8>, i64)> {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1220,6 +1263,42 @@ mod tests {
                     "{said}"
                 );
             }
+        }
+    }
+
+    /// The first builder, 30 Oct, on the launch testers' findings: a hello
+    /// at 15:42 in Ho Chi Minh said "Evening". Its note is told the part of
+    /// the day from the lamp's own time, none at night or with no zone, and
+    /// to say a hello and the name only.
+    #[test]
+    fn a_hello_is_told_the_part_of_the_day_from_the_lamps_own_time() {
+        let saigon = zone(b'2', &[], &[25_200], "<+07>-7");
+        // 2026-10-30 00:00 local in Ho Chi Minh, 29 Oct 17:00 UTC.
+        let midnight = 1_793_293_200;
+        let at = |hour: i64, minute: i64| midnight + hour * 3_600 + minute * 60;
+        let told = |hour, minute| hello_told(Some(&saigon), at(hour, minute));
+        let afternoon = told(15, 42);
+        assert_eq!(
+            afternoon,
+            format!(
+                "\n\n(It is the afternoon here now: if you name the part of the day, it is the afternoon, never another. {HELLO_ONLY})"
+            )
+        );
+        assert!(!afternoon.contains("evening") && !afternoon.contains("morning"));
+        assert!(told(9, 0).contains("It is the morning here now"));
+        assert!(told(18, 0).contains("It is the evening here now"));
+        let night = told(23, 0);
+        assert!(night.contains("do not name the part of the day"));
+        assert!(!night.contains("the evening") && !night.contains("the morning"));
+        for unknown in [
+            hello_told(None, at(15, 42)),
+            hello_told(Some(b"no zone"), at(15, 42)),
+        ] {
+            assert!(unknown.contains("You do not know the part of the day here"));
+            assert!(unknown.ends_with(&format!("{HELLO_ONLY})")));
+        }
+        for hello in [told(15, 42), told(9, 0), told(18, 0), told(23, 0)] {
+            assert!(hello.starts_with("\n\n(") && hello.ends_with(&format!("{HELLO_ONLY})")));
         }
     }
 }

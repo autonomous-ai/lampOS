@@ -2242,7 +2242,14 @@ async fn serve_with_visual<C: Connect>(
                     && !crate::addressed::judged(addressed_said.as_ref(), &request)
                 {
                     let now = monotonic_us();
-                    let said = crate::addressed::judge(request, &ears_levels, &looks, now);
+                    let mut said = crate::addressed::judge(request, &ears_levels, &looks, now);
+                    // How alike its voice is to the conversation's asker's:
+                    // told to the Policy, read by no rule (#4306).
+                    said.like_asker = crate::addressed::like_asker(
+                        intake.handoff.voices.as_mut(),
+                        said.request,
+                        crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now())),
+                    );
                     attention.set_addressed(said.addressed);
                     if let Some(out) = addressed_out.as_mut()
                         && let Err(error) = out.tell(&said, now)
@@ -3050,7 +3057,12 @@ async fn serve_with_visual<C: Connect>(
                                 && !crate::addressed::judged(addressed_said.as_ref(), &in_hand)
                             {
                                 let now = monotonic_us();
-                                let said = crate::addressed::judge(in_hand, &ears_levels, &looks, now);
+                                let mut said = crate::addressed::judge(in_hand, &ears_levels, &looks, now);
+                                said.like_asker = crate::addressed::like_asker(
+                                    intake.handoff.voices.as_mut(),
+                                    said.request,
+                                    crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now())),
+                                );
                                 attention.set_addressed(said.addressed);
                                 if let Some(out) = addressed_out.as_mut()
                                     && let Err(error) = out.tell(&said, now)
@@ -9942,7 +9954,10 @@ pub(crate) mod tests {
     /// The worker's leases, heartbeat bound and waits, and the rig's
     /// heartbeats and capture times, read the scenario clock; the rig's
     /// ticks move it two milliseconds at a time with Tokio's, so a wait of
-    /// seconds passes in no time and the two clocks never part.
+    /// seconds passes in no time and the two clocks never part. It also
+    /// serves a runtime that is not paused (`tests/catalog.rs`): the rig's
+    /// ticks still drive it, so a stall of the host between two heartbeats
+    /// is not counted, while Tokio's timers and `Instant` stay on the host.
     fn logical_clock() -> crate::scenario_clock::Scope {
         let scope = crate::scenario_clock::Scope::enter(Duration::from_secs(60)).unwrap();
         scope.set_pump(|_| Ok(())).unwrap();

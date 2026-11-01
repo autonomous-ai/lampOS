@@ -346,6 +346,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "light-scenes",
     "point-light",
     "light-show",
+    "pose",
     "smoky-air",
     "dusty-air",
     "feelings",
@@ -380,6 +381,13 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
         "light-show",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+    ),
+    // #4135's core skill: the stand a person asks by voice.
+    (
+        "pose",
+        "not yet tried on a lamp (#4135): its stand is published and read only with \
+         `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body, off until a lamp has moved to it \
+         and held it through a conversation",
     ),
     // #1684's two core skills, merged off (the first builder, #1722): a
     // trial puts them on by hand. Each comes with the product once the four
@@ -582,6 +590,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("light-show", "shows/calm.toml"),
     skill_file!("light-show", "shows/music.toml"),
     skill_file!("light-show", "shows/party.toml"),
+    skill_file_off!("pose"),
+    skill_file!("pose", "SKILL.md"),
     skill_file_off!("smoky-air"),
     skill_file!("smoky-air", "SKILL.md"),
     skill_file_off!("dusty-air"),
@@ -615,6 +625,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "c0984e92851125e0a4d588bd793473698ae6f918825a9cd85c3aa9b5aac7d01e", // #4514: pushed skills' developer folder
     "cf1adcb3075bff001ae625c90ddab1e956a25c9b3bcf633ce07c1228737d0adc", // #4333: the owner's place beside the name
     "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b", // #2948 carried onto lamp-voice 23 Oct: head touch on (#711)
     "ad3fd11185bdf206f8622fef2c6d9bafac4efb7742e65b1c7df11de383cc83e6", // combined people temporaries and face expressions, 23 Oct
@@ -706,8 +717,8 @@ pub fn product_settings() -> Vec<manifest::Setting> {
 
 /// Where the repository keeps the Skills Store's public key a build ships
 /// (#3692), under `lamp-update manifest`'s `--deploy` (`lampOS/deploy`).
-/// Not in the repository until the Store's keeper gives its key; a build
-/// made without it carries none and leaves a lamp's key as it is.
+/// The production key has been in the repository since 28 Oct (#3692); a
+/// build made without it carries none and leaves a lamp's key as it is.
 pub const STORE_KEY_SOURCE: &str = "product/settings/var/lib/lampOS/skills/store-key.pub";
 /// Where a build writes it: lamp-skills' `package::BUILD_STORE_KEY` in the
 /// product's skills folder, a place a settings writer from build 7071 on
@@ -3181,6 +3192,58 @@ mod tests {
         }
     }
 
+    /// `deploy/product/README.md` names every file in the folder, so one
+    /// added here is said where a reader of the folder looks (six units and
+    /// `models.json` had gone unsaid), and gives the exit notes' count as
+    /// [`EXIT_NOTE_UNITS`] has it. A part's own unit, `PartOf=` and
+    /// `WantedBy=lampos.target`, is the table's `lamp-<part>.service` row;
+    /// a file under `settings/` is named by its path there.
+    #[test]
+    fn the_deploy_product_readme_names_every_file_and_the_exit_notes_count() {
+        let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+        let readme = fs::read_to_string(folder.join("README.md")).unwrap();
+        let named = |name: &str| readme.contains(&format!("`{name}`"));
+        let mut unnamed = Vec::new();
+        for entry in fs::read_dir(&folder).unwrap() {
+            let entry = entry.unwrap();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name == "README.md" || entry.file_type().unwrap().is_dir() {
+                continue;
+            }
+            let text = fs::read_to_string(entry.path()).unwrap();
+            let part = name.starts_with("lamp-")
+                && name.ends_with(".service")
+                && text.lines().any(|line| line == "PartOf=lampos.target")
+                && text
+                    .lines()
+                    .any(|line| line.starts_with("WantedBy=") && line.contains("lampos.target"));
+            if !part && !named(&name) {
+                unnamed.push(name);
+            }
+        }
+        let settings = folder.join("settings");
+        let mut folders = vec![settings.clone()];
+        while let Some(at) = folders.pop() {
+            for entry in fs::read_dir(&at).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    folders.push(path);
+                    continue;
+                }
+                let inside = path.strip_prefix(&settings).unwrap().to_string_lossy();
+                if !named(&inside) && !named(&format!("settings/{inside}")) {
+                    unnamed.push(format!("settings/{inside}"));
+                }
+            }
+        }
+        assert!(
+            unnamed.is_empty(),
+            "deploy/product/README.md does not name {unnamed:?}"
+        );
+        let count = format!("for the {} fixed reporting services", EXIT_NOTE_UNITS.len());
+        assert!(readme.contains(&count), "README.md does not say {count:?}");
+    }
+
     /// #2892: the eyes' camera helper is installed, its socket enabled and
     /// its template never, and it names the same camera as the eyes, which
     /// ask it; #4074: both on any port, since it differs by
@@ -3382,6 +3445,102 @@ mod tests {
         assert_eq!(
             run_within(Command::new("sh").args(["-c", "echo ok"]), JOURNAL_WITHIN),
             Ok(())
+        );
+    }
+
+    /// docs/install.md names every unit `install` enables, beyond the
+    /// parts in `lampos.target` (its "every part"), so a unit added to
+    /// [`enabled`] is said where a reader of the install looks: the Wi-Fi
+    /// restore, the hotspot's recovery and the camera's socket had gone
+    /// unsaid there.
+    #[test]
+    fn install_md_names_every_unit_install_enables() {
+        let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/install.md");
+        let doc = fs::read_to_string(doc).unwrap();
+        let part = |name: &str| {
+            PRODUCT.iter().any(|(unit, text)| {
+                *unit == name
+                    && text.lines().any(|line| line == "PartOf=lampos.target")
+                    && text
+                        .lines()
+                        .any(|line| line.starts_with("WantedBy=") && line.contains("lampos.target"))
+            })
+        };
+        let unsaid: Vec<String> = enabled()
+            .into_iter()
+            .filter(|name| !part(name) && !doc.contains(&format!("`{name}`")))
+            .collect();
+        assert!(
+            unsaid.is_empty(),
+            "docs/install.md does not name {unsaid:?}"
+        );
+    }
+
+    /// docs/install.md's "The parts" has a row for every part of the
+    /// product, its binary first in the row's Binary cell, so a part added
+    /// to [`PRODUCT`] is said there: setup had no row until #4682.
+    #[test]
+    fn install_md_has_a_row_in_the_parts_for_every_part() {
+        let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/install.md");
+        let doc = fs::read_to_string(doc).unwrap();
+        let section = doc
+            .split("\n## The parts\n")
+            .nth(1)
+            .and_then(|rest| rest.split("\n## ").next())
+            .expect("docs/install.md has \"## The parts\"");
+        let binaries: Vec<&str> = section
+            .lines()
+            .filter_map(|line| line.strip_prefix("| ")?.split(" | ").nth(1))
+            .collect();
+        let rowless: Vec<String> = parts()
+            .into_iter()
+            .map(|part| part.binary)
+            .filter(|binary| {
+                !binaries.iter().any(|cell| {
+                    cell.starts_with(&format!("`{binary} "))
+                        || cell.starts_with(&format!("`{binary}`"))
+                })
+            })
+            .collect();
+        assert!(
+            rowless.is_empty(),
+            "docs/install.md's \"The parts\" has no row for {rowless:?}"
+        );
+    }
+
+    /// docs/skills.md's "Core and installable skills" has a row for every
+    /// skill the product installs ([`PRODUCT_SKILLS`]), by its title (its
+    /// folder's name in words, "watch-you-leave" as "Watch you leave") or
+    /// its folder's name in backticks, so a skill added there is said where
+    /// a reader of the skills looks: Onboarding, Startle, Watch you leave
+    /// and Music sway had no row.
+    #[test]
+    fn skills_md_has_a_row_for_every_product_skill() {
+        let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/skills.md");
+        let doc = fs::read_to_string(doc).unwrap();
+        let section = doc
+            .split("\n### Core and installable skills\n")
+            .nth(1)
+            .and_then(|rest| rest.split("\n#").next())
+            .expect("docs/skills.md has \"### Core and installable skills\"");
+        let skills: Vec<String> = section
+            .lines()
+            .filter_map(|line| line.strip_prefix("| ")?.split(" | ").next())
+            .map(str::to_lowercase)
+            .collect();
+        let rowless: Vec<&str> = PRODUCT_SKILLS
+            .iter()
+            .copied()
+            .filter(|name| {
+                let title = name.replace('-', " ");
+                !skills
+                    .iter()
+                    .any(|cell| cell.contains(&title) || cell.contains(&format!("`{name}`")))
+            })
+            .collect();
+        assert!(
+            rowless.is_empty(),
+            "docs/skills.md's \"Core and installable skills\" has no row for {rowless:?}"
         );
     }
 }

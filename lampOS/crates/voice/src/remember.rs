@@ -134,6 +134,50 @@ pub fn held_forget_told(name: &str) -> serde_json::Value {
     })
 }
 
+/// What the model is told of a carried line's `remember`
+/// (`LAMP_CONVERSATION_CARRIED_SAVES`, `ScopeLease::saves_carried`): the
+/// lamp could not see who said it, so nothing is kept yet. It is held, in
+/// memory only, for the carried person's own yes, their face seen saying it
+/// (`second_provider::HeldForget`), and dropped on anything else. The reply
+/// asks once and never says it is kept (the first builder's call on #4508).
+pub fn held_keep_told() -> serde_json::Value {
+    serde_json::json!({
+        "remembered": false,
+        "held": HELD_KEEP_ASKS,
+    })
+}
+
+/// [`held_keep_told`]'s words.
+pub const HELD_KEEP_ASKS: &str = "Not kept yet: you could not see who said it. Do not say it is kept or noted. Ask them once, in a few words, whether you should keep it for them (for example \"Want me to keep that for you?\"), and then stop. Their yes, said where you can see them, keeps it; do not call remember again for it.";
+
+/// What the model is told when a carried line's `remember` cannot be held
+/// for a yes: one waits already, or the eyes don't read who speaks.
+/// Nothing is kept.
+pub const HELD_KEEP_REFUSED: &str = "Not kept: you could not see who said it. Say so in a few words, and that you can keep it when they say it where you can see them. Do not say it is kept.";
+
+/// Whether the lamp's `answer` asks them about a held keep: one of its
+/// sentences is an offer to keep ([`offers_a_keep`]: a question in which
+/// the lamp would keep it, "Want me to keep that for you?"). What keeps a
+/// carried line's held `remember` for their yes
+/// (`second_provider::HeldForget`).
+pub fn asks_about_keeping(answer: &str) -> bool {
+    let mut sentence = String::new();
+    for c in answer.chars() {
+        sentence.push(c);
+        match c {
+            '?' | '\u{ff1f}' => {
+                if offers_a_keep(&sentence.replace('\u{ff1f}', "?")) {
+                    return true;
+                }
+                sentence.clear();
+            }
+            '.' | '!' | '\u{2026}' | '\u{3002}' => sentence.clear(),
+            _ => {}
+        }
+    }
+    false
+}
+
 /// What the model is told when a held forget's yes did not count: the lamp
 /// did not see the person whose forget it is say it
 /// (`second_provider::HeldForget`, `LAMP_EYES_SPEAKING=on`). Nothing ran;
@@ -143,6 +187,10 @@ pub fn unseen_yes_told(name: &str) -> String {
     let (what, example) = match name {
         crate::known_faces::FORGET => ("their face", "Yes, forget my face."),
         FORGET_EVERYTHING => ("everything about them", "Yes, forget everything."),
+        // A carried line's held keep: nothing was kept.
+        REMEMBER => {
+            return "(For you to know: that yes did not count, since you did not see them say it, so nothing was kept. If they want it kept, they can tell you again where you can see them. Do not say it is kept, and do not call remember for it now.)".to_owned();
+        }
         _ => ("that", "Yes, forget that."),
     };
     format!(
@@ -1769,9 +1817,18 @@ pub fn tools() -> Vec<Tool> {
 /// What `recall`'s description adds for a person's own preference
 /// (lamp-06c1, 26 Oct, P09: "What is my favorite drink?" was answered "I
 /// don't know" with no `recall`; with this, P40 called it and said black
-/// coffee). Words for the model, not a guarantee of a call.
-const RECALL_OWN_PREFERENCE: &str =
-    " For their own preference ('my favourite drink?'), call it before saying you do not remember.";
+/// coffee), and since #4339's third long run on lamp-06c1 (30 Oct: 3 recalls
+/// in 96 turns, four "I don't have anything" answers about the person's own
+/// life with the facts kept, observed or in a talk note) for their own life
+/// and what was talked about. Words for the model, not a guarantee of a call.
+pub(crate) const RECALL_OWN_PREFERENCE: &str = " For their own life (a preference, plans, people, work, what you talked about), call it \
+     before saying you do not know or remember.";
+
+/// What recall's description says it is not for: what the model can still
+/// see. "Not for this conversation" kept the model from asking for a long
+/// talk's earlier part, now in its talk note (#4339). Both short, so recall
+/// stays within 1,024 bytes under every switch.
+pub(crate) const RECALL_NOT_FOR: &str = "Not for what you still see of this talk.";
 
 /// The recall function; with its second version ([`RECALL_V2_ENVIRONMENT`])
 /// it also takes a span of days.
@@ -1779,11 +1836,16 @@ fn recall_tool(second: bool) -> Tool {
     // Short: with `history` and a span added it stays within a function's
     // 1,024-byte description (`Tool::validate`; Reviewer-two's P2 on
     // #3625), else the function is dropped.
-    let mut description = "Call this for what you do not already know from an earlier conversation or day: what \
-                          they told you or asked you to keep. Not for this conversation. If nothing is found, say \
-                          only that you do not remember; never make anything up. You cannot tell who is speaking: \
-                          never say 'you told me'; give what you remember roughly, without dates or times."
-        .to_owned();
+    let mut description =
+        "Call this for what you do not already know from an earlier conversation or day: what \
+                          they told you or asked you to keep. "
+            .to_owned();
+    description.push_str(RECALL_NOT_FOR);
+    description.push_str(
+        " If nothing is found, say only that you do not remember; never make anything up. You \
+         cannot tell who is speaking: never say 'you told me'; give what you remember roughly, \
+         without dates or times.",
+    );
     description.push_str(RECALL_OWN_PREFERENCE);
     let mut parameters = json!({
         "type": "object",
@@ -3843,6 +3905,65 @@ pub fn face_saved(request: u64, to: &str) {
     }
 }
 
+/// What is kept of the name a face was saved under at onboarding
+/// ([`keep_name_with_face`]): a kept thing of that person's own, so a
+/// person-scoped "what's my name?" finds it past the conversation's window.
+/// None for a name with nothing to keep.
+pub fn name_with_face(name: &str) -> Option<ToolCall> {
+    let name = name.trim();
+    (name.chars().any(char::is_alphanumeric) && name.len() <= 64).then(|| ToolCall {
+        id: "onboarding-name-with-face".to_owned(),
+        name: REMEMBER.to_owned(),
+        args: json!({"text": format!("Their name is {name}.")}),
+    })
+}
+
+/// The memory ids [`keep_name_with_face`] kept a name for in this run, so a
+/// face saved twice in one "who you are" (a tester's 7071 lamp, 27 Oct)
+/// keeps it once.
+static NAMES_KEPT: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The name a face was saved under while "who you are" was not yet done
+/// (`onboarding::who_you_are_open`), kept as a thing of that person's own,
+/// in their scope (`known_faces::memory_person`), as a "remember my name"
+/// would keep it (the onboarding forgets report, 30 Oct: the walk kept no
+/// name, so once its exchange left the window a recognised owner had no
+/// source for it). On a thread of its own, never on a turn's path; only on
+/// the Days memory. Forgotten as any kept thing of theirs: a forget of it,
+/// their "forget everything", their face's forget with
+/// `LAMP_MEMORY_FORGET_ALL`. Only their own scope reads it: a voice in the
+/// room's scope or another person's never recalls it.
+pub fn keep_name_with_face(name: &str) {
+    let Some(call) = name_with_face(name) else {
+        return;
+    };
+    let Some(client) = DAYS.get().and_then(Option::as_ref) else {
+        return;
+    };
+    let person = crate::known_faces::memory_person(name.trim());
+    {
+        let Ok(mut kept) = NAMES_KEPT.lock() else {
+            return;
+        };
+        if kept.contains(&person) {
+            return;
+        }
+        kept.push(person.clone());
+    }
+    let socket = client.socket.clone();
+    std::thread::spawn(move || {
+        let (told, _) = run_for(&socket, &call, WRITER_DEADLINE, Some(&person));
+        let kept = told["remembered"] == true;
+        eprintln!(
+            "lamp-voice provider: the name a face was saved under at onboarding {} in their own memory",
+            if kept { "is kept" } else { "could not be kept" }
+        );
+        if !kept && let Ok(mut names) = NAMES_KEPT.lock() {
+            names.retain(|id| *id != person);
+        }
+    });
+}
+
 /// The same keep/forget exclusion for both journal backends. Scope is carried
 /// by each exchange; completion-time face observations never remap it.
 fn journalable(done: Vec<FinishedExchange>) -> impl Iterator<Item = FinishedExchange> {
@@ -4950,6 +5071,16 @@ pub fn clear_forgotten_thread(thread: &mut crate::thread::Thread) {
 }
 
 const SOURCE_IDS: usize = 64;
+/// The journal's line when a conversation reaches [`SOURCE_IDS`] and its
+/// part so far is closed and observed as its own piece (#1693, step 2).
+/// Counts only.
+pub(crate) const OVERFLOW_CLOSED_LINE: &str = "lamp-voice provider: a conversation reached the memory source bound; the part said so far was closed and observed, and it goes on";
+/// Since start: conversations closed at [`SOURCE_IDS`], ends the memory
+/// refused for its input bound, and passes closed unsent with the
+/// observation queue full. The journal gives them as running counts.
+static OVERFLOW_CLOSED: AtomicU64 = AtomicU64::new(0);
+static TOO_LARGE: AtomicU64 = AtomicU64::new(0);
+static OBSERVE_BUSY: AtomicU64 = AtomicU64::new(0);
 /// At most this many people's follow-ups wait for the lamp to ask
 /// ([`DaysContext::asking`]).
 const ASKING_MOST: usize = 16;
@@ -7238,6 +7369,9 @@ impl DaysClient {
         // toward closing a job unsent.
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
             OBSERVE_FORGETS.fetch_add(1, Ordering::AcqRel);
+            // And the conversation's running summary goes, with any of it
+            // being made (`LAMP_CONVERSATION_SUMMARY`).
+            crate::conversation_summary::forget_all();
             eprintln!("lamp-voice provider: {}", forget_args_logged(call));
         }
         if !scope_current(lease) {
@@ -8173,7 +8307,31 @@ impl DaysClient {
             // The room's own history, when asked for (`history_allowed`).
             let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
             let partial = bounded_span(request, &answer, None);
-            let (mut told, ids) = days_answer(&answer, now, zone, dated.then_some(history))?;
+            let (mut told, mut ids) = days_answer(&answer, now, zone, dated.then_some(history))?;
+            // The room's talk notes (`LAMP_CONVERSATION_SUMMARY`), as the
+            // room's.
+            if crate::conversation_summary::on()
+                && let Some(left) = deadline.checked_sub(started.elapsed())
+                && let Some(answer) = bounded_exchange_scoped(
+                    &self.socket,
+                    &talk_request(request, TALK_RECALL_BYTES),
+                    left,
+                    lease,
+                )
+            {
+                let notes = talk_found(&answer, false);
+                if !notes.is_empty()
+                    && let Some(found) = told["found"].as_array_mut()
+                {
+                    for (item, id) in notes {
+                        found.push(item);
+                        ids.push(id);
+                    }
+                    if let Some(told) = told.as_object_mut() {
+                        told.remove("note");
+                    }
+                }
+            }
             if partial {
                 mark_partial_span(&mut told);
             }
@@ -8215,6 +8373,7 @@ impl DaysClient {
                 ids = all;
             }
         }
+        let room_asked = room.is_some();
         if let Some(mut room) = room {
             // Nothing of the room's about a person for the rest of the day
             // they forgot everything (#2849, `LAMP_MEMORY_ROOM_AFTER_FORGET`).
@@ -8231,6 +8390,35 @@ impl DaysClient {
             let (room, room_ids) = days_answer(&room, now, zone, dated.then_some(false))?;
             found.extend(room["found"].as_array()?.iter().cloned());
             ids.extend(room_ids.into_iter().map(|id| (None, id)));
+        }
+        // Their talk notes, then the room's (`LAMP_CONVERSATION_SUMMARY`):
+        // theirs marked theirs, the room's told as the room's, none of the
+        // room's the day they forgot everything (#2849).
+        if crate::conversation_summary::on() {
+            let room_too = room_asked && self.forgot_today(Some(person), now, zone).is_none();
+            for (scope, most) in [
+                (Some(person), TALK_RECALL_BYTES),
+                (None, TALK_RECALL_ROOM_BYTES),
+            ] {
+                if scope.is_none() && !room_too {
+                    continue;
+                }
+                let Some(left) = deadline.checked_sub(started.elapsed()) else {
+                    break;
+                };
+                let Some(answer) = bounded_exchange_scoped(
+                    &self.socket,
+                    &for_person(talk_request(request, most), scope),
+                    left,
+                    lease,
+                ) else {
+                    continue;
+                };
+                for (item, id) in talk_found(&answer, scope.is_some()) {
+                    found.push(item);
+                    ids.push((scope.map(str::to_owned), id));
+                }
+            }
         }
         let mut told = json!({"found":found,"untrusted":true,"scope":BOTH_SCOPE});
         if ids.is_empty() {
@@ -9493,6 +9681,35 @@ impl Conversation {
         }
     }
 
+    /// Full at [`SOURCE_IDS`]: the part said so far is closed as its own
+    /// piece, to be ended and observed as a conversation's end is, and the
+    /// conversation goes on, the same person's, from the next exchange
+    /// (#1693, step 2: a talk with no quiet gap used to reach the bound and
+    /// lose its whole pass). Both pieces keep the conversation's first
+    /// exchange's forget count, so a forget said anywhere in the talk still
+    /// closes every piece's job unsent, as it closed the whole talk's. A
+    /// loss is the closed piece's alone. Room lines kept for a face to
+    /// follow go with it: a face known later moves only what was said after
+    /// the cut, never what was observed already.
+    fn close_piece(&mut self) -> Conversation {
+        let piece = Conversation {
+            person: self.person.clone(),
+            sources: std::mem::take(&mut self.sources),
+            finished: self.finished,
+            incomplete: std::mem::take(&mut self.incomplete),
+            forgets: self.forgets,
+            ..Conversation::default()
+        };
+        self.kept.clear();
+        self.lines.clear();
+        self.follow = None;
+        piece
+    }
+
+    fn full(&self) -> bool {
+        self.sources.len() == SOURCE_IDS
+    }
+
     fn wait(&self, idle: Duration) -> Duration {
         self.finished.map_or(Duration::from_secs(86_400), |last| {
             (last + idle).saturating_duration_since(Instant::now())
@@ -9530,8 +9747,9 @@ fn observe(
     {
         let job = input["job"].as_str().unwrap_or_default();
         let closed = close_job(socket, person.as_deref(), job);
+        let busy = OBSERVE_BUSY.fetch_add(1, Ordering::Relaxed) + 1;
         eprintln!(
-            "lamp-voice provider: observation pass busy; a conversation was closed with nothing kept (closed={closed})"
+            "lamp-voice provider: observation pass busy; a conversation was closed with nothing kept (closed={closed} busy={busy})"
         );
     }
 }
@@ -9595,6 +9813,17 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
             );
             continue;
         };
+        // A fact only the conversation's running note supports is never
+        // kept: the note is the lamp's words, not the person's.
+        let (observations, only_noted) = match input["summary"].as_str() {
+            Some(summary) => without_summary_only(observations, &input, summary),
+            None => (observations, 0),
+        };
+        if only_noted > 0 {
+            eprintln!(
+                "lamp-voice provider: observation pass: {only_noted} resting only on the lamp's running note left out"
+            );
+        }
         // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is
         // kept while nobody is known.
         let (observations, dropped) =
@@ -9637,6 +9866,138 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
             }
         }
     }
+}
+
+/// What the observation pass is told when its job has the conversation's
+/// running note (`LAMP_CONVERSATION_SUMMARY`).
+pub const OBSERVE_SUMMARY: &str = " The job's \"summary\", when there is one, is your own running note of the whole conversation, in your words, not the person's: read it to understand the conversation, but cite only the records' ids, and never propose a fact that only the summary supports and no record of what the person said does.";
+
+/// `observations` without those resting only on the conversation's running
+/// note: none of whose words is in what the person said in the records
+/// they cite, while one of them is in the note. Erring that way, one in
+/// other words than the person's is left out too when the note has it.
+/// And how many went.
+fn without_summary_only(
+    observations: Vec<Value>,
+    input: &Value,
+    summary: &str,
+) -> (Vec<Value>, usize) {
+    let noted = kept_words(summary);
+    let before = observations.len();
+    let kept: Vec<Value> = observations
+        .into_iter()
+        .filter(|observation| {
+            let words = kept_words(observation["text"].as_str().unwrap_or_default());
+            let cited: Vec<u64> = observation["source_ids"]
+                .as_array()
+                .map(|ids| ids.iter().filter_map(Value::as_u64).collect())
+                .unwrap_or_default();
+            let heard: Vec<String> = input["records"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|record| record["id"].as_u64().is_some_and(|id| cited.contains(&id)))
+                .flat_map(|record| {
+                    let said = if record["kind"] == "exchange" {
+                        record["heard"].as_str()
+                    } else {
+                        record["text"].as_str()
+                    };
+                    kept_words(said.unwrap_or_default())
+                })
+                .collect();
+            let theirs = words
+                .iter()
+                .any(|word| heard.iter().any(|heard| about_same(word, heard)));
+            let in_note = words
+                .iter()
+                .any(|word| noted.iter().any(|noted| about_same(word, noted)));
+            theirs || !in_note
+        })
+        .collect();
+    let left_out = before - kept.len();
+    (kept, left_out)
+}
+
+/// A conversation's talk note to the memory (`talk_note`,
+/// `LAMP_CONVERSATION_SUMMARY`): in `person`'s scope, the room's for none,
+/// linked to its exchanges `sources`; whether it was kept.
+pub(crate) fn keep_talk_note(
+    socket: &Path,
+    person: Option<&str>,
+    text: &str,
+    sources: &[u64],
+) -> bool {
+    bounded_exchange(
+        socket,
+        &for_person(
+            json!({"op":"talk_note","text":text,"source_ids":sources}),
+            person,
+        ),
+        WRITER_DEADLINE,
+    )
+    .is_some_and(|answer| answer["ok"] == true)
+}
+
+/// What a recall is told of a talk note of the asker's own, and of one of
+/// the room's (`LAMP_CONVERSATION_SUMMARY`).
+pub const TALK_THEIRS: &str = "Your own summary of a talk with this person on that day, in your words, not theirs: use it only to answer what they asked, and never read it out whole.";
+pub const TALK_ROOM: &str = "Your own summary of a talk in this room on that day, with whoever was here: the room's, never told as the asker's own; use it only to answer what was asked, and never read it out whole.";
+/// The most of a recall's talk notes, the asker's and then the room's.
+const TALK_RECALL_BYTES: usize = 6_400;
+const TALK_RECALL_ROOM_BYTES: usize = 3_200;
+
+/// A recall's talk notes of `scope` (`talk_notes`): of the days it asks
+/// about, else found by its words; each as a found item and its id.
+fn talk_request(request: &Value, max_bytes: usize) -> Value {
+    let mut line = json!({"op":"talk_notes","limit":2,"max_bytes":max_bytes});
+    if let Some(query) = request["query"].as_str() {
+        line["query"] = json!(query);
+    }
+    match (
+        request["day_from"].as_str(),
+        request["day_to"].as_str(),
+        request["day"].as_str(),
+    ) {
+        (Some(from), Some(to), _) => {
+            line["day_from"] = json!(from);
+            line["day_to"] = json!(to);
+        }
+        (_, _, Some(day)) => {
+            line["day_from"] = json!(day);
+            line["day_to"] = json!(day);
+        }
+        _ => {}
+    }
+    line
+}
+
+/// The found items of a `talk_notes` answer, `theirs` or the room's, and
+/// their ids; nothing for an answer that is not one.
+fn talk_found(answer: &Value, theirs: bool) -> Vec<(Value, u64)> {
+    if answer["ok"] != true {
+        return vec![];
+    }
+    answer["talk_notes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|note| {
+            let id = note["id"]
+                .as_u64()
+                .filter(|id| *id > 0 && *id <= i64::MAX as u64)?;
+            let mut item = json!({
+                "source_id":id,
+                "talked_on":note["day"].as_str()?,
+                "talk_summary":note["text"].as_str()?,
+                "about":if theirs { TALK_THEIRS } else { TALK_ROOM },
+            });
+            if theirs {
+                item["theirs"] = json!(true);
+            }
+            Some((item, id))
+        })
+        .collect()
 }
 
 /// The model's answer for the observation pass, as the route reads it: the
@@ -10020,7 +10381,53 @@ fn days_writer(
             eprintln!("{END_ALL_FORGOTTEN}");
             return;
         }
+        // The conversation's running note (`LAMP_CONVERSATION_SUMMARY`):
+        // read for its observation pass as the lamp's own words, and kept
+        // as its talk note, in its own scope (the room's too), linked to its
+        // exchanges, off this thread.
+        let summary = crate::conversation_summary::for_observing(ended.person.as_deref());
+        // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, a conversation nobody known
+        // was seen in keeps nothing, its talk note included (reviewer-three's
+        // P1 on #4479): as it is never observed below.
+        let keeps_talk = needs_face::observes(ended.person.as_deref(), needs_face::on());
+        if crate::conversation_summary::on() && !keeps_talk {
+            eprintln!(
+                "lamp-voice provider: talk note: a conversation nobody known was seen in keeps none (LAMP_MEMORY_PERSONAL_NEEDS_FACE)"
+            );
+        }
+        if crate::conversation_summary::on() && keeps_talk {
+            let (socket, person, sources) = (
+                socket.to_owned(),
+                ended.person.clone(),
+                ended.sources.clone(),
+            );
+            crate::conversation_summary::conversation_ended(crate::conversation_summary::Ended {
+                whose: ended.person.clone(),
+                until: ended.finished.unwrap_or_else(Instant::now),
+                keep: Box::new(move |text| {
+                    keep_talk_note(&socket, person.as_deref(), text, &sources)
+                }),
+                still: Box::new(move || OBSERVE_FORGETS.load(Ordering::Acquire) == forgets),
+            });
+        }
         if observing {
+            let refused = answer
+                .as_ref()
+                .filter(|answer| answer["ok"] != true)
+                .map(|answer| {
+                    let code = answer["error"].as_str().unwrap_or("refused");
+                    let code = if code.len() <= 32
+                        && code.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+                    {
+                        code
+                    } else {
+                        "refused"
+                    };
+                    let too_large = answer["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("exceeds 32 KiB"));
+                    (code.to_owned(), too_large)
+                });
             match answer
                 .filter(|answer| answer["ok"] == true)
                 .and_then(|answer| answer.get("input").cloned())
@@ -10043,11 +10450,31 @@ fn days_writer(
                         .lock()
                         .map(|context| context.shown_texts(ended.person.as_deref()))
                         .unwrap_or_default();
+                    let mut input = input;
+                    if let Some(summary) = summary {
+                        input["summary"] = json!(summary);
+                    }
                     observe(socket, ended.person, input, forgets, shown);
                 }
-                None => eprintln!(
-                    "lamp-voice provider: memory conversation end gave no job; no observation pass"
-                ),
+                None => {
+                    // The memory's refusal, by its own fixed code: a pass
+                    // over its input bound (`tidy::MAX_INPUT_BYTES`) is
+                    // counted apart, never a word of the talk.
+                    let why = refused.as_ref().map_or("no_answer", |(code, too_large)| {
+                        if *too_large {
+                            "too_large"
+                        } else {
+                            code.as_str()
+                        }
+                    });
+                    if why == "too_large" {
+                        TOO_LARGE.fetch_add(1, Ordering::Relaxed);
+                    }
+                    eprintln!(
+                        "lamp-voice provider: memory conversation end gave no job; no observation pass (why={why} too_large={})",
+                        TOO_LARGE.load(Ordering::Relaxed)
+                    );
+                }
             }
             return;
         }
@@ -10180,6 +10607,14 @@ fn days_writer(
                     .filter(|id| *id > 0 && *id <= i64::MAX as u64);
                 report(id.is_some());
                 if let Some(id) = id {
+                    if conversation.full() {
+                        let mut piece = conversation.close_piece();
+                        let closed = OVERFLOW_CLOSED.fetch_add(1, Ordering::Relaxed) + 1;
+                        eprintln!(
+                            "{OVERFLOW_CLOSED_LINE} (exchanges={SOURCE_IDS} closed={closed})"
+                        );
+                        end(&mut piece);
+                    }
                     conversation.add(id, finished, observe_forgets);
                     if let Ok(mut current) = current.lock() {
                         *current = (conversation.person.clone(), conversation.sources.clone());
@@ -11167,6 +11602,7 @@ mod tests {
         let route = crate::tools::Route::Memory(
             memory.clone(),
             Some((eyes.clone(), crate::known_faces::FaceSwitches::default())),
+            None,
         );
         let forget = call(FORGET_EVERYTHING, json!({}));
         // Not marked: the memory is emptied, the face kept, the eyes asked
@@ -11426,6 +11862,10 @@ mod tests {
                     recall.description.len()
                 );
                 assert!(recall.description.contains(RECALL_OWN_PREFERENCE));
+                // #4339: their own life and the talk too, and recall is not
+                // kept from a long talk's earlier part.
+                assert!(recall.description.contains(RECALL_NOT_FOR));
+                assert!(!recall.description.contains("Not for this conversation."));
             }
         }
     }
@@ -16122,6 +16562,107 @@ mod tests {
         );
         drop(client);
         std::fs::remove_file(socket).unwrap();
+    }
+
+    /// A talk with no quiet gap as long as #1693's repro (70 exchanges):
+    /// at [`SOURCE_IDS`] its part so far is closed and ended as its own
+    /// piece, and the rest at its end, so both are observed, none skipped,
+    /// and no exchange is named twice (#1693, step 2).
+    fn overflowing_talk(name: &str) -> Vec<Value> {
+        // 70 lines, 2 ends at most, the barrier's close.
+        let (socket, served) = memory(name, 73, |request| match request["op"].as_str() {
+            Some("append_linked") => {
+                let n: u64 = request["heard"].as_str().unwrap()[1..].parse().unwrap();
+                json!({"ok":true,"id":n})
+            }
+            _ => json!({"ok":true,"submitted":false,"reason":"model_unconfigured"}),
+        });
+        let (send, receive) = sync_channel(80);
+        let now = Instant::now();
+        for n in 1..=70u64 {
+            send.send(DaysJob::Exchange {
+                request: n,
+                at_unix_ms: NOW,
+                finished: now,
+                heard: format!("n{n}"),
+                said: "answer".into(),
+                sources: vec![],
+                rules: vec![],
+                person: Some("p-a".into()),
+                forgotten: 0,
+                observe_forgets: 0,
+            })
+            .unwrap();
+        }
+        send.send(DaysJob::End).unwrap();
+        send.send(DaysJob::Close("barrier".into(), None)).unwrap();
+        drop(send);
+        days_writer(
+            &socket,
+            "voice-test",
+            &receive,
+            Duration::from_secs(45),
+            &AtomicU64::new(0),
+            &Mutex::new(Current::default()),
+            &HandOns::default(),
+            None,
+        );
+        let read = served.join().unwrap();
+        std::fs::remove_file(socket).unwrap();
+        read
+    }
+
+    #[test]
+    fn a_talk_past_the_source_bound_is_ended_in_two_pieces_never_skipped() {
+        let read = overflowing_talk("days-overflow-pieces");
+        let ends: Vec<&Value> = read
+            .iter()
+            .filter(|request| request["op"] == "conversation_end")
+            .collect();
+        assert_eq!(ends.len(), 2, "{read:?}");
+        let first: Vec<u64> = (1..=64).collect();
+        let rest: Vec<u64> = (65..=70).collect();
+        assert_eq!(ends[0]["source_ids"], json!(first));
+        assert_eq!(ends[1]["source_ids"], json!(rest));
+        assert_eq!(ends[0]["person"], "p-a");
+        assert_eq!(ends[1]["person"], "p-a");
+        assert_ne!(ends[0]["conversation"], ends[1]["conversation"]);
+        // The first piece ends once a 65th line is written, before the
+        // 66th: a talk of exactly 64 ends whole at its quiet gap.
+        let at = |op: &str, n: u64| {
+            read.iter()
+                .position(|request| {
+                    request["op"] == op
+                        && (op != "append_linked" || request["heard"] == format!("n{n}"))
+                })
+                .unwrap()
+        };
+        assert!(at("append_linked", 65) < at("conversation_end", 0));
+        assert!(at("conversation_end", 0) < at("append_linked", 66));
+    }
+
+    /// Both pieces keep the talk's first exchange's forget count: a forget
+    /// said after the cut still closes the earlier piece's job unsent, and
+    /// one said before it the later piece's, as the observation thread's
+    /// check (`observe_jobs`) closed the whole talk's. A loss in the closed
+    /// piece is its own.
+    #[test]
+    fn a_closed_piece_and_the_rest_keep_the_talks_forget_count() {
+        let mut conversation = Conversation::default();
+        let now = Instant::now();
+        for id in 1..=64 {
+            conversation.add(id, now, 0);
+        }
+        conversation.incomplete = true;
+        assert!(conversation.full());
+        let piece = conversation.close_piece();
+        assert_eq!(piece.forgets, Some(0));
+        assert_eq!(piece.sources.len(), SOURCE_IDS);
+        assert!(piece.incomplete && !piece.overflow);
+        conversation.add(65, now, 1);
+        assert_eq!(conversation.forgets, Some(0));
+        assert_eq!(conversation.sources, [65]);
+        assert!(!conversation.incomplete && !conversation.overflow);
     }
 
     #[test]
@@ -23238,5 +23779,57 @@ mod tests {
             );
             assert!(forget_said_told(None).contains("could not be removed"));
         }
+    }
+
+    /// A fact only the conversation's running note supports is never kept
+    /// (`LAMP_CONVERSATION_SUMMARY`): the note is the lamp's words. One in
+    /// the person's own cited words is kept, and one the note does not have.
+    #[test]
+    fn no_fact_resting_only_on_the_running_note_is_kept() {
+        let input = json!({"records":[
+            {"id":1,"kind":"exchange","heard":"I like tea","said":"Nice."},
+            {"id":2,"kind":"exchange","heard":"my budget is 300 dollars","said":"Got it."}
+        ]});
+        let summary =
+            "Current activity: none\nKey facts:\n- budget is 300 dollars\n- moving to Hue in May";
+        let proposals = vec![
+            json!({"text":"Moving to Hue in May","category":"thread","source_ids":[1]}),
+            json!({"text":"Budget is 300 dollars","category":"preference","source_ids":[2]}),
+            json!({"text":"Likes tea","category":"preference","source_ids":[1]}),
+        ];
+        let (kept, left_out) = super::without_summary_only(proposals, &input, summary);
+        assert_eq!(left_out, 1);
+        let texts: Vec<&str> = kept
+            .iter()
+            .filter_map(|kept| kept["text"].as_str())
+            .collect();
+        assert_eq!(texts, ["Budget is 300 dollars", "Likes tea"]);
+    }
+
+    /// A recall's talk notes are asked by the day it asks about, else by
+    /// its words; each told with whose it is.
+    #[test]
+    fn a_recall_asks_its_talk_notes_by_day_and_tells_whose() {
+        let by_day = super::talk_request(&json!({"query":"talk","day":"2026-10-29"}), 6400);
+        assert_eq!(by_day["day_from"], "2026-10-29");
+        assert_eq!(by_day["day_to"], "2026-10-29");
+        assert_eq!(by_day["query"], "talk");
+        let span = super::talk_request(
+            &json!({"day_from":"2026-10-27","day_to":"2026-10-29"}),
+            6400,
+        );
+        assert_eq!(
+            (span["day_from"].as_str(), span["day_to"].as_str()),
+            (Some("2026-10-27"), Some("2026-10-29"))
+        );
+        let answer = json!({"ok":true,"talk_notes":[{"id":7,"day":"2026-10-29","text":"Current activity: none"}]});
+        let theirs = super::talk_found(&answer, true);
+        assert_eq!(theirs[0].1, 7);
+        assert_eq!(theirs[0].0["theirs"], true);
+        assert_eq!(theirs[0].0["about"], super::TALK_THEIRS);
+        let room = super::talk_found(&answer, false);
+        assert!(room[0].0.get("theirs").is_none());
+        assert_eq!(room[0].0["about"], super::TALK_ROOM);
+        assert!(super::talk_found(&json!({"ok":false}), true).is_empty());
     }
 }

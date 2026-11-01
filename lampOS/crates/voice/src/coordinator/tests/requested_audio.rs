@@ -397,7 +397,12 @@ impl Test {
                 &mut queue,
                 accepted,
                 PlayoutStart::default(),
-                false,
+                notices::LocalOnly {
+                    speech: false,
+                    back: false,
+                    service: false,
+                    signed_out: false,
+                },
                 &mut self.trace,
                 |state| self.speaker.publish_speaker_snapshot(state),
             ),

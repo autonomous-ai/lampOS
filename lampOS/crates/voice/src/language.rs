@@ -11,7 +11,9 @@
 //! - the character's "Always speak English" becomes the chosen language's
 //!   ([`instruction`]); the call name stays "Lamp";
 //! - ElevenLabs speaks with [`SPEECH_MODEL`], which speaks all four, in the
-//!   language's voice from V1's table ([`Language::voice`]);
+//!   language's voice from V1's table ([`Language::voice`]); Korean keeps the
+//!   voice's own model, English's, in a voice of its own (Kanna,
+//!   [`Language::speech_model`]);
 //! - the English-only gates follow it: a cut-in with no English word is no
 //!   fragment, a turn heard in another script is asked again (#926) only in
 //!   a Latin-script language (Vietnamese), and the stop stream listens only
@@ -29,8 +31,8 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_LANGUAGE_FILE";
 /// The language last announced, one code a line; absent is English.
 pub const SAID_PATH: &str = "/var/lib/lampOS/voice/language-said";
 
-/// The ElevenLabs model for every language but English: it speaks ja, zh
-/// and ko (`docs/second-voice.md`, "The owner's language").
+/// The ElevenLabs model for Vietnamese, Japanese and Chinese
+/// (`docs/second-voice.md`, "The owner's language").
 pub const SPEECH_MODEL: &str = "eleven_flash_v2_5";
 
 /// The longest file taken: a code and a newline, with room to spare.
@@ -93,16 +95,26 @@ impl Language {
         }
     }
 
-    /// V1's first voice for it (`system/domain/device.go`'s
-    /// `elevenLabsVoicesByLang`), by its name in `net::tts`'s table. V1 had
-    /// no Korean voice: Korean keeps the lamp's own.
-    pub fn voice(self) -> Option<&'static str> {
+    /// Its voice, by its name in `net::tts`'s table: V1's first
+    /// (`system/domain/device.go`'s `elevenLabsVoicesByLang`) for vi, ja and
+    /// zh. V1 had no Korean voice: Kanna is a Korean native speaker's pick
+    /// from a listening test (#4473, 30 Oct).
+    pub fn voice(self) -> &'static str {
         match self {
-            Self::Vietnamese => Some("Ngan"),
-            Self::Japanese => Some("Shizuka"),
-            Self::Chinese => Some("Amy"),
-            Self::Korean => None,
+            Self::Vietnamese => "Ngan",
+            Self::Japanese => "Shizuka",
+            Self::Chinese => "Amy",
+            Self::Korean => "Kanna",
         }
+    }
+
+    /// The ElevenLabs model it is spoken with: [`SPEECH_MODEL`], or `None`
+    /// to keep the voice's own, English's (the product's
+    /// `eleven_v4_turbo`), with the speech tags English gets. Korean keeps
+    /// it: [`SPEECH_MODEL`] drops the pitch at the end of a Korean sentence,
+    /// and v4 ends it naturally (the same listening test).
+    pub fn speech_model(self) -> Option<&'static str> {
+        (self != Self::Korean).then_some(SPEECH_MODEL)
     }
 
     /// Whether the stop stream has words for it: #2939's Vietnamese
@@ -126,6 +138,235 @@ impl Language {
             Self::Korean => "이제부터 한국어로 말할게요.",
         }
     }
+}
+
+/// The product's failure notices' English words (`docs/failure-notices.md`,
+/// "The product's recordings"): the keys of [`FIXED_LINES`] for the lines
+/// the notices release holds. An English lamp plays the release's files,
+/// never these.
+pub const PROVIDER_UNAVAILABLE: &str =
+    "Sorry, I can't reach the internet right now. I'll be back soon.";
+pub const BACK_ONLINE: &str = "I'm back online.";
+pub const VOICE_SERVICE_UNREACHABLE: &str =
+    "Sorry, I'm having trouble thinking right now. Give me a moment.";
+pub const WIFI_LOST: &str = "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again.";
+pub const WIFI_RECOVERING: &str =
+    "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.";
+
+pub const SIGNED_OUT: &str = "I've been signed out. Please set me up again in the app.";
+
+/// The lamp's fixed lines (#4473 (c)), by their English words, in
+/// Vietnamese, Japanese, Chinese and Korean, in that order: said from the
+/// speech cache in the owner's language, English where a line is not kept.
+const FIXED_LINES: &[(&str, [&str; 4])] = &[
+    (
+        lamp_msgs::GOING_TO_SLEEP,
+        [
+            "Mình đi ngủ đây. Khi đèn chuyển sang màu xanh lá thì rút điện cho mình nhé.",
+            "おやすみなさい。ライトが緑になったら、プラグを抜いてね。",
+            "我要睡觉了。等灯变绿了，就可以拔掉电源了。",
+            "이제 잘게요. 불이 초록색으로 바뀌면 플러그를 뽑아 주세요.",
+        ],
+    ),
+    (
+        lamp_msgs::SLEEP_LINE,
+        [
+            "Mình ngủ đây. Chạm vào đầu mình để đánh thức nhé.",
+            "おやすみ。頭をタップしたら起きるよ。",
+            "我去睡了。拍拍我的头就能叫醒我。",
+            "잘게요. 제 머리를 한 번 톡 두드리면 깨어날게요.",
+        ],
+    ),
+    (
+        PROVIDER_UNAVAILABLE,
+        [
+            "Xin lỗi, giờ mình không kết nối được internet. Mình sẽ quay lại sớm thôi.",
+            "ごめんね、今インターネットにつながらないんだ。すぐ戻るね。",
+            "抱歉，我现在连不上网。很快就回来。",
+            "미안해요, 지금 인터넷에 연결할 수 없어요. 곧 돌아올게요.",
+        ],
+    ),
+    (
+        BACK_ONLINE,
+        [
+            "Mình kết nối lại rồi nhé.",
+            "またつながったよ。",
+            "我又连上网了。",
+            "다시 연결됐어요.",
+        ],
+    ),
+    (
+        VOICE_SERVICE_UNREACHABLE,
+        [
+            "Xin lỗi, mình đang hơi chậm một chút. Đợi mình một chút nhé.",
+            "ごめんね、今うまく考えられないんだ。ちょっと待ってね。",
+            "抱歉，我现在脑子有点转不过来。稍等我一下。",
+            "미안해요, 지금은 생각을 할 수가 없어요. 잠깐만 기다려 주세요.",
+        ],
+    ),
+    (
+        WIFI_LOST,
+        [
+            "Mình không kết nối được Wi-Fi nào cả. Nếu bạn đã đổi tên hoặc mật khẩu Wi-Fi, hãy dùng kẹp giấy ấn vào lỗ có chữ reset ở mặt sau đế đèn và giữ năm giây. Mình sẽ được đưa về cài đặt ban đầu để bạn cài lại từ đầu.",
+            "Wi-Fiにつながらないよ。Wi-Fiの名前かパスワードを変えたなら、台座の裏にある「reset」の穴にクリップを差し込んで、5秒間押し続けてね。データが消えて、最初から設定し直せるよ。",
+            "我连不上任何Wi-Fi。如果你改了Wi-Fi的名称或密码，请用回形针按住我底座背面标着reset的小孔五秒钟。这样会清除我的数据，重新开始设置。",
+            "와이파이에 연결할 수 없어요. 와이파이 이름이나 비밀번호를 바꿨다면, 받침대 뒷면에 '리셋'이라고 적힌 구멍을 클립으로 5초 동안 누르고 계세요. 그러면 제가 초기화되고 설정이 처음부터 다시 시작돼요.",
+        ],
+    ),
+    (
+        WIFI_RECOVERING,
+        [
+            "Mình không kết nối được Wi-Fi nên đã mở chế độ cài đặt. Bạn cài lại Wi-Fi cho mình trong ứng dụng nhé.",
+            "Wi-Fiにつながらないから、設定モードにしたよ。アプリでWi-Fiをもう一度設定してね。",
+            "我连不上Wi-Fi，已经打开了设置。请在App里重新帮我设置Wi-Fi。",
+            "와이파이에 연결할 수 없어서 설정 모드를 열었어요. 앱에서 와이파이를 다시 설정해 주세요.",
+        ],
+    ),
+    (
+        SIGNED_OUT,
+        [
+            "Mình đã bị đăng xuất. Bạn cài đặt lại cho mình trong ứng dụng nhé.",
+            "サインアウトされちゃった。アプリでもう一度設定してね。",
+            "我已经退出登录了。请在App里重新帮我设置。",
+            "로그아웃됐어요. 앱에서 다시 설정해 주세요.",
+        ],
+    ),
+    // The second route's own words before a look and a search (Thirteen's
+    // P2 on #4707): never English in a turn in the owner's language.
+    (
+        crate::second_provider::LOOKING,
+        [
+            "Để mình xem nào.",
+            "ちょっと見てみるね。",
+            "我看一下。",
+            "잠깐 볼게요.",
+        ],
+    ),
+    (
+        crate::second_provider::CHECKING,
+        [
+            "Để mình kiểm tra nhé.",
+            "ちょっと調べてみるね。",
+            "我查一下。",
+            "잠깐 확인해 볼게요.",
+        ],
+    ),
+    // Its down lines (`LAMP_SECOND_DOWN_LINE`) and a look that never began
+    // (`LAMP_SECOND_LOOK`), both on in the product: said in the owner's
+    // language too, never English to an owner who chose another (#4473).
+    (
+        crate::second_provider::DOWN_LINE,
+        [
+            "Xin lỗi, giờ mình đang nghĩ hơi chậm. Lát nữa hỏi lại mình nhé.",
+            "ごめんね、今ちょっと考えるのが遅くなってるんだ。少ししたらもう一度聞いてね。",
+            "抱歉，我现在反应有点慢。过一会儿再问我吧。",
+            "미안해요. 지금 대답이 좀 늦어지네요. 잠시 후 다시 물어봐 주세요.",
+        ],
+    ),
+    (
+        crate::second_provider::DOWN_LINE_AGAIN,
+        [
+            "Vẫn còn chậm, xin lỗi nhé.",
+            "まだ遅いんだ、ごめんね。",
+            "还是有点慢，抱歉。",
+            "아직도 대답이 늦네요. 미안해요.",
+        ],
+    ),
+    (
+        crate::second_provider::DOWN_LINE_CANNOT,
+        [
+            "Xin lỗi, giờ mình chưa trả lời được.",
+            "ごめんね、今は答えられないんだ。",
+            "抱歉，我现在没法回答。",
+            "미안해요, 지금은 대답할 수 없어요.",
+        ],
+    ),
+    (
+        crate::second_provider::COULD_NOT_LOOK,
+        [
+            "Mình không nhìn rõ được.",
+            "よく見えなかったよ。",
+            "我没看清楚。",
+            "잘 안 보였어요.",
+        ],
+    ),
+    // Its answer to a stop said over it (`LAMP_SPOKEN_STOP_ENDS`, on).
+    (
+        crate::spoken_stop::LINE,
+        [
+            "Được rồi, mình dừng ở đây nhé.",
+            "わかった、ここでやめるね。",
+            "好的，我就说到这儿。",
+            "알겠어요. 그만할게요.",
+        ],
+    ),
+    // What it says when a line by name gets no words twice
+    // (`LAMP_NO_WORDS_AGAIN`, off in the product; Tests' P3 on #4723).
+    (
+        crate::second_provider::NO_WORDS_LINE,
+        [
+            "Xin lỗi, mình bị mất lời rồi. Bạn hỏi lại mình được không?",
+            "ごめんね、言葉が出てこなかった。もう一度聞いてくれる？",
+            "抱歉，我刚才一下子说不出话了。你能再问我一次吗？",
+            "미안해요, 하려던 말을 놓쳤어요. 다시 한 번 물어봐 주세요.",
+        ],
+    ),
+    // The first stand's ask and its "here I go", sent to the say service as
+    // text (Fourth's finding on #4710). In another language than English it
+    // asks for the touch alone, never the spoken yes.
+    (
+        lamp_body::first_stand::ASK_TOUCH_ONLY,
+        [
+            "Mình muốn vươn vai lần đầu tiên. Khi nào bạn sẵn sàng thì đặt tay lên đầu mình nhé.",
+            "はじめて体を伸ばしてみたいな。準備ができたら、頭に手をのせてね。",
+            "我想第一次伸个懒腰。你准备好了，就把手放在我头上吧。",
+            "처음으로 몸을 좀 풀어 보고 싶어요. 준비되면 제 머리에 손을 살짝 올려 주세요.",
+        ],
+    ),
+    (
+        lamp_body::first_stand::GOING,
+        [
+            "Được rồi, mình bắt đầu đây.",
+            "よし、いくよ。",
+            "好，我开始啦。",
+            "좋아요, 시작할게요.",
+        ],
+    ),
+];
+
+impl Language {
+    /// Its place in each of [`FIXED_LINES`]' rows.
+    fn column(self) -> usize {
+        match self {
+            Self::Vietnamese => 0,
+            Self::Japanese => 1,
+            Self::Chinese => 2,
+            Self::Korean => 3,
+        }
+    }
+
+    /// The fixed line whose English words are `english`, in this language;
+    /// none for a line that is not one of [`FIXED_LINES`].
+    pub fn fixed(self, english: &str) -> Option<&'static str> {
+        FIXED_LINES
+            .iter()
+            .find(|(line, _)| *line == english)
+            .map(|(_, words)| words[self.column()])
+    }
+
+    /// Every fixed line in this language, for the speech cache to warm.
+    pub fn fixed_lines(self) -> impl Iterator<Item = &'static str> {
+        FIXED_LINES
+            .iter()
+            .map(move |(_, words)| words[self.column()])
+    }
+}
+
+/// `english`, a fixed line, as `language` says it: English as it is.
+pub fn fixed_in(language: Option<Language>, english: &'static str) -> &'static str {
+    language
+        .and_then(|language| language.fixed(english))
+        .unwrap_or(english)
 }
 
 /// The language in `text`; an unknown value is said and taken as English.
@@ -390,6 +631,70 @@ mod tests {
         ] {
             let heard = heard_in(route(), Some(language));
             assert_eq!(heard.stt_language.as_deref(), Some(language.code()));
+        }
+    }
+
+    /// #4473 (c): every fixed line has its own words in each language, none
+    /// left English; English keeps the English, byte for byte.
+    #[test]
+    fn each_fixed_line_has_its_words_in_each_language() {
+        assert_eq!(FIXED_LINES.len(), 18);
+        for (english, _) in FIXED_LINES {
+            assert_eq!(fixed_in(None, english), *english);
+        }
+        assert_eq!(fixed_in(Some(Language::Japanese), "Hello."), "Hello.");
+        for language in [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+        ] {
+            let lines: Vec<_> = language.fixed_lines().collect();
+            assert_eq!(lines.len(), FIXED_LINES.len());
+            for ((english, _), words) in FIXED_LINES.iter().zip(&lines) {
+                assert!(!words.trim().is_empty(), "{language:?}");
+                assert_ne!(words, english, "{language:?}");
+                assert_eq!(language.fixed(english), Some(*words));
+                assert_eq!(fixed_in(Some(language), english), *words);
+            }
+            assert_eq!(language.fixed("Hello."), None);
+        }
+        assert_eq!(
+            Language::Vietnamese.fixed(lamp_msgs::SLEEP_LINE),
+            Some("Mình ngủ đây. Chạm vào đầu mình để đánh thức nhé.")
+        );
+        // The second route's look and search lines (#4707's P2).
+        assert_eq!(
+            fixed_in(Some(Language::Japanese), crate::second_provider::CHECKING),
+            "ちょっと調べてみるね。"
+        );
+        assert_eq!(
+            fixed_in(None, crate::second_provider::LOOKING),
+            crate::second_provider::LOOKING
+        );
+        // The first stand's ask and "here I go" (#4710).
+        assert_eq!(
+            fixed_in(Some(Language::Korean), lamp_body::first_stand::GOING),
+            "좋아요, 시작할게요."
+        );
+        assert_eq!(
+            fixed_in(None, lamp_body::first_stand::ASK_TOUCH_ONLY),
+            lamp_body::first_stand::ASK_TOUCH_ONLY
+        );
+    }
+
+    /// The first stand reads the voice's language file, and takes a language
+    /// as not English exactly where the voice does.
+    #[test]
+    fn the_first_stand_reads_the_language_as_the_voice_does() {
+        use lamp_body::first_stand::{LANGUAGE_FILE, speaks_other_than_english};
+        assert_eq!(LANGUAGE_FILE, FILE_ENVIRONMENT);
+        for text in ["", "en", "vi", "ja\n", "zh", " ko ", "fr", "JA"] {
+            assert_eq!(
+                speaks_other_than_english(Some(text)),
+                matches!(Language::parse(text), Ok(Some(_))),
+                "{text:?}"
+            );
         }
     }
 

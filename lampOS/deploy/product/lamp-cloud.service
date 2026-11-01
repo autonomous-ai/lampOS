@@ -45,6 +45,9 @@ Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
 # the other broker-held changes for the broker connection's TLS (LAMP_CLOUD_TLS, docs/cloud.md).
 Environment=LAMP_SETTINGS_CHANGE=on
 Environment=LAMP_SKILLS_PAGE=on
+# A skill typed in the app (#2813, fourteen-P15): `can` names skills.make only while lamp-voice's maker
+# has a computer to hand it to (make_skill::watch, asked every 60 s).
+Environment=LAMP_APP_MAKE_SKILL=on
 # Health and crash reports to the company (#2862, docs/cloud.md, "Health and crash reports"): only after
 # the person's yes at setup (share_reports) or from the app (reports.set). With no recorded yes, nothing
 # is sent; a reset wipes the choice.
@@ -54,6 +57,7 @@ Environment=LAMP_REPORTS=on
 Environment=LAMP_SKILLS_STORE=off
 EnvironmentFile=-/etc/lampOS/skills/store.env
 Environment=LAMP_APP_UPDATE=on
+# LAMP_SHUTDOWN stays off until the button's check on a product lamp (#3697); the first builder, 31 Oct.
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

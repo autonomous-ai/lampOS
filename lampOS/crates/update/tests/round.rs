@@ -60,6 +60,8 @@ mod product_companions;
 mod restart_order;
 #[path = "round/restart_quiet.rs"]
 mod restart_quiet;
+#[path = "round/self_after_parts.rs"]
+mod self_after_parts;
 #[path = "round/self_cuts.rs"]
 mod self_cuts;
 #[path = "round/self_recovery.rs"]
@@ -2515,6 +2517,7 @@ fn app_turns(lamp: &Lamp, way: &str, name: &str) -> String {
         &lamp.root.join("var/lib/lampos-skills-state"),
         std::time::Duration::from_secs(1),
         None,
+        None,
         format!("{{\"{way}\": \"{name}\"}}\n").as_bytes(),
         &mut answer,
     )
@@ -3365,7 +3368,8 @@ fn no_second_round_begins_while_lamp_updates_own_switch_waits() {
         lamp.back(update_unit("failed", "failed"), u64::MAX),
         own::Back::Busy
     );
-    assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    // Not a failure: nothing was tried, and the next round tries again.
+    assert!(matches!(lamp.round(), Outcome::NotQuiet(_)));
     assert_eq!(lamp.own_build(), new);
     drop(held);
 

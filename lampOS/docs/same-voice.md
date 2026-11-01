@@ -603,6 +603,37 @@ the call (#2341), which may be someone who never called; and a moving mouth
 is not the sound's source, so lips moving under a TV voice pass too.
 Not yet run on a lamp.
 
+## The asker's voice (#4306, 30 October)
+
+The conversation's voice is for the rule, and a line let out as the
+conversation going on can add to it (above). For the Policy the voice
+keeps one more print: the asker's, the print of the line that began the
+conversation (`Voices::like_asker`). It is the print of a line let out for
+itself, or, with the caller's voice only, of the first going-on line seen
+spoken by the caller when the call was too short to print. A line let out
+only as the conversation going on never becomes it, so a second person
+whose line was taken for the conversation's is never the asker. A
+conversation of its own begins it afresh: a new call's print is the asker
+from then on, and a call too short to print leaves none.
+
+For each request, `attention/addressed` then says `like_asker`: the cosine
+of the request's print against the asker's, from -1 to 1. It is read
+without using up the line's one judgement, and is left out while no
+conversation is going on (the voice's thread has no exchange with the
+lamp's words in it from the last 45 s), while
+either print is not known, and without the check. The prints stay in the
+voice; only the number is told. No rule in the voice reads it. On
+lamp-4ace's played rounds (#4306, 30 Oct) a follow-up and desk talk inside
+a conversation looked alike to the Policy's seven questions; whose voice it
+is should tell them apart, and the Policy's weight for it stays 0 until it
+is fitted on a lamp's run with the sign ([policy.md](policy.md), "How
+alike to the asker").
+
+Shown in tests only (`like_asker_is_against_the_line_that_began_the_conversation_alone`,
+`like_asker_is_told_only_in_a_conversation_and_high_in_the_askers_voice`):
+no unit in `deploy/` sets `LAMP_SAME_VOICE_MODEL` or `LAMP_ADDRESSED`
+yet, and the voice says `like_asker` only with both.
+
 ## Not shown
 
 - **People.** Every voice was synthetic and played from one loudspeaker.

@@ -187,6 +187,36 @@ original acquisition or the current controller deadline, whichever comes first.
 The controller's existing maximum authority lease is 250 ms: if the main owner
 stalls but this child and Controls continue, that controller deadline still
 limits renewal. A blocked/dead privacy child cannot renew the shorter Bus lease.
+The muted wait (`service_privacy_controls`) sends the worker its first
+authority as soon as it has read the worker's Ready, with no rate holding it
+back, and then in each look (`Waiting::step`) before its gate and between the
+gate's checks (the reminders, the say socket's refusal, the light, the
+controls, the owed reminder and the health), at most every 50 ms, as well as
+after the gate as before (#4332). A refused renewal says which it was at the
+end of its line: `(renewal after Ready)`, `(renewal before the gate)`,
+`(renewal in the gate after <check>)` or `(renewal after the gate)`.
+That authority is always the wait's microphone and camera **Denied**, so a
+renewal grants nothing.
+
+The privacy worker rides a lapse of a lease that grants nothing
+(`DeniedLapse` in `privacy_bus.rs`, #4332): when the authority it holds has
+expired, or one comes already expired from its queue, and that snapshot has
+the microphones and the camera both Denied and no turn, the worker skips it
+and publishes nothing until a fresh authority comes. The journal then says
+`lamp-voice: privacy worker re-armed its denied lease after <N> ms lapsed
+(microphones and camera stayed closed)`, once per lapse. Each pass looks at
+its authority twice: before its Bus I/O, and again after it at the stamp the
+lease would take, and it publishes only on that second look, so a lease that
+lapsed while the board stalled in the I/O is ridden too, not published with
+its lapsed expiry (which its own check refuses). A lapse ridden
+1.5 s from its expiry (`DENIED_LAPSE_MOST_US`) still ends the worker with
+`privacy controller lease expired`, and so does a lapse of any lease that
+grants the microphones or the camera, or leaves either Unknown, and no
+authority within 250 ms of the worker's start. The switch's own checks run
+on every look, ride or not: a stale or missing reading, or the publisher
+gone or late, ends the worker as before. A worker that ended abnormally
+still ends the wait with an error that is not an unreadable switch, so the
+voice exits and the restart guard counts it.
 
 Ears also holds Voice to its latch: once a `voice/privacy` session has reported
 the switch closed, Ears refuses any later permit from that session, and only a
@@ -329,7 +359,7 @@ reading a no-slide lease finds it invalid (a permit with unknown physical
 state, or an acquisition with no level) and stays closed.
 
 Tests: `crates/controls/tests/it/no_slide.rs`, the no-slide tests in
-`crates/voice/tests/privacy_controls.rs` and `privacy_pipeline.rs`,
+`crates/voice/tests/it/privacy_controls.rs` and `privacy_pipeline.rs`,
 `crates/msgs/tests/it/privacy.rs` and `controls.rs`, and Ears'
 `a_no_slide_lease_opens_capture_and_expires_at_its_observation` and
 `a_no_slide_observation_regression_is_refused`. The real worker's

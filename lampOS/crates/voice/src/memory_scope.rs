@@ -468,6 +468,19 @@ struct RequestContext {
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
+    /// Carried as a person's conversation going on, no face seen speaking
+    /// it (#4339, [`ScopeLease::carry_conversation`]): that person's scope
+    /// held ([`ScopeSnapshot::held`]) from then on, unless narrowed.
+    carried: OnceLock<ScopeSnapshot>,
+    /// Carried, its keep waits for that conversation's person's yes
+    /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`ScopeLease::save_carried`]).
+    carried_saves: AtomicBool,
+    /// The known person (a memory id) whose face was the one face in view
+    /// through this line, none seen speaking it, and no other voice heard
+    /// (`LAMP_PERSON_SCOPE_ONE_FACE`, [`ScopeLease::take_by_one_face`]): its
+    /// `remember` goes to their scope, and nothing else does. Its reads stay
+    /// the room's. Cleared by any narrow after it ([`ScopeLease::narrow_to_room`]).
+    one_face: Mutex<Option<Arc<str>>>,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -523,6 +536,9 @@ impl RequestScope {
             context: Arc::new(RequestContext {
                 key,
                 scope,
+                carried: OnceLock::new(),
+                carried_saves: AtomicBool::new(false),
+                one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -567,6 +583,9 @@ impl RequestScope {
             context: Arc::new(RequestContext {
                 key,
                 scope,
+                carried: OnceLock::new(),
+                carried_saves: AtomicBool::new(false),
+                one_face: Mutex::new(None),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
@@ -610,6 +629,8 @@ impl ScopeLease {
         self.is_current().then(|| {
             if self.context.narrowed.load(Ordering::Acquire) {
                 &self.context.room
+            } else if let Some(carried) = self.context.carried.get() {
+                carried
             } else {
                 &self.context.scope
             }
@@ -620,7 +641,75 @@ impl ScopeLease {
     /// every later boundary reads the room. One way only; nothing widens a
     /// scope again.
     pub fn narrow_to_room(&self) {
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         self.context.narrowed.store(true, Ordering::Release);
+        *one_face = None;
+    }
+
+    /// A line no face was seen speaking, with nothing to say it was anyone
+    /// else's, in the conversation `person` (a memory id) is in (#4339): told
+    /// from that conversation as it stood, as a line held by a face's gap is
+    /// ([`ScopeSnapshot::held`]). On lamp-3e83 one such line of the owner's
+    /// dropped to the room's and the chat lost the talk and asked its
+    /// question again; on lamp-06c1 (29 Oct) 13 of 68 turns with the person
+    /// in view throughout were not theirs, 5 of them admitted as the room's
+    /// with no face named at all. So a line admitted as `person`'s, or as the
+    /// room's, may be carried; one admitted as someone else's may not. Held,
+    /// it is their thread and the exchanges before it, and never memory's
+    /// reads, a keep, a forget or a yes, and never journalled: no memory
+    /// authority is widened, only the conversation it is told. `false`, and
+    /// nothing changed, for a revoked or narrowed line, one admitted as
+    /// another person's, or one already carried for another; a later
+    /// [`Self::narrow_to_room`] still narrows it.
+    pub fn carry_conversation(&self, person: &str) -> bool {
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.person().is_some_and(|own| own != person)
+        {
+            return false;
+        }
+        let held = ScopeSnapshot {
+            person: Some(Arc::from(person)),
+            held: true,
+        };
+        let carried = self.context.carried.get_or_init(|| held);
+        carried.person() == Some(person)
+    }
+
+    /// A carried line ([`Self::carry_conversation`]) may save: its
+    /// `remember` is held, in memory only, for the carried person's yes,
+    /// their own face seen saying it, and then written in their scope, the
+    /// conversation's own (`LAMP_CONVERSATION_CARRIED_SAVES`, #4339,
+    /// approved 30 Oct; the first builder's call on #4508). Nothing is
+    /// written or journalled from the carried line itself, and its scope
+    /// stays held ([`ScopeSnapshot::held`]): no recall, note or hits, no
+    /// forget and no yes. `false`, and nothing changed, for a line not
+    /// carried, narrowed, revoked, or admitted held only by a face's gap.
+    pub fn save_carried(&self) -> bool {
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.held
+            || self.context.carried.get().is_none()
+        {
+            return false;
+        }
+        self.context.carried_saves.store(true, Ordering::Release);
+        true
+    }
+
+    /// The carried person whose yes this line's keep waits for
+    /// ([`Self::save_carried`]): while current, not narrowed, and only for
+    /// a line marked to save.
+    pub fn saves_carried(&self) -> Option<&str> {
+        (self.is_current()
+            && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.carried_saves.load(Ordering::Acquire))
+        .then(|| self.context.carried.get().and_then(ScopeSnapshot::person))
+        .flatten()
     }
 
     /// A line narrowed to the room whose admitted person's face was alone in
@@ -633,6 +722,74 @@ impl ScopeLease {
         self.context.named.store(true, Ordering::Release);
     }
 
+    /// A line admitted as a known person's, theirs only by the one-face rule
+    /// (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers' item 1 on #3997):
+    /// their known face the one face in view, none seen speaking it, and no
+    /// other voice heard in the conversation. Narrowed to the room, so every
+    /// read (recall, hits, the memory note, the person's context, their
+    /// thread) is the room's; only its `remember` goes to their scope
+    /// ([`Self::kept_by_one_face`]). A guest off camera who begins a
+    /// conversation while they sit silent reads the same, so their memory
+    /// is never read on it (reviewer-three's P1 on #4584, option 2). `false`,
+    /// and nothing changed, for a revoked line or one admitted as nobody's.
+    pub fn take_by_one_face(&self) -> bool {
+        let Some(person) = self.context.scope.person().filter(|_| self.is_current()) else {
+            return false;
+        };
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        self.context.narrowed.store(true, Ordering::Release);
+        *one_face = Some(Arc::from(person));
+        true
+    }
+
+    /// [`Self::take_by_one_face`] for a line admitted as the room's whose
+    /// known face the eyes named late (#2807): its `remember` goes to
+    /// `person`'s scope, its reads and every other call stay the room's.
+    /// `false`, and nothing changed, for a revoked, narrowed or carried line,
+    /// or one admitted as someone's.
+    pub fn keep_for_one_face(&self, person: &str) -> bool {
+        let mut one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if !self.is_current()
+            || self.context.narrowed.load(Ordering::Acquire)
+            || self.context.carried.get().is_some()
+            || self.context.scope.person().is_some()
+        {
+            return false;
+        }
+        *one_face = Some(Arc::from(person));
+        true
+    }
+
+    /// Whose scope this line's `remember` goes to by the one-face rule
+    /// ([`Self::take_by_one_face`], [`Self::keep_for_one_face`]), while the
+    /// lease is current and no narrow came after. Never a read, a forget or
+    /// a yes: only a keep reads it.
+    pub fn kept_by_one_face(&self) -> Option<String> {
+        if !self.is_current() {
+            return None;
+        }
+        self.context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_deref()
+            .map(str::to_owned)
+    }
+
+    /// Whether this line's keep is someone's by the one-face rule
+    /// ([`Self::kept_by_one_face`]): a held forget's yes on it is never one.
+    pub fn by_one_face(&self) -> bool {
+        self.kept_by_one_face().is_some()
+    }
+
     /// The admitted person whose name a narrowed line's reply is told
     /// ([`Self::name_for_reply`]), while the lease is current. Never
     /// authority to act: every memory boundary reads [`Self::scope`].
@@ -642,6 +799,17 @@ impl ScopeLease {
             && self.context.named.load(Ordering::Acquire))
         .then(|| self.context.scope.person())
         .flatten()
+    }
+
+    /// The person (a memory id) this line is carried for as their
+    /// conversation going on ([`Self::carry_conversation`], #4339), while
+    /// the lease is current and not narrowed. Never authority to act: only
+    /// the by-default name reads it, for the reply (`person::someone_else_now`).
+    pub fn carried_for(&self) -> Option<&str> {
+        (self.is_current() && !self.context.narrowed.load(Ordering::Acquire))
+            .then(|| self.context.carried.get())
+            .flatten()
+            .and_then(ScopeSnapshot::person)
     }
 
     /// The known person this line was admitted as, whatever came after:
@@ -791,6 +959,11 @@ impl ScopeLease {
     /// forget reads this; recall and other calls retain the admitted scope.
     pub fn keeper_within(&self, wait: Duration) -> Option<String> {
         self.context.late.as_ref()?;
+        // A carried line's keep is the carried conversation's, never a face
+        // named late (`LAMP_CONVERSATION_CARRIED_SAVES`).
+        if self.context.carried.get().is_some() && !self.context.narrowed.load(Ordering::Acquire) {
+            return None;
+        }
         let until = Instant::now() + wait;
         loop {
             let late = self.late_open()?;
@@ -810,6 +983,132 @@ impl ScopeLease {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    /// #4339: a line carried as a person's conversation reads their scope
+    /// held ([`ScopeSnapshot::held`]): their thread, never memory's reads.
+    /// A person's own line or a room's line may be carried; one admitted as
+    /// someone else's, a narrowed or a revoked line may not, and a narrow
+    /// still narrows a carried one.
+    #[test]
+    fn a_carried_line_reads_their_scope_held_and_still_narrows() {
+        let (a, b) = (ScopeSnapshot::of("A"), ScopeSnapshot::of("B"));
+        let a_id = a.person().unwrap().to_owned();
+        let own = RequestScope::new(key(1), a.clone());
+        let lease = own.lease();
+        assert_eq!(lease.carried_for(), None, "not carried yet");
+        assert!(lease.carry_conversation(&a_id));
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::held_of("A")));
+        assert_eq!(lease.carried_for(), Some(a_id.as_str()));
+        lease.narrow_to_room();
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        assert_eq!(lease.carried_for(), None, "a narrow ends it");
+        // A room's line, in A's conversation going on (06c1: no face named).
+        let room = RequestScope::new(key(2), ScopeSnapshot::room());
+        assert!(room.lease().carry_conversation(&a_id));
+        assert_eq!(room.lease().scope(), Some(&ScopeSnapshot::held_of("A")));
+        assert!(
+            !room.lease().carry_conversation(b.person().unwrap()),
+            "carried once"
+        );
+        let theirs = RequestScope::new(key(3), b);
+        assert!(!theirs.lease().carry_conversation(&a_id), "someone else's");
+        assert_eq!(theirs.lease().scope(), Some(&ScopeSnapshot::of("B")));
+        let narrowed = RequestScope::new(key(4), a.clone());
+        narrowed.lease().narrow_to_room();
+        assert!(!narrowed.lease().carry_conversation(&a_id), "never widened");
+        assert_eq!(narrowed.lease().scope(), Some(&ScopeSnapshot::room()));
+        let revoked = RequestScope::new(key(5), a);
+        let lease = revoked.lease();
+        assert!(lease.carry_conversation(&a_id));
+        revoked.revoke();
+        assert!(!lease.carry_conversation(&a_id), "revoked");
+        assert_eq!(lease.carried_for(), None, "revoked");
+    }
+    /// `LAMP_PERSON_SCOPE_ONE_FACE` (reviewer-three's P1 on #4584, option
+    /// 2): a line A's only by the one-face rule reads the room's, and only
+    /// its keep is A's. A narrow after it ends the keep; a revoked line, or
+    /// one admitted as nobody's, takes none. A room's line named late keeps
+    /// for that face, unless narrowed, carried or admitted as someone's.
+    #[test]
+    fn a_one_face_line_reads_the_room_and_keeps_only_for_its_person() {
+        let a = ScopeSnapshot::of("A");
+        let a_id = a.person().unwrap().to_owned();
+        let own = RequestScope::new(key(21), a.clone());
+        let lease = own.lease();
+        assert_eq!(lease.kept_by_one_face(), None);
+        assert!(lease.take_by_one_face());
+        assert_eq!(
+            lease.scope(),
+            Some(&ScopeSnapshot::room()),
+            "reads: the room's"
+        );
+        assert_eq!(lease.kept_by_one_face(), Some(a_id.clone()), "keeps: A's");
+        assert!(lease.by_one_face());
+        assert_eq!(lease.carried_for(), None);
+        assert!(!lease.carry_conversation(&a_id), "never widened after");
+        lease.narrow_to_room();
+        assert_eq!(lease.kept_by_one_face(), None, "a narrow ends the keep");
+        let room = RequestScope::new(key(22), ScopeSnapshot::room());
+        assert!(!room.lease().take_by_one_face(), "nobody's");
+        assert_eq!(room.lease().kept_by_one_face(), None);
+        assert!(room.lease().keep_for_one_face(&a_id), "named late");
+        assert_eq!(room.lease().scope(), Some(&ScopeSnapshot::room()));
+        assert_eq!(room.lease().kept_by_one_face(), Some(a_id.clone()));
+        let carried = RequestScope::new(key(23), ScopeSnapshot::room());
+        assert!(carried.lease().carry_conversation(&a_id));
+        assert!(!carried.lease().keep_for_one_face(&a_id), "carried wins");
+        let narrowed = RequestScope::new(key(24), ScopeSnapshot::room());
+        narrowed.lease().narrow_to_room();
+        assert!(!narrowed.lease().keep_for_one_face(&a_id), "narrowed");
+        assert!(
+            !own.lease().keep_for_one_face(&a_id),
+            "admitted as someone's"
+        );
+        let revoked = RequestScope::new(key(25), a);
+        let lease = revoked.lease();
+        assert!(lease.take_by_one_face());
+        revoked.revoke();
+        assert_eq!(lease.kept_by_one_face(), None, "revoked");
+        assert!(!lease.take_by_one_face(), "revoked");
+    }
+    /// `LAMP_CONVERSATION_CARRIED_SAVES` (#4339): only a carried line may
+    /// save, and only into the carried person's scope; not one narrowed,
+    /// revoked, never carried, or admitted held only by a face's gap. A
+    /// narrow after it ends the save. A carried line's keep never goes to a
+    /// face named late.
+    #[test]
+    fn only_a_carried_line_saves_and_only_as_the_carried_person() {
+        let a = ScopeSnapshot::of("A");
+        let a_id = a.person().unwrap().to_owned();
+        let room = RequestScope::new(key(11), ScopeSnapshot::room());
+        let lease = room.lease();
+        assert!(!lease.save_carried(), "not carried");
+        assert_eq!(lease.saves_carried(), None);
+        assert!(lease.carry_conversation(&a_id));
+        assert!(lease.save_carried());
+        assert_eq!(lease.saves_carried(), Some(a_id.as_str()));
+        assert!(lease.scope().unwrap().held(), "still held: no reads");
+        lease.narrow_to_room();
+        assert_eq!(lease.saves_carried(), None, "narrowed");
+        let gap = RequestScope::new(key(12), ScopeSnapshot::held_of("A"));
+        assert!(gap.lease().carry_conversation(&a_id));
+        assert!(!gap.lease().save_carried(), "admitted held by a gap");
+        assert_eq!(gap.lease().saves_carried(), None);
+        let revoked = RequestScope::new(key(13), a.clone());
+        let lease = revoked.lease();
+        assert!(lease.carry_conversation(&a_id));
+        revoked.revoke();
+        assert!(!lease.save_carried(), "revoked");
+        // A room's line looking later, its keeper recorded as B, carried as
+        // A's: its keep is A's, never B's.
+        let cache = Arc::new(FaceCache::default());
+        let late = RequestScope::looking_later(key(14), ScopeSnapshot::room(), cache);
+        let lease = late.lease();
+        lease.record_keeper(Some(crate::remember::person_id("B")));
+        assert!(lease.carry_conversation(&a_id));
+        assert!(lease.save_carried());
+        assert_eq!(lease.keeper_within(Duration::ZERO), None);
+    }
     fn key(worker: u8) -> RequestKey {
         RequestKey {
             worker: BootId::new([worker; 16]).unwrap(),
@@ -1750,6 +2049,82 @@ mod tests {
             .unwrap();
         assert!(read(&cache));
         assert!(cache.is_cold(Instant::now()));
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// A refresh as the worker runs it: the known file's mark, then its
+    /// observation, both from the file (#4493).
+    fn refresh_from(cache: &FaceCache, known: &std::path::Path) -> bool {
+        let mut token = cache.begin_refresh();
+        let changed = cache.known_file_read(
+            &mut token,
+            crate::known_faces::KnownMark::read(known),
+            Instant::now(),
+        );
+        cache.replace_seen(
+            token,
+            crate::known_faces::FaceObservation::read(known),
+            None,
+        );
+        changed
+    }
+
+    fn known_in(label: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let directory = std::env::temp_dir().join(format!(
+            "known-{label}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let known = directory.join("known");
+        (directory, known)
+    }
+
+    /// #4493's guard: the eyes renewing a held name (its time only, the same
+    /// words) is no change, so the cache stays warm and names them.
+    #[test]
+    fn the_same_words_renewed_keep_the_face_cache_warm() {
+        let (directory, known) = known_in("renewed");
+        std::fs::write(&known, "Alpha\n").unwrap();
+        let cache = FaceCache::default();
+        cache.went_cold(Instant::now());
+        assert!(
+            !refresh_from(&cache, &known),
+            "the first read sets the mark"
+        );
+        assert!(!cache.is_cold(Instant::now()));
+        for _ in 0..10 {
+            std::fs::File::options()
+                .write(true)
+                .open(&known)
+                .unwrap()
+                .set_modified(std::time::SystemTime::now())
+                .unwrap();
+            assert!(!refresh_from(&cache, &known));
+            assert!(!cache.is_cold(Instant::now()));
+            assert!(cache.snapshot(Instant::now()).person().is_some());
+        }
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// #4493's guard: a known file removed (a missed check) names nobody,
+    /// and it and the write back are two changes, each making the cache cold.
+    #[test]
+    fn a_removed_known_file_names_nobody_and_goes_cold_twice() {
+        let (directory, known) = known_in("removed");
+        std::fs::write(&known, "Alpha\n").unwrap();
+        let cache = FaceCache::default();
+        cache.went_cold(Instant::now());
+        assert!(!refresh_from(&cache, &known));
+        assert!(cache.snapshot(Instant::now()).person().is_some());
+        std::fs::remove_file(&known).unwrap();
+        assert!(refresh_from(&cache, &known), "the removal");
+        assert!(cache.is_cold(Instant::now()));
+        assert_eq!(cache.snapshot(Instant::now()), ScopeSnapshot::room());
+        std::fs::write(&known, "Alpha\n").unwrap();
+        assert!(refresh_from(&cache, &known), "the write back");
+        assert!(cache.snapshot(Instant::now()).person().is_some());
         std::fs::remove_dir_all(&directory).unwrap();
     }
 }

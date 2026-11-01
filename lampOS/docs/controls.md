@@ -67,7 +67,8 @@ the button and the reset are unchanged.
   on `controls/touch` and its source on `controls/touch_state`. Their
   readers (Voice's hand controls, onboarding and bus out, Expression,
   `lamp-setup`, the self-test's touch by hand, cloud skills' `touch`
-  trigger) see no strip event while the switch is off. Tests:
+  trigger, `lamp-skills`, whose runs a touch stops, and `lamp-control`,
+  which passes it on) see no strip event while the switch is off. Tests:
   `tests/it/touch_runtime.rs`
   (`the_strip_switch_off_means_no_strip_event_with_a_hand_on_it`,
   `the_strip_timing_is_the_boards_and_defaults_without_it`).
@@ -202,6 +203,74 @@ poll. Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
 mute), since a tap on the head is how it wakes: without it the function is
 not declared at all, and the journal says so once. A held line's call is
 refused, as every action's is.
+
+**Without `go_to_sleep`** (the switch off, or no head sleep), the model is
+told it cannot put itself to sleep because someone asks: asked to sleep, or
+to rest until the person comes back, it does not agree or say good night as
+if it will (a launch lamp said "Rest well, … I'll keep the light warm till
+you're back" and stayed awake), and says that a hand rested on its head for
+three seconds puts it to sleep and a tap wakes it. With it the rule that it
+never agrees to something it has no function for (`lamp-voice`'s
+`without_a_tool`, #4595).
+On the Live route it follows the session's functions, on the second route
+the flag; with `go_to_sleep` declared it is not told.
+
+**The hold says the line (#3748 part 1, `LAMP_SLEEP_LINE=on`, off unless
+on).** At the hold's 2 s mark the voice plays the line "Going to sleep. Tap
+my head to wake me." (`lamp_msgs::SLEEP_LINE`, the same words as the
+`go_to_sleep` function's) in place of the falling breath, as the same sound
+turn of its own. The line comes from the voice's speech cache
+(speaking-first.md, "A cached line"): rendered once at start in the product
+voice through the voice's speech service (`tts_cache::WARM`) and kept on the
+lamp, so it plays offline. The coordinator reads it at each hold, from the
+file only, never waiting on a render, so a line rendered after the
+conversation started plays at the next hold; with an owner's language
+other than English, the line in that language when kept, the English
+otherwise (#4473 (c), second-voice.md, "The fixed lines"). If it isn't kept yet (no
+speech cache, not rendered yet, or its render failed), the breath plays as
+without the switch, and the journal says so. Either way the sleep now waits for that cue: the 3 s Hold no longer
+mutes at once, it makes the sleep owed (`HandControls::land_owed_sleep`),
+and the mute, the microphones closing and the asleep face come once the
+cue has played whole, or 6 s after the Hold if it still sounds
+(`SLEEP_OWED_CAP_US`). The coordinator says before each poll whether the
+cue still sounds (`HandControls::sleep_cue_sounding`); a poll it doesn't
+say so lands the owed sleep, so a hold seen between conversations, or with
+no cue played, sleeps at once. Letting go before the Hold, before 3 s, cuts
+the cue at once, as a head touch cuts speech (`head_stop`), and no sleep
+follows. Letting go after the Hold changes nothing: the sleep is decided.
+A tap or new speech while it is owed doesn't cancel it either: it still
+lands when the cue's turn ends, which the tap's own stop may end early.
+The owed sleep is asked with the time the hand arrived, so a hand that woke
+the lamp (a kept hand's wake at the stroke) and stays past 3 s still cannot
+send it back. **Privacy:** with the switch on, the mute and the microphones
+closing move from the 3 s Hold to the cue's end, at most 6 s after the
+Hold. The microphones stay open past the person's hold for that time, and
+speech in that window does not cancel the sleep. Not
+while onboarding is under way, as above, and a pet asks no Hold
+(`LAMP_HEAD_PET`). The journal says when the line starts (ms after the
+hold's 2 s), when the owed sleep lands (ms after the cue ended, or at the
+cap) and when a letting go cuts it. With the switch off, the hold sleeps at
+3 s and cuts the breath, as before.
+
+**Asked aloud, the same line (#3748 part 3, `LAMP_SLEEP_LINE=on` with
+`LAMP_SLEEP_ASKED=on`).** When the model calls `go_to_sleep` and the line
+is kept in the speech cache (the same lookup a hold makes,
+`TtsCache::sleep_line`), the voice cuts the model's turn as the shutdown's
+last words cut it (`cut_for_last_words`: the speaker revoked first, as a
+hand's Stop revokes it, so any of the model's audio still queued is an
+expected discard, reason `last_words`, never a cancelled tail kept for the
+next turn; lamp-52e6 on 30 Oct ended its voice on that) and plays the
+recorded line as the hold's sound turn (`SpeechOrigin::SleepBreath`, basis `asked_sleep_line`),
+so it is the same line, word for word, each time. The sleep is then owed as
+a hold's is (`HandControls::owe_sleep`, `land_owed_sleep`): it lands once
+that cue is no longer sounding, or 6 s after the ask, and speech meanwhile
+does not cancel it: a person who speaks over the line cuts it as any
+interruption does, and the owed sleep lands as soon as the cue stops, as
+after a hold, cutting what they began to say. The model is still told the words; what it says of
+them is never played. With the line not kept, or no hand controls, the
+model says the line and `SleepOwed` waits for it, as above. The journal
+says "the sleep line plays in the model's place" and "a sleep asked aloud:
+its owed sleep lands N ms after its cue ended".
 
 Sleep and Wake are separate, idempotent requested transitions. They never
 toggle microphone mute. First's 18:23 decision in
@@ -477,8 +546,12 @@ mean a newly acquired sample.
 ### Reader, startup and shutdown
 
 The new pins schema has `chip`, `buttons`, `head_pads`, `every_ms`, optional
-`reset`, optional `base` and optional `legacy_head` (false unless set; see
-above). Only chip 0 is allowed. Optional primary is line 99; reset is
+`reset`, optional `base`, optional `legacy_head` (false unless set; see
+above), and the optional head and strip timings (`head_qualify_ms`,
+`head_tap_min_ms`, `head_gap_ms`, `strip_qualify_ms`, `strip_release_ms`,
+`strip_stroke_ms`, `strip_sleep_ms`), `head_rest` and `privacy`
+(`crates/controls/src/touch_pins.rs`). Only chip 0 is allowed for the
+buttons and pads; `privacy` names its own chip. Optional primary is line 99; reset is
 active-low line 100, pulled up, in its own field. Head candidates are
 37/96/97/98, selected and polarized per unit. Names/lines are unique. The
 buttons match the Controls configuration's. The head pads are the pins
@@ -489,7 +562,10 @@ product's pins naming four. The pins decide the head pads; the settings
 only check the names both give. So a settings file naming none no longer
 keeps the head off beside pins that name some. A Controls that refused to
 start would close the microphones on the privacy route. The privacy
-switch, chip 1 line 9, remains Voice's. A base requires `base_selected_mask`
+switch, chip 1 line 9, is Controls' with `LAMP_PRIVACY_CONTROLS=on`, as the
+product's units set it: the pins file's `privacy`, and Voice leases the
+microphones from Controls ([privacy-switch.md](privacy-switch.md)). Without
+the switch it stays Voice's. A base requires `base_selected_mask`
 to exactly match its working
 electrodes (4095 for all twelve, 3823/0x0EEF for lamp-4ace's ten), and a complete
 explicit profile: twelve independently specified touch thresholds and twelve
@@ -505,8 +581,9 @@ number, not by position in the working list. Each release threshold is below
 that electrode's touch threshold.
 
 An I²C child does all reset, calibration and reads. The parent runs GPIO and
-the nonblocking socket, draining at most 32 acquisitions from each per 2 ms
-step. `controls/touch_state` is said at once when what a reader acts on
+the nonblocking socket, draining at most 32 acquisitions from each per
+step: 2 ms (`runtime::POLL_US`), or 1 ms (`privacy::STEP_US`) with the
+privacy route on, as in the product. `controls/touch_state` is said at once when what a reader acts on
 changes (a press, a release, a contact, a fault; its times aside: when it
 was said, and when each source was last read), with an event, and every
 100 ms otherwise, as declared. What only grows or moves while a hand stays
@@ -883,7 +960,7 @@ are simultaneous. If one configured input cannot be read, report the fault;
 do not fill its value with the previous sample. Omit truly absent optional
 inputs from configuration before starting instead of silently changing it.
 
-The runtime targets one step every 2 ms, drains at most 64 observations per
+The runtime targets one step every 2 ms (1 ms with the privacy route on), drains at most 64 observations per
 step, ages a sample after the adapter returns, and faults on a full drain.
 These are software budgets, not hard scheduling guarantees. `controls.lock`
 allows one process per bus root. The OS releases the lock when a process dies.
@@ -991,8 +1068,9 @@ reading failed, the longest step 0.5 ms, and all three inputs at rest
 throughout. `controls/state` was published.
 
 **Running on lamp-4ace since 11:03 the same day**, as its own unit
-(`deploy/lamp-4ace/lamp-controls.service`), watching only: no `--enable`, so
-its gestures say `enabled:false` and nothing acts on them. Its two files sit
+(`deploy/lamp-4ace/lamp-controls.service`), watching only then: no `--enable`, so
+its gestures said `enabled:false` and nothing acted on them. That unit now
+passes `--enable --touch`. Its two files sit
 beside its build in `/opt/lampOS/controls/<sha>/`, because `/etc/lampOS` is
 root's alone and the first start, with them there, failed on "Permission
 denied". It says `controls/state` on the bus, and since 11:17 it writes one
@@ -1277,7 +1355,8 @@ apply. Replays open no GPIO, audio, I2C or Bus. Selected ordinary touch replay
 adds an optional `controls` state beside its existing touch output; privacy-only
 touch replay emits the ordinary Controls replay frames. Off output omits these
 additions. That replayed `controls` state models the button alone: a recording
-from pins with `legacy_head` (the product's) replays with no `head_active` and
+from pins with `legacy_head` (the product's then; its pins have none now,
+and it runs `serve --touch`) replays with no `head_active` and
 no head `Pet` there, though the live `controls/state` has both (the reviewer on
 #795).
 
@@ -1551,8 +1630,9 @@ the press-carrying inputs queued and not yet taken (`Shared::pressing`).
 The release sets the record's time to its look, best effort; without it
 the floor is the save's own write, a moment later.
 
-The switch stays off on the product until Monday's check with the owner, which
-tries a 3 s head hold in the window after the EBUSY run. There is no backstop that mutes:
+The switch stayed off on the product until a check with the owner, which
+tried a 3 s head hold in the window after the EBUSY run; the product's
+`lamp-voice.service` sets `LAMP_GUARD_NEVER_LISTENED=on` now (#4332). There is no backstop that mutes:
 a lamp that cannot start cannot hear, so muting it would only bring back a
 lamp muted after an update with nobody told. Tests:
 `hand_controls::tests::a_run_that_heard_nothing_releases_the_guard_and_is_counted`,
@@ -1830,8 +1910,8 @@ snapshots. EOF creates no fresh samples; feedback becomes stale.
 After First installs its adapter, start with shadow and record real acquisitions:
 
 ```sh
-lamp-controls serve --config /etc/lampos/controls.json --record /var/tmp/controls-real-20261014.jsonl --seconds 60
-lamp-controls replay --config /etc/lampos/controls.json --input /var/tmp/controls-real-20261014.jsonl --clock-id "$(cat /proc/sys/kernel/random/boot_id)" --enable --output /var/tmp/controls-real-replay-20261014.jsonl
+lamp-controls serve --config /etc/lampOS/controls/controls.json --record /var/tmp/controls-real-20261014.jsonl --seconds 60
+lamp-controls replay --config /etc/lampOS/controls/controls.json --input /var/tmp/controls-real-20261014.jsonl --clock-id "$(cat /proc/sys/kernel/random/boot_id)" --enable --output /var/tmp/controls-real-replay-20261014.jsonl
 ```
 
 Without the adapter, that serve command truthfully records Missing faults.

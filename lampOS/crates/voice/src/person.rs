@@ -81,17 +81,20 @@ fn breaks_or_turns(c: char) -> bool {
         || ('\u{2066}'..='\u{2069}').contains(&c)
 }
 
+/// The path `LAMP_PERSON_NAME` names, as it is set; unset is none.
+fn path_from_environment() -> Option<std::path::PathBuf> {
+    #[cfg(test)]
+    if let Some(path) = FILE_FOR_TEST.with(|cell| cell.borrow().clone()) {
+        return Some(path);
+    }
+    std::env::var_os(ENVIRONMENT).map(std::path::PathBuf::from)
+}
+
 /// The name, from the file `LAMP_PERSON_NAME` names. Unset, relative, missing
 /// or unfit is none; unfit is said, never the name itself.
 pub fn from_environment() -> Option<String> {
-    #[cfg(test)]
-    let path = match FILE_FOR_TEST.with(|cell| cell.borrow().clone()) {
-        Some(path) => path.into_os_string(),
-        None => std::env::var_os(ENVIRONMENT)?,
-    };
-    #[cfg(not(test))]
-    let path = std::env::var_os(ENVIRONMENT)?;
-    let path = Path::new(&path);
+    let path = path_from_environment()?;
+    let path = path.as_path();
     if !path.is_absolute() {
         eprintln!("lamp-voice: {ENVIRONMENT} must be an absolute path; no name is used");
         return None;
@@ -411,6 +414,111 @@ pub(crate) fn set_for_test(path: Option<std::path::PathBuf>) {
     FILE_FOR_TEST.with(|cell| *cell.borrow_mut() = path);
 }
 
+/// Whether `LAMP_PERSON_NAME` names an absolute path, a name there or not:
+/// what the second route keys its per-reply read on ([`now`]), so a name
+/// typed after start is told too (Reviewer-three's P3 on #4476).
+pub fn named_in_environment() -> bool {
+    path_from_environment().is_some_and(|path| path.is_absolute())
+}
+
+/// The name as the file holds it now ([`from_environment`]), read again for
+/// each reply and said nothing of, so one forgotten ([`forget_with_everything`])
+/// or set again from the app holds from the next reply (#4461). Its read at
+/// start said whether it is used.
+pub fn now() -> Option<String> {
+    let path = path_from_environment()?;
+    if !path.is_absolute() {
+        return None;
+    }
+    read(&path).ok().flatten()
+}
+
+/// What the model is told when the name typed at setup could not be
+/// removed with everything else ([`forget_with_everything`]).
+pub const NAME_KEPT: &str = "The name given when the lamp was set up could not be forgotten just now, so you may still use it. Tell them so; a reset clears it.";
+
+/// The owner's "forget everything about me" (`told`, as the model hears it):
+/// once their memory was emptied, for a request the second route's guard
+/// marked as asking for everything, the name typed at setup goes too, as the
+/// owner's place does (`owner_place::forget_with_everything`, #4356), and the
+/// answer says so (#4461: after the owner forgot themselves the lamp still
+/// named them by it). Only the owner's own line: the person whose memory id
+/// is the typed name's. Another person's forget, a room's, an unmarked one,
+/// or one whose memory was not emptied, leaves it and `told` as they were.
+/// Run after the place's, which finds the owner by this name.
+pub fn forget_with_everything(
+    told: (serde_json::Value, bool),
+    lease: &crate::memory_scope::ScopeLease,
+) -> (serde_json::Value, bool) {
+    if !lease.everything_marked() {
+        return told;
+    }
+    let Some(path) = path_from_environment().filter(|path| path.is_absolute()) else {
+        return told;
+    };
+    forget_if(&path, told, lease.admitted_person(), &owner_ids())
+}
+
+/// The memory ids the owner goes by, for their own "forget everything"
+/// ([`forget_with_everything`], `owner_place::forget_with_everything`): the
+/// typed name's ([`now`]) and the one who_you_are kept with their face
+/// (`known_faces::owner_now`), as [`by_default_owner`] names them (#4530).
+/// A typed "Minh Nguyen" whose face was kept as "Minh" forgets as "Minh",
+/// and the typed name must go too (Friday's P2 on #4476). `owner_now` is
+/// still set here: the face's forget clears it only after the call
+/// (`tools::face_gone_with_everything`).
+pub fn owner_ids() -> Vec<String> {
+    let mut ids: Vec<String> = now()
+        .into_iter()
+        .chain(crate::known_faces::owner_now())
+        .map(|name| crate::known_faces::memory_person(&name))
+        .collect();
+    ids.dedup();
+    ids
+}
+
+/// [`forget_with_everything`] once its mark is judged: the name at `file`
+/// removed when `admitted`, the line's person, is one of `owners`, the
+/// owner's memory ids ([`owner_ids`]), and `told` says their memory was
+/// emptied. The answer then says
+/// `name: "forgotten too"` in place of the face's `setup_name` note that it
+/// stays.
+pub(crate) fn forget_if(
+    file: &Path,
+    mut told: (serde_json::Value, bool),
+    admitted: Option<&str>,
+    owners: &[String],
+) -> (serde_json::Value, bool) {
+    use serde_json::json;
+    let emptied =
+        told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
+    let theirs = admitted.is_some_and(|admitted| owners.iter().any(|owner| owner == admitted));
+    if !emptied || !theirs || fs::symlink_metadata(file).is_err() {
+        return told;
+    }
+    match fs::remove_file(file) {
+        Ok(()) => {
+            eprintln!("lamp-voice: the owner's name was cleared with everything about them");
+            if let Some(answer) = told.0.as_object_mut() {
+                answer.remove("setup_name");
+            }
+            told.0["name"] = json!("forgotten too");
+        }
+        Err(error) => {
+            eprintln!(
+                "lamp-voice: the owner's name could not be cleared with everything about them: {}",
+                error.kind()
+            );
+            if let Some(answer) = told.0.as_object_mut() {
+                answer.remove("setup_name");
+            }
+            told.0["everything"] = json!(false);
+            told.0["name"] = json!(NAME_KEPT);
+        }
+    }
+    told
+}
+
 /// What the model's instruction is given about its person.
 pub fn told(name: &str) -> String {
     format!(
@@ -435,28 +543,63 @@ pub fn by_default_from_environment() -> bool {
     std::env::var(BY_DEFAULT_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// Why the owner `name` is not told by default now, or `None` when they
-/// may be ([`BY_DEFAULT_ENVIRONMENT`], #3884): another voice in the
-/// conversation (`another_voice`, the second route's own sign), more than
-/// one face in view, one face the eyes don't know as the owner (an unknown
-/// face, or a known face that isn't theirs), or the eyes knowing someone
-/// else. No face in view, or no look at all, is no sign: the owner looking
-/// away is still the owner.
+/// The owner for [`BY_DEFAULT_ENVIRONMENT`]: the name a reply is told, the
+/// typed one (`typed`, `LAMP_PERSON_NAME`) else the one who_you_are saved
+/// with their face (`kept`, `known_faces::owner_now`), and every name the
+/// owner goes by, both when both are there. An app user who types "Minh
+/// Nguyen" and says "Minh" at "What should I call you?" has their face
+/// kept under "Minh": with the typed name alone, every turn the eyes knew
+/// them read as "a known face that isn't theirs", and the name was held
+/// back and taken out of the lamp's lines on each one (the onboarding
+/// forgets report, 30 Oct). Neither: no owner.
+pub fn by_default_owner(
+    typed: Option<String>,
+    kept: Option<String>,
+) -> Option<(String, Vec<String>)> {
+    let told = typed.clone().or_else(|| kept.clone())?;
+    Some((told, typed.into_iter().chain(kept).collect()))
+}
+
+/// Why the owner is not told by default now, or `None` when they may be
+/// ([`BY_DEFAULT_ENVIRONMENT`], #3884): another voice in the conversation
+/// (`another_voice`, the second route's own sign), more than one face in
+/// view, one face the eyes don't know as the owner (an unknown face, or a
+/// known face that isn't theirs), or the eyes knowing someone else. The
+/// owner is any of `owners` ([`by_default_owner`]), matched by memory
+/// person id (`known_faces::memory_person`), as the eyes' face and memory
+/// are keyed. No face in view, or no look at all, is no sign: the owner
+/// looking away is still the owner.
+///
+/// `carried` is the person (a memory id) the line is carried for as their
+/// conversation going on (`ScopeLease::carried_for`, #4339: no face seen
+/// speaking it, no other face in any look through it, their face in view
+/// through it or within `CARRY_UNSEEN_WITHIN` before it, their own last
+/// exchange within the conversation). When that is the owner, one face the
+/// eyes don't name just now is no sign: a recognition slip mid-talk (a
+/// missed check, a track found again) unnamed the owner and took the name
+/// out of the lamp's own lines (the onboarding forgets report, 30 Oct).
+/// Another voice, two faces, or a known face that isn't theirs still is.
 pub fn someone_else_now(
-    name: &str,
+    owners: &[String],
     faces: Option<usize>,
     known_now: Option<&str>,
     another_voice: bool,
+    carried: Option<&str>,
 ) -> Option<&'static str> {
-    let owner = crate::known_faces::memory_person(name);
-    let theirs = known_now.map(|known| crate::known_faces::memory_person(known) == owner);
+    let owner_id = |id: &str| {
+        owners
+            .iter()
+            .any(|owner| crate::known_faces::memory_person(owner) == id)
+    };
+    let theirs = known_now.map(|known| owner_id(&crate::known_faces::memory_person(known)));
+    let carried = carried.is_some_and(owner_id);
     if another_voice {
         Some("another voice in the conversation")
     } else if faces.is_some_and(|faces| faces > 1) {
         Some("more than one face in view")
     } else if theirs == Some(false) {
         Some("a known face that isn't theirs")
-    } else if faces == Some(1) && theirs.is_none() {
+    } else if faces == Some(1) && theirs.is_none() && !carried {
         Some("an unknown face in view")
     } else {
         None
@@ -557,7 +700,7 @@ pub fn by_default(name: &str) -> String {
 pub const OFTEN: &str = "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)";
 
 /// What a skill's note is told about the person at the lamp now (#2825), so
-/// that Welcome back's "by name if you know it" greets a known face by name
+/// that Welcome back's "their name if you know it" greets a known face by name
 /// and someone who comes by often one beat warmer, as the voice's own hello
 /// did: the known face's name (`known_faces::note`), and [`OFTEN`] for a
 /// remembered person Mood calls `regular` or `close`. Nothing for nobody
@@ -591,6 +734,16 @@ pub fn told_who(
         Some((known, familiar)) if who => turn + &at_the_lamp(known.as_deref(), familiar),
         _ => turn,
     }
+}
+
+/// A say's turn, told after [`told_who`] the part of the day and to say a
+/// hello and the name only (`hello`, [`crate::local_time::hello_told`])
+/// when its skill asked (`who`: Welcome back alone), whether or not anyone
+/// is at the lamp; the first builder, 30 Oct, on the launch testers'
+/// findings. Any other skill's note: the turn as it came, and `hello` is
+/// never worked out.
+pub fn told_hello(turn: String, who: bool, hello: impl FnOnce() -> String) -> String {
+    if who { turn + &hello() } else { turn }
 }
 
 /// What a say's `skill_says` record keeps of [`told_who`] (#2831): whether
@@ -676,7 +829,10 @@ mod tests {
     #[test]
     fn the_owner_is_named_by_default_unless_someone_else_is_there() {
         let owner = "Example Name";
-        let at = |faces, known: Option<&str>, voice| someone_else_now(owner, faces, known, voice);
+        let owners = [owner.to_owned()];
+        let at = |faces, known: Option<&str>, voice| {
+            someone_else_now(&owners, faces, known, voice, None)
+        };
         // Alone, the face turned away or out of view, or no look at all.
         assert_eq!(at(Some(0), None, false), None);
         assert_eq!(at(None, None, false), None);
@@ -708,6 +864,90 @@ mod tests {
             );
         }
         assert!(by_default(owner).contains("“Example Name”"));
+    }
+
+    /// The onboarding forgets report (30 Oct): a typed name that isn't the
+    /// one their face was saved under still names the owner whose face the
+    /// eyes know; a different known person, or an unknown face, still
+    /// doesn't. No typed name: the one who_you_are kept. Made-up names.
+    #[test]
+    fn the_owners_face_is_theirs_under_the_typed_or_the_onboarding_name() {
+        let kept = || Some("Robin".to_owned());
+        // Typed differs from the name said at who_you_are.
+        let (told, owners) = by_default_owner(Some("Robin Example".to_owned()), kept()).unwrap();
+        assert_eq!(told, "Robin Example");
+        let at = |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, None);
+        assert_eq!(at(Some("Robin")), None);
+        assert_eq!(at(Some("robin ")), None);
+        assert_eq!(at(Some("Robin Example")), None);
+        assert_eq!(
+            at(Some("Sam Example")),
+            Some("a known face that isn't theirs")
+        );
+        assert_eq!(at(None), Some("an unknown face in view"));
+        // No setup file: the onboarding owner, still matched.
+        let (told, owners) = by_default_owner(None, kept()).unwrap();
+        assert_eq!(told, "Robin");
+        assert_eq!(
+            someone_else_now(&owners, Some(1), Some("Robin"), false, None),
+            None
+        );
+        assert_eq!(
+            someone_else_now(&owners, Some(1), Some("Sam Example"), false, None),
+            Some("a known face that isn't theirs")
+        );
+        // Typed only (no face saved at who_you_are), and both the same: as before.
+        for kept in [None, Some("Robin Example".to_owned())] {
+            let (told, owners) = by_default_owner(Some("Robin Example".to_owned()), kept).unwrap();
+            assert_eq!(told, "Robin Example");
+            let at = |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, None);
+            assert_eq!(at(Some("Robin Example")), None);
+            assert_eq!(at(Some("Robin")), Some("a known face that isn't theirs"));
+            assert_eq!(at(None), Some("an unknown face in view"));
+        }
+        assert_eq!(by_default_owner(None, None), None);
+    }
+
+    /// The onboarding forgets report (30 Oct), fix B: a line carried as the
+    /// owner's conversation going on keeps the name through a face the eyes
+    /// don't name just now; a second face, another voice or a known face
+    /// that isn't theirs still holds it back, and so does a slip on a line
+    /// not carried, or carried for someone else. Made-up names.
+    #[test]
+    fn a_carried_owners_line_keeps_the_name_through_a_face_slip_only() {
+        let (_, owners) =
+            by_default_owner(Some("Robin Example".to_owned()), Some("Robin".to_owned())).unwrap();
+        let owner = crate::known_faces::memory_person("Robin");
+        let guest = crate::known_faces::memory_person("Sam Example");
+        let at = |faces, known: Option<&str>, voice, carried: Option<&str>| {
+            someone_else_now(&owners, faces, known, voice, carried)
+        };
+        // Carried for the owner: an unnamed face is a slip.
+        assert_eq!(at(Some(1), None, false, Some(&owner)), None);
+        // The typed name's id is theirs too.
+        let typed = crate::known_faces::memory_person("Robin Example");
+        assert_eq!(at(Some(1), None, false, Some(&typed)), None);
+        // Still held back while carried.
+        assert_eq!(
+            at(Some(2), None, false, Some(&owner)),
+            Some("more than one face in view")
+        );
+        assert_eq!(
+            at(Some(1), None, true, Some(&owner)),
+            Some("another voice in the conversation")
+        );
+        assert_eq!(
+            at(Some(1), Some("Sam Example"), false, Some(&owner)),
+            Some("a known face that isn't theirs")
+        );
+        // Not carried, or carried for someone else: as before.
+        for carried in [None, Some(guest.as_str())] {
+            assert_eq!(
+                at(Some(1), None, false, carried),
+                Some("an unknown face in view"),
+                "{carried:?}"
+            );
+        }
     }
 
     #[test]
@@ -761,6 +1001,22 @@ mod tests {
             "Watch the room."
         );
         assert_eq!(told_who("Greet them.".into(), true, None), "Greet them.");
+    }
+
+    /// The first builder, 30 Oct: a hello's note is told the part of the
+    /// day and to say a hello and the name only; another skill's note is
+    /// the turn byte for byte, its hello never worked out.
+    #[test]
+    fn only_a_note_that_asked_is_told_the_part_of_the_day() {
+        let hello = || "\n\n(It is the afternoon here now.)".to_owned();
+        assert_eq!(
+            told_hello("Greet them.".into(), true, hello),
+            "Greet them.\n\n(It is the afternoon here now.)"
+        );
+        assert_eq!(
+            told_hello("Watch the room.".into(), false, || unreachable!()),
+            "Watch the room."
+        );
     }
 
     fn file(name: &str, text: &[u8]) -> std::path::PathBuf {
@@ -1050,5 +1306,217 @@ mod tests {
         // lamp-06c1, 26 Oct (P38/P39): asked its owner's name, the lamp
         // said it had none.
         assert!(told("Example Name").contains("If asked who owns this lamp"));
+    }
+
+    /// #4461: the owner's own "forget everything" clears the typed name, as
+    /// it clears their place (#4356); another person's, a room's, or one that
+    /// emptied nothing leaves it. The answer says it went, in place of the
+    /// face's note that it stays. Made-up names.
+    #[test]
+    fn only_the_owners_forget_everything_clears_the_typed_name() {
+        let dir = std::env::temp_dir().join(format!("lamp-person-forget-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        fs::write(&file, "Robin Example\n").unwrap();
+        let emptied = || {
+            (
+                serde_json::json!({"forgotten": true, "everything": true,
+                    "face": "forgotten too",
+                    "setup_name": crate::remember::SETUP_NAME_KEPT}),
+                true,
+            )
+        };
+        for (admitted, owner) in [
+            (Some("p-guest"), Some("p-owner")),
+            (None, Some("p-owner")),
+            (Some("p-owner"), None),
+            (None, None),
+        ] {
+            assert_eq!(
+                forget_if(
+                    &file,
+                    emptied(),
+                    admitted,
+                    &owner.into_iter().map(str::to_owned).collect::<Vec<_>>()
+                ),
+                emptied(),
+                "{admitted:?} {owner:?}"
+            );
+            assert!(file.exists(), "{admitted:?} {owner:?}");
+        }
+        // A forget whose memory was not emptied leaves it.
+        let failed = (
+            serde_json::json!({"error": "the memory did not answer"}),
+            false,
+        );
+        assert_eq!(
+            forget_if(
+                &file,
+                failed.clone(),
+                Some("p-owner"),
+                &["p-owner".to_owned()]
+            ),
+            failed
+        );
+        assert!(file.exists());
+        // The owner's: gone, and said, the face's "it stays" note taken out.
+        let (told, answered) =
+            forget_if(&file, emptied(), Some("p-owner"), &["p-owner".to_owned()]);
+        assert!(answered);
+        assert_eq!(told["name"], "forgotten too");
+        assert_eq!(told["everything"], true);
+        assert!(told.get("setup_name").is_none(), "{told}");
+        assert!(!file.exists());
+        // Nothing kept: nothing said of it.
+        let nothing = (
+            serde_json::json!({"note": "I was keeping nothing of them."}),
+            true,
+        );
+        assert_eq!(
+            forget_if(
+                &file,
+                nothing.clone(),
+                Some("p-owner"),
+                &["p-owner".to_owned()]
+            ),
+            nothing
+        );
+        // Not removable: kept, and said so.
+        let kept = dir.join("name-dir");
+        fs::create_dir_all(kept.join("inner")).unwrap();
+        let (told, _) = forget_if(&kept, emptied(), Some("p-owner"), &["p-owner".to_owned()]);
+        assert_eq!(told["name"], NAME_KEPT);
+        assert_eq!(told["everything"], false);
+        assert!(told.get("setup_name").is_none(), "{told}");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Friday's P2 on #4476: a typed "Robin Example" whose face was kept as
+    /// "Robin" (#4530) forgets as "Robin", and the typed name goes too:
+    /// the line's person matched against either of the owner's ids
+    /// (`owner_ids`). A guest by neither leaves it. Made-up names.
+    #[test]
+    fn the_owner_forgets_the_typed_name_by_either_name_they_go_by() {
+        let dir = std::env::temp_dir().join(format!("lamp-person-split-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        fs::write(&file, "Robin Example\n").unwrap();
+        let emptied = || {
+            (
+                serde_json::json!({"forgotten": true, "everything": true}),
+                true,
+            )
+        };
+        let owners = ["p-robin-example".to_owned(), "p-robin".to_owned()];
+        assert_eq!(
+            forget_if(&file, emptied(), Some("p-guest"), &owners),
+            emptied()
+        );
+        assert!(file.exists());
+        let (told, _) = forget_if(&file, emptied(), Some("p-robin"), &owners);
+        assert_eq!(told["name"], "forgotten too");
+        assert!(!file.exists());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A line's request scope admitted as `name`'s face, or the room's.
+    fn scoped(name: Option<&str>, request: u64) -> crate::memory_scope::RequestScope {
+        let cache = crate::memory_scope::FaceCache::default();
+        if let Some(name) = name {
+            let path = std::env::temp_dir()
+                .join(format!("lamp-person-face-{}-{request}", std::process::id()));
+            fs::write(&path, name).unwrap();
+            let refresh = cache.begin_refresh();
+            cache.replace(refresh, crate::known_faces::FaceObservation::read(&path));
+            fs::remove_file(path).unwrap();
+        }
+        crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            cache.snapshot(std::time::Instant::now()),
+        )
+    }
+
+    /// Friday's P2 on #4476, through `forget_with_everything` rather than
+    /// `forget_if` alone: the name typed at setup "Robin Example", the face
+    /// who_you_are kept as "Robin" (`owner_now`). The owner's marked "forget
+    /// everything", admitted as "Robin", removes the typed name; the owner's
+    /// line unmarked, a guest's marked one or the room's leave it. Made-up
+    /// names.
+    #[test]
+    fn the_owners_marked_forget_by_the_kept_name_removes_the_typed_one() {
+        let dir = std::env::temp_dir().join(format!("lamp-person-kept-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        fs::write(&file, "Robin Example\n").unwrap();
+        set_for_test(Some(file.clone()));
+        crate::known_faces::owner_for_test(Some(Some("Robin".to_owned())));
+        assert_eq!(
+            owner_ids(),
+            [
+                crate::known_faces::memory_person("Robin Example"),
+                crate::known_faces::memory_person("Robin")
+            ]
+        );
+        let emptied = || {
+            (
+                serde_json::json!({"forgotten": true, "everything": true}),
+                true,
+            )
+        };
+        let shown = crate::second_provider::everything_shown_for_test;
+        let owner = scoped(Some("Robin"), 4_476_001);
+        let owners_line = owner.lease();
+        assert_eq!(forget_with_everything(emptied(), &owners_line), emptied());
+        let guest = scoped(Some("Sam Example"), 4_476_002);
+        let guests_line = guest.lease();
+        guests_line.mark_everything_asked(&shown());
+        assert_eq!(forget_with_everything(emptied(), &guests_line), emptied());
+        let room = scoped(None, 4_476_003);
+        let rooms_line = room.lease();
+        rooms_line.mark_everything_asked(&shown());
+        assert_eq!(forget_with_everything(emptied(), &rooms_line), emptied());
+        assert!(file.exists());
+        owners_line.mark_everything_asked(&shown());
+        let (told, answered) = forget_with_everything(emptied(), &owners_line);
+        assert!(answered);
+        assert_eq!(told["name"], "forgotten too");
+        assert!(!file.exists());
+        crate::known_faces::owner_for_test(None);
+        set_for_test(None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #4461: the name is read again for each reply, so one cleared or set
+    /// again holds from the next, though none was there at start; a
+    /// relative path is none.
+    #[test]
+    fn the_typed_name_now_follows_the_file() {
+        let dir = std::env::temp_dir().join(format!("lamp-person-now-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("name");
+        set_for_test(Some(file.clone()));
+        // Set with no name there yet is still set: a name typed after start
+        // is read (Reviewer-three's P3 on #4476).
+        assert!(named_in_environment());
+        assert_eq!(now(), None);
+        fs::write(&file, "Robin Example\n").unwrap();
+        assert_eq!(now().as_deref(), Some("Robin Example"));
+        fs::write(&file, "Sam Example\n").unwrap();
+        assert_eq!(now().as_deref(), Some("Sam Example"));
+        fs::remove_file(&file).unwrap();
+        assert_eq!(now(), None);
+        set_for_test(Some("relative/name".into()));
+        assert!(!named_in_environment());
+        assert_eq!(now(), None);
+        set_for_test(None);
+        fs::remove_dir_all(&dir).unwrap();
     }
 }

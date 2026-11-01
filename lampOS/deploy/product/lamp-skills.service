@@ -5,8 +5,11 @@
 # until their lamp checks. A skill speaks only through the voice's say service
 # (LAMP_SAY=on in lamp-voice.service, its socket in the group lampos); the voice has no hello of its own (#2825), so only
 # Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).
-# LAMP_SKILLS_ASK=skip acts without asking the Policy, whose gate is not built yet (#939);
-# without it every skill is asked about and refused, and nothing is done.
+# LAMP_SKILLS_ASK=skip acts without asking the Policy, but for Welcome back's hello: a skill whose
+# [ask] is the Policy's hello is asked still, on skills/ask (lamp-policy --hello --act hello --gate),
+# for its hard rules, one hello an hour to each person among them (the first builder, 30 Oct, on the
+# launch testers' findings); unanswered, it is not said. Without LAMP_SKILLS_ASK every skill is asked
+# about and refused, and nothing is done.
 [Unit]
 Description=lampOS skills (lamp-skills)
 PartOf=lampos.target
@@ -40,6 +43,12 @@ Environment=LAMP_SKILLS_DAILY_FILE=/var/lib/lampos-skills-state/daily.json
 # LAMP_WHO_WAS_HERE_KNOWN=on. An Environment= line too, as --known-file is as new as guard mode
 # (19 Oct) and would end an older lamp-skills at its start (#2157).
 Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
+# The developer folder: skills a paired computer pushed over lamp-control
+# (#3869, docs/skills.md "Skills pushed from a computer"), loaded after the
+# skills folder and held to the protocol's grants. Read only here; the
+# manage helper alone writes it. An Environment= line, as an older
+# lamp-skills ignores it where it would end at an unknown flag (#2157).
+Environment=LAMP_SKILLS_DEV_DIR=/var/lib/lampOS/skills-dev
 ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s

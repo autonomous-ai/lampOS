@@ -14,7 +14,7 @@ SDKs generate from.
 - **piece 1** (#3715): the protocol's messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the rates (`rate.rs`), with their tests;
 - **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
 - **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Its actions were refused until piece 4.
-- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event, and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` at `ahead` or `{yaw, pitch}` goes on the body's lease socket under the lease the door holds (`body_lease.rs`), its end a `done` with the angles reached; `look` at `hand` has the body follow the hand in view, said with the body's lease (below). `look` at `face` or `name` is refused as out of this release ("not in this release: look at a face or a name"); `joints`, `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
+- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event, `sound` is the voice's built-in short hum through the same socket and gates (`hum` is the only name in this release), and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` at `ahead` or `{yaw, pitch}` goes on the body's lease socket under the lease the door holds (`body_lease.rs`), its end a `done` with the angles reached; `look` at `hand` has the body follow the hand in view, said with the body's lease (below). `look` at `face` or `name` is refused as out of this release ("not in this release: look at a face or a name"); `joints` and `play` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
 - **piece 5**: the bus as events, lease signals and state (`watch.rs`, with `--bus-root`). Events go out by edge, never per message: someone arrived or left, turned to or from the lamp, or stood up; the lamp's name heard; a sound class past its bar (never `speech`); a touch or the button; the lamp talking, paused, private or asleep. Each goes only to a connection subscribed to it that holds its grant. Words heard are matched on the lamp against each connection's own phrases, and only the phrase leaves it. Talking suspends every lease and resting holds them again; a hand on the body, a stop, a pause, privacy or sleep loses them. `get` answers presence (counts, never who), the light, the inner state and the lamp's own.
 - **piece 6**: the body's lease (`body_lease.rs`): with `--lease-socket`, a computer's `body` lease holds lamp-body's own, so the lamp's own life stands back, and the body's end of it is the computer's (`slumped` added to the whys).
 - **piece 7**: skills pushed from a computer (`push.rs`, with `--manage-socket`): the `skills` grant, `skill.push` in parts, `skill.list` and `skill.remove`, each asked of root's manage helper off the door's lock, and a revoke turning the computer's pushed skills off. The helper's side is lamp-skills' (Eighth's piece B); until it is in, the helper refuses what it doesn't know.
@@ -89,7 +89,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 
 | op | args | carried out by | grant | lease |
 |---|---|---|---|---|
-| `express` | `feeling`, `strength` 0–1 (0.5) | the `feelings` skill's (#3691) move on `mood.sock` `{move}` and its light as a `light/request`, so one set of feelings (below) | `body`, `light` | no |
+| `express` | `feeling`, `strength` 0–1 (0.5) | the `feelings` skill's (#3691) move on `mood.sock` `{move}` and its light as a `light/request`, so one set of feelings (below). One action: while a motion plays, an `express` with a move is refused `busy` whole, its light too; below strength 0.0625 there's no move, and the light goes alone | `body`, `light` | no |
 | `gesture` | `name`, one of 19 built-in clips (below) | `mood.sock` `{gesture}` | `body` | no |
 | `look` | `at`: `face`, `hand`, `name`, `ahead`, or `{yaw, pitch}` in degrees (yaw right and pitch up positive). `hand` follows it until `stop`, another look or the lease ends | `ahead` and `{yaw, pitch}`: the body's lease socket `{look}`, eased to and held while the lease is, inside the gaze's reach and the pose's bounds (below); `hand` with the lease socket's hold; `face` and `name` refused, "not in this release: look at a face or a name" | `body` (and `look` for `face` and `hand`) | body |
 | `move` | `step_ms` 40–1,000, `frames` (2–500) of 5 joints in counts, first and last all 0, lasting 1.5–10 s, each joint within the body's reach and speed | `mood.sock` `{move}`; the door holds it to `moves.rs`'s check first, so a move the body would drop is refused with its words | `body` | body |
@@ -97,7 +97,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
 | `say` | `text`, at most 300 characters | `say.sock`, with its quiet after a turn, privacy and busy gates | `speak` | no |
-| `sound` | `name` of a clip of 3 s or less in the client's package | `say.sock` `{sound}` | `speak` | no |
+| `sound` | `name`: `hum` only in this release, the voice's built-in short hum (no file, no model); the recorded notices are never a computer's | `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates; its `done` follows | `speak` | no |
 | `stop` | | ends the client's own actions now | none | no |
 
 **Gestures** a client may name: `nod`, `headshake`, `greeting`, `laugh`,
@@ -387,7 +387,7 @@ connection closed), `slumped` (the body gave way under load and let go). Ids are
 {"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}
 {"id":14,"op":"say","text":"Build passed."}
 {"id":16,"op":"play","name":"wave"}
-{"id":17,"op":"sound","name":"chime"}
+{"id":17,"op":"sound","name":"hum"}
 {"id":15,"op":"stop"}
 ```
 
@@ -446,7 +446,7 @@ which back. An SDK's wait for them returns at the answer.
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |
 | `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
 | `say` | `text`: words, ≤ 300 chars | `speak` | — |
-| `sound` | `name` (a clip of the client's package, ≤ 3 s) | `speak` | — |
+| `sound` | `name`: `hum` (the only one in this release) | `speak` | — |
 | `stop` | — | — | — |
 | `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |
 | `skill.list` | — | `skills` | — |
@@ -506,7 +506,7 @@ body bounds every move itself, whatever the rate:
 - **Its own pose rule:** may a move play now, from this pose (the anti-tip rule, `cog.rs`).
 - **Priority and caller caps:** with `--arbitration` and `--caller-caps`, it holds a computer to `skill` priority.
 
-A gesture or move asked while another plays is dropped by the body, not queued or replaced ("dropped: another gesture plays", or "dropped: busy, skill" with `--arbitration`). So the door remembers when the last motion it sent to the body ends, one for the lamp whichever computer asked, and refuses a `gesture`, `move` or `express` asked before then as `busy`, "busy: a motion plays for N ms more", with `retry_ms` (#4209). A refused motion is not sent and does not move that end. A motion lasts as the body plays it, from its first frame to its last: a `move` its frames less one at its `step_ms`, a gesture its built-in clip's length, an `express` its feeling's move (an `express` with no move refuses nothing). A gesture from the lamp's move folder, whose length the door can't see, holds nothing. A `stop` doesn't free it: the door never stops the body, which plays the motion to its end. `look` and `joints` are not motions here. The lamp's own gestures (its idle life, the voice's expressions) don't pass the door, so the body can still drop a computer's motion for one of those, and the computer isn't told then. Most gestures (2 to 10 s) and every `express` move (2.5 to 7 s) play for seconds, so a computer waits for its last motion's length (or the `retry_ms`) before asking for the next.
+A gesture or move asked while another plays is dropped by the body, not queued or replaced ("dropped: another gesture plays", or "dropped: busy, skill" with `--arbitration`). So the door remembers when the last motion it sent to the body ends, one for the lamp whichever computer asked, and refuses a `gesture`, `move` or `express` asked before then as `busy`, "busy: a motion plays for N ms more", with `retry_ms` (#4209). A refused motion is not sent and does not move that end. `busy` is the door's count, not the body's: a move the body then drops (reach, speed, the anti-tip rule, privacy) still holds the slot for its full length, so a program may wait out a motion that never played. Like every refusal, `busy` counts toward the refused actions' guard (20 a second, then the connection closes), so a program waits its `retry_ms` rather than asking again at once. A motion lasts as the body plays it, from its first frame to its last: a `move` its frames less one at its `step_ms`, a gesture its built-in clip's length, an `express` its feeling's move (an `express` with no move refuses nothing). A gesture from the lamp's move folder, whose length the door can't see, holds nothing. A `stop` doesn't free it: the door never stops the body, which plays the motion to its end. `look` and `joints` are not motions here. The lamp's own gestures (its idle life, the voice's expressions) don't pass the door, so the body can still drop a computer's motion for one of those, and the computer isn't told then. Most gestures (2 to 10 s) and every `express` move (2.5 to 7 s) play for seconds, so a computer waits for its last motion's length (or the `retry_ms`) before asking for the next.
 
 `express` is counted only in its own class: not in motion, though it moves the body, and not in `light`, though it lights the ring. The ring's own arbitration and the light rate bound its light.
 
@@ -694,6 +694,11 @@ on the lamp that run on their own".
 ← {"re":11,"ok":true}
 ```
 
+- **The reset** (the 5 s pinhole, setup's product plan) wipes
+  `/var/lib/lampOS/skills-dev`: every pushed skill and the owner's yes to
+  any that sees the picture (`.yes.json`) go with the owner, and the next
+  owner's lamp has neither (Reviewer-three's P2 on #4514). The pairings
+  themselves are lamp-control's to wipe.
 - **Parts:** `data` is at most 48 KiB of base64 (36 KiB of the package),
   so a frame stays under 64 KiB; at most 32 parts, in order from 0. One push
   in flight on the lamp: a second, from any computer, is `busy` until the

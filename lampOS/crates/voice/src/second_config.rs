@@ -785,10 +785,10 @@ impl SecondConfig {
         if let Some(language) = crate::language::from_var(&var) {
             self.stt_language = Some(language.stt().to_owned());
             if self.tts_provider == TtsProvider::ElevenLabs {
-                self.tts_model = Some(crate::language::SPEECH_MODEL.to_owned());
-                if let Some(voice) = language.voice() {
-                    self.tts_voice = Some(voice.to_owned());
+                if let Some(model) = language.speech_model() {
+                    self.tts_model = Some(model.to_owned());
                 }
+                self.tts_voice = Some(language.voice().to_owned());
             }
         }
         self = self.with_key_terms_from(&var)?;
@@ -1642,18 +1642,24 @@ mod tests {
                 "{english:?}"
             );
         }
-        for (code, voice) in [
-            ("vi", Some("Ngan")),
-            ("ja", Some("Shizuka")),
-            ("zh", Some("Amy")),
-            ("ko", None),
+        // Korean keeps English's model (v4 turbo, which reads the speech
+        // tags), in Kanna's voice.
+        for (code, voice, model) in [
+            ("vi", "Ngan", "eleven_flash_v2_5"),
+            ("ja", "Shizuka", "eleven_flash_v2_5"),
+            ("zh", "Amy", "eleven_flash_v2_5"),
+            ("ko", "Kanna", "eleven_v4_turbo"),
         ] {
             fs::write(&file, format!("{code}\n")).unwrap();
             let spoken = route().with_environment(product).unwrap();
             assert_eq!(spoken.stt_language.as_deref(), Some(code));
-            assert_eq!(spoken.tts_model.as_deref(), Some("eleven_flash_v2_5"));
-            assert_eq!(spoken.tts_voice.as_deref(), voice, "{code}");
+            assert_eq!(spoken.tts_model.as_deref(), Some(model), "{code}");
+            assert_eq!(spoken.tts_voice.as_deref(), Some(voice), "{code}");
         }
+        assert!(crate::second_provider::speech_tags::read_by(
+            "eleven_v4_turbo",
+            None
+        ));
         // OpenAI's voice keeps its own model and voice; only the hearing changes.
         let (_, openai) = written("language-openai", "");
         fs::write(&file, "ja").unwrap();

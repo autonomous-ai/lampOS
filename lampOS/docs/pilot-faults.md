@@ -331,6 +331,90 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   warning, if the link is down) until the next capture start: the voice's
   own, or the one after a mute or a sleep, which clears it if the microphone
   opened at once.
+- **The speaker busy at start.** On lamp-06c1 on 2026-10-30 (boot
+  `b8c51349`) PulseAudio held the C-Media speaker after a restart: busy from
+  10:17:01, free again at about 10:17:10, some 9 s (`module-suspend-on-idle`
+  lets a card go 5 s after its last use). Two runs in a row ended on the
+  speaker's one open (`EBUSY` at 10:17:01 and 10:17:06) before the third
+  started (#4332). The speaker worker now waits out a busy open as the
+  microphone does, every 50 ms, but for up to 20 s
+  (`SPEAKER_BUSY_AT_START`, in `open_at_start.rs`), not the microphone's
+  8 s, which those 9 s would beat: a wait inside the run is cheap beside a
+  restart, which an update's 60 s watch does not ride out. Off USB, any
+  other open failure, or busy for longer ends the worker as before. It
+  waits before it says it is ready, so no authority has been sent to it and
+  no lease can lapse. At the first busy answer it tells the coordinator
+  (`busy_at_start`), which waits for its readiness up to 20 s longer, once,
+  keeps the other workers' leases renewed meanwhile, and still ends the
+  start on a stop. The journal says `lamp-voice: speaker: the speaker
+  plug:device_speaker is busy at start; waiting up to 20 s for it, as the
+  microphone waits for its own`, then, once open, `the speaker was busy for
+  9.2 s at start; opened on try 185`. Its holder is not looked up.
+- **The privacy worker's lease lapsing in the muted wait after boot.** On
+  lamp-06c1 on 2026-10-30, a cold boot, run 1: `onboarding skill loaded`
+  at 15.82, `schedule-consumer: due reminders available` at 15.89, then
+  `privacy controller lease expired` at 17.47 and `privacy switch
+  unreadable: privacy.c.p: Connection refused (os error 111); verified
+  cleanup failed: privacy worker exited abnormally: exit status: 1` at
+  17.78: the voice exited 1 and systemd restarted it (#4332). It died in
+  the service's muted wait, before any session. The wait's privacy worker
+  got its authority only after each look's gate (`Waiting::step` in
+  `service_privacy_controls.rs`), and the gate (the reminders' poll, the
+  say socket's refusal, the light, the controls' quiescent observation,
+  which may write the mute record, and the health's report, each with its
+  trace lines) took past the worker's 250 ms lease on that boot. The look
+  now also renews the worker's authority before its gate and between the
+  gate's checks, when 50 ms or more have passed since the last renewal.
+  It is the wait's microphone and camera Denied authority, so nothing is
+  granted, and no lease length, freshness or fail-closed rule changed: one
+  check held past 250 ms still lapses the lease and ends the wait closed.
+  A look whose gate takes 50 ms or more after the switch has been read
+  still finds its readings stale and ends that wait as unreadable, closed,
+  read again after 1 s with a fresh worker, as before; only the lapse that
+  ended the voice is gone. With `LAMP_STALLS=on` each look is timed in
+  `stalls-wait.log` and each check in its own `stalls-wait-<check>.log`
+  (`reminders`, `say`, `light`, `controls`, `owed`, `health`, `state`), so
+  the next slow boot names the slow one. A cold boot of lamp-06c1 with that
+  in, run 2, still logged `privacy controller lease expired` 250 ms after the
+  worker's Ready, before the wait's first line, and exited 1: the first
+  renewal came only inside the first look, after the worker's start, the
+  wait's controller, its stall recorders and the first look's start. The
+  wait now builds its controller before it starts the worker and sends the
+  first authority as soon as it has read the worker's Ready, with no 50 ms
+  rule holding it back; a refused send there fails closed like any other.
+  Each refused renewal now ends its line with which it was: `(renewal after
+  Ready)`, `(renewal before the gate)`, `(renewal in the gate after
+  <check>)` or `(renewal after the gate)`; the rest of the line is as
+  before. Unit tests: a look whose gate takes ~400 ms in ~100 ms checks
+  keeps the stand-in worker's authority arriving within 250 ms (it lapsed
+  at 250 ms before), and one 320 ms check still lapses it; a worker whose
+  Ready is read ~100 ms after its start, then ~200 ms to the first look and
+  ~100 ms in its gate, keeps its lease with the authority at Ready and
+  lapses without it; each refused renewal names itself. A fixture worker,
+  not tried on a lamp. Then 1 cold boot of 6 on lamp-06c1 with both in
+  still ended: one pass of the wait took 890.8 ms at 15.28 s, with 5 major
+  faults, 6 blocked processes and 1250 dirty pages on the board, and the
+  privacy worker ended on `authority snapshot has expired`, exit 1: the
+  wait's Denied authority had lapsed in the worker's queue, and installing
+  it was fatal. The worker now rides a lapse of a lease that grants
+  nothing (`DeniedLapse` in `privacy_bus.rs`): an expired snapshot with the
+  microphones and the camera Denied and no turn is skipped, the worker
+  publishes nothing meanwhile, and the next fresh authority re-arms it, said
+  once as `lamp-voice: privacy worker re-armed its denied lease after <N>
+  ms lapsed (microphones and camera stayed closed)`. The coordinator is
+  unchanged: it never refuses a snapshot of its own, and after such a stall
+  its own stale readings already end that wait as unreadable, read again
+  after 1 s with a fresh worker, which the worker's clean stop now allows.
+  A lapse of a lease that grants anything, a Denied lapse past 1.5 s from
+  its expiry, no authority within 250 ms of the start, the publisher gone
+  and a worker that ended abnormally all end as before. Unit tests: a
+  Denied lease lapsed by a 900 ms stall is ridden with nothing granted and
+  re-armed with one line; the 06c1 queue (an expired Denied authority) is
+  skipped and an expired granting one still ends with "authority snapshot
+  has expired"; granting, Unknown, past-the-bound and no-authority lapses
+  still end; a worker dead in the wait still ends the voice. Two Linux
+  tests of the real worker (a 900 ms Denied lapse ridden, a granting lapse
+  ends) run on the ARM64 gate only. Not yet tried on a lamp.
 - **A worker's first control message older than 100 ms.** A worker sends its
   first control message as soon as its peer is there; at start the
   coordinator may read it only after starting its other workers. lamp-4ace

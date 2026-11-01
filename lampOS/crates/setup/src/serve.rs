@@ -55,6 +55,9 @@ fn default_reports() -> PathBuf {
 fn default_display_name() -> PathBuf {
     "/etc/lampOS/setup/display-name".into()
 }
+fn default_language() -> PathBuf {
+    "/etc/lampOS/setup/language".into()
+}
 fn default_own_keys() -> PathBuf {
     crate::keys::FOLDER.into()
 }
@@ -118,6 +121,12 @@ pub struct Config {
     /// changes what the lamp answers to.
     #[serde(default = "default_display_name")]
     pub display_name: PathBuf,
+    /// The owner's language (#4473): one of [`LANGUAGES`] on one line,
+    /// root's, 0644, read by the voice at each start (`LAMP_LANGUAGE_FILE`).
+    /// Written by setup when the request names one and by `language.set`
+    /// (`crate::change`); none is English. A reset keeps it, as the zone.
+    #[serde(default = "default_language")]
+    pub language: PathBuf,
     /// The folder of the person's own DeepSeek and Deepgram keys (#2094,
     /// `crate::keys`), with `LAMP_OWN_KEYS=on`: root's, 0700, each key
     /// 0600, loaded whole by the voice's unit. The reset's plan removes it.
@@ -144,7 +153,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 21] = [
+pub const FIELDS: [&str; 22] = [
     "listen",
     "marker",
     "credential",
@@ -161,6 +170,7 @@ pub const FIELDS: [&str; 21] = [
     "backend",
     "reports",
     "display_name",
+    "language",
     "own_keys",
     "web_start",
     "web_stop",
@@ -196,6 +206,7 @@ impl Config {
             &self.backend,
             &self.reports,
             &self.display_name,
+            &self.language,
             &self.own_keys,
         ] {
             if !path.is_absolute() {
@@ -306,6 +317,9 @@ pub struct SetupRequest {
     pub name: String,
     #[serde(default)]
     pub timezone: String,
+    /// The owner's language (#4473), optional: one of [`LANGUAGES`].
+    #[serde(default, deserialize_with = "text")]
+    pub language: String,
     #[serde(default, deserialize_with = "text")]
     pub mqtt_endpoint: String,
     /// A number from the app, a string from a link: either is taken.
@@ -452,6 +466,8 @@ pub struct Accepted {
     pub credential: Option<String>,
     pub name: Option<String>,
     pub timezone: Option<String>,
+    /// The owner's language, when the request named one this lamp speaks.
+    pub language: Option<&'static str>,
     /// The backend's link, when the request carried a whole one.
     pub backend: Option<Backend>,
     /// Whether the person said yes to health and crash reports (#1683).
@@ -475,6 +491,7 @@ impl fmt::Debug for SetupRequest {
             .field("device_id", &self.device_id)
             .field("name", &self.name)
             .field("timezone", &self.timezone)
+            .field("language", &self.language)
             .field("mqtt_endpoint", &self.mqtt_endpoint)
             .field("mqtt_port", &self.mqtt_port)
             .field("mqtt_username", &self.mqtt_username)
@@ -497,6 +514,7 @@ impl fmt::Debug for Accepted {
             .field("credential", &self.credential.as_ref().map(|_| HIDDEN))
             .field("name", &self.name)
             .field("timezone", &self.timezone)
+            .field("language", &self.language)
             .field("backend", &self.backend)
             .field("share_reports", &self.share_reports)
             .field("own_keys", &self.own_keys)
@@ -541,16 +559,40 @@ pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String
     // A zone the lamp's zone data lacks does not block setup: the lamp keeps
     // its own zone, as a V1 lamp did, and the person can set it later.
     let timezone = request.timezone.trim();
+    // Nor does a language the lamp doesn't speak: it stays English, and the
+    // app's `language.set` refuses the same value with [`LANGUAGE_REFUSED`].
+    let given = request.language.trim();
+    let language = language(given);
+    if language.is_none() && !given.is_empty() {
+        eprintln!(
+            "lamp-setup: the request's language is not one of en, vi, ja, zh, ko; none is written"
+        );
+    }
     Ok(Accepted {
         ssid: request.ssid.trim().to_owned(),
         password: request.password.clone(),
         credential: (!credential.is_empty()).then(|| credential.to_owned()),
         name: (!name.is_empty()).then(|| name.to_owned()),
         timezone: zone_known(timezone, &config.zoneinfo).then(|| timezone.to_owned()),
+        language,
         backend: backend_link(request).ok(),
         share_reports: request.share_reports,
         own_keys: own_keys(request),
     })
+}
+
+/// Whether a request to the recovery hotspot (#3020) carries the voice key
+/// already on the lamp. That hotspot is open and its name ends in the
+/// sticker's suffix, so the sticker proves nothing; the key comes only from
+/// the owner's signed-in account page, as at the first setup. Compared in
+/// constant time; a lamp without its key file refuses every one.
+pub fn recovery_key_matches(given: &str, credential: &Path) -> bool {
+    use subtle::ConstantTimeEq;
+    let Ok(kept) = fs::read_to_string(credential) else {
+        return false;
+    };
+    let (given, kept) = (given.trim().as_bytes(), kept.trim().as_bytes());
+    !kept.is_empty() && bool::from(given.ct_eq(kept))
 }
 
 /// The own keys a request names (#2094), each fitted or why not. A key that
@@ -600,12 +642,29 @@ pub fn zone_known(zone: &str, zoneinfo: &Path) -> bool {
         && &magic == b"TZif"
 }
 
+/// The languages the lamp speaks (#4473), as the voice reads them
+/// (`crates/voice/src/language.rs`).
+pub const LANGUAGES: [&str; 5] = ["en", "vi", "ja", "zh", "ko"];
+
+/// Why a language is refused: the app shows it.
+pub const LANGUAGE_REFUSED: &str = "language must be one of en, vi, ja, zh, ko";
+
+/// `text` as one of [`LANGUAGES`], exactly; anything else is none.
+pub fn language(text: &str) -> Option<&'static str> {
+    LANGUAGES.into_iter().find(|code| *code == text)
+}
+
 /// What a finished setup writes. Injected for tests.
 pub trait Save {
     /// The user's voice key, to the voice's credential and the Policy's key.
     fn credential(&mut self, key: &str) -> io::Result<()>;
     fn name(&mut self, name: &str) -> io::Result<()>;
     fn timezone(&mut self, zone: &str) -> io::Result<()>;
+    /// The owner's language (#4473), one of [`LANGUAGES`]. Nothing by
+    /// default: only [`Files`] keeps it.
+    fn language(&mut self, _code: &str) -> io::Result<()> {
+        Ok(())
+    }
     /// The backend's link, root's and private (#1396).
     fn backend(&mut self, link: &Backend) -> io::Result<()>;
     /// The person's answer on health and crash reports (#1683). Nothing by
@@ -875,6 +934,11 @@ impl Save for Files<'_> {
         }
         Ok(())
     }
+    fn language(&mut self, code: &str) -> io::Result<()> {
+        // 0644: the voice and `lamp-cloud` run as `lampos` and read it.
+        let temporary = stage(&self.0.language, format!("{code}\n").as_bytes(), 0o644)?;
+        put_in_place(&temporary, &self.0.language)
+    }
     fn backend(&mut self, link: &Backend) -> io::Result<()> {
         let mut bytes = serde_json::to_vec_pretty(link).map_err(io::Error::other)?;
         bytes.push(b'\n');
@@ -1019,6 +1083,10 @@ pub fn run(
             }
             .and_then(|()| match &accepted.timezone {
                 Some(zone) => save.timezone(zone),
+                None => Ok(()),
+            })
+            .and_then(|()| match accepted.language {
+                Some(code) => save.language(code),
                 None => Ok(()),
             })
             .map(|()| {

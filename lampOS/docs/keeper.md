@@ -70,8 +70,8 @@ from being lost. Not taken: conditional keep-alive.
     systemctl start lampos.target
     systemctl stop lampos.target
 
-and `lamp-keeper start lamp` / `lamp-keeper stop lamp` do the same with a
-pause first (below). The target is active when every part it wants has
+and `lamp-keeper start lamp` does the same, and `lamp-keeper stop lamp`
+with a pause first (below). The target is active when every part it wants has
 started; for a `Type=notify` part that means it has said it is ready, so
 the target's start time is the lamp's "power-up to every part ready"
 once every part notifies.
@@ -81,15 +81,18 @@ together):
 
 | Step | Parts | Why |
 |---|---|---|
-| 1 | memory, actions, health | The voice reads what is kept before its first session and calls the actions for its functions. Health is there to see the others come up |
+| 1 | memory, actions, controls | The voice reads what is kept before its first session and calls the actions for its functions. It starts after Controls, so at a shutdown it stops before Controls (#3697) |
 | 2 | voice | The lamp's reason to be: listening as early as it can. The ring is the voice's own, so "the light" comes with it |
-| 3 | body, name, controls, policy | The body's mood comes from the voice; name, controls and policy read and write the voice's topics |
+| 3 | body, name, policy | The body's mood comes from the voice; name and policy read and write the voice's topics |
 | 4 | eyes, Expression | The eyes send each look to the body's gaze socket; Expression's requests go to the body and the ring's owner |
+
+Health is ordered against none of them: it starts and stops with the
+target, at no fixed point in either order.
 
 Stop is the reverse: eyes and Expression first, so nothing is sent to a
 body on its way down; then the body, which folds before it ends (its
-`TimeoutStopSec=25s`), with name, controls and policy; then the voice; then
-memory, actions and health, so health reports the others going.
+`TimeoutStopSec=25s`), with name and policy; then the voice; then
+memory, actions and controls.
 
 What is known and what is not:
 
@@ -118,7 +121,7 @@ What is known and what is not:
 | Slice | Parts | Weight | Why |
 |---|---|---|---|
 | `lampos-voice.slice` | voice | `CPUWeight=1000`, `IOWeight=1000` | A late word is worse than anything else late. The voice's microphone and speaker threads are also round-robin real-time at 20 (lamp-4ace, 2026-10-13: with every core busy the voice ended four times at ordinary priority) |
-| `lampos-parts.slice` | every other part | `CPUWeight=100` | Together no more than one ordinary service. Within it: eyes `Nice=10` (looking is never worth a late word); name, Expression, policy, health `Nice=5`; body and memory ordinary; controls' main loop and strip child round-robin real-time at 30, above the voice, so the switch and hand can be read while speech is busy. Each loop rests for at least its thread CPU work; reset-on-fork stays unset (#2602, [controls.md](controls.md)) |
+| `lampos-parts.slice` | every other part | `CPUWeight=100` | Together no more than one ordinary service. Within it: eyes `Nice=10` (looking is never worth a late word); name, Expression, policy, health `Nice=5`; body and memory ordinary; controls `Nice=5` in these units, and in the product unit (`deploy/product/lamp-controls.service`) its main loop and strip child round-robin real-time at 30, above the voice, so the switch and hand can be read while speech is busy. Each loop rests for at least its thread CPU work; reset-on-fork stays unset (#2602, [controls.md](controls.md)) |
 
 The name also keeps to the board's fast processors (`CPUAffinity=`), as on
 lamp-4ace.
@@ -176,11 +179,13 @@ systemd has no pause. Each part honours one itself, when the keeper asks:
 | voice | Takes no new turn. A turn under way is finished, the person is not cut off. The microphone stays as the privacy switch has it |
 | body | Goes to rest (folds, if it stands), sends no new goal, and holds there |
 | Expression | Holds still: no new requests; those already sent run out |
+| skills | A run under way sends no further step: no next clip, a show stops before its next frame, a search ends |
+| addons | The judge drops every suggestion: `the lamp is paused` |
 | eyes, name, memory, actions, policy, controls, health | Nothing: none of them moves or speaks by itself |
 
 Resume undoes it. A stop by the keeper is: pause, wait until the voice has
-been quiet (task 12's 45 s, [surround.md](surround.md), "the owner
-protocol"), then `systemctl stop lampos.target`. `systemctl stop` alone
+been quiet (task 12's 45 s, [surround.md](surround.md), "Startup and first
+setup"), then `systemctl stop lampos.target`. `systemctl stop` alone
 does not pause: the body still folds on its way down, but the voice may be
 ended mid-word.
 
@@ -193,7 +198,9 @@ lamp leaves them folded and resting until it is next started (install.md,
 #2818). `lamp-keeper stop
 lamp` pauses, waits up to 45 s for `voice/state` to say resting, stops
 `lampos.target`, and then clears the pause, so that the lamp is not paused
-when it is next started.
+when it is next started. Setup's shutdown says `lamp-keeper pause` too,
+before it stops the target ([shutdown.md](shutdown.md)); a lamp with no
+keeper is said so, and its body rests as it stops.
 
 **Who honours it now.** The body: it reads the kept value at most once a
 second; paused, every mood it is told is rest, and gestures, looks,
@@ -220,6 +227,13 @@ in the session record. Expression, paused, publishes nothing on
 `expression/body` or `expression/light`; what it sent runs out with its
 200 ms lease, and the next request after resume is the planner's own.
 With nothing said on `lamp/pause` both do exactly what they did before.
+
+Skills and addons read `lamp/pause` too. A skill's run looks at it as it goes
+(`body_stopped` in `lamp-skills`): paused, it sends no next clip and no step
+after it, a light show stops before its next frame and a search ends, each
+saying why, `the lamp was paused` ([skills.md](skills.md)). The addons
+judge drops a suggestion while the lamp is paused, as while it is private or
+asleep ([addons.md](addons.md)).
 
 ## A restart asked from the app (#2193)
 

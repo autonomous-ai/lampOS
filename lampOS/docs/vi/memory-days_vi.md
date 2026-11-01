@@ -140,6 +140,23 @@ như vẫn còn, và lệnh kết thúc bị từ chối). Một id người đ�
 một id chưa từng được cấp cho họ, kể cả id của người khác, vẫn bị từ chối
 (`bad_request`).
 
+## Cuộc trò chuyện dài quá 64 lượt
+
+Một cuộc trò chuyện không có quãng lặng nào mà đạt 64 lượt (`SOURCE_IDS`,
+giới hạn nguồn của một lệnh kết thúc) không còn bị bỏ qua lượt quan sát nữa
+(#1693, bước 2). Khi lượt thứ 65 được ghi, 64 lượt trước đó được đóng thành
+một phần riêng và kết thúc như một cuộc trò chuyện kết thúc, rồi cuộc trò
+chuyện đi tiếp, vẫn của người đó, trong một phần mới. Không lượt nào được nêu
+trong hai phần. Mọi phần giữ số lệnh quên của lượt đầu tiên của cuộc trò
+chuyện, nên một lệnh quên nói ở bất kỳ đâu trong đó vẫn đóng job quan sát của
+từng phần mà không gửi; một lượt ghi bị mất chỉ làm bỏ qua phần chứa nó
+(`crates/memory/tests/voice_observe_overflow.rs`: 70 lượt cho hai lượt quan
+sát 64 và 6, và một lệnh quên theo tên trong phần đầu dừng cả hai). Nhật ký
+có ba bộ đếm không chứa nội dung, tính từ lúc khởi động: phần bị đóng ở giới
+hạn (`closed=N`), lệnh kết thúc bị memory từ chối vì vượt giới hạn đầu vào
+32 KiB của lượt quan sát (`why=too_large too_large=N`), và job bị đóng không
+gửi vì hàng đợi quan sát đã đầy (`busy=N`).
+
 ## Truy xuất theo khoảng ngày
 
 Khi `recall_v2` hỏi một ngày hay một khoảng ngày mà không có từ khóa, các ghi
@@ -168,6 +185,79 @@ là hôm nay. Ghi chú cũ (legacy) ghi cùng ngày ở cuối dòng, «(on Frid
 October)». Không có điều nào có ngày thì ghi chú giữ nguyên như trước. Giới hạn
 1.200 byte của ghi chú không đổi và tính cả `on`; mỗi điều có ngày tốn khoảng
 18–23 byte, câu giải thích khoảng 130 byte, chỉ khi có điều có ngày.
+
+## Ghi chú cuộc trò chuyện (`talk_note`, `LAMP_CONVERSATION_SUMMARY`)
+
+Khi bật `LAMP_CONVERSATION_SUMMARY` (chỉ tuyến thứ hai, bật trong unit sản
+phẩm), lúc một cuộc trò chuyện kết thúc, ghi chú chạy của nó (bản tóm tắt
+mà voice giữ trong RAM trong lúc nói chuyện) được lưu vào bộ nhớ thành
+**ghi chú cuộc trò chuyện** của chính phạm vi đó, kể cả phạm vi của căn
+phòng:
+
+- **Lưu thế nào.** Lệnh mới `talk_note {text, source_ids}` trả
+  `{ok:true,id}`. `text` không rỗng, tối đa 6.400 byte UTF-8, được xuống
+  dòng nhưng không có ký tự điều khiển khác; `source_ids` là 1 đến 64 lượt
+  trao đổi khác nhau của phạm vi này, đã xảy ra. Lưu như một observation
+  loại `talk`, **không hoạt động** (`active=0`), liên kết với các lượt đó và
+  mang ngày của lượt mới nhất. Vì không hoạt động, ghi chú phiên, `kept`,
+  `search`, `recall` và lượt quan sát không bao giờ thấy nó, kể cả một bản
+  cũ hơn khi quay lại. `adopt` không chuyển nó: khi các lượt của căn phòng
+  được chuyển cho một người quen, ghi chú cuộc trò chuyện của căn phòng làm
+  từ bất kỳ lượt nào trong số đó bị xoá, để căn phòng không còn nhắc lại
+  được những lời đó (nó có thể chứa cả lượt khác của căn phòng nên không
+  được chuyển; P2 của reviewer-lead trên #4479).
+- **Giữ bao lâu.** Đến khi bị quên: không hết hạn, kể cả khi các lượt trao
+  đổi của nó đã hết hạn.
+- **Không kể khi không được hỏi.** Không có trong ghi chú đầu phiên. Lệnh
+  `talk_notes {query?, day_from?, day_to?, limit?, max_bytes?}` trả các ghi
+  chú của phạm vi, mới nhất trước: theo khoảng ngày nếu có, nếu không thì
+  theo từ của câu hỏi; câu hỏi chỉ về chính cuộc trò chuyện («lúc nãy chúng
+  ta đã nói chuyện gì?», `TALK_WORDS`) hoặc không có câu hỏi thì trả các ghi
+  chú mới nhất (trên lamp-06c1 ngày 30/10, hỏi như vậy không tìm thấy ghi
+  chú nào trong 7 ghi chú đã lưu); nhật ký đếm các ghi chú này là `entries`;
+  tối đa 4 ghi chú và 12.800 byte, ghi chú quá dài bị
+  bỏ các dòng `- ` cũ nhất, không bao giờ cắt phần cuối. Khi `recall`, voice
+  hỏi thêm ghi chú của người hỏi (đánh dấu là của họ, «bản tóm tắt của chính
+  bạn, bằng lời của bạn, không phải lời họ») rồi của căn phòng (kể như của
+  căn phòng, không bao giờ như của người hỏi). Người hỏi chưa nhận ra được,
+  hỏi về chính mình, vẫn không được trả gì (#4196).
+- **Quên.** «Quên mọi thứ về tôi» xoá ghi chú của người đó. Bất kỳ lệnh quên
+  nào xoá một lượt trao đổi của nó cũng xoá nó (kể cả quên một điều đã ghi
+  nhớ, vì bằng chứng của điều đó bị xoá); quên chính ghi chú thì xoá cả các
+  lượt trao đổi của cuộc trò chuyện. Quên một điều đã ghi nhớ hay một
+  observation cùng phạm vi, có chung một lượt nguồn với ghi chú, cũng xoá
+  ghi chú, kể cả khi các lượt đó đã hết hạn sau 30 ngày: id các lượt nguồn
+  của mỗi điều đã ghi nhớ và observation được chép vào bảng `origins` trước
+  khi lượt nào hết hạn (`keep_origins`, trong `maintain`), tạo `IF NOT
+  EXISTS`, `user_version` không đổi (P1 của reviewer-three trên #4479).
+- **Lượt quan sát** được đọc ghi chú như `"summary"`, là lời của đèn, chỉ
+  được dẫn các bản ghi; voice bỏ một đề xuất không có từ nào trong lời người
+  đó nói ở các bản ghi được dẫn mà lại có trong ghi chú.
+
+## Gọi `recall` trước khi nói không biết
+
+Mô tả `recall` của voice bảo mô hình gọi nó trước khi nói không nhớ một sở
+thích của chính người đó, như đồ uống yêu thích, trừ khi câu trả lời đã có
+trong cuộc trò chuyện (`remember::RECALL_OWN_PREFERENCE`; lamp-06c1, 26/10:
+P09 đáp «tôi không biết» mà không gọi, P40 gọi và nói cà phê đen). Từ #4339
+(lần chạy dài thứ ba trên lamp-06c1, 30/10: 3 lần `recall` trong 96 lượt, bốn
+câu «tôi không có gì» về đời sống của chính người đó trong khi điều ấy đã được
+giữ, quan sát hay nằm trong một ghi chú cuộc trò chuyện), cùng câu đó phủ cả
+đời sống của họ: kế hoạch, những người trong đời họ, công việc và những gì đã
+nói với nhau. `recall` nay «không dành cho những gì bạn còn thấy của cuộc
+trò chuyện này» (`remember::RECALL_NOT_FOR`); trước đây là «không dành cho
+cuộc trò chuyện này», khiến mô hình không hỏi phần đầu của một cuộc trò
+chuyện dài, nay đã nằm trong ghi chú cuộc trò chuyện. Lượt nói cũng nói điều
+đó, sau các lệnh của bộ nhớ (`worker::RECALL_BEFORE_NOT_KNOWING`): trước khi
+nói không biết hay không nhớ điều gì về đời sống của họ, gọi `recall` trước,
+chỉ nói «tôi không nhớ» khi nó không tìm thấy gì, và chỉ dùng những gì tìm
+được để trả lời điều họ hỏi (không bao giờ kể ra khi không được hỏi). Một câu
+đùa, một sự thật, giờ giấc hay chuyện phiếm không hỏi gì trước, nên một lượt
+bình thường không có vòng `recall` trước âm thanh đầu tiên. Đó là lời cho mô
+hình, không phải một bảo đảm; memory vẫn chỉ tìm trong phạm vi của người hỏi.
+Ghi chú cuộc trò chuyện vẫn chỉ đến qua `recall`: không ghi chú nào được hiện
+khi một phiên bắt đầu. `probe-tools ... --recall` đo quy tắc này so với lời
+trước nó trên mô hình thật ([second-voice.md](../second-voice.md)).
 
 ## Người hỏi chưa nhận ra được, hỏi về chính mình
 
@@ -200,3 +290,152 @@ vòng kiểm tra bản 8327 trên lamp-4ace, một giọng chưa nhận ra hỏi
 take my coffee?» và được trả lời «someone here said you take it green tea»,
 một ghi chú của căn phòng từ cảnh khác (#4196). Trong ghi chú đó là lời dặn
 cho mô hình; trong `recall` là một chặn cứng.
+
+## Một câu của họ không thấy mặt nói, trong cuộc trò chuyện đang diễn ra
+
+Với `LAMP_PERSON_SCOPE_SEEN`, một câu của người quen mà không thấy mặt ai nói
+thì thuộc về căn phòng, nên một lượt trong cuộc trò chuyện của họ mất cả cuộc
+trò chuyện (lamp-3e83, 29/10: cuộc chat thấy 16, rồi 4, rồi 16 tin nhắn, và đèn
+hỏi lại câu đã hỏi). Với `LAMP_CONVERSATION_CARRIES=on` (#4339), câu ấy vẫn
+thuộc cuộc trò chuyện đó khi lượt trao đổi mới nhất trước nó là của họ và bắt
+đầu trong vòng 45 giây, và mắt có nhìn qua câu ấy mà không thấy mặt nào khác
+ngoài mặt họ. Nó được đọc như một phạm vi được giữ qua khoảng hở của khuôn mặt
+(`ScopeSnapshot::held`): luồng và các lượt trao đổi của họ như đang có, không
+có ghi chú ký ức, gợi ý, `recall`, ghi nhớ, quên hay một lời «có», và không bao
+giờ được ghi vào nhật ký. Vì vậy quy tắc ở trên vẫn giữ: người hỏi chưa nhận ra
+không chạm được ký ức đã lưu của ai. Thấy mặt ai nói câu ấy, có mặt khác trong
+khung hình, im lặng quá 45 giây, có lượt của người khác ở giữa, hoặc mắt không
+nhìn qua câu ấy, thì nó thuộc về căn phòng như trước. Một câu được nhận là của
+căn phòng vì không nhận ra ai (lamp-06c1, 29/10: 5 trong 68 lượt dù người đó ở
+trong khung hình suốt) cũng được giữ trong cuộc trò chuyện đang diễn ra của
+người quen theo cùng quy tắc. Rủi ro đã chấp nhận: một
+người ngoài khung hình, không có dấu hiệu nào khác, được trả lời trong cuộc trò
+chuyện đang diễn ra và nghe được những gì đã nói trong đó; họ không chạm được
+ký ức đã lưu của người kia.
+
+**Một khuôn mặt im lặng không tính** (`LAMP_CONVERSATION_CARRIES_PAST_SILENT=on`,
+#4339, quyết định của người phụ trách trí nhớ ngày 30/10): trên lamp-3e83 ngày
+30/10 (bản 8899), khuôn mặt quen ở trong khung hình ở các câu bị rơi nhưng hầu
+như không bao giờ một mình (30 lần nhìn, không lần nào chỉ một mặt, mặt quen có
+trong cả 30), nên quy tắc trên chỉ giữ được 4 câu và một cuộc trò chuyện bị chia
+từng câu vào luồng của người đó hoặc của căn phòng. Bật công tắc này, «không có
+mặt nào khác trong khung hình» trở thành **không thấy mặt nào khác nói câu ấy,
+và không có giọng nào khác trong cuộc trò chuyện**: mắt vẫn phải nhìn qua câu
+ấy (`SpeakingFaces::looked_between`), và giọng khác là dấu hiệu người thứ hai
+của chính quy tắc nghe, dấu hiệu mà việc nối lời bị cắt giữ
+(`Heeding::another_person`: một câu bằng giọng khác giọng cuộc trò chuyện, một
+dấu giọng dưới `same_voice::DIFFERENT_BELOW`, hoặc hai mặt được thấy nói một
+câu). Nó được đọc khi nghe câu và một lần nữa sau khi quy tắc đã xét giọng của
+chính câu ấy; nếu đã có giọng khác, câu thuộc về căn phòng trước khi kể gì. Một câu
+mà quy tắc bỏ qua (bị giữ lại vì là tiếng ngắn, rỗng, hoặc là tiếng vọng của
+chính đèn) không được xét giọng, nên dấu hiệu là của câu trước: câu ấy không
+được giữ, thuộc về căn phòng trước khi kể hay lưu gì. Chỉ có tác dụng khi quy
+tắc giữ dấu hiệu đó (`LAMP_JOIN_CUT_WORDS` hoặc `LAMP_SECOND_NAME_CARRIES`, cả
+hai đều bật trong sản phẩm) và việc kiểm tra cùng giọng đang chạy (bộ lấy dấu
+giọng đã khởi động, đèn là giọng duy nhất, và một trong `LAMP_SPOKEN_TO`,
+`LAMP_QUIET_GOING_ON_SAME_ONE`, `LAMP_GOING_ON_NOT_OWN`,
+`LAMP_MEMORY_FOLLOWS_FACE` bật): thiếu một trong hai, không gì có thể cho thấy
+giọng khác, nên công tắc không làm gì, mặt khác trong khung hình vẫn giữ câu
+cho căn phòng như trước, và nhật ký ghi một lần lúc khởi động là thiếu gì
+(`Engine::carrying_past_silent_where_heard`). Phần còn lại giữ nguyên. Rủi ro đã chấp nhận: **một vị khách im lặng ngồi bên nghe được luồng
+của người đó ở một câu được giữ** (không bao giờ là ký ức đã lưu của họ).
+
+**Các câu của căn phòng trong cùng cuộc trò chuyện**
+(`LAMP_CONVERSATION_ROOM_LINES_TOLD=on`, #4339): một câu vẫn bị tách sang luồng
+của căn phòng thì lượt sau của người đó không biết (lamp-3e83, 30/10: một tìm
+kiếm trên mạng được trả lời trong luồng của căn phòng, rồi «I've lost the
+thread» cho chính câu hỏi của họ về nó). Bật công tắc này, lượt của một người
+quen được đưa cả các lượt trao đổi của căn phòng trong cùng cuộc trò chuyện,
+câu của người nói được đánh dấu `(said in the room)`
+(`Thread::recent_with_room_lines`): cùng cuộc trò chuyện là đi ngược từ bây giờ
+qua các lượt của họ và của căn phòng, mỗi lượt cách lượt sau không quá 45 giây,
+dừng ở lượt của người khác, và chỉ tính các lượt của căn phòng từ lượt đầu tiên
+của họ trong đó; trong cửa sổ 12 lượt và 600 giây của cuộc chat. Chỉ một chiều:
+lượt của căn phòng hay của một giọng chưa nhận ra (#4196/#4207) không bao giờ
+được đưa câu của một người, và lượt của một người không bao giờ được đưa câu của
+người khác. Bản tóm tắt chạy và ghi chú cuộc trò chuyện vẫn theo từng phạm vi.
+Mọi lệnh quên đều bỏ chúng. Tất cả trong bộ nhớ, không thêm I/O trên đường trả
+lời. Thuộc rủi ro «đã nói thành tiếng» được chấp nhận: một câu bị thu về căn
+phòng vì một giọng khác đã nói nó (`Heeding::another_person`, hoặc lần xét lại
+sau quy tắc) vẫn đến lượt của người đó, đánh dấu `(said in the room)`: lời của
+một vị khách, nói thành tiếng bên cạnh họ, được kể cho lượt của họ; không bao
+giờ vào bản tóm tắt chạy, ghi chú hay ký ức đã lưu của họ.
+
+**Điều một câu được giữ yêu cầu lưu phải chờ lời «có» của họ**
+(`LAMP_CONVERSATION_CARRIED_SAVES=on`, #4339, thay đổi quy tắc riêng tư được
+duyệt ngày 30/10, cùng quyết định của người xây dựng đầu tiên trên #4508):
+trước đây câu được giữ không lưu được gì, nên «We booked the Pine Hill Hotel»
+nói lúc khuôn mặt lệch khỏi khung hình bị mất («I can't save that just now»).
+Bật công tắc này, lệnh `remember` của một câu được giữ
+(`ScopeLease::save_carried`) được khai báo nhưng không ghi ngay: nó được giữ
+trong RAM, không ghi vào nhật ký, chờ lời «có» của chính người được giữ, như
+một lệnh quên được giữ (`hold_carried_keep`, `take_held_forget`). Mô hình được
+báo «Not kept yet» (`remember::held_keep_told`) và hỏi một lần, «Want me to
+keep that for you?»; việc giữ chỉ còn nếu câu trả lời nói trọn có hỏi
+(`remember::asks_about_keeping`). Lời «có» đơn giản của họ ở câu nói kế tiếp,
+trong vòng `HELD_FORGET_FOR` (60 giây), với chính khuôn mặt họ được thấy đang
+nói và không mặt nào khác (`LAMP_EYES_SPEAKING`,
+`speaking_faces::seen_saying`), mới ghi nó vào phạm vi của họ, và câu trả lời
+nói đã lưu. Khuôn mặt họ chỉ ở trong khung hình là chưa đủ: nó vẫn ở đó khi một
+vị khách nói từ ngoài khung hình (Reviewer-three, 14:46). Mọi trường hợp khác
+đều bỏ nó, không ghi gì ở đâu cả: không có «có», «có» không được thấy (mô hình
+được báo là không tính), một mặt khác được thấy nói, một lệnh quên, cuộc trò
+chuyện kết thúc, hay quá một phút. Khi mắt không đọc được ai đang nói thì không
+giữ gì, và việc lưu bị từ chối («Not kept»). Lượt trao đổi của câu được giữ vẫn
+không vào nhật ký, nên không lời nào trong đó thành điều quan sát về họ. Mọi thứ
+khác vẫn giữ như phạm vi được giữ: không `recall`, ghi chú hay gợi ý, không
+`forget`, `forget_everything`, quy tắc, khuôn mặt hay lời «có». Một câu được
+nhận chỉ nhờ khoảng hở của khuôn mặt (`LAMP_FACE_GAP_HOLD`) không giữ gì, và câu
+đã thu hẹp về căn phòng (thấy mặt khác nói) là của căn phòng. Bản tóm tắt chạy
+và ghi chú cuộc trò chuyện vẫn bỏ qua câu được giữ. Rủi ro còn lại: lời «có»
+được thấy của chính họ xác nhận một điều mà người khác có thể đã nói; họ được
+hỏi trước. Việc kiểm tra cùng giọng (`same_voice_releases`, một điểm móc, hiện
+chưa bao giờ đúng) là phần làm sau.
+## Một câu của họ không thấy mặt nói, khi chỉ có mặt họ trong khung hình
+
+Với `LAMP_PERSON_SCOPE_ONE_FACE=on` (bật trong bản sản phẩm; mục 1 của nhóm
+thử nghiệm ra mắt trên #3997): trên lamp-220c ngày 30/10, mặt chủ đèn có trong
+17 lần nhìn của một câu nhưng không lần nào đọc là đang nói, nên với
+`LAMP_PERSON_SCOPE_SEEN` mọi câu đều thuộc về căn phòng và ký ức riêng của họ
+gần như trống. Giờ đây, với một câu được nhận là của người quen, không thấy mặt
+ai nói, khi các lần nhìn qua câu ấy thấy khuôn mặt quen của họ trong ít nhất 3
+lần và không thấy mặt nào khác trong bất kỳ lần nào
+(`SpeakingFaces::one_face_in_view`; một lần nhìn không có ai không tính là mặt
+khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **chỉ việc ghi nhớ**
+(`remember`) là của họ: điều đó được lưu vào phạm vi của họ
+(`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`). **Mọi việc
+đọc vẫn là của căn phòng**: không `recall` hay gợi ý từ ký ức của họ, không
+ghi chú ký ức của họ, không ngữ cảnh của người ấy, không chuỗi hội thoại hay
+bản tóm tắt của họ; câu được nói và đọc như của căn phòng, như khi không có
+công tắc. Lý do (P1 của Reviewer-three trên #4584, phương án 2): «không có
+giọng khác» được so với giọng của cuộc trò chuyện, không phải giọng của họ,
+nên một vị khách ngoài khung hình mở đầu cuộc trò chuyện trong khi họ ngồi im
+là mặt duy nhất trông y hệt; một lần ghi nhầm nằm trong ký ức của chính họ, nơi
+họ có thể quên nó, còn một lần đọc nhầm đưa ký ức của họ cho người khác. Việc
+đọc ký ức của họ cần một dấu hiệu nói (thấy mặt họ nói) hoặc một cuộc trò
+chuyện được giữ (#4479); khi đó cách ấy thắng, như hôm nay. Bằng chứng «giọng
+khác» là ghi nhận của chính quy tắc trên tuyến thứ hai
+(`worker::Heeding::another_person`): một câu có dấu giọng khác với giọng của
+cuộc trò chuyện (`same_voice::DIFFERENT_BELOW`) hoặc thấy hai mặt cùng nói một
+câu, kể từ khi cuộc trò chuyện bắt đầu. Nó được đọc khi câu được nhận và đọc
+lại khi câu đã được xét, nên giọng khác nghe thấy ngay trong câu ấy khiến cả
+việc ghi nhớ cũng thuộc về căn phòng. Một câu được nhận là của căn phòng mà mắt
+gọi tên họ muộn (#2807) cũng vậy: chỉ việc ghi nhớ là của họ. Chỉ có tác dụng
+cùng `LAMP_PERSON_SCOPE_SEEN` và khi quy tắc giữ phòng của từng câu
+(`LAMP_JOIN_CUT_WORDS` hoặc `LAMP_SECOND_NAME_CARRIES`)
+(`worker::one_face_not_acted`); thiếu một trong hai thì lý do được ghi lúc khởi
+động và công tắc không làm gì. Công tắc không chờ việc kiểm tra cùng giọng
+(phương án 1 của người xây dựng đầu tiên trên #3997): không khởi động được bộ
+lấy dấu giọng, hoặc là tuyến dự phòng bên cạnh Live, thì không câu nào được nhận
+là giọng khác, chỉ thấy mặt thứ hai nói mới cho biết có người khác; vì chỉ việc
+ghi nhớ là của họ, cái giá là lời được lưu, không bao giờ bị đọc. Có mặt thứ hai, mặt lạ,
+không có mặt nào, hoặc có giọng khác, thì như trước. Một câu được nhận là của
+căn phòng vì không nhận ra ai thì không đổi, nên giọng chưa nhận ra vẫn không
+chạm được ký ức của ai (#4196, #4207). **Việc quên không đổi:** `forget` và
+`forget_everything` trên câu như vậy chạy trong phạm vi của căn phòng, và **một
+lời «có» nói trên câu như vậy không bao giờ chạy một lệnh quên đang giữ**
+(`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói. Rủi ro còn lại:
+một giọng ngoài khung hình khi họ ngồi một mình trong khung, không có dấu giọng
+để phân biệt, có thể được lưu vào ký ức của họ (không bao giờ được đọc lại cho
+giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
+hình có thể chứa lời người khác nói ngoài khung hình.

@@ -176,6 +176,16 @@ pub(crate) fn holding_only(text: &str) -> bool {
             | "just a moment"
             | "give me a second"
             | "give me a moment"
+            // A check promised with no call (#4684's line 3 on lamp-4ace on
+            // 31 Oct: "Let me check that one." about an Aeron chair, then
+            // nothing): the one continuation lets the search be made.
+            | "let me check"
+            | "let me check that"
+            | "let me check that one"
+            | "let me check on that"
+            | "let me look that up"
+            | "let me look it up"
+            | "let me find out"
     )
 }
 
@@ -243,6 +253,10 @@ mod tests {
             "  LET ME\nTHINK...  ",
             "Just a moment.",
             "Let me think for a second.",
+            "Let me check that one.",
+            "let me check",
+            "Let me look that up…",
+            "Let me find out!",
         ] {
             assert!(holding_only(phrase), "{phrase}");
         }
@@ -260,6 +274,12 @@ mod tests {
             "Let me see: four",
             "one moment; the answer is four",
             "Let me think. Let me think.",
+            // A check with its answer, or a look (the lamp's own
+            // `LOOKING`), is no holding answer.
+            "Let me check: it's $1,895.",
+            "Let me check that one. It's about $1,800.",
+            "Let me look.",
+            "Let me check the light",
         ] {
             assert!(!holding_only(phrase), "{phrase}");
         }

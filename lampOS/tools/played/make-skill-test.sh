@@ -350,7 +350,7 @@ grep -qx "Hey Lamp, I'm back at my desk." "$T/d/played" && { echo "FAIL app-face
 # No lamp-cloud given: nothing changed, nothing played.
 MAKE_FROM=app run app-no-cloud yes 2 "needs CLOUD=PATH"
 [[ ! -e $T/d/played ]] || { echo "FAIL app-no-cloud: something was played"; fail=1; }
-FAKE_ENV="LAMP_VOICE_ROUTE=second LAMP_TASKS_DIR=/run/lampos-tasks LAMP_APP_MAKE_SKILL=on" CLOUD=$T/fixture MAKE_FROM=app run app-set yes 3 "already set"
+FAKE_ENV="LAMP_VOICE_ROUTE=second LAMP_TASKS_DIR=/run/lampos-tasks LAMP_APP_MAKE_SKILL=off" CLOUD=$T/fixture MAKE_FROM=app run app-set yes 3 "and not to on"
 
 # The lamp's own confirm before the hand-over: answered, then the hand-over's yes.
 FAKE_CONFIRM=1 run confirm yes 0 "PASS asked to confirm: the lamp's answer played" "PASS handed over" "0 failed"
@@ -390,8 +390,10 @@ grep -q 'rm -rf /usr/local/lib/played-stand-in' "$T/d/calls" || { echo "FAIL pla
 FAKE_SETUP_FAILS=1 run setup-fails yes 9 "the stand-in's setup failed; nothing was played" "put back"
 [[ ! -e $T/d/played ]] || { echo "FAIL setup-fails: something was played"; fail=1; }
 
-# The switch already set, or no tasks part: nothing changed, nothing played.
-FAKE_ENV="LAMP_TASKS_DIR=/run/lampos-tasks LAMP_MAKE_SKILL=on" run already yes 3 "already set"
+# The product unit's switches, both on (fourteen-P15): taken as they are, and the arm plays.
+FAKE_ENV="LAMP_VOICE_ROUTE=second LAMP_TASKS_DIR=/run/lampos-tasks LAMP_MAKE_SKILL=on LAMP_APP_MAKE_SKILL=on" run product yes 0 "PASS asked to put it on" "0 failed"
+# A switch set to something other than on, or no tasks part: nothing changed, nothing played.
+FAKE_ENV="LAMP_TASKS_DIR=/run/lampos-tasks LAMP_MAKE_SKILL=off" run already yes 3 "and not to on"
 [[ ! -e $T/d/fixture ]] || { echo "FAIL already: the stand-in was sent"; fail=1; }
 FAKE_ENV="LAMP_VOICE_ROUTE=second" run no-tasks yes 3 "no tasks part"
 

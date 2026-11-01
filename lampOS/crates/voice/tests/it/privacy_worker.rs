@@ -42,6 +42,12 @@ use std::{
 
 const WAIT: Duration = Duration::from_secs(2);
 const SAMPLE: Duration = Duration::from_millis(5);
+/// How often the rig renews the worker's authority: the coordinator's own
+/// pace (`coordinator.rs`, a snapshot every 20 ms). The worker ends when one
+/// pass finds 16 queued (`privacy_bus.rs`), so a stalled worker has about
+/// 320 ms, the product's own margin; at 10 ms a 160 ms runner stall ended it
+/// (#4733's ARM64, 31 Oct: "privacy authority drain overflow").
+const AUTHORITY_EVERY: Duration = Duration::from_millis(20);
 
 fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
@@ -611,7 +617,7 @@ impl Rig {
         worker.check_running()?;
         if self
             .last_authority
-            .is_none_or(|at| at.elapsed() >= Duration::from_millis(10))
+            .is_none_or(|at| at.elapsed() >= AUTHORITY_EVERY)
         {
             let snapshot = self.controller.snapshot(now()).map_err(io::Error::other)?;
             worker
@@ -1314,6 +1320,76 @@ fn expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker() {
     }
 }
 
+/// #4332, fault A: lamp-06c1's cold boot held the board ~0.9 s on memory,
+/// the wait's Denied lease lapsed and the real worker ended with exit 1. A
+/// lapse of a lease granting nothing is now ridden, with nothing published,
+/// and the next authority re-arms it; nothing is ever permitted.
+#[test]
+fn the_real_worker_rides_a_900_ms_lapse_of_a_denied_lease() {
+    on_time(
+        "the_real_worker_rides_a_900_ms_lapse_of_a_denied_lease",
+        || {
+            let mut rig = Rig::start(Permission::Denied);
+            rig.controller
+                .set_camera_permission(now(), Permission::Denied)
+                .unwrap();
+            rig.last_authority = None;
+            rig.until(|value| value.physical_muted == Some(false));
+            let until = Instant::now() + Duration::from_millis(900);
+            while Instant::now() < until {
+                rig.worker
+                    .as_mut()
+                    .unwrap()
+                    .check_running()
+                    .expect("the worker ended on a lapse of a Denied lease");
+                // Its readings still come, as the wait takes them.
+                rig.feedback().unwrap();
+                // The leases are read on, as Ears reads them: left queued
+                // for 900 ms, the Bus passes them over as expired with no
+                // gap, and the next one read seems to skip its order. None
+                // is published once the held lease lapsed, while it rides.
+                for (value, _) in rig.leases().unwrap() {
+                    assert!(!value.permitted, "a lapsed Denied lease permitted capture");
+                    assert!(
+                        value.stamp.at_us < rig.authority_until,
+                        "a lease was published while its authority had lapsed"
+                    );
+                }
+                thread::sleep(Duration::from_millis(5));
+            }
+            rig.until(|value| value.physical_muted == Some(false));
+            rig.observe(Duration::from_millis(80), |value| assert!(!value.permitted));
+            rig.stop_worker();
+        },
+    );
+}
+
+/// A lapse of a lease that grants the microphones still ends the real
+/// worker, as an error the restart guard counts, not as an unreadable switch.
+#[test]
+fn a_lapse_of_a_granting_lease_still_ends_the_real_worker() {
+    on_time(
+        "a_lapse_of_a_granting_lease_still_ends_the_real_worker",
+        || {
+            let mut rig = Rig::start(Permission::Allowed);
+            rig.until(|value| value.permitted);
+            let deadline = Instant::now() + WAIT;
+            let ended = loop {
+                if let Err(error) = rig.worker.as_mut().unwrap().check_running() {
+                    break error;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "the worker rode a lapse of a granting lease"
+                );
+                thread::sleep(Duration::from_millis(5));
+            };
+            assert!(!Worker::ended_cleanly(&ended), "{ended}");
+            rig.worker.take();
+        },
+    );
+}
+
 /// Allowed authority alone does not establish a conversation to preserve.
 /// With a live but silent publisher, the flagged worker must still end at
 /// startup's ordinary source-expiry deadline, before granting any lease.
@@ -1417,7 +1493,7 @@ fn allowed_authority_without_a_first_observation_cannot_start_a_gap_ride() {
                 monotonic_us() < deadline_us,
                 "worker rode startup without a first grant"
             );
-            if last_authority.elapsed() >= Duration::from_millis(10) {
+            if last_authority.elapsed() >= AUTHORITY_EVERY {
                 renew(&mut worker, &mut controller);
                 last_authority = Instant::now();
             }

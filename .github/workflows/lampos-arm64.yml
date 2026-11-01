@@ -98,7 +98,11 @@ on:
       - 'lampOS/docs/endpoint-pilot.md'
       - 'lampOS/docs/install.md'
       - 'lampOS/docs/memory.md'
+      - 'lampOS/docs/msgs.md'
+      - 'lampOS/docs/setup.md'
+      - 'lampOS/docs/skills.md'
       - 'lampOS/docs/switches.md'
+      - 'lampOS/docs/updates.md'
       - '.github/workflows/lampos-arm64.yml'
       - '.github/scripts/lampos-pr-crates.py'
       - '.github/scripts/lampos-source-times.py'
@@ -516,13 +520,23 @@ jobs:
       # waiting for its lamp check that no product unit turns on, read from
       # the units (#3976). The notes are also kept on the build's own release
       # as NOTES.md; its one-line body is the provenance a promotion reads,
-      # never touched. Never a gate either.
+      # never touched. Never a gate either. Read and built at the promoted
+      # build's own commit, the receipt's from its signed manifest, not this
+      # checkout's: lamp-voice's head may be past the build (9276 on 31 Oct,
+      # with LAMP_WINDOW_FROM_START turned on after it), and which unit
+      # install places is that build's lamp-update's to say.
       - name: fill the stable notes' built-but-not-on part
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PROMOTE_SEQUENCE: ${{ inputs.promote_sequence }}
-        run: cargo run --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --bin lampos-notes -- --sequence "$PROMOTE_SEQUENCE"
+        run: |
+          commit=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["commit"])' "$RUNNER_TEMP/promotion-receipt.json")
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "the receipt's commit is not 40 hex digits"; exit 1; }
+          git fetch --depth 1 origin "$commit"
+          git worktree add --detach "$RUNNER_TEMP/promoted" "$commit"
+          cd "$RUNNER_TEMP/promoted"
+          cargo run --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --bin lampos-notes -- --sequence "$PROMOTE_SEQUENCE"
 
   # A full run that fails opens an issue (or comments on the open one), so a
   # realtime test broken by a merge is not left unseen: no other run has it.

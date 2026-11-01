@@ -91,7 +91,8 @@ It is gone with, each whether the switch is on or not (#4356):
   the same mark as the face's, `memory.md`): the answer says
   `"place": "forgotten too"`. With the switch off a kept place still goes,
   so "everything" never leaves it behind. Only the owner's own line: the person whose
-  memory id is the typed name's, or the owner the onboarding kept. Another
+  memory id is the typed name's or the owner the onboarding kept with their
+  face, either name they go by (`person::owner_ids`). Another
   person's, a room's, Live's and texts' leave it.
 
 ## What the voice does with it

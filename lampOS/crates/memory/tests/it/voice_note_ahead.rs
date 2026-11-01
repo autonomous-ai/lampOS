@@ -39,6 +39,8 @@ struct Lamp {
     socket: PathBuf,
     stop: Stopper,
     worker: Option<JoinHandle<()>>,
+    /// Held for the fixture's life, so real-store voice fixtures take turns.
+    _turn: std::sync::MutexGuard<'static, ()>,
 }
 
 fn options(root: &Path) -> Options {
@@ -51,6 +53,7 @@ fn options(root: &Path) -> Options {
 
 impl Lamp {
     fn new(person: &Person) -> Self {
+        let turn = crate::voice_store_turn();
         let root = std::env::temp_dir().join(format!(
             "lamp-vahead-{}-{}",
             std::process::id(),
@@ -93,6 +96,7 @@ impl Lamp {
             socket,
             stop,
             worker: Some(worker),
+            _turn: turn,
         }
     }
 

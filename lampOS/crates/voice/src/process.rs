@@ -451,7 +451,8 @@ impl Worker {
         directory: &Path,
         mut on_wait: impl FnMut() -> io::Result<()>,
     ) -> io::Result<()> {
-        let deadline = startup_now() + WORKER_STARTUP_TIMEOUT;
+        let mut deadline = startup_now() + WORKER_STARTUP_TIMEOUT;
+        let mut busy_at_start = false;
         let role = self.role.clone();
         let peer_c = directory.join(format!("{role}.c.w"));
         let peer_d = directory.join(format!("{role}.d.w"));
@@ -486,6 +487,18 @@ impl Worker {
             };
             match received {
                 Some(WorkerEvent::Ready) => return Ok(()),
+                // The speaker's device is busy at start and tried again for
+                // up to its bound (#4332): ready is waited for that much
+                // longer, once, with the usual time for the rest of its start
+                // after. No authority is sent to it before ready, so none of
+                // its leases can lapse; `on_wait` keeps the other workers'
+                // renewed and ends the wait on a stop, the child killed.
+                Some(WorkerEvent::BusyAtStart) if role == "speaker" && !busy_at_start => {
+                    busy_at_start = true;
+                    deadline = startup_now()
+                        + crate::open_at_start::SPEAKER_BUSY_AT_START
+                        + WORKER_STARTUP_TIMEOUT;
+                }
                 Some(WorkerEvent::DiagnosticsStarted { started })
                     if self.diagnostic_start.is_none()
                         && matches!(role.as_str(), "capture" | "speaker") =>
@@ -714,6 +727,71 @@ fn failed_fixture(child: &mut Child, error: io::Error) -> io::Error {
 #[cfg(test)]
 mod fixture_tests {
     use super::*;
+
+    /// A speaker busy at start says so before it is ready (#4332): its
+    /// readiness is waited for up to 20 s past then plus the usual 3 s, once;
+    /// without the word, or from another role, the usual 3 s hold.
+    #[test]
+    fn a_speaker_busy_at_start_is_waited_for_past_the_usual_three_seconds() {
+        // Each wait moves the startup clock on by 500 ms, so the host's own
+        // time in the wait counts little; Ready is sent once it has moved
+        // `ready_after`, if at all.
+        let start = |role: &str, busy: bool, ready_after: Option<Duration>| {
+            let directory = SessionDirectory::create().unwrap();
+            let dir = &directory.path;
+            let (parent, boot) = (new_boot().unwrap(), new_boot().unwrap());
+            // The parent's side is left for `wait_until_ready` to connect.
+            let channels = WorkerChannels::bind(dir, role, parent, boot, false).unwrap();
+            let mut peer = WorkerChannels::bind(dir, role, parent, boot, true).unwrap();
+            peer.connect(dir, role, true).unwrap();
+            let child = Command::new("sleep")
+                .arg("60")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap();
+            let mut worker = Worker {
+                channels,
+                child,
+                boot,
+                role: role.into(),
+                diagnostic_start: None,
+                ring_resources: None,
+                on_stop: None,
+                after_terminate: None,
+            };
+            if busy {
+                peer.control.send(WorkerEvent::BusyAtStart).unwrap();
+            }
+            let mut moved = Duration::ZERO;
+            let result = worker.wait_until_ready(&directory.path, || {
+                startup_clock::move_on(Duration::from_millis(500));
+                moved += Duration::from_millis(500);
+                if ready_after == Some(moved) {
+                    peer.control.send(WorkerEvent::Ready)?;
+                }
+                Ok(())
+            });
+            (result, moved)
+        };
+        let (ready, _) = start("speaker", true, Some(Duration::from_secs(20)));
+        ready.unwrap();
+        let (late, moved) = start("speaker", true, None);
+        assert_eq!(late.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert!(moved > Duration::from_secs(20), "{moved:?}");
+        let (unsaid, moved) = start("speaker", false, Some(Duration::from_secs(5)));
+        assert_eq!(unsaid.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert!(moved < Duration::from_secs(4), "{moved:?}");
+        let (capture, moved) = start("capture", true, Some(Duration::from_secs(5)));
+        let error = capture.unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("unexpected worker startup message")
+        );
+        assert!(moved < Duration::from_secs(1), "{moved:?}");
+    }
 
     #[test]
     fn cooperative_ready_child_exit_observation_does_not_reap_or_hide_a_timeout() {
@@ -1022,6 +1100,10 @@ fn worker_command(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
         ))
+        .envs(conversation_summary_worker_environment(
+            role,
+            var(crate::conversation_summary::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_reopen_quiet_worker_environment(
             role,
             var(crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT).as_deref(),
@@ -1106,6 +1188,10 @@ fn worker_command(
         .envs(shutdown_worker_environment(
             role,
             var(lamp_msgs::SHUTDOWN_SWITCH).as_deref(),
+        ))
+        .envs(night_worker_environment(
+            role,
+            var(crate::ring_night::ENVIRONMENT).as_deref(),
         ))
         .envs(scheduling_worker_environment(
             role,
@@ -1247,6 +1333,17 @@ fn memory_observe_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::OBSERVE_ENVIRONMENT, "on"))
+}
+
+// The conversation's running summary (#1693's long-conversation plan, step
+// 3), passed the same narrow way: the exact `on`, to the second route
+// alone, the one with the chat's model to ask.
+fn conversation_summary_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::conversation_summary::ENVIRONMENT, "on"))
 }
 
 // Keeping a fact as it was heard (#2176), passed the same narrow way: the
@@ -1557,8 +1654,12 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
+        // A repeat of the line before's end is no call by its text (#3923).
+        crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
         // The name at a line's start dated from its usual start (#4226).
         crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
+        // The conversation's windows measured to a line's start (#4594).
+        crate::second_provider::WINDOW_FROM_START_ENVIRONMENT,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
@@ -1584,6 +1685,8 @@ fn second_route_worker_environment(
         crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_provider::SAID_ONCE_ENVIRONMENT,
+        crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+        crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
         crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -1593,6 +1696,8 @@ fn second_route_worker_environment(
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
+        // Untied talk keeps no conversation going (#3882).
+        crate::untied_going_on::ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -1607,6 +1712,11 @@ fn second_route_worker_environment(
         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
         crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
+        crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+        crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
         crate::person::BY_DEFAULT_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
@@ -1655,6 +1765,16 @@ fn shutdown_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((lamp_msgs::SHUTDOWN_SWITCH, "on"))
+}
+
+// The night's asleep face (#3748), the same narrow way: the exact `on`, to
+// the ring only, which eases its resting face into it.
+fn night_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::ring_night::ENVIRONMENT, "on"))
 }
 
 #[cfg(test)]
@@ -1720,7 +1840,9 @@ mod tests {
             crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
             crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
+            crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
             crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
+            crate::second_provider::WINDOW_FROM_START_ENVIRONMENT,
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
             crate::second_config::OWN_KEYS_ENV,
@@ -1728,12 +1850,15 @@ mod tests {
             crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT,
             crate::second_provider::FEW_TOOLS_ENVIRONMENT,
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
+            crate::second_provider::SAY_WITH_CALL_ENVIRONMENT,
+            crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
+            crate::untied_going_on::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
@@ -1753,6 +1878,11 @@ mod tests {
             crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
             crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
+            crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+            crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -2117,6 +2247,13 @@ mod tests {
                         "LAMP_MEMORY_OBSERVE",
                         ["second"].as_slice(),
                     ),
+                    // The conversation's running summary, the route with a
+                    // model (#1693's long-conversation plan, step 3).
+                    (
+                        conversation_summary_worker_environment,
+                        "LAMP_CONVERSATION_SUMMARY",
+                        ["second"].as_slice(),
+                    ),
                     // The note asked again after a quiet, the second route's
                     // (#1693 (1)).
                     (
@@ -2265,8 +2402,8 @@ mod tests {
     /// days, the clock, the name's file (#1323) and its scoped context
     /// (#1839), both task news's told file (#2762), capture the quiet
     /// evidence switch (#1285) and the detector's input (#828), and the ring
-    /// the unplug switch (#1674, the reviewer on #1699) and the shutdown's
-    /// (#3697). With every other variable set to a secret,
+    /// the unplug switch (#1674, the reviewer on #1699), the shutdown's
+    /// (#3697) and the night's asleep face (#3748). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
     fn a_started_worker_gets_its_roles_switches_and_nothing_else() {
@@ -2296,6 +2433,7 @@ mod tests {
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
+                    crate::conversation_summary::ENVIRONMENT,
                     crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
@@ -2314,6 +2452,7 @@ mod tests {
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
+                    crate::ring_night::ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                 ]
                 .contains(&name)
@@ -2351,7 +2490,9 @@ mod tests {
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
+                    || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
                     || name == crate::second_provider::NAME_START_USUAL_ENVIRONMENT
+                    || name == crate::second_provider::WINDOW_FROM_START_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
@@ -2364,6 +2505,8 @@ mod tests {
                     || name == crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
+                    || name == crate::second_provider::SAY_WITH_CALL_ENVIRONMENT
+                    || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
@@ -2371,6 +2514,7 @@ mod tests {
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
+                    || name == crate::untied_going_on::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
@@ -2390,6 +2534,11 @@ mod tests {
                     || name == crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT
                     || name == crate::second_provider::TWO_FACES_HELD_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT
+                    || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
+                    || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
@@ -2476,6 +2625,11 @@ mod tests {
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
+                    "LAMP_CONVERSATION_CARRIED_SAVES=on",
+                    "LAMP_CONVERSATION_CARRIES=on",
+                    "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
+                    "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
+                    "LAMP_CONVERSATION_SUMMARY=on",
                     "LAMP_DECLINE_SILENT=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACE_GAP_HOLD=on",
@@ -2509,6 +2663,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAME_NEAR=on",
+                    "LAMP_NAME_REPEAT_NOT_A_CALL=on",
                     "LAMP_NAME_SAID_TO_A_PERSON=on",
                     "LAMP_NAME_SECOND_SIGN=on",
                     "LAMP_NAME_START_USUAL=on",
@@ -2520,6 +2675,7 @@ mod tests {
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_BY_DEFAULT=on",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
+                    "LAMP_PERSON_SCOPE_ONE_FACE=on",
                     "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
@@ -2530,6 +2686,7 @@ mod tests {
                     "LAMP_SCHEDULE_ASKED=on",
                     "LAMP_SECOND_CHAT_KEPT=on",
                     "LAMP_SECOND_CHAT_WARM=on",
+                    "LAMP_SECOND_CHECKING_LINE=on",
                     "LAMP_SECOND_CUE_AFTER_MS=on",
                     "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
                     "LAMP_SECOND_FACE_NAME=on",
@@ -2550,6 +2707,7 @@ mod tests {
                     "LAMP_SECOND_QUIET_HELD=on",
                     "LAMP_SECOND_REMEMBER_ASKED=on",
                     "LAMP_SECOND_SAID_ONCE=on",
+                    "LAMP_SECOND_SAY_WITH_CALL=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SKILL_LOOK=on",
                     "LAMP_SECOND_SPEAKING_FACE=on",
@@ -2570,6 +2728,8 @@ mod tests {
                     "LAMP_TURNED_FACE_SPEAKS=on",
                     "LAMP_TURNED_SPEAKING=on",
                     "LAMP_TWO_FACES_HELD=on",
+                    "LAMP_UNTIED_GOING_ON=on",
+                    "LAMP_WINDOW_FROM_START=on",
                 ],
             ),
             (
@@ -2580,7 +2740,14 @@ mod tests {
                     "LAMP_VAD_INPUT=linear",
                 ],
             ),
-            ("ring", vec!["LAMP_SHUTDOWN=on", "LAMP_UNPLUG=on"]),
+            (
+                "ring",
+                vec![
+                    "LAMP_NIGHT_ASLEEP_FACE=on",
+                    "LAMP_SHUTDOWN=on",
+                    "LAMP_UNPLUG=on",
+                ],
+            ),
             ("speaker", vec![]),
         ] {
             let status = status_of_fresh(&mut worker_command(

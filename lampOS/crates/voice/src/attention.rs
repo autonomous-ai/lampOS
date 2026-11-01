@@ -42,6 +42,7 @@
 //! spotting its name in its own sound, the eyes seeing someone face it)
 //! is to take the text's place (docs/attention.md).
 
+use crate::language::Language;
 use crate::room_told::Room;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -597,8 +598,11 @@ pub fn called(heard: &str) -> bool {
         return true;
     }
     // A misheard name stands where the name stood: first, or after a
-    // greeting.
+    // greeting. Or the name as the owner's language writes it (#4473).
     called_by_stand_in(&all)
+        || calls_as_written(heard, crate::language::at_start())
+            .next()
+            .is_some()
 }
 
 /// Words the service has written in the lamp's name's place ([`called`]).
@@ -657,7 +661,7 @@ pub(crate) fn said_to_a_person(heard: &str) -> Option<&'static str> {
 /// may not have set off yet: one of two words or fewer also opens with the
 /// word bare ("Ma'am could", #3945's request 12 on c0a4). A whole line
 /// still needs it set off ("Honey could you …").
-fn said_to_a_person_in_a_cut_line(heard: &str) -> Option<&'static str> {
+pub(crate) fn said_to_a_person_in_a_cut_line(heard: &str) -> Option<&'static str> {
     said_to_a_person(heard).or_else(|| {
         let heard = heard.replace('\u{2019}', "'");
         let mut words = heard.split_whitespace();
@@ -780,7 +784,10 @@ fn name_said_to(heard: &str, stand_alone_ins: bool, recognizer_stand_ins: bool) 
             _ => None,
         })
         .collect();
-    said_to || (recognizer_stand_ins && called_by_stand_in(&words))
+    said_to
+        || (recognizer_stand_ins && called_by_stand_in(&words))
+        || calls_as_written(heard, crate::language::at_start())
+            .any(|call| recognizer_stand_ins || call.real)
 }
 
 /// Whether what was heard is the lamp's name alone, or a word written for
@@ -802,6 +809,7 @@ pub fn only_the_name(heard: &str) -> bool {
                 || is(word, STAND_ALONE_INS)
         })
         && called_by_name_on(heard, true)
+        || only_the_name_as_written(heard, crate::language::at_start())
 }
 
 /// Whether what was heard opens with the lamp's name set off as a call:
@@ -831,8 +839,198 @@ pub fn begins_with_the_name(heard: &str) -> bool {
             .chars()
             .next()
             .is_none_or(|c| matches!(c, ',' | '.' | '?' | '!' | ';' | ':'));
-        return (greeted || set_off) && is(word, &["lamp", "lamb"]);
+        if (greeted || set_off) && is(word, &["lamp", "lamb"]) {
+            return true;
+        }
+        return begins_as_written(heard, crate::language::at_start());
     }
+}
+
+/// How the owner's language's speech to text writes the lamp's name and the
+/// "Hey" before it (#4473: on lamp-52e6 on 30 Oct, with `ja`, "Hey Lamp.
+/// 今何時ですか？" came back as 「エイランク、今何時ですか。」). English has
+/// none: its name is read as above, and nothing here changes it. `real`
+/// are the name itself, read where the name is; `stand_ins` are words
+/// speech to text writes for it that are also other words ("ランク" is
+/// "rank", "làm" is "do"), read only set off, alone in their clause past
+/// any greetings (a greeting alone is not enough: "Ê làm bài tập chưa?").
+struct Written {
+    greetings: &'static [&'static str],
+    real: &'static [&'static str],
+    stand_ins: &'static [&'static str],
+    /// Spaced words (Vietnamese): a greeting or a stand-in is a whole word.
+    /// Otherwise a greeting or a stand-in is a clause's opening characters.
+    whole_words: bool,
+    /// A character that, right after the name itself, makes it no call:
+    /// more katakana, a longer word (「ランプシェード」), where a particle or
+    /// a verb still calls (「ランプを消して」); a Korean subject or object
+    /// particle, talk about the lamp ("램프가 고장났어."), where "렘프야"
+    /// calls. Chinese, often written unpunctuated ("兰普现在几点"), has none.
+    not_the_name: fn(char) -> bool,
+    /// The stand-ins are everyday one-word replies ("Làm!" is "do it!",
+    /// "Lắm." is "a lot."): they count only in the line's first clause,
+    /// greeted ("Hây lăm.") or with more clauses after ("Làm, mấy giờ rồi?").
+    everyday: bool,
+}
+
+fn written(language: Language) -> Written {
+    match language {
+        Language::Japanese => Written {
+            // "a": 「Aランク。」 for "Hey Lamp." on lamp-52e6 (#4554).
+            greetings: &["hey", "ヘイ", "エイ", "a"],
+            real: &["ランプ", "らんぷ"],
+            // 「ヘイ、マンプ。」 on lamp-52e6 (#4554): マンプス is "mumps".
+            stand_ins: &["ランク", "マンプ"],
+            whole_words: false,
+            not_the_name: |c| matches!(c, '\u{30A0}'..='\u{30FF}'),
+            everyday: false,
+        },
+        Language::Chinese => Written {
+            greetings: &["hey", "嘿", "嗨"],
+            real: &["兰普", "蓝普", "lamp"],
+            stand_ins: &[],
+            whole_words: false,
+            not_the_name: |_| false,
+            everyday: false,
+        },
+        Language::Korean => Written {
+            greetings: &["hey", "헤이"],
+            real: &["램프", "렘프"],
+            stand_ins: &[],
+            whole_words: false,
+            not_the_name: |c| "가를이은는의도".contains(c),
+            everyday: false,
+        },
+        // "Lamp" stays Latin and is read as English reads it; "làm" and
+        // "lắm" are everyday words, so never one mid-sentence.
+        Language::Vietnamese => Written {
+            greetings: &["hey", "hây", "hê", "ê", "này"],
+            real: &[],
+            stand_ins: &["lam", "lăm", "làm", "lắm", "lem"],
+            whole_words: true,
+            not_the_name: |_| false,
+            everyday: true,
+        },
+    }
+}
+
+/// A clause that opens with the name as [`Written`].
+#[derive(Clone, Copy)]
+struct WrittenCall {
+    /// The name itself, not a stand-in.
+    real: bool,
+    greeted: bool,
+    /// Nothing after it in its clause.
+    set_off: bool,
+}
+
+/// What `heard` is split into clauses at: any punctuation, the ideographic
+/// "、" and "。" among it.
+fn clauses(heard: &str) -> impl Iterator<Item = &str> {
+    heard
+        .split(|c: char| !c.is_alphanumeric() && !c.is_whitespace())
+        .map(str::trim)
+        .filter(|clause| !clause.is_empty())
+}
+
+/// `text` past `word` at its start, lower case already, or `None`.
+fn past<'a>(text: &'a str, word: &str, whole: bool) -> Option<&'a str> {
+    let rest = text.strip_prefix(word)?;
+    (!whole || !rest.starts_with(char::is_alphanumeric)).then_some(rest)
+}
+
+/// Each clause's call with the name as `language` writes it, in order,
+/// `None` for a clause that is none: at its start, past greetings, as the
+/// English name is read at a sentence's start. Empty for English.
+fn calls_by_clause(heard: &str, language: Option<Language>) -> Vec<Option<WrittenCall>> {
+    let Some(written) = language.map(written) else {
+        return Vec::new();
+    };
+    let clauses: Vec<&str> = clauses(heard).collect();
+    let last = clauses.len().saturating_sub(1);
+    clauses
+        .iter()
+        .enumerate()
+        .map(|(at, clause)| {
+            opens_as_written(clause, &written).filter(|call| {
+                call.real || !written.everyday || at == 0 && (call.greeted || at < last)
+            })
+        })
+        .collect()
+}
+
+/// Each call in `heard` with the name as `language` writes it. None for
+/// English.
+fn calls_as_written(heard: &str, language: Option<Language>) -> impl Iterator<Item = WrittenCall> {
+    calls_by_clause(heard, language).into_iter().flatten()
+}
+
+/// `clause`, lower case, past the greetings it opens with, and whether
+/// there were any.
+fn past_greetings(clause: &str, written: &Written) -> (String, bool) {
+    let lower = clause.to_lowercase();
+    let mut rest = lower.as_str();
+    let mut greeted = false;
+    while let Some(after) = written
+        .greetings
+        .iter()
+        .find_map(|greeting| past(rest, greeting, written.whole_words))
+    {
+        rest = after.trim_start();
+        greeted = true;
+    }
+    (rest.to_owned(), greeted)
+}
+
+fn opens_as_written(clause: &str, written: &Written) -> Option<WrittenCall> {
+    let (rest, greeted) = past_greetings(clause, written);
+    let rest = rest.as_str();
+    let names = written.real.iter().filter_map(|name| {
+        let after = rest.strip_prefix(name)?;
+        (!after.starts_with(written.not_the_name)).then_some((after, true))
+    });
+    let stand_ins = (written.stand_ins.iter())
+        .filter_map(|name| Some((past(rest, name, written.whole_words)?, false)));
+    names.chain(stand_ins).find_map(|(after, real)| {
+        let set_off = after.trim().is_empty();
+        (real || set_off).then_some(WrittenCall {
+            real,
+            greeted,
+            set_off,
+        })
+    })
+}
+
+/// [`begins_with_the_name`] for the name as `language` writes it: the
+/// line's first clause opens with it, greeted or set off.
+fn begins_as_written(heard: &str, language: Option<Language>) -> bool {
+    calls_by_clause(heard, language)
+        .first()
+        .copied()
+        .flatten()
+        .is_some_and(|call| call.greeted || call.set_off)
+}
+
+/// [`only_the_name`] for the name as `language` writes it: every clause a
+/// greeting or the name set off, the name in one ("エイランク。", "嘿，兰普",
+/// "Hây lăm"; not a bare Vietnamese stand-in, "Làm!", "Này, làm.").
+/// Onboarding's how_you_sound takes such a line as its call
+/// (`second_provider::name_alone`).
+pub(crate) fn only_the_name_as_written(heard: &str, language: Option<Language>) -> bool {
+    let Some(written) = language.map(written) else {
+        return false;
+    };
+    let mut named = false;
+    let calls = calls_by_clause(heard, language);
+    let all = clauses(heard).zip(calls).all(|(clause, call)| match call {
+        Some(call) if call.set_off => {
+            named = true;
+            true
+        }
+        Some(_) => false,
+        None => past_greetings(clause, &written).0.is_empty(),
+    });
+    all && named
 }
 
 /// What the service has written in the name's place, first or after a
@@ -909,6 +1107,43 @@ pub enum Verdict {
 /// than this before the request began: the name is the first thing said,
 /// and the voice takes a moment to be sure someone is speaking.
 pub const NAME_BEFORE_US: u64 = 1_500_000;
+
+/// How soon after the line before ended a line must begin for its opening
+/// words to be read as that line's last words repeated
+/// (`LAMP_NAME_REPEAT_NOT_A_CALL=on`, [`Attention::not_calling_on_a_repeat`],
+/// #3923). The second route puts the last 1.5 s of an unanswered line's
+/// sound ([`crate::second_provider::KEPT_SAMPLES`]) in front of the next
+/// line's speech to text when that line begins within
+/// [`crate::second_provider::CARRY_AFTER_END`] of its end, or within
+/// [`crate::second_provider::KEEP_AFTER_END`] when it goes on from it, and
+/// its words are not back yet: those words are then written twice. Never
+/// past [`crate::second_provider::KEEP_AFTER_END`], when that sound is let
+/// go, so this is that bound: no repeat of this kind begins later. Measured
+/// from the line before's last sound to the line's first, its pre-roll
+/// with it, so a carried line reads sooner here than the carry's own clock.
+pub const REPEAT_WITHIN_US: u64 = crate::second_provider::KEEP_AFTER_END.as_micros() as u64;
+
+/// With `LAMP_NAME_REPEAT_NOT_A_CALL=on`, the fewest of a line's opening
+/// words, the lamp's name first, that must repeat the line before's closing
+/// words for the name there not to call the lamp by its text. Two, never
+/// the name alone: "…by the lamp." then "Lamp, turn the light on." is a
+/// person going on to call it, and a name said once more is how a call
+/// sounds ([`Attention::not_calling_on_a_repeat`]).
+const REPEAT_LEAST_WORDS: usize = 2;
+
+/// How many spoken lines' words are kept for a repeat
+/// ([`Attention::words_back`]): the line before, and a few more in case
+/// lines are judged out of the order they were said in.
+const SAID_LINES_KEPT: usize = 4;
+
+/// How long after its end a kept line's words are let go
+/// ([`Attention::let_go_of_said_lines`], Reviewer-three's P3 on #4645): only
+/// a line begun within [`REPEAT_WITHIN_US`] of that end reads them, but it
+/// can be judged once it has ended, after the next line began, and a line
+/// can run on for many seconds (#4594's 13 s follow-up). So not that bound
+/// itself: let go at it, a long line's line before would be gone before
+/// that line is judged.
+const SAID_LINE_KEPT_US: u64 = 30_000_000;
 const NAMED: &str = "its name was heard in the room's sound";
 
 /// With `LAMP_NAME_SECOND_SIGN=on`, a hearing of the name that began no
@@ -1251,6 +1486,18 @@ pub struct Attention {
     /// A hearing of the name inside a line's sound counts for that line
     /// only (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, [`Self::keep_the_name_in_its_line`]).
     name_stays: bool,
+    /// The name opening a line is no call by its text when its words repeat
+    /// the line before's last ones (`LAMP_NAME_REPEAT_NOT_A_CALL=on`,
+    /// [`Self::not_calling_on_a_repeat`]). With it: the last
+    /// [`SAID_LINES_KEPT`] spoken lines' words, each with its request and
+    /// when its sound ended, newest last, kept as soon as they are written
+    /// ([`Self::words_back`]) or as the next line begins, and read when the
+    /// request in hand is judged; and, for a request going on from a first
+    /// part, that part's words, where its own begin in [`Self::heard`], and
+    /// how long after that part ended it began.
+    repeat_not_a_call: bool,
+    said_lines: std::collections::VecDeque<(u64, u64, String)>,
+    line_before: Option<(String, usize, u64)>,
     /// The name at the line's start is dated from the line's usual start,
     /// not its soft start's lead (`LAMP_NAME_START_USUAL=on`,
     /// [`Self::date_the_start_from_the_usual_start`]).
@@ -1310,6 +1557,154 @@ impl Attention {
     /// which was answered.
     pub fn keep_the_name_in_its_line(&mut self, on: bool) {
         self.name_stays = on;
+    }
+
+    /// The lamp's name opening a line is no call by its text when the line's
+    /// opening words, the name first and [`REPEAT_LEAST_WORDS`] or more,
+    /// repeat the closing words of the line before, begun within
+    /// [`REPEAT_WITHIN_US`] of its end (`LAMP_NAME_REPEAT_NOT_A_CALL=on`,
+    /// #3923). On lamp-4ace on 30 Oct (build 8999, a busy room) "That lamp
+    /// is cute, where did you get it?", said between two colleagues, came
+    /// as two lines, the second written "Lamp is cute. Where did you get
+    /// it?": the end of the first written again ([`REPEAT_WITHIN_US`] says
+    /// how), and its "Lamp" opening a sentence let it out as the text
+    /// calling the lamp ([`CALLED_IN_TEXT`]). The conversation it opened
+    /// answered the next two desk lines. The repeated words are read as the
+    /// line before's, so the rest of the line is what is read for a call:
+    /// the name said again after them still calls. Words are compared
+    /// lower case, punctuation left out. The name alone repeated is not
+    /// enough ("…this lamp." then "Lamp, turn the light on."). Only the
+    /// text's call: the name heard in the sound, a tap, a face, being
+    /// addressed, an answer to the lamp's question and a conversation
+    /// going on count as before.
+    pub fn not_calling_on_a_repeat(&mut self, on: bool) {
+        self.repeat_not_a_call = on;
+    }
+
+    /// With [`Self::not_calling_on_a_repeat`], where in [`Self::heard`] the
+    /// request in hand's opening words repeat the line before's closing
+    /// ones: from where its own words begin to the end of the last repeated
+    /// word, and how many words. Its first word is the lamp's name, and at
+    /// least [`REPEAT_LEAST_WORDS`] repeat; the most that do are taken.
+    /// The line before is read now, as the request in hand is judged, not
+    /// as it began: a line's words can be written after the next line began
+    /// (the carried sound's own case, [`REPEAT_WITHIN_US`]), and on the
+    /// second route a line can be judged before the one said before it.
+    /// Going on from a first part, that part is the line before; otherwise
+    /// the newest kept line of an earlier request, ended within
+    /// [`REPEAT_WITHIN_US`] of the request in hand's start. With the
+    /// repeat, how long after the line before ended it began.
+    fn repeated_opening(&self) -> Option<(usize, usize, usize, u64)> {
+        let (before, from, gap_us) = match self.line_before.as_ref() {
+            Some((before, from, gap_us)) => (before.as_str(), *from, *gap_us),
+            None => {
+                let began = self.began_us?;
+                let (_, ended, before) = self
+                    .said_lines
+                    .iter()
+                    .filter(|(of, _, _)| *of < self.request)
+                    .max_by_key(|(of, _, _)| *of)?;
+                let gap_us = began.saturating_sub(*ended);
+                if gap_us > REPEAT_WITHIN_US {
+                    return None;
+                }
+                (before.as_str(), 0, gap_us)
+            }
+        };
+        let own = self.heard.get(from..)?;
+        // Words, lower case, each with where it ends in `text`: split as
+        // [`called`] splits them, so "Lamp's" opens with the name as it
+        // does there, whichever apostrophe is written.
+        let words = |text: &str| -> Vec<(String, usize)> {
+            let mut words = Vec::new();
+            let mut start = None;
+            for (at, c) in text.char_indices().chain([(text.len(), ' ')]) {
+                if c.is_alphanumeric() {
+                    start.get_or_insert(at);
+                } else if let Some(begun) = start.take() {
+                    words.push((text[begun..at].to_lowercase(), at));
+                }
+            }
+            words
+        };
+        let own_words = words(own);
+        let before_words = words(before);
+        if !own_words
+            .first()
+            .is_some_and(|(word, _)| word == "lamp" || word == "lamb")
+        {
+            return None;
+        }
+        let most = own_words.len().min(before_words.len());
+        let repeated = (REPEAT_LEAST_WORDS..=most).rev().find(|&count| {
+            own_words[..count]
+                .iter()
+                .zip(&before_words[before_words.len() - count..])
+                .all(|((own, _), (before, _))| own == before)
+        })?;
+        Some((from, from + own_words[repeated - 1].1, repeated, gap_us))
+    }
+
+    /// With [`Self::not_calling_on_a_repeat`]: a spoken line's words, as soon
+    /// as its speech to text has written them, with when it was said
+    /// (`second_provider::Engine::telling_words_back`), kept for a repeat of
+    /// their end at the next line's start. Never the lamp's own turn.
+    pub fn words_back(&mut self, request: u64, (_, ended_us): (u64, u64), words: &str) {
+        if !self.repeat_not_a_call || own_request().load(Ordering::Acquire) == request {
+            return;
+        }
+        self.keep_said_line(request, ended_us, words);
+    }
+
+    /// Keep `words` as `request`'s, ended at `ended_us`, in place of any kept
+    /// for it before ([`Self::words_back`]).
+    fn keep_said_line(&mut self, request: u64, ended_us: u64, words: &str) {
+        self.let_go_of_said_lines(ended_us);
+        self.said_lines.retain(|(of, _, _)| *of != request);
+        if self.said_lines.len() == SAID_LINES_KEPT {
+            self.said_lines.pop_front();
+        }
+        self.said_lines
+            .push_back((request, ended_us, words.to_owned()));
+    }
+
+    /// The request in hand's words as read for a call: with
+    /// [`Self::not_calling_on_a_repeat`], its opening words that repeat the
+    /// line before's left out ([`Self::repeated_opening`]); otherwise all of
+    /// them, as before.
+    fn heard_as_a_call(&self) -> std::borrow::Cow<'_, str> {
+        match self.repeated_opening() {
+            Some((from, end, _, _)) => {
+                std::borrow::Cow::Owned(format!("{}{}", &self.heard[..from], &self.heard[end..]))
+            }
+            None => std::borrow::Cow::Borrowed(&self.heard),
+        }
+    }
+
+    /// With [`Self::not_calling_on_a_repeat`]: how many words repeated, and
+    /// how long after the line before ended the request in hand began, when
+    /// the text would have called the lamp but for them; for the journal,
+    /// which never has the words.
+    pub fn call_taken_as_a_repeat(&self) -> Option<(usize, u64)> {
+        let (_, _, count, gap_us) = self.repeated_opening()?;
+        (self.calls_in(&self.heard) && !self.called_in_text()).then_some((count, gap_us))
+    }
+
+    /// Let go of kept lines' words that ended more than [`SAID_LINE_KEPT_US`]
+    /// before `now_us`, as a line is kept or begins (Reviewer-three's P3 on
+    /// #4645): they are past any use, and are not held on through a quiet
+    /// spell, a privacy close or a forget until newer lines push them out.
+    fn let_go_of_said_lines(&mut self, now_us: u64) {
+        self.said_lines
+            .retain(|(_, ended, _)| ended.saturating_add(SAID_LINE_KEPT_US) >= now_us);
+    }
+
+    /// Let go of every kept line's words and of a first part's kept for
+    /// its continuation ([`Self::not_calling_on_a_repeat`]): a camera close
+    /// or a mute (`Heeding::privacy_changed`, Reviewer-two's P3 on #4645).
+    pub fn forget_said_lines(&mut self) {
+        self.said_lines.clear();
+        self.line_before = None;
     }
 
     /// A hearing of the name is at the line's start ([`NAME_AT_THE_START_US`])
@@ -1672,7 +2067,21 @@ impl Attention {
                     .then_some(word)
             })
             .flatten();
+        // The line in hand's words, judged, are kept for a repeat of their
+        // end at a later line's start (`LAMP_NAME_REPEAT_NOT_A_CALL`, #3923),
+        // if none came back for it before (`words_back`): only someone's.
+        if self.repeat_not_a_call
+            && self.request != request
+            && own != self.request
+            && let Some(ended) = self.ended_us
+            && !self.said_lines.iter().any(|(of, _, _)| *of == self.request)
+        {
+            let words = self.heard.clone();
+            self.keep_said_line(self.request, ended, &words);
+        }
+        self.let_go_of_said_lines(now_us);
         self.began(request, session);
+        self.line_before = None;
         self.after_another = after_another;
         self.after_question = after_question;
         self.after_unanswered = after_unanswered;
@@ -1750,6 +2159,9 @@ impl Attention {
         // `began_at`, which lets go of one that stays with the line before.
         let hearings = (self.named_us, self.named_sure_us);
         let continuing = before.is_some();
+        // When the first part ended, for a repeat of its end at this part's
+        // start (`LAMP_NAME_REPEAT_NOT_A_CALL`).
+        let first_part_ended = self.ended_us;
         self.began_at_led(request, session, now_us, lead_us);
         if continuing {
             (self.named_us, self.named_sure_us) = hearings;
@@ -1787,6 +2199,20 @@ impl Attention {
             self.after_another = after_another;
             self.after_question = after_question;
             self.after_unanswered = after_unanswered;
+            // Its words go on from the first part's, which may end with
+            // the words this part's sound wrote again: the first part is the
+            // line before it (`LAMP_NAME_REPEAT_NOT_A_CALL`).
+            self.line_before = first_part_ended
+                .filter(|end| {
+                    self.repeat_not_a_call && end.saturating_add(REPEAT_WITHIN_US) >= now_us
+                })
+                .map(|end| {
+                    (
+                        self.heard.clone(),
+                        self.heard.len(),
+                        now_us.saturating_sub(end),
+                    )
+                });
         }
         self.tapped |= tapped;
         self.after_call |= after_call;
@@ -2352,13 +2778,20 @@ impl Attention {
     /// Whether the text shows the lamp was called, as the rule reads it
     /// ([`called_by_name_on`] with `LAMP_NAME_IN_PASSING=ignored`, else
     /// [`called`]), narrowed when [`Self::narrow_the_call`] said so.
+    /// With [`Self::not_calling_on_a_repeat`], the words read are
+    /// [`Self::heard_as_a_call`]'s.
     fn called_in_text(&self) -> bool {
+        self.calls_in(&self.heard_as_a_call())
+    }
+
+    /// [`Self::called_in_text`] for `heard`.
+    fn calls_in(&self, heard: &str) -> bool {
         let read = if self.name_in_passing_ignored {
-            called_by_name_on(&self.heard, self.stand_alone_ins)
+            called_by_name_on(heard, self.stand_alone_ins)
         } else {
-            called(&self.heard)
+            called(heard)
         };
-        read && !(self.call_narrowed && !self.named && !begins_with_the_name(&self.heard))
+        read && !(self.call_narrowed && !self.named && !begins_with_the_name(heard))
     }
 
     /// With `LAMP_BUSY_CALLED_STRICT=on`, in a busy room with nobody turned
@@ -2514,6 +2947,127 @@ mod tests {
     }
 
     use super::*;
+
+    /// #4473, lamp-52e6 on 30 Oct: with `ja`, "Hey Lamp. 今何時ですか？" came
+    /// back as 「エイランク、今何時ですか。」 and was not taken as a call. The
+    /// name as each language writes it is a call; English adds nothing; the
+    /// sound inside a word, or an everyday word mid-sentence, is none.
+    #[test]
+    fn the_name_is_heard_as_each_language_writes_it() {
+        use Language::{Chinese, Japanese, Korean, Vietnamese};
+        let called = |heard: &str, language| calls_as_written(heard, language).next().is_some();
+        for (language, heard) in [
+            (Japanese, "エイランク、今何時ですか。"),
+            (Japanese, "ヘイランプ、電気をつけて。"),
+            (Japanese, "エイランプ。"),
+            (Japanese, "ヘイランク、天気は？"),
+            (Japanese, "ランプ、今何時ですか。"),
+            (Japanese, "らんぷ、聞こえる？"),
+            (Japanese, "今何時ですか。ランク。"),
+            (Japanese, "ヘイ、マンプ。"),
+            (Japanese, "Aランク。今何時？"),
+            (Japanese, "Aランク、明日の天気は？"),
+            (Chinese, "兰普，现在几点？"),
+            (Chinese, "蓝普，开灯。"),
+            (Chinese, "嘿兰普，现在几点？"),
+            (Chinese, "嗨兰普。"),
+            (Chinese, "嘿Lamp，现在几点？"),
+            (Korean, "램프, 지금 몇 시야?"),
+            (Korean, "헤이 램프, 지금 몇 시야?"),
+            (Korean, "렘프야, 불 켜 줘."),
+            (Vietnamese, "Hây lăm, mấy giờ rồi?"),
+            (Vietnamese, "Hê lăm, bật đèn lên."),
+            (Vietnamese, "Này lem, mấy giờ rồi?"),
+            (Vietnamese, "Làm, mấy giờ rồi?"),
+            (Vietnamese, "Ê lắm."),
+        ] {
+            assert!(called(heard, Some(language)), "{heard}");
+            assert!(!called(heard, None), "English adds nothing: {heard}");
+        }
+        for (language, heard) in [
+            (Japanese, "今何時ですか。"),
+            (Japanese, "クランクを回す。"),
+            (Japanese, "ランクを上げたい。"),
+            (Chinese, "我买了一个兰普。"),
+            (Korean, "캠프 가고 싶어."),
+            (Korean, "어제 캠프에서 램프를 샀어."),
+            (Vietnamese, "Tôi làm việc nhiều lắm."),
+            (Vietnamese, "Làm việc đi."),
+            (Vietnamese, "Lắm chuyện quá."),
+            // A greeting alone does not make a stand-in a call: it must be
+            // set off, alone in its clause.
+            (Vietnamese, "Ê làm bài tập chưa?"),
+            (Japanese, "エイランクのホテルに泊まった。"),
+            (Japanese, "エイランクだね。"),
+            (Japanese, "Aランクのホテルに泊まった。"),
+            (Japanese, "Aランクだね。"),
+            (Japanese, "マンプス"),
+            (Japanese, "マンプスにかかった。"),
+            (Japanese, "A lamp is on the desk."),
+            // Vietnamese's stand-ins are everyday one-word replies: only
+            // in the first clause, greeted or with more after.
+            (Vietnamese, "Ừ, làm."),
+            (Vietnamese, "Làm!"),
+            (Vietnamese, "Lắm."),
+            (Vietnamese, "Nhiều không? Lắm."),
+            (Vietnamese, "Này, làm."),
+            (Vietnamese, "Lem."),
+            (Vietnamese, "Ừ, làm đi."),
+            // The name opening a longer word, or Korean's subject or
+            // object particle after it, is talk about a lamp.
+            (Japanese, "ランプシェード"),
+            (Korean, "램프가 고장났어."),
+            (Korean, "램프를 꺼 줘."),
+        ] {
+            assert!(!called(heard, Some(language)), "{heard}");
+        }
+        for (language, heard) in [
+            (Japanese, "ランプ"),
+            (Japanese, "ランプ 消して"),
+            (Japanese, "ランプを消して"),
+            (Chinese, "兰普现在几点"),
+            (Korean, "램프야"),
+            (Korean, "헤이 램프"),
+        ] {
+            assert!(called(heard, Some(language)), "{heard}");
+        }
+        // The line opens with it, greeted or set off.
+        assert!(begins_as_written(
+            "エイランク、今何時ですか。",
+            Some(Japanese)
+        ));
+        assert!(begins_as_written("헤이 램프, 몇 시야?", Some(Korean)));
+        assert!(!begins_as_written("램프를 꺼 줘.", Some(Korean)));
+        assert!(!begins_as_written("今何時ですか。ランプ。", Some(Japanese)));
+        assert!(begins_as_written("Làm, mấy giờ rồi?", Some(Vietnamese)));
+        assert!(!begins_as_written("Làm!", Some(Vietnamese)));
+        // Onboarding's how_you_sound: the name alone, greetings at most.
+        for (language, alone) in [
+            (Japanese, "エイランク。"),
+            (Japanese, "ヘイ、ランプ。"),
+            (Japanese, "ヘイ、マンプ。"),
+            (Japanese, "Aランク。"),
+            (Chinese, "嘿兰普。"),
+            (Korean, "헤이 램프."),
+            (Vietnamese, "Hây lăm."),
+        ] {
+            assert!(only_the_name_as_written(alone, Some(language)), "{alone}");
+            assert!(!only_the_name_as_written(alone, None), "{alone}");
+        }
+        for (language, not) in [
+            (Japanese, "エイランク、今何時ですか。"),
+            (Japanese, "ヘイ。"),
+            (Japanese, "クランク。"),
+            (Korean, "캠프."),
+            (Vietnamese, "Làm việc."),
+            (Vietnamese, "Làm!"),
+            (Vietnamese, "Lắm."),
+            (Vietnamese, "Lem."),
+            (Vietnamese, "Này, làm."),
+        ] {
+            assert!(!only_the_name_as_written(not, Some(language)), "{not}");
+        }
+    }
 
     /// The calls held in the played scenes of 2026-10-14 had their name
     /// heard at 0.97 to 0.99 with no face: close to the lamp, with
@@ -4987,6 +5541,245 @@ mod tests {
             attention.began_at(3, 7, 13 * second + 700_000);
             assert_eq!(attention.named, !stays, "the third line, stays {stays}");
         }
+    }
+
+    /// `LAMP_NAME_REPEAT_NOT_A_CALL=on` (#3923): on lamp-4ace on 30 Oct
+    /// (build 8999, a busy room) d09's "That lamp is cute, where did you get
+    /// it?", said between colleagues, came as two lines, the second written
+    /// "Lamp is cute. Where did you get it?", and that one was let out as
+    /// the text calling the lamp. With the switch its "Lamp is cute" is the
+    /// first line's end written again, and the line is held; off, it is
+    /// let out as before. As the product judges text: the name in passing
+    /// ignored, `--spoken-to`, the second route's stand-ins.
+    #[test]
+    fn a_repeat_of_the_line_befores_end_is_no_call_by_its_text() {
+        const S: u64 = 1_000_000;
+        let judged = |repeat: bool, before: &str, line: &str, gap_us: u64| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ignore_name_in_passing(true);
+            attention.count_stand_alone_ins(true);
+            attention.not_calling_on_a_repeat(repeat);
+            attention.began_at(70, 7, 10 * S);
+            attention.heard(before);
+            attention.ended(70, 11 * S + 200_000);
+            let first = attention.first_output_busy(70, Room::Busy, false, false, None);
+            attention.began_at(71, 7, 11 * S + 200_000 + gap_us);
+            attention.heard(line);
+            attention.ended(71, 13 * S + 500_000);
+            let verdict = attention.first_output_busy(71, Room::Busy, false, false, None);
+            (first, verdict, attention.call_taken_as_a_repeat())
+        };
+        // d09, the second line begun 0.3 s after the first ended.
+        let (d09_before, d09) = ("That lamp is cute.", "Lamp is cute. Where did you get it?");
+        let (first, off, untaken) = judged(false, d09_before, d09, 300_000);
+        assert!(matches!(first, Some(Verdict::Hold(_))), "{first:?}");
+        assert_eq!(off, Some(Verdict::Play(CALLED_IN_TEXT)), "off: as on 4ace");
+        assert_eq!(untaken, None, "off: nothing taken as a repeat");
+        let (_, on, taken) = judged(true, d09_before, d09, 300_000);
+        assert!(matches!(on, Some(Verdict::Hold(_))), "{on:?}");
+        assert_eq!(taken, Some((3, 300_000)), "three words, never the words");
+        // Calls that stay calls with the switch on.
+        let calls = [
+            // After an unrelated line.
+            (
+                "I need to finish the report.",
+                "Lamp, what time is it?",
+                300_000,
+            ),
+            // Only the name repeats, not two words.
+            ("I like this lamp.", "Lamp, turn the light on.", 300_000),
+            // A repeat begun past `REPEAT_WITHIN_US` is a person saying it.
+            (d09_before, d09, REPEAT_WITHIN_US + 1),
+            // The name said again after the repeat calls by itself.
+            (
+                d09_before,
+                "Lamp is cute. Lamp, where did you get it?",
+                300_000,
+            ),
+        ];
+        for (before, line, gap_us) in calls {
+            let (_, verdict, taken) = judged(true, before, line, gap_us);
+            assert_eq!(
+                verdict,
+                Some(Verdict::Play(CALLED_IN_TEXT)),
+                "{before:?} then {line:?}, {gap_us} us after"
+            );
+            assert_eq!(taken, None, "{line:?}");
+        }
+        // Words compared lower case, punctuation left out: a curly
+        // apostrophe and a comma where the first line had a stop.
+        let (_, on, _) = judged(
+            true,
+            "Honestly, that lamp\u{2019}s great.",
+            "Lamp's great, where's it from?",
+            300_000,
+        );
+        assert!(matches!(on, Some(Verdict::Hold(_))), "{on:?}");
+    }
+
+    /// The switch's cost (the first builder on #3923, 31 Oct): someone's
+    /// "Lamp, …" begun within [`REPEAT_WITHIN_US`] of another person's line.
+    /// After a line ending in "…the lamp." only the name is the same, and
+    /// it calls by its text as before. Only a line whose last words are the
+    /// name and what follows it ("Just ask the lamp, what time is it.")
+    /// takes the text's call from "Lamp, what time is it?"; the name heard
+    /// in its sound by `lamp-name` still calls it.
+    #[test]
+    fn a_call_right_after_a_line_ending_in_the_name_still_calls() {
+        const S: u64 = 1_000_000;
+        let judged = |before: &str, line: &str, heard_at: Option<u64>| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ignore_name_in_passing(true);
+            attention.count_stand_alone_ins(true);
+            attention.not_calling_on_a_repeat(true);
+            attention.began_at(70, 7, 10 * S);
+            attention.heard(before);
+            attention.ended(70, 12 * S);
+            attention.first_output_busy(70, Room::Busy, false, false, None);
+            attention.began_at(71, 7, 12 * S + 300_000);
+            if let Some(at) = heard_at {
+                attention.name_heard(at);
+            }
+            attention.heard(line);
+            attention.ended(71, 14 * S);
+            (
+                attention.first_output_busy(71, Room::Busy, false, false, None),
+                attention.call_taken_as_a_repeat(),
+            )
+        };
+        let call = "Lamp, what time is it?";
+        for before in [
+            "Can you pass me the lamp.",
+            "I keep talking to the lamp",
+            "Ask the lamp.",
+        ] {
+            assert_eq!(
+                judged(before, call, None),
+                (Some(Verdict::Play(CALLED_IN_TEXT)), None),
+                "{before:?} then {call:?}"
+            );
+        }
+        // Two words the same: the text no longer calls, the hearing does.
+        let before = "Just ask the lamp, what time is it.";
+        let (verdict, taken) = judged(before, call, None);
+        assert!(matches!(verdict, Some(Verdict::Hold(_))), "{verdict:?}");
+        assert_eq!(taken, Some((5, 300_000)));
+        let (verdict, _) = judged(before, call, Some(12 * S + 300_000));
+        assert!(matches!(verdict, Some(Verdict::Play(_))), "{verdict:?}");
+        // At the rule's least, the name and one word more (Reviewer-three's
+        // P3 on #4701).
+        let (verdict, taken) = judged("You talk to the lamp, what.", call, None);
+        assert!(matches!(verdict, Some(Verdict::Hold(_))), "{verdict:?}");
+        assert_eq!(taken, Some((2, 300_000)));
+    }
+
+    /// The same when the line before's words are written late: the carry
+    /// happens exactly when they are not back as the next line begins, and
+    /// on the second route that line can even be judged before the one said
+    /// before it. The line before is read as the line in hand is judged:
+    /// line 2 begins, then line 1's words come back
+    /// (`Engine::telling_words_back`), then line 2's words are judged. Line
+    /// 1 never judged here; an older unrelated line before both.
+    #[test]
+    fn a_repeat_of_words_written_after_the_next_line_began_is_no_call() {
+        const S: u64 = 1_000_000;
+        let judged = |repeat: bool, late_gap_us: u64| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ignore_name_in_passing(true);
+            attention.count_stand_alone_ins(true);
+            attention.not_calling_on_a_repeat(repeat);
+            attention.began_at(69, 7, 2 * S);
+            attention.heard("I need to finish the report.");
+            attention.ended(69, 4 * S);
+            attention.first_output_busy(69, Room::Busy, false, false, None);
+            // Line 2 begins 0.3 s (or `late_gap_us`) after line 1's end at
+            // 11.2 s; line 1's words come back only then.
+            let began = 11 * S + 200_000 + late_gap_us;
+            attention.began_at(71, 7, began);
+            attention.words_back(70, (10 * S, 11 * S + 200_000), "That lamp is cute.");
+            attention.heard("Lamp is cute. Where did you get it?");
+            attention.ended(71, 13 * S + 500_000);
+            (
+                attention.first_output_busy(71, Room::Busy, false, false, None),
+                attention.call_taken_as_a_repeat(),
+            )
+        };
+        assert_eq!(
+            judged(false, 300_000),
+            (Some(Verdict::Play(CALLED_IN_TEXT)), None)
+        );
+        let (on, taken) = judged(true, 300_000);
+        assert!(matches!(on, Some(Verdict::Hold(_))), "{on:?}");
+        assert_eq!(taken, Some((3, 300_000)), "three words, never the words");
+        assert_eq!(
+            judged(true, REPEAT_WITHIN_US + 1).0,
+            Some(Verdict::Play(CALLED_IN_TEXT)),
+            "past the gap"
+        );
+        // Words come back off: nothing kept, as before.
+        let mut attention = Attention::default();
+        attention.words_back(70, (0, S), "That lamp is cute.");
+        assert!(attention.said_lines.is_empty());
+    }
+
+    /// Kept words are let go [`SAID_LINE_KEPT_US`] after their line ended,
+    /// as a line begins (Reviewer-three's P3 on #4645): a line begun a
+    /// minute later finds none. A long line begun within the gap and judged
+    /// after it ran 20 s still reads its line before.
+    #[test]
+    fn kept_words_are_let_go_past_their_use() {
+        const S: u64 = 1_000_000;
+        let mut attention = Attention::default();
+        attention.not_calling_on_a_repeat(true);
+        attention.words_back(70, (10 * S, 12 * S), "I'll call the doctor at four.");
+        attention.began_at(71, 7, 72 * S);
+        assert!(attention.said_lines.is_empty(), "a minute later");
+
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.ignore_name_in_passing(true);
+        attention.count_stand_alone_ins(true);
+        attention.not_calling_on_a_repeat(true);
+        attention.words_back(70, (10 * S, 11 * S + 200_000), "That lamp is cute.");
+        attention.began_at(71, 7, 11 * S + 500_000);
+        attention.heard("Lamp is cute. Where did you get it, and how long did it take?");
+        attention.ended(71, 31 * S + 500_000);
+        // The next line begins before line 71 is judged.
+        attention.began_at(72, 7, 32 * S);
+        assert!(
+            attention.said_lines.iter().any(|(of, _, _)| *of == 70),
+            "still in use"
+        );
+        // A camera close or a mute lets go of them all.
+        attention.forget_said_lines();
+        assert!(attention.said_lines.is_empty(), "on privacy");
+    }
+
+    /// The same when the second line goes on from the first, cut short
+    /// (`Attention::continued_at`): the first part's words, then its own,
+    /// are read as one, and the repeat at the join is the first part's.
+    #[test]
+    fn a_repeat_at_a_continuations_join_is_no_call_by_its_text() {
+        const S: u64 = 1_000_000;
+        let judged = |repeat: bool| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ignore_name_in_passing(true);
+            attention.count_stand_alone_ins(true);
+            attention.not_calling_on_a_repeat(repeat);
+            attention.began_at(80, 7, 10 * S);
+            attention.heard("That lamp is cute.");
+            attention.ended(80, 11 * S + 200_000);
+            attention.continued_at(81, 7, 11 * S + 500_000);
+            attention.heard(" Lamp is cute. Where did you get it?");
+            attention.ended(81, 13 * S + 500_000);
+            attention.first_output_busy(81, Room::Busy, false, false, None)
+        };
+        assert_eq!(judged(false), Some(Verdict::Play(CALLED_IN_TEXT)));
+        assert!(matches!(judged(true), Some(Verdict::Hold(_))));
     }
 
     /// `LAMP_NAME_STAYS_IN_ITS_LINE` with `LAMP_NAME_START_USUAL` (Fourth's

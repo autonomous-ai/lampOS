@@ -66,6 +66,7 @@ impl Root {
             backend: self.0.join("etc/backend.json"),
             reports: self.0.join("etc/reports.json"),
             display_name: self.0.join("etc/display-name"),
+            language: self.0.join("etc/setup/language"),
             own_keys: self.0.join("etc/own"),
             web_start: vec![],
             web_stop: vec![],
@@ -103,6 +104,8 @@ fn a_request_is_checked_before_anything_is_touched() {
             credential: Some("AIza-key_1".into()),
             name: Some("Lan".into()),
             timezone: Some("Asia/Ho_Chi_Minh".into()),
+            // None asked: nothing is written, which is English.
+            language: None,
             // A port alone is no link.
             backend: None,
             share_reports: false,
@@ -266,6 +269,9 @@ impl Save for Saved {
     fn timezone(&mut self, zone: &str) -> io::Result<()> {
         self.record("timezone", zone)
     }
+    fn language(&mut self, code: &str) -> io::Result<()> {
+        self.record("language", code)
+    }
     fn backend(&mut self, link: &Backend) -> io::Result<()> {
         self.record(
             "backend",
@@ -324,6 +330,64 @@ fn a_joined_lamp_saves_the_settings_then_the_marker_and_says_it_is_set_up() {
             "marker="
         ]
     );
+}
+
+/// #4473: setup's optional `language`, checked as `language.set` checks
+/// it, is saved after the zone. One the lamp doesn't speak is left out,
+/// never a failed setup, as an unknown zone is; through the light's
+/// wrapper too, and a recovery run saves none.
+#[test]
+fn setup_saves_a_language_the_lamp_speaks_after_the_zone() {
+    let root = Root::new();
+    let config = root.config(false);
+    let with = |language: Value| {
+        let mut body = good();
+        body["language"] = language;
+        check(&request(body), &config).unwrap().language
+    };
+    for code in ["en", "vi", "ja", "zh", "ko"] {
+        assert_eq!(with(json!(code)), Some(code));
+    }
+    assert_eq!(with(json!(" ko\n")), Some("ko"), "trimmed");
+    for other in [json!("fr"), json!("JA"), json!(""), json!(null), json!(7)] {
+        assert_eq!(with(other.clone()), None, "{other}");
+    }
+    let mut body = good();
+    body["language"] = json!("ja");
+    let accepted = check(&request(body), &config).unwrap();
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut releasing = lamp_setup::light::ReleasingSave {
+        save: Saved::default(),
+        light: None,
+    };
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut releasing,
+        || Some("192.168.1.23".into()),
+    );
+    assert_eq!(
+        releasing.save.calls,
+        [
+            "name=Lan",
+            "timezone=Asia/Ho_Chi_Minh",
+            "language=ja",
+            "credential=AIza-key_1",
+            "marker="
+        ]
+    );
+    let mut saved = Saved::default();
+    run(
+        &Arc::new(Mutex::new(Status::new("lamp-4ace".into()))),
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut lamp_setup::serve::NetworkOnly(&mut saved),
+        || Some("192.168.1.23".into()),
+    );
+    assert!(saved.calls.is_empty(), "{:?}", saved.calls);
 }
 
 /// #3020, El's P1 on #3024: a recovery run takes the app's one full setup
@@ -909,6 +973,52 @@ async fn call(app: &axum::Router, method: &str, path: &str, body: Value) -> (Sta
     let code = response.status();
     let bytes = to_bytes(response.into_body(), 1 << 20).await.unwrap();
     (code, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+/// Reviewer-two on #4180: refusals asked many times a second write the
+/// first line, then one a minute later with the count since it.
+#[test]
+fn the_recovery_hotspot_journals_a_refused_key_once_a_minute_with_a_count() {
+    let mut refusals = lamp_setup::http::Refusals::new();
+    let start = Instant::now();
+    let lines: Vec<_> = (0..100)
+        .filter_map(|i| refusals.refused(start + Duration::from_millis(i * 10)))
+        .collect();
+    assert_eq!(lines, ["a request without this lamp's own key was refused"]);
+    assert_eq!(
+        refusals.refused(start + Duration::from_secs(61)).as_deref(),
+        Some("100 requests without this lamp's own key refused since the last line")
+    );
+    assert_eq!(refusals.refused(start + Duration::from_secs(62)), None);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn the_recovery_hotspot_takes_a_network_only_with_the_lamps_own_key() {
+    let (app, status, started, root) = app(false);
+    let credential = root.config(false).credential;
+    std::fs::write(&credential, "AIza-key_1\n").unwrap();
+    status.lock().unwrap().runtime_phase = lamp_setup::recover::RECOVERING.into();
+    // The sticker's suffix, another key and no key are all refused.
+    for key in ["4ace", "AIza-key_2", ""] {
+        let mut request = good();
+        request["llm_api_key"] = json!(key);
+        let (code, body) = call(&app, "POST", "/api/device/setup", request).await;
+        assert_eq!(code, StatusCode::FORBIDDEN, "{key:?}");
+        assert!(body["message"].as_str().unwrap().contains("own key"));
+    }
+    assert!(started.lock().unwrap().is_empty());
+    assert_eq!(status.lock().unwrap().phase, Phase::Idle);
+    // The owner's key, as the account page passes it, starts the run.
+    let (code, _) = call(&app, "POST", "/api/device/setup", good()).await;
+    assert_eq!(code, StatusCode::OK);
+    assert_eq!(started.lock().unwrap().len(), 1);
+    // A lamp without its key file refuses even a matching one.
+    std::fs::remove_file(&credential).unwrap();
+    assert!(!lamp_setup::serve::recovery_key_matches(
+        "AIza-key_1",
+        &credential
+    ));
+    assert!(!lamp_setup::serve::recovery_key_matches("", &credential));
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -1656,4 +1766,47 @@ fn the_status_says_own_keys_from_the_hotspots_start_but_never_in_a_recovery() {
             "{on} {recovering}"
         );
     }
+}
+
+/// setup.md's "What setup writes, and what a 5 s reset does with it" is where
+/// a person checking a lamp after setup or a reset looks each file up, and it
+/// had no row for the own keys' folder. Each file the product's setup can
+/// write has a row there, by the path the product's configuration gives it.
+#[test]
+fn setup_md_has_a_row_for_every_file_setup_writes() {
+    let config = fixture(include_str!("../../fixtures/serve-own-page.json"));
+    let doc = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/setup.md");
+    let doc = fs::read_to_string(doc).unwrap();
+    let table = doc
+        .split("\n**What setup writes, and what a 5 s reset does with it:**\n")
+        .nth(1)
+        .expect("docs/setup.md has \"What setup writes, and what a 5 s reset does with it\"");
+    let rows: Vec<&str> = table
+        .lines()
+        .skip_while(|line| !line.starts_with('|'))
+        .take_while(|line| line.starts_with('|'))
+        .filter_map(|line| line.strip_prefix("| `")?.split('`').next())
+        .collect();
+    let rowless: Vec<&std::path::Path> = [
+        &config.marker,
+        &config.credential,
+        &config.policy_key,
+        &config.name,
+        &config.localtime,
+        &config.timezone_file,
+        &config.zone_env,
+        &config.backend,
+        &config.reports,
+        &config.display_name,
+        &config.language,
+        &config.own_keys,
+    ]
+    .into_iter()
+    .map(PathBuf::as_path)
+    .filter(|path| !rows.iter().any(|row| std::path::Path::new(row) == *path))
+    .collect();
+    assert!(
+        rowless.is_empty(),
+        "docs/setup.md's \"What setup writes\" has no row for {rowless:?}"
+    );
 }

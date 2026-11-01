@@ -1,7 +1,7 @@
 use lamp_msgs::{ClockStamp, ScheduleDue};
 use lamp_schedule::{
     engine::{Engine, MAX_ITEMS, Persistence},
-    protocol::{Guard, MAX_REPLY_BYTES, Request},
+    protocol::{Asker, Guard, MAX_REPLY_BYTES, Request},
     time::{ClockSample, When},
 };
 use serde_json::{Value, json};
@@ -64,6 +64,7 @@ fn set(engine: &mut Engine<Disk>, at: &ClockSample, seconds: u64) -> Value {
     engine
         .answer(
             Request::Set {
+                person: None,
                 guard: guard(engine),
                 text: "Call Maria".into(),
                 when: When::After { seconds },
@@ -77,6 +78,7 @@ fn create(engine: &mut Engine<Disk>, at: &ClockSample, when: When) -> Value {
     engine
         .answer(
             Request::Set {
+                person: None,
                 guard: guard(engine),
                 text: "Check the calendar".into(),
                 when,
@@ -216,6 +218,7 @@ fn cancelling_before_or_after_due_removes_only_the_named_item() {
         set(&mut e, &now(0), 3);
         e.tick(&now(elapsed)).unwrap();
         let r = Request::Cancel {
+            asker: None,
             guard: guard(&e),
             id: 1,
         };
@@ -229,6 +232,7 @@ fn a_lost_create_reply_is_replayed_after_restart_without_a_second_timer() {
     let disk = Disk::default();
     let mut e = open(disk.clone(), &now(0));
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: "Tea".into(),
         when: When::After { seconds: 1 },
@@ -245,6 +249,7 @@ fn changing_the_payload_of_a_retried_guard_is_a_conflict() {
     let old = guard(&e);
     set(&mut e, &now(0), 10);
     let r = Request::Set {
+        person: None,
         guard: old,
         text: "Different".into(),
         when: When::After { seconds: 10 },
@@ -256,12 +261,14 @@ fn changing_the_payload_of_a_retried_guard_is_a_conflict() {
 fn an_old_retry_after_another_mutation_cannot_recreate_a_cancelled_timer() {
     let mut e = open(Disk::default(), &now(0));
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: "Tea".into(),
         when: When::After { seconds: 10 },
     };
     e.answer(r.clone(), &now(0)).unwrap();
     let cancel = Request::Cancel {
+        asker: None,
         guard: guard(&e),
         id: 1,
     };
@@ -273,6 +280,7 @@ fn an_old_retry_after_another_mutation_cannot_recreate_a_cancelled_timer() {
 fn automatic_due_updates_preserve_the_last_mutation_receipt() {
     let mut e = open(Disk::default(), &now(0));
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: "Tea".into(),
         when: When::After { seconds: 1 },
@@ -323,6 +331,7 @@ fn a_lost_snooze_receipt_does_not_extend_the_timer_after_restart() {
     set(&mut e, &now(0), 1);
     e.tick(&now(1000)).unwrap();
     let request = Request::Snooze {
+        asker: None,
         guard: guard(&e),
         id: 1,
         delivery: 1,
@@ -345,6 +354,7 @@ fn a_commit_error_before_write_stops_the_owner_and_does_not_announce_the_candida
     let mut e = open(disk.clone(), &now(0));
     disk.0.lock().unwrap().fail = true;
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: "Tea".into(),
         when: When::After { seconds: 1 },
@@ -361,6 +371,7 @@ fn a_commit_then_sync_error_recovers_the_receipt_without_duplicate_creation() {
     let mut e = open(disk.clone(), &now(0));
     disk.0.lock().unwrap().after_commit = true;
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: "Tea".into(),
         when: When::After { seconds: 1 },
@@ -475,6 +486,7 @@ fn after_a_reboot_with_the_clock_a_day_behind_nothing_calendar_timed_acts_until_
     }
     let made = e.answer(
         Request::Set {
+            person: None,
             guard: guard(&e),
             text: "Tea".into(),
             when: When::At {
@@ -593,6 +605,7 @@ fn untrusted_wall_time_cannot_create_a_false_reboot_deadline() {
     at.wall_trusted = false;
     let mut e = open(Disk::default(), &at);
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: "Tea".into(),
         when: When::After { seconds: 1 },
@@ -657,6 +670,7 @@ fn snoozing_invalidates_old_delivery_but_does_not_shift_the_repeat_anchor() {
     at.unix_ms = first;
     e.tick(&at).unwrap();
     let r = Request::Snooze {
+        asker: None,
         guard: guard(&e),
         id: 1,
         delivery: 1,
@@ -681,6 +695,7 @@ fn snooze_requires_a_due_occurrence() {
     let mut e = open(Disk::default(), &now(0));
     set(&mut e, &now(0), 60);
     let r = Request::Snooze {
+        asker: None,
         guard: guard(&e),
         id: 1,
         delivery: 1,
@@ -696,6 +711,7 @@ fn capacity_refuses_new_work_without_evicting_a_due_reminder() {
     }
     e.tick(&now(2000)).unwrap();
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: "Extra".into(),
         when: When::After { seconds: 1 },
@@ -727,6 +743,7 @@ fn wrong_store_or_invalid_request_identity_cannot_mutate() {
     ] {
         let mut e = open(Disk::default(), &now(0));
         let r = Request::Set {
+            person: None,
             guard: bad,
             text: "Tea".into(),
             when: When::After { seconds: 1 },
@@ -740,6 +757,7 @@ fn text_is_unicode_preserving_and_never_silently_truncated() {
     let mut e = open(Disk::default(), &now(0));
     let text = "Nhắc tôi gọi Maria";
     let r = Request::Set {
+        person: None,
         guard: guard(&e),
         text: text.into(),
         when: When::After { seconds: 1 },
@@ -748,6 +766,7 @@ fn text_is_unicode_preserving_and_never_silently_truncated() {
     assert_eq!(get(&mut e, &now(0), 1)["text"], text);
     for text in [" ".into(), "a\nb".into(), "a\0b".into(), "é".repeat(151)] {
         let r = Request::Set {
+            person: None,
             guard: guard(&e),
             text,
             when: When::After { seconds: 1 },
@@ -829,6 +848,7 @@ fn maximum_text_and_repeat_metadata_fit_a_whole_list_reply() {
         let mut g = guard(&e);
         g.request_id = "x".repeat(64);
         let r = Request::Set {
+            person: None,
             guard: g,
             text: "\"".repeat(300),
             when: When::Weekly {
@@ -1153,6 +1173,7 @@ fn with_no_known_zone_or_offset_a_clock_time_is_refused_and_minutes_still_work()
             let refused = engine
                 .answer(
                     Request::Set {
+                        person: None,
                         guard: guard(&engine),
                         text: "Call Maria".into(),
                         when,
@@ -1203,4 +1224,380 @@ fn with_no_known_zone_or_offset_a_clock_time_is_refused_and_minutes_still_work()
     // A zone it knows is no fallback.
     let engine = Engine::open(Disk::default(), "Etc/UTC", &at, STORE).unwrap();
     assert_eq!(engine.zone_fallback(), None);
+}
+
+/// When an item was set (the person's call, 30 Oct: "when did I set that
+/// reminder?"): `ListSet` says it, from the item's stored creation time, in
+/// the lamp's zone, its day against now's. 14 Oct 23:30 UTC is 06:30 on 15
+/// Oct in Ho Chi Minh City: the day is the lamp's, not UTC's. With now's
+/// wall clock untrusted, the day is its date, never "today" on a guess.
+/// `List` and `Get`, which the delivery ledger reads strictly, are as they
+/// were.
+#[test]
+fn a_list_set_item_says_when_it_was_set_in_the_lamps_zone() {
+    // WALL is 14 Oct 08:00 UTC; 23:30 UTC is 15.5 hours on.
+    let at = now(15 * 3_600_000 + 1_800_000);
+    let mut e = Engine::open(Disk::default(), "Asia/Ho_Chi_Minh", &at, STORE).unwrap();
+    set(&mut e, &at, 86_400 * 3);
+    let listed = |e: &mut Engine<Disk>, at: &ClockSample| {
+        e.answer(
+            Request::ListSet {
+                asker: None,
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+            },
+            at,
+        )
+        .unwrap()["items"][0]
+            .clone()
+    };
+    let item = listed(&mut e, &at);
+    assert_eq!(
+        (item["set_local"].as_str(), item["set_day"].as_str()),
+        (
+            Some("2026-10-15T06:30:00+07:00[Asia/Ho_Chi_Minh]"),
+            Some("today")
+        ),
+        "{item}"
+    );
+    let mut plain = item.as_object().unwrap().clone();
+    plain.remove("set_local");
+    plain.remove("set_day");
+    assert_eq!(Value::Object(plain), get(&mut e, &at, 1));
+    let list = e
+        .answer(
+            Request::List {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+            },
+            &at,
+        )
+        .unwrap();
+    assert!(list["items"][0].get("set_local").is_none(), "{list}");
+    let day = |e: &mut Engine<Disk>, at: &ClockSample| listed(e, at)["set_day"].clone();
+    assert_eq!(day(&mut e, &now(39 * 3_600_000 + 1_800_000)), "yesterday");
+    assert_eq!(day(&mut e, &now(63 * 3_600_000 + 1_800_000)), "2026-10-15");
+    let mut untrusted = now(64 * 3_600_000);
+    untrusted.wall_trusted = false;
+    assert_eq!(day(&mut e, &untrusted), "2026-10-15");
+}
+
+const ANN: &str = "p-0123456789abcdef";
+const BO: &str = "p-fedcba9876543210";
+
+/// A reminder `person` set, due at 08:10, 600 s after [`WALL`]: a
+/// reminder, since every line sees the room's timers.
+fn set_by(engine: &mut Engine<Disk>, at: &ClockSample, text: &str, person: Option<&str>) -> u64 {
+    set_when(
+        engine,
+        at,
+        text,
+        person,
+        When::At {
+            time: "08:10".into(),
+            day: None,
+            zone: None,
+            fold: None,
+        },
+    )
+}
+/// A timer `person` set, due 600 s from `at`.
+fn timer_by(engine: &mut Engine<Disk>, at: &ClockSample, text: &str, person: Option<&str>) -> u64 {
+    set_when(engine, at, text, person, When::After { seconds: 600 })
+}
+fn set_when(
+    engine: &mut Engine<Disk>,
+    at: &ClockSample,
+    text: &str,
+    person: Option<&str>,
+    when: When,
+) -> u64 {
+    engine.tick(at).unwrap();
+    engine
+        .answer(
+            Request::Set {
+                guard: guard(engine),
+                text: text.into(),
+                when,
+                person: person.map(str::to_owned),
+            },
+            at,
+        )
+        .unwrap()["id"]
+        .as_u64()
+        .unwrap()
+}
+fn asker(person: Option<&str>, owner: bool) -> Asker {
+    Asker {
+        person: person.map(str::to_owned),
+        owner,
+    }
+}
+fn listed(engine: &mut Engine<Disk>, at: &ClockSample, asker: Option<Asker>) -> Vec<String> {
+    let page = engine
+        .answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+                asker,
+            },
+            at,
+        )
+        .unwrap();
+    page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["text"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// #4527's P2, the first builder's (a): each reminder keeps who set it; a
+/// line hears only its own, and one set with nobody sure only on the
+/// owner's line. A request with no asker (the app, the due reminder's own
+/// reads) sees them all.
+#[test]
+fn each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_person_ones() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    set_by(&mut e, &at, "Bo's call", Some(BO));
+    set_by(&mut e, &at, "Water the plant", None);
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(ANN), false))),
+        ["Ann's pills"]
+    );
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(BO), false))),
+        ["Bo's call"]
+    );
+    // The owner is Ann: hers and the no-person one, never Bo's.
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(ANN), true))),
+        ["Ann's pills", "Water the plant"]
+    );
+    // An unknown face, or the room's line: nothing of anyone's.
+    assert!(listed(&mut e, &at, Some(asker(None, false))).is_empty());
+    assert_eq!(listed(&mut e, &at, None).len(), 3);
+    // Its count of what is set and not yet due is the line's own.
+    let page = e
+        .answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: true,
+                asker: Some(asker(Some(BO), false)),
+            },
+            &at,
+        )
+        .unwrap();
+    assert_eq!(page["not_yet_due"], 1);
+}
+
+#[test]
+fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    let ann = set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    let room = set_by(&mut e, &at, "Water the plant", None);
+    for (id, guest) in [
+        (ann, asker(Some(BO), false)),
+        (ann, asker(None, false)),
+        (room, asker(Some(BO), false)),
+    ] {
+        let refused = e
+            .answer(
+                Request::Cancel {
+                    guard: guard(&e),
+                    id,
+                    asker: Some(guest.clone()),
+                },
+                &at,
+            )
+            .unwrap_err();
+        assert_eq!(refused.code, "not_found", "{id} {guest:?}");
+    }
+    let due_at = now(600_000);
+    e.tick(&due_at).unwrap();
+    let delivery = get(&mut e, &due_at, ann)["delivery"].as_u64().unwrap();
+    let refused = e
+        .answer(
+            Request::Snooze {
+                guard: guard(&e),
+                id: ann,
+                delivery,
+                seconds: 60,
+                asker: Some(asker(Some(BO), false)),
+            },
+            &due_at,
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, "not_found");
+    assert_eq!(listed(&mut e, &due_at, None).len(), 2);
+    // Ann snoozes her own, and the owner cancels the no-person one.
+    e.answer(
+        Request::Snooze {
+            guard: guard(&e),
+            id: ann,
+            delivery,
+            seconds: 60,
+            asker: Some(asker(Some(ANN), false)),
+        },
+        &due_at,
+    )
+    .unwrap();
+    e.answer(
+        Request::Cancel {
+            guard: guard(&e),
+            id: room,
+            asker: Some(asker(Some(ANN), true)),
+        },
+        &due_at,
+    )
+    .unwrap();
+    assert_eq!(listed(&mut e, &due_at, None), ["Ann's pills"]);
+}
+
+/// The room's timers (option 1 on #4656's after-merge P2, bounded by
+/// Reviewer-three's P1 and Third's line on #4668): a line with no face
+/// seen, at the stove, hears and cancels a timer set by nobody for two hours
+/// at most. It never hears a person's timer, a reminder, or a relative
+/// reminder set further out, a person's or nobody's.
+#[test]
+fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    let weeks = || When::After {
+        seconds: 21 * 86_400,
+    };
+    let pasta = timer_by(&mut e, &at, "Pasta", None);
+    let tea = timer_by(&mut e, &at, "Tea", Some(ANN));
+    let pills = set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    set_when(&mut e, &at, "Ann's prescription", Some(ANN), weeks());
+    set_when(&mut e, &at, "Renew the visa", None, weeks());
+    // At the bound and just past it.
+    set_when(&mut e, &at, "Roast", None, When::After { seconds: 7_200 });
+    set_when(&mut e, &at, "Bread", None, When::After { seconds: 7_201 });
+    let room = asker(None, false);
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Pasta", "Roast"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(BO), false))),
+        ["Pasta", "Roast"]
+    );
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(ANN), false))),
+        ["Pasta", "Tea", "Ann's pills", "Ann's prescription", "Roast"]
+    );
+    // The owner's line hears every one set by nobody, as before.
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(None, true))),
+        ["Pasta", "Renew the visa", "Roast", "Bread"]
+    );
+    let cancel = |e: &mut Engine<Disk>, id: u64| {
+        e.answer(
+            Request::Cancel {
+                guard: guard(e),
+                id,
+                asker: Some(room.clone()),
+            },
+            &at,
+        )
+    };
+    for id in [tea, pills] {
+        assert_eq!(cancel(&mut e, id).unwrap_err().code, "not_found", "{id}");
+    }
+    cancel(&mut e, pasta).unwrap();
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Roast"]);
+    // A person's timer keeps its setter: Ann's forget takes it with hers.
+    let forgot = e
+        .answer(
+            Request::Forget {
+                guard: guard(&e),
+                person: ANN.into(),
+            },
+            &at,
+        )
+        .unwrap();
+    assert_eq!(forgot["forgotten"], 3);
+    assert_eq!(
+        listed(&mut e, &at, None),
+        ["Renew the visa", "Roast", "Bread"]
+    );
+}
+
+#[test]
+fn a_persons_forget_cancels_every_reminder_they_set_and_survives_a_reopen() {
+    let at = now(0);
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &at);
+    set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    set_by(&mut e, &at, "Ann's call", Some(ANN));
+    set_by(&mut e, &at, "Bo's call", Some(BO));
+    set_by(&mut e, &at, "Water the plant", None);
+    let forgot = e
+        .answer(
+            Request::Forget {
+                guard: guard(&e),
+                person: ANN.into(),
+            },
+            &at,
+        )
+        .unwrap();
+    assert_eq!(forgot["forgotten"], 2);
+    assert_eq!(listed(&mut e, &at, None), ["Bo's call", "Water the plant"]);
+    let refused = e
+        .answer(
+            Request::Forget {
+                guard: guard(&e),
+                person: "Ann".into(),
+            },
+            &at,
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, "bad_request");
+    drop(e);
+    let mut e = open(disk, &at);
+    assert_eq!(listed(&mut e, &at, None), ["Bo's call", "Water the plant"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(BO), false))),
+        ["Bo's call"]
+    );
+}
+
+#[test]
+fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_setter_on_reopen() {
+    let at = now(0);
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &at);
+    // A reminder: a short timer set by nobody is every line's.
+    set_by(&mut e, &at, "Call Maria", None);
+    set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    drop(e);
+    // The older build's store: no `person` on the item set without one.
+    let stored: Value =
+        serde_json::from_slice(disk.0.lock().unwrap().bytes.as_ref().unwrap()).unwrap();
+    assert!(stored["items"][0].get("person").is_none());
+    assert_eq!(stored["items"][1]["person"], ANN);
+    let mut e = open(disk, &at);
+    assert_eq!(listed(&mut e, &at, Some(asker(None, true))), ["Call Maria"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(ANN), false))),
+        ["Ann's pills"]
+    );
+    // A setter that is not a person id is refused, never stored.
+    let refused = e
+        .answer(
+            Request::Set {
+                guard: guard(&e),
+                text: "x".into(),
+                when: When::After { seconds: 60 },
+                person: Some("Ann".into()),
+            },
+            &at,
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, "bad_request");
 }

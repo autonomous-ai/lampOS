@@ -37,7 +37,8 @@ usage: lamp-setup COMMAND [OPTIONS]
   watch-reset --plan FILE [--bus-root PATH] [--clock-id ID] [--seconds N] [--enable]
       Watch controls/touch for the reset button held 5 s and released. With
       --enable: stop the lamp, wipe the person's data, remove the setup
-      marker and reboot. Without it, a valid reset is only logged.
+      marker, and start setup in place (a product lamp) or reboot. Without
+      it, a valid reset is only logged.
   reset-now --plan FILE [--enable]
       Reset now: what watch-reset hands to a unit of its own when the reset
       button is held. Without --enable it does nothing.
@@ -600,7 +601,8 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
             }
         };
     }
-    let (reply, done) = change::answer(&line, &config, enabled);
+    // A new language holds lamp-update's lock through the voice's restart.
+    let (reply, done, _lock) = change::answer_holding(&line, &config, enabled, &records);
     {
         let mut out = io::stdout().lock();
         writeln!(out, "{reply}")?;
@@ -614,14 +616,30 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         }
         _ => {}
     }
-    if !done.is_some_and(|done| done.restart_schedule) {
+    let Some(done) = done.filter(|done| done.restart_schedule || done.restart_voice) else {
         return Ok(true);
-    }
+    };
     let bus = match bus_root {
         Some(root) => Bus::new(root)?,
         None => Bus::from_environment()?,
     };
     let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: change: {line}"));
+    // A new language (#4473): the voice reads it at start, so it restarts
+    // once it rests between turns, as the app's restart waits.
+    if done.restart_voice {
+        let said = change::when_rested(&mut ears, lamp_setup::keys::VOICE_UNIT, || {
+            match std::process::Command::new("/usr/bin/systemctl")
+                .args(["try-restart", lamp_setup::keys::VOICE_UNIT])
+                .status()
+            {
+                Ok(status) if status.success() => Ok(()),
+                Ok(status) => Err(status.to_string()),
+                Err(error) => Err(error.to_string()),
+            }
+        });
+        eprintln!("lamp-setup: change: {said}");
+        return Ok(true);
+    }
     // Quiet, and no update at work: held to the end, so no round's watch
     // sees lamp-schedule change process and puts its build back.
     match change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST) {

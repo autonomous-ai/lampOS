@@ -22,7 +22,8 @@ import { WebSocketServer } from 'ws';
 import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 
-const now = () => new Date().toISOString();
+// As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
+const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 // `express`'s feelings and their moves, as lamp-control's feelings.rs.
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
@@ -41,7 +42,6 @@ export const LAMP_CONTROL_REFUSES = Object.freeze({
   look: "the body's lease socket is not on here",
   joints: "not routed yet: waits for a goal stream on the body's lease socket",
   play: 'not routed yet: waits for client packages',
-  sound: 'not routed yet: waits for client packages',
 });
 // A light's pattern, as lamp-control checks it before the ring (lamp_msgs'
 // LightPattern::check, with the breath's low at 1): the least level each is
@@ -54,6 +54,18 @@ export const PATTERN_LEAST_LEVEL = Object.freeze({
 // The ring plays one pulse a minute for one asker, and shows a second steady,
 // without its pulse (lamp_msgs' PULSE_GAP_US): the door has answered by then.
 export const PULSE_GAP_MS = 60_000;
+
+// Hello's `limits`, as lamp-control says them with its rates off (session.rs
+// `limits`): no rate but its two guards, refused actions and phrase changes.
+export const LIMITS = Object.freeze({
+  rates: 'off',
+  refused: [{ most: 20, within_ms: 1_000 }],
+  phrases: [{ most: 6, within_ms: 60_000 }],
+  hold_max_ms: 30_000,
+  take_max_ms: 600_000,
+  say_max_chars: 300,
+  quiet_hours: { from: '22:00', to: '07:00' },
+});
 
 // A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs): head
 // pitch, head roll, base yaw, shoulder, elbow, in counts from rest and counts a
@@ -421,7 +433,7 @@ export class FakeLamp {
       ws.close();
       return null;
     }
-    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits: { joints_hz: 40 } });
+    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits: LIMITS });
     return request.client;
   }
 
@@ -551,7 +563,9 @@ export class FakeLamp {
         // follows.
         return this.ok(ws, id, { to: 'body' });
       case 'say':
-        // As lamp-control: the voice takes it, and its `done` follows.
+      case 'sound':
+        // As lamp-control: the voice takes it (a sound is its hum), and
+        // its `done` follows.
         this.ok(ws, id, { to: 'voice' });
         if (this.autoDone) this.done(id);
         return undefined;

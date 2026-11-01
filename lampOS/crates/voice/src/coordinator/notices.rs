@@ -24,6 +24,9 @@ pub(super) struct FailureNotices {
     /// The recovery hotspot's line (#3743, #3020): played only when
     /// `lamp-setup recover` asks for it through the say service.
     wifi_recovering: std::result::Result<Arc<Recording>, Missing>,
+    /// The lamp's login is no longer accepted (`LAMP_SIGNED_OUT`): said once
+    /// a spell and when someone talks, by a local-only turn.
+    signed_out: std::result::Result<Arc<Recording>, Missing>,
     /// With a notices folder configured, what a failed line plays when its
     /// recording can't be loaded (#2943 part 3): the lamp's own sigh, made
     /// here, so a lamp whose files are missing never meets a question it
@@ -31,6 +34,10 @@ pub(super) struct FailureNotices {
     /// stays silent as before.
     fallback: Option<Arc<Recording>>,
     language: Option<String>,
+    /// The speech cache, only when the owner's language is not English
+    /// (#4473 (c)): a line it keeps in that language is said in place of
+    /// the release's English file, read when the line is chosen.
+    owners: Option<Arc<crate::say::tts_cache::TtsCache>>,
 }
 
 /// How loud the fallback sigh is, as RMS over its loudest tenth of a
@@ -48,6 +55,9 @@ pub(super) struct Recording {
 impl Recording {
     pub(super) fn kind(&self) -> Option<NoticeKind> {
         self.info.as_ref().map(|info| info.kind)
+    }
+    pub(super) fn first_sample(&self) -> i16 {
+        self.samples[0]
     }
 }
 impl FailureNotices {
@@ -74,11 +84,14 @@ impl FailureNotices {
             service_down: get(NoticeKind::VoiceServiceUnreachable),
             wifi_lost: get(NoticeKind::WifiLost),
             wifi_recovering: get(NoticeKind::WifiRecovering),
+            signed_out: get(NoticeKind::SignedOut),
             fallback: Some(Arc::new(Recording {
                 info: None,
                 samples: crate::head_cue::breath(FALLBACK_DBFS).into_boxed_slice(),
             })),
             language: Some(options.language().to_owned()),
+            owners: crate::language::at_start()
+                .and_then(|_| crate::say::tts_cache::from_environment()),
         }
     }
     pub(super) fn none() -> Self {
@@ -89,9 +102,40 @@ impl FailureNotices {
             service_down: Err(Missing::NoDirectory),
             wifi_lost: Err(Missing::NoDirectory),
             wifi_recovering: Err(Missing::NoDirectory),
+            signed_out: Err(Missing::NoDirectory),
             fallback: None,
             language: None,
+            owners: None,
         }
+    }
+    /// `kind`'s line in the owner's language, read from the speech cache
+    /// now, never rendered: none for English, for a kind with no words of
+    /// its own (`turn_lost`), and for a line not kept yet, which leaves the
+    /// release's English file (#4473 (c)). Its record names the cache, not
+    /// a file of the release.
+    fn owners_line(
+        &self,
+        kind: NoticeKind,
+    ) -> Option<std::result::Result<Arc<Recording>, Missing>> {
+        let cache = self.owners.as_ref()?;
+        let (language, words) = cache.owners_words(notice_words(kind)?)?;
+        let samples = cache.kept(words)?;
+        let frames = u32::try_from(samples.len()).ok()?;
+        Some(Ok(Arc::new(Recording {
+            info: Some(NoticeInfo {
+                kind,
+                language: language.code().to_owned(),
+                transcript: words.to_owned(),
+                voice: "speech-cache".into(),
+                voice_revision: "speech-cache".into(),
+                approval: Approval::Production,
+                wav_sha256: format!("speech-cache:{}", cache.key(words)),
+                pcm_sha256: "speech-cache".into(),
+                frames,
+                duration_ms: frames / 24,
+            }),
+            samples: samples.into_boxed_slice(),
+        })))
     }
     pub(super) fn capability(&self) -> Value {
         let mut capability = match &self.selected {
@@ -115,6 +159,7 @@ impl FailureNotices {
             capability["service_down"] = state(&self.service_down);
             capability["wifi_lost"] = state(&self.wifi_lost);
             capability["wifi_recovering"] = state(&self.wifi_recovering);
+            capability["signed_out"] = state(&self.signed_out);
         }
         capability
     }
@@ -138,6 +183,21 @@ impl FailureNotices {
     }
 }
 
+/// The English words of `kind`'s product recording, the key of its line in
+/// the owner's language (#4473 (c)); none for a kind the product has no
+/// words for.
+fn notice_words(kind: NoticeKind) -> Option<&'static str> {
+    match kind {
+        NoticeKind::ProviderUnavailable => Some(crate::language::PROVIDER_UNAVAILABLE),
+        NoticeKind::BackOnline => Some(crate::language::BACK_ONLINE),
+        NoticeKind::VoiceServiceUnreachable => Some(crate::language::VOICE_SERVICE_UNREACHABLE),
+        NoticeKind::WifiLost => Some(crate::language::WIFI_LOST),
+        NoticeKind::WifiRecovering => Some(crate::language::WIFI_RECOVERING),
+        NoticeKind::SignedOut => Some(crate::language::SIGNED_OUT),
+        NoticeKind::TurnLost | NoticeKind::ServiceRefused => None,
+    }
+}
+
 /// A turn taken while the lamp could not reach the internet (#830,
 /// `LAMP_OFFLINE_VOICE=on`): admitted, listened to and ended as any other,
 /// but its request never goes to the provider; it is failed locally from
@@ -146,11 +206,15 @@ impl FailureNotices {
 /// `back`: the turn the lamp takes for itself to say it is back online.
 /// `service`: taken while the internet answers but the voice service does
 /// not (`LAMP_SERVICE_DOWN_LINE=on`), so its line is the service's.
+/// `signed_out`: taken while the lamp's login is no longer accepted
+/// (`LAMP_SIGNED_OUT=on`), so its line says that; with `back`, the turn the
+/// lamp takes for itself to say it once, with no sigh in its place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct LocalOnly {
     pub(super) speech: bool,
     pub(super) back: bool,
     pub(super) service: bool,
+    pub(super) signed_out: bool,
 }
 
 /// What one outage has said: the offline line once, and "back online" only
@@ -172,7 +236,9 @@ impl Outage {
         let Some(current) = reply.as_ref() else {
             return;
         };
-        let offline_line = current.local_only.filter(|local| !local.back);
+        let offline_line = current
+            .local_only
+            .filter(|local| !local.back && !local.signed_out);
         let delivered = match &current.notice {
             NoticeDelivery::Selected { retired_at_us, .. } => {
                 current.playback.is_some() || retired_at_us.is_some()
@@ -490,16 +556,29 @@ pub(super) fn select_failure_notice_in(
     }
     // A local-only turn says the offline line, once an outage and only for
     // speech; any other try gets no words, only the ring's offline breath.
-    let (selected, stands_in) = match current.local_only {
-        None => (&catalog.selected, true),
-        // "Back online" is never stood in for: nothing failed.
-        Some(local) if local.back => (&catalog.back_online, false),
-        Some(local) if local.speech && !outage.said && local.service => {
-            (&catalog.service_down, true)
+    let (selected, stands_in, kind) = match current.local_only {
+        None => (&catalog.selected, true, NoticeKind::TurnLost),
+        // Signed out comes first: it holds whether or not the link is up.
+        // Only for speech, and the lamp's own turn is never stood in for.
+        Some(local) if local.signed_out && local.speech => {
+            (&catalog.signed_out, !local.back, NoticeKind::SignedOut)
         }
-        Some(local) if local.speech && !outage.said => (&catalog.offline, true),
+        Some(local) if local.signed_out => return Ok(()),
+        // "Back online" is never stood in for: nothing failed.
+        Some(local) if local.back => (&catalog.back_online, false, NoticeKind::BackOnline),
+        Some(local) if local.speech && !outage.said && local.service => (
+            &catalog.service_down,
+            true,
+            NoticeKind::VoiceServiceUnreachable,
+        ),
+        Some(local) if local.speech && !outage.said => {
+            (&catalog.offline, true, NoticeKind::ProviderUnavailable)
+        }
         Some(_) => return Ok(()),
     };
+    // In the owner's language when the speech cache keeps it (#4473 (c)).
+    let owners = catalog.owners_line(kind);
+    let selected = owners.as_ref().map_or(selected, |owners| owners);
     let selected_recording = |recording: &Arc<Recording>| NoticeDelivery::Selected {
         origin: SpeechOrigin::FailureNotice,
         recording: Arc::clone(recording),
@@ -550,7 +629,14 @@ impl FailureNotices {
         catalog.offline = recording(NoticeKind::ProviderUnavailable, 123);
         catalog.back_online = recording(NoticeKind::BackOnline, 77);
         catalog.service_down = recording(NoticeKind::VoiceServiceUnreachable, 55);
+        catalog.signed_out = recording(NoticeKind::SignedOut, 44);
         catalog
+    }
+
+    /// The catalog with the speech cache of an owner's language (#4473 (c)).
+    pub(super) fn with_owners(mut self, cache: crate::say::tts_cache::TtsCache) -> Self {
+        self.owners = Some(Arc::new(cache));
+        self
     }
 
     /// A folder configured that isn't there (#2943 part 3): every line
@@ -584,11 +670,13 @@ impl FailureNotices {
             offline: Err(Missing::NotProvisioned),
             back_online: Err(Missing::NotProvisioned),
             service_down: Err(Missing::NotProvisioned),
+            signed_out: Err(Missing::NotProvisioned),
             wifi_lost: Err(Missing::NotProvisioned),
             wifi_recovering: Err(Missing::NotProvisioned),
             // The other tests' catalog stays silent on a missing line.
             fallback: None,
             language: Some("en-US".into()),
+            owners: None,
         }
     }
 }
@@ -662,6 +750,41 @@ mod loading_tests {
         let unset = FailureNotices::load(None);
         assert!(unset.fallback.is_none());
         assert!(unset.capability().get("fallback").is_none());
+    }
+
+    /// #4473 (c): the owner's language adds no notices kind (an older voice
+    /// refuses a whole manifest with one it doesn't know); `notice_words`
+    /// matches every kind with no wildcard, so a new one fails to build.
+    #[test]
+    fn the_owners_language_adds_no_notice_kind_and_keys_the_product_words() {
+        use NoticeKind::*;
+        let worded: Vec<_> = [
+            ProviderUnavailable,
+            TurnLost,
+            ServiceRefused,
+            BackOnline,
+            VoiceServiceUnreachable,
+            WifiLost,
+            WifiRecovering,
+        ]
+        .into_iter()
+        .filter_map(|kind| notice_words(kind).map(|words| (kind, words)))
+        .collect();
+        assert_eq!(
+            worded,
+            [
+                (ProviderUnavailable, crate::language::PROVIDER_UNAVAILABLE),
+                (BackOnline, crate::language::BACK_ONLINE),
+                (
+                    VoiceServiceUnreachable,
+                    crate::language::VOICE_SERVICE_UNREACHABLE
+                ),
+                (WifiLost, crate::language::WIFI_LOST),
+                (WifiRecovering, crate::language::WIFI_RECOVERING),
+            ]
+        );
+        // An English lamp's catalog has no cache of the owner's.
+        assert!(FailureNotices::synthetic_offline().owners.is_none());
     }
 
     /// #1959: the say service is handed the Wi-Fi line's samples when it

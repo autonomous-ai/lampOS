@@ -1,6 +1,7 @@
 //! The reset (#806): the reset button held 5 s and released, as Controls
 //! publishes it on `controls/touch`, stops the lamp, wipes the person's data,
-//! removes the setup marker and reboots into setup.
+//! removes the setup marker and starts setup again: in place on a product lamp
+//! (#4500, [`stop_and_wait_keeping`]), else by the plan's reboot.
 //!
 //! A journal is written durably first, then the setup marker is removed, and
 //! only then is the lamp stopped and its data wiped. So a power cut, or a stop
@@ -23,6 +24,9 @@ use std::{
 };
 
 pub(crate) mod query;
+#[cfg(test)]
+mod skill_reset_tests;
+mod skill_staging;
 
 /// The product plan's journal, read by Wi-Fi's restore of an old network
 /// ([`wifi_restore_allowed`]).
@@ -93,7 +97,9 @@ pub struct Plan {
     /// without wiping, into setup, which finishes the wipe with nothing
     /// running.
     pub stop: Vec<String>,
-    /// Run after the wipe.
+    /// Run after the wipe when setup isn't started in place (#4500): a
+    /// keeper's plan, a lamp without setup's unit, a start that fails, or a
+    /// stop or wipe that fails.
     pub reboot: Vec<String>,
     /// How `watch-reset` hands the reset to a unit of its own, outside
     /// `lampos.target`, so stopping the lamp cannot stop the reset
@@ -284,7 +290,126 @@ pub trait Effects {
     /// The last resort when the reboot command fails: a lamp left dark with
     /// no marker must still come back, into setup.
     fn force_reboot(&mut self);
+    /// Before setup is started in place (#4500): what a reboot cleared by
+    /// being memory, [`VOLATILE`], emptied, each folder kept.
+    fn clear_volatile(&mut self) -> io::Result<()>;
+    /// One of [`FORGET`]'s commands. A lamp's runs bounded, as setup's other
+    /// `wpa_cli` and `journalctl` calls are ([`System`]'s, `QUERY_TIMEOUT`);
+    /// by default as [`Effects::run`].
+    fn forget(&mut self, argv: &[String]) -> io::Result<()> {
+        self.run(argv)
+    }
+    /// The skills a person put on from a package removed,
+    /// [`remove_installed_skills`] in [`SKILLS`]; how many.
+    fn remove_installed_skills(&mut self) -> io::Result<usize>;
 }
+
+/// The product's skills folder (`lamp_update::product_skills::FOLDER`).
+pub const SKILLS: &str = lamp_update::product_skills::FOLDER;
+
+/// What a skill put on from a package keeps beside it,
+/// `lamp_skills::package::INSTALLED_FROM`, named here so the reset needs no
+/// skills crate, and with it no voice (Third on the branch, 1 Nov 11:30); a
+/// test holds the two equal.
+pub const INSTALLED_FROM: &str = ".package.json";
+
+/// A reset's one pending skill, renamed before deletion so neither the
+/// selection mark nor the person's chosen folder name is needed to resume.
+const SKILL_PENDING: &str = ".reset-skill-pending";
+
+/// Each skill in `folder` a person put on from a package, made by voice
+/// (`LAMP_MAKE_SKILL`) or from the Store, removed with its folder: it holds
+/// [`INSTALLED_FROM`], which a skill that comes with
+/// the lamp never does, so the lamp's own stay, as install and each round
+/// put them back. A made skill is the person's, and it outlived the plan's
+/// wipes (the Queue, #4710, 1 Nov 02:4x). Not a plan path: the plan empties
+/// a path and keeps it, and a plan field this build doesn't know refuses
+/// the whole reset. Each selected folder is renamed to [`SKILL_PENDING`]
+/// and its parent synced before deleting contents. Resume always finishes
+/// that pending folder, even without its package mark. Installer staging
+/// and retired folders are selected by their
+/// reserved names, even before a package mark was written. A link is passed
+/// over and a missing folder removes nothing. Returns removed folders in order.
+pub fn remove_installed_skills(folder: &Path) -> io::Result<Vec<PathBuf>> {
+    remove_installed_skills_with(folder, &mut || Ok(()))
+}
+
+// The callback lets tests interrupt the actual deletion traversal, including
+// inside nested folders and immediately after the package mark is unlinked.
+fn remove_installed_skills_with(
+    folder: &Path,
+    after_remove: &mut impl FnMut() -> io::Result<()>,
+) -> io::Result<Vec<PathBuf>> {
+    let entries = match fs::read_dir(folder) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let mut skills = Vec::new();
+    let pending = folder.join(SKILL_PENDING);
+    for entry in entries {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            if entry.file_name() == SKILL_PENDING {
+                return Err(io::Error::other("reset's pending skill is not a directory"));
+            }
+            continue;
+        }
+        let skill = entry.path();
+        if skill == pending
+            || entry
+                .file_name()
+                .to_str()
+                .is_some_and(skill_staging::left_by_a_run)
+        {
+            skills.push(skill);
+            continue;
+        }
+        match fs::symlink_metadata(skill.join(INSTALLED_FROM)) {
+            Ok(_) => skills.push(skill),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    // Finish a prior interruption before reusing the single pending place.
+    skills.sort_by_key(|skill| (skill != &pending, skill.clone()));
+    if skills.is_empty() {
+        return Ok(skills);
+    }
+    let parent = open_dir(folder)?;
+    for skill in &skills {
+        if skill != &pending {
+            rustix::fs::renameat(&parent, skill.file_name().unwrap(), &parent, SKILL_PENDING)?;
+            after_remove()?;
+        }
+        // No contents are touched until the deletion decision and removal
+        // of the person's folder name are durable. A retry needs no marker.
+        rustix::fs::fsync(&parent)?;
+        after_remove()?;
+        let dir = open_dir(&pending)?;
+        empty_with(&dir, after_remove)?;
+        rustix::fs::fsync(&dir)?;
+        after_remove()?;
+        rustix::fs::unlinkat(&parent, SKILL_PENDING, AtFlags::REMOVEDIR)?;
+        after_remove()?;
+        rustix::fs::fsync(&parent)?;
+    }
+    Ok(skills)
+}
+
+/// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
+/// bus's latest messages, which can say a person's name or words, and the
+/// app's photos for the eyes) and each `RuntimeDirectory=` its unit keeps
+/// (`RuntimeDirectoryPreserve=yes`: the voice's, with the thread's set-aside
+/// words and the room, and the records'). Every other `RuntimeDirectory=` is
+/// removed by systemd as its unit stops. A reboot empties `/run`; a reset
+/// that starts setup in place empties these, with every part stopped.
+pub const VOLATILE: [&str; 4] = [
+    "/run/lampos-bus",
+    "/run/lampos-photos",
+    "/run/lampos-voice",
+    "/run/lamp-records",
+];
 
 pub struct System;
 
@@ -308,6 +433,32 @@ impl Effects for System {
         #[cfg(target_os = "linux")]
         let _ = rustix::system::reboot(rustix::system::RebootCommand::Restart);
     }
+    fn clear_volatile(&mut self) -> io::Result<()> {
+        for folder in VOLATILE {
+            wipe(Path::new(folder))?;
+        }
+        Ok(())
+    }
+    fn forget(&mut self, argv: &[String]) -> io::Result<()> {
+        run_within(argv, crate::wifi::QUERY_TIMEOUT)
+    }
+    fn remove_installed_skills(&mut self) -> io::Result<usize> {
+        remove_installed_skills(Path::new(SKILLS)).map(|removed| removed.len())
+    }
+}
+
+/// `argv` run and killed with its children once `most` has passed
+/// ([`crate::wifi::within`]): a stuck journald or wpa_supplicant never holds
+/// back setup's start in place (the Reviewer-lead's P3 on #4533).
+pub fn run_within(argv: &[String], most: std::time::Duration) -> io::Result<()> {
+    let mut command = Command::new(&argv[0]);
+    command.args(&argv[1..]);
+    let (status, _) = crate::wifi::within(&mut command, most)?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!("{} ended with {status}", argv[0])))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -318,6 +469,12 @@ pub enum Step {
     Wiped(PathBuf),
     MarkerRemoved,
     JournalRemoved,
+    /// Skills put on from a package removed, [`remove_installed_skills`]: by
+    /// count, never by name, since a made skill's name is the person's words
+    /// and the journal outlives the reset (Reviewer-two's P3 on the branch).
+    InstalledSkillsRemoved,
+    /// Setup and what a boot starts, started in place of a reboot (#4500).
+    Started,
     Rebooting,
 }
 
@@ -371,6 +528,11 @@ fn is_dir(stat: &rustix::fs::Stat) -> bool {
 
 /// Remove everything inside the open directory, by handle.
 fn empty(dir: &OwnedFd) -> io::Result<()> {
+    empty_with(dir, &mut || Ok(()))
+}
+
+/// Empty by handle, with an interruption point after each removed entry.
+fn empty_with(dir: &OwnedFd, after_remove: &mut impl FnMut() -> io::Result<()>) -> io::Result<()> {
     let mut names = Vec::new();
     for entry in rustix::fs::Dir::read_from(dir)? {
         let name = entry?.file_name().to_owned();
@@ -383,11 +545,12 @@ fn empty(dir: &OwnedFd) -> io::Result<()> {
         if is_dir(&stat) {
             let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
             let child = rustix::fs::openat(dir, name.as_c_str(), flags, Mode::empty())?;
-            empty(&child)?;
+            empty_with(&child, after_remove)?;
             rustix::fs::unlinkat(dir, name.as_c_str(), AtFlags::REMOVEDIR)?;
         } else {
             rustix::fs::unlinkat(dir, name.as_c_str(), AtFlags::empty())?;
         }
+        after_remove()?;
     }
     Ok(())
 }
@@ -439,43 +602,83 @@ pub fn wipe(path: &Path) -> io::Result<()> {
 /// checks them the same way. A stop that is not `systemctl stop`
 /// (`lamp-keeper stop lamp`) is the plan's as it is.
 pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<()> {
+    stop_and_wait_keeping(stop, effects).map(|_| ())
+}
+
+/// The lamp's setup, which serves when the marker is gone and brings up the
+/// hotspot from a station live, as Wi-Fi's recovery does.
+pub const SETUP_UNIT: &str = "lamp-setup.service";
+
+/// [`stop_and_wait`], and what to start again in place of a reboot after a
+/// product reset's wipe (#4500, the A733 board's warm reset hangs one time
+/// in three): the [`STARTERS`] and `lamp-update.service` that were active
+/// before the stop, which a boot starts outside `lampos.target`, and
+/// [`SETUP_UNIT`]. None (empty) unless the stop is `systemctl stop` of
+/// `lampos.target` and setup's unit is loaded: then the lamp reboots, as
+/// before. The updater's way back is not named: its timer starts it.
+pub fn stop_and_wait_keeping(
+    stop: &[String],
+    effects: &mut impl Effects,
+) -> io::Result<Vec<String>> {
     let systemctl = stop
         .first()
         .is_some_and(|program| Path::new(program).file_name() == Some("systemctl".as_ref()));
     if !systemctl || stop.get(1).map(String::as_str) != Some("stop") {
-        return effects.run(stop);
+        return effects.run(stop).map(|()| Vec::new());
     }
     let product = stop[2..].iter().any(|unit| unit == "lampos.target");
     // Only loaded units are named: a stop that names a unit systemd does
     // not have fails (systemd 252), and one it does not have is not running.
-    let starters = if product {
-        loaded(&stop[0], &STARTERS, effects)?
+    let listed_starters = if product {
+        listed(&stop[0], &STARTERS, effects)?
     } else {
         Vec::new()
     };
+    let mut again: Vec<String> = listed_starters
+        .iter()
+        .filter(|(unit, active)| *active && unit != "lamp-update-back.service")
+        .map(|(unit, _)| unit.clone())
+        .collect();
+    let starters: Vec<String> = listed_starters.into_iter().map(|(unit, _)| unit).collect();
     if !starters.is_empty() {
         let mut argv = vec![stop[0].clone(), "stop".into()];
         argv.extend(starters.iter().cloned());
         effects.run(&argv)?;
     }
-    let writers = |effects: &mut _| -> io::Result<Vec<String>> {
+    let writers = |effects: &mut _| -> io::Result<(Vec<String>, Listed)> {
         let mut parts = parts_of(stop, effects)?;
-        if product {
-            for writer in loaded(&stop[0], &WRITERS, effects)? {
-                if !stop[2..].contains(&writer) && !parts.contains(&writer) {
-                    parts.push(writer);
-                }
+        let found = if product {
+            listed(&stop[0], &WRITERS, effects)?
+        } else {
+            Vec::new()
+        };
+        for (writer, _) in &found {
+            if !stop[2..].contains(writer) && !parts.contains(writer) {
+                parts.push(writer.clone());
             }
         }
-        Ok(parts)
+        Ok((parts, found))
     };
-    let parts = writers(effects)?;
+    let (parts, listed_writers) = writers(effects)?;
+    // The updater was running, and setup can be started: else no start in
+    // place, and the lamp reboots.
+    if listed_writers
+        .iter()
+        .any(|(unit, active)| *active && unit == "lamp-update.service")
+    {
+        again.push("lamp-update.service".into());
+    }
+    if listed_writers.iter().any(|(unit, _)| unit == SETUP_UNIT) {
+        again.push(SETUP_UNIT.into());
+    } else {
+        again.clear();
+    }
     let mut argv = stop.to_vec();
     argv.extend(parts.iter().cloned());
     effects.run(&argv)?;
     let parts: Vec<String> = starters.into_iter().chain(parts).collect();
     if parts.is_empty() {
-        return Ok(());
+        return Ok(again);
     }
     let mut show = vec![
         stop[0].clone(),
@@ -507,6 +710,7 @@ pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<
         )));
     }
     if let Some(joined) = writers(effects)?
+        .0
         .into_iter()
         .find(|part| !parts.contains(part))
     {
@@ -514,7 +718,7 @@ pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<
             "{joined} became part of the lamp during its stop"
         )));
     }
-    Ok(())
+    Ok(again)
 }
 
 /// What starts a writer of wiped paths outside `lampos.target` on a product
@@ -545,9 +749,13 @@ pub const STARTERS: [&str; 8] = [
 /// records' check (`/var/lib/lampOS/voice/sessions`), and the updater and
 /// its apply (the skills' state, `/var/lib/lampOS`; the reboot after the
 /// reset would end them all the same), and the boot's Wi-Fi restore (the
-/// Wi-Fi file; Third on #3579). Patterns name only loaded units, and none
-/// matches `lamp-setup-wipe.service`, the reset's own unit.
-pub const WRITERS: [&str; 10] = [
+/// Wi-Fi file; Third on #3579). And `lamp-peek`, an office lamp's page,
+/// which a reboot kept off by its setup condition: a start in place would
+/// leave it holding port 80 from setup's page (#4536); stopped, it is not
+/// started again until the lamp next boots. Patterns name only loaded
+/// units (no product lamp has `lamp-peek`), and none matches
+/// `lamp-setup-wipe.service`, the reset's own unit.
+pub const WRITERS: [&str; 11] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
@@ -558,13 +766,18 @@ pub const WRITERS: [&str; 10] = [
     "lamp-update.service",
     "lamp-update-apply.service",
     "lamp-setup-wifi-restore.service",
+    "lamp-peek.service",
 ];
+
+/// Units as [`listed`] gives them: each name, and whether it is active.
+type Listed = Vec<(String, bool)>;
 
 /// The loaded units among `units` (names or patterns), as `systemctl
 /// list-units --all` lists them: the first word of each line whose LOAD
 /// column says `loaded`, never a `not-found` or masked stub, which a stop
-/// would refuse (the reviewer-lead's P3 on #3579).
-fn loaded(systemctl: &str, units: &[&str], effects: &mut impl Effects) -> io::Result<Vec<String>> {
+/// would refuse (the reviewer-lead's P3 on #3579). Each with whether its
+/// ACTIVE column says `active`, for what a reset starts again (#4500).
+fn listed(systemctl: &str, units: &[&str], effects: &mut impl Effects) -> io::Result<Listed> {
     let mut argv: Vec<String> = [
         systemctl,
         "list-units",
@@ -584,7 +797,8 @@ fn loaded(systemctl: &str, units: &[&str], effects: &mut impl Effects) -> io::Re
                 .split_whitespace()
                 .skip_while(|word| *word == "\u{25cf}");
             let unit = words.next()?;
-            (words.next() == Some("loaded") && !unit.starts_with('-')).then(|| unit.to_owned())
+            (words.next() == Some("loaded") && !unit.starts_with('-'))
+                .then(|| (unit.to_owned(), words.next() == Some("active")))
         })
         .collect())
 }
@@ -632,7 +846,8 @@ fn parts_of(stop: &[String], effects: &mut impl Effects) -> io::Result<Vec<Strin
     Ok(parts)
 }
 
-/// Begin a reset: journal, remove the marker, stop the lamp, wipe, reboot.
+/// Begin a reset: journal, remove the marker, stop the lamp, wipe, then start
+/// setup in place ([`stop_and_wait_keeping`]), or reboot where it can't.
 /// If the stop fails, reboot at once without wiping: setup finishes the wipe
 /// at the next start, before anything of the lamp can run again.
 pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
@@ -646,13 +861,16 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
     effects.sync();
     // Parts that cannot be read, or not all stopped, are as a stop that
     // fails: nothing is wiped while one may still be running.
-    if let Err(error) = stop_and_wait(&plan.stop, effects) {
-        eprintln!(
-            "lamp-setup: reset: the lamp did not stop ({error}); rebooting into setup, which finishes the wipe at its start"
-        );
-        reboot(plan, effects, &mut steps);
-        return Ok(steps);
-    }
+    let again = match stop_and_wait_keeping(&plan.stop, effects) {
+        Ok(again) => again,
+        Err(error) => {
+            eprintln!(
+                "lamp-setup: reset: the lamp did not stop ({error}); rebooting into setup, which finishes the wipe at its start"
+            );
+            reboot(plan, effects, &mut steps);
+            return Ok(steps);
+        }
+    };
     steps.push(Step::Stopped);
     if let Err(error) = finish(plan, effects, &mut steps) {
         // The journal and the missing marker bring the lamp back into setup,
@@ -660,8 +878,85 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
         reboot(plan, effects, &mut steps);
         return Err(error);
     }
-    reboot(plan, effects, &mut steps);
+    if again.is_empty() {
+        reboot(plan, effects, &mut steps);
+    } else {
+        start_in_place(plan, &again, effects, &mut steps);
+    }
     Ok(steps)
+}
+
+/// Run before setup is started in place, after [`VOLATILE`] is emptied, each
+/// best effort (Reviewer-three's, Fourth's and Reviewer-two's P3s on #4513):
+/// wpa_supplicant leaves the old owner's network, which it still holds in
+/// memory with its file wiped, so the lamp is off it before setup's hotspot
+/// takes the radio; then the journal, which a reboot emptied (it is a RAM
+/// disk on the product) and which names the networks joined, is rotated and
+/// emptied. The start's own line is written after it. Absolute, as the
+/// plan's own commands are (Reviewer-two's P3 on #4513): Debian 12's
+/// merged `/usr`, so a unit's `PATH` is never asked. Each is bounded, as
+/// setup's other calls of them are ([`Effects::forget`]).
+pub const FORGET: [&[&str]; 4] = [
+    &["/usr/sbin/wpa_cli", "-i", "wlan0", "disconnect"],
+    &["/usr/sbin/wpa_cli", "-i", "wlan0", "remove_network", "all"],
+    &["/usr/bin/journalctl", "--rotate"],
+    &["/usr/bin/journalctl", "--vacuum-time=1s"],
+];
+
+/// The lamp back into setup without a reboot (#4500): what the reset stopped
+/// that a boot starts, and setup, which serves with the marker gone and
+/// brings up its hotspot. Every part of `lampos.target` waits for the
+/// marker, which setup writes again. A start that fails reboots, as before,
+/// so a reset never leaves the lamp dark by itself.
+fn start_in_place(
+    plan: &Plan,
+    again: &[String],
+    effects: &mut impl Effects,
+    steps: &mut Vec<Step>,
+) {
+    // What a reboot would have emptied, emptied first: the last person's
+    // latest messages on the bus and photos never reach the next setup.
+    if let Err(error) = effects.clear_volatile() {
+        eprintln!("lamp-setup: reset: /run could not be emptied ({error}); rebooting");
+        reboot(plan, effects, steps);
+        return;
+    }
+    // What else a reboot dropped from memory, best effort: the old network
+    // wpa_supplicant still runs, though its file is wiped, and the journal,
+    // which keeps the networks joined (a RAM disk on the product). Neither
+    // keeps the start from going on. What failed is said once, after the
+    // vacuum, which would take a line written before it (Reviewer-three's
+    // P3 on #4533).
+    let mut failed = Vec::new();
+    for forget in FORGET {
+        let argv: Vec<String> = forget.iter().map(|word| (*word).to_owned()).collect();
+        if let Err(error) = effects.forget(&argv) {
+            failed.push(format!("{} ({error})", argv.join(" ")));
+        }
+    }
+    if !failed.is_empty() {
+        eprintln!(
+            "lamp-setup: reset: not forgotten, going on: {}",
+            failed.join("; ")
+        );
+    }
+    let mut argv = vec![plan.stop[0].clone(), "start".into()];
+    argv.extend(again.iter().cloned());
+    match effects.run(&argv) {
+        Ok(()) => {
+            eprintln!(
+                "lamp-setup: reset: started in place, no reboot: {}",
+                again.join(" ")
+            );
+            steps.push(Step::Started);
+        }
+        Err(error) => {
+            eprintln!(
+                "lamp-setup: reset: setup could not be started in place ({error}); rebooting"
+            );
+            reboot(plan, effects, steps);
+        }
+    }
 }
 
 fn reboot(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) {
@@ -697,6 +992,11 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         wipe(&path.with_extension(STAGED))?;
         wipe(path)?;
         steps.push(Step::Wiped(path.clone()));
+    }
+    let removed = effects.remove_installed_skills()?;
+    if removed > 0 {
+        eprintln!("lamp-setup: reset: removed {removed} skills put on from a package");
+        steps.push(Step::InstalledSkillsRemoved);
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {

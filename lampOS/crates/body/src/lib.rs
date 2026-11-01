@@ -34,6 +34,7 @@ pub mod name_in;
 pub mod pause_in;
 pub mod peaks;
 pub mod sleep_in;
+pub mod stand_in;
 
 pub mod calibration;
 pub mod clips;

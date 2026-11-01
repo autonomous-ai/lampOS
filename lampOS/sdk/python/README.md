@@ -6,7 +6,7 @@ messages in
 [control.schema.json](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.schema.json)).
 It runs on your computer, never on a lamp.
 
-**New here?** [docs/develop.md](../../docs/develop.md) is the 10-minute quick-start: the fake lamp, a first program, pairing, lamp-mcp and skills.
+**New here?** [docs/develop.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/develop.md) is the 10-minute quick-start: the fake lamp, a first program, pairing, lamp-mcp and skills.
 
 **Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
 (#3504). Until then, try it with the fake lamp below.
@@ -42,13 +42,14 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 ```
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
-example runs this way: `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
+example runs this way: `tour.py` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
 `phrase.py`, `pomodoro.py`, `ci_light.py`.
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
-`express` as the feelings skill's move and light,
+`express` as the feelings skill's move and light, `say` and `sound`
+(`hum`, the lamp's own short hum) with `{"to": "voice"}` and their `done`,
 `look` refused as "the body's lease socket is not on here" (no product
-unit passes it yet), and `play`, `sound` and `joints` refused (`refused`,
+unit passes it yet), and `play` and `joints` refused (`refused`,
 "not routed yet: waits for …"), in lamp-control's own words, so a program
 built against it meets the same refusals on a lamp. `--everything` answers
 every op instead.
@@ -113,10 +114,14 @@ asyncio.run(main())
   `wait=True` on a gesture, move or play returns when it has finished, or,
   where the lamp hands it on and says no more (today `gesture` and `move`,
   answered `{"to": "body"}`), at that answer.
-- **A motion asked while another plays is dropped by the body**, and the
-  lamp has already answered `{"to": "body"}`, so you aren't told (#4209).
-  At one motion a second, wait for your last gesture's or move's length
-  (2 to 10 s; a feeling's move 2.5 to 7 s) before asking for the next.
+- **A motion asked while another still plays is refused `busy`**, with
+  `retry_ms`, when it ends (#4209, lamp-control #4494): `lampos.errors.BY_CODE["busy"]`. The body plays
+  one at a time (a gesture or move 2 to 10 s, a feeling's move 2.5 to 7 s),
+  whoever asked. Wait `retry_ms` and ask again.
+- **Closing gives your light back at once.** When a computer's last
+  connection closes, the lamp gives back the light it asked for and stops a
+  `say` still waiting. A script that lights the ring and exits shows it for a
+  moment only: stay connected while it should show (`examples/ci_light.py`).
 - **Leases:** `async with lamp.lease("body"):` holds the body for looks,
   moves and joints, renewed for you, until the block ends or the lamp takes
   it back (a hand on its head, a conversation): `lease.state`,
@@ -128,7 +133,7 @@ asyncio.run(main())
   `{"to": "body", "follow": "hand"}` with no `done`, so
   `await following.wait()` is told here: `how` and `why` (`stopped`,
   `stop`, `another look`, or the lease's why). Needs `body` and `look`;
-  each start is a look, held to the motion rate (one in 2 s). See
+  each start is a look. See
   `examples/follow_hand.py`.
   A lamp that takes the look without answering `follow: "hand"` (a
   lamp-control from before #4183) is refused, "this lamp doesn't follow a
@@ -180,7 +185,7 @@ doesn't know, such as one from a newer lamp, is printed as `<not shown>`.
 ## Check a skill folder
 
 A skill is a folder the lamp runs without code: its rules in `skill.toml`
-([the skill format, version 1](../../docs/skill-format.md)). Check one
+([the skill format, version 1](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/skill-format.md)). Check one
 before it goes to a lamp or the Store:
 
 ```sh
@@ -210,7 +215,7 @@ here can still be refused there, with its reason.
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
-[control.md](../../docs/control.md) and the schema. Every event comes **by
+[control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md) and the schema. Every event comes **by
 edge**: when something changes, never once per sensor reading. Each event
 carries `at`, a UTC time ending `Z`, besides the fields below. Subscribe with
 `on(event, …)`. An event your pairing lacks the grant for is refused at
@@ -260,12 +265,12 @@ face's place in the picture is a share of it, never the picture.
 
 Every public call and `lamp` command, with what the lamp takes. The ranges are
 what lamp-control and the ring refuse past, read from
-[control.md](../../docs/control.md) and their code. The SDK checks names
+[control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md) and their code. The SDK checks names
 against the schema before sending, and the lamp checks the rest. A test keeps
 every public method named here.
 
 **Today a lamp refuses** `look` (but at `hand`, on a lamp with the body's lease
-socket), `joints`, `play` and `sound` with `refused`, "not routed yet: waits for
+socket), `joints` and `play` with `refused`, "not routed yet: waits for
 …" (`lampos.testing.LAMP_CONTROL_REFUSES`), and `say` and `sound` in its quiet
 hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 `lamp.limits["quiet_hours"]`), or while its time isn't known, with `quiet_hours`.
@@ -276,7 +281,7 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 |---|---|---|
 | `await Lamp.pair(code, host, *, pin, port=7731, name=None, keyring=None)` | `code`: the owner's 8-digit pairing code. `host`: the lamp's address. `pin`: the certificate's SHA-256 the app shows, 64 hex. `port`: 7731. `name`: this computer's name in the app, 1–64 characters, default the host name. `keyring`: where the key and pairings are kept, default `Keyring()` (`LAMPOS_HOME`, else `~/.config/lampos`) | a `Pairing` (`lamp`, `client`, `grants`, …) |
 | `await Lamp.connect(lamp=None, *, host=None, keyring=None)` | `lamp`: a paired lamp's id, or the only one paired. `host`: an address to use instead of the kept one | a `Lamp`, after hello. Also `async with await Lamp.connect() as lamp:` |
-| `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: each rate as `{most, within_ms}` windows (`joints`, `motion`, `light`, `say`, `express`, …), `hold_max_ms`, `take_max_ms`, `say_max_chars` and `quiet_hours` (`{from, to}` or `off`). By default the rates are off: `rates: "off"`, and only the `refused` and `phrases` windows (a lamp run with `--rates default` gives every class). The fake lamp sends only `joints_hz` |
+| `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: `rates: "off"` (lamp-control's default), the two guards as `{most, within_ms}` windows (`refused` and `phrases`), `hold_max_ms`, `take_max_ms`, `say_max_chars` and `quiet_hours` (`{from, to}` or `off`). A lamp run with `--rates default` sends a window for each class (`joints`, `motion`, `light`, `say`, `express`, …) and no `rates`. The fake lamp sends the same as a lamp with its rates off |
 | `await lamp.close()` | | lets go of every lease, then closes |
 | `await lamp.wait_closed()` | | returns when the connection ends, and raises a subscription's refusal nobody awaited |
 | `await find(seconds=3.0)` (`lampos.discovery`) | `seconds`: how long to listen for mDNS | the lamps on this network (`id`, `name`, `host`, `port`, `fp`). Needs `pip install 'lampos[find]'` |
@@ -305,25 +310,43 @@ Every event and state, with its fields, an example and when it fires, is
 Each returns the lamp's answer when the action is taken. `wait=True` returns
 its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 
-| call | parameters | grant | lease | rate |
-|---|---|---|---|---|
-| `await lamp.express(feeling, strength=None)` | `feeling`: `glad`, `lively` or `low`. `strength`: 0–1, default 0.5. Under 0.5 a smaller move; under 0.0625 no move, only the light | `body` and `light` | no | 1 a minute |
-| `await lamp.gesture(name, *, wait=False)` | `name`: `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (never `idle` or `scanning`) | `body` | no | motion: 1 every 2 s |
-| `await lamp.look(at=None, *, yaw=None, pitch=None)` | `at`: `face` (needs `look` too), `hand` (needs `look` too: the body follows the hand in view until another look, a `stop` or the lease ends; answered `{"to":"body","follow":"hand"}`, no `done`; needs the body's lease socket on the lamp), `name` or `ahead`. Or `yaw` −180 to 180 and `pitch` −90 to 90 in degrees, right and up positive, kept in the body's reach | `body` | `body` | motion |
-| `lamp.follow_hand(*, for_ms=10_000, why=None)` | `async with lamp.follow_hand() as following:`, or `await lamp.follow_hand().start()` then `await following.stop()`: a `look` at `hand` under a body lease of its own (`for_ms`, renewed), until the block ends, `stop()`, another look, or the lamp takes the body back. `await following.wait()` says how: `finished`/`stopped`, or `cut_short` with the why. `lamp.stop()` lets go of its lease too. After another look the lease stays held (that look runs under it), and the lamp's own life stands back until `stop()` or the block ends; a new `follow_hand()` lets go of it first. A lamp that takes the look without following (before #4183) is `refused`, and the lease let go. Where the hand is comes as `hand` events | `body`, `look` | its own | motion |
-| `await lamp.move(frames, step_ms, *, wait=False)` | `frames`: 2–500 frames of 5 joints (pitch, roll, yaw, shoulder, elbow) in counts from home, the first and last all 0. `step_ms`: 40–1,000, and 1.5 to 10 s in all. Each joint within the body's reach and speed, else `bad_request` in the body's words | `body` | `body` | motion |
-| `await lamp.play(name, *, wait=False)` | `name`: a move of your installed package | `body` | `body` | motion |
-| `await lamp.joints(lease, within_ms, **targets)` | `lease`: your held `body` lease. `within_ms`: up to 5,000. `targets`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow` in degrees, −180 to 180, at least one | `body` | `body` (named) | 20 a second |
-| `await lamp.light(colour, level, for_ms, pattern=None)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `for_ms`: 1–30,000. `pattern`: none (steady), `breathe` (level 2 or up), `candle` (3 or up) or `pulse` (2 or up). Under its level a pattern is `refused`. The ring plays one `pulse` a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no | 5 a second |
-| `await lamp.say(text)` | `text`: words, up to 300 characters | `speak` | no | 6 a minute, 60 an hour; refused in quiet hours |
-| `await lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no | as `say` |
-| `await lamp.stop()` | | none | no | |
-| `await lamp.request(op, **fields)` | any op of the schema, checked against it first | the op's | | |
+| call | parameters | grant | lease |
+|---|---|---|---|
+| `await lamp.express(feeling, strength=None)` | `feeling`: `glad`, `lively` or `low`. `strength`: 0–1, default 0.5. Under 0.5 a smaller move; under 0.0625 no move, only the light | `body` and `light` | no |
+| `await lamp.gesture(name, *, wait=False)` | `name`: `nod`, `headshake`, `greeting`, `laugh`, `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`, `surprised`, `confused`, `sleepy`, `excited`, `dance_chill`, `dance_groove`, `dance_hype`, `dance_waltz`, `dance_jazz` (never `idle` or `scanning`) | `body` | no |
+| `await lamp.look(at=None, *, yaw=None, pitch=None)` | `at`: `face` (needs `look` too), `hand` (needs `look` too: the body follows the hand in view until another look, a `stop` or the lease ends; answered `{"to":"body","follow":"hand"}`, no `done`; needs the body's lease socket on the lamp), `name` or `ahead`. Or `yaw` −180 to 180 and `pitch` −90 to 90 in degrees, right and up positive, kept in the body's reach | `body` | `body` |
+| `lamp.follow_hand(*, for_ms=10_000, why=None)` | `async with lamp.follow_hand() as following:`, or `await lamp.follow_hand().start()` then `await following.stop()`: a `look` at `hand` under a body lease of its own (`for_ms`, renewed), until the block ends, `stop()`, another look, or the lamp takes the body back. `await following.wait()` says how: `finished`/`stopped`, or `cut_short` with the why. `lamp.stop()` lets go of its lease too. After another look the lease stays held (that look runs under it), and the lamp's own life stands back until `stop()` or the block ends; a new `follow_hand()` lets go of it first. A lamp that takes the look without following (before #4183) is `refused`, and the lease let go. Where the hand is comes as `hand` events | `body`, `look` | its own |
+| `await lamp.move(frames, step_ms, *, wait=False)` | `frames`: 2–500 frames of 5 joints (pitch, roll, yaw, shoulder, elbow) in counts from home, the first and last all 0. `step_ms`: 40–1,000, and 1.5 to 10 s in all. Each joint within the body's reach and speed, else `bad_request` in the body's words | `body` | `body` |
+| `await lamp.play(name, *, wait=False)` | `name`: a move of your installed package | `body` | `body` |
+| `await lamp.joints(lease, within_ms, **targets)` | `lease`: your held `body` lease. `within_ms`: up to 5,000. `targets`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow` in degrees, −180 to 180, at least one | `body` | `body` (named) |
+| `await lamp.light(colour, level, for_ms, pattern=None)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `for_ms`: 1–30,000. `pattern`: none (steady), `breathe` (level 2 or up), `candle` (3 or up) or `pulse` (2 or up). Under its level a pattern is `refused`. The ring plays one `pulse` a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no |
+| `await lamp.say(text)` | `text`: words, up to 300 characters | `speak` | no |
+| `await lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no |
+| `await lamp.stop()` | | none | no |
+| `await lamp.request(op, *, on_id=None, **fields)` | any op of the schema, checked against it first. `on_id(id)`: told the request's id before it is sent, to match a `done` that may come before the reply is read | the op's | |
+
+A lamp has no rate limits, except two guards: refused actions, 20 a second (past it the connection closes), and changes of the phrases a connection listens for, 6 a minute. Hello's `limits` says `"rates": "off"` with those two as `refused` and `phrases`. `say` and `sound` are still refused in quiet hours.
 
 **Refusals** raise `lampos.errors.BY_CODE[code]`, a `LampError` with `code`,
-`why` and, for `rate`, `retry_ms`: `unpaired`, `no_hello`, `no_grant`,
-`no_lease`, `lease_lost`, `busy`, `refused`, `quiet_hours`, `private`,
-`paused`, `asleep`, `rate`, `bad_request`, `off`.
+`why` (the lamp's own words), for `rate` `retry_ms`, and `what_to_do`, the
+line below for its code (`lampos.errors.WHAT_TO_DO`):
+
+| code | what to do |
+|---|---|
+| `unpaired` | Pair again with a new code from the owner's app (`lamp pair CODE --pin PIN`): this computer isn't paired, was revoked, or its key no longer matches. |
+| `no_hello` | Say hello first: `Lamp.connect()` does; with `request()` alone, send `hello` before anything else. |
+| `no_grant` | Ask the owner to tick this grant for this computer in the app, then connect again: grants are read at hello. |
+| `no_lease` | Hold a `body` lease first (Python `lamp.lease("body")`, JS `lamp.withLease(['body'], ...)`); `joints` names it. |
+| `lease_lost` | The lamp took the body back; `why` says why (a conversation, a hand, private, a stop). Let it be, and take a new lease later. |
+| `busy` | A motion still plays (a gesture, move or feeling's move, whoever asked): wait `retry_ms` and send it again. Without `retry_ms`, someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
+| `refused` | The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again. |
+| `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, by default 22:00 to 07:00): `say` and `sound` wait until they end. A light is still fine. |
+| `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. |
+| `paused` | The person paused the lamp. Wait for `lamp.changed` with `paused` false. |
+| `asleep` | The lamp is asleep. Wait for `lamp.changed` with `asleep` false. |
+| `rate` | Too many of one kind too fast: wait `retry_ms` and send it again. With the rates off (the default), only refused actions and phrase changes are bounded. |
+| `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
+| `off` | Developer access is off on this lamp: the owner turns it on in the app. |
 
 ### The `lamp` command
 

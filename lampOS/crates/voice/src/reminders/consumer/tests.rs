@@ -178,6 +178,7 @@ fn prepared_engine<P: Persistence>(disk: P, count: usize) -> Engine<P> {
     let mut engine = Engine::open(disk, "Etc/UTC", &sample(0), STORE_ID).unwrap();
     for index in 0..count {
         let request = Request::Set {
+            person: None,
             guard: guard(&engine, &format!("set-{index}")),
             text: TEXT.into(),
             when: When::After { seconds: 1 },
@@ -529,6 +530,7 @@ fn cancel_snooze_store_switch_and_missing_due_withdraw_existing_offer() {
         match change {
             "cancel" => {
                 let request = Request::Cancel {
+                    asker: None,
                     guard: guard(&engine, "cancel"),
                     id: 1,
                 };
@@ -536,6 +538,7 @@ fn cancel_snooze_store_switch_and_missing_due_withdraw_existing_offer() {
             }
             "snooze" => {
                 let request = Request::Snooze {
+                    asker: None,
                     guard: guard(&engine, "snooze"),
                     id: 1,
                     delivery: 1,
@@ -1098,6 +1101,7 @@ fn evicted_ack_receipt_resolves_by_current_absence_without_claiming_its_cause() 
     {
         let mut engine = engine.lock().unwrap();
         let request = Request::Set {
+            person: None,
             guard: guard(&engine, "evict-ack-receipt"),
             text: "Later".into(),
             when: When::After { seconds: 60 },

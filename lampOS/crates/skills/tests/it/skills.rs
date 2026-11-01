@@ -276,18 +276,18 @@ fn the_loader_refuses_what_it_cannot_do() {
         // Words the voice keeps (#939): only what it keeps, only `from`,
         // and still one say a skill.
         (
-            "say = { note = \"They are back at their desk. Greet them in one short line, by name if you know it.\", expires = \"60s\" }",
+            "say = { note = \"They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.\", expires = \"60s\" }",
             "say = { from = \"calendar\" }",
             "say.from is \"schedule\" or \"tasks\", not \"calendar\"",
         ),
         (
-            "say = { note = \"They are back at their desk. Greet them in one short line, by name if you know it.\", expires = \"60s\" }",
+            "say = { note = \"They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.\", expires = \"60s\" }",
             "say = { from = \"schedule\", note = \"x\" }",
             "a say table has from and nothing else",
         ),
         // A say that is neither, told in plain words (Fourth on #1033).
         (
-            "say = { note = \"They are back at their desk. Greet them in one short line, by name if you know it.\", expires = \"60s\" }",
+            "say = { note = \"They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.\", expires = \"60s\" }",
             "say = 5",
             "say is a note in words, or { from = \"schedule\" } or { from = \"tasks\" }",
         ),
@@ -514,6 +514,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "not-feeling-well",
             "onboarding",
             "point-light",
+            "pose",
             "prepare-unplug",
             "reminders",
             "rest-your-eyes",
@@ -1523,6 +1524,15 @@ fn the_program_timed(
     (lighting, then): (Ring, After),
     on_the_host: bool,
 ) -> Seen {
+    // Skipping the ask, a hello is still asked of the Policy (the first
+    // builder, 30 Oct), and none stands in here: these runs show what a run
+    // does once allowed, so their skill asks another question, which
+    // `skip` allows at once.
+    let skill = &if skip {
+        skill.replace("policy = \"hello\"", "policy = \"unprompted\"")
+    } else {
+        skill.to_owned()
+    };
     // Short: a socket's whole path has to fit in 103 bytes.
     let dir = tempfile::Builder::new()
         .prefix("sk")
@@ -3572,10 +3582,14 @@ fn a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps() {
                     .publish_json(1, &Light::new(true, colour, 3).unwrap())
                     .unwrap();
             }
+            // Counted before it is answered, as in
+            // `a_held_dim_asked_of_the_policy`: the runs' `done` follow the
+            // answers, and the calls are read after them (Tests' P3 on
+            // #4703).
+            let _ = called.send(line);
             (&stream)
                 .write_all(b"{\"ok\":true,\"result\":{}}\n")
                 .unwrap();
-            let _ = called.send(line);
         }
     });
     let tools = root.join("tools");
@@ -4233,6 +4247,17 @@ fn asking_the_policy_with(
     clock: &Clock,
     hello: &str,
 ) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
+    asking_with(root, clock, hello, "policy")
+}
+
+/// [`asking_the_policy_with`] with `LAMP_SKILLS_ASK` as `ask` says, and the
+/// eyes' known file at `known` in `root` (none there unless a test puts it).
+fn asking_with(
+    root: &Path,
+    clock: &Clock,
+    hello: &str,
+    ask: &str,
+) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
     fs::create_dir(root.join("skills")).unwrap();
     let bus = Bus::new(root.join("bus")).unwrap();
     let voice = UnixListener::bind(root.join("say.sock")).unwrap();
@@ -4267,7 +4292,8 @@ fn asking_the_policy_with(
             root.join("actions.sock").as_os_str(),
         ])
         .args(clock.args())
-        .env("LAMP_SKILLS_ASK", "policy");
+        .env("LAMP_SKILLS_ASK", ask)
+        .env("LAMP_SKILLS_KNOWN_FILE", root.join("known"));
     let running = Running(command.spawn().unwrap());
     clock.started();
     if !on_the_host {
@@ -4439,6 +4465,113 @@ fn asking_the_policy_a_skill_acts_only_on_a_say_now_that_names_its_ask() {
     // Only the first say_now was said, the late one passed over too.
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(said.try_iter().count(), 0);
+}
+
+/// The first builder, 30 Oct, on the launch testers' findings: with
+/// `LAMP_SKILLS_ASK=skip` a hello (`[ask] policy = "hello"`) is still asked
+/// of the Policy on `skills/ask`, for whom it is by the memory's id of the
+/// known face (never the name), and acts only on its `say_now`: a `wait`
+/// leaves it undone, as does no answer.
+#[test]
+fn skipping_the_ask_a_hello_is_still_asked_of_the_policy() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("sh")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    let mut asks = bus.subscribe("skills/ask", "policy").unwrap();
+    let mut decisions = bus
+        .publisher_declared(
+            "policy/decisions",
+            &lamp_msgs::Decision::declaration(),
+            "policy",
+        )
+        .unwrap();
+    let clock = Clock::at(root);
+    let (_running, bus, said) = asking_with(root, &clock, &hello_after_a_second(), "skip");
+    let mut eyes = bus
+        .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+        .unwrap();
+    // A known face at the lamp, as the eyes write it.
+    fs::write(root.join("known"), "Alpha\n").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut answered = Vec::new();
+    let mut put = Vec::new();
+    for (cycle, choice) in ["say_now", "wait", ""].into_iter().enumerate() {
+        a_face_appears(&mut eyes, &clock, false);
+        let ask = next_ask(&mut asks, Duration::from_secs(5)).expect("a hello is asked");
+        if !choice.is_empty() {
+            let decision = serde_json::json!({"about": "hello", "choice": choice,
+                "probability": 0.9, "answers": {}, "by": "rule", "took_ms": 3,
+                "shadow": false, "ask": ask["ask"]});
+            decisions.publish_json(1, &decision).unwrap();
+        } else {
+            // Unanswered: past the program's 2.5 s wait.
+            clock.skip(Duration::from_millis(2_800));
+        }
+        put.push(ask);
+        answered.push(next_answer(&mut events, deadline));
+        if cycle == 0 {
+            said.recv_timeout(Duration::from_secs(2))
+                .expect("the say_now said the hello");
+        }
+    }
+    assert_eq!(
+        (put[0]["skill"].as_str(), put[0]["act"].as_str()),
+        (Some("hello"), Some("hello"))
+    );
+    assert_eq!(
+        put[0]["person"].as_str(),
+        Some(lamp_msgs::known::person_id("Alpha").as_str()),
+        "{put:?}"
+    );
+    assert!(
+        !put[0].to_string().contains("Alpha"),
+        "never the name: {put:?}"
+    );
+    let allowed: Vec<Option<bool>> = answered.iter().map(|event| event.allowed).collect();
+    assert_eq!(
+        allowed,
+        [Some(true), Some(false), Some(false)],
+        "{answered:?}"
+    );
+    assert!(answered[1].why.contains("wait"), "{answered:?}");
+    assert!(answered[2].why.contains("did not answer"), "{answered:?}");
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(said.try_iter().count(), 0, "only the say_now was said");
+}
+
+/// With `LAMP_SKILLS_ASK=skip`, a skill whose `[ask]` is not the hello acts
+/// at once, as before: nothing is asked on `skills/ask`, though the Policy
+/// listens there.
+#[test]
+fn skipping_the_ask_any_other_skill_acts_at_once() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("so")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    let mut asks = bus.subscribe("skills/ask", "policy").unwrap();
+    let clock = Clock::at(root);
+    let skill = hello_after_a_second().replace("policy = \"hello\"", "policy = \"unprompted\"");
+    assert!(skill.contains("policy = \"unprompted\""));
+    let (_running, bus, said) = asking_with(root, &clock, &skill, "skip");
+    let mut eyes = bus
+        .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+        .unwrap();
+    a_face_appears(&mut eyes, &clock, false);
+    let answer = next_answer(&mut events, Instant::now() + Duration::from_secs(10));
+    assert_eq!(answer.allowed, Some(true), "{answer:?}");
+    assert!(answer.why.contains("skipped"), "{answer:?}");
+    said.recv_timeout(Duration::from_secs(2))
+        .expect("said without asking");
+    assert_eq!(next_ask(&mut asks, Duration::from_millis(300)), None);
 }
 
 /// The next ask on `skills/ask`, within `wait`.
@@ -4638,10 +4771,14 @@ fn a_held_dim_asked_of_the_policy(moved: bool) -> (SkillEvent, Option<SkillEvent
                 light.level += 1;
             }
             shown.publish_json(1, &light).unwrap();
+            // Counted before it is answered: the run's `done` follows the
+            // answer to its give-back, so a call counted after the answer
+            // could come after the test had read the calls (1 of 2 on a
+            // pull request's ARM64 run on 31 Oct).
+            let _ = called.send(line);
             (&stream)
                 .write_all(b"{\"ok\":true,\"result\":{}}\n")
                 .unwrap();
-            let _ = called.send(line);
         }
     });
     // The Policy stood in for: the ask is told, and answered `say_now`
@@ -7516,6 +7653,11 @@ impl ToolProgram {
     /// With the skill `name` of `toml` and its `shows/`, the light shown
     /// blue at 3, ready for a call.
     fn with(name: &str, toml: &str, shows: &[(&str, &str)]) -> Self {
+        Self::with_env(name, toml, shows, &[])
+    }
+
+    /// As [`ToolProgram::with`], the program run with `env` set.
+    fn with_env(name: &str, toml: &str, shows: &[(&str, &str)], env: &[(&str, &str)]) -> Self {
         // Short: a socket's whole path has to fit in 103 bytes.
         let dir = tempfile::Builder::new()
             .prefix("tp")
@@ -7577,6 +7719,7 @@ impl ToolProgram {
                     camera_yes(&root, &[name]).as_os_str(),
                 ])
                 .args(clock.args())
+                .envs(env.iter().copied())
                 .spawn()
                 .unwrap(),
         );
@@ -7794,6 +7937,145 @@ body = { mood = "reading", for = "10s", toward = -0.5 }
     );
 }
 
+/// #4135: a `stand` step is a percent of the lamp's own stand, 1 to 100,
+/// in a skill its tool alone starts, and needs `body`. Out of range or
+/// without the grant, the skill is refused as it loads.
+#[test]
+fn a_stand_step_is_a_percent_its_tool_asks_with_the_body_grant() {
+    let dir = tempfile::tempdir().unwrap();
+    let with = |name: &str, step: &str, body: bool| {
+        load(&skill_with(
+            dir.path(),
+            name,
+            &format!("tool = \"{name}\"\n[permissions]\nbody = {body}\n[[do]]\n{step}\n"),
+        ))
+    };
+    let skill = with("lower", "stand = 60", true).unwrap();
+    let mut engine = Engine::new(vec![skill], false);
+    assert_eq!(
+        engine
+            .tool("lower", &serde_json::json!({}), 1)
+            .unwrap()
+            .calls,
+        [Call::Stand(60)]
+    );
+    assert_eq!(
+        Call::Stand(60).named(),
+        ("body.stand", serde_json::json!({"share": 60}))
+    );
+    for (name, share) in [("zero", 0), ("past", 101), ("far", 300)] {
+        let why = with(name, &format!("stand = {share}"), true).unwrap_err();
+        assert!(
+            why.contains(&format!(
+                "stand = {share}: a percent of the lamp's own stand, 1 to 100"
+            )),
+            "{why}"
+        );
+    }
+    let why = with("ungranted", "stand = 60", false).unwrap_err();
+    assert!(
+        why.contains("not permitted") && why.contains("body"),
+        "{why}"
+    );
+    // A trigger's run is the lamp's own: a kept stand is only a person's.
+    let why = load(&skill_with(
+        dir.path(),
+        "unasked",
+        "[permissions]\nbody = true\ntopics = [\"voice/state\"]\n\
+         [trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+         [ask]\npolicy = \"nudge\"\n[[do]]\nstand = 60\n",
+    ))
+    .unwrap_err();
+    assert!(why.contains("tool alone"), "{why}");
+}
+
+/// #4135: the Pose skill's tool, `set_pose`, with its three heights, each
+/// a stand of its own: normal 100, lower 60, sit 30.
+#[test]
+fn the_pose_skill_asks_a_stand_for_each_of_its_three_choices() {
+    let pose = load(&skills_root().join("pose")).unwrap();
+    let tools = tools_file(std::slice::from_ref(&pose));
+    assert_eq!(tools["body"], serde_json::json!(["set_pose"]));
+    let tool = &tools["tools"][0];
+    assert_eq!(tool["name"], "set_pose");
+    assert_eq!(
+        tool["parameters"]["properties"]["pose"]["enum"],
+        serde_json::json!(["normal", "lower", "sit"])
+    );
+    let description = tool["description"].as_str().unwrap();
+    assert!(
+        description.contains("This is as tall as I stand."),
+        "{description}"
+    );
+    let mut engine = Engine::new(vec![pose], false);
+    for (choice, share) in [("normal", 100), ("lower", 60), ("sit", 30)] {
+        let calls = engine
+            .tool("set_pose", &serde_json::json!({ "pose": choice }), 1)
+            .unwrap()
+            .calls;
+        let stands: Vec<_> = calls
+            .iter()
+            .filter(|call| matches!(call, Call::Stand(_)))
+            .collect();
+        assert_eq!(stands, [&Call::Stand(share)], "{choice}");
+    }
+}
+
+/// #4135: with `LAMP_BODY_POSE_ASK=on`, a call publishes one stand on
+/// `body/stand_asked`, as `skills`; off, nothing is published and the run
+/// says the stand was not acted on.
+#[test]
+fn a_stand_is_published_only_with_the_pose_ask_switch_on() {
+    let skill = "tool = \"set_pose\"\n[permissions]\nbody = true\nspeak = true\n\
+                 [choice]\nname = \"pose\"\nabout = \"How tall.\"\none_of = [\"lower\"]\n\
+                 [[do]]\nsay = \"Say it.\"\n[[do]]\nif_choice = [\"lower\"]\nstand = 60\n";
+    let stand = |program: &ToolProgram| {
+        Bus::new(program._dir.path().join("bus"))
+            .unwrap()
+            .latest(lamp_msgs::StandAsked::TOPIC)
+            .unwrap()
+    };
+    let on = ToolProgram::with_env("pose", skill, &[], &[("LAMP_BODY_POSE_ASK", "on")]);
+    assert_eq!(on.call("set_pose", r#"{"pose":"lower"}"#)["ok"], true);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let kept = loop {
+        if let Some(kept) = stand(&on) {
+            break kept;
+        }
+        assert!(Instant::now() < deadline, "no stand published");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(kept.header.source, "skills");
+    assert_eq!(
+        kept.parse::<lamp_msgs::StandAsked>().unwrap(),
+        lamp_msgs::StandAsked { share: 60 }
+    );
+
+    let off = ToolProgram::with_env("pose", skill, &[], &[("LAMP_BODY_POSE_ASK", "off")]);
+    let mut events = Bus::new(off._dir.path().join("bus"))
+        .unwrap()
+        .subscribe(SkillEvent::TOPIC, "test")
+        .unwrap();
+    assert_eq!(off.call("set_pose", r#"{"pose":"lower"}"#)["ok"], true);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let done = loop {
+        assert!(Instant::now() < deadline, "no done");
+        if let Ok(Some(message)) = events.recv(Duration::from_millis(100)) {
+            let event: SkillEvent = message.parse().unwrap();
+            if event.stage == SkillStage::Done {
+                break event;
+            }
+        }
+    };
+    assert!(
+        done.why
+            .contains("stand 60%: not acted on, LAMP_BODY_POSE_ASK is not on"),
+        "{}",
+        done.why
+    );
+    assert!(stand(&off).is_none());
+}
+
 /// A short show for the program's tests: three frames of two seconds.
 const SHORT_SHOW: &str = r#"
 [[light]]
@@ -7901,15 +8183,15 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
         ),
         (
             format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nsay = \"Hi.\"\n"),
-            "body, light or show",
+            "body, light, show or stand",
         ),
         (
             format!("{TOOL}[[do]]\nif_choice = [\"a\"]\ncue = \"hum\"\n"),
-            "body, light or show",
+            "body, light, show or stand",
         ),
         (
             format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nrest = {{ op = \"wake\" }}\n"),
-            "body, light or show",
+            "body, light, show or stand",
         ),
         (
             "tool = \"t\"\n[[do]]\nif_choice = [\"a\"]\nlight = { colour = \"warm\" }\n".into(),

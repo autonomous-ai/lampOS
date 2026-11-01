@@ -12,11 +12,18 @@
 //!
 //! With the switch, such a line is held when it shows it is turned to
 //! someone else ([`turns_to_another`]):
-//! - it calls someone by a role at its start ("Mom, ...", "Guys, ...");
-//! - it asks someone for an object, or to hand one over ("pass me", "hand
-//!   me", "grab the"): the lamp has no hands;
-//! - it offers something or tells of going somewhere ("Do you want
-//!   coffee?", "I'm going downstairs"): an errand between people.
+//! - it calls someone by a role at its start ("Mom, ...", "Guys, ...",
+//!   "Mẹ ơi, ...");
+//! - it asks someone for an object in the words of a request between people
+//!   ("pass me", "hand me", "lend me", "đưa giùm"): the lamp has no hands.
+//!   Bare "grab the", "fetch the" and "pass the" are left out, since people
+//!   ask an assistant that way too;
+//! - every part of it offers something or tells of going somewhere ("Do you
+//!   want coffee?", "I'm going downstairs"): an errand between people. "I'm
+//!   going downstairs, turn the light off" carries a command and plays.
+//!
+//! The signs are in English and Vietnamese, the second route's two
+//! languages.
 //!
 //! Only a line let out as the conversation going on alone is held: no name,
 //! no call, nobody turned to the lamp, not said close to it, and not an
@@ -34,6 +41,7 @@ pub const FLAG: &str = "--turned-away";
 pub const HELD: &str = "a busy room: a conversation with the lamp is going on, but the line turns to someone else: a role called, an object asked for, or an errand";
 
 /// Words that call a person by a role at a line's start, before a comma.
+/// The lamp is never called by these: it is called by its name.
 const ROLES: &[&str] = &[
     "mom",
     "mum",
@@ -58,31 +66,45 @@ const ROLES: &[&str] = &[
     "mate",
     "sir",
     "madam",
+    // Vietnamese: a role, then "ơi", calls a person.
+    "mẹ ơi",
+    "má ơi",
+    "bố ơi",
+    "ba ơi",
+    "anh ơi",
+    "chị ơi",
+    "em ơi",
+    "bạn ơi",
+    "các bạn ơi",
+    "mọi người ơi",
 ];
 
-/// Words that ask a person for an object, or to hand one over.
+/// Words that ask a person for an object, or to hand one over: each names
+/// the person asked ("me") or borrowing, the shape of a request between
+/// people. Bare "grab the", "fetch the", "pass the", "hand over" and "fetch
+/// me" are left out: people ask an assistant that way too ("Fetch the
+/// forecast", "Pass the message on to my wife").
 const OBJECT_ASKS: &[&str] = &[
     "pass me",
-    "pass the",
-    "pass that",
-    "pass it",
     "hand me",
-    "hand over",
-    "hand the",
-    "hand that",
     "toss me",
     "throw me",
-    "grab me",
-    "grab the",
-    "grab that",
-    "fetch me",
-    "fetch the",
     "lend me",
     "can i borrow",
     "could i borrow",
+    // Vietnamese: hand over, pass along, lend.
+    "đưa giùm",
+    "đưa giúp",
+    "chuyền giùm",
+    "cho mình mượn",
+    "cho tôi mượn",
+    "cho em mượn",
 ];
 
-/// Words that offer something to a person, or tell of going somewhere.
+/// Words that offer something to a person, or tell of going somewhere. A
+/// line holds for one only when every part of it is such an errand: "I'm
+/// going downstairs, turn the light off" carries a command to the lamp and
+/// plays.
 const ERRANDS: &[&str] = &[
     "do you want coffee",
     "do you want a coffee",
@@ -104,19 +126,62 @@ const ERRANDS: &[&str] = &[
     "im going to the kitchen",
     "i'm heading out",
     "im heading out",
-    "i'll be right back",
-    "ill be right back",
     "be right back",
     "i'm getting coffee",
     "im getting coffee",
     "i'm grabbing coffee",
     "im grabbing coffee",
+    // Vietnamese.
+    "đi mua cà phê",
+    "uống cà phê không",
+    "mình xuống dưới",
+    "tôi xuống dưới",
+    "em xuống dưới",
+    "anh xuống dưới",
+    "chị xuống dưới",
+    "mình ra ngoài một chút",
+    "tôi ra ngoài một chút",
 ];
 
 /// Whether `heard` shows it is turned to someone else: a role called at
 /// its start, an object asked for, or an errand between people.
 pub fn turns_to_another(heard: &str) -> bool {
     let lower = heard.to_lowercase().replace('’', "'");
+    let says = |words: &str| {
+        let words = spaced(words);
+        move |phrase: &&str| words.contains(&format!(" {phrase} "))
+    };
+    calls_a_role(&lower) || OBJECT_ASKS.iter().any(says(&lower)) || all_errand(&lower)
+}
+
+/// Short parts that offer something only beside an errand, never alone as
+/// a line: "I'm going downstairs, want something?". "I want something
+/// warmer" said to the lamp is no such part, being longer.
+const OFFER_PARTS: &[&str] = &["want something", "want anything", "anything", "something"];
+
+/// Whether every part of the line (split at commas and stops) is an
+/// errand between people, and there is at least one part.
+fn all_errand(lower: &str) -> bool {
+    let parts: Vec<String> = lower
+        .split([',', '.', ';', '!', '?'])
+        .map(spaced)
+        .filter(|part| !part.trim().is_empty())
+        .collect();
+    let errand = |part: &String| {
+        ERRANDS
+            .iter()
+            .any(|phrase| part.contains(&format!(" {phrase} ")))
+    };
+    let offer = |part: &String| {
+        OFFER_PARTS
+            .iter()
+            .any(|phrase| part == &format!(" {phrase} "))
+    };
+    parts.iter().any(errand) && parts.iter().all(|part| errand(part) || offer(part))
+}
+
+/// The words, lower case, one space apart, with a space at each end.
+fn spaced(lower: &str) -> String {
     let words: String = lower
         .chars()
         .map(|c| {
@@ -127,12 +192,10 @@ pub fn turns_to_another(heard: &str) -> bool {
             }
         })
         .collect();
-    let words = format!(
+    format!(
         " {} ",
         words.split_whitespace().collect::<Vec<_>>().join(" ")
-    );
-    let says = |phrase: &&str| words.contains(&format!(" {phrase} "));
-    calls_a_role(&lower) || OBJECT_ASKS.iter().any(says) || ERRANDS.iter().any(says)
+    )
 }
 
 /// Whether the line begins by calling a role, as "Mom, ..." does: the
@@ -189,13 +252,14 @@ mod tests {
             "Can you pass me the charger? The white one.",
             "Do you want coffee? I'm going downstairs.",
             "Hand me that pen.",
-            "Could you grab the tape from the drawer?",
             "Mom, where are my keys?",
             "Guys, the meeting moved to three.",
             "I'll be right back.",
             "Want anything from the kitchen?",
             "Can I borrow your stapler?",
             "I’m going downstairs, want something?",
+            "Mom, pass the remote.",
+            "Could you toss me the tape?",
         ] {
             assert!(turns_to_another(line), "{line}");
         }
@@ -221,6 +285,56 @@ mod tests {
             "Okay, stop.",
             "Mai mình đi sớm nhé",
             "Man, that was a long day.",
+            // Mid-sentence words that are no ask (#3895's reads).
+            "On the other hand, the forecast said rain?",
+            "Will the storm pass the coast?",
+            "I think it will pass the test.",
+            // Requests to the lamp in the words of an ask (#3895's reads).
+            "Can you grab the weather for tomorrow?",
+            "Fetch the forecast for the weekend.",
+            "Fetch me the news.",
+            "Pass the message on to my wife.",
+            "Hand over the details of the order.",
+            // An errand with a command to the lamp after it plays.
+            "I'm going downstairs, turn the light off.",
+            "Good night, I'll be right back.",
+            "Mom is calling, what time is it?",
+            "I want something warmer.",
+            "Something calmer, please.",
+        ] {
+            assert!(!turns_to_another(line), "{line}");
+        }
+    }
+
+    /// Vietnamese desk talk turned to another person shows it too.
+    #[test]
+    fn vietnamese_desk_talk_turned_to_another_person_shows_it() {
+        for line in [
+            "Mẹ ơi, chìa khóa con đâu rồi?",
+            "Anh ơi, tối nay ăn gì?",
+            "Các bạn ơi, họp dời sang ba giờ.",
+            "Đưa giùm mình cái sạc.",
+            "Cho mình mượn cái bấm kim.",
+            "Mình đi mua cà phê, có ai uống cà phê không?",
+            "Tôi xuống dưới một chút.",
+        ] {
+            assert!(turns_to_another(line), "{line}");
+        }
+    }
+
+    /// A Vietnamese follow-up or request to the lamp shows none of the signs.
+    #[test]
+    fn vietnamese_follow_ups_to_the_lamp_show_none() {
+        for line in [
+            "Thế còn ngày mai thì sao?",
+            "Bật đèn sáng hơn.",
+            "Mấy giờ rồi?",
+            "Kể chuyện con rồng đi.",
+            "Giúp tôi đặt hẹn giờ năm phút.",
+            "Lấy giúp tôi tin tức hôm nay.",
+            "Tôi xuống dưới, tắt đèn giúp tôi.",
+            "Cảm ơn nhé.",
+            "Mai mình đi sớm nhé",
         ] {
             assert!(!turns_to_another(line), "{line}");
         }

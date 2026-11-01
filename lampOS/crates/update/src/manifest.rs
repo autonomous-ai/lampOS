@@ -34,8 +34,10 @@ pub const SCHEMA: u32 = 1;
 /// 6: ordinary product service units carried under [`PRODUCT_LAMP`].
 /// 7: a part's templates, sockets and timers under it too
 /// (crate::companion). 8: a product unit the lamp lacks added
-/// (crate::added).
-pub const UPDATER: u64 = 8;
+/// (crate::added). 9: a round stops the voice first and starts it again
+/// after the parts it reads (#4431), which every product build asks for
+/// ([`ORDER_UPDATER`]).
+pub const UPDATER: u64 = 9;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
@@ -47,6 +49,13 @@ pub const COMPANIONS_UPDATER: u64 = 7;
 /// lacks: an older updater takes only the units a lamp has, so it climbs
 /// first. A round adds only from a build that asks for this level.
 pub const ADDS_UPDATER: u64 = 8;
+/// The level every product build asks for (second-P1): an updater below it
+/// restarts lamp-controls before the voice, and a lamp on a build from
+/// 28 Oct 17:16 to 29 Oct 09:59 (8237 to 8498) also keeps the old voice's
+/// restart-guard mute through that. Asked for, such an updater takes only
+/// the lamp-update the build carries, and that one, in the same `serve`,
+/// runs the switch in its own order.
+pub const ORDER_UPDATER: u64 = 9;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
@@ -1664,6 +1673,56 @@ mod tests {
         assert!(
             why.contains(&format!("needs updater {RESET_PLAN_UPDATER}")),
             "{why}"
+        );
+    }
+
+    /// docs/updates.md says the updater's level where a reader of a lamp's
+    /// round looks it up: each "`UPDATER` is N" and each "floor to N
+    /// (`manifest::ORDER_UPDATER`)" is today's, so a level raised here
+    /// (#4503's 10) leaves no line behind (one said 8 after 9, #4653).
+    #[test]
+    fn updates_md_gives_todays_updater_levels() {
+        let doc = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/updates.md");
+        let doc = std::fs::read_to_string(doc).unwrap();
+        // Each level after `before` (and before `after`), only where
+        // `before` starts the constant's whole name: after a backtick or
+        // `manifest::`, never the end of `ADDS_UPDATER` and the like. An
+        // `UPDATER` with no level after it is named, not taken as one.
+        let levels = |before: &str, after: &str| -> Vec<u64> {
+            doc.match_indices(before)
+                .filter(|(at, _)| {
+                    !before.starts_with("UPDATER")
+                        || doc[..*at].ends_with('`')
+                        || doc[..*at].ends_with("manifest::")
+                })
+                .filter_map(|(at, _)| {
+                    let rest = &doc[at + before.len()..];
+                    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+                    assert!(
+                        !digits.is_empty() || !before.starts_with("UPDATER"),
+                        "updates.md: no level after {before:?}: {:?}",
+                        rest.chars().take(60).collect::<String>()
+                    );
+                    if digits.is_empty() {
+                        return None;
+                    }
+                    rest[digits.len()..]
+                        .starts_with(after)
+                        .then(|| digits.parse().unwrap())
+                })
+                .collect()
+        };
+        let said = levels("UPDATER` is ", "");
+        assert!(said.len() >= 3, "{said:?}");
+        assert!(
+            said.iter().all(|level| *level == UPDATER),
+            "{said:?} against {UPDATER}"
+        );
+        let floors = levels("raises the floor to ", " (`manifest::ORDER_UPDATER`)");
+        assert!(!floors.is_empty());
+        assert!(
+            floors.iter().all(|level| *level == ORDER_UPDATER),
+            "{floors:?} against {ORDER_UPDATER}"
         );
     }
 }

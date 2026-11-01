@@ -60,8 +60,9 @@
 //!   `_TTS_CACHE_DIR`), a WAV per line under `/var/lib/lampOS/voice/tts-cache`
 //!   named by the SHA-256 of the voice, model, language and words, rendered
 //!   once through the speech service the voice speaks with and kept, so a
-//!   lamp offline still says it. [`tts_cache::WARM`] (the shutdown's line) is
-//!   rendered at start. It is played as a recording is (the shutdown's skill
+//!   lamp offline still says it. [`tts_cache::WARM`] (the shutdown's line,
+//!   then a hand's hold's sleep line, #3748) is rendered at start; the
+//!   coordinator reads the sleep line from the same cache, never rendering. It is played as a recording is (the shutdown's skill
 //!   past the gates, as its last words); not kept and not renderable, it is refused at once with why.
 //! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
 //!   fixed -20 dBFS default on the client's thread, without a file or model
@@ -1030,12 +1031,22 @@ impl Says {
         note: &str,
         priority: u8,
     ) -> (Self, mpsc::Receiver<Answer>) {
+        Self::words_for_test(skill, Words::Note(note.into()), priority)
+    }
+
+    /// [`Self::note_for_test`] for any `words`.
+    #[cfg(test)]
+    pub(crate) fn words_for_test(
+        skill: &str,
+        words: Words,
+        priority: u8,
+    ) -> (Self, mpsc::Receiver<Answer>) {
         let (mut says, ask) = Self::by_hand();
         let (answer, answered) = mpsc::channel();
         ask.send(Asked {
             request: Request {
                 skill: skill.into(),
-                words: Words::Note(note.into()),
+                words,
                 priority,
                 expires_in_ms: 60_000,
                 start_before_us: None,
@@ -1194,9 +1205,30 @@ impl Says {
     /// answered `expired` first, so that none begins after it (the reviewer
     /// on #954).
     pub fn take(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
+        self.take_of(now_us, false)
+    }
+
+    /// [`Self::take`] while the model service refuses and turns are held
+    /// (#4265, the lead's call on #1711): only a `text`, whose words are
+    /// fixed, is taken, as the lamp's own line said as it is with no chat
+    /// asked. A note or a quoted line needs the model to word it: it waits
+    /// for the service, or for its own expiry.
+    pub fn take_while_refused(&mut self, now_us: u64) -> Option<(String, u8, Ticket, bool)> {
+        self.take_of(now_us, true)
+    }
+
+    fn take_of(&mut self, now_us: u64, refused: bool) -> Option<(String, u8, Ticket, bool)> {
         self.expire(now_us);
         let waiting = loop {
-            let waiting = self.waiting.remove(self.next_index()?);
+            let next = if refused {
+                self.next_of(|request| match &request.words {
+                    Words::Text(text) => crate::onboarding::said_as_is(text).is_some(),
+                    _ => false,
+                })
+            } else {
+                self.next_index()
+            };
+            let waiting = self.waiting.remove(next?);
             if waiting
                 .guard
                 .as_ref()
@@ -1210,8 +1242,12 @@ impl Says {
         };
         let quoted = matches!(waiting.request.words, Words::Quoted(_));
         let who = waiting.request.who;
+        let turn = match &waiting.request.words {
+            Words::Text(text) if refused => crate::onboarding::said_as_is(text),
+            words => words.turn(),
+        };
         Some((
-            waiting.request.words.turn()?,
+            turn?,
             waiting.request.priority,
             Ticket {
                 skill: waiting.request.skill,
@@ -1408,6 +1444,15 @@ fn serve_client(
                     Words::Cached(text) => {
                         request.words = Words::Sound(recordings.cached(text)?);
                     }
+                    // A fixed line asked as text, the first stand's (#4710),
+                    // in the owner's words (#4473 (c)).
+                    Words::Text(text) => {
+                        if let Some(owners) =
+                            crate::language::at_start().and_then(|language| language.fixed(text))
+                        {
+                            request.words = Words::Text(owners.to_owned());
+                        }
+                    }
                     Words::Quoted(_) if !ADDON_SAY.load(std::sync::atomic::Ordering::Relaxed) => {
                         return Err(format!("add-on says are off ({ADDON_SAY_ENVIRONMENT})"));
                     }
@@ -1557,17 +1602,34 @@ impl Recordings {
         self
     }
 
-    /// The samples of a cached `text`, kept or rendered now, or why not.
+    /// The samples of a cached `text`, kept or rendered now, or why not:
+    /// in the owner's language when it is kept (#4473 (c)).
     pub fn cached(&self, text: &str) -> Result<Vec<i16>, String> {
-        self.cache
+        let cache = self
+            .cache
             .as_ref()
-            .ok_or_else(|| "the speech cache is off".to_owned())?
-            .samples(text)
+            .ok_or_else(|| "the speech cache is off".to_owned())?;
+        cache
+            .owners_kept(text)
+            .map_or_else(|| cache.samples(text), Ok)
     }
 
     /// The samples of `name`, or why there are none, in words the asker
-    /// can journal: never a path.
+    /// can journal: never a path. A Wi-Fi line is said in the owner's
+    /// language when the speech cache keeps it (#4473 (c)), the recording
+    /// otherwise.
     pub fn samples(&self, name: &str) -> Result<Vec<i16>, String> {
+        let english = match name {
+            "wifi_lost" => Some(crate::language::WIFI_LOST),
+            "wifi_recovering" => Some(crate::language::WIFI_RECOVERING),
+            _ => None,
+        };
+        if let Some(owners) = english
+            .zip(self.cache.as_ref())
+            .and_then(|(english, cache)| cache.owners_kept(english))
+        {
+            return Ok(owners);
+        }
         match self.held.iter().find(|(held, _)| *held == name) {
             Some((_, Ok(samples))) => Ok(samples.to_vec()),
             Some((_, Err(why))) => Err(format!("the recording is not there: {why}")),
@@ -2277,6 +2339,65 @@ mod tests {
         );
     }
 
+    /// #4473 (c): the shutdown's line and the Wi-Fi lines in the owner's
+    /// language when the cache keeps them; the English line and the
+    /// recording otherwise, and always for English.
+    #[test]
+    fn the_owners_language_is_played_when_kept_and_english_otherwise() {
+        use crate::language::Language;
+        let dir = std::env::temp_dir().join(format!("lamp-say-owners-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let cache = |language: Option<Language>, sub: &str| {
+            tts_cache::TtsCache::new(
+                dir.join(sub),
+                "Ngan",
+                crate::language::SPEECH_MODEL,
+                language.map_or("en", Language::code),
+                Box::new(|text: &str| Ok(vec![text.chars().count() as i16; 2_400])),
+            )
+            .speaking(language)
+        };
+        let english_file: Loaded = Ok(Arc::from(vec![9_i16; 2_400]));
+        let held = |cache: tts_cache::TtsCache| {
+            Recordings::none()
+                .with("wifi_lost", english_file.clone())
+                .with_cache(Some(Arc::new(cache)))
+        };
+        let sound = |text: &str| vec![text.chars().count() as i16; 2_400];
+        // English: today's line and today's file.
+        let english = held(cache(None, "en"));
+        assert_eq!(
+            english.cached(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            sound(lamp_msgs::GOING_TO_SLEEP)
+        );
+        assert_eq!(english.samples("wifi_lost").unwrap(), vec![9_i16; 2_400]);
+        // Vietnamese not kept yet: the English line, the English file.
+        let vietnamese = held(cache(Some(Language::Vietnamese), "vi"));
+        assert_eq!(
+            vietnamese.cached(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            sound(lamp_msgs::GOING_TO_SLEEP)
+        );
+        assert_eq!(vietnamese.samples("wifi_lost").unwrap(), vec![9_i16; 2_400]);
+        // Kept: its own words.
+        let warmed = cache(Some(Language::Vietnamese), "vi");
+        warmed.warm(&warmed.warm_lines()).unwrap();
+        let vietnamese = held(warmed);
+        let vi = |english| Language::Vietnamese.fixed(english).unwrap();
+        assert_eq!(
+            vietnamese.cached(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            sound(vi(lamp_msgs::GOING_TO_SLEEP))
+        );
+        assert_eq!(
+            vietnamese.samples("wifi_lost").unwrap(),
+            sound(vi(crate::language::WIFI_LOST))
+        );
+        assert_eq!(
+            vietnamese.samples("wifi_recovering").unwrap(),
+            sound(vi(crate::language::WIFI_RECOVERING))
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// #3697: the shutdown's line, warmed at start, reaches the voice as a
     /// sound from the cache with no further render (no network), as the
     /// shutdown asks for it. The helper is this test's own user here.
@@ -2300,7 +2421,7 @@ mod tests {
             }),
         );
         cache.warm(tts_cache::WARM).unwrap();
-        assert_eq!(renders.load(Ordering::SeqCst), 1);
+        assert_eq!(renders.load(Ordering::SeqCst), tts_cache::WARM.len());
         let held = Recordings::none()
             .helper_uid(us)
             .with_cache(Some(Arc::new(cache)));
@@ -2326,7 +2447,11 @@ mod tests {
         }
         let (samples, ticket) = taken.expect("the cached line reached the voice");
         assert_eq!(samples, vec![1_500_i16; 24_000]);
-        assert_eq!(renders.load(Ordering::SeqCst), 1, "played from the cache");
+        assert_eq!(
+            renders.load(Ordering::SeqCst),
+            tts_cache::WARM.len(),
+            "played from the cache"
+        );
         ticket.answer(Outcome::Spoken);
         assert_eq!(
             client.join().unwrap(),

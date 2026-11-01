@@ -1,0 +1,27 @@
+# Synthetic (no lamp has an answering SEN63C, so no trace exists): PM2.5 at
+# 40 ug/m3, then up to 1,000, the sensor's cap (AirState::check takes 0 to
+# 1,000 for every PM size, so PM4 and PM10 stop there too), in 30 s (300 to
+# 330 s), held capped to 2,700 s and back to 40 by 2,760. At 305 s it reads
+# 200, over 150 and 160 above the 3 minutes before, so after 30 s held, at
+# 335 s, it lifts, breathes amber and says the line, once. Capped for 39
+# more minutes, past the 30-minute cooldown, it says nothing again: it never
+# spends 10 minutes under 150 to rearm.
+clock = "10:00"
+
+[[expect]]
+at = "335s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "335s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "335s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

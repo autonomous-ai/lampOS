@@ -16,6 +16,12 @@
 //!     or `{"refused": WHY}` in plain words.
 //!   - `{"made": {"request_id"?}}`: the state of that ask, or of the
 //!     newest, only ever one the app made ([`status`]).
+//!   - `{"ready": {}}`: `{"ready": true}` when the tasks part has a
+//!     computer to hand the work to ([`crate::agent_tasks::has_a_target`],
+//!     within [`READY_WAIT`]), else `{"ready": false, "why": NOT_SET_UP}`.
+//!     `lamp-cloud` names `skills.make` in `can` only while it is ready
+//!     (fourteen-P15), so the app's button shows only on a lamp whose
+//!     Harness has a computer. It reads nothing of the asks.
 //! - **Told aloud.** The hand-over is never kept as typed
 //!   (`task_news::keep_typed`), so its news, the skill kept and "Shall I
 //!   put it on the lamp?", is told by the voice's spoken task news at a
@@ -52,6 +58,10 @@ pub const MOST_ASKS: usize = made_skill::KEPT_MOST;
 pub const MAKING_LONGEST_MS: u64 = 30 * 60_000;
 /// The hand-over's whole wait, on its own thread.
 pub const HAND_OVER_WAIT: Duration = Duration::from_secs(20);
+
+/// How long a `ready` waits on the tasks part's `targets`: within the 2 s
+/// `lamp-cloud` waits on this socket.
+pub const READY_WAIT: Duration = Duration::from_secs(1);
 /// A client has this long to send its line, and the line is at most
 /// [`MOST_LINE_BYTES`].
 const LINE_WAIT: Duration = Duration::from_secs(2);
@@ -424,7 +434,14 @@ pub fn answer(
     if let Some(made) = only("made") {
         return status(&place.made, made["request_id"].as_str(), now_unix_ms);
     }
-    json!({"refused": "a request is one line, {\"make\": {\"words\", \"request_id\"}} or {\"made\": {\"request_id\"}}"})
+    if only("ready").is_some() {
+        return if crate::agent_tasks::has_a_target(&place.tasks, READY_WAIT) {
+            json!({"ready": true})
+        } else {
+            json!({"ready": false, "why": NOT_SET_UP})
+        };
+    }
+    json!({"refused": "a request is one line, {\"make\": {\"words\", \"request_id\"}}, {\"made\": {\"request_id\"}} or {\"ready\": {}}"})
 }
 
 /// The service, from the coordinator's environment: started only with
@@ -745,6 +762,51 @@ mod tests {
         assert_eq!(told["state"], "not_kept", "{told}");
         assert_eq!(told["why"], "the computer couldn't be reached");
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    /// `ready` (fourteen-P15): yes only when the tasks part answers
+    /// `targets` with at least one; an empty list, a refusal or no tasks
+    /// part at all is no, with why. The asks are never touched.
+    #[test]
+    fn ready_only_when_the_tasks_part_has_a_computer() {
+        let dir = folder("ready");
+        // A short folder of its own: a socket's path is at most 104 bytes.
+        let tasks = PathBuf::from(format!("/tmp/amr-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tasks);
+        fs::create_dir_all(&tasks).unwrap();
+        let place = Place {
+            tasks: tasks.clone(),
+            target: "office".into(),
+            discover: false,
+            made: dir.join("made"),
+        };
+        let ready = || answer(&place, r#"{"ready": {}}"#, NOW, |_, _| panic!("not handed"));
+        let not_ready = json!({"ready": false, "why": NOT_SET_UP});
+        assert_eq!(ready(), not_ready, "no tasks part");
+        let listener = UnixListener::bind(tasks.join("request.sock")).unwrap();
+        let answers = [
+            json!({"ok": true, "targets": [{"alias": "office", "engine": "claude"}]}),
+            json!({"ok": true, "targets": []}),
+            json!({"ok": false, "error": "busy"}),
+        ];
+        let served = answers.clone();
+        std::thread::spawn(move || {
+            for (stream, told) in listener.incoming().zip(served) {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                assert_eq!(
+                    serde_json::from_str::<Value>(&line).unwrap(),
+                    json!({"op": "targets"})
+                );
+                writeln!(stream, "{told}").unwrap();
+            }
+        });
+        assert_eq!(ready(), json!({"ready": true}), "a computer");
+        assert_eq!(ready(), not_ready, "no computer");
+        assert_eq!(ready(), not_ready, "refused");
+        assert!(!place.made.join(APP_INDEX).exists(), "no ask written");
+        let _ = fs::remove_dir_all(&tasks);
     }
 
     /// Writers that overlap (reviewer-two's P2 on #2887): an old ask's

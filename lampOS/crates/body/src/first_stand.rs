@@ -16,6 +16,9 @@
 //!   ([`Touches`], from `controls/state`). **Or a spoken yes** (the owner,
 //!   22 Oct): a short yes ([`is_yes`]) on `voice/heard`, heard after the
 //!   ask's words ended, with a face near; the words are never journaled.
+//!   Only in English: when the owner's language is another
+//!   ([`LANGUAGE_FILE`]), the lamp says [`ASK_TOUCH_ONLY`] and the touch is
+//!   the only yes (Fourth's finding on #4710).
 //! - **The stand.** The factory's: lamp-body stopped, a rest read, the arm
 //!   stood at 30% and then 100% by a body run by hand, and this arm's stand
 //!   written into `lamp.env` as `deploy/factory/steps.sh` writes it. A second
@@ -155,6 +158,40 @@ pub const SPOKEN_SWITCH: &str = "LAMP_FIRST_STAND_SPOKEN";
 /// Whether [`SPOKEN_SWITCH`]'s value turns the spoken yes off.
 pub fn spoken_is_off(value: Option<&str>) -> bool {
     value.is_some_and(|value| value.trim() == "off")
+}
+
+/// The variable naming the owner's language file, the voice's own
+/// (`lamp_voice::language::FILE_ENVIRONMENT`, #4473).
+pub const LANGUAGE_FILE: &str = "LAMP_LANGUAGE_FILE";
+
+/// Whether the language file's text is a language the lamp speaks other
+/// than English (vi, ja, zh, ko). Missing, empty, `en` or unknown is
+/// English, as the voice takes it.
+pub fn speaks_other_than_english(text: Option<&str>) -> bool {
+    text.is_some_and(|text| matches!(text.trim(), "vi" | "ja" | "zh" | "ko"))
+}
+
+/// Whether an ask takes the touch alone: in a busy room, with
+/// [`SPOKEN_SWITCH`] off, or when the owner's language is not English,
+/// since a spoken yes is matched by English words only (Fourth's finding on
+/// #4710). `language` is the language file's text.
+pub fn takes_touch_alone(busy: bool, spoken_switch: Option<&str>, language: Option<&str>) -> bool {
+    busy || spoken_is_off(spoken_switch) || speaks_other_than_english(language)
+}
+
+/// The language file's text, from [`LANGUAGE_FILE`]: none when it names no
+/// absolute path or the file can't be read.
+pub fn language_text() -> Option<String> {
+    use std::io::Read;
+    let path = PathBuf::from(std::env::var_os(LANGUAGE_FILE)?);
+    if !path.is_absolute() {
+        return None;
+    }
+    let mut text = String::new();
+    fs::File::open(path)
+        .and_then(|file| file.take(64).read_to_string(&mut text))
+        .ok()?;
+    Some(text)
 }
 
 /// What became of a line the voice heard, for a spoken yes.
@@ -742,10 +779,14 @@ mod run {
             heard = None;
         }
         // In a busy room only the touch counts, and the ask says so; and
-        // with `LAMP_FIRST_STAND_SPOKEN=off`, always.
-        let busy = busy_now(bus);
-        let spoken_off = spoken_is_off(std::env::var(SPOKEN_SWITCH).ok().as_deref());
-        let mut spoken_yes = SpokenYes::new(busy || spoken_off || heard.is_none());
+        // with `LAMP_FIRST_STAND_SPOKEN=off`, or an owner's language other
+        // than English, always.
+        let touch_alone = takes_touch_alone(
+            busy_now(bus),
+            std::env::var(SPOKEN_SWITCH).ok().as_deref(),
+            language_text().as_deref(),
+        );
+        let mut spoken_yes = SpokenYes::new(touch_alone || heard.is_none());
         let told = match ask(options, spoken_yes.asked()) {
             Ok(told) => told,
             Err(error) => {
@@ -1531,6 +1572,34 @@ mod tests {
         assert!(!spoken_is_off(None));
         assert!(!spoken_is_off(Some("on")));
         assert!(!spoken_is_off(Some("")));
+    }
+
+    /// Fourth's finding on #4710: an owner's language other than English
+    /// asks for the touch alone and takes no spoken yes; English is as it
+    /// was.
+    #[test]
+    fn another_language_takes_the_touch_alone() {
+        let touch_alone = takes_touch_alone(false, None, Some("ja\n"));
+        assert!(touch_alone);
+        let mut window = opened(touch_alone);
+        assert_eq!(window.asked(), ASK_TOUCH_ONLY);
+        assert_eq!(
+            window.line("yes", AFTER, true, false, true),
+            Heard::NotTaken("the ask took the touch alone")
+        );
+        for language in ["vi", "zh", " ko "] {
+            assert!(takes_touch_alone(false, None, Some(language)), "{language}");
+        }
+
+        for language in [None, Some(""), Some("en\n"), Some("fr")] {
+            let touch_alone = takes_touch_alone(false, None, language);
+            assert!(!touch_alone, "{language:?}");
+            let mut window = opened(touch_alone);
+            assert_eq!(window.asked(), ASK);
+            assert_eq!(window.line("yes", AFTER, true, false, true), Heard::Yes);
+        }
+        assert!(takes_touch_alone(true, None, Some("en")));
+        assert!(takes_touch_alone(false, Some("off"), None));
     }
 
     #[test]

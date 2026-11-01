@@ -1162,6 +1162,22 @@ async fn until_asked(helper: &std::sync::Mutex<Helper>, request: &Value) {
     panic!("never asked {request}: {:?}", helper.lock().unwrap().asked);
 }
 
+/// Waits until the helper has been asked `request` `times` times, within
+/// 10 s.
+async fn until_asked_times(helper: &std::sync::Mutex<Helper>, request: &Value, times: usize) {
+    for _ in 0..500 {
+        let asked = helper.lock().unwrap().asked.clone();
+        if asked.iter().filter(|seen| *seen == request).count() >= times {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!(
+        "never asked {request} {times} times: {:?}",
+        helper.lock().unwrap().asked
+    );
+}
+
 /// #3869's wire: a `skills` grant pushes a package in parts, kept with
 /// `push.json` for the helper and installed by it; list and remove go to
 /// the helper as this computer's own; a revoke turns its pushed skills off.
@@ -1279,9 +1295,10 @@ async fn a_revoke_during_an_install_turns_the_skill_off_after_it() {
         true
     );
     let off = json!({"off_pushed_by": client});
-    until_asked(&helper, &off).await;
-    // The first off came while the install was still with the helper.
-    tokio::time::sleep(Duration::from_millis(2_000)).await;
+    // The first off came while the install was still with the helper; the
+    // second once it answered. Waited for, not slept for: under load the
+    // install's answer can land over 2 s after the first off.
+    until_asked_times(&helper, &off, 2).await;
     let asked = helper.lock().unwrap().asked.clone();
     assert_eq!(asked, [install, off.clone(), off], "{asked:?}");
 }

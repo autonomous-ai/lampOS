@@ -124,8 +124,17 @@ struct Fake {
     fail_read: bool,
     fail_stop: bool,
     fail_reboot: bool,
+    /// `systemctl start`, the start in place after a product reset (#4500), fails.
+    fail_start: bool,
+    /// Emptying [`reset::VOLATILE`] before the start in place fails.
+    fail_clear: bool,
+    /// Every [`reset::FORGET`] command fails (no `wpa_cli` or `journalctl`).
+    fail_forget: bool,
     writes_on_stop: Option<PathBuf>,
     pending: Option<PathBuf>,
+    /// How many skills [`reset::remove_installed_skills`] removed in the
+    /// product's skills folder, which a test can't reach.
+    installed: usize,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -134,7 +143,12 @@ impl Effects for Fake {
         }
         self.calls.borrow_mut().push(argv[1].clone());
         self.argvs.borrow_mut().push(argv.to_vec());
-        if (self.fail_stop && argv[1] == "stop") || (self.fail_reboot && argv[1] == "reboot") {
+        if (self.fail_stop && argv[1] == "stop")
+            || (self.fail_reboot && argv[1] == "reboot")
+            || (self.fail_start && argv[1] == "start")
+            || (self.fail_forget
+                && (argv[0] == "/usr/sbin/wpa_cli" || argv[0] == "/usr/bin/journalctl"))
+        {
             return Err(io::Error::other("refused"));
         }
         if argv[1] == "stop" {
@@ -210,6 +224,17 @@ impl Effects for Fake {
     fn force_reboot(&mut self) {
         self.calls.borrow_mut().push("force".into());
     }
+    fn clear_volatile(&mut self) -> io::Result<()> {
+        self.calls.borrow_mut().push("clear".into());
+        if self.fail_clear {
+            return Err(io::Error::other("busy"));
+        }
+        Ok(())
+    }
+    fn remove_installed_skills(&mut self) -> io::Result<usize> {
+        self.calls.borrow_mut().push("skills".into());
+        Ok(self.installed)
+    }
 }
 
 /// A unit name against a `systemctl` pattern, `*` standing for any run of
@@ -276,6 +301,7 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "show",
             "list-units",
             "stop",
+            "skills",
             "sync",
             "sync",
             "reboot"
@@ -595,7 +621,7 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     let steps = reset::resume(&plan, &mut start).unwrap();
     wiped(&root);
     assert!(!steps.contains(&Step::Rebooting));
-    assert_eq!(*start.calls.borrow(), ["sync", "sync"]);
+    assert_eq!(*start.calls.borrow(), ["skills", "sync", "sync"]);
     // Nothing left to finish.
     assert!(
         reset::resume(&plan, &mut Fake::default())
@@ -722,7 +748,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 38] = [
+const PERSON_STORES: [&str; 39] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -759,6 +785,10 @@ const PERSON_STORES: [&str; 38] = [
     // Daily routine claims and durable output restrictions belong to this
     // owner even when their switches are currently off.
     "/var/lib/lampos-skills-state",
+    // The skills a paired computer pushed, and the owner's yes to any that
+    // sees the picture, kept beside them (piece B, Reviewer-three's P2 on
+    // #4514): the next owner's lamp has neither.
+    "/var/lib/lampOS/skills-dev",
     "/var/lib/lampos-output-caps",
     "/var/lib/lampos-policy",
     "/var/lib/lampOS/voice/sessions",
@@ -903,6 +933,144 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
     }
 }
 
+/// Every folder the product keeps across a boot, the tmpfiles' `d` and `D`
+/// lines and each product unit's `StateDirectory=`, is the reset's: the
+/// shipped plan wipes it, a folder above it, or what in it is the person's
+/// (its marker and journal count). So is each `/var/lib` path the product's
+/// files name, outside a comment, in any unit, drop-in or setting, a flag's or
+/// a switch's (`--dir /var/lib/lampOS/skills`):
+/// a part can keep a store in a folder no tmpfiles line or `StateDirectory=`
+/// makes, as the skills made by voice are (the Queue, #4710, 1 Nov 02:4x).
+/// The rest is on [`KEPT`], each with why, and a path in a kept folder is
+/// kept. A new data folder fails this until the plan or the list names it,
+/// so it fails on a Mac, not after a reset on a lamp (Reviewer-three's P3
+/// beside #4542: `/var/lib/lampOS/skills-dev` on #4514).
+#[test]
+fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
+    const KEPT: [(&str, &str); 5] = [
+        // The factory's self-test record, kept on purpose (install.md).
+        ("/var/lib/lamp-selftest", "the self-test's runs"),
+        // The product's skills, which install and each round put back. A
+        // skill put on from a package there, made by voice or from the
+        // Store, is the person's: the reset removes it in its own step
+        // (`reset::remove_installed_skills`, #4839), not as a plan path.
+        ("/var/lib/lampOS/skills", "the product's skills"),
+        // The updater's records: the builds, its state, its lock.
+        ("/var/lib/lampos-update", "the update's records"),
+        // PulseAudio's client setting (#4487), no one's data.
+        ("/etc/pulse", "the image's sound setting"),
+        ("/etc/pulse/client.conf.d", "the image's sound setting"),
+    ];
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut folders: Vec<String> = fs::read_to_string(product.join("lampos.conf"))
+        .unwrap()
+        .lines()
+        .filter_map(|line| line.strip_prefix("d ").or_else(|| line.strip_prefix("D ")))
+        .filter_map(|rest| rest.split_whitespace().next())
+        .filter(|folder| !folder.starts_with("/run/"))
+        .map(String::from)
+        .collect();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|kind| kind != "service") {
+            continue;
+        }
+        for line in fs::read_to_string(&path).unwrap().lines() {
+            if let Some(names) = line.trim().strip_prefix("StateDirectory=") {
+                folders.extend(
+                    names
+                        .split_whitespace()
+                        .map(|name| format!("/var/lib/{name}")),
+                );
+            }
+        }
+    }
+    // Every file under deploy/product but its README: the units, the
+    // `.path` and `.target`, the drop-ins and the settings (Third's note on
+    // #4837: those named only stores the plan wipes, until a later one).
+    let mut named = Vec::new();
+    let mut files = Vec::new();
+    let mut folders_left = vec![product.clone()];
+    while let Some(folder) = folders_left.pop() {
+        for entry in fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                folders_left.push(path);
+            } else if path.extension().is_none_or(|kind| kind != "md") {
+                files.push(path);
+            }
+        }
+    }
+    assert!(
+        files
+            .iter()
+            .any(|path| path.ends_with("lampos-setup-done.path"))
+            && files
+                .iter()
+                .any(|path| path.ends_with("settings/records.json")),
+        "the product's files were walked: {files:?}"
+    );
+    for path in files {
+        for line in fs::read_to_string(&path).unwrap().lines() {
+            if line.trim_start().starts_with('#') {
+                continue;
+            }
+            for (at, _) in line.match_indices("/var/lib/") {
+                let named_path: String = line[at..]
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || "_.@-/".contains(*c))
+                    .collect();
+                named.push(named_path.trim_end_matches(['/', '.']).to_owned());
+            }
+        }
+    }
+    assert!(
+        named.iter().any(|path| path == "/var/lib/lampOS/skills"),
+        "the units' paths were read: {named:?}"
+    );
+    folders.extend(named);
+    folders.sort();
+    folders.dedup();
+    assert!(
+        folders
+            .iter()
+            .any(|folder| folder == "/var/lib/lampos-memory"),
+        "the product's folders were read: {folders:?}"
+    );
+    for (kept, why) in KEPT {
+        assert!(
+            folders.iter().any(|folder| folder == kept),
+            "{kept} ({why}) is no longer a product folder: take it off the list"
+        );
+    }
+    let wiped: Vec<&Path> = plan
+        .wipe
+        .iter()
+        .chain([&plan.marker, &plan.journal])
+        .map(PathBuf::as_path)
+        .collect();
+    let unnamed: Vec<&String> = folders
+        .iter()
+        .filter(|folder| {
+            let folder = Path::new(folder.as_str());
+            !wiped
+                .iter()
+                .any(|path| folder.starts_with(path) || path.starts_with(folder))
+        })
+        .filter(|folder| {
+            !KEPT
+                .iter()
+                .any(|(kept, _)| Path::new(folder).starts_with(kept))
+        })
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "kept across a boot, neither wiped by the product's reset plan nor on its keep list: {unnamed:?}"
+    );
+}
+
 /// Reset covers the whole private onboarding directory, including unfinished
 /// writes and handoffs, while the installed core skill is software to keep.
 #[test]
@@ -1015,6 +1183,40 @@ fn the_product_reset_wipes_daily_claims_and_caps_but_keeps_service_directories()
         );
     }
     assert_eq!(fs::read(root.path("kept-setting")).unwrap(), b"kept");
+}
+
+/// A pushed skill and the owner's yes to its picture are the owner's: the
+/// product reset wipes the developer folder they're kept in, and keeps the
+/// folder itself (Reviewer-three's P2 on #4514).
+#[test]
+fn the_product_reset_wipes_pushed_skills_and_their_picture_yes() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    assert!(
+        plan.wipe
+            .contains(&Path::new("/var/lib/lampOS/skills-dev").to_path_buf()),
+        "the developer folder is absent from the product plan"
+    );
+    let root = Root::new();
+    let dev = root.path("skills-dev");
+    let skill = dev.join("sees-desk");
+    fs::create_dir_all(&skill).unwrap();
+    for (file, text) in [
+        ("SKILL.md", "---\nname: sees-desk\n---\n"),
+        ("skill.toml", "format = 2\n"),
+        (".pushed.json", "{\"client\": \"c_1\"}"),
+    ] {
+        fs::write(skill.join(file), text).unwrap();
+    }
+    fs::write(
+        dev.join(".yes.json"),
+        b"{\"c_1\": {\"sees-desk\": \"sha\"}}",
+    )
+    .unwrap();
+    reset::wipe(&dev).unwrap();
+    assert!(dev.is_dir());
+    assert_eq!(fs::read_dir(&dev).unwrap().count(), 0);
 }
 
 fn event(at_us: u64, held_us: u64) -> TouchEvent {
@@ -1455,6 +1657,54 @@ fn check_reads_the_product_plan_install_places() {
     }
 }
 
+/// How far after its folder a store's rest may be named: the farthest on
+/// 1 Nov, `people.json.from-photos`, ends 187 bytes after
+/// `/var/lib/lampos-eyes/`.
+const NAMED_NEAR: usize = 240;
+
+/// setup.md's "The person's data, which reset wipes" is the docs' list of
+/// what a reset wipes, and it had fallen twelve stores behind the plan
+/// (`seems.log`, `skills-dev`, the Wi-Fi's file, …). Each path the product
+/// plan wipes is named there, whole or as a folder (`/var/lib/lampos-eyes/`)
+/// with its rest in backticks (`seems.log`) soon after it, within
+/// [`NAMED_NEAR`] bytes: a rest named only beside another folder, a later
+/// store's `mute` beside the voice's, is not its store named (Reviewer-two's
+/// P3 on #4830).
+#[test]
+fn setup_md_names_every_store_the_product_plan_wipes() {
+    let plan: serde_json::Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    let doc = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/setup.md");
+    let doc = fs::read_to_string(doc).unwrap();
+    let section = doc
+        .split("\n## The person's data, which reset wipes\n")
+        .nth(1)
+        .and_then(|rest| rest.split("\n## ").next())
+        .expect("docs/setup.md has \"The person's data, which reset wipes\"");
+    let unnamed: Vec<&str> = plan["wipe"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|path| path.as_str().unwrap())
+        .filter(|path| {
+            !section.contains(path)
+                && !path.match_indices('/').any(|(at, _)| {
+                    let rest = format!("`{}`", &path[at + 1..]);
+                    section.match_indices(&path[..=at]).any(|(folder, _)| {
+                        let after = &section[folder + at + 1..];
+                        after
+                            .find(&rest)
+                            .is_some_and(|near| near + rest.len() <= NAMED_NEAR)
+                    })
+                })
+        })
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "docs/setup.md's \"The person's data, which reset wipes\" leaves out {unnamed:?}"
+    );
+}
+
 /// #3710: lamp-setup-reset.service is read-only but the bus, so an enabled
 /// watcher whose plan has no `detach` would run the reset in there and wipe
 /// nothing after the button. It is refused at start instead, before the bus
@@ -1570,11 +1820,12 @@ fn watch_requests_taken(
     (started.get(), logged.into_inner())
 }
 
+// The shutdown watcher's cases, two at most a test (#1806): each runs the
+// real watcher for its 600 ms, so seven in one test took 4.5 s on ARM64.
 #[test]
-fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
+fn the_watcher_starts_the_shutdown_once_for_two_valid_requests() {
     use lamp_msgs::ShutdownSource::Button;
     let at = 50_000_000;
-    // Two valid requests: the shutdown is started once.
     let (started, log) = watch_requests(
         true,
         true,
@@ -1588,7 +1839,12 @@ fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
         log.iter().any(|line| line.contains("already turning off")),
         "{log:?}"
     );
-    // Off, or without --enable: logged, never started.
+}
+
+#[test]
+fn the_watcher_only_logs_a_request_with_the_switch_off_or_without_enable() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
     let (started, log) = watch_requests(false, true, vec![("controls", request(at, Button))]);
     assert_eq!(started, 0);
     assert!(
@@ -1600,7 +1856,12 @@ fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
         watch_requests(true, false, vec![("controls", request(at, Button))]).0,
         0
     );
-    // Stale, from another boot, or not from its source's publisher.
+}
+
+#[test]
+fn the_watcher_starts_no_shutdown_for_a_stale_request_or_one_from_another_boot() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
     let (started, log) = watch_requests(
         true,
         true,
@@ -1615,6 +1876,12 @@ fn the_watcher_starts_the_shutdown_once_only_with_the_switch_on_and_fresh() {
     let mut foreign = request(at, Button);
     foreign.stamp.clock_id = "another-boot".into();
     assert_eq!(watch_requests(true, true, vec![("controls", foreign)]).0, 0);
+}
+
+#[test]
+fn the_watcher_starts_no_shutdown_for_a_request_not_from_its_sources_publisher() {
+    use lamp_msgs::ShutdownSource::Button;
+    let at = 50_000_000;
     let (started, log) = watch_requests(true, true, vec![("cloud", request(at, Button))]);
     assert_eq!(started, 0);
     assert!(
@@ -1651,4 +1918,553 @@ fn a_refused_shutdown_leaves_the_next_hold_acted_on() {
         !log.iter().any(|line| line.contains("already turning off")),
         "{log:?}"
     );
+}
+
+/// The parts whose code reads `LAMP_SHUTDOWN`, each with the product units
+/// that run it: setup's reader is `watch-reset` only, not `serve` or the
+/// change helper (the app's request is lamp-cloud's to refuse).
+const SHUTDOWN_READERS: &[(&str, &[&str])] = &[
+    ("cloud", &["lamp-cloud.service"]),
+    ("controls", &["lamp-controls.service"]),
+    ("setup", &["lamp-setup-reset.service"]),
+    ("voice", &["lamp-voice.service"]),
+];
+
+/// The switch census for `LAMP_SHUTDOWN` (the first builder, 22:1x on 30
+/// Oct): on in the product, it must be on in every unit whose part reads it,
+/// or one way to turn the lamp off would be silently missing (the app's
+/// Turn off with no amber hold, or a hold that's never acted on). Off until
+/// the button's check on a product lamp (#3697, the first builder on 31
+/// Oct), it is set in none of them. The readers are found in the source at
+/// test time, past comments, so a part that starts reading it fails here
+/// until its unit is listed.
+#[test]
+fn the_product_sets_the_shutdown_switch_in_every_unit_whose_part_reads_it_or_in_none() {
+    fn sources(folder: &Path, found: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                sources(&path, found);
+            } else if path.extension().is_some_and(|kind| kind == "rs") {
+                found.push(path);
+            }
+        }
+    }
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut readers = Vec::new();
+    for entry in fs::read_dir(&crates).unwrap() {
+        let folder = entry.unwrap().path();
+        let name = folder.file_name().unwrap().to_str().unwrap().to_owned();
+        // lamp-msgs only names it, for the others to read.
+        if name == "msgs" || !folder.join("src").is_dir() {
+            continue;
+        }
+        let mut files = Vec::new();
+        sources(&folder.join("src"), &mut files);
+        let reads = files.iter().any(|file| {
+            fs::read_to_string(file).unwrap().lines().any(|line| {
+                let line = line.trim_start();
+                !line.starts_with("//")
+                    && [
+                        "SHUTDOWN_SWITCH",
+                        "shutdown_switched_on",
+                        "shutdown::SWITCH",
+                        "SHUTDOWN_ENVIRONMENT",
+                        "\"LAMP_SHUTDOWN\"",
+                    ]
+                    .iter()
+                    .any(|name| line.contains(name))
+            })
+        });
+        if reads {
+            readers.push(name);
+        }
+    }
+    readers.sort();
+    let listed: Vec<&str> = SHUTDOWN_READERS.iter().map(|(name, _)| *name).collect();
+    assert_eq!(
+        readers, listed,
+        "a part reads LAMP_SHUTDOWN: list its units"
+    );
+
+    let product = crates.join("../deploy/product");
+    let mut on = Vec::new();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            continue;
+        }
+        let unit = fs::read_to_string(&path).unwrap();
+        let set: Vec<&str> = unit
+            .lines()
+            .filter(|line| line.starts_with("Environment=LAMP_SHUTDOWN="))
+            .collect();
+        if !set.is_empty() {
+            assert_eq!(set, ["Environment=LAMP_SHUTDOWN=on"], "{}", path.display());
+            on.push(path.file_name().unwrap().to_str().unwrap().to_owned());
+        }
+    }
+    on.sort();
+    let mut units: Vec<&str> = SHUTDOWN_READERS
+        .iter()
+        .flat_map(|(_, units)| units.iter().copied())
+        .collect();
+    units.sort();
+    assert!(
+        on.is_empty() || on == units,
+        "LAMP_SHUTDOWN is set in {on:?}: set it in all of {units:?} or in none"
+    );
+}
+
+/// #4500 (lamp-cb94, 30 Oct): the A733 board's warm reset hung one time in
+/// three, a lamp left dark after a pinhole reset. A product reset doesn't
+/// reboot: after the wipe it starts, in place, what it stopped that a boot
+/// starts outside `lampos.target` and was running (not the updater's way
+/// back, which its timer starts), and setup, which serves with the marker
+/// gone and brings up its hotspot.
+fn product_lamp() -> Fake {
+    Fake {
+        parts: "lamp-voice.service".into(),
+        starters: "lamp-skills-manage.socket loaded active listening Skills\nlamp-setup-change.socket loaded inactive dead Change\nlamp-update-back.timer loaded active waiting Back\nlamp-update-back.service loaded active running Back\n".into(),
+        writers: "lamp-setup.service loaded inactive dead Setup\n\u{25cf} lamp-update.service loaded active running Update\nlamp-records.service loaded inactive dead Records\n".into(),
+        ..Fake::default()
+    }
+}
+
+#[test]
+fn a_product_reset_starts_setup_in_place_instead_of_rebooting() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = product_lamp();
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(
+        &steps[steps.len() - 2..],
+        [Step::JournalRemoved, Step::Started]
+    );
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs.last().unwrap(),
+        &[
+            "/bin/systemctl",
+            "start",
+            "lamp-skills-manage.socket",
+            "lamp-update-back.timer",
+            "lamp-update.service",
+            "lamp-setup.service"
+        ]
+        .map(String::from),
+        "what was running and a boot starts, and setup; never a stopped one or the way back"
+    );
+    assert!(
+        !fake
+            .calls
+            .borrow()
+            .iter()
+            .any(|call| call == "reboot" || call == "force")
+    );
+    // Started only after the wipe, the journal's removal, /run emptied of
+    // what a reboot would have cleared (the bus's latest, the photos), and
+    // the old network and the journal forgotten (#4513's P3s).
+    let calls = fake.calls.borrow();
+    assert_eq!(
+        calls[calls.len() - 8..],
+        [
+            "sync",
+            "sync",
+            "clear",
+            "-i",
+            "-i",
+            "--rotate",
+            "--vacuum-time=1s",
+            "start"
+        ]
+    );
+    let forgotten = argvs[argvs.len() - 5..argvs.len() - 1].to_vec();
+    let forget: Vec<Vec<String>> = reset::FORGET
+        .iter()
+        .map(|argv| argv.iter().map(|word| (*word).to_owned()).collect())
+        .collect();
+    assert_eq!(forgotten, forget);
+}
+
+/// A start in place that fails reboots, then forces one, as before: a reset
+/// never leaves the lamp dark by itself.
+#[test]
+fn a_start_in_place_that_fails_reboots_as_before() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_start: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    let calls = fake.calls.borrow();
+    assert_eq!(calls[calls.len() - 2..], ["start", "reboot"]);
+}
+
+/// Without setup's unit nothing would bring the lamp back, and a keeper's
+/// plan (a dev lamp) is the plan's as it is: either way, the reboot.
+#[test]
+fn a_lamp_without_setups_unit_or_a_keepers_plan_reboots() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        writers: "\u{25cf} lamp-update.service loaded active running Update\n".into(),
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    assert!(!fake.calls.borrow().iter().any(|call| call == "start"));
+
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    plan.stop = vec![
+        "/opt/lampOS/keeper/current/lamp-keeper".into(),
+        "stop".into(),
+        "lamp".into(),
+    ];
+    let mut fake = product_lamp();
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    assert!(!fake.calls.borrow().iter().any(|call| call == "start"));
+}
+
+/// A stop that fails still reboots at once without wiping or starting:
+/// something may be running, and setup finishes the wipe at its start.
+#[test]
+fn a_failed_stop_of_a_product_lamp_reboots_without_starting() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_stop: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    assert!(
+        root.path("setup/reset.json").exists(),
+        "the journal is kept"
+    );
+    assert!(!fake.calls.borrow().iter().any(|call| call == "start"));
+}
+
+/// What a reboot cleared in `/run` (the bus's latest messages, the app's
+/// photos) must be emptied before setup starts in place: if it can't be,
+/// the reset reboots, which clears it, and starts nothing.
+#[test]
+fn run_not_emptied_reboots_instead_of_starting_in_place() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_clear: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Rebooting));
+    let calls = fake.calls.borrow();
+    assert_eq!(calls[calls.len() - 2..], ["clear", "reboot"]);
+    assert!(!calls.iter().any(|call| call == "start"));
+}
+
+/// What starting in place empties is every folder a part keeps in `/run`
+/// past its stop, and only those: each `/run/lampos-*` folder the product's
+/// tmpfiles make (but the locks, which hold no one's words), and each
+/// product unit's `RuntimeDirectory=` with `RuntimeDirectoryPreserve=yes`.
+/// A unit that starts keeping its folder fails this until it is named.
+#[test]
+fn what_starting_in_place_empties_is_every_folder_kept_in_run_past_a_stop() {
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut kept: Vec<String> = fs::read_to_string(product.join("lampos.conf"))
+        .unwrap()
+        .lines()
+        .filter_map(|line| line.strip_prefix("d "))
+        .filter_map(|rest| rest.split_whitespace().next())
+        .filter(|folder| {
+            folder.starts_with("/run/lampos-") && !folder.starts_with("/run/lampos-locks")
+        })
+        .map(String::from)
+        .collect();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|kind| kind != "service") {
+            continue;
+        }
+        let unit = fs::read_to_string(&path).unwrap();
+        if unit
+            .lines()
+            .any(|line| line.trim() == "RuntimeDirectoryPreserve=yes")
+        {
+            for line in unit.lines() {
+                if let Some(folders) = line.trim().strip_prefix("RuntimeDirectory=") {
+                    kept.extend(
+                        folders
+                            .split_whitespace()
+                            .map(|folder| format!("/run/{folder}")),
+                    );
+                }
+            }
+        }
+    }
+    kept.sort();
+    let mut named: Vec<String> = reset::VOLATILE
+        .iter()
+        .map(|folder| (*folder).to_owned())
+        .collect();
+    named.sort();
+    assert_eq!(named, kept);
+}
+
+/// The old network and the journal are forgotten best effort: a lamp
+/// without `wpa_cli` or `journalctl`, or one that refuses, still starts
+/// setup in place, never reboots for it.
+#[test]
+fn forgetting_the_old_network_or_the_journal_never_stops_the_start() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_forget: true,
+        ..product_lamp()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    let calls = fake.calls.borrow();
+    assert_eq!(calls.last().map(String::as_str), Some("start"));
+    assert!(!calls.iter().any(|call| call == "reboot" || call == "force"));
+}
+
+#[test]
+fn a_forget_that_hangs_is_killed_at_its_bound_and_never_holds_the_start() {
+    let words = |argv: &[&str]| {
+        argv.iter()
+            .map(|word| (*word).to_owned())
+            .collect::<Vec<_>>()
+    };
+    let started = Instant::now();
+    let error =
+        reset::run_within(&words(&["sleep", "30"]), Duration::from_millis(200)).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+    reset::run_within(&words(&["true"]), Duration::from_secs(5)).unwrap();
+    assert!(reset::run_within(&words(&["false"]), Duration::from_secs(5)).is_err());
+}
+
+/// A reset started in place never reboots (#4500), so a product unit that
+/// waits for the setup marker but is not part of `lampos.target` is not
+/// stopped with the lamp, nor held off by its condition while setup runs:
+/// the reset must stop it ([`reset::WRITERS`]) or start it again
+/// ([`reset::STARTERS`]). Only the boot's own units, which a start in place
+/// does not run, are left: the waking face, which every voice start shows
+/// too. On an office lamp `lamp-peek` was such a unit and kept port 80 from
+/// setup (`peek.md`); a product unit like it fails this until it is named.
+#[test]
+fn every_product_unit_outside_the_target_that_waits_for_setup_is_the_resets() {
+    const BOOT_ONLY: [&str; 1] = ["lamp-waking.service"];
+    let named = |unit: &str| {
+        reset::STARTERS
+            .iter()
+            .chain(&reset::WRITERS)
+            .any(|pattern| match pattern.split_once('*') {
+                Some((head, tail)) => {
+                    unit.starts_with(head)
+                        && unit.ends_with(tail)
+                        && unit.len() >= head.len() + tail.len()
+                }
+                None => *pattern == unit,
+            })
+    };
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut outside = Vec::new();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let kind = path
+            .extension()
+            .map(|kind| kind.to_string_lossy().into_owned());
+        if !matches!(
+            kind.as_deref(),
+            Some("service" | "socket" | "timer" | "path")
+        ) || name == "lampos.target"
+        {
+            continue;
+        }
+        let unit = fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = unit.lines().map(str::trim).collect();
+        if lines.contains(&"ConditionPathExists=/var/lib/lampos-setup/done")
+            && !lines.contains(&"PartOf=lampos.target")
+        {
+            outside.push(name);
+        }
+    }
+    outside.sort();
+    assert!(!outside.is_empty(), "the product's units were read");
+    let unnamed: Vec<&String> = outside
+        .iter()
+        .filter(|unit| !named(unit) && !BOOT_ONLY.contains(&unit.as_str()))
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "outside lampos.target, waiting for setup, and neither stopped nor started by a reset in place: {unnamed:?}"
+    );
+}
+
+/// An office lamp's `lamp-peek` on port 80 (#4536): a reset in place stops
+/// it with the lamp, as a writer, and never starts it again, so setup's page
+/// has the port; the lamp's next boot starts it once setup is done.
+#[test]
+fn a_reset_in_place_stops_lamp_peek_and_leaves_it_off_for_setup() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = product_lamp();
+    fake.writers
+        .push_str("lamp-peek.service loaded active running Peek\n");
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    let argvs = fake.argvs.borrow();
+    let stop = argvs
+        .iter()
+        .find(|argv| argv[1] == "stop" && argv.iter().any(|word| word == "lampos.target"))
+        .unwrap();
+    assert!(
+        stop.iter().any(|unit| unit == "lamp-peek.service"),
+        "{stop:?}"
+    );
+    let start = argvs.iter().rfind(|argv| argv[1] == "start").unwrap();
+    assert!(
+        !start.iter().any(|unit| unit == "lamp-peek.service"),
+        "{start:?}"
+    );
+    assert!(
+        start.iter().any(|unit| unit == "lamp-setup.service"),
+        "{start:?}"
+    );
+}
+
+/// The skills made by voice outlived the plan's wipes in the product's skills
+/// folder (the Queue, #4710, 1 Nov 02:4x). Each skill there put on from a
+/// package, its `.package.json` beside it, goes with its folder; a skill that
+/// comes with the lamp has none and stays, as does a link and a plain file.
+#[test]
+fn a_reset_removes_each_skill_put_on_from_a_package_and_keeps_the_lamps_own() {
+    let root = Root::new();
+    let skills = root.path("skills");
+    let made = skills.join("water-the-plants");
+    fs::create_dir_all(made.join("sounds")).unwrap();
+    fs::write(made.join("lamp-skill.json"), b"{}").unwrap();
+    fs::write(made.join("sounds/chime.wav"), b"x").unwrap();
+    fs::write(made.join(reset::INSTALLED_FROM), b"{\"sha256\":\"x\"}").unwrap();
+    let store = skills.join("stretch-break");
+    fs::create_dir_all(&store).unwrap();
+    fs::write(store.join(reset::INSTALLED_FROM), b"{}").unwrap();
+    let own = skills.join("onboarding");
+    fs::create_dir_all(&own).unwrap();
+    fs::write(own.join("skill.json"), b"{}").unwrap();
+    let elsewhere = root.path("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    fs::write(elsewhere.join(reset::INSTALLED_FROM), b"{}").unwrap();
+    symlink(&elsewhere, skills.join("linked")).unwrap();
+    fs::write(skills.join("README"), b"x").unwrap();
+
+    let removed = reset::remove_installed_skills(&skills).unwrap();
+    assert_eq!(removed, [store.clone(), made.clone()]);
+    assert!(!made.exists() && !store.exists());
+    assert!(own.join("skill.json").exists());
+    assert!(elsewhere.join(reset::INSTALLED_FROM).exists());
+    assert!(fs::symlink_metadata(skills.join("linked")).is_ok());
+    assert!(skills.join("README").exists());
+    // Again, and with no folder at all: nothing to remove.
+    assert!(reset::remove_installed_skills(&skills).unwrap().is_empty());
+    assert!(
+        reset::remove_installed_skills(&root.path("none"))
+            .unwrap()
+            .is_empty()
+    );
+    // The product's folder is the one install and each round put skills in,
+    // and the mark the skills' own install writes.
+    assert_eq!(reset::SKILLS, "/var/lib/lampOS/skills");
+    assert_eq!(reset::INSTALLED_FROM, lamp_skills::package::INSTALLED_FROM);
+}
+
+/// The reset's last wipe, before the marker and the journal go, so a reset
+/// cut after it resumes with them gone. Said once, by no name: a made
+/// skill's name is the person's words, and the steps are printed to a
+/// journal the reset keeps (Reviewer-two's P3 on the branch).
+#[test]
+fn the_reset_removes_installed_skills_after_the_plans_wipes_by_no_name() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        installed: 2,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    let at = steps
+        .iter()
+        .position(|step| *step == Step::InstalledSkillsRemoved)
+        .expect("the skills removed said");
+    assert!(
+        steps[..at]
+            .iter()
+            .filter(|step| matches!(step, Step::Wiped(_)))
+            .count()
+            == plan.wipe.len()
+    );
+    assert_eq!(steps[at + 1..].first(), Some(&Step::JournalRemoved));
+    assert_eq!(
+        serde_json::to_value(&steps[at]).unwrap(),
+        serde_json::json!({"step": "installed_skills_removed"})
+    );
+    // None removed, none said.
+    let root = Root::new();
+    let plan = lamp(&root);
+    let steps = reset::reset(&plan, &mut Fake::default()).unwrap();
+    assert!(!steps.contains(&Step::InstalledSkillsRemoved));
+}
+
+/// The package install and reset removal together: Desk tutor put on from
+/// its package, as the Store and a made skill are, is removed, and
+/// Onboarding, which comes with the lamp as a folder, stays and still loads.
+#[test]
+fn a_skill_the_skills_install_put_on_from_a_package_goes_and_the_lamps_own_stays() {
+    fn copy(from: &Path, to: &Path) {
+        fs::create_dir_all(to).unwrap();
+        for entry in fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            let target = to.join(entry.file_name());
+            if entry.path().is_dir() {
+                copy(&entry.path(), &target);
+            } else {
+                fs::copy(entry.path(), target).unwrap();
+            }
+        }
+    }
+    let root = Root::new();
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+    let skills = root.path("skills");
+    fs::create_dir_all(&skills).unwrap();
+    copy(&repository.join("onboarding"), &skills.join("onboarding"));
+    copy(
+        &repository.join("desk-tutor"),
+        &root.path("tutor/desk-tutor"),
+    );
+    let package =
+        lamp_skills::package::pack(&root.path("tutor/desk-tutor"), &root.path("tutor")).unwrap();
+    lamp_skills::package::install(&skills, None, &package).unwrap();
+    assert!(lamp_skills::package::installed_from(&skills.join("desk-tutor")).is_some());
+
+    let removed = reset::remove_installed_skills(&skills).unwrap();
+    assert_eq!(removed, [skills.join("desk-tutor")]);
+    assert!(!skills.join("desk-tutor").exists());
+    assert!(lamp_skills::load(&skills.join("onboarding")).is_ok());
 }

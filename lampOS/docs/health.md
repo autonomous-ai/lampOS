@@ -109,12 +109,14 @@ All with the types of [lamp-msgs](msgs.md), under the name `health`.
 | `diagnostics` | `lamp_msgs/Diagnostic` | event | Publishes the board's own report, named `board` | Once a second. With a stale time under three seconds, three times within it, so that the board is never stale by its own doing |
 | `lamp/health` | `lamp_msgs/Health` | latest | Publishes how the whole lamp is | At once when it says something new, and every 5 s besides. It means nothing after 15 s |
 | `board/state` | `lamp_msgs/BoardState` | latest | Publishes the board's numbers | Every 5 s, when the board is read. It means nothing after 15 s |
+| `lamp/online` | `lamp_msgs/Online` | latest | Publishes whether the lamp can reach the internet, with `--online on` only (the product's unit has it) | With each `lamp/health` turn |
 | `lamp/selftest` | `lamp_msgs/SelfTest` | latest | Subscribes: the self-test's newest run, its kept value first ([The self-test's run](#the-self-tests-run)) | As runs come; the subscription is tried again each second while it cannot be made |
 
 The two kept values come five seconds apart, and the bus takes a publisher
 that has been silent for its lease of three seconds for gone. So the
 program tells the bus that it is alive (`Publisher::alive()`) on all three
-topics with every turn of its loop, ten times a second or more. The bus
+topics it publishes, and on `lamp/online` too with `--online on`, with every
+turn of its loop, ten times a second or more. The bus
 gives a publisher's entry a new time at most once a second
 ([bus.md](bus.md)), so that is one file touched a second for each topic.
 
@@ -156,10 +158,18 @@ time go in, a `Health` comes out):
   part that goes quiet without saying it (a crash) is stale and counts as
   before. It is a fact, not a field or a level: a `lamp-health` from
   before reads it as one more `ok` report. A forgotten part named with
-  `--expect` would be missing again; none of those says `stopping` today.
-  Who says it: the voice, for `voice-keys`, when own keys are turned off
-  (the second worker's start with `LAMP_OWN_KEYS` off) and when it drops
-  the second worker (#960) with the switch on ([own-keys.md](own-keys.md)).
+  `--expect` is missing again until it next reports. Who says it: the
+  voice, for `voice-keys`, when own keys are turned off (the second
+  worker's start with `LAMP_OWN_KEYS` off) and when it drops the second
+  worker (#960) with the switch on ([own-keys.md](own-keys.md)); and the
+  body, in its last report as it stops (`lamp_body::bus_out::stopped`). A
+  body asked to stop says it at `warn` and is forgotten like any stop on
+  purpose. A body stopped on a fault (too warm, pushed against, servos not
+  answering) says it at `error`: an `error` is never a stop on purpose
+  (`Diagnostic::is_stopping`), so it is kept, and once quiet it is that
+  error and why, as above, not missing. Until this was fixed (21 Oct to
+  1 Nov) an expected body that stopped on a fault was shown as never
+  heard from.
 - **Missing.** A name given with `--expect` that has never reported is in
   `missing`, in the order given. A part that reported once is never missing
   again, however long ago: it is stale.
@@ -276,10 +286,10 @@ goes on with what it had, making the subscription again each second.
 ## Memory reports
 
 Memory opts in with `--bus-root ABSOLUTE_DIR` on its existing command, in
-either JSONL or `--memory-days` mode. First adds this argument to the
-existing Health `serve` command, preserving its other expected parts:
-
-    --expect memory
+either JSONL or `--memory-days` mode, and Health expects it with
+`--expect memory`. The product's units have both since 15 Oct
+(`deploy/product/lamp-memory.service` and `lamp-health.service`); the
+templates under `deploy/units/` do not.
 
 Memory reports `name: "memory"` on `diagnostics` once per second. Its values
 include retained exchange/kept counts, their snapshot age, and the slowest
@@ -478,6 +488,10 @@ expires like that of a `serve` that has stopped.
 
 ## On the lamp
 
+A record of 14 Oct. The product's `lamp-health.service` now expects 14
+parts and judges `skin` alone, with `--online on`
+(`deploy/product/lamp-health.service`).
+
 On lamp-4ace since 03:16 on 2026-10-14, as `lamp-health.service` under
 the lamp's ordinary user, with the command also at
 `/usr/local/bin/lamp-health`:
@@ -598,7 +612,6 @@ Not exercised:
   cannot be published was played with a file in its way. A root that
   cannot be subscribed to at the start was played and ends the program.
 - **SIGTERM.** The built program was killed with SIGKILL.
-- **Memory reporting in a unit.** The templates under `deploy/units/` do
-  not enable Memory's new report by themselves. First adds the Memory bus
-  argument and Health's expected name to the lamp's existing commands;
-  task 28 edits no unit.
+- **Memory reporting in a template unit.** The templates under
+  `deploy/units/` do not enable Memory's report by themselves; the
+  product's units do (above, "Memory reports").

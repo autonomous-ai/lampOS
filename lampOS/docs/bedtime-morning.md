@@ -21,13 +21,14 @@ It stays on through the next install or update round: the round keeps it in
 `/var/lib/lampos-skills-state/on` and writes the build's file turned on
 ([skills.md](skills.md), #2585). A multi-night lamp run survives an
 overnight round.
-It copies `skill.toml` and `SKILL.md`, excluding `tests/`: eighteen product
-skills are installed and nine are enabled (Not feeling well came with the
-product after its lamp check, #1681). Light out, Watches you leave, Music
-sway, Light scenes, Point the light, Light show, Smoky air and Dusty air are
-installed disabled by install itself (`install::PRODUCT_SKILLS_OFF`); Desk
-tutor, Desk tutor marks and the other installable skills remain outside the
-product install (`install::NOT_PRODUCT_SKILLS`). Bedtime's
+It copies every file of each product skill's folder but its `tests/`
+(`install::PRODUCT_SKILLS`). Those in `install::PRODUCT_SKILLS_OFF` are
+installed disabled by install itself, and Bedtime and Morning by its own
+`enabled = false`; the rest are installed enabled (Not feeling well came with
+the product after its lamp check, #1681). Desk tutor, Desk tutor marks and the
+other installable skills remain outside the product install
+(`install::NOT_PRODUCT_SKILLS`); [skills.md](skills.md), "Core and
+installable skills", has each one's row. Bedtime's
 hours, movements, sound and ceilings are authored defaults awaiting a lamp
 comparison. Host validation does not authorize an installation or establish
 physical, optical or acoustic behavior.

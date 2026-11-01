@@ -939,6 +939,9 @@
         "keep": {
           "type": "boolean"
         },
+        "no_brighter": {
+          "const": true
+        },
         "relative": {
           "type": "object",
           "additionalProperties": false,
@@ -952,6 +955,9 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 4
+            },
+            "warm_at_dimmest": {
+              "const": true
             }
           }
         }
@@ -1247,6 +1253,11 @@
         },
         "show": {
           "$ref": "#/$defs/plain_name"
+        },
+        "stand": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
         },
         "propose": {
           "$ref": "#/$defs/propose"

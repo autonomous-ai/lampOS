@@ -52,7 +52,9 @@ LAMPOS_HOME=/tmp/lampos-try lamp fake
 
 It answers as a lamp does today. `gesture`, `move` and `express` are taken
 (`{"to": "body"}`, and `express` says its move and that it showed the
-light: `{"to": "body", "move": "glad-lift", "light": true}`). `play`, `sound` and `joints` are refused, in
+light: `{"to": "body", "move": "glad-lift", "light": true}`), and `say`
+and `sound` (`hum`, the lamp's own short hum) with `{"to": "voice"}` and
+their `done`. `play` and `joints` are refused, in
 lamp-control's own words ("not routed yet: waits for …"), and `look` with "the
 body's lease socket is not on here", as a product lamp refuses it until its
 unit passes `--lease-socket`.
@@ -279,13 +281,36 @@ claude mcp add lamp -- lamp-mcp        # or any MCP client; --lamp ID picks one 
 Install the two in one `pip` command: the SDK (`lampos`) isn't on PyPI, so
 `sdk/mcp` installed alone looks for it there and fails.
 
-The tools are `lamp_state`, `lamp_wait_for`, `lamp_gesture`, `lamp_light`,
-`lamp_say`, `lamp_look`, `lamp_move`, `lamp_express` and `lamp_stop`. Each
-is offered only with the grant it needs, takes its own short body lease,
-and keeps to the lamp's rates. A refusal comes back as the tool's error,
+The tools send every op of the protocol: `lamp_state`, `lamp_wait_for`,
+`lamp_gesture`, `lamp_light`, `lamp_say`, `lamp_sound`, `lamp_look`,
+`lamp_move`, `lamp_play`, `lamp_joints`, `lamp_express`, `lamp_follow_hand`,
+`lamp_follow_stop` and `lamp_stop` (the README's table has each one's
+parameters). Each is offered only with the grant it needs. A body tool takes
+a short body lease of its own, or renews the one it holds, and keeps to what
+hello's `limits` says. A refusal comes back as the tool's error,
 in the lamp's words. `lamp_look` works on a lamp with `--lease-socket` and on
 `lamp fake --everything`; a product lamp refuses it ("the body's lease socket
 is not on here") until its unit passes `--lease-socket`.
+
+### Your coding agent knows the SDK: the agent skill
+
+`sdk/agent-skill/lampos-sdk` is a skill for coding agents (Claude Code,
+Codex, Cursor and others that read `SKILL.md`): when you ask your agent to
+program the lamp, it reads the mental model (grants, leases, who wins,
+limits, quiet hours), the calls side by side in Python, JavaScript and MCP,
+ready patterns, the gotchas, and how to test with the fake lamp. A test in
+the SDK keeps it naming every call, tool, event and error code.
+
+```sh
+# Claude Code, as a plugin (also adds lamp-mcp's tools when lamp-mcp is installed)
+claude plugin marketplace add ./lampOS/sdk/agent-skill
+claude plugin install lampos-sdk@lampos
+# or as a plain skill, for you or for one project
+cp -r lampOS/sdk/agent-skill/lampos-sdk ~/.claude/skills/        # or .claude/skills/ in a repo
+```
+
+For another agent, point it at `lampos-sdk/SKILL.md`, or copy the folder
+where it keeps skills.
 
 ## 5. A skill the lamp runs on its own (2 minutes)
 

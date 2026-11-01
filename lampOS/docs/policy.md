@@ -42,7 +42,7 @@ owner's rules for this part:
 
 ## The process
 
-    lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--hello-quiet to-the-lamp] [--rules] [--act attention] [--gate]
+    lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--hello-by-rule] [--hello-quiet to-the-lamp] [--rules] [--act attention] [--gate]
 
 | Option | What it is | If left out |
 |---|---|---|
@@ -59,6 +59,7 @@ owner's rules for this part:
 | `--act progress` | That question's decisions act: published with `shadow: false`, so that the voice tells a `say_now` ([below](#acting---act-progress-752)). Needs `--progress` | shadow |
 | `--hello` | Also ask, when the voice holds a due hello, whether to say it now ([below](#hello-on-arrival-say-hello-now-752)) | off |
 | `--act hello` | Those decisions act. Needs `--hello` | shadow |
+| `--hello-by-rule` | The hello is decided by the hard rules alone: a pass is `say_now` at once, with no wait for the model; the judge is asked only in shadow, its answer written on a `hello_judge` line and never acted on ([below](#by-the-hard-rules-alone-4625)). Needs `--hello` | the judge decides a pass |
 | `--hello-quiet to-the-lamp` | The hello's 15 s quiet counts only talk to the lamp or by it: a turn the voice held back as not said to the lamp (`voice/turn`) is taken back from it ([below](#the-quiet-counts-talk-to-the-lamp-1155)). Needs `--hello` | all talk counts |
 | `--act attention` | "Is this said to the lamp?" is published with `shadow: false`, for the voice to hold the lamp's actions by ([below](#acting-on-the-lamps-actions---act-attention-800)) | shadow |
 | `--rules` | The progress and hello questions, and with `--gate` the moment question, obey what the people at the lamp asked about it speaking first (`memory/rules`, [above](#a-persons-rules-about-speaking-first-813)). Needs `--progress` or `--hello` | not listened to |
@@ -197,9 +198,12 @@ never pauses is still judged, in parts.
 | `lamp_is_speaking` | Whether the lamp was speaking |
 | `lamp_last_said` | The end of what the lamp had last said: at most its last 200 bytes, begun at a whole character |
 | `seconds_since_lamp_spoke` | How long before the utterance the lamp had last spoken |
+| `name_heard` | The highest score the lamp's name was heard with while it was said; not there when nothing listens for the name (below). Not shown to the model |
+| `like_asker` | How alike its voice is to the voice of the person the lamp is in conversation with, from -1 to 1, as the voice said it for the request; not there when the voice said none ("How alike to the asker", below). Not shown to the model |
 
-The last three are taken when the utterance's first piece comes, not when
-the utterance ends. By its end the lamp may have begun to answer it, and
+`lamp_is_speaking`, `lamp_last_said` and `seconds_since_lamp_spoke` are
+taken when the utterance's first piece comes, not when the utterance
+ends. By its end the lamp may have begun to answer it, and
 whether to answer must not be judged from the answer. The log is what the
 weights are fitted from, and a context that held the lamp's own reaction
 would give away what is to be learned. "Last spoken" is the later of the
@@ -315,6 +319,28 @@ it, and answered what was not for the lamp 7.5 times of 44 against 17; it
 ignored what was for the lamp 5.7 times of 120 against 5. The log now
 holds real hearings beside real decisions, which is what the next fit is
 to be made from.
+
+**How alike to the asker.** Since #4306 the voice can say, for each
+request, how alike its voice is to the voice of the person the lamp is in
+conversation with, the one who said the line that began it
+(`attention/addressed`'s `like_asker`, [attention.md](attention.md)). The
+Policy joins it to the utterance by the request's number, the newest the
+voice said for that number in the last 60 s, and keeps it in the context
+as `like_asker`. It is the cosine of the two lines' voice prints, from -1
+to 1. Both sums have a term for it, added only when it is there:
+
+        + w x (like_asker - 0.70)
+
+0.70 is where the term is nothing: the voice's own bar for two prints
+being one person's. `w` is 0 in both sums today, so every decision is the
+one it was without the sign, to the bit, and a test holds that. It is to
+be fitted once a lamp has run with the sign. On lamp-4ace's played rounds
+of 30 Oct (1,166 lines), inside a conversation the seven answers told
+follow-ups from desk talk badly: `follows_lamp` 0.61 against 0.42,
+`others_business` 0.57 against 0.56. Whose voice it is should. The model
+is not shown the sign. Without the voice's same-voice check, outside a
+conversation, or when a print is not known, the context has no
+`like_asker` and the term adds nothing.
 
 **When no model answers.** The rule that was the baseline decides:
 `answer` if the room is quiet, the lamp is in conversation or its name
@@ -713,6 +739,18 @@ of what is said in the office to the decision model's service. The key is
 in `/etc/lampOS/policy/jev.key`, readable by root alone, and systemd hands
 the service its own copy (`LoadCredential`); the log is in
 `/var/lib/lampos-policy`, which only the service's user can enter.
+
+**The hello on a home lamp** (the first builder, 30 Oct, on the launch
+testers' findings and on #4625): the product unit passes `--zone system
+--hello --act hello --gate --hello-by-rule`, so Welcome back's hello, which
+lamp-skills asks on `skills/ask` even with `LAMP_SKILLS_ASK=skip`
+([skills.md](skills.md)), is decided here by the hard rules alone (talking,
+twenty minutes since the last hello, one an hour to each person, kept
+rules): a pass is `say_now` at once, with no wait for the model. The judge
+is still asked for each pass, in shadow, off the answer's path, and its
+answer is only written down ([below](#by-the-hard-rules-alone-4625)). Every
+other question stays off; `--gate` also makes the moment question, which
+the product's skills do not ask under `skip`.
 
 **On a home lamp** (#811) the product unit asks Jev through V1's route, the
 campaign-api proxy (`--endpoint
@@ -1748,7 +1786,7 @@ with it, `acting_a_say_now_goes_out_for_real_while_the_attention_question_stays_
 (`crates/policy/tests/it/progress.rs`) shows `shadow: false` for progress and
 `true` for attention. The chain from a change on `tasks/status` to one note
 offered by the voice runs with this crate's own loop and a stand-in judge in
-`crates/voice/tests/progress_news.rs`.
+`crates/voice/tests/it/progress_news.rs`.
 
 **On the lamp** (the first builder): the steps are in
 [tasks.md](tasks.md#playing-progress-news-on-lamp-4ace).
@@ -1776,6 +1814,7 @@ a thread of its own.
 |---|---|---|
 | `--hello` | Listen to `voice/arrival` and ask the hello question | off |
 | `--act hello` | Its decisions act: `say_now` says the hello, `wait` keeps it. Needs `--hello`; `--act` may be given once for each question | shadow |
+| `--hello-by-rule` | The hard rules alone decide: a pass is `say_now` at once, the judge asked only in shadow ([below](#by-the-hard-rules-alone-4625)). Needs `--hello` | the judge decides a pass |
 | `--hello-quiet to-the-lamp` | The 15 s quiet counts only talk to the lamp or by it ([below](#the-quiet-counts-talk-to-the-lamp-1155)). Needs `--hello` | all talk counts |
 
 **Two hard rules, around the decider, and a third with `--rules`.** While
@@ -1789,11 +1828,75 @@ unanswered would leave the hello to its rule.
   it ([below](#the-quiet-counts-talk-to-the-lamp-1155)).
 - **No hello within twenty minutes of the last:** the voice's minutes since
   its last hello, or the last `say_now` this acted on.
+- **No hello to the same person within an hour** (`ONCE_PER_PERSON`), for a
+  skill's ask (`--gate`): by the ask's `person`, the memory's id of the
+  known face at the lamp, which lamp-skills reads from the eyes' known file
+  as it asks (never the name); every ask without one, a face not known,
+  shares one key, `someone`. Counted from the last `say_now` this acted on
+  for that person, as the twenty minutes are, so nothing in shadow starts
+  it. Guard `greeted_person`, checked after the two above and before a kept
+  rule, and again as an answer comes back. The first builder, 30 Oct, on
+  the launch testers' findings: on stable 8899 Welcome back greeted the
+  same person every time they came back after five minutes away, as soon
+  as its 20-minute cooldown let it (15:13 and 15:41 on one lamp); the ruling
+  is at most once an hour per person. Tests:
+  `hello::tests::one_hello_an_hour_to_the_same_person_and_asks_without_one_share_a_key`,
+  `hello::tests::a_hello_in_shadow_starts_no_persons_hour`.
 - **With `--rules` (#813), not when a rule the people at the lamp kept
   holds it** ([above](#a-persons-rules-about-speaking-first-813)): `quiet`,
   `quiet_mornings`, and the `hello` limits (`never`, not before or from a
   minute of the day, not while the room is not known to be quiet). Guard
   `kept_rule`. A limit on `news` holds no hello.
+
+<a id="by-the-hard-rules-alone-4625"></a>
+**By the hard rules alone (#4625, `--hello-by-rule`).** The first builder,
+30 Oct, on #4625: #4305 took Jev out of everything the lamp does, and the
+rules as built are the policy, so on the product and on lamp-4ace the hello
+is decided by the hard rules alone: someone talking, twenty minutes since
+the last hello, one an hour to each person, and kept rules with `--rules`.
+The product units pass it. lamp-4ace's unit does not yet: its pinned
+lamp-policy predates the option, and lamp-policy exits on an unknown
+option, so it comes with the change that pins a build with #4625 there.
+With the switch:
+
+- **A pass is `say_now` at once**, by the rule: `by` `rule`, probability
+  `RULE_YES` (0.6), `took_ms` 0, no answers. There is no wait for the model
+  on the answer's path. Acting (`--act hello`), it starts the twenty minutes
+  and the person's hour as any `say_now` acted on does. The room, the hour
+  and the lamp's own speaking up, which the rule weighs when no model
+  answers without the switch (`fallback`), are not weighed: they are the
+  judge's questions, and the judge does not decide.
+- **The judge is asked in shadow** for each pass, beside it: the same
+  state and questions, with at most 1.5 s, after the decision is published.
+  The decision's log line says `judge` `asked_in_shadow`, or `not_asked`
+  when the judge's thread was still busy with an earlier pass or gone. When
+  its answer comes, a line of its own is written to the same log, `about`
+  `hello_judge`, `shadow` true, never published: the context and state, the
+  `decided` choice (`say_now`), the judge's `answers` and `judgement`, and
+  `differs` when it would have decided otherwise; or `failed` when it gave
+  no usable answer. The journal says it in one line, and the diagnostics
+  add `hello_judged` and `hello_judge_differs`. It gives the next tuning
+  round its data and never acts.
+- **A hard rule holding** is `wait` by the rule as without the switch, and
+  no model is asked, in shadow or otherwise.
+
+A decision line by the rule (the context and state shortened):
+
+    {"at_unix_ms":1000000,"about":"hello","shadow":false,"context":{...,"skill_ask":true},"state":{...},"asked":"jev","answers":{},"judgement":{"probability":0.6,"choice":"say_now","from_rule":true},"by":"rule","took_ms":0,"judge":"asked_in_shadow"}
+
+and its journal lines:
+
+    lamp-policy: hello decision 1 arrival=1 choice=say_now probability=0.600 by=rule took_ms=0 guard=none
+    lamp-policy: hello judge in shadow arrival=1 decided=say_now judge=wait probability=0.020 took_ms=640
+
+Tests: `hello::tests::a_rule_pass_says_hello_while_the_judge_says_wait`
+(a pass is `say_now` on the first turn while the judge has not answered;
+its answer, `wait`, is written as `hello_judge` with `differs` and
+counted, and nothing more is decided),
+`hello::tests::by_rule_the_persons_hour_still_holds_a_second_hello` (the
+twenty minutes and the person's hour hold by the rule, with no judge asked),
+and the option tests in `main.rs` (`--hello-by-rule` read, refused without
+`--hello`).
 
 <a id="the-quiet-counts-talk-to-the-lamp-1155"></a>
 **The quiet counts talk to the lamp (#1155, `--hello-quiet to-the-lamp`).**
@@ -1927,7 +2030,9 @@ and for a hello its minutes away and seconds there), and is answered by a
 `--act hello`:
 - `act` `hello` is put to the hello question as an arrival of that number
   is: the same hard rules (someone talking, a hello within 20 minutes),
-  the same question and the same log. The quiet it is shown is the
+  and one of its own, a hello to the same person within the hour, by the
+  ask's `person` ([above](#hello-on-arrival-say-hello-now-752)), the same
+  question and the same log. The quiet it is shown is the
   policy's own (since anything was last said, or since it started), and
   the last hello its own. The decision names the ask, not an arrival:
   whether it came from a skill is carried with it from waiting to decided
@@ -2049,8 +2154,9 @@ state shown, the answers, the judgement and any `guard`, `failed` or
     lamp-policy: hello decision 2 arrival=98563000000 choice=say_now probability=0.720 by=model took_ms=612 guard=none
 
 The diagnostics add `hello_decided`, `hello_by_rule`, `hello_said`,
-`hello_held_talking`, `hello_held_recent`, `hello_late`, `hello_held_rule`
-with `--rules`, and `hello_acts` with `--act hello`; the start line `hello=true`, and `act=` names each
+`hello_held_talking`, `hello_held_recent`, `hello_held_person` (the hour
+to the same person), `hello_late`, `hello_held_rule` with `--rules`,
+`hello_judged` and `hello_judge_differs` with `--hello-by-rule`, and `hello_acts` with `--act hello`; the start line `hello=true`, `hello_by_rule=true` with the switch, and `act=` names each
 question that acts (`act=progress,hello`). A yes held as it comes back is
 counted too, under its kind, with or without `--rules`: someone talking
 by then counts in `hello_held_talking`, which the code before #1003 did

@@ -34,6 +34,7 @@ Environment=LAMP_PRIVACY_CONTROLS=on
 # A pet on the head (#3997, Part of #4133): said on controls/pet, and a petted contact asks no sleep. On in the
 # product since #4133's design owner's yes (29 Oct), with the head-pat and head-pat-wiggle skills (switches.md).
 Environment=LAMP_HEAD_PET=on
+# LAMP_SHUTDOWN stays off until the button's check on a product lamp (#3697); the first builder, 31 Oct.
 ExecStart=/opt/lampOS/controls/current/lamp-controls serve --touch --config /etc/lampOS/controls/controls.json --pins /etc/lampOS/controls/controls-pins.json --bus-root /run/lampos-bus --enable
 Restart=on-failure
 RestartSec=5s

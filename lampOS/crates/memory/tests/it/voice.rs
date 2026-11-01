@@ -72,6 +72,8 @@ struct Fixture {
     trace: Receiver<(Value, Value)>,
     stop: Stopper,
     worker: Option<JoinHandle<()>>,
+    /// Held for the fixture's life, so real-store voice fixtures take turns.
+    _turn: std::sync::MutexGuard<'static, ()>,
 }
 
 impl Fixture {
@@ -84,6 +86,7 @@ impl Fixture {
         hold: Option<Receiver<()>>,
         refuse_forget: bool,
     ) -> Self {
+        let turn = crate::voice_store_turn();
         let root = std::env::temp_dir().join(format!(
             "lamp-mv-{}-{}",
             std::process::id(),
@@ -126,6 +129,7 @@ impl Fixture {
             trace,
             stop,
             worker: Some(worker),
+            _turn: turn,
         }
     }
 

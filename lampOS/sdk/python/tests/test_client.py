@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import re
 import stat
 from pathlib import Path
 
@@ -127,7 +128,7 @@ def test_the_debug_log_redacts_what_would_pair_or_hello_as_this_computer():
     assert unknown == {"ev": "lamp.changed", "token": "<not shown>", "lamp": {"id": "lamp-1", "badge": "<not shown>"}}
     # What a lamp sends beyond the schema's own fields is decided too.
     for sample in ({"re": 3, "ok": True, "to": "body", "move": "glad-lift", "light": True},
-                  {"re": 1, "ok": True, "limits": {"joints_hz": 20}},
+                  {"re": 1, "ok": True, "limits": {"rates": "off", "refused": [{"most": 20, "within_ms": 1_000}], "phrases": [{"most": 6, "within_ms": 60_000}]}},
                   {"re": 2, "ok": True, "state": {"mood": {"energy": 0.5, "warmth": 0.6, "awake": True, "asleep": False},
                                                   "light": {"on": True, "colour": "warm", "level": 3,
                                                             "shows": {"on": True, "colour": "warm", "level": 3}}}},
@@ -221,14 +222,47 @@ def test_hello_with_another_computers_key_is_unpaired(tmp_path):
     run(go())
 
 
+def test_every_error_code_says_what_to_do_and_both_sdks_say_the_same():
+    """Each code the schema has comes with what to do, on the error and in the
+    README, in the same words as the JS SDK's (errors.js)."""
+    assert set(errors.WHAT_TO_DO) == set(schema.error_codes())
+    refused = errors.from_reply({"code": "no_grant", "why": "not granted: look"})
+    assert refused.what_to_do == errors.WHAT_TO_DO["no_grant"] and str(refused) == "no_grant: not granted: look"
+    assert errors.LampError("x", code="closed").what_to_do == ""
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
+    for code, line in errors.WHAT_TO_DO.items():
+        assert f"| `{code}` | {line} |" in readme, code
+    js = Path(__file__).resolve().parents[2] / "js" / "src" / "errors.js"
+    if js.exists():
+        said = dict(re.findall(r'^  ([a-z_]+): (".*"),$', js.read_text(), re.M))
+        assert {code: json.loads(line) for code, line in said.items()} == errors.WHAT_TO_DO
+
+
+def test_request_tells_its_id_before_sending_so_an_early_done_can_be_matched(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                told: list[int] = []
+                done = asyncio.get_running_loop().create_future()
+                lamp.on("done", lambda event: done.set_result(event) if told and event["re"] == told[0] else None)
+                reply = await lamp.request("say", on_id=told.append, text="Hello.")
+                assert told == [reply["re"]]
+                assert (await asyncio.wait_for(done, 5))["re"] == told[0]
+
+    run(go())
+
+
 def test_greet_a_person_who_arrives(tmp_path):
     async def go():
         async with FakeLamp(grants=("body", "look")) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 greeted = asyncio.Event()
+                heard = []
 
                 async def greet(event):
+                    heard.append(event)
                     await lamp.gesture("greeting")
                     greeted.set()
 
@@ -238,6 +272,8 @@ def test_greet_a_person_who_arrives(tmp_path):
                 await fake.emit("person.arrived", count=1, near=0.3)
                 await greeted.wait()
             assert fake.asked("gesture") == [{"name": "greeting"}]
+            # `at` as lamp-control stamps it: UTC, to the second, ending Z.
+            assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", heard[0]["at"]), heard[0]["at"]
 
     run(go())
 
@@ -477,7 +513,35 @@ def test_the_examples_compile_and_call_only_what_the_client_has():
         tree = ast.parse(example.read_text(), str(example))
         for node in ast.walk(tree):
             if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "lamp":
-                assert hasattr(Lamp, node.attr), f"{example.name}: lamp.{node.attr}"
+                # `info`, `grants` and `limits` are set per connection, at hello.
+                assert hasattr(Lamp, node.attr) or node.attr in ("info", "grants", "limits"), f"{example.name}: lamp.{node.attr}"
+
+
+def test_the_tour_runs_every_step_against_a_fake_lamp(tmp_path):
+    """examples/tour.py, run as a developer would, against a fake lamp that
+    grants everything and routes everything: each step is taken."""
+    import os
+    import sys
+
+    tour = Path(__file__).resolve().parents[1] / "examples" / "tour.py"
+
+    async def go():
+        async with FakeLamp(grants=tuple(schema.grants())) as fake:
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring(tmp_path))
+            ran = await asyncio.create_subprocess_exec(
+                sys.executable, str(tour), env={**os.environ, "LAMPOS_HOME": str(tmp_path)},
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            said = (await ran.communicate())[0].decode()
+            assert ran.returncode == 0, said
+            # A step's refusal prints as "name: refused, …" (`limits` has a
+            # `refused` window, so the word alone isn't one).
+            assert ": refused," not in said, said
+            for op in ("get", "light", "say", "gesture", "express", "look", "joints", "stop"):
+                assert fake.asked(op), (op, said)
+            assert fake.asked("joints")[0]["targets"] == {"pitch": 5}
+
+    asyncio.run(asyncio.wait_for(go(), 60))
 
 
 def test_the_readme_reference_names_every_public_call_command_and_option():
@@ -991,6 +1055,8 @@ def test_a_fake_like_lamp_control_refuses_what_it_doesnt_route(tmp_path):
                 await lamp.express("glad")
                 assert (await lamp.gesture("nod"))["to"] == "body"
                 await lamp.light("warm", 3, 1_000)
+                # The hum is routed, as lamp-control's sound.
+                assert (await lamp.sound("hum"))["to"] == "voice"
 
     run(go())
 

@@ -42,6 +42,8 @@ const WAITING: [&str; 2] = ["until", "now"];
 pub const ON_UNSET: &str = "on (unset)";
 /// The column of a switch table that says what the product unit does.
 const PRODUCT_COLUMN: &str = "Product unit";
+/// The column of a switch table that says when the product should take it.
+const PROPOSED_COLUMN: &str = "Proposed product default";
 /// A value that leaves a switch off.
 const OFF: [&str; 5] = ["", "off", "0", "false", "no"];
 /// One sentence of a row's words at most this long.
@@ -168,16 +170,29 @@ pub fn turned_on(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     on
 }
 
-/// Every row of the page's switch tables counted `until` or `now` whose
-/// switch isn't in `on`, in the page's order, each switch once. A row whose
-/// "Product unit" cell is exactly [`ON_UNSET`] is on by its code's default,
-/// and is not listed.
-pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
-    let plain = plain_lines(page);
+/// One row of the page's switch tables that names a switch.
+pub struct Row {
+    /// The name of its table.
+    pub part: &'static str,
+    pub switch: String,
+    /// Its **Counted as**: `on`, `now`, `until`, `off` or `setting`.
+    pub counted: String,
+    /// Its "Values and default" cell.
+    values: String,
+    /// Its "Product unit" cell, if its table has one.
+    pub product: Option<String>,
+    /// Its "Proposed product default" cell, if its table has one.
+    pub proposed: Option<String>,
+}
+
+/// Every row of the page's switch tables that names a switch, in the
+/// page's order.
+pub fn rows(page: &str) -> Vec<Row> {
     let mut found = Vec::new();
     let mut part = None;
     let mut header = false;
     let mut product_at = None;
+    let mut proposed_at = None;
     for line in page.lines() {
         if line.starts_with("## ") {
             part = TABLES
@@ -186,6 +201,7 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
                 .map(|(_, name)| *name);
             header = false;
             product_at = None;
+            proposed_at = None;
             continue;
         }
         let Some(part) = part else {
@@ -197,32 +213,53 @@ pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
         if !header {
             header = true;
             product_at = cells(line).iter().position(|cell| *cell == PRODUCT_COLUMN);
+            proposed_at = cells(line).iter().position(|cell| *cell == PROPOSED_COLUMN);
             continue;
         }
         let row = cells(line);
         if row.len() < 3 || row[0].starts_with("---") {
             continue;
         }
-        let product = product_at
-            .and_then(|at| row.get(at))
-            .map(|cell| (*cell).to_owned());
         let Some(switch) = switch_of(row[0]) else {
             continue;
         };
-        let counted = row.last().copied().unwrap_or_default();
-        if !WAITING.contains(&counted)
-            || on.contains_key(&switch)
-            || product.as_deref() == Some(ON_UNSET)
-            || found.iter().any(|w: &Waiting| w.switch == switch)
+        found.push(Row {
+            part,
+            switch,
+            counted: row.last().copied().unwrap_or_default().to_owned(),
+            values: row[1].to_owned(),
+            product: product_at
+                .and_then(|at| row.get(at))
+                .map(|cell| (*cell).to_owned()),
+            proposed: proposed_at
+                .and_then(|at| row.get(at))
+                .map(|cell| (*cell).to_owned()),
+        });
+    }
+    found
+}
+
+/// Every row of the page's switch tables counted `until` or `now` whose
+/// switch isn't in `on`, in the page's order, each switch once. A row whose
+/// "Product unit" cell is exactly [`ON_UNSET`] is on by its code's default,
+/// and is not listed.
+pub fn waiting(page: &str, on: &BTreeMap<String, String>) -> Vec<Waiting> {
+    let plain = plain_lines(page);
+    let mut found: Vec<Waiting> = Vec::new();
+    for row in rows(page) {
+        if !WAITING.contains(&row.counted.as_str())
+            || on.contains_key(&row.switch)
+            || row.product.as_deref() == Some(ON_UNSET)
+            || found.iter().any(|w| w.switch == row.switch)
         {
             continue;
         }
         found.push(Waiting {
-            part,
-            plain: plain.get(&switch).cloned(),
-            switch,
-            words: words_of(row[1]),
-            product,
+            part: row.part,
+            plain: plain.get(&row.switch).cloned(),
+            words: words_of(&row.values),
+            product: row.product,
+            switch: row.switch,
         });
     }
     found
@@ -311,7 +348,11 @@ pub fn placed(body: &str, part: &str) -> String {
 }
 
 /// The product's files a switch can be turned on in: every unit and
-/// drop-in in `deploy/product`, and its settings' `.env` files.
+/// drop-in in `deploy/product` that `lamp-update install` places, and its
+/// settings' `.env` files. A file there that install never places is on no
+/// lamp, so nothing in it is on: `own-keys-voice.conf` goes on a test lamp
+/// by hand, and the keeper's restart and the own keys' helpers wait for
+/// their lamp checks (install's left-out list).
 pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
     let mut files = BTreeMap::new();
     let product = lamp_os.join("deploy/product");
@@ -327,11 +368,40 @@ pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
                 .iter()
                 .any(|end| name.ends_with(end));
             if path.is_file() && (unit || name.ends_with(".env")) {
-                files.insert(name, fs::read_to_string(&path)?);
+                let text = fs::read_to_string(&path)?;
+                if installed(&name, &text) {
+                    files.insert(name, text);
+                }
             }
         }
     }
     Ok(files)
+}
+
+/// Whether `lamp-update install` places this file, as this build carries
+/// it: its name and its text both (Second's P3 on #4666), so a hand drop-in
+/// that happens to hold an installed file's text is not taken for it. A
+/// unit by its name; a setting, the exit note and the tmpfiles conf by the
+/// last part of the path install writes them to.
+fn installed(name: &str, text: &str) -> bool {
+    use lamp_update::install::{
+        EXIT_NOTE, PRODUCT, SETTINGS, STORE_SETTINGS, TMPFILES, TMPFILES_PATH,
+    };
+    let file = |path: &str| path.rsplit('/').next().unwrap_or(path).to_owned();
+    PRODUCT
+        .iter()
+        .map(|(unit, placed)| ((*unit).to_owned(), *placed))
+        .chain(
+            SETTINGS
+                .iter()
+                .chain(STORE_SETTINGS)
+                .map(|(path, placed)| (file(path), *placed)),
+        )
+        .chain([
+            ("exit-note.conf".to_owned(), EXIT_NOTE),
+            (file(TMPFILES_PATH), TMPFILES),
+        ])
+        .any(|(placed_name, placed)| placed_name == name && placed == text)
 }
 
 /// One `gh` call's standard output, or why not.

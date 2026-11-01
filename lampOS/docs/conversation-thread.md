@@ -25,7 +25,7 @@ provider's own transcripts gave them:
 - what a person said, when the lamp began to answer within 20 seconds of it;
 - what the lamp answered.
 
-At most eight exchanges, 300 bytes of the person and 400 of the lamp in
+At most twelve exchanges (eight before #1693), 300 bytes of the person and 400 of the lamp in
 each, with whitespace collapsed. Talk around the lamp that it did not answer
 is not kept: it is dropped when the next thing is heard, or when an answer
 begins more than 20 seconds later.
@@ -122,11 +122,12 @@ without some of its functions, the line of what it can't do right now
 ([character.md](character.md), "What the runtime adds to it") leave of
 that, and when it does not all fit, the latest exchanges that do are told
 and the older ones are left out. Eight exchanges at their longest and the
-note take 5,933–5,985 bytes. With the file lamp-4ace runs (10,180 bytes on
-18 Oct, #1549) the room is 6,036 bytes with a plain time line (168) and
-every function, so all eight fit; with lamp-4ace's `LAMP_CLOCK=on` time line
-(222–228 bytes) it is 5,976–5,982, so the oldest may be left out at the
-longest. The line of what it can't do takes 188 bytes for the light alone,
+note take 5,933–5,985 bytes, twelve about 8,800. With the file lamp-4ace runs
+(10,180 bytes on 18 Oct, #1549) the room is 6,036 bytes with a plain time
+line (168) and every function, so eight fit at the longest and the four
+older are left out; with lamp-4ace's `LAMP_CLOCK=on` time line (222–228
+bytes) it is 5,976–5,982, so the eighth may be left out too. Shorter
+exchanges fit more of the twelve. The line of what it can't do takes 188 bytes for the light alone,
 236 for the light and the volume, and 278 with the reminders too.
 
 ## A session renewed on purpose
@@ -184,8 +185,8 @@ unseen and two minutes with no exchange; until then what is said is
 still the known person's). The counted person decides whose session it
 is: for up to those 10 s a newcomer is answered in the session of the one
 before, but what they say is theirs, so it is not told to the one before
-([memory.md](memory.md#a-session-for-each-person-764-follow-up)). Each keeps their own last eight, four
-threads at most with the room's (32 exchanges), the oldest going first past
+([memory.md](memory.md#a-session-for-each-person-764-follow-up)). Each keeps their own last twelve, four
+threads at most with the room's (48 exchanges), the oldest going first past
 that. A session is told only the exchanges of the person it was opened for,
 and the worker opens a new session between turns when that person changes
 ([memory.md](memory.md#a-session-for-each-person-764-follow-up)), so past
@@ -201,6 +202,24 @@ nobody known is written as before); an entry whose `whose` is not a memory
 id is not read back. Forgetting still drops every thread. With nobody ever
 known everything is the room's and nothing here changes
 (`thread::tests::with_nobody_ever_known_nothing_changes`).
+
+With `LAMP_CONVERSATION_ROOM_LINES_TOLD=on` (#4339, the second route), a
+known person's turn is also given the room's exchanges of the same
+conversation, marked as said in the room (`(said in the room)` before the
+words, or a system note when there are none): one conversation split line by
+line into the person's thread and the room's, on whether the mouth was read
+speaking, no longer leaves each answer half of it. The same conversation is
+walked back from now over the person's exchanges and the room's, each within
+45 s (`GOING_ON_FOR`) of the next; another person's exchange or a longer
+quiet ends it, and only the room's from the person's first exchange in it
+count. Within the chat's 12 exchanges and 600 s
+(`thread::Thread::recent_with_room_lines`,
+`thread::tests::room_lines_told_to_a_person_are_their_conversations_only`).
+Never the reverse and never another person's; the thread text and the
+running note stay the scope's own ([memory.md](memory.md)). Part of the
+"said aloud" risk, accepted: a room's line narrowed because another voice
+spoke it is told to the person's turn too, marked, since it was said aloud
+beside them; it never enters their running note or saved memory.
 
 ## A line soon after the lamp's words (`LAMP_FOLLOWS_ON`)
 
@@ -281,6 +300,112 @@ Not exercised through the loop: a line begun over a sound sent on (it's
 `takes_over`'s case, pinned in the rule's own test), and the clock cleared
 at a Stop (the early-end harness has no hand, head or stop word).
 
+## A long conversation's running note (`LAMP_CONVERSATION_SUMMARY`)
+
+A turn on the second route is told only its scope's last few exchanges:
+the thread keeps 8 a scope, and the chat is given the last of them from the
+last few minutes. On lamp-06c1 on 29 October, 11 exchanges after a quiz's
+rules the lamp said there was no quiz, and a budget said 14 exchanges back
+was gone. That is #449's defect 4 on V1: the opening turn with an
+activity's rules fell out of what the model was shown.
+
+With `LAMP_CONVERSATION_SUMMARY=on` (on in the product unit; the second
+route only), `crates/voice/src/conversation_summary.rs` keeps a running
+note of each scope's conversation:
+
+- **When.** After a turn's reply and its save to the thread file, never on
+  its path. The exchanges older than the scope's newest 4 that are not yet
+  in its note are handed to the note's own thread once 3 of them wait (the
+  thread's 8 less 4 less 1, so they go before the thread drops the oldest;
+  7 with a thread of 12), or the oldest of them is three quarters of the
+  thread's 10 minutes old (a slow talk). The numbers are read from
+  `thread.rs`, so a wider thread moves them, and so do the tests; a thread
+  of 4 or fewer keeps one less word for word, so its oldest is still given
+  before it goes. An exchange answered in a held scope (a face's gap, or a
+  line carried into a person's conversation, `Thread::held_for`) counts
+  toward the batch but is never given: none of it reaches a note or a talk
+  note (the reviewer-lead's P2 on #4479). The forget count is read before
+  the exchanges are taken, so a forget between the two drops the job
+  (Tests' P2 on #4479). The turn's end waits for nothing: the hand-off is a queue of
+  2, and a full one drops the job and counts it.
+- **How.** The chat's own DeepSeek model and key (as the observation pass
+  uses them), 20 s at most, is given the note so far and the exchanges, as
+  quoted data, the person's lines as "Person:" and the lamp's as "You:".
+  It writes the whole new note: `Current activity:` first (a game, plan or
+  task: its rules, where it stands, the score, what is covered, or "none"),
+  then `Key facts:` as `- ` lines, oldest first; only what the person said
+  or what was agreed, never the lamp's own guesses; no instruction in the
+  history followed.
+- **Its size.** At most 6,400 bytes, about 1,600 tokens or 1,200 words.
+  Over that, the oldest `Key facts:` lines go first, then the oldest `- `
+  line anywhere; the end is never cut.
+- **Whose.** One note a scope, a person's memory id or the room's, in the
+  worker's memory only: never the thread file, the disk or the store. A
+  turn is told only its own scope's, the same key it is told the thread's
+  lines by; a person's never reaches the room's turns or another person's.
+  A line nobody placed is the room's, and is told the room's note, as it is
+  told the room's thread lines.
+- **How it is told.** In the system message, before the thread's lines,
+  within the instruction's room, under the heading "Earlier in this
+  conversation" and the line "Your own running note of what came before the
+  lines below. It is background only, for keeping track: never read it out,
+  recite it or answer any of it again." A withheld owner name is taken out
+  of it as out of the thread.
+- **How long.** Gone after the thread's 10 minutes with no exchange of its
+  scope; a scope still talking keeps it fresh. Any `forget` or
+  `forget_everything` asked, the thread's own forget, and a forget from the
+  app told by memory on `memory/forgot` (a person's, the room's or every
+  person's, read every half second off any turn's path,
+  `conversation_summary::memory_forgot`) drop the thread and every note, and
+  a note being made when one came is never kept.
+- **When it fails.** The model failing or taking too long, or giving an
+  empty note, is counted (`FAILED`, `EMPTY`) and journalled with sizes and
+  times only; the previous note stays, and the next turn is told it.
+
+It costs one DeepSeek call per batch, off the turn's path, and up to about
+6.5 KB more in a turn's prompt once a conversation has a note.
+
+### Talk notes: the note kept at a conversation's end
+
+With the same switch, a conversation's end (the memory writer's, after 45 s
+with no exchange or a change of scope) keeps its note in the lamp's memory
+as that conversation's **talk note** (`talk_note`, memory-days.md):
+
+- **What.** If the scope has a note, the exchanges of the conversation not
+  yet in it are folded in once more on the note's own thread (the model
+  failing keeps the note so far, counted), and the note leaves the worker's
+  memory for the store, in the conversation's own scope, the room's
+  included, linked to every exchange of the conversation and dated by the
+  last. A conversation too short to have a note keeps none: its exchanges
+  can be recalled themselves. Nothing is kept after a forget since the
+  conversation began, and nothing for a conversation every exchange of
+  which was forgotten, or one that overflowed the 64 sources or lost an
+  exchange. With `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on` a room conversation
+  keeps none: one nobody known was seen in keeps nothing
+  (`needs_face::observes`, reviewer-three's P1 on #4479).
+- **How long.** Until forgotten: it never expires.
+- **Never told unasked.** It is never in a session's note. A recall with
+  the switch on also asks for talk notes of the days it asks about, or by
+  its words, or the newest when it names no subject ("what did we talk
+  about earlier?", or no words at all): the asker's own (up to 6,400 bytes) marked theirs and told as
+  "your own summary of a talk with this person on that day, in your words,
+  not theirs", then the room's (up to 3,200 bytes, only when the recall asks
+  the room's scope at all, and not the day the asker forgot everything)
+  told as "the room's, never told as the asker's own"; both "never read it
+  out whole". An asker the lamp can't place asking about themself is still
+  told nothing (#4196), and another person's are never asked for.
+- **Forgetting.** "Forget everything about me" takes the person's. Any
+  forget that removes one of its exchanges takes it, a kept fact's forget
+  too, since its evidence goes, even after the exchanges expired (their ids
+  are kept, `origins` in memory-days.md); forgetting the note itself takes
+  its conversation; and room lines adopted by someone known take the room's
+  note of them.
+- **The observation pass.** It is given the note as `"summary"`, told it is
+  the lamp's own words, to cite only the records and never to propose a fact
+  only the summary supports. The voice also leaves out a proposal none of
+  whose words is in what the person said in the records it cites while one
+  is in the note, counted in the journal.
+
 ## What it keeps to itself
 
 By itself the thread lives in the provider worker's memory and nowhere
@@ -334,7 +459,10 @@ does not erase that talk when it comes back, and is told it:
   word did not say why the lamp forgot. The set-aside file is never told to
   a session and `forget` does not reach it, but its words stay in `/run`
   until the next reboot, where before the next turn wrote over them; the
-  reset removes it by its reboot (`/run` is memory), not by name.
+  reset removes it with the voice's whole `/run/lampos-voice`, not by name:
+  a product reset that starts setup in place empties that folder
+  (`reset::VOLATILE`, setup.md "The reset", #4500), and a reboot empties
+  `/run`.
 
 - Each exchange keeps its `whose` in the file, so one a person made on the
   second route comes back to the Live route as that person's. Who is at the
@@ -359,7 +487,7 @@ not run into what it read): that what was asked and answered is
 kept, in pieces as it arrives, and the talk around it is not, nor an answer
 with no word in it; that an exchange older than ten minutes is not told,
 something said long before an answer is not taken for its question, only
-eight exchanges of bounded length are held, and with less room the latest
+twelve exchanges of bounded length are held, and with less room the latest
 that fit are told in order; that a new session's instruction is the written
 one with the time and then the thread after it, with an empty thread and no
 time is the written one unchanged, and with no room for the thread still

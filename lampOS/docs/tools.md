@@ -235,10 +235,11 @@ advertisement, confirmation retirement, immutable asset checks and terminal
 cancellation. This does not extend autonomous three-second sound cues.
 
 **Many skills: `use_skill`** (#1668, `LAMP_USE_SKILL=on`, the worker's
-`--use-skill`; off unless set). A session may be given 32 functions; the
-voice's own and the executive's are 30 on a product lamp, so a third skill's
-function is cut without a word to the model: `declared` keeps only the room
-left. The setup line names what it cut (`; skills not given: show_verdict
+`--use-skill`; off unless set). A Live session may be given 32 functions,
+and on a product lamp the voice's own 21 and the executive's 17 are already
+past that (`crates/update/tests/functions.rs`; the product's chat route
+allows 48), so there a skill's function is cut without a word to the model:
+`declared` keeps only the room left. The setup line names what it cut (`; skills not given: show_verdict
 (past 32: LAMP_USE_SKILL=on reaches them)`, the reviewer on #1696). With
 the switch a session is given one function for every skill, `use_skill`,
 and none of the skills' own (`crate::use_skill`):
@@ -330,7 +331,8 @@ uncertainty; read current reminders first. The new exchange has a 1,250 ms
 Actions deadline across all hops and a 1,500 ms Voice deadline; ordinary tools
 keep their existing transport.
 
-`LAMP_SCHEDULE_SPEAK=on` is independent of tool declaration. It starts Voice's
+`LAMP_SCHEDULE_SPEAK=on` (or `skill`, as the product's unit sets it;
+`reminders::speaks`) is independent of tool declaration. It starts Voice's
 single optional delivery consumer, requiring an explicit persistent
 `LAMP_SCHEDULE_DELIVERY_DIR`. The due text is JSON-quoted reminder data in a
 fixed instruction. Every tool call on that autonomous request is denied before
@@ -409,8 +411,8 @@ remember ([memory.md](memory.md#what-a-person-teaches-and-corrects-813)):
 
 | Function | When the model calls it | What it is told |
 |---|---|---|
-| `keep_rule {rule, speaking_up?, about?, never?, not_before?, not_from?, not_while_talking?}` | The person corrects how it behaves or says how they want it to behave from now on, also in passing ("from now on…", "always…", "never…", "stop…", "don't call me…"), even when it has already begun to do so; never for a one-off request about the answer at hand. `speaking_up` is `never_first` or `not_first_in_mornings`, only for a rule about speaking first; `about` (`greeting`, `news`, `both`) with its limits (`not_before` / `not_from` as `HH:MM`) only for a rule about the greeting or news said unprompted (#813) | `{"kept_rule":true,"note":"Follow it from now on, ..."}`; a rule over 200 bytes or with no words is refused, and so is a limit without `about` or a time not `HH:MM`, and a seventh rule (`"kept_rule":false`, ask which to drop) |
-| `forget_rule {number}` | The person takes a rule back ("you can tell me the weather again", "forget that rule"). The number is required, as numbered in the session's rules or by `list_rules` | `{"forgotten":true}`; with no number or one that is not theirs nothing is removed, `false` with a note to call `list_rules` and ask which |
+| `keep_rule {rule, speaking_up?, about?, never?, not_before?, not_from?, not_while_talking?}` | The person corrects how it behaves or says how they want it to behave from now on, also in passing ("from now on…", "always…", "never…", "stop…", "don't call me…"), even when it has already begun to do so; never for a one-off request about the answer at hand. `speaking_up` is `never_first` or `not_first_in_mornings`, only for a rule about speaking first; `about` (`greeting`, `news`, `both`) with its limits (`not_before` / `not_from` as `HH:MM`) only for a rule about the greeting or news said unprompted (#813), or `light` with `never` only, for keeping the light on, a rule of the room's whoever says it (#1677) | `{"kept_rule":true,"note":"Follow it from now on, ..."}`; a rule over 200 bytes or with no words is refused, and so is a limit without `about` or a time not `HH:MM`, and a seventh rule (`"kept_rule":false`, ask which to drop) |
+| `forget_rule {number?, about?}` | The person takes a rule back ("you can tell me the weather again", "forget that rule"). It gives the number, as numbered in the session's rules or by `list_rules`, or `about: "light"` instead for "you can turn your light off again"; neither is required alone | `{"forgotten":true}`; with no number or one that is not theirs nothing is removed, `false` with a note to call `list_rules` and ask which |
 | `list_rules {}` | "What have I asked you not to do?", or to find a rule's number | `{"rules":[{"number":3,"rule":"...","when":"yesterday"}],"note":"The numbers are for forget_rule only: never say them."}`, or an empty list |
 
 Without the switch none of these is declared and a call of one of these
@@ -426,19 +428,24 @@ executive's and the skills' functions, so it is never the one cut past 32;
 a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
-(below), so a session is told two more than without it. A product lamp
-declares 31 without it (the voice's own 13, the actions part's 17 and
-Dance's) and 33 with it. At the bound a core skill's function is never the
-one cut (the owner's rule, on #2614; [install.md](install.md)), and
-neither is `reports_stop` nor any of the actions part's (the first
-builder, on #2644): the cut takes the second route's fetch, then its time
+(below), so a session is told two more than without it. The product's
+unit sets it: a product lamp's chat request offers 39 of the lamp's own
+functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
+voice's own 21 with these two among them, the actions part's 17 and Dance's
+`dance`. At the bound a core skill's function is never the one cut (the
+owner's rule, on #2614; [install.md](install.md)), and on the chat route
+neither is `reports_stop` nor any of the actions part's (the first builder,
+on #2644): the cut takes the second route's fetch, then its time
 elsewhere, then `reports_state` (reading reports' state is rare), then the
 skills' functions that are not a core skill's, the last first, then the
-search. A Live session's bound is 32 (`lamp_gemini::MAX_TOOLS`); the second
-route's chat requests have their own, 48 (`second_provider::MAX_TOOLS`,
-22 Oct: Live's bound had left out the time, the light scenes and the search
-on lamp-4ace). On the product's chat route nothing is left out; in a Live
-session `reports_state` alone, and `dance` stays in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
+weather, then the search (`chat_cut`). A Live session's bound is 32
+(`lamp_gemini::MAX_TOOLS`); the second route's chat requests have their
+own, 48 (`second_provider::MAX_TOOLS`, 22 Oct: Live's bound had left out
+the time, the light scenes and the search on lamp-4ace). On the product's
+chat route nothing is left out. In a Live session, a per-lamp drop-in, the
+voice's own come first and the actions part's catalog fills only the room
+left, so its last are left out, and the cut then takes `reports_state`;
+`reports_stop` and `dance` stay in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
 core skill, so it is a core name and never the one cut. Whatever is cut is
 said once, at start, on a plain journal line naming the bound (`past the
 bound of 32, left out: …` on Live, 48 on the chat route); only the lamp's own
@@ -556,8 +563,9 @@ time, from its opening note, and nothing said whose it was.
   yet timed on the lamp; the check below measures first audio with and
   without it.
 - **Beside `lamp-local-time`** (#820, #1380), which resolves zone names with
-  a zone database of its own: the voice reads the system's zone files and
-  works out a slim file's closing rule itself (`rule_offset`). Jarvis's 64
+  a zone database of its own: the voice reads the system's zone files, and
+  `lamp-local-time`'s `offset_seconds_in` works out a slim file's closing
+  rule (`local_time::offset_at`). Jarvis's 64
   moments across 2026's changes (London, New York, Sydney, Lord Howe,
   Kathmandu; fat and slim files) match Python's `zoneinfo`, but the two can
   differ where the system's zone data and the bundled one do. A later move
@@ -741,10 +749,11 @@ and made up what became of the work. Two causes, both mended:
   start_agent_task (1036 bytes described)`, `tools::admitted`; a name given
   twice and a function past 32 are left out the same way). A test holds
   every description under the limit for every combination of the switches
-  with one, two or three of the staff
+  with none, one, two, three or four of the staff (the fourth Devin)
   (`every_description_fits_the_service_whatever_the_switches`), and another
   every function of the voice's own with all its switches on. The lead-in
-  sentence is the shortest that says it (1,005 bytes with three of the staff).
+  sentence is the shortest that says it (1,005 bytes with three of the staff, and 1,014 with the staff's note,
+  `LAMP_STAFF_NOTE`, as `agent_tasks::CHOSE_NOTED` says).
 - The read-back and its question were asked for before the call. Now only
   the read-back is, as a statement, "then call it at once", and the
   question comes from the answer. The functions, their

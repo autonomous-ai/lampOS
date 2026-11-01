@@ -874,6 +874,7 @@ fn offline_reply(speech: bool) -> (Controller, Option<Reply>) {
         speech,
         back: false,
         service: false,
+        signed_out: false,
     });
     (owner, Some(current))
 }
@@ -897,6 +898,7 @@ fn back_online_is_its_own_recording_and_does_not_count_as_the_outages_line() {
         speech: true,
         back: true,
         service: false,
+        signed_out: false,
     });
     select_failure_notice_in(&catalog, &mut back, &None, &mut outage, &mut trace).unwrap();
     assert!(selected(&back, lamp_audio::notice::NoticeKind::BackOnline));
@@ -907,6 +909,7 @@ fn back_online_is_its_own_recording_and_does_not_count_as_the_outages_line() {
         speech: true,
         back: true,
         service: false,
+        signed_out: false,
     });
     select_failure_notice_in(
         &FailureNotices::synthetic(),
@@ -920,6 +923,110 @@ fn back_online_is_its_own_recording_and_does_not_count_as_the_outages_line() {
         silent.as_ref().unwrap().notice,
         NoticeDelivery::Skipped(_)
     ));
+}
+
+/// #4473 (c): with the owner's language not English, the offline, service
+/// and back-online lines are said from the speech cache in that language
+/// when it keeps them, and the release's English recording when it does
+/// not. No notices kind is added: the cached line is recorded under the
+/// release's own kind, named as the cache's.
+#[test]
+fn offline_lines_are_said_in_the_owners_language_when_kept_and_english_otherwise() {
+    use crate::language::{self, Language};
+    use lamp_audio::notice::NoticeKind;
+    let dir = std::env::temp_dir().join(format!("lamp-notice-owners-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let cache = || {
+        crate::say::tts_cache::TtsCache::new(
+            &dir,
+            "Shizuka",
+            language::SPEECH_MODEL,
+            "ja",
+            Box::new(|text: &str| Ok(vec![text.chars().count() as i16; 2_400])),
+        )
+        .speaking(Some(Language::Japanese))
+    };
+    let said = |catalog: &FailureNotices, back: bool, service: bool| {
+        let (_owner, mut reply) = offline_reply(true);
+        reply.as_mut().unwrap().local_only = Some(notices::LocalOnly {
+            speech: true,
+            back,
+            service,
+            signed_out: false,
+        });
+        let mut trace = SessionState::default();
+        select_failure_notice_in(
+            catalog,
+            &mut reply,
+            &None,
+            &mut Outage::default(),
+            &mut trace,
+        )
+        .unwrap();
+        let Some(Reply {
+            notice: NoticeDelivery::Selected { .. },
+            ..
+        }) = reply.as_ref()
+        else {
+            panic!("a line is chosen");
+        };
+        reply
+    };
+    let first_sample = |reply: &Option<Reply>| match &reply.as_ref().unwrap().notice {
+        NoticeDelivery::Selected { recording, .. } => recording.first_sample(),
+        _ => unreachable!(),
+    };
+    // Not kept yet: the English recordings, as an English lamp has them.
+    let english = FailureNotices::synthetic_offline().with_owners(cache());
+    assert_eq!(first_sample(&said(&english, false, false)), 123);
+    assert_eq!(first_sample(&said(&english, true, false)), 77);
+    assert_eq!(first_sample(&said(&english, false, true)), 55);
+    // Kept: the owner's words, under the release's kinds.
+    let warmed = cache();
+    warmed.warm(&warmed.warm_lines()).unwrap();
+    let owners = FailureNotices::synthetic_offline().with_owners(warmed);
+    for (back, service, kind, english) in [
+        (
+            false,
+            false,
+            NoticeKind::ProviderUnavailable,
+            language::PROVIDER_UNAVAILABLE,
+        ),
+        (true, false, NoticeKind::BackOnline, language::BACK_ONLINE),
+        (
+            false,
+            true,
+            NoticeKind::VoiceServiceUnreachable,
+            language::VOICE_SERVICE_UNREACHABLE,
+        ),
+    ] {
+        let reply = said(&owners, back, service);
+        assert!(selected(&reply, kind), "{kind:?}");
+        let words = Language::Japanese.fixed(english).unwrap();
+        assert_eq!(first_sample(&reply), words.chars().count() as i16);
+        let evidence = reply.as_ref().unwrap().notice.evidence();
+        assert!(
+            evidence["wav_sha256"]
+                .as_str()
+                .unwrap()
+                .starts_with("speech-cache:"),
+            "{evidence}"
+        );
+    }
+    // A failed turn (turn_lost) has no words of its own: the release's.
+    let (_owner, mut lost) = offline_reply(true);
+    lost.as_mut().unwrap().local_only = None;
+    select_failure_notice_in(
+        &owners,
+        &mut lost,
+        &None,
+        &mut Outage::default(),
+        &mut SessionState::default(),
+    )
+    .unwrap();
+    assert!(selected(&lost, NoticeKind::TurnLost));
+    assert_eq!(first_sample(&lost), 321);
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// The speaker has taken the turn's first block: its playback has begun.
@@ -1190,4 +1297,109 @@ fn the_service_line_is_said_once_and_is_not_the_internets() {
         silent.as_ref().unwrap().notice,
         NoticeDelivery::Skipped(_)
     ));
+}
+
+fn signed_out_turn(speech: bool, back: bool) -> (Controller, Option<Reply>) {
+    let (owner, mut reply) = offline_reply(speech);
+    reply.as_mut().unwrap().local_only = Some(notices::LocalOnly {
+        speech,
+        back,
+        service: true,
+        signed_out: true,
+    });
+    (owner, reply)
+}
+
+/// Heard speech gets the signed-out line every time, whatever an outage has
+/// said; a sound gets nothing; and the line is no outage's line, so no "back
+/// online" follows it.
+#[test]
+fn signed_out_says_its_own_line_for_speech_every_time_and_is_no_outages_line() {
+    use lamp_audio::notice::NoticeKind;
+    let catalog = FailureNotices::synthetic_offline();
+    let mut trace = SessionState::default();
+    let mut outage = Outage {
+        said: true,
+        service: false,
+    };
+    for _ in 0..3 {
+        let (_owner, mut reply) = signed_out_turn(true, false);
+        select_failure_notice_in(&catalog, &mut reply, &None, &mut outage, &mut trace).unwrap();
+        let NoticeDelivery::Selected { recording, .. } = &reply.as_ref().unwrap().notice else {
+            panic!("speech while signed out gets the line");
+        };
+        assert_eq!(recording.kind(), Some(NoticeKind::SignedOut));
+    }
+    let (_owner, mut cough) = signed_out_turn(false, false);
+    select_failure_notice_in(&catalog, &mut cough, &None, &mut outage, &mut trace).unwrap();
+    assert!(matches!(
+        cough.as_ref().unwrap().notice,
+        NoticeDelivery::Unselected
+    ));
+    let mut fresh = Outage::default();
+    let (_owner, mut line) = signed_out_turn(true, false);
+    select_failure_notice_in(&catalog, &mut line, &None, &mut fresh, &mut trace).unwrap();
+    if let NoticeDelivery::Selected { retired_at_us, .. } = &mut line.as_mut().unwrap().notice {
+        *retired_at_us = Some(1);
+    }
+    fresh.note_delivery(&line);
+    assert!(!fresh.said);
+}
+
+/// With no recording, a person who spoke gets the sigh; the lamp's own
+/// unasked turn stays silent and lets the line go, so it isn't tried forever.
+#[test]
+fn a_missing_signed_out_line_is_sighed_for_a_person_and_let_go_unasked() {
+    let catalog = FailureNotices::missing_with_sigh();
+    let mut trace = SessionState::default();
+    let mut outage = Outage::default();
+    let (_owner, mut heard) = signed_out_turn(true, false);
+    select_failure_notice_in(&catalog, &mut heard, &None, &mut outage, &mut trace).unwrap();
+    assert!(matches!(
+        heard.as_ref().unwrap().notice,
+        NoticeDelivery::Selected { .. }
+    ));
+    let (_owner, mut own) = signed_out_turn(true, true);
+    select_failure_notice_in(&catalog, &mut own, &None, &mut outage, &mut trace).unwrap();
+    assert!(matches!(
+        own.as_ref().unwrap().notice,
+        NoticeDelivery::Skipped(_)
+    ));
+    let mut state = super::super::signed_out::SignedOut::default();
+    state.take(
+        Some(lamp_msgs::AccountState {
+            signed_out: true,
+            for_s: 0,
+        }),
+        0,
+    );
+    assert!(state.owed());
+    state.note_delivery(&own, 1);
+    assert!(!state.owed());
+}
+
+/// Chosen but not yet played, as a Stop would leave it: still owed. Played:
+/// not owed again this spell.
+#[test]
+fn the_signed_out_line_counts_as_said_only_once_it_played() {
+    let catalog = FailureNotices::synthetic_offline();
+    let mut trace = SessionState::default();
+    let mut outage = Outage::default();
+    let mut state = super::super::signed_out::SignedOut::default();
+    state.take(
+        Some(lamp_msgs::AccountState {
+            signed_out: true,
+            for_s: 0,
+        }),
+        0,
+    );
+    let (_owner, mut own) = signed_out_turn(true, true);
+    select_failure_notice_in(&catalog, &mut own, &None, &mut outage, &mut trace).unwrap();
+    state.note_delivery(&own, 1);
+    assert!(state.owed());
+    if let NoticeDelivery::Selected { retired_at_us, .. } = &mut own.as_mut().unwrap().notice {
+        *retired_at_us = Some(1);
+    }
+    state.note_delivery(&own, 1);
+    assert!(!state.owed());
 }

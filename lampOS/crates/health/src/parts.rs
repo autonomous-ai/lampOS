@@ -1559,6 +1559,28 @@ mod tests {
         assert_eq!(parts.reports().len(), MOST_PARTS);
     }
 
+    /// The body's last report when it stops on a fault says `state` =
+    /// `stopping` as well as why, at `error`: it is kept, so an expected body
+    /// that stopped too warm is that error once quiet, never missing.
+    #[test]
+    fn a_body_stopped_on_a_fault_is_kept_at_its_error_not_forgotten() {
+        let now = Instant::now() + Duration::from_secs(3_600);
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "body", ""), now - ms(20_000));
+        let fault = report(Level::Error, "body", "stopped: elbow is too warm")
+            .with(Diagnostic::STATE, Diagnostic::STOPPING);
+        assert_eq!(parts.take(&fault, now - ms(9_500)), Taken::Kept);
+        let lamp = health(parts.reports(), now, &["body".to_owned()], STALE);
+        assert!(lamp.missing.is_empty());
+        let body = lamp.items.iter().find(|item| item.name == "body").unwrap();
+        assert_eq!(body.level, Level::Error);
+        assert_eq!(
+            body.message,
+            "stopped: elbow is too warm; not heard from for 9 s"
+        );
+        assert_eq!(lamp.level, Level::Error);
+    }
+
     /// #2415's P3: a part that goes quiet without saying `stopping` (a
     /// crash) still counts in `quiet_ms`; and a part that said `stopping`
     /// and then says it is well again is tracked again, quiet and all.

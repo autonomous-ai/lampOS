@@ -80,7 +80,6 @@ LAMP_CONTROL_REFUSES = {
     "look": "the body's lease socket is not on here",
     "joints": "not routed yet: waits for a goal stream on the body's lease socket",
     "play": "not routed yet: waits for client packages",
-    "sound": "not routed yet: waits for client packages",
 }
 
 
@@ -115,6 +114,18 @@ PATTERN_LEAST_LEVEL = {
 # The ring plays one pulse a minute for one asker, and shows a second steady,
 # without its pulse (lamp_msgs' PULSE_GAP_US): the door has answered by then.
 PULSE_GAP_S = 60.0
+
+# Hello's `limits`, as lamp-control says them with its rates off (session.rs
+# `limits`): no rate but its two guards, refused actions and phrase changes.
+LIMITS = {
+    "rates": "off",
+    "refused": [{"most": 20, "within_ms": 1_000}],
+    "phrases": [{"most": 6, "within_ms": 60_000}],
+    "hold_max_ms": 30_000,
+    "take_max_ms": 600_000,
+    "say_max_chars": 300,
+    "quiet_hours": {"from": "22:00", "to": "07:00"},
+}
 
 # How a synthetic hand moves (`hand_track`): across the picture and back
 # (`wave`), round in a circle, left to right once, or held still.
@@ -233,7 +244,8 @@ def _frames(frames: Any) -> bool:
 
 
 def _now() -> str:
-    return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    # As lamp-control stamps it (server.rs `rfc3339_utc`): UTC, to the second, ending `Z`.
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class FakeLamp:
@@ -510,7 +522,7 @@ class FakeLamp:
             await self._refuse(ws, request["id"], "unpaired", "not paired, or a bad signature")
             await ws.close()
             return None
-        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits={"joints_hz": 40})
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=LIMITS)
         return request["client"]
 
     # The grant each event and state needs, as lamp-control's own (#3736).
@@ -645,8 +657,9 @@ class FakeLamp:
             if self.auto_done:
                 at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
                 await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
-        elif op == "say":
-            # As lamp-control: the voice takes it, and its `done` follows.
+        elif op in ("say", "sound"):
+            # As lamp-control: the voice takes it (a sound is its hum), and
+            # its `done` follows.
             await self._ok(ws, id_, to="voice")
             if self.auto_done:
                 await self.done(id_)

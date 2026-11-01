@@ -101,6 +101,7 @@ fn the_log_is_asked_again_of_each_model_and_nothing_heard_is_printed() {
         lamp_last_said: Some("Canberra.".into()),
         seconds_since_lamp_spoke: Some(12.0),
         name_heard: Some(0.97),
+        like_asker: None,
     };
     let talk = Context {
         heard: "Voglio mangiare sushi.".into(),
@@ -109,6 +110,7 @@ fn the_log_is_asked_again_of_each_model_and_nothing_heard_is_printed() {
         lamp_last_said: None,
         seconds_since_lamp_spoke: None,
         name_heard: None,
+        like_asker: None,
     };
     let line = |at: u64, context: &Context, choice: &str| {
         json!({"at_unix_ms": at, "about": "attention", "shadow": true, "context": context,
@@ -251,6 +253,7 @@ fn an_earlier_run_is_fitted_again_to_each_models_answers() {
             lamp_last_said: None,
             seconds_since_lamp_spoke: None,
             name_heard: None,
+            like_asker: None,
         };
         let yes = if call { 0.9 } else { 0.1 };
         let new = Replayed::Chose {

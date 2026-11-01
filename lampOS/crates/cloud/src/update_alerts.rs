@@ -58,12 +58,13 @@ pub const FILE: &str = "update-alerts.json";
 /// round said, or `models`. A name not in this list is not told.
 pub const REASONS: &[&str] = &UpdateResult::REASONS;
 
-/// Where the alert goes: the backend's base as the account has it, with
-/// `/alert` after it. Unlike the ping, a trailing `/v1` stays: the alert
-/// lives beside the OpenAI-compatible routes. `None` without a base.
+/// Where the alert goes: `/v1/alert` under the backend's base, whether the
+/// account's base ends in `/v1` or not (a setup's account has it without).
+/// `None` without a base.
 pub fn url(account: &Account) -> Option<String> {
     let base = account.llm_base_url.trim().trim_end_matches('/');
-    (!base.is_empty()).then(|| format!("{base}/alert"))
+    let base = base.strip_suffix("/v1").unwrap_or(base);
+    (!base.is_empty()).then(|| format!("{base}/v1/alert"))
 }
 
 /// One stage of a round.
@@ -366,30 +367,9 @@ impl Watcher {
         };
         let mut told = told;
         let mut alerts = Vec::new();
-        if status.now != "idle" {
-            // `checking` opens every round, most of which find nothing to
-            // do: a round is started when it goes on to fetch.
-            if status.now != "checking" && !(told.started && told.started_after == current) {
-                told.started = true;
-                told.started_after = current;
-                told.from = status
-                    .running
-                    .as_ref()
-                    .map(|build| Version::running(build).0);
-                // The start is still kept, but not told, while the same end
-                // repeats: its end would not be told either.
-                if told.repeating.is_none() {
-                    alerts.push(Alert {
-                        stage: Stage::Started,
-                        from: told.from.as_deref().and_then(Version::kept),
-                        to: None,
-                        code: None,
-                        took_s: None,
-                        at_s: now_ms / 1000,
-                    });
-                }
-            }
-        } else if told.ended != current {
+        // An end is told when it is first seen, idle or not: a confirmed new
+        // lamp-update can begin its next round before it is ever idle.
+        if told.ended != current {
             // The end before this one names the round, if its start was told.
             let began = told.started && told.started_after == told.ended;
             told.ended = current.clone();
@@ -426,6 +406,30 @@ impl Watcher {
                             .and_then(|began| result.at_unix_ms.checked_sub(began))
                             .map(|ms| ms / 1000)
                             .filter(|seconds| *seconds <= LONGEST_TOOK_S),
+                        at_s: now_ms / 1000,
+                    });
+                }
+            }
+        }
+        if status.now != "idle" {
+            // `checking` opens every round, most of which find nothing to
+            // do: a round is started when it goes on to fetch.
+            if status.now != "checking" && !(told.started && told.started_after == current) {
+                told.started = true;
+                told.started_after = current;
+                told.from = status
+                    .running
+                    .as_ref()
+                    .map(|build| Version::running(build).0);
+                // The start is still kept, but not told, while the same end
+                // repeats: its end would not be told either.
+                if told.repeating.is_none() {
+                    alerts.push(Alert {
+                        stage: Stage::Started,
+                        from: told.from.as_deref().and_then(Version::kept),
+                        to: None,
+                        code: None,
+                        took_s: None,
                         at_s: now_ms / 1000,
                     });
                 }
@@ -648,7 +652,7 @@ mod tests {
     }
 
     #[test]
-    fn the_url_is_the_base_with_alert_after_it_and_its_v1_kept() {
+    fn the_url_is_v1_alert_under_the_base_with_or_without_its_v1() {
         let account = |base: &str| Account {
             device_id: "d-42".into(),
             llm_base_url: base.into(),
@@ -659,10 +663,40 @@ mod tests {
             Some("https://api.test/v1/alert")
         );
         assert_eq!(
+            url(&account("https://api.test/api/v1/ai")).as_deref(),
+            Some("https://api.test/api/v1/ai/v1/alert")
+        );
+        assert_eq!(
             url(&account("https://api.test")).as_deref(),
-            Some("https://api.test/alert")
+            Some("https://api.test/v1/alert")
         );
         assert_eq!(url(&account(" ")), None);
+    }
+
+    #[test]
+    fn a_climbs_confirmation_is_told_when_the_next_round_is_already_going() {
+        let mut watcher = Watcher::new(None);
+        let mut stages = |now: &str, last: Last| {
+            watcher
+                .observe(&status(now, 8899, last), &none(), T0)
+                .iter()
+                .map(|alert| alert.stage)
+                .collect::<Vec<_>>()
+        };
+        let climbed = Some(("self-switched", Some(8999), T0 + 1_000));
+        let confirmed = Some(("self-confirmed", Some(8999), T0 + 2_000));
+        assert!(stages("idle", None).is_empty());
+        assert!(stages("checking", None).is_empty());
+        assert_eq!(stages("idle", climbed), [Stage::SelfSwitched]);
+        assert_eq!(
+            stages("fetching", confirmed),
+            [Stage::SelfConfirmed, Stage::Started]
+        );
+        assert!(stages("switching", confirmed).is_empty());
+        assert_eq!(
+            stages("idle", Some(("switched", Some(8999), T0 + 3_000))),
+            [Stage::Done]
+        );
     }
 
     #[test]
@@ -1017,6 +1051,28 @@ mod tests {
         let odd = Some(("Alice said s3cret", None, T0 + 510_000));
         let told = watcher.observe(&status("idle", 3310, odd), &none(), T0 + 511_000);
         assert_eq!(told[0].code, Some("other"));
+    }
+
+    /// #4490's P3: a round that found lamp-update's lock taken (a settings
+    /// change restarting a part under it) ends `not-quiet` before any phase,
+    /// so no start was told and nothing is alerted. Ended `failed`, as it
+    /// was before, it was told as a failed update.
+    #[test]
+    fn a_round_refused_by_the_lock_alerts_nothing() {
+        let dir = folder("locked");
+        let mut watcher = Watcher::new(Some(dir.join(FILE)));
+        let old = Some(("up-to-date", Some(8599), T0 - 1));
+        watcher.observe(&status("idle", 8599, old), &none(), T0);
+        let locked = Some(("not-quiet", None, T0 + 10_000));
+        let told = watcher.observe(&status("idle", 8599, locked), &none(), T0 + 11_000);
+        assert!(told.is_empty(), "{told:?}");
+        let failed = Some(("failed", None, T0 + 20_000));
+        let told = watcher.observe(&status("idle", 8599, failed), &none(), T0 + 21_000);
+        assert_eq!(
+            told.into_iter().map(|a| a.stage).collect::<Vec<_>>(),
+            [Stage::Failed]
+        );
+        let _ = fs::remove_dir_all(dir);
     }
 
     /// A lamp that keeps refusing, or is talked to through every update

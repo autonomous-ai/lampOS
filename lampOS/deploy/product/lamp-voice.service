@@ -148,6 +148,9 @@ Environment=LAMP_NAME_SECOND_SIGN=on
 # A hearing of the name inside one line's sound stays with that line: on lamp-4ace on 26 Oct (6919) a hearing in
 # "Can you pass me the charger? The white one." counted for the desk line begun 0.7 s after it, which was answered.
 Environment=LAMP_NAME_STAYS_IN_ITS_LINE=on
+# The conversation's windows measured to when a line began (#4594): on lamp-4ace on 31 Oct (9063) off then on, talk
+# answered 41/43 against 42/43 and desk lines left alone 0/4 against 2/4 (the first builder on #4604).
+Environment=LAMP_WINDOW_FROM_START=on
 # The line's end: a 0.5 s line is a line, a short one gets the end-of-turn model's verdict, an unsure one waits.
 Environment=LAMP_ENDPOINT_LEAST_SPEECH_MS=500
 Environment=LAMP_ENDPOINT_SHORT_VERDICT=on
@@ -163,6 +166,10 @@ Environment=LAMP_CUT_IN_TOLD=on
 # "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985).
 Environment=LAMP_SPOKEN_STOP_ENDS=on
 Environment=LAMP_SECOND_SAID_ONCE=on
+# A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
+# English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
+# against 2.95-3.27 s, a real light change 1.82-1.89 s, nothing said twice (the first builder on #4710, 17:35).
+Environment=LAMP_SECOND_SAY_WITH_CALL=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by
@@ -175,6 +182,9 @@ Environment=LAMP_SECOND_WEATHER=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
 Environment=LAMP_SECOND_CHAT_KEPT=on
+# The model service refusing every turn (#4265; lamp-52e6 30 Oct, the lead's call on #1711): said once and held,
+# a line sent each minute to find it back; a skill's fixed words are said meanwhile, a note the model words waits.
+Environment=LAMP_SECOND_REFUSED_HOLD=on
 Environment=LAMP_VOICE_LINK=on
 # The eyes' camera permitted with the microphone, without which every turn is the room's (#2233): per-person memory on
 # a product lamp. Run on lamp-52e6 on 21 Oct (#2402). A name told before the lamp knows the face is the room's
@@ -229,6 +239,7 @@ Environment=LAMP_RING_ASLEEP=on
 # a person's try on lamp-52e6: a tap, a hold, and sleep and wake (#1798).
 Environment=LAMP_HEAD_TOUCH=on
 Environment=LAMP_RESTORED_MUTE=on
+# LAMP_SHUTDOWN stays off until the button's check on a product lamp (#3697); the first builder, 31 Oct.
 # A run that fails before its capture gave any audio, with no control input in flight, leaves the lamp as its person
 # left it, and a fault after the stop's signal is the stop's (#1567). On for #4332: a busy first boot (a privacy
 # connection refused, a capture message late) ended the voice before it heard anything, and the guard then muted a
@@ -278,6 +289,11 @@ Environment=LAMP_TASKS_NEEDS=/usr/local/bin/harness
 # words and tells each task once, with the skill's ask, or itself when no ask has come within 10 s (#1038).
 # The skill takes news of a task that stopped or asks something too (#1722).
 Environment=LAMP_TASK_NEWS=skill
+# A skill made for the person (#1685, #2813, fourteen-P15): asked aloud or typed in the app's "Make a skill",
+# made on their computer through the tasks part, and put on only by a spoken yes at the lamp (the lead's
+# ruling on #1711). The app's button shows only while the tasks part has a computer (app_make's `ready`).
+Environment=LAMP_MAKE_SKILL=on
+Environment=LAMP_APP_MAKE_SKILL=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
@@ -300,6 +316,38 @@ Environment=LAMP_SCHEDULE_ASKED=on
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
 Environment=LAMP_PERSON_SCOPE_SEEN=on
+# But with exactly one face in view through a line, their own known face, and no other voice heard since the
+# conversation began, its keep is theirs though no face was seen speaking it (the launch testers' item 1 on #3997:
+# on lamp-220c the owner's face was in 17 looks, read speaking in none, and their own memory stayed empty). Only the
+# keep: recall, hits, their note and context stay the room's, since a guest off camera talking while they sit silent
+# looks the same (reviewer-three's P1 on #4584); reads need their face seen speaking or a carried conversation. It
+# does not wait on the same-voice check, so a keep can hold words said out of view. A second face, another voice or
+# no face in view, and it is as above; a held forget's yes still needs their face seen saying it.
+Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
+# But within a conversation going on, a line of theirs no face was seen speaking (or one with nobody named), with no
+# other face in view and no 45 s quiet since their last exchange, stays in that conversation (#4339, lamp-3e83: one such line dropped to the
+# room's, the chat lost the talk and asked its question again), when their face was in view through it or within
+# 5 s before it began (an empty view from the start, or the face gone longer, is the room's: the lamp-memory
+# owner's decision on #4479). It is told from the conversation as it stood (its thread and running summary), never
+# from memory's reads, keeps, forgets or a yes, and never summarised or kept in a talk note.
+Environment=LAMP_CONVERSATION_CARRIES=on
+# And such a carried line's keep waits for that person's yes (#4339, approved by the memory's owner on 30 Oct; the
+# first builder's call on #4508): its remember is held in RAM, never journalled, the lamp asks "Want me to keep that
+# for you?", and only their plain yes with their own face seen saying it writes it in their scope; anything else drops
+# it. Still no recall, note or hits on it, no forget and no yes, never another person's scope, and a line held only by
+# a face's gap holds nothing.
+Environment=LAMP_CONVERSATION_CARRIED_SAVES=on
+# And a silent face doesn't count (#4339, lamp-3e83 on 30 Oct: the known face in all 30 looks of a line, none with it
+# alone, so 4 lines carried while one conversation split in two): with no other face seen speaking a line and no other
+# voice in the conversation (the rule's sign of another person, kept for the cut words' join), other faces in view
+# no longer keep it the room's; a second face seen speaking, or another voice, still does. Accepted risk, approved by
+# the memory's owner on 30 Oct: a silent guest sitting by hears the person's thread on a carried line.
+Environment=LAMP_CONVERSATION_CARRIES_PAST_SILENT=on
+# And a person's turn is also told the room's lines of the same conversation (#4339: a search answered in the room's
+# thread was unknown to their next turn), marked as said in the room, within the chat's 12 exchanges and 10 minutes
+# and the conversation's 45 s chain. Room to person only: a room's or unplaced turn is never told a person's, and
+# another person's never; never into a person's running summary or talk note; gone at any forget.
+Environment=LAMP_CONVERSATION_ROOM_LINES_TOLD=on
 # The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things
 # worth keeping, each checked by the store and linked to the words it came from (OBSERVE); a dated one keeps its
 # day (EVENTS); the next session with that person asks after one open thread, once, at most one a day (THREADS);
@@ -314,6 +362,17 @@ Environment=LAMP_MEMORY_FORGET_ALL=on
 # pass above saw nothing more until the voice restarted (lamp-06c1, 27 Oct, Friday's N13 on #3504). The next
 # session opened fresh, with no resumption, starts the journal again and so the next conversation's pass.
 Environment=LAMP_MEMORY_JOURNAL_RESUMES=on
+# A long conversation's exchanges about to leave the chat's view are folded, after the reply and off its path, by
+# the same DeepSeek model into a RAM-only running note per person or room: what is going on first (a game's rules,
+# where it stands, the score), then the facts said; told to that scope's next turns as background never read out,
+# gone at any forget (by voice or from the app) or after 10 quiet minutes. And each conversation's note is kept on
+# disk, in the lamp's memory, as its talk note, in its own scope: never expired, kept until forgotten (a forget of
+# the person, of everything, or of its source exchanges or a fact from them), found only by a recall; the room's
+# can be found by anyone in the room, an unplaced voice included; a room conversation keeps none under
+# LAMP_MEMORY_PERSONAL_NEEDS_FACE, and a held or carried line is never summarised (the lamp-memory owner's decisions
+# on #4479). On lamp-06c1 on 29 Oct, without it, 11 exchanges after a quiz's rules the lamp said there was no quiz
+# (#1693's long-conversation plan, step 3).
+Environment=LAMP_CONVERSATION_SUMMARY=on
 # A thing the person already keeps, said again, is that kept thing, not a second one: on lamp-06c1 on 28 Oct
 # (build 8163, the product unit) "remember the meeting room is called orange" said again kept it twice (Friday's
 # run on #3504). A correction (`replaces`) always writes, and the room's scope is told as a first keep (#2176).
@@ -334,12 +393,15 @@ Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
-# The name typed at setup (lamp-setup writes it; a reset wipes it), told to the model with its character
-# so Welcome back can greet by it when no face is known (docs/setup.md, #806). No file, no name.
+# The name typed at setup (lamp-setup writes it; a reset and the owner's own "forget everything" wipe it,
+# #4461), told to the model (docs/setup.md, #806). No file, no name.
 Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name
 # The owner's language (#4473), read at each start: en, vi, ja, zh or ko. No file, empty, en or unknown is English,
 # as before (docs/second-voice.md, "The owner's language").
 Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
+# Never in the character: told only to the owner's own known face alone in view, and by default below
+# (LAMP_PERSON_NAME_OWNER_ONLY, #2602, the first builder's piece 2 on #1711; #4461).
+Environment=LAMP_PERSON_NAME_OWNER_ONLY=on
 # A reply is told the person speaking is most likely the one who set the lamp up, unless someone else is
 # seen or heard now; the reply only, nothing personal kept on it (LAMP_PERSON_NAME_BY_DEFAULT, #3884).
 Environment=LAMP_PERSON_NAME_BY_DEFAULT=on

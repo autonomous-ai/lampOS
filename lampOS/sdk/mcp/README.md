@@ -2,8 +2,8 @@
 
 One paired lampOS lamp as MCP tools, for an agent on your own computer: Claude
 Code, Claude Desktop, or any MCP client. It runs on your computer, never on the
-lamp, and reaches the lamp only through the [`lampos`](../python) SDK and the
-pairing `lamp pair` made. The protocol is [docs/control.md](../../docs/control.md).
+lamp, and reaches the lamp only through the [`lampos`](https://github.com/autonomous-ai/lampOS/tree/lamp-voice/lampOS/sdk/python) SDK and the
+pairing `lamp pair` made. The protocol is [docs/control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md).
 
 ```sh
 pip install ./sdk/python ./sdk/mcp
@@ -39,11 +39,21 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | `lamp_follow_stop` | none | | ends a running `lamp_follow_hand`, or one still starting as soon as it has started; "not following" when none runs | | body, look (listed with `lamp_follow_hand`) | lets go of its lease |
 | `lamp_move` | `step_ms` | integer, required | 20 to 1000 | — | body | yes, 10 s |
 | | `frames` | list of lists of integers, required | each 5 joint offsets in counts (pitch, roll, yaw, shoulder, elbow), the first and last all 0; the body checks it | — | | |
+| `lamp_play` | `name` | string, required | a recorded move's name: lowercase letters, digits, `-` and `_`, 40 at most; a lamp that doesn't route `play` yet refuses it | — | body | yes, 10 s |
+| `lamp_joints` | `within_ms` | integer | up to 5000: how soon the joints get there | 1000 | body | yes, 10 s, named in the request |
+| | `pitch` | number | degrees, −180 to 180; at least one of the five | none | | |
+| | `roll` | number | degrees, −180 to 180 | none | | |
+| | `yaw` | number | degrees, −180 to 180 | none | | |
+| | `shoulder` | number | degrees, −180 to 180 | none | | |
+| | `elbow` | number | degrees, −180 to 180 | none | | |
 | `lamp_light` | `colour` | string, required | `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm` | — | light | no |
 | | `level` | integer | 1 to 5 | 3 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
 | `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
+| `lamp_sound` | `name` | string, required | a sound's name: lowercase letters, digits, `-` and `_`, 40 at most; `hum`, the lamp's own short hum, is the only one in this release; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
+| `lamp_events` | `since` | integer | a `seq` from an earlier answer; 0 for every event kept (the last 200) | 0 | the event's (`person.*` and `hand` look, `name.heard` hear, `sound.heard` sound; `touch`, `button`, `lamp.changed` none) | no |
+| | `wait_s` | number | 0 to 120: with nothing after `since`, how long to wait for the next | 0 | | |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |
 
 **An argument a tool doesn't take is refused**, never read past. Each
@@ -55,11 +65,15 @@ needs is refused the same way, `bad_request: lamp_light needs colour`, never
 in the validator's words. `serverInfo.version` is lamp-mcp's own.
 
 `joints` is left out: a 20 Hz stream isn't something an agent drives turn by
-turn. `play` and `sound` need a skill package.
+turn. `play` needs a skill package; `sound` takes only `hum` in this release.
 
-**Leases** are taken for you: `lamp_look` and `lamp_move` take a 10 s body lease,
-never renewed. It is let go at the action's `done`, or left to lapse if `done`
-doesn't come. A lease another computer holds, or one the lamp suspends because
+**Leases** are taken for you: a body tool (`lamp_look`, `lamp_move`,
+`lamp_play`, `lamp_joints`) takes a 10 s body lease, or renews the one this
+server still holds, so tools called one after another aren't refused `busy`.
+It is let go at the action's `done`, or left to lapse 10 s after the last body
+tool if `done` doesn't come: while an agent keeps calling body tools, the
+lamp's own life (its rest glance, its feelings' small moves) stands back, and
+it comes back about 10 s after the agent goes idle. A lease another computer holds, or one the lamp suspends because
 someone is talking to it, comes back as the tool's error, never retried.
 
 **Refusals** come back as the tool's error, with the lamp's code and words:
@@ -81,6 +95,7 @@ All JSON, read when asked; none takes a parameter.
 | `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
 | `lamp://lease` | the leases this server holds now | none |
 | `lamp://events/recent` | the last 50 events `lamp_wait_for` heard, newest last; never a transcript: `phrase.heard` says only which registered phrase it was | none |
+| `lamp://events` | the events stream: every event the grants let this computer hear but `phrase.heard`, the last 200, newest last, each with its `seq`, and `latest`. Subscribable: a subscribed client gets `notifications/resources/updated` for each new event, and for `lamp://state/presence` or `lamp://state/lamp` when one changes it | none (each event needs its own grant) |
 
 ## Tests
 

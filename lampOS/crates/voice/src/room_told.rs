@@ -116,6 +116,9 @@ const BUSY_ENDS_UNANSWERED_US: u64 = 60_000_000;
 /// thinking aloud between their questions. One line held as another voice
 /// counts as this many ([`RoomTold::another_voice_held`]).
 pub const TALK_ENDS_CONVERSATION: usize = 2;
+/// How many requests held by the lamp's own rule are kept until they are
+/// closed ([`RoomTold::held`]).
+const HELD_KEPT: usize = 8;
 /// The room is told only when nothing has been heard or said for this
 /// long: a fact written into a request would be taken for part of it, and
 /// one offered while an answer is owed is dropped. Longer than the four
@@ -157,7 +160,9 @@ pub struct RoomTold {
     /// whose answer the lamp's own rule held, until it is closed, and when
     /// the last thing that counts as talk was left unanswered.
     talk_only: bool,
-    held: Option<u64>,
+    /// Every such request not yet closed, the latest [`HELD_KEPT`]: two
+    /// held lines judged before either is closed are both no talk (#4175).
+    held: VecDeque<u64>,
     last_talk_us: Option<u64>,
     /// The request whose line the Policy held as not the lamp's in a
     /// conversation going on (`LAMP_GOING_ON_ASKS`), until it is closed: it
@@ -223,7 +228,7 @@ impl RoomTold {
             unanswered: VecDeque::new(),
             sound: None,
             talk_only: false,
-            held: None,
+            held: VecDeque::new(),
             last_talk_us: None,
             held_by_policy: None,
             talk_since_spoke: 0,
@@ -406,8 +411,11 @@ impl RoomTold {
     /// The lamp's own rule held the answer to `request`. With
     /// [`Self::count_only_talk`], it is not talk when it is closed.
     pub fn held(&mut self, request: u64) {
-        if self.talk_only {
-            self.held = Some(request);
+        if self.talk_only && !self.held.contains(&request) {
+            if self.held.len() == HELD_KEPT {
+                self.held.pop_front();
+            }
+            self.held.push_back(request);
         }
     }
 
@@ -675,8 +683,8 @@ impl RoomTold {
             self.sound = None;
             return Left::Sound;
         }
-        if self.held == Some(request) {
-            self.held = None;
+        if let Some(at) = self.held.iter().position(|held| *held == request) {
+            self.held.remove(at);
             return Left::Held;
         }
         if self.carried == Some(request) {

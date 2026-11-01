@@ -809,6 +809,25 @@ What it does:
    answer begins if that comes first, for the Policy and anything else.
    A turn the lamp wrote itself (a hello, a look) is not told, nor a
    request cancelled before either.
+
+   With the same-voice check (`LAMP_SAME_VOICE_MODEL`), it also says
+   `like_asker` (#4306): how alike the request's voice is to the voice of
+   the person the lamp is in conversation with, the one who said the line
+   that began the conversation. It is the cosine of the two lines' voice
+   prints, from -1 to 1: the same person reads high (0.70 and over is the
+   voice's own bar for one person), someone else at the desk low. The
+   asker's print is the opening line's, kept apart from the conversation's
+   voice, so a second person's line let out as the conversation going on
+   never becomes it ([same-voice.md](same-voice.md), "The asker's voice").
+   It is left out when no conversation is going on (the voice's thread has
+   no exchange with the lamp's words in it from the last 45 s), when either
+   print is not known (a line under 1.5 s
+   has none, and one whose print is not back yet when the request is
+   judged has none yet), and without the check. Only the number leaves the
+   voice, never a print. No rule in the voice reads it. It is for the
+   Policy: to its seven questions, a follow-up and desk talk inside a
+   conversation look alike ([policy.md](policy.md), "How alike to the
+   asker").
 2. **In the rule.** In a busy room, an answer the rule would hold is let
    out for a request said to the lamp, with the reason "someone close to
    the lamp and turned to it spoke". It never changes an answer the rule
@@ -2429,7 +2448,21 @@ line's start is the one at its own start
 fewer the word may be bare ("Ma'am could"), but only for the line after
 it: the cut line itself, a longer one and a whole line still need the
 comma. A line joined with the one it cut short is read on the
-joined words. Lamp
+joined words. Words cut short are also never answered in a held line's
+place (second-voice.md, "Words cut short by the next line") when they
+open with a word said to a person ("Ma'am could", bare in two words or
+fewer, as above) or the held line does ("Sir, what time is this?") and
+they don't call the lamp
+(`attention::called`: "Lamp, what time is it in London?" cut by "Sir, …"
+is still answered): they are let go, and the journal says
+`request N's words, cut short, are let go: they or request M open with
+"ma'am", said to a person; their unplayed answers are not kept as the
+lamp's words (1 requests, LAMP_NAME_SAID_TO_A_PERSON)`, and those answers
+leave the thread (`Engine::unsaying_joined`), so they open no conversation
+(`second_provider::cut_said_to_a_person`, #3945's c0a4 run 2 on 29 Oct: a
+cut "Ma'am, could … you pass me the salt", let out as a conversation going
+on, was answered in place of a held "Sir, what time is this?"). Words cut
+short and joined into a line let out are left as they were. Lamp
 check on c0a4 (28 Oct, a person speaking, turned away): the one "Ma'am, …"
 lamp-name heard as the name (1.00, begun 0.9 s in) was held, the other
 "Ma'am, …" lines had no hearing and were left alone; "Lamp, what time is it in

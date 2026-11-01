@@ -207,8 +207,13 @@ lamp 'sudo -n true' || { echo "make-skill.sh: the lamp's user needs sudo -n" >&2
 env=$(lamp 'systemctl show -p ActiveState -p Environment lamp-voice') || { echo "make-skill.sh: no answer from the lamp" >&2; exit 3; }
 case $env in *ActiveState=active*) ;; *) echo "make-skill.sh: lamp-voice is not active; nothing changed" >&2; exit 3 ;; esac
 case $env in *LAMP_TASKS_DIR=*) ;; *) echo "make-skill.sh: lamp-voice has no tasks part (LAMP_TASKS_DIR); nothing changed" >&2; exit 3 ;; esac
-case $env in *LAMP_MAKE_SKILL=*) echo "make-skill.sh: LAMP_MAKE_SKILL is already set on lamp-voice; nothing changed" >&2; exit 3 ;; esac
-case $env in *LAMP_APP_MAKE_SKILL=*) echo "make-skill.sh: LAMP_APP_MAKE_SKILL is already set on lamp-voice; nothing changed" >&2; exit 3 ;; esac
+# The product unit sets both switches on (fourteen-P15): on is taken as it is. Any other value is someone's own
+# setting, which this run never overrides (Seventh's P2 on #4567).
+not_on() {  # NAME: lamp-voice's unit sets NAME, to something other than on
+  printf '%s\n' "$env" | tr ' ' '\n' | sed 's/^Environment=//' | grep -E "^$1=" | grep -q -v -x "$1=on"
+}
+not_on LAMP_MAKE_SKILL && { echo "make-skill.sh: LAMP_MAKE_SKILL is set on lamp-voice, and not to on; nothing changed" >&2; exit 3; }
+not_on LAMP_APP_MAKE_SKILL && { echo "make-skill.sh: LAMP_APP_MAKE_SKILL is set on lamp-voice, and not to on; nothing changed" >&2; exit 3; }
 lamp 'systemctl is-active -q lamp-skills-manage.socket' || { echo "make-skill.sh: the skills helper's socket is not active; nothing changed" >&2; exit 3; }
 # The run's skill is removed on exit, so one already on is never the run's to take off. Only a list that succeeded
 # and is whole (its header first) says it is not on; any other answer stops here (Third's P2 on #3889).

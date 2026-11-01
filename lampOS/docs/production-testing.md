@@ -111,13 +111,17 @@ Only the air checks may be `not_fitted`, and only on `draft-a-no-air`.
 
 ### What the station gives
 
-- **The lamp's self-test report**, `/var/lib/lamp-selftest/latest.json`,
+- **The lamp's self-test report**, `/var/lib/lampOS/selftest/latest.json`,
   copied off the lamp by the station after a factory run
-  (`lamp-selftest --occasion factory`): only that occasion asks for the
-  touch by hand, the head's move and the ring's colours, and the speaker is
-  checked only after the lamp has spoken for 4 s or more
-  ([selftest.md](selftest.md)). A first-boot or on-demand report leaves those
-  `not_checked` or missing, so the run is `incomplete`. Read strictly: a field
+  (`lamp-selftest --occasion factory`, which the factory step runs with no
+  `--dir`, so its report is in the tool's own folder;
+  `/var/lib/lamp-selftest` is the first-boot unit's, and holds first-boot
+  reports): only that occasion asks for the touch by hand; the head's move,
+  the ring's colours and the speaker are asked for at the factory and on
+  demand, never at first boot, and the speaker is checked only after the
+  lamp has spoken for 4 s or more ([selftest.md](selftest.md)). A first-boot
+  report leaves those `not_checked` or missing, and an on-demand one has no
+  touch by hand, so either run is `incomplete`. Read strictly: a field
   `lamp_msgs::SelfTest` does not have is refused, and so is a report that
   fails its own check (a verdict that is not the worst of its parts, a fail
   with no reason). The report names the lamp that ran it (`lamp`, below).
@@ -202,12 +206,14 @@ with an upper-case letter, since a share may not tell `Lamp-4ACE` from
 for which it says to give the lamp its own, such as
 `lamp-<the last four of its serial>`.
 
-A record kept in `--out` but refused by the place also exits 2. Where the
-place could take it later, it says so with the `--out` path to copy there by
-hand, since the same run can't be made again:
-- one already there (no copy);
-- a lamp folder that is a link to elsewhere, which is never followed;
-- a place that can't make hard links. A record is put in place by a hard
+A record kept in `--out` but refused by the place also exits 2:
+- one already there: nothing to copy;
+- a lamp folder that is a link to elsewhere, which is never followed: no
+  copy is offered either;
+- any other refusal, such as a place that can't make hard links or one that
+  refuses the write: it says so with the `--out` path to copy there by hand
+  once the place can take it, since the same run can't be made again. A
+  record is put in place by a hard
   link from a part file, so it's never half there and never replaces
   another, and many shares (SMB, most FUSE and NAS mounts) don't make them.
   The place must.
@@ -319,7 +325,7 @@ In this order:
    qualification check in a routine run or a retest**; a revision the matrix
    does not name; a suite version that is not the matrix's; an operator id
    that is not `op-<digits>`; a step outside the run's times, a run that ends
-   before it starts or after now, or a self-test report that started more
+   before it starts or more than 5 minutes after now, or a self-test report that started more
    than 5 minutes outside the run (an old `latest.json`; the slack is for a
    lamp's clock, which has no battery); a self-test report that names
    another lamp than `--device`, or names none where the matrix's
@@ -343,8 +349,9 @@ whole routine run again, not only the checks that failed.
 
 ### Written whole
 
-The record is written to `<run id>.part`, synced, and renamed to
-`<run id>.json`, as the self-test keeps its reports, so a reader or a power
+The record is written to a part file of this writer's own
+(`.<run id>.<process>-<nanoseconds>-<count>.part`), synced, hard-linked to
+`<run id>.json` and the part removed (`store.rs`), so a reader or a power
 cut never finds half a record. A record already there is never written over:
 the tool refuses and makes nothing. A run made again is a retest.
 

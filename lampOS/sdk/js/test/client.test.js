@@ -109,7 +109,7 @@ test('the debug log redacts what would pair or hello as this computer', async ()
   // What a lamp sends beyond the schema's own fields is decided too.
   for (const frame of [
     { re: 3, ok: true, to: 'body', move: 'glad-lift', light: true },
-    { re: 1, ok: true, limits: { joints_hz: 20 } },
+    { re: 1, ok: true, limits: { rates: 'off', refused: [{ most: 20, within_ms: 1000 }], phrases: [{ most: 6, within_ms: 60000 }] } },
     { re: 2, ok: true, state: { mood: { energy: 0.5, warmth: 0.6, awake: true, asleep: false }, light: { on: true, colour: 'warm', level: 3, shows: { on: true, colour: 'warm', level: 3 } } } },
     { ev: 'hand', seen: true, x: 0.4, y: 0.5, size: 0.12, open: true, confidence: 0.9 },
     { re: 4, ok: true, to: 'body', follow: 'hand' },
@@ -259,14 +259,28 @@ test('hello with another computer\'s key is unpaired', async (t) => {
   await assert.rejects(Lamp.connect(undefined, { keyring: stranger }), byCode.unpaired);
 });
 
+test('every error code says what to do, on the error and in the README', async () => {
+  const { WHAT_TO_DO } = await import('../src/errors.js');
+  assert.deepEqual(Object.keys(WHAT_TO_DO).sort(), [...schema.errorCodes].sort());
+  const refused = fromReply({ code: 'no_grant', why: 'not granted: look' });
+  assert.equal(refused.whatToDo, WHAT_TO_DO.no_grant);
+  assert.equal(refused.message, 'no_grant: not granted: look');
+  assert.equal(new LampError('x', { code: 'closed' }).whatToDo, '');
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  for (const [code, line] of Object.entries(WHAT_TO_DO)) assert.ok(readme.includes(`| \`${code}\` | ${line} |`), code);
+});
+
 test('greet a person who arrives', async () => {
   await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
     let greeted;
     const done = new Promise((resolve) => { greeted = resolve; });
-    await lamp.on('person.arrived', async () => { await lamp.gesture('greeting'); greeted(); });
+    let at;
+    await lamp.on('person.arrived', async (event) => { at = event.at; await lamp.gesture('greeting'); greeted(); });
     fake.emit('person.arrived', { count: 1, near: 0.3 });
     await done;
     assert.deepEqual(fake.asked('gesture'), [{ name: 'greeting' }]);
+    // `at` as lamp-control stamps it: UTC, to the second, ending Z.
+    assert.match(at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
   });
 });
 
@@ -424,6 +438,32 @@ test('the fake light state shows what the ring draws', async () => {
     await lamp.light('blue', 4, 2000);
     assert.deepEqual(await lamp.get('light'), { light: { shows: { on: true, colour: 'blue', level: 4 } } });
   });
+});
+
+test('the tour runs every step against a fake lamp', async () => {
+  const { spawn } = await import('node:child_process');
+  const fake = await FakeLamp.start({ grants: [...schema.grants] });
+  const home = folder();
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
+    // Not execFileSync: the fake answers on this process's event loop.
+    const tour = new URL('../examples/tour.js', import.meta.url).pathname;
+    const said = await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [tour], { env: { ...process.env, LAMPOS_HOME: home } });
+      let out = '';
+      child.stdout.on('data', (chunk) => { out += chunk; });
+      child.stderr.on('data', (chunk) => { out += chunk; });
+      child.on('error', reject);
+      child.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`exit ${code}: ${out}`))));
+    });
+    // A step's refusal prints as "name: refused, …" (`limits` has a `refused`
+    // window, so the word alone isn't one).
+    assert.ok(!said.includes(': refused,'), said);
+    for (const op of ['get', 'light', 'say', 'gesture', 'express', 'look', 'joints', 'stop']) assert.ok(fake.asked(op).length, `${op}: ${said}`);
+    assert.deepEqual(fake.asked('joints')[0].targets, { pitch: 5 });
+  } finally {
+    await fake.stop();
+  }
 });
 
 test('the examples call only what the client has', async () => {
@@ -682,6 +722,8 @@ test('a fake like lamp-control refuses what it does not route yet', async () => 
     await lamp.express('glad');
     assert.equal((await lamp.gesture('nod')).to, 'body');
     await lamp.light('warm', 3, 1000);
+    // The hum is routed, as lamp-control's sound.
+    assert.equal((await lamp.sound('hum')).to, 'voice');
   });
 });
 

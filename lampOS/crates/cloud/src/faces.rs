@@ -199,7 +199,16 @@ pub fn entirely(data: &Value) -> Result<bool, String> {
 /// `face.remove`: the eyes' own forget of `data`'s name, then, unless
 /// `"entirely": false`, memory's of everything it keeps for them and their
 /// rules.
-pub fn remove(eyes: &Eyes, data: &Value) -> Result<Value, String> {
+///
+/// Removed entirely, the reminders the person set go too, with the
+/// schedule given to lamp-cloud (`LAMP_APP_SCHEDULE=on`, #4527's P2):
+/// `reminders` says `{"cancelled": n}`, or `kept` and why. Without the
+/// schedule the answer is as before, with no `reminders`.
+pub fn remove(
+    eyes: &Eyes,
+    data: &Value,
+    schedule: Option<&lamp_actions::schedule::Adapter>,
+) -> Result<Value, String> {
     // A lamp that takes `entirely` says so in a nameless remove's refusal:
     // that refusal is the app's probe for its two choices (Mobile on
     // #2563). A lamp without the field refuses it plainly.
@@ -235,11 +244,15 @@ pub fn remove(eyes: &Eyes, data: &Value) -> Result<Value, String> {
             }
             None => return Err("the lamp's eyes did not answer".to_owned()),
         };
+    let asks = memory_asks(&name, id.as_deref(), name_id_free);
+    let reminders = schedule
+        .filter(|_| entirely)
+        .map(|schedule| reminders_forgotten(schedule, &asks));
     let memory = match &eyes.memory {
         // The face only: memory is not asked, and says so.
         _ if !entirely => json!({"memory": "not asked"}),
         Some(socket) => {
-            let answers: Vec<Option<Value>> = memory_asks(&name, id.as_deref(), name_id_free)
+            let answers: Vec<Option<Value>> = asks
                 .iter()
                 .map(|ask| crate::photos::exchange(socket, ask, DEADLINE))
                 .collect();
@@ -259,7 +272,23 @@ pub fn remove(eyes: &Eyes, data: &Value) -> Result<Value, String> {
     if let (Some(told), Some(memory)) = (told.as_object_mut(), memory.as_object()) {
         told.extend(memory.clone());
     }
+    if let Some(reminders) = reminders {
+        told["reminders"] = reminders;
+    }
     Ok(told)
+}
+
+/// The reminders each of `asks`' people set, cancelled ([`memory_asks`]'
+/// ids): `{"cancelled": n}`, or `{"kept": reason}`.
+pub fn reminders_forgotten(schedule: &lamp_actions::schedule::Adapter, asks: &[Value]) -> Value {
+    let mut cancelled = 0;
+    for person in asks.iter().filter_map(|ask| ask["person"].as_str()) {
+        match schedule.forget_person(person)["result"]["forgotten"].as_u64() {
+            Some(n) => cancelled += n,
+            None => return json!({"kept": "the lamp's reminders could not be reached"}),
+        }
+    }
+    json!({"cancelled": cancelled})
 }
 
 #[cfg(test)]
@@ -373,7 +402,7 @@ mod tests {
             json!({"faces": [{"name": "Lan", "waiting": false}, {"name": "Bo", "waiting": true}]})
         );
         assert_eq!(
-            remove(&eyes, &json!({"name": "Lan"})).unwrap(),
+            remove(&eyes, &json!({"name": "Lan"}), None).unwrap(),
             json!({"removed": "Lan", "memory": "kept", "reason": "the lamp's memory isn't given to lamp-cloud"})
         );
         assert_eq!(
@@ -487,7 +516,7 @@ mod tests {
             memory: Some(memory),
         };
         assert_eq!(
-            remove(&eyes, &json!({"name": "Lan"})).unwrap(),
+            remove(&eyes, &json!({"name": "Lan"}), None).unwrap(),
             json!({"removed": "Lan", "memory": "forgotten"})
         );
         assert_eq!(eyes_side.join().unwrap(), [json!({"forget": "Lan"})]);
@@ -524,17 +553,17 @@ mod tests {
         // The app's probe: a nameless remove with `entirely` is refused
         // naming it; without the field, plainly, as an older lamp does.
         assert_eq!(
-            remove(&eyes, &json!({"entirely": true})),
+            remove(&eyes, &json!({"entirely": true}), None),
             Err("name must be a name of at most 40 characters; entirely is taken".to_owned())
         );
         assert_eq!(
-            remove(&eyes, &json!({})),
+            remove(&eyes, &json!({}), None),
             Err("name must be a name of at most 40 characters".to_owned())
         );
         // A bad flag is refused before the eyes would be asked: no "did not
         // answer" from a socket that isn't there.
         assert_eq!(
-            remove(&eyes, &json!({"name": "Lan", "entirely": "yes"})),
+            remove(&eyes, &json!({"name": "Lan", "entirely": "yes"}), None),
             Err("entirely must be true or false".to_owned())
         );
     }
@@ -568,7 +597,7 @@ mod tests {
             memory: Some(memory),
         };
         assert_eq!(
-            remove(&eyes, &json!({"name": "Lan", "entirely": false})).unwrap(),
+            remove(&eyes, &json!({"name": "Lan", "entirely": false}), None).unwrap(),
             json!({"removed": "Lan", "memory": "not asked"})
         );
         assert_eq!(eyes_side.join().unwrap(), json!({"forget": "Lan"}));
@@ -616,7 +645,7 @@ mod tests {
         };
         // Unreachable eyes still refuse; an unknown face's refusal stands
         // for a face-only remove and for a name another person holds.
-        assert!(remove(&eyes, &json!({"name": "Lan", "entirely": true})).is_err());
+        assert!(remove(&eyes, &json!({"name": "Lan", "entirely": true}), None).is_err());
         assert_eq!(
             removed("Lan", &json!({"forgot": false, "name_id_free": false})),
             Err("the lamp doesn't know that face".to_owned())
@@ -688,7 +717,7 @@ mod tests {
             socket: who,
             memory: Some(memory),
         };
-        let answer = remove(&eyes, &data).unwrap();
+        let answer = remove(&eyes, &data, None).unwrap();
         assert_eq!(answer["removed"], "Lan", "{answer}");
         // A face already gone says so, and that memory was asked by the
         // name only; a face the eyes forgot now says neither.

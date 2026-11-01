@@ -72,8 +72,9 @@ leave its original catalog and dispatch unchanged. Voice separately gates
 the same declarations and routing; enabling Actions alone is insufficient.
 `LAMP_SCHEDULE_SOCKET` selects the absolute Schedule socket, defaulting to
 `/run/lampos-schedule/call.sock` only when enabled. A disabled configuration
-does not inspect that setting or connect to Schedule. No deployment file is
-changed by this integration.
+does not inspect that setting or connect to Schedule. The product's
+`lamp-actions.service` and `lamp-voice.service` both set
+`LAMP_SCHEDULE_TOOLS=on`.
 
 ```sh
 LAMP_SCHEDULE_TOOLS=on \
@@ -91,9 +92,18 @@ honest failure when called. It does not disable unrelated volume/light calls.
 | `set_timer` | `text`, whole `seconds` | Set with an elapsed `After` deadline |
 | `set_reminder` | `text`, exact `time` in `HH:MM`; optional `day`, `zone`, `fold` | Set one civil `At` deadline |
 | `repeat_reminder` | `text`, `time`, `every` (`daily` or `weekly`); `weekday` required only for weekly; optional `zone` | Set a local daily/weekly recurrence |
-| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page |
-| `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series |
-| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it |
+| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own and the room's timers; each item says when it was set (`set_day`, `set_clock`), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
+| `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series, only the line's own or the room's timer (one set with nobody sure, for 2 h at most; [schedule.md](schedule.md)) |
+| `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own or the room's timer |
+
+Each schedule call on the socket may carry a fourth key, `caller`
+(`lamp_actions::schedule::Caller`, `{"asker":{"person","owner"},"setter"}`),
+which the voice adds for its line: whose reminders it hears and changes, and
+who a reminder it sets is kept as. A call without it is nobody's. The
+voice's own `{"op":"schedule_forget","person":"p-…"}` cancels every reminder
+that person set, after their "forget everything about me"; it is an op, not
+a tool, so no model call can name it ([schedule.md](schedule.md), "Whose
+reminders a line hears", #4527's P2).
 
 The catalog directs relative requests to `set_timer`, even when the person
 says "remind me": "in two minutes" uses the requested label and `seconds:120`,
@@ -194,7 +204,9 @@ could not confirm my speaker's volume changed.", "I asked for it but could
 not confirm my light changed.", and for anything not offered "I can't do
 that."
 
-**Short after a change (`LAMP_SHORT_DONE=on`, off unless set).** A light or
+**Short after a change (`LAMP_SHORT_DONE=on`, on in the product's
+lamp-actions unit since 31 Oct for the voice's answer at once,
+`LAMP_SECOND_SAY_WITH_CALL`; the voice's own unit leaves it off).** A light or
 volume call that changed the lamp is answered with what was established and
 `"next": "It is done. About this change, say only a word or two, in your own
 words and not the same each time. Answer anything else they asked as you
@@ -212,10 +224,16 @@ reply-time table). A creature changes its light, then says so in a word,
 and not the same word every time (the character file; Third on #1520). A
 call that changed nothing (`Outcome::Already`: "My light is already
 orange.", "My speaker is already as loud as it is allowed to go.", or
-"My speaker is muted." for quieter while muted) is said
-as before, since there is no change to be the answer (the reviewer and
-Third on #1520), and so is a call not done; the app's two calls are numbers
-as before. The journal says so once at start: `lamp-actions: the light's
+"My speaker is muted." for quieter while muted) is never answered as if it
+had changed (the reviewer and Third on #1520). With the switch it carries
+`"already": true`, `"next": "Nothing changed: it already was so. …"`
+(`lamp_actions::SHORT_ALREADY_NEXT`) and its own words, `"say"`
+(`lamp_actions::already_say`: "I'm already as warm as I go.", "…as bright",
+"…as dim", "…as cool", "…as loud", "…as quiet", else "It already is.").
+The voice says them at once: on lamp-4ace on 31 Oct, a light that couldn't
+change waited 2.8–3.3 s for the next round without them (the first builder
+on #4710, 17:35). A call not done is said as before, and the app's two calls
+are numbers as before. The journal says so once at start: `lamp-actions: the light's
 and the volume's calls are answered short (LAMP_SHORT_DONE)`. Its measure on
 lamp-4ace is the model's first audio after our answer plus the reply's
 length, before and after, in the same hour, with a two-part line and

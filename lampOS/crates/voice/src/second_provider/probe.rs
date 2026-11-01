@@ -56,6 +56,8 @@ pub mod cache;
 pub mod handover;
 pub mod kept_earlier;
 pub mod quality;
+pub mod recall_first;
+pub mod reminders;
 pub mod says_kept;
 pub mod tools;
 pub mod wire;

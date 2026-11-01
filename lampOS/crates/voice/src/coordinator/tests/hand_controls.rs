@@ -816,6 +816,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
             stopped: false,
             told: Vec::new(),
             chunks: Vec::new(),
+            playing: None,
         }),
     );
     let error = finish_active_run(
@@ -1154,6 +1155,10 @@ thread_local! {
     /// The loop's rig with a camera of its own, whose side records each
     /// authority it is given (#2602, the first builder's P1 on #2623).
     static RIG_CAMERA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The rig's speaker accepts each chunk and retires a sound once its
+    /// last frame has played in real time (#3748). Unset, it only keeps
+    /// them, as before.
+    static RIG_SPEAKER_PLAYS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Opt in to a capture peer that waits for Allowed and StartCapture, then
     /// returns fresh silent frames from this time. Other fixtures stay silent.
     static WAKE_CAPTURE_FROM: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
@@ -1163,6 +1168,11 @@ thread_local! {
     /// The next loop's onboarding walk, its storage loaded, and its file
     /// (#3747). Unset, no walk, as before.
     static RIG_ONBOARDING: RefCell<Option<(crate::onboarding::storage::ServiceStorage, PathBuf)>> =
+        const { RefCell::new(None) };
+    /// From this time, on the scenario clock, the sleep line is rendered
+    /// into this speech cache, as the warm thread would after the loop
+    /// started (#3748, the reviewer on #4478). Unset, nothing, as before.
+    static SPEECH_CACHE_WARMS_AT: RefCell<Option<(u64, std::sync::Arc<crate::say::tts_cache::TtsCache>)>> =
         const { RefCell::new(None) };
 }
 
@@ -1238,6 +1248,25 @@ struct SteppedPeer {
     stopped: bool,
     told: Vec<Snapshot>,
     chunks: Vec<SpeakerChunk>,
+    /// With [`RIG_SPEAKER_PLAYS`]: the sound now playing.
+    playing: Option<Playing>,
+}
+
+/// A sound the rig's speaker is playing, with [`RIG_SPEAKER_PLAYS`] (#3748):
+/// when it began on the scenario clock, its chunks not yet accepted, the
+/// frames accepted, and its final chunk once accepted.
+struct Playing {
+    began: u64,
+    waiting: Vec<(TurnOwner, u64, u64, bool)>,
+    accepted: u64,
+    last: Option<(TurnOwner, u64)>,
+}
+
+impl Playing {
+    /// When `frames` of it have played, in real time.
+    fn played_at(&self, frames: u64) -> u64 {
+        self.began + frames * 1_000_000 / 24_000
+    }
 }
 
 impl SteppedPeer {
@@ -1288,6 +1317,17 @@ impl SteppedPeer {
                 Control::ProviderOutputCapacity { .. } => {}
                 other => panic!("unexpected command to a head-touch fixture worker: {other:?}"),
             }
+        }
+        if self.privacy
+            && let Some(cache) = SPEECH_CACHE_WARMS_AT.with(|warms| {
+                let mut warms = warms.borrow_mut();
+                let due = warms.as_ref().is_some_and(|(at, _)| monotonic_us() >= *at);
+                due.then(|| warms.take().unwrap().1)
+            })
+        {
+            cache
+                .warm(&[lamp_msgs::SLEEP_LINE])
+                .map_err(io::Error::other)?;
         }
         if self.privacy
             && self.keeping
@@ -1429,10 +1469,71 @@ impl SteppedPeer {
             })?;
         }
         if self.speaker {
+            let plays = RIG_SPEAKER_PLAYS.with(std::cell::Cell::get);
             while let Some(chunk) = self.peer.data.receive::<SpeakerChunk>().unwrap() {
+                if plays && self.keeping {
+                    let playing = self.playing.get_or_insert_with(|| Playing {
+                        began: now_us,
+                        waiting: Vec::new(),
+                        accepted: 0,
+                        last: None,
+                    });
+                    playing.waiting.push((
+                        chunk.permit.owner(),
+                        chunk.chunk_sequence,
+                        chunk.samples.len() as u64,
+                        chunk.end_of_speech,
+                    ));
+                }
                 if self.keeping {
                     self.chunk_times.push(monotonic_us());
                     self.chunks.push(chunk);
+                }
+            }
+            if let Some(playing) = &mut self.playing {
+                // Each chunk accepted once the one before it has played,
+                // as a speaker's small buffer takes them.
+                while !playing.waiting.is_empty()
+                    && now_us >= playing.played_at(playing.accepted.saturating_sub(240))
+                {
+                    let (owner, sequence, frames, end) = playing.waiting.remove(0);
+                    let first = playing.accepted;
+                    playing.accepted += frames;
+                    self.peer.control.send(WorkerEvent::Playback {
+                        owner,
+                        turn: owner.turn(),
+                        sequence,
+                        first_sample: PlaybackCursor {
+                            epoch: 1,
+                            frame: first,
+                        },
+                        end_sample: PlaybackCursor {
+                            epoch: 1,
+                            frame: playing.accepted,
+                        },
+                        queue_observed_at_us: now_us,
+                        queued_frames: 0,
+                        accepted_frames: frames as usize,
+                        observed_at_us: now_us,
+                    })?;
+                    if end {
+                        playing.last = Some((owner, sequence));
+                    }
+                }
+                // Retired once its last frame has played.
+                if let Some((owner, sequence)) = playing.last
+                    && now_us >= playing.played_at(playing.accepted)
+                {
+                    self.peer.control.send(WorkerEvent::SpeechRetired {
+                        owner,
+                        sequence,
+                        final_sample: PlaybackCursor {
+                            epoch: 1,
+                            frame: playing.accepted,
+                        },
+                        observed_at_us: now_us,
+                    })?;
+                    self.playing = None;
                 }
             }
         }
@@ -1633,6 +1734,7 @@ fn run_loop_ringed(
                     stopped: false,
                     told: Vec::new(),
                     chunks: Vec::new(),
+                    playing: None,
                 })
                 .collect::<Vec<_>>(),
         ));
@@ -2072,7 +2174,7 @@ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
             |on_state, gate| {
                 on_state(said, crate::process::new_boot().unwrap(), 1)?;
                 for _ in 0..3 {
-                    gate()?;
+                    gate(&mut |_| Ok(()))?;
                 }
                 Ok(WaitOutcome::Allowed)
             },
@@ -2170,7 +2272,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
             let boot = crate::process::new_boot().unwrap();
             on_state(PrivacyState::Allowed, boot, 1)?;
             for _ in 0..3 {
-                gate()?;
+                gate(&mut |_| Ok(()))?;
             }
             let until = Instant::now() + Duration::from_secs(2);
             while !open.load(Ordering::SeqCst) && Instant::now() < until {
@@ -2180,10 +2282,10 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
             on_state(PrivacyState::Muted, boot, 2)?;
             closed_when_told = Some(!open.load(Ordering::SeqCst));
             for _ in 0..3 {
-                gate()?;
+                gate(&mut |_| Ok(()))?;
             }
             on_state(PrivacyState::Allowed, boot, 3)?;
-            gate()?;
+            gate(&mut |_| Ok(()))?;
             Ok(WaitOutcome::Stopped)
         },
     )
@@ -2235,7 +2337,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
                 1,
             )?;
             for _ in 0..3 {
-                assert!(!gate()?, "still muted");
+                assert!(!gate(&mut |_| Ok(()))?, "still muted");
             }
             Ok(WaitOutcome::Stopped)
         },
@@ -2300,7 +2402,7 @@ fn the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start() {
                 crate::process::new_boot().unwrap(),
                 since,
             )?;
-            gate()?;
+            gate(&mut |_| Ok(()))?;
             Ok(WaitOutcome::Stopped)
         },
     )
@@ -2728,7 +2830,7 @@ fn the_muted_wait_says_the_microphones_are_off_by_the_switch() {
                 crate::process::new_boot().unwrap(),
                 &Termination::inactive(),
                 on_state,
-                gate,
+                || gate(&mut |_| Ok(())),
             )
         },
     )
@@ -2875,7 +2977,31 @@ fn a_tap_on_a_quiet_lamps_head_plays_its_hm_as_a_turn_of_its_own() {
 /// loop left, and the scenario time Controls' sleep would come at if the
 /// hand stays.
 fn held_run(held_us: u64, lifted_us: u64, fresh_us: u64) -> (Ran, u64) {
+    held_run_with(held_us, lifted_us, fresh_us, None)
+}
+
+/// As [`held_run`], with `LAMP_SLEEP_LINE=on` when `sleep_line` is given
+/// (#3748): the line kept in the speech cache, or none kept.
+fn held_run_with(
+    held_us: u64,
+    lifted_us: u64,
+    fresh_us: u64,
+    sleep_line: Option<Option<Vec<i16>>>,
+) -> (Ran, u64) {
+    held_run_kept_at(held_us, lifted_us, fresh_us, sleep_line, None)
+}
+
+/// As [`held_run_with`], the line rendered into the speech cache only
+/// `kept_after_us` into the loop when given, not before it starts.
+fn held_run_kept_at(
+    held_us: u64,
+    lifted_us: u64,
+    fresh_us: u64,
+    sleep_line: Option<Option<Vec<i16>>>,
+    kept_after_us: Option<u64>,
+) -> (Ran, u64) {
     use std::os::unix::fs::PermissionsExt;
+    RIG_SPEAKER_PLAYS.with(|plays| plays.set(sleep_line.is_some()));
     // One folder each: the stepped tests share their scenario clock's start.
     static RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -2883,6 +3009,22 @@ fn held_run(held_us: u64, lifted_us: u64, fresh_us: u64) -> (Ran, u64) {
         std::env::temp_dir().join(format!("lv-sleep-breath-{}-{run}", std::process::id()));
     fs::create_dir(&directory).unwrap();
     fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    if let Some(Some(line)) = &sleep_line {
+        // Kept in the speech cache as its start would have rendered it.
+        let rendered = line.clone();
+        let cache = crate::say::tts_cache::TtsCache::new(
+            directory.join("tts-cache"),
+            "Rachel",
+            "eleven_v4_turbo",
+            "en",
+            Box::new(move |_: &str| Ok(rendered.clone())),
+        );
+        let cache = std::sync::Arc::new(cache);
+        if kept_after_us.is_none() {
+            cache.warm(&[lamp_msgs::SLEEP_LINE]).unwrap();
+        }
+        TEST_SPEECH_CACHE.with(|given| *given.borrow_mut() = Some(cache));
+    }
     let record = directory.join("mute.json");
     let sleeps_at = std::cell::Cell::new(0);
     let ran = run_loop_with(
@@ -2890,14 +3032,33 @@ fn held_run(held_us: u64, lifted_us: u64, fresh_us: u64) -> (Ran, u64) {
             let now = monotonic_us();
             sleeps_at.set(now + crate::head_cue::SLEEP_HOLD_US - held_us);
             PRIVACY_FRESH_UNTIL.with(|until| until.set((fresh_us > 0).then_some(now + fresh_us)));
-            HandControls::with_test_hold("test-hand-clock", now, held_us, lifted_us, &record)
-                .unwrap()
+            // A cue that plays whole needs the capture alive meanwhile,
+            // as on a lamp, or its turn's lease lapses (#3748).
+            if sleep_line.is_some() {
+                WAKE_CAPTURE_FROM.with(|from| from.set(Some(now)));
+            }
+            if let Some(after) = kept_after_us {
+                let cache = TEST_SPEECH_CACHE
+                    .with(|given| given.borrow().clone())
+                    .unwrap();
+                SPEECH_CACHE_WARMS_AT
+                    .with(|warms| *warms.borrow_mut() = Some((now + after, cache)));
+            }
+            let mut controls =
+                HandControls::with_test_hold("test-hand-clock", now, held_us, lifted_us, &record)
+                    .unwrap();
+            controls.set_sleep_line(sleep_line.is_some());
+            controls
         },
         || (quiet_owner(), None),
         false,
         Clocking::Stepped,
     );
     PRIVACY_FRESH_UNTIL.with(|until| until.set(None));
+    RIG_SPEAKER_PLAYS.with(|plays| plays.set(false));
+    WAKE_CAPTURE_FROM.with(|from| from.set(None));
+    TEST_SPEECH_CACHE.with(|given| given.borrow_mut().take());
+    SPEECH_CACHE_WARMS_AT.with(|warms| warms.borrow_mut().take());
     let _ = fs::remove_dir_all(&directory);
     (ran, sleeps_at.get())
 }
@@ -2999,6 +3160,180 @@ fn a_hand_lifted_after_its_breath_sighs_and_stays_awake() {
         ran.error
     );
     assert!(ran.ended_us > sleeps_at, "ran past the sleep's time");
+}
+
+/// The hold's sleep line for a test (#3748): `seconds` of one level, a
+/// whole number of chunks.
+fn sleep_line(seconds: u32) -> Vec<i16> {
+    vec![1_234_i16; (24_000 * seconds) as usize]
+}
+
+/// The samples of every chunk the speaker was sent, in order.
+fn played(ran: &Ran) -> Vec<i16> {
+    ran.chunks
+        .iter()
+        .flat_map(|chunk| chunk.samples.iter().copied())
+        .collect()
+}
+
+/// A held run's sleep, owed until its cue played (#3748): the conversation
+/// ends `head_sleep`, at a time the caller checks.
+fn slept_owed(ran: &Ran) -> u64 {
+    assert!(ran.error.contains("software mute"), "{}", ran.error);
+    let cancel = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "hand_control_cancel")
+        .expect("the sleep ends it");
+    assert_eq!(cancel["reason"], "head_sleep");
+    cancel["at_us"].as_u64().unwrap()
+}
+
+/// #3748 (`LAMP_SLEEP_LINE=on`, the recording there): a hand kept on the
+/// head gets the recorded line at its 2 s mark in place of the breath, as
+/// a turn of its own; the Hold at 3 s does not mute at once, and the
+/// microphones close only once the line has played whole.
+#[test]
+fn with_the_sleep_line_a_hold_says_it_and_sleeps_once_it_has_played() {
+    let line = sleep_line(2);
+    let (ran, holds_at) = held_run_with(2_050_000, 9_000_000, 3_000_000, Some(Some(line.clone())));
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_sleep_line");
+    let heard = played(&ran);
+    assert_eq!(heard.len(), line.len(), "the whole line: {}", ran.error);
+    assert_eq!(heard, line, "the whole line, and nothing else");
+    let slept_at = slept_owed(&ran);
+    let last_chunk = *ran.chunk_times.last().unwrap();
+    assert!(slept_at > holds_at + 500_000, "not at the Hold");
+    assert!(slept_at >= last_chunk, "after its last chunk");
+    // The line ends 1.05 s after the Hold here (begun 2.05 s into the
+    // hold, 2 s long); the microphones close within 300 ms of that.
+    assert!(
+        slept_at < holds_at + 1_350_000,
+        "slept {} us after the Hold",
+        slept_at - holds_at
+    );
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| row["kind"] == "turn_finished" && row["outcome"] != "head_sleep"),
+        "the line's turn ended on its own"
+    );
+}
+
+/// #3748 (the reviewer on #4478): the speech cache has no sleep line when
+/// the loop starts, and the warm thread renders it 300 ms later: the hold
+/// that comes after says the line, read at the hold, not the breath.
+#[test]
+fn with_the_sleep_line_kept_after_the_loop_started_the_next_hold_says_it() {
+    let line = sleep_line(2);
+    let (ran, _) = held_run_kept_at(
+        1_500_000,
+        9_000_000,
+        4_000_000,
+        Some(Some(line.clone())),
+        Some(300_000),
+    );
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_sleep_line");
+    assert_eq!(played(&ran), line, "the whole line: {}", ran.error);
+    slept_owed(&ran);
+}
+
+/// #3748: a hand let go at 2.5 s, before the Hold, cuts the line at once,
+/// and no sleep follows.
+#[test]
+fn with_the_sleep_line_a_hand_let_go_before_the_hold_cuts_it_and_stays_awake() {
+    let line = sleep_line(2);
+    let (ran, holds_at) = held_run_with(2_050_000, 2_500_000, 1_500_000, Some(Some(line.clone())));
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_sleep_line");
+    let heard = played(&ran);
+    assert!(
+        !heard.is_empty() && heard.len() < line.len() / 2,
+        "cut: {} of {}",
+        heard.len(),
+        line.len()
+    );
+    assert!(
+        ran.trace
+            .iter()
+            .any(|row| { row["kind"] == "hand_control_cancel" && row["reason"] == "head_stop" }),
+        "the letting go cut it"
+    );
+    assert!(
+        ran.trace
+            .iter()
+            .all(|row| row["kind"] != "hand_control_cancel" || row["reason"] != "head_sleep"),
+        "no sleep"
+    );
+    assert!(
+        ran.error.contains("privacy") && !ran.error.contains("software mute"),
+        "ended only by the stale switch: {}",
+        ran.error
+    );
+    assert!(ran.ended_us > holds_at, "ran past the Hold's time");
+}
+
+/// #3748: with the switch on and no recording, the breath plays as today,
+/// and the sleep still waits for it: the Hold comes while it sounds, and
+/// the microphones close once it has played whole.
+#[test]
+fn with_the_sleep_line_missing_the_breath_plays_and_the_sleep_waits_for_it() {
+    let (ran, holds_at) = held_run_with(2_150_000, 9_000_000, 1_500_000, Some(None));
+    let admitted = ran
+        .trace
+        .iter()
+        .find(|row| row["kind"] == "input_admitted")
+        .expect("its own turn");
+    assert_eq!(admitted["admission_basis"], "head_sleep_breath");
+    let breath = crate::head_cue::breath(crate::head_cue::DBFS);
+    let heard = played(&ran);
+    assert_eq!(heard.len(), breath.len(), "the whole breath: {}", ran.error);
+    assert_eq!(heard, breath, "the whole breath");
+    let slept_at = slept_owed(&ran);
+    assert!(slept_at > holds_at, "not at the Hold");
+    assert!(
+        slept_at >= *ran.chunk_times.last().unwrap(),
+        "after its last chunk"
+    );
+    // The breath, begun 2.15 s into the hold, ends 50 ms after the Hold.
+    assert!(
+        slept_at < holds_at + 350_000,
+        "slept {} us after the Hold",
+        slept_at - holds_at
+    );
+}
+
+/// #3748: a line still sounding 6 s after the Hold no longer holds the
+/// sleep back: it comes at the cap.
+#[test]
+fn with_the_sleep_line_the_owed_sleep_comes_at_its_cap() {
+    let line = sleep_line(10);
+    let (ran, holds_at) = held_run_with(2_050_000, 20_000_000, 8_000_000, Some(Some(line.clone())));
+    let slept_at = slept_owed(&ran);
+    let cap = holds_at + crate::hand_controls::SLEEP_OWED_CAP_US;
+    assert!(
+        (cap..cap + 10_000).contains(&slept_at),
+        "slept {} us after the cap",
+        slept_at as i64 - cap as i64
+    );
+    assert!(
+        played(&ran).len() < line.len(),
+        "the line was cut by the sleep"
+    );
 }
 
 /// An onboarding walk for the next loop (#3747) whose kept progress has

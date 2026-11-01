@@ -283,7 +283,14 @@ unit takes port 80 with one capability, `CAP_NET_BIND_SERVICE`, and no
 other (`AmbientCapabilities=` and `CapabilityBoundingSet=`). It never runs
 beside setup, whose hotspot page and nginx have port 80:
 `ConditionPathExists=/var/lib/lampos-setup/done` keeps it off a lamp not
-set up, and a reset reboots with that marker gone. It has no `Conflicts=`
+set up, and a reset that reboots leaves it off with that marker gone. A
+reset started in place (#4500, setup.md) stops it with the lamp: it is not
+part of `lampos.target`, so it is among the reset's `WRITERS` (`reset.rs`),
+and it is not started again, since on port 80 it would keep the port from
+setup, which ends serving at once on a port still held (`serve.rs`). It
+comes back at the lamp's next boot once setup is done. Before this, an
+in-place reset on such a lamp left setup with no page on the hotspot
+(#4536). Product lamps don't install it. It has no `Conflicts=`
 with `lamp-setup.service`: both are wanted by `multi-user.target`, and at
 boot after a reset systemd would keep this unit's start and drop setup's,
 and then this unit's condition fails and nothing listens (the reviewer on

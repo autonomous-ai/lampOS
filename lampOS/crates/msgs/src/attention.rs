@@ -39,6 +39,14 @@ pub struct Addressed {
     pub name_score: f32,
     /// Said to the lamp from close to it: near, and a close face turned to it.
     pub addressed: bool,
+    /// How alike this request's voice is to the voice of the person the
+    /// lamp is in conversation with, the one who said the line that began
+    /// it: the cosine of the two lines' voice prints, from -1 to 1
+    /// (`docs/same-voice.md`, "The asker's voice"). None when either print
+    /// is not known, or no conversation is going on. Left out when none, so
+    /// a voice that does not say it says what it said before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub like_asker: Option<f32>,
 }
 
 impl Addressed {
@@ -96,6 +104,11 @@ impl Addressed {
                 self.name_score
             )));
         }
+        if let Some(like) = self.like_asker
+            && !(like.is_finite() && (-1.0..=1.0).contains(&like))
+        {
+            return Err(Invalid(format!("like_asker is {like}: from -1 to 1")));
+        }
         if self.addressed != (self.near == Some(true) && self.facing_close == Some(true)) {
             return Err(Invalid(
                 "addressed is near and a close face turned to the lamp, no more and no less".into(),
@@ -123,6 +136,7 @@ mod tests {
             facing_close: Some(true),
             name_score: 0.0,
             addressed: true,
+            like_asker: None,
         }
     }
 
@@ -139,6 +153,37 @@ mod tests {
         assert_eq!(back, said());
         assert!(back.check().is_ok());
         assert_eq!(Addressed::declaration().kind, Kind::Event);
+    }
+
+    #[test]
+    fn like_asker_is_said_only_when_known_and_an_older_message_reads_as_none() {
+        // A message from before the field, as an older voice sends it.
+        let older = "{\"session\":3,\"request\":41,\"began_us\":10000000,\"ended_us\":12400000,\
+             \"rise_db\":21.5,\"near\":true,\"looks\":8,\"facing_height\":0.22,\
+             \"facing_share\":0.75,\"facing_close\":true,\"name_score\":0.0,\"addressed\":true}";
+        let read: Addressed = serde_json::from_str(older).unwrap();
+        assert_eq!(read, said());
+        assert!(read.check().is_ok());
+        // One with it, back as it was sent.
+        let alike = Addressed {
+            like_asker: Some(0.82),
+            ..said()
+        };
+        let text = serde_json::to_string(&alike).unwrap();
+        assert!(
+            text.ends_with(",\"addressed\":true,\"like_asker\":0.82}"),
+            "{text}"
+        );
+        let back: Addressed = serde_json::from_str(&text).unwrap();
+        assert_eq!(back, alike);
+        assert!(back.check().is_ok());
+        for edge in [-1.0, 0.0, 1.0] {
+            let at_edge = Addressed {
+                like_asker: Some(edge),
+                ..said()
+            };
+            assert!(at_edge.check().is_ok(), "{edge}");
+        }
     }
 
     #[test]
@@ -211,6 +256,22 @@ mod tests {
             },
             Addressed {
                 addressed: false,
+                ..said()
+            },
+            Addressed {
+                like_asker: Some(f32::NAN),
+                ..said()
+            },
+            Addressed {
+                like_asker: Some(f32::INFINITY),
+                ..said()
+            },
+            Addressed {
+                like_asker: Some(1.01),
+                ..said()
+            },
+            Addressed {
+                like_asker: Some(-1.5),
                 ..said()
             },
         ];

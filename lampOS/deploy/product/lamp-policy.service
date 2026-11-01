@@ -22,7 +22,15 @@ Nice=5
 # copied once by install from V1's config on a lamp that ran V1 (#811). The judge is asked through V1's route, the campaign-api proxy,
 # as V1's own Jev client does (system/intent/jev), not with a key of the project's own.
 LoadCredential=jev.key:/etc/lampOS/policy/jev.key
-ExecStart=/opt/lampOS/policy/current/lamp-policy --key-file %d/jev.key --endpoint https://campaign-api.autonomous.ai/api/v1/ai/v1/jev/decisions --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus
+# --zone system: the hour of its decisions in the lamp's own zone, as setup points /etc/localtime (#820).
+# --hello --act hello --gate: the Policy's hello gate answers Welcome back's ask on skills/ask, asked
+# even with LAMP_SKILLS_ASK=skip; acting, its say_now alone says the hello (the first builder, 30 Oct,
+# on the launch testers' findings). --hello-by-rule: the hello is decided by the hard rules alone
+# (never over talk, twenty minutes between hellos, one an hour to each person), a pass is say_now at
+# once with no wait for the model; the judge is asked only in shadow, logged, never acting (the first
+# builder, 30 Oct, on #4625, as #4305 took Jev out of what the lamp does). Every other question stays
+# off or in shadow.
+ExecStart=/opt/lampOS/policy/current/lamp-policy --zone system --hello --act hello --gate --hello-by-rule --key-file %d/jev.key --endpoint https://campaign-api.autonomous.ai/api/v1/ai/v1/jev/decisions --log-dir /var/lib/lampos-policy --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

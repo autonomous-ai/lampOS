@@ -49,7 +49,7 @@ use std::{
 
 /// Exchanges kept for each person (and for the room), and the most of each
 /// side of one that is kept.
-const EXCHANGES: usize = 8;
+const EXCHANGES: usize = 12;
 /// Whose threads are kept at once, the room's among them: past this the
 /// oldest exchanges go, whoever's they were.
 const PEOPLE: usize = 4;
@@ -100,6 +100,16 @@ struct Exchange {
     tail: String,
     /// Handed on to the lamp's memory, or not for it to have.
     journalled: bool,
+    /// Given to the conversation's running summary
+    /// ([`crate::conversation_summary`]); never kept in the file.
+    summarized: bool,
+    /// Its line was answered in a scope held only by a face's gap or
+    /// carried as a person's conversation going on
+    /// ([`crate::memory_scope::ScopeSnapshot::held`]): told in the thread
+    /// as ever, never given to the running summary, so none of it reaches
+    /// a talk note (the reviewer-lead's P2 on #4479). Never kept in the
+    /// file.
+    held: bool,
     /// Cut before any of the lamp's answer played (`LAMP_SAID_AS_HEARD`): its
     /// part is [`crate::said_as_heard::CUT`], and the exchange is still told,
     /// so the person's words are (the reviewer's P2 on #2145).
@@ -182,13 +192,25 @@ struct Kept {
 }
 
 /// One exchange as [`Thread::recent`] gives it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Recent {
     /// The note of a request the lamp was given in writing, if it was one.
     pub written: Option<String>,
     /// What the person said; empty for none.
     pub person: String,
     pub lamp: String,
+    /// The room's, told to a person's turn as said in the room
+    /// ([`Thread::recent_with_room_lines`]); never for a turn of the room's.
+    pub room: bool,
+}
+
+/// A scope's exchanges due for its running summary ([`Thread::summary_due`]).
+#[derive(Debug, PartialEq, Eq)]
+pub struct SummaryDue {
+    /// A person's memory id; `None`: the room's.
+    pub whose: Option<String>,
+    /// (request, what the person said, what the lamp said), oldest first.
+    pub exchanges: Vec<(u64, String, String)>,
 }
 
 /// A written request's note waiting for the answer to it.
@@ -414,7 +436,31 @@ impl Thread {
             self.note.take(),
         );
         let (count_only, quoted) = (self.count_only, self.quoted);
+        let marks: Vec<_> = self
+            .exchanges
+            .iter()
+            .filter(|exchange| exchange.held || exchange.summarized)
+            .map(|exchange| {
+                (
+                    exchange.whose.clone(),
+                    exchange.person.clone(),
+                    exchange.lamp.clone(),
+                    exchange.held,
+                    exchange.summarized,
+                )
+            })
+            .collect();
         *self = read;
+        // The file keeps no mark of a held or summarised exchange: the same
+        // exchange read back keeps this process's.
+        for exchange in &mut self.exchanges {
+            if let Some((.., held, summarized)) = marks.iter().find(|(whose, person, lamp, ..)| {
+                *whose == exchange.whose && *person == exchange.person && *lamp == exchange.lamp
+            }) {
+                exchange.held |= held;
+                exchange.summarized |= summarized;
+            }
+        }
         self.whose = whose;
         self.named = named;
         self.opened_for = opened_for;
@@ -519,6 +565,8 @@ impl Thread {
                 lamp,
                 // The process that wrote the file handed it on.
                 journalled: true,
+                summarized: false,
+                held: false,
                 whose: kept.whose,
                 written: kept.written.map(|text| {
                     let mut written = String::new();
@@ -716,8 +764,8 @@ impl Thread {
             self.heard.clear();
             self.heard_at = None;
             self.heard_done = false;
-            // Each person's last eight; with nobody ever known, the room's
-            // eight are all there is. The person the eyes name now; nobody
+            // Each person's last EXCHANGES; with nobody ever known, the
+            // room's are all there is. The person the eyes name now; nobody
             // named, the one counted; nobody known while a person's session
             // goes on: theirs.
             let whose = scope.map(str::to_owned);
@@ -737,6 +785,8 @@ impl Thread {
                 lamp: String::new(),
                 tail: String::new(),
                 journalled: false,
+                summarized: false,
+                held: false,
                 unheard: false,
                 whose,
                 written,
@@ -845,6 +895,7 @@ impl Thread {
     /// Drop everything: a person has had something forgotten, and what was
     /// said about it is not to be told to the next session.
     pub fn forget(&mut self) {
+        crate::conversation_summary::forget_all();
         self.exchanges.clear();
         self.lines.clear();
         self.note = None;
@@ -942,6 +993,42 @@ impl Thread {
             .min()
     }
 
+    /// The known person (a memory id) whose conversation is going on as
+    /// `request` is heard: the newest exchange before it, one with words from
+    /// the lamp or cut unheard, began within [`GOING_ON_FOR`] of `now` and is
+    /// theirs (#4339). `None` for the room's, a quiet, or no exchange: an
+    /// exchange of anyone else's after theirs ends it.
+    pub fn going_on_with(&self, request: u64, now: Instant) -> Option<String> {
+        self.exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+            .filter(|exchange| now.saturating_duration_since(exchange.at) <= GOING_ON_FOR)
+            .and_then(|exchange| exchange.whose.clone())
+    }
+
+    /// What the person said and what the lamp answered in the newest
+    /// exchange with the lamp's words, the answers to `but` and `request`
+    /// left out (`LAMP_UNTIED_GOING_ON`): what a line going on may be tied
+    /// to. The answer is its kept start and its end ([`TAIL_BYTES`]), so a
+    /// word near the end of a long answer still ties.
+    pub fn said_last_but(&self, request: u64, but: &[u64]) -> Option<(String, String)> {
+        self.exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request && !but.contains(&exchange.request))
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .map(|exchange| {
+                let lamp = if exchange.lamp.ends_with(exchange.tail.as_str()) {
+                    exchange.lamp.clone()
+                } else {
+                    format!("{} {}", exchange.lamp, exchange.tail)
+                };
+                (exchange.person.clone(), lamp)
+            })
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
@@ -974,6 +1061,132 @@ impl Thread {
         }
     }
 
+    /// How many exchanges a scope keeps ([`EXCHANGES`]), so the summary's
+    /// tests hold at any window.
+    #[cfg(test)]
+    pub(crate) const KEPT_A_SCOPE: usize = EXCHANGES;
+
+    /// With `LAMP_CONVERSATION_SUMMARY` ([`crate::conversation_summary`]):
+    /// each scope's exchanges older than its newest `keep`, with words, not
+    /// yet summarised and not held ([`Self::held_for`]), once they are about to leave what a turn is told:
+    /// [`EXCHANGES`] less `keep` less one of them, before the thread drops
+    /// the oldest, or the oldest of them three quarters of
+    /// [`REMEMBERED_FOR`] old. Each is marked as given, oldest first, as
+    /// (request, what the person said, what the lamp said).
+    pub fn summary_due(&mut self, keep: usize, now: Instant) -> Vec<SummaryDue> {
+        // A window of `keep` or fewer would drop an exchange never given:
+        // at least the oldest is given before the scope is full.
+        let keep = keep.min(EXCHANGES.saturating_sub(1));
+        let batch = EXCHANGES.saturating_sub(keep).saturating_sub(1).max(1);
+        let ageing = REMEMBERED_FOR * 3 / 4;
+        let mut scopes: Vec<Option<String>> = Vec::new();
+        for exchange in &self.exchanges {
+            if !scopes.contains(&exchange.whose) {
+                scopes.push(exchange.whose.clone());
+            }
+        }
+        let mut due = Vec::new();
+        for whose in scopes {
+            let theirs: Vec<usize> = (0..self.exchanges.len())
+                .filter(|&index| self.exchanges[index].whose == whose)
+                .collect();
+            let older = theirs.len().saturating_sub(keep);
+            let waiting: Vec<usize> = theirs[..older]
+                .iter()
+                .copied()
+                .filter(|&index| {
+                    let exchange = &self.exchanges[index];
+                    !exchange.summarized
+                        && (exchange.lamp.chars().any(char::is_alphanumeric)
+                            || !exchange.person.trim().is_empty())
+                })
+                .collect();
+            let old = waiting.first().is_some_and(|&index| {
+                now.saturating_duration_since(self.exchanges[index].at) >= ageing
+            });
+            if waiting.is_empty() || (waiting.len() < batch && !old) {
+                continue;
+            }
+            // A held exchange counts toward the batch, so the others are
+            // given before they leave, but is marked and never given.
+            let exchanges: Vec<_> = waiting
+                .iter()
+                .filter_map(|&index| {
+                    let exchange = &mut self.exchanges[index];
+                    exchange.summarized = true;
+                    (!exchange.held).then(|| {
+                        (
+                            exchange.request,
+                            exchange.person.trim().to_owned(),
+                            exchange.lamp.trim().to_owned(),
+                        )
+                    })
+                })
+                .collect();
+            if !exchanges.is_empty() {
+                due.push(SummaryDue { whose, exchanges });
+            }
+        }
+        due
+    }
+
+    /// A conversation's end (`LAMP_CONVERSATION_SUMMARY`): the exchanges of
+    /// scope `whose`, made by `until`, with words, not yet summarised and
+    /// not held ([`Self::held_for`]), each marked as given, oldest first; for its talk note.
+    pub fn summary_rest(
+        &mut self,
+        whose: Option<&str>,
+        until: Instant,
+    ) -> Vec<(u64, String, String)> {
+        self.exchanges
+            .iter_mut()
+            .filter(|exchange| {
+                exchange.whose.as_deref() == whose
+                    && exchange.at <= until
+                    && !exchange.summarized
+                    && !exchange.held
+                    && (exchange.lamp.chars().any(char::is_alphanumeric)
+                        || !exchange.person.trim().is_empty())
+            })
+            .map(|exchange| {
+                exchange.summarized = true;
+                (
+                    exchange.request,
+                    exchange.person.trim().to_owned(),
+                    exchange.lamp.trim().to_owned(),
+                )
+            })
+            .collect()
+    }
+
+    /// Request `request`'s line was answered in a held scope
+    /// ([`crate::memory_scope::ScopeSnapshot::held`]): its exchange is
+    /// never given to the running summary ([`Self::summary_due`],
+    /// [`Self::summary_rest`]).
+    pub fn held_for(&mut self, request: u64) {
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+        {
+            exchange.held = true;
+        }
+    }
+
+    /// The scopes with an exchange of the last `within`.
+    pub fn scopes_since(&self, now: Instant, within: Duration) -> Vec<Option<String>> {
+        let mut scopes: Vec<Option<String>> = Vec::new();
+        for exchange in &self.exchanges {
+            if now.saturating_duration_since(exchange.at) <= within
+                && !scopes.contains(&exchange.whose)
+            {
+                scopes.push(exchange.whose.clone());
+            }
+        }
+        scopes
+    }
+
     /// The person's exchanges ([`Self::opening`]) of the last `within`,
     /// at most `most`, oldest first, as (what they said, what the lamp said):
     /// for a route that gives a model the conversation as messages.
@@ -1004,6 +1217,70 @@ impl Thread {
                 written: exchange.written.clone(),
                 person: exchange.person.trim().to_owned(),
                 lamp: exchange.lamp.trim().to_owned(),
+                room: false,
+            })
+            .collect();
+        recent.reverse();
+        recent
+    }
+
+    /// [`Self::recent_for`] `person` (a memory id), with the room's exchanges
+    /// of the same conversation among them, each marked as the room's
+    /// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339: on lamp-3e83 on 30 Oct one
+    /// conversation went line by line to the person's thread or the room's,
+    /// on whether the mouth was read speaking, so a search answered in the
+    /// room's was unknown to their next turn). The same conversation: back
+    /// from `now`, over their exchanges and the room's only, each within
+    /// [`GOING_ON_FOR`] of the one after it; another person's exchange or a
+    /// longer quiet ends it, and only the room's at or after their own first
+    /// exchange in it are told. Within the same `within` and `most`, the
+    /// newest of both, oldest first. One way only: a turn of the room's, or
+    /// another person's, is never told theirs ([`Self::recent_for`]). A
+    /// forget drops the room's with the rest ([`Self::forget`]). A room's
+    /// line narrowed because another voice spoke it is told too: said
+    /// aloud beside them, the accepted risk (`docs/memory.md`).
+    pub fn recent_with_room_lines(
+        &self,
+        person: &str,
+        now: Instant,
+        within: Duration,
+        most: usize,
+    ) -> Vec<Recent> {
+        let mut later = now;
+        let mut start = self.exchanges.len();
+        for (index, exchange) in self.exchanges.iter().enumerate().rev() {
+            if exchange
+                .whose
+                .as_deref()
+                .is_some_and(|whose| whose != person)
+                || later.saturating_duration_since(exchange.at) > GOING_ON_FOR
+            {
+                break;
+            }
+            later = exchange.at;
+            start = index;
+        }
+        let first_theirs = (start..self.exchanges.len())
+            .find(|&index| self.exchanges[index].whose.as_deref() == Some(person));
+        let mut recent: Vec<Recent> = self
+            .exchanges
+            .iter()
+            .enumerate()
+            .rev()
+            .filter(|(index, exchange)| {
+                let theirs = exchange.whose.as_deref() == Some(person);
+                let rooms =
+                    exchange.whose.is_none() && first_theirs.is_some_and(|first| *index >= first);
+                (theirs || rooms)
+                    && now.saturating_duration_since(exchange.at) <= within
+                    && (exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
+            })
+            .take(most)
+            .map(|(_, exchange)| Recent {
+                written: exchange.written.clone(),
+                person: exchange.person.trim().to_owned(),
+                lamp: exchange.lamp.trim().to_owned(),
+                room: exchange.whose.is_none(),
             })
             .collect();
         recent.reverse();
@@ -1546,27 +1823,33 @@ mod tests {
             section.contains("- dance: When asked to dance."),
             "{section}"
         );
+        // Neither `go_to_sleep` nor `prepare_to_unplug` is declared: how
+        // instead is told after the skills (#4595).
+        let none = crate::without_a_tool::told(false, false, false);
         let recalling = Recalling::new(config.clone()).tools(settings.clone());
         let equipped = recalling.equipped(config.clone());
         assert_eq!(
             equipped.instruction_text(),
-            format!("You are a lamp.{section}")
+            format!("You are a lamp.{section}{none}")
         );
         let opened = recalling.opened(|keep| {
-            assert_eq!(keep, section.len());
+            assert_eq!(keep, section.len() + none.len());
             None
         });
         assert_eq!(
             opened.instruction_text(),
-            format!("You are a lamp.{section}")
+            format!("You are a lamp.{section}{none}")
         );
-        // Without the switch: dance is its own function, and nothing is
-        // told after the instruction.
+        // Without the switch: dance is its own function, and nothing of
+        // the skills is told after the instruction.
         let off = Recalling::new(config.clone()).tools(crate::tools::Settings {
             use_skill: false,
             ..settings
         });
-        assert_eq!(off.equipped(config).instruction_text(), "You are a lamp.");
+        assert_eq!(
+            off.equipped(config).instruction_text(),
+            format!("You are a lamp.{none}")
+        );
         let _ = std::fs::remove_dir_all(&folder);
     }
 
@@ -1609,24 +1892,30 @@ mod tests {
                 .instruction_text()
                 .to_owned()
         };
+        // Neither `go_to_sleep` nor `prepare_to_unplug` is declared: how
+        // instead is told after it (#4595).
+        let none = crate::without_a_tool::told(false, false, false);
         catalog(&["volume_up"]);
         assert_eq!(
             told(&recalling),
-            format!("You are a lamp.{}", crate::session_tools::NO_LIGHT)
+            format!("You are a lamp.{}{none}", crate::session_tools::NO_LIGHT)
         );
         assert!(told(&recalling).contains("Never say you changed it."));
         // The catalog gone (lamp-actions down): told it can't change its
         // light or its voice either (the first builder's lamp run on #1513:
         // "I've turned my voice down" with no function at all).
         std::fs::remove_file(folder.join(crate::tools::CATALOG_FILE)).unwrap();
-        assert!(told(&recalling).ends_with(
+        assert!(told(&recalling).ends_with(&format!(
             "You cannot change your light or change how loud your voice is right now: \
              they are not ready. If someone asks for any of them, say so in a few words \
-             of your own, not the same way twice. Never say you did it."
-        ));
+             of your own, not the same way twice. Never say you did it.{none}"
+        )));
         catalog(&["volume_up", "light_colour"]);
-        assert_eq!(told(&recalling), "You are a lamp.");
-        assert_eq!(told(&Recalling::new(config)), "You are a lamp.");
+        assert_eq!(told(&recalling), format!("You are a lamp.{none}"));
+        assert_eq!(
+            told(&Recalling::new(config)),
+            format!("You are a lamp.{none}")
+        );
         // The thread leaves it room. With an instruction that leaves a
         // little less than the line and the thread together, the thread is
         // not recalled and the line is; without the room kept, the thread
@@ -1638,7 +1927,11 @@ mod tests {
         thread.lamp(3, "Nice to meet you, Sam.", now);
         let recall = thread.recall(now, usize::MAX).unwrap().len();
         let long = "x".repeat(
-            lamp_gemini::MAX_INSTRUCTION_BYTES - crate::session_tools::NO_LIGHT.len() - recall + 20,
+            lamp_gemini::MAX_INSTRUCTION_BYTES
+                - crate::session_tools::NO_LIGHT.len()
+                - none.len()
+                - recall
+                + 20,
         );
         let near_full = Recalling::new(recalling.config.clone().instruction(&long).unwrap()).tools(
             crate::tools::Settings {
@@ -1650,7 +1943,7 @@ mod tests {
         let open = |recalling: &Recalling| {
             recalling.opened(|keep| {
                 assert!(
-                    keep == 0 || keep == crate::session_tools::NO_LIGHT.len(),
+                    keep == none.len() || keep == crate::session_tools::NO_LIGHT.len() + none.len(),
                     "{keep}"
                 );
                 Some(recalling.recalled_keeping(&thread, now, None, keep))
@@ -1658,13 +1951,13 @@ mod tests {
         };
         assert_eq!(
             open(&near_full).instruction_text(),
-            format!("{long}{}", crate::session_tools::NO_LIGHT)
+            format!("{long}{}{none}", crate::session_tools::NO_LIGHT)
         );
         // The catalog gone: the longer line's room is kept, and it fits too
         // (the reviewer on #1549).
         std::fs::remove_file(folder.join(crate::tools::CATALOG_FILE)).unwrap();
-        let line = crate::session_tools::not_ready(&[], &near_full.tools).unwrap();
-        assert!(line.len() > crate::session_tools::NO_LIGHT.len());
+        let line = crate::session_tools::told_after(&[], &near_full.tools).unwrap();
+        assert!(line.len() > crate::session_tools::NO_LIGHT.len() + none.len());
         let longer = "x".repeat(lamp_gemini::MAX_INSTRUCTION_BYTES - line.len() - recall + 20);
         let near_full_longer = Recalling::new(
             recalling.config.clone().instruction(&longer).unwrap(),
@@ -1682,14 +1975,14 @@ mod tests {
                 .instruction_text(),
             format!("{longer}{line}")
         );
-        // With the light, nothing is kept: its recall has all its room.
+        // With the light, only the how-to is kept: its recall has the rest.
         catalog(&["volume_up", "light_colour"]);
         let whole = open(&near_full);
         assert!(whole.instruction_text().contains("My name is Sam"));
         assert!(
             !whole
                 .instruction_text()
-                .ends_with(crate::session_tools::NO_LIGHT)
+                .contains(crate::session_tools::NO_LIGHT)
         );
         let _ = std::fs::remove_dir_all(&folder);
     }
@@ -1771,7 +2064,13 @@ mod tests {
         // Opened in the gap: no light, and told so.
         catalog(&["volume_up"]);
         let mut thread = Thread::new();
-        assert!(open(&recalling, &thread).ends_with(crate::session_tools::NO_LIGHT));
+        // Then how instead of a sleep or an unplug it has no function for
+        // (#4595).
+        assert!(open(&recalling, &thread).ends_with(&format!(
+            "{}{}",
+            crate::session_tools::NO_LIGHT,
+            crate::without_a_tool::told(false, false, false)
+        )));
         assert!(!has_light());
         // Asked, and the lamp said it can't.
         thread.person("Make your light orange.", true, now);
@@ -2088,6 +2387,7 @@ mod tests {
             written: written.map(str::to_owned),
             person: person.to_owned(),
             lamp: lamp.to_owned(),
+            room: false,
         };
         for (day, text) in kept {
             // Read a minute after its newest exchange, within the ten
@@ -2360,20 +2660,21 @@ mod tests {
         assert!(!thread.recall(at(31), ROOM).unwrap().contains("What time"));
         // Ten minutes on, nothing of it is told.
         assert_eq!(thread.recall(at(30 + 601), ROOM), None);
-        // Only the last eight exchanges, each side cut to its length.
-        for request in 10..22u64 {
+        // Only the last EXCHANGES, each side cut to its length.
+        for request in 10..26u64 {
             thread.person(&"word ".repeat(200), true, at(700 + request));
             thread.lamp(request, &"answer ".repeat(200), at(701 + request));
         }
-        let recalled = thread.recall(at(730), ROOM).unwrap();
-        assert_eq!(recalled.matches("Person: ").count(), 8);
-        assert_eq!(recalled.matches("You: ").count(), 8);
-        assert!(recalled.len() < 8 * (PERSON_BYTES + LAMP_BYTES + 20) + 400);
+        // Unbounded room: twelve at their longest are past ROOM.
+        let recalled = thread.recall(at(730), usize::MAX).unwrap();
+        assert_eq!(recalled.matches("Person: ").count(), EXCHANGES);
+        assert_eq!(recalled.matches("You: ").count(), EXCHANGES);
+        assert!(recalled.len() < EXCHANGES * (PERSON_BYTES + LAMP_BYTES + 20) + 400);
         assert!(!recalled.contains('\0') && !recalled.contains("  "));
         // With less room, the latest that fit, still in order; with none, nothing.
         let whole = recalled.len();
         let fewer = thread.recall(at(730), whole - 1).unwrap();
-        assert_eq!(fewer.matches("You: ").count(), 7);
+        assert_eq!(fewer.matches("You: ").count(), EXCHANGES - 1);
         assert!(recalled.ends_with(&fewer[GOING_ON.len()..]));
         assert_eq!(thread.recall(at(730), GOING_ON.len() + 10), None);
     }
@@ -2777,6 +3078,156 @@ mod tests {
         assert_eq!(thread.opened_for(), Some(a.as_str()));
     }
 
+    /// The reviewer-lead's P2 on #4479, and #4508 (carried lines may be
+    /// journalled): a held or carried exchange is never given to the running
+    /// summary, journalled or not, at a batch or at the conversation's end;
+    /// the skip is keyed on the held scope, never on what is journalled.
+    #[test]
+    fn a_held_exchange_journalled_or_not_is_never_given_to_the_summary() {
+        let start = Instant::now();
+        let a = crate::remember::person_id("A");
+        let mut thread = Thread::new();
+        for request in 1..=EXCHANGES as u64 {
+            thread.person(&format!("line {request}"), true, start);
+            thread.lamp_for(request, "Mm.", start, Some(&a));
+            if request % 3 == 0 {
+                thread.held_for(request);
+            }
+        }
+        // Journalled, as a carried line's exchange is under #4508's switch.
+        assert!(!thread.finished(EXCHANGES as u64, start).is_empty());
+        let given: Vec<u64> = thread
+            .summary_due(4, start + Duration::from_secs(1))
+            .into_iter()
+            .flat_map(|due| due.exchanges.into_iter().map(|(request, ..)| request))
+            .chain(
+                thread
+                    .summary_rest(Some(&a), start + Duration::from_secs(2))
+                    .into_iter()
+                    .map(|(request, ..)| request),
+            )
+            .collect();
+        assert!(!given.is_empty());
+        assert!(given.iter().all(|request| request % 3 != 0), "{given:?}");
+        assert_eq!(given.len(), EXCHANGES - EXCHANGES / 3, "{given:?}");
+    }
+
+    /// #4339: A is in a conversation going on only while the newest
+    /// exchange before the line in hand is A's and began within
+    /// [`GOING_ON_FOR`]; someone else's in between, a quiet, or only the
+    /// line's own exchange, and they are not.
+    /// #4339 (`LAMP_CONVERSATION_ROOM_LINES_TOLD`): the room's exchanges
+    /// told to A's turn are those of A's conversation only: from A's first
+    /// exchange in it, each within the conversation's 45 s of the next, no
+    /// other person's between, within the chat's window; marked as the
+    /// room's. B's exchanges never, and nothing for the room's turn.
+    #[test]
+    fn room_lines_told_to_a_person_are_their_conversations_only() {
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let t0 = Instant::now();
+        let at = |seconds: u64| t0 + Duration::from_secs(seconds);
+        let lamps = |recent: &[Recent]| -> Vec<(String, bool)> {
+            recent
+                .iter()
+                .map(|said| (said.lamp.clone(), said.room))
+                .collect()
+        };
+        let mut thread = Thread::new();
+        // An earlier conversation of the room's, then a quiet past 45 s.
+        thread.lamp_for(1, "Old room talk.", at(0), None);
+        // A's conversation: the room's before A's first is not A's.
+        thread.lamp_for(2, "Room before A.", at(100), None);
+        thread.lamp_for(3, "A one.", at(110), Some(&a));
+        thread.lamp_for(4, "Room in A's.", at(120), None);
+        thread.lamp_for(5, "A two.", at(130), Some(&a));
+        let told = thread.recent_with_room_lines(&a, at(140), REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(
+            lamps(&told),
+            [
+                ("A one.".to_owned(), false),
+                ("Room in A's.".to_owned(), true),
+                ("A two.".to_owned(), false),
+            ]
+        );
+        // Within the most asked: the newest.
+        let two = thread.recent_with_room_lines(&a, at(140), REMEMBERED_FOR, 2);
+        assert_eq!(
+            lamps(&two),
+            [
+                ("Room in A's.".to_owned(), true),
+                ("A two.".to_owned(), false)
+            ]
+        );
+        // Outside the window: none of it.
+        assert!(
+            thread
+                .recent_with_room_lines(&a, at(140), Duration::from_secs(5), EXCHANGES)
+                .is_empty()
+        );
+        // B's turn is told neither A's nor A's conversation's room lines.
+        assert!(
+            thread
+                .recent_with_room_lines(&b, at(140), REMEMBERED_FOR, EXCHANGES)
+                .is_empty()
+        );
+        // The room's turn is told the room's alone, never A's.
+        assert!(
+            thread
+                .recent_for(None, at(140), REMEMBERED_FOR, EXCHANGES)
+                .iter()
+                .all(|said| !said.lamp.starts_with('A'))
+        );
+        // A quiet past 45 s: a new conversation, the room's line after it
+        // not A's.
+        thread.lamp_for(6, "Room later.", at(200), None);
+        let later = thread.recent_with_room_lines(&a, at(205), REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(
+            lamps(&later),
+            [("A one.".to_owned(), false), ("A two.".to_owned(), false)],
+            "another conversation's room line is not told"
+        );
+        // Another person's exchange between ends A's conversation.
+        thread.lamp_for(7, "A three.", at(210), Some(&a));
+        thread.lamp_for(8, "B one.", at(215), Some(&b));
+        thread.lamp_for(9, "Room after B.", at(220), None);
+        thread.lamp_for(10, "A four.", at(225), Some(&a));
+        let after_b = thread.recent_with_room_lines(&a, at(230), REMEMBERED_FOR, EXCHANGES);
+        assert!(
+            after_b.iter().all(|said| !said.room),
+            "a room line after another person's is not A's conversation's: {after_b:?}"
+        );
+        assert!(after_b.iter().all(|said| said.lamp != "B one."));
+        // A forget drops the room's lines too.
+        thread.forget();
+        assert!(
+            thread
+                .recent_with_room_lines(&a, at(230), REMEMBERED_FOR, EXCHANGES)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn going_on_with_needs_their_own_newest_exchange_within_the_conversation() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let mut thread = Thread::new();
+        assert_eq!(thread.going_on_with(2, now), None, "no exchange yet");
+        thread.lamp_for(1, "Floral or woody?", now, Some(&a));
+        let soon = now + Duration::from_secs(10);
+        assert_eq!(thread.going_on_with(2, soon), Some(a.clone()));
+        assert_eq!(
+            thread.going_on_with(2, now + GOING_ON_FOR + Duration::from_secs(1)),
+            None,
+            "a quiet past the conversation's 45 s"
+        );
+        // The line's own exchange, once begun, is not the one before it.
+        assert_eq!(thread.going_on_with(1, now), None);
+        // The room's exchange came after A's: someone else's in between.
+        thread.lamp_for(2, "Hello there.", now + Duration::from_secs(5), None);
+        assert_eq!(thread.going_on_with(3, soon), None);
+    }
+
     #[test]
     fn scoped_answer_keeps_its_admitted_person_after_the_face_changes() {
         let now = Instant::now();
@@ -2936,6 +3387,7 @@ mod tests {
                 written: Some("Tell them the code word is ORCHID.".into()),
                 person: String::new(),
                 lamp: "The code word is ORCHID.".into(),
+                room: false,
             }]
         );
         // The note is the written turn's alone: a spoken one after it has none.
@@ -3106,14 +3558,14 @@ mod tests {
     }
 
     /// With nobody ever known, a thread is what it always was: the room's,
-    /// never switched, saved as before, eight exchanges.
+    /// never switched, saved as before, EXCHANGES exchanges.
     #[test]
     fn with_nobody_ever_known_nothing_changes() {
         let mut thread = Thread::new();
         let start = Instant::now();
         assert!(!thread.switch_due(start) && !thread.switch_now(false, false, start));
         assert!(!thread.opening(start));
-        for request in 0..12u64 {
+        for request in 0..(EXCHANGES as u64 + 4) {
             thread.person("hello", true, start);
             thread.lamp(request, "hi", start);
         }
@@ -3132,7 +3584,7 @@ mod tests {
         for person in 0..6 {
             let whose = format!("p-{person}");
             thread.at_lamp(Some(whose.clone()));
-            for _ in 0..10 {
+            for _ in 0..EXCHANGES + 2 {
                 request += 1;
                 thread.lamp(request, "hi", start);
             }
@@ -3196,5 +3648,47 @@ mod tests {
         let mut empty = Thread::new();
         empty.at_start(None);
         assert!(!empty.opening(at(0)) && empty.opened_for().is_none());
+    }
+
+    /// `LAMP_UNTIED_GOING_ON` (Sixth's P3 on #4562): what a line going on
+    /// may be tied to holds the end of a long answer too, past the kept
+    /// start's 400 bytes, and leaves out the answers to `but`.
+    #[test]
+    fn said_last_but_holds_a_long_answers_end() {
+        let mut thread = Thread::new();
+        let now = Instant::now();
+        thread.person("Tell me about Saigon.", true, now);
+        let long = "Saigon is a busy city with many old streets and markets. ".repeat(10);
+        thread.lamp(
+            1,
+            &format!("{long}The best time to visit is the dry season."),
+            now,
+        );
+        let (person, lamp) = thread.said_last_but(2, &[]).unwrap();
+        assert_eq!(person, "Tell me about Saigon.");
+        assert!(lamp.starts_with("Saigon is a busy city"), "{lamp}");
+        assert!(lamp.contains("dry season"), "{lamp}");
+        assert!(crate::untied_going_on::tied(
+            "Is it humid in the dry months?",
+            &[&person, &lamp]
+        ));
+        thread.person("Did you send the slides?", true, now);
+        thread.lamp(2, "I hope so.", now);
+        assert!(
+            thread
+                .said_last_but(3, &[])
+                .unwrap()
+                .1
+                .starts_with("I hope so.")
+        );
+        assert!(
+            thread
+                .said_last_but(3, &[2])
+                .unwrap()
+                .1
+                .contains("dry season")
+        );
+        let short = Thread::new();
+        assert!(short.said_last_but(1, &[]).is_none());
     }
 }

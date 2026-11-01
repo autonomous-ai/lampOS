@@ -106,7 +106,7 @@ policy = "hello"
 [[do]]
 body = { look_at = "face" }
 light = "warm_glow"
-say = "They are back at their desk. Greet them in one short line, by name if you know it."
+say = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else."
 ```
 
 The numbers are in the data, never in prose. The runtime applies them.
@@ -200,7 +200,8 @@ must not leave a step silently undone)*.
 | `do.sound` | no | A file in `sounds/`, written as its name: `sound = "ding"` plays `sounds/ding.wav` (#938). Checked at load by the voice's own check (`lamp_voice::say::read_sound`), and the skill refused with why: a regular file, not a link, of at most 148,140 bytes; a WAV of 16-bit mono PCM at 24 kHz (the speaker path's rate), 1 frame to 3 s; no 10 ms of it louder than -30 dBFS RMS (well under the lamp's speech) and no sample past -12 dBFS. Played by the voice, through its say service (`LAMP_SAY=on`) as `{"sound": PATH}`, the file's absolute path; the voice reads it again, only from under the skills folder, and plays it as a turn of its own, so it never overlaps speech ([speaking-first.md](speaking-first.md), the say service). A lamp not at rest as a say needs it (paused, muted, speaking, listening, owing an answer, a reminder due, within 15 s of its last turn) does not play it, nor a second sound within 30 s, and the voice refuses it at once, never later; the run's `done` says why (`sound: refused (the lamp is speaking)`). One say or sound a skill: the run's other steps are made when the voice begins it, as with a say. Refused in a skill with a `tool`: a tool is called while the voice answers |
 | `do.after` | no | `"say"`: this step and every one after it are made when the say ends, not as it begins: the skill's own say in an earlier step, which ends with its outcome, or in a skill with a `tool`, the line the model says after the call, which ends when `voice/state` is `resting` or `listening` again. A line that ends in `listening` was cut, the person speaking over it: then none of the steps after it is made, and the run's `done` says "the line was cut". `thinking` after `speaking` is still the line, since its sound plays on (lamp-06c1, 2026-10-16: 20 ms of `speaking`, then 15 s of `thinking`, through a line of about 2 s), so that wait ends at most 4 s after the speaking began. The run waits at most 5 s for the speaking to begin, and goes on at once if `voice/state` was not said within 3 s. Not after a say never begun. A light changed is then given back when the last clip ends |
 | `do.on` | no | A trigger's `name`: the step is made only in a run that trigger started (Task news: `happy` for done, `caring` and a dimmer light for failed). A step without it is made in every run. One say for each run: one among the steps without `on`, and one for each trigger with its own. Not with `after` in the same skill *(chosen, until a skill needs both)* (#1021) |
-| `do.if_choice` | no | Values of the `[choice]` (each once): the step is made only in a call (or, with the choice's `field`, a trigger's run) that chose one of them, or whose `default` is one (#1679: a scene's own light and pose). Its body, light and show only: no say, sound or look, which are the same for every choice, and no automatic cue, rest or requested-audio step. Not with `on`. An `after = "say"` on it is every run's wait: the steps after it wait in each |
+| `do.if_choice` | no | Values of the `[choice]` (each once): the step is made only in a call (or, with the choice's `field`, a trigger's run) that chose one of them, or whose `default` is one (#1679: a scene's own light and pose). Its body, light, show and stand only: no say, sound or look, which are the same for every choice, and no automatic cue, rest or requested-audio step. Not with `on`. An `after = "say"` on it is every run's wait: the steps after it wait in each |
+| `do.stand` | no | A percent of the lamp's own stand, 1 to 100 (#4135): one `lamp_msgs::StandAsked { share }` published on `body/stand_asked` as publisher `skills`, which the bus keeps as latest and lamp-body takes in place of `--stand-share` until the next ask or power-up ([body.md](body.md), "A stand asked by voice"). Out of range, the skill is refused as it loads (`stand = 0: a percent of the lamp's own stand, 1 to 100`). Only in a skill its `tool` alone starts: the stand is kept, so only a person asks it. Needs `body`. Published only with `LAMP_BODY_POSE_ASK=on` in lamp-skills' environment, the body's own switch; off, the run says `stand 60%: not acted on, LAMP_BODY_POSE_ASK is not on` and nothing is published. A call again while the run is under way publishes again. May go with `if_choice` (Pose: `normal` 100, `lower` 60, `sit` 30) |
 | `do.look` | no | `true`: the voice's full look (#836). Only in a skill with a `tool` and no trigger: the call's answer carries `"look": true` and tells the model to say "Let me take a look."; lamp-skills makes the run's body and light before it answers, and the voice takes its full look for that turn itself as the answer's first audio plays, whatever the model says, its still in the model's next turn, or a note that it could not see if none comes (#941) |
 | `do.requested_audio` | no | A fixed relative `.wav` path, only in a tool-only skill with `permissions.speak = true`: exactly one short plain `say` confirmation, then one `requested_audio` step with `after = "say"`. No other actions, triggers (including daily clock triggers), conditions, choice/flag arguments, output limits, history, search, watch, stop, quiet hours or nudge limits (`most_a_day`, `active`, `budget`, `rest`). The ordinary `again` guard and `still` note remain available and confer no audio authority. Voice plays at most 60 seconds of checked 24 kHz mono PCM16 under the same spoken owner after confirmed confirmation retirement. Advertisement and execution require exact `LAMP_REQUESTED_AUDIO=on`; pack/install may validate while off. See [requested audio](requested-audio.md) for private context, leases, revocation and asset bounds |
 
@@ -261,7 +262,7 @@ the design above, the Policy is the one
 gate for everything the lamp starts itself (#939). Until that gate exists, a
 skill that must keep quiet in those cases says so with a `[[while]]`.
 Routine skills additionally require their documented freshness, local-time
-and durable daily admission checks; see [scheduled skill execution](#scheduled-skill-execution).
+and durable daily admission checks; see [bedtime-morning.md](bedtime-morning.md#authored-routine).
 
 **`moves/`** holds the skill's own moves, read only as `do.body.move` names
 them. The body plays one as it plays its own gestures: on a standing lamp
@@ -481,7 +482,23 @@ skills".)
     lamp-skills then does not greet: the answer came after 2.5 s, the
     person had gone, or the skill's last run was still under way. Until
     lamp-skills tells the Policy, such a hello is lost for those 20 minutes.
-  - `skip`: yes without asking.
+  - `skip`: yes without asking, but for a skill whose `[ask] policy` is
+    `hello` (Welcome back), which is asked of the Policy's gate still, as
+    with `policy`, and acts only on its `say_now`; unanswered within the
+    2.5 s, nothing is done (`lamp_skills::asks_anyway`; the first builder,
+    30 Oct, on the launch testers' findings: the Policy's hard rules, one
+    hello an hour to each person among them, hold on every lamp). Its ask
+    carries `person`, the memory's id of the known face at the lamp, read
+    from the eyes' known file as it asks (`--known-file`, the id on the
+    file's second line, else the id of the name; never the name), and none
+    for a face not known. The product's `lamp-policy` runs with `--hello
+    --act hello --gate --hello-by-rule` to answer it: the hard rules alone
+    decide, a pass is `say_now` at once with no wait for the model, and the
+    judge is asked only in shadow, never acting (the first builder on
+    #4625; [policy.md](policy.md#by-the-hard-rules-alone-4625)). Every other skill acts at once, as
+    before. Tests: `skipping_the_ask_a_hello_is_still_asked_of_the_policy`,
+    `skipping_the_ask_any_other_skill_acts_at_once`,
+    `known::tests::the_person_a_hello_is_for_is_the_memorys_id_never_the_name`.
   - unset: no, and nothing is done.
 
   `answered` says which, and with the Policy its choice, the decision's
@@ -668,7 +685,7 @@ skills".)
 news, Stretch break, Stuffy air and Dance, plus Bedtime and Morning installed
 but disabled pending its lamp comparison, `install::PRODUCT_SKILLS`, which
 is every core skill; Light out, Light
-scenes, Point the light, Light show, Smoky air, Dusty air and Feelings are installed
+scenes, Point the light, Light show, Pose, Smoky air, Dusty air and Feelings are installed
 disabled until their lamp checks or replays, `install::PRODUCT_SKILLS_OFF`;
 Desk tutor and its marks wait for a Live session to take their functions, and the
 other installable skills and the parked Laugh glance are left out,
@@ -710,7 +727,11 @@ and, for someone Mood calls `regular` or `close`, to greet them one beat
 warmer (`person::at_the_lamp`), by its `who = true` permission, which no
 other skill has, so Guard mode and Who was here never name anyone; the
 voice refuses `who` on anything but a note; the typed name is
-in the model's instruction. The voice's one hello an hour for someone
+in the model's instruction. The note is also told, last, the part of the
+day from the lamp's own time (none at night or when the time is not known)
+and to say only a hello and the name, with no weather, day, time, question
+or offer (`local_time::hello_told`; the first builder, 30 Oct, on the
+launch testers' findings, after a hello said "Evening" at 15:42). The voice's one hello an hour for someone
 `close` (#1670) was not carried: `lamp-skills` has no cooldown by
 familiarity, and the 20 minutes hold for everyone.
 
@@ -1153,7 +1174,10 @@ choose"; "we should have core skills and installable skills. but we should
 try to build everything as skills. core skills like core apple apps right
 always installed on the phone and then installable skills like installable
 apps". Earlier: an owner can make a private skill, and choose to publish it
-to a Skills Store for others.
+to a Skills Store for others. That last step is built as fourteen-P13
+(`LAMP_SKILLS_SHARE`, off): the app's Share sends a skill made on the lamp
+to the Store's owner upload, where a reviewer reads it before it is listed
+([cloud.md](cloud.md), "A made skill sent to the Store").
 
 As built on 2026-10-19 (`crates/skills/src/package.rs`; not yet run on a
 lamp):
@@ -1173,12 +1197,17 @@ and version and held to the add-on limits, for a judge. Without
 
 | Skill | Kind | Why |
 |---|---|---|
-| Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance, Prepare-to-unplug | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a stretch with one short line, a droop and a line in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
+| Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance, Prepare-to-unplug (`prepare-unplug`) | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a stretch with one short line, a droop and a line in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
 | Light out when you leave (#1677) | core | The owner's: the light going out when nobody is there is something every lamp does. It does nothing without the eyes' `room/presence` (`LAMP_PRESENCE=on`), and until its lamp check it is installed disabled (`install::PRODUCT_SKILLS_OFF`), so turning presence on for Messages (#1673) does not turn it on too ([presence.md](presence.md)) |
 | Not feeling well (#1681) | core | A failed part shown as a creature a little unwell: on `lamp/health`'s `error` for 30 s, or its `quiet_ms` past 5 minutes (a part that came up well and stopped), one sleepy droop and a pale, slow breath until it ends. In the product's install since its lamp check: row 8 on lamp-52e6 with the lead, 20 Oct 11:35 (`install::PRODUCT_SKILLS`) |
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Installed disabled (`install::PRODUCT_SKILLS_OFF`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
 | Feelings (#3691) | core | What the lamp felt, shown as a creature would: Mood's `felt` on `mood/state` (glad, lively, low; [mood.md](mood.md)) as a small head move of its own and a step of light from the person's, never brighter. Installed disabled (`install::PRODUCT_SKILLS_OFF`) until its lamp check, and it does nothing without Mood (`LAMP_MOOD=on`), which stays trial-only with Tone |
-| Light scenes, Point the light, Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Installed disabled (`PRODUCT_SKILLS_OFF`): not yet tried on a lamp, and enabled, their three functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
+| Light scenes, Point the light (`point-light`), Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Installed disabled (`PRODUCT_SKILLS_OFF`): not yet tried on a lamp, and enabled, their three functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
+| Pose (#4135) | core | Asked for by a person, never on its own: "get lower", "sit down", "back to normal". Its tool `set_pose` (`normal`, `lower`, `sit`) asks the body's stand at 100, 60 or 30 percent of its own through a `stand` step, kept until the next ask or power-up; asked taller than its usual height, the model says so ("This is as tall as I stand.") and calls nothing. Installed disabled (`PRODUCT_SKILLS_OFF`): not yet tried on a lamp, and its stand moves the body only with `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body |
+| Onboarding | core | Every lamp's first meeting: the walk's steps and their order are this skill's own file (`skills/onboarding/skill.toml`), which the voice reads once when it starts, checked by the same validator Skills loads and packages a core skill with ([onboarding.md](onboarding.md)) |
+| Startle (#2822) | core | A creature glances at a sudden sound, a bang or something dropped, then lets it go. Its move is this skill's own file (`[startle]`), which `lamp-expression serve` reads once when it starts ([expression.md](expression.md), "The startle: a glance at a sudden sound") |
+| Watch you leave (#1669 (e)) | core | A pet watches you go: a small base turn toward the side the sitter left by, held about 2 s, then back; on in the product since #2834, with the eyes' `LAMP_ACTIVITY` ([creature.md](creature.md), "You leave") |
+| Music sway (#1669) | core | Once, a slight sway when music has played a while, never while the lamp speaks or listens, at night, or more than twice an hour; on in the product since #2834, on `ears/classes`, so it sways only once the product's ears run their sound classes ([creature.md](creature.md), "Music") |
 | Look for things | installable | "Where are my keys?" (#1685): the owner's call, 19 Oct: an installable skill, and the whole search is fine since a person asked. The desk first, then two places either side, five looks at most, the head down over the desk throughout; the model's look finds the thing, since the eyes find faces only. Not in the product's install: not yet tried on a lamp, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Guard mode (#1685) | installable | Turned on by voice while the person is out; texts them about visits to the desk ([guard-mode.md](guard-mode.md)). Not in the product's install until it has been tried on a lamp (`NOT_PRODUCT_SKILLS`), and its texts reach the phone only with `LAMP_MESSAGES=on` in `lamp-cloud` ([messages.md](messages.md), "Unasked texts") |
 | A sip of water, Rest your eyes, Stand up, Wind down (#1685) | core (since 25 Oct) | The wellbeing nudges beyond Stretch break, each with one short line the voice words (the owner, 25 Oct: "talk to the user"), only when nothing has been heard or said for 5 s and the lamp itself has been quiet 30 s, beside: a slow blue breath after 90 minutes at the desk (10:00 to 17:00); a small tilt and a shade softer light after 45 (09:00 to 20:00, once an hour); a turn and a tilt after 100 minutes of Stretch break's sitting (08:00 to 20:00); a droop and a shade of dim until they leave, in the hour before bedtime (its `[active]`, 22:00 to 23:00 as it comes, never from bedtime on, the night then Bedtime and Morning's). Each has `most_a_day`, `[active]`, `[quiet]`, `[rest]`, Stretch break's `[[while]]` on `room/activity` (never while someone reads or writes head down, #1678; nothing without the eyes' `LAMP_ACTIVITY`), a second on its `sitting_s` (above the trigger's `for`, `unknown = "holds"`: the sitting is the sitter's own, since the eyes begin it again when someone else sits down, so a face in the chair for 90 minutes that was two people is no 90-minute sitting; cases `a-sip-when-the-eyes-say-the-same-sitting` and `not-when-someone-else-sat-down`), one shared `[stop]`, `wellbeing_nudges` (the one that came last, or `all`), and `[budget] group = "wellbeing"`, `per_hour = 1`, with Stretch break: one an hour between them. In the product's install (`PRODUCT_SKILLS`) since 25 Oct, on |
@@ -1188,7 +1217,7 @@ and version and held to the add-on limits, for a judge. Without
 | Sit back (#3694) | installable | V1's posture reminder, which the owner asked to bring back (the first builder on #3504, 27 Oct). Two named triggers on the eyes' `room/activity` (`LAMP_ACTIVITY=place`, the product's): `leaned_in`, `leaning_in` held 10 minutes (the face 1.25 times as big as it sat, against this sitting's own baseline, never a fixed line; a sit-up under its 20 s `gap` does not end it), turns to them and one short, kind line the voice words, that it might be a good moment to sit back; and `sat_well`, `at_desk` held a minute within 15 minutes of that line (`follows`), a short warm word. Neither speaks of a body or looks (`sit_back_says_nothing_of_a_body_and_takes_no_picture`). With nobody else in view a minute (`faces_at_most = 1`), the voice resting 5 s, the lamp quiet 30 s, and the sitting past 12 minutes (`sitting_s`, so a warm word is never for coming back from a gap over 2 minutes, a new sitting); held up to 10 minutes while still leaned in; once an hour, three a day, never 22:00 to 08:00; the wellbeing group's hour; two words in a row unnoticed rest it until morning (`[rest] after_ignored = 2`); the warm word not counted. `head_down` (reading, writing) is not taken as leaning in. Not in the product's install until a played check on a lamp with a person (`NOT_PRODUCT_SKILLS`) |
 | Who was here | installable | "Was anyone here while I was out?" (#1685): the owner's call, 19 Oct: an installable skill. The model is told the lamp's record of the room from `room/presence` (#1721), times only, never a picture or who (with `LAMP_WHO_WAS_HERE_KNOWN=on`, at most "someone the lamp knows", and with `LAMP_WHO_WAS_HERE_NAMES=on` the name of someone who said yes to being named, #1997). Not in the product's install: not yet tried on a lamp, `room/presence` is off in the product, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Night sleep (#940) | core | When the lamp sleeps at night, moved out of Expression with today's numbers: 23:00 to 06:00, nobody seen, the voice resting and the lamp awake for 15 minutes, then Expression's rest (with `LAMP_REST_THROUGH_SOUNDS=on`, a sound heard as no words does not begin the voice's 15 minutes again: only words, its name, a push, a touch or the lamp speaking do; a sound with no words, a baby or an alarm too, does not, #1672); no light, sound or words, asked of nobody. Expression's bow, breath and reflex wakes are unchanged ([alive.md](alive.md#night-sleep-is-a-skill)). On in the product units (`LAMP_SKILL_ROUTINES`, `LAMP_REST_REQUESTS`), with Expression's built-in sleep as the fallback for one release |
-| Bedtime and Morning | core, disabled | Installed for every product lamp, with authored evening glow, morning hum and output-limit data; its own rest and wake moved to Night sleep (#940); no active trigger or tool until enabled after its lamp comparison |
+| Bedtime and Morning (`bedtime-morning`) | core, disabled | Installed for every product lamp, with authored evening glow, morning hum and output-limit data; its own rest and wake moved to Night sleep (#940); no active trigger or tool until enabled after its lamp comparison |
 | Desk tutor, Desk tutor's marks | installable | Desk tutor reads handwriting from the full look's still (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), which a product lamp takes since #2791's product half. With its marks, its two functions would take a product Live session past its 32 (#1667's count). Its marks are called only after its look. Both become core once a session can take their functions (#1668) |
 
 Which of the skills to come are core and which installable is the owner's
@@ -1278,6 +1307,131 @@ it does not know).
 - **`asked`** is the manage helper ("The manage helper", below): one
   request read from the standard input, its answer on the standard output.
 
+**Skills pushed from a computer** (#3869, [control.md](control.md),
+"Skills pushed from a computer"). A paired computer with the `skills`
+grant puts a skill of its own on its own lamp, with no Store. The running
+program loads them from a developer folder of their own,
+`/var/lib/lampOS/skills-dev` (the product unit's
+`LAMP_SKILLS_DEV_DIR`, or `--dev-dir`, which wins; an `Environment=` line,
+as an older `lamp-skills` would end at an unknown flag, #2157), after the
+skills folder, looked at every 2 s with it (`lamp_skills::load_all_with`):
+- **Never in another's place.** A pushed folder with the name of a skill in
+  the skills folder isn't loaded ("a skill of that name is already on the
+  lamp: a pushed skill never takes its place"), and a pushed skill claims
+  its tool's name only after every skill there has, core first, so a
+  pushed skill never takes a core or Store skill's function, whatever the
+  folders' order. Nor does it join a `[budget]` group a skill there uses,
+  or share a `[stop]` with one, so it can never spend a group's hour (the
+  Reviewer-lead's P2 on #3879: a pushed member of `wellbeing` would have
+  quieted A sip of water). A skill there that fails to load just then still
+  holds its group, read from its own `skill.toml`.
+- **Held to the protocol's grants** (`lamp_skills::pushed_refuses`),
+  whatever wrote the folder:
+  - installable only, never `core` or `addon`;
+  - none of `actions`, `messages`, `known_faces`, `who`,
+    `output_limits`, `propose`, `say` or `core`;
+  - topics from `lamp_skills::PUSHED_TOPICS` alone: presence
+    (`humans/faces/tracked`, `room/stood_up`) and those the protocol's
+    events take with no grant (`clock/local`, `voice/state`,
+    `lamp/pause`, `controls/touch`). Not `voice/heard`, `name/heard` or
+    `ears/classes`, which give a skill every phrase or class heard until
+    format 2 lists them (Fourteen on #3869).
+- **The picture held for the owner's yes.** One that sees the picture
+  (`Permissions::sees_picture`: `camera = true`, or format 1's
+  `look = true`) loads off, unless the owner said yes in the app, kept as
+  its name in `--state-dir`'s `on`.
+- **Said as pushed.** Each is said as pushed by the computer its folder's
+  `.pushed.json` names (`{"computer": NAME}`, at most 1 KiB, never through
+  a link), "a computer" without one.
+
+The manage helper writes the folder; `/etc/tmpfiles.d/lampos.conf` makes
+it (0755 root), since the helper's unit may write it only if it is there.
+`lamp-control` asks it, and only `lamp-control` may (by its unit, as
+`lamp-cloud` and the voice are known):
+- `{"install_pushed": SHA256}`: the one push `lamp-control` keeps in its
+  `push/` (`push.json`: `sha256`, `client`, `client_name`, `name`,
+  `grants`, `at_unix_ms`; beside it `package.tar`, at most 1 MiB). Taken
+  only if the SHA-256 is that push's and it was taken within the last
+  60 s, never in the future; its bytes read once, never through a link,
+  and hashed again. It is checked as the running program will load it,
+  beside the skills folder (the rules above), then held to the computer's
+  `grants`: a skill that asks one the computer doesn't hold is refused
+  ("it asks speak, which this computer was not granted"). A name in the
+  skills folder, or another computer's push of that name, is refused; the
+  same computer's push replaces its own. The folder gets `.pushed.json`
+  (`computer`, `client`, `sha256`, `at_unix_ms`) in the same move as the
+  skill. The answer is `{"done": {"name", "version", "sha256", "on",
+  "held", "asks", "shown"}}`: `held` is "sees the picture: off until the
+  owner says yes in the app" or none, `asks` the protocol's grants it
+  asks, and `shown` their words as the pairing screen says them of the
+  skill ("moves the lamp's body", "changes the light", "speaks and plays
+  sounds", "knows when someone is there, never who", "uses the camera
+  when it runs"). A refusal for a grant (a permission or topic past the
+  protocol's grants, `hear` and `sound` among them, or a grant the
+  computer doesn't hold) also says `"code": "no_grant"`, which
+  `lamp-control` gives the computer as its `no_grant`.
+- **A shared package** (Ten on #3931; the helper's half, in B): one whose
+  `lamp-skill.sig` carries its author's `public` key. `install_pushed`
+  reads it again with `read_shared_package_bytes` against the Store's keys
+  (`store_keys`: the build's beside the skills folder, else `--key-file`).
+  A package changed after signing, naming another key, or carrying a Store
+  key is refused ("its signature: …", `bad_package`), and so is any
+  install when the Store's key can't be read, never an empty list. Its
+  `push.json` must carry `asks`, the computer's shown grants, equal to
+  `grants_asked`'s names in their order, or it's refused (`asks_differ`).
+  That is a check for honest tools only, and the skill is still held to
+  `grants`. `.pushed.json` keeps `author` (the whole key, base64) and
+  `author_fingerprint` (FPR16). An update of that name must be signed by
+  the same key, and a signed push over a name pushed unsigned is refused
+  ("desk-wave is signed by key FPR16 on this lamp: remove it first",
+  `signer_changed`). The answer and `list_pushed_by` say `author` (FPR16),
+  "signed by key FPR16, not the Store", never "verified". The owner's
+  picture yes is keyed by name, computer, SHA-256 and author. A Store
+  signature, with no `public`, makes a plain push, as an unsigned one does.
+- `{"off_pushed_by": CLIENT}`: a revoke, or the `skills` grant taken back:
+  that computer's pushes turned off as the app's off does, kept. The
+  revoke is kept first, with its time, in the folder's `.revoked.json`
+  under the folder's lock, so an install of a push it made before then is
+  refused ("that computer was revoked after the push") even when another
+  helper serves the install after the off: the socket starts a helper per
+  connection. A revoke is kept two minutes, past any push it could stop.
+- `{"grants_pushed_by": {"client": CLIENT, "grants": [...]}}`: the owner
+  changed that computer's grants, by a re-pair with fewer or a grant taken
+  back. Its pushed skills that ask a grant outside them (or no longer
+  load) are turned off, kept, and the change is kept in the same record as
+  a revoke, so a push made before it that asks one is refused ("it asks
+  light, which this computer was not granted"). A re-pair after a revoke
+  never lifts the revoke for a push made before it: every change is kept
+  for its two minutes, at most 64. Those dropped, by age or past the
+  64, leave a revoke of every computer at the newest of their times, and
+  a record that can't be read refuses every install until the next
+  change replaces it with a revoke of every computer then: the record
+  fails closed, never open.
+- **Ordered by the door's revision** (Reviewer-two on #3504): the door
+  keeps a `rev` for each computer's pairing, raised on every pair,
+  re-pair, grant change and revoke, writes the one it had into a push's
+  `push.json`, and sends it with each change, `{"off_pushed_by":
+  {"client", "rev"}}` or `{"grants_pushed_by": {"client", "rev",
+  "grants"}}`. A change whose `rev` isn't above the highest kept for that
+  computer is stale and does nothing, answered `{"done": {"stale": REV}}`
+  with the highest; that highest is kept apart from the changes' two
+  minutes (at most 256 computers), so a late retry of an old change is
+  stale however late. A push is after a change when its `rev` is not
+  below the change's; with either missing, by time. A plain id in
+  `off_pushed_by`, from a door that sends no `rev` yet, still works.
+- `{"list_pushed_by": CLIENT}`: that computer's pushes, each `name`,
+  `version`, `sha256`, `on`, `held` and `pushed_at_unix_ms`.
+- `{"remove_pushed": {"client", "name"}}`: removed only for the computer
+  that pushed it.
+- The app's `{"on": NAME}` of a pushed skill is also the owner's yes to it
+  seeing the picture, kept in the folder's `.yes.json` for that computer
+  and that SHA-256: a re-push of other bytes, or another computer's push
+  of the name, has no yes (the Reviewer-lead's P3 on #3879). `{"off":
+  NAME}` turns it off as any skill.
+- A helper given no developer folder answers each of these "skill push is
+  not on this lamp". Tests
+(`crates/skills/tests/it/pushed.rs`): `a_pushed_skill_*`.
+
 **The manage helper** (#1722, the first builder's 18:33). The one way a
 part that is not root changes the skills folder. `lamp-cloud`'s
 `skills.remove` and `skills.install`, for the app's skills page
@@ -1329,9 +1483,12 @@ for it.
   the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
   `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
   install) and `lamp-voice` (a made skill's spoken yes, #1685), each at
-  the system's place for it, are answered. Any other part in the group
-  `lampos` gets `only the app's link and the voice may change the lamp's
-  skills`, as the keys helper does (#2167; `package::from_an_asker`,
+  the system's place for it, are answered, and `lamp-control` for skills
+  pushed from a computer alone (`package::Asker`: it asks nothing else,
+  and nothing else asks those, "only lamp-control asks for pushed skills,
+  and it asks for nothing else"). Any other part in the group `lampos`
+  gets `only the app's link, the voice and lamp-control may change the
+  lamp's skills`, as the keys helper does (#2167; `package::from_an_asker`,
   `only_lamp_cloud_and_the_voice_may_ask_the_manage_helper`). The tests that
   drive `lamp-skills asked` over a socket pair of their own set
   `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit
@@ -1589,7 +1746,7 @@ core = []       # a core skill's alone (kind = "core"): its core-only grants
   have them said at its own moment). A routine also declares its implicit
   `voice/state` read, even without an explicit condition. An internal
   `clock/local` trigger declares that read but adds no external subscription.
-  Each step needs its key: body steps and rest/wake/cancel need `body`, light
+  Each step needs its key: body steps, stand and rest/wake/cancel need `body`, light
   needs `light`, say/sound/cue need `speak`, and a `look = true` step needs `camera` (or format 1's `look`, which still gives the picture; [skill-format.md](skill-format.md), "The camera").
   `[limits]` needs the separate `output_limits` grant, not a general action
   permission. A skill
@@ -1849,14 +2006,14 @@ on the lamp. A "My skills" page in the lamp's app (on or off, what each did
 and when) comes once there are more than a handful. The store comes after
 launch.
 
-#### Made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
+#### Made by voice (#1685, `LAMP_MAKE_SKILL=on`, on in the product)
 
 "Lamp, make me a skill that dims the light at 10 pm." With the switch, the
 model is given `make_skill(request)` (`crates/voice/src/made_skill.rs`). What
 happens:
 
 1. **Handed over as any work.** The voice prepares a hand-over with the
-   tasks part ([tasks.md](tasks.md#a-skill-made-by-voice-1685-off-unless-lamp_make_skillon)).
+   tasks part ([tasks.md](tasks.md#a-skill-made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
    Its text is the brief, then the person's request:
    - The brief is fixed words: the skill format and what a made skill may
      use. So the computer's agent needs no skill creator of its own.
@@ -1999,7 +2156,7 @@ Tests:
 - `task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out`.
 - `crates/skills/tests/it/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
 
-#### Asked for in the app (#2813, off unless `LAMP_APP_MAKE_SKILL=on`)
+#### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
 The same maker, from words typed in the app; put on only as above, by a
 spoken yes at the lamp (the lead's ruling on #1711; the first builder on
@@ -2027,11 +2184,19 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    or one not 1 to 64 letters, digits, `-`, `_`, `.` or `:`; the words too
    long; an id sent before, of the newest 100; or one still being made: one
    at a time, and one "making" for 30 minutes is let go).
-3. **Told aloud.** The hand-over is never kept as typed
+3. `{"ready": {}}` (fourteen-P15): `{"ready": true}` when the tasks part
+   answers `targets` with at least one target within 1 s
+   (`app_make::READY_WAIT`, `agent_tasks::has_a_target`), else
+   `{"ready": false, "why": "the computer's agent isn't set up for the lamp
+   yet"}`; unreached is no. It reads nothing of the asks. `lamp-cloud` asks
+   it every 60 s and names `skills.make` in `can` only while it is ready,
+   so the app's "Make a skill" shows only on a lamp whose Harness has a
+   computer.
+4. **Told aloud.** The hand-over is never kept as typed
    (`task_news::keep_typed`), so its news ("… Shall I put it on the
    lamp?") is told by the spoken task news at a good moment, with someone
    there, and the ask is dated only when heard whole or played through with
-   a gap (`made_skill::asked`, step 6 above).
+   a gap (`made_skill::asked`, step 6 of "Made by voice" above).
    A spoken yes within 120 s puts it on (`put_on_made_skill`, and the
    manage helper's own check, #2874); a no, a typed yes or silence leaves
    it off. What the tasks part settles is settled here too, by the task's
@@ -2041,7 +2206,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    stopped (by the task's own states), are `not_kept` with why; work it may have
    sent (`uncertain`) stays `making`, so another may start after 30
    minutes.
-4. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
+5. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
    only, never a skill made by voice. `state` is `making`, `kept` (not yet
    asked about aloud), `asked` (the offer a spoken yes would put on now:
    the newest, within its 120 s, `made_skill::waiting`, #2874), `on`,
@@ -2049,7 +2214,7 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    or why it wasn't handed over; never the agent's text). Once kept:
    `name`, `description`, `version`, `uses` (`light`, `body`, `topics`) and
    `sha256`, what the lamp asks about. `{"state": "none"}` with no ask.
-5. Kept beside the made skills, root's, 0700: `app.json`, the newest five
+6. Kept beside the made skills, root's, 0700: `app.json`, the newest five
    asks, each its request id, when, its task and why it wasn't kept. Never
    the words. Every writer (the socket's admission, the hand-over's thread,
    the task news' reader, the texts' reader in the worker) holds one lock

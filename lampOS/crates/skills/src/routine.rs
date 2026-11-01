@@ -737,11 +737,14 @@ impl Manager {
                 // correction: elapsed windows cannot be reopened.
                 || now >= active.window_until_us
                 || window_until_us.is_none_or(|until| now >= until)
+                // A state stamped after `now` was written after the loop
+                // read its clock, before this read of the bus: it is judged
+                // at the next tick, and meanwhile is no evidence (`target`),
+                // so a rest it would end lapses with its lease at the latest.
                 || observed.as_ref().is_some_and(|(owner, state)| {
                     owner != &active.request.expression_session_id
                         || !state.enabled
                         || state.stamp.clock_id != self.clock_id
-                        || state.stamp.at_us > now
                 });
             // A completion from an old owner/window is no authority for
             // following sound, even if that receipt itself is still fresh.
@@ -2629,6 +2632,46 @@ mod tests {
             .unwrap();
         f.tick(NIGHT);
         assert!(f.manager.sources["routine"].active.is_none());
+    }
+    /// Expression's state is read from the bus after the main loop read
+    /// `now`, so one written in between is stamped a little after `now`.
+    /// That is no reason to end an admitted rest: the state is judged at
+    /// the next tick, as an ask issued after the tick's sample waits (the
+    /// lamp-skills routine test on ARM64, 31 Oct: "routine cancelled while
+    /// awaiting Rest", 45 ms in).
+    #[test]
+    fn a_state_written_just_after_the_ticks_clock_read_keeps_the_admitted_rest() {
+        let mut f = Fixture::new();
+        let initial = f.resting();
+        let published = f.manager.publisher.totals().published;
+        f.now += 1;
+        let read = f.now;
+        f.now += 1;
+        f.heartbeat();
+        f.manager
+            .tick(read, read, Some(&LocalTime::Offset(0)), NIGHT);
+        assert_eq!(f.manager.publisher.totals().published, published);
+        assert_eq!(
+            f.manager.sources["routine"]
+                .active
+                .as_ref()
+                .unwrap()
+                .request,
+            initial
+        );
+        // At the next tick it is the evidence it always was, and the rest
+        // renews as ever.
+        f.now += RENEW_US;
+        f.observe(Phase::Resting);
+        f.tick(NIGHT);
+        let renewed = &f.manager.sources["routine"]
+            .active
+            .as_ref()
+            .unwrap()
+            .request;
+        assert_eq!(renewed.op, Op::Rest);
+        assert_eq!(renewed.episode, initial.episode);
+        assert_eq!(f.manager.publisher.totals().published, published + 1);
     }
     #[test]
     fn changed_expression_does_not_rebind_rest_during_clock_loss() {

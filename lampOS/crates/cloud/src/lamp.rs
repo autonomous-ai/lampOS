@@ -110,6 +110,9 @@ pub struct Real {
     /// with `LAMP_APP_MAKE_SKILL=on` and the skills page (#2813,
     /// `crate::make_skill`).
     pub make_skill: Option<PathBuf>,
+    /// The Skills Store's owner upload, for a made skill sent there
+    /// (`LAMP_SKILLS_SHARE=on` with the skills page, fourteen-P13).
+    pub share: Option<crate::share::Store>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -390,6 +393,12 @@ impl Real {
         read(&self.places.etc.join("timezone"))
     }
 
+    /// The owner's language (#4473), always said: `en` with no file, so the
+    /// app tells English from a lamp too old to say (Mobile on #4473).
+    pub fn language(&self) -> &'static str {
+        crate::settings::language(&read(&self.places.etc.join("lampOS/setup/language")))
+    }
+
     /// The default route's own address, for `local_ip`.
     pub fn local_ip(&self) -> String {
         default_route(&read(&self.places.proc.join("net/route")))
@@ -541,6 +550,7 @@ impl Lamp for Real {
             "device_name": self.device_name(),
             "uptime_seconds": uptime,
             "timezone": self.timezone(),
+            "language": self.language(),
         })
     }
 
@@ -643,6 +653,14 @@ impl Lamp for Real {
         }))
     }
 
+    fn account(&mut self) -> Option<&'static str> {
+        self.latest(lamp_msgs::AccountState::TOPIC)
+            .filter(|message| !message.expired)
+            .and_then(|message| message.parse::<lamp_msgs::AccountState>().ok())
+            .filter(|state| state.signed_out)
+            .map(|_| "signed_out")
+    }
+
     fn recovery(&self) -> bool {
         self.places
             .run
@@ -704,6 +722,14 @@ impl Lamp for Real {
 
     fn make_skill(&self) -> Option<PathBuf> {
         self.make_skill.clone()
+    }
+
+    fn make_skill_ready(&self) -> bool {
+        crate::make_skill::is_ready()
+    }
+
+    fn share(&self) -> Option<crate::share::Store> {
+        self.share.clone()
     }
 
     fn update_status(&self) -> Option<lamp_bus::Message> {
@@ -921,6 +947,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            share: None,
             shutdown: None,
         };
         assert!(!lamp.recovery());
@@ -999,6 +1026,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            share: None,
             shutdown: None,
         };
         let level = Volume {
@@ -1026,7 +1054,7 @@ mod tests {
         assert_eq!(
             host,
             json!({"hostname": "lamp-7f72", "device_id": "d-42", "device_name": "lamp-7f72",
-                "uptime_seconds": 86400, "timezone": "Asia/Ho_Chi_Minh"})
+                "uptime_seconds": 86400, "timezone": "Asia/Ho_Chi_Minh", "language": "en"})
         );
         // The lamp's name in the app, once the person gave it one (#1959):
         // only `device_name`; the host's own name stays.
@@ -1053,6 +1081,61 @@ mod tests {
             })
         );
         assert!(lamp.health().is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #4473: `host.language` is always said, `en` with no file (Mobile's
+    /// ask 1), and `system.info` and `mic.get` are answered while the voice
+    /// restarts after a new one (ask 2): neither asks the voice, only files
+    /// and what the bus kept, so with the voice down on its bus both answer,
+    /// the microphones as not available.
+    #[test]
+    fn system_info_and_the_mic_are_answered_with_the_voice_down() {
+        let (places, root) = places("language");
+        let bus_root = root.join("bus");
+        std::fs::create_dir_all(&bus_root).unwrap();
+        let mut lamp = Real {
+            places: places.clone(),
+            bus: Some(Bus::new(&bus_root).unwrap()),
+            device_id: "d-42".into(),
+            build: "812+460a1a1aa2b3".into(),
+            wifi: Wifi::default(),
+            ring: Ring::default(),
+            texts: Texts::default(),
+            reports: None,
+            skills: None,
+            changes: None,
+            photos: None,
+            faces: None,
+            schedule: None,
+            update_page: false,
+            update_checks: Default::default(),
+            restart: None,
+            guard: None,
+            make_skill: None,
+            share: None,
+            shutdown: None,
+        };
+        let info = crate::answer::answer(&mut lamp, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(info["host"]["language"], "en");
+        assert_eq!(info["host"]["timezone"], "Asia/Ho_Chi_Minh");
+        let file = places.etc.join("lampOS/setup/language");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "ja\n").unwrap();
+        let info = crate::answer::answer(&mut lamp, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(info["host"]["language"], "ja");
+        std::fs::write(&file, "fr\n").unwrap();
+        assert_eq!(lamp.host()["language"], "en");
+        assert_eq!(
+            crate::answer::answer(&mut lamp, "mic.get", &Value::Null),
+            Ok(Some(
+                json!({"muted": false, "hw_switch_muted": null, "available": false})
+            ))
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -1131,6 +1214,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            share: None,
             shutdown: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();

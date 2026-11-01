@@ -3,7 +3,12 @@
 # physical skill, the lamp's only one (the voice's own was removed, #2825). The skill folders are in /var/lib/lampOS/skills (lampOS/skills/welcome-back).
 # It speaks through the voice's say service (#954: LAMP_SAY=on and LAMP_SAY_GROUP=orangepi in
 # lamp-voice.service); without it a hello is never begun, and nothing moves or lights.
-# LAMP_SKILLS_ASK=skip: the Policy's gate (#939) is not built yet, so nothing asks it.
+# LAMP_SKILLS_ASK=skip: nothing asks the Policy but Welcome back, whose hello is asked of its gate
+# on skills/ask still (the first builder, 30 Oct) by a lamp-skills built with #4625: it needs
+# lamp-policy --hello --act hello --gate, and without an answer no hello is said. The binary pinned
+# below predates it and still greets without asking until 4ace's lamp-skills is replaced.
+# LAMP_SKILLS_KNOWN_FILE: the eyes' known file, for the person a hello is asked for (one an hour
+# each), as the product unit; an older binary ignores it.
 [Unit]
 Description=lampOS skills (lamp-skills)
 ConditionHost=lamp-4ace
@@ -14,6 +19,7 @@ Type=exec
 User=orangepi
 Group=orangepi
 Environment=LAMP_SKILLS_ASK=skip
+Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
 # The SHA-256 is the ARM64 run's lamp-skills (PR for #938), installed under /opt/lampOS/skills/.
 # --zone system: a skill's quiet hours in the lamp's own zone (#1384, #820); it had none.
 ExecStart=/opt/lampOS/skills/229504a0c1cd392c28a326591b2e9c6cf4398b4ddea7f1fe23428c3ee4e068c5/lamp-skills --dir /var/lib/lamp-skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --zone system

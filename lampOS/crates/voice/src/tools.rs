@@ -47,6 +47,9 @@ mod schedule_integration_tests;
 #[path = "tools/schedule_asked.rs"]
 pub mod schedule_asked;
 
+#[path = "tools/schedule_whose.rs"]
+pub mod schedule_whose;
+
 /// Where the coordinator reads whether the model may say a thing was not
 /// for it. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_TOOLS";
@@ -153,6 +156,10 @@ pub struct Settings {
     /// The onboarding file, whose mailbox the model's reports go to
     /// ([`crate::onboarding`]).
     pub onboarding: Option<PathBuf>,
+    /// This lamp's walk offers room sounds / face expressions: only then
+    /// does `setup_step` name them (#3769).
+    pub onboarding_room_sounds: bool,
+    pub onboarding_face_expressions: bool,
     /// The skills are reached through one function, `use_skill`
     /// ([`crate::use_skill`], `LAMP_USE_SKILL=on`), not one each.
     pub use_skill: bool,
@@ -164,6 +171,10 @@ pub struct Settings {
     /// The person may put the lamp to sleep by voice
     /// ([`crate::sleep_asked`], `LAMP_SLEEP_ASKED=on`, #3748).
     pub sleep_asked: bool,
+    /// The app's off button turns the lamp off (`LAMP_SHUTDOWN=on`,
+    /// shutdown.md): only then is a model with no `prepare_to_unplug` told
+    /// to say so ([`crate::without_a_tool`], #4595).
+    pub shutdown_from_app: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -219,6 +230,14 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         flags.push(crate::onboarding::FLAG.to_owned());
         flags.push(file.display().to_string());
+        flags.extend(crate::onboarding::offers_arguments(
+            std::env::var(crate::privacy_bus::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+            std::env::var(crate::onboarding::FACE_EXPRESSIONS_ASK_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ));
     }
     flags.extend(crate::use_skill::arguments(
         std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref(),
@@ -233,6 +252,9 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(crate::sleep_asked::ENVIRONMENT)
             .ok()
             .as_deref(),
+    ));
+    flags.extend(crate::without_a_tool::arguments(
+        std::env::var(lamp_msgs::SHUTDOWN_SWITCH).ok().as_deref(),
     ));
     flags
 }
@@ -418,6 +440,18 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         }
         settings.onboarding = Some(PathBuf::from(file));
         flags = rest;
+        if let [flag, rest @ ..] = flags
+            && flag == crate::onboarding::ROOM_SOUNDS_FLAG
+        {
+            settings.onboarding_room_sounds = true;
+            flags = rest;
+        }
+        if let [flag, rest @ ..] = flags
+            && flag == crate::onboarding::FACE_EXPRESSIONS_FLAG
+        {
+            settings.onboarding_face_expressions = true;
+            flags = rest;
+        }
     }
     if let [flag, rest @ ..] = flags
         && flag == crate::use_skill::FLAG
@@ -441,6 +475,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::sleep_asked::FLAG
     {
         settings.sleep_asked = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::without_a_tool::SHUTDOWN_FLAG
+    {
+        settings.shutdown_from_app = true;
         flags = rest;
     }
     Ok((settings, flags))
@@ -753,7 +793,10 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.push(crate::marked::tool());
     }
     if settings.onboarding.is_some() {
-        tools.extend(crate::onboarding::tools());
+        tools.extend(crate::onboarding::tools(
+            settings.onboarding_room_sounds,
+            settings.onboarding_face_expressions,
+        ));
     }
     // A system function, never a skill (#1683): before the executive's and
     // the skills', so it is never the one cut past 32; a skill cut for it is
@@ -904,8 +947,14 @@ pub enum Route {
     Schedule(PathBuf),
     /// Ask the memory on this socket; with the eyes' socket and switches,
     /// a known person's "forget everything about me" forgets their face too
-    /// ([`crate::remember::forget_everything_face`]).
-    Memory(PathBuf, Option<(PathBuf, crate::known_faces::FaceSwitches)>),
+    /// ([`crate::remember::forget_everything_face`]); with the executive's
+    /// directory when the schedule's tools are on, the reminders they set go
+    /// too ([`schedule_whose::forget_reminders`], #4527's P2).
+    Memory(
+        PathBuf,
+        Option<(PathBuf, crate::known_faces::FaceSwitches)>,
+        Option<PathBuf>,
+    ),
     /// The time: answered here, at once.
     Clock,
     /// Work for an agent elsewhere, through the tasks part.
@@ -975,6 +1024,10 @@ pub fn route(settings: &Settings, name: &str) -> Route {
                 .who
                 .clone()
                 .map(|who| (who, face_switches(settings))),
+            settings
+                .schedule_tools
+                .then(|| settings.exec.clone())
+                .flatten(),
         );
     }
     if crate::agent_tasks::is_tool(name) {
@@ -1246,7 +1299,7 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
         return json!({"error": MOVES_ONLY_AT_THE_LAMP});
     }
     match route {
-        Route::Memory(socket, _) => {
+        Route::Memory(socket, ..) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
@@ -1502,6 +1555,28 @@ fn spoken_scope_current(
         })
 }
 
+/// The name a `remember_my_face` that saved a face keeps in that person's
+/// own memory: only while the onboarding walk at `onboarding` has not yet
+/// ended "who you are" ([`crate::onboarding::who_you_are_open`]); once it
+/// has (done, skipped, failed, later), or with no walk, none, so a later
+/// save by anyone keeps no "Their name is X." (the Reviewer-lead's P3 on
+/// #4530). The name the eyes kept, else the one asked.
+fn name_kept_with_face<'a>(
+    call: &'a ToolCall,
+    told: &'a Value,
+    onboarding: Option<&Path>,
+) -> Option<&'a str> {
+    (call.name == crate::known_faces::REMEMBER
+        && told["ok"] == true
+        && onboarding.is_some_and(crate::onboarding::who_you_are_open))
+    .then(|| {
+        told["remembered"]
+            .as_str()
+            .or_else(|| call.args.get("name").and_then(Value::as_str))
+    })
+    .flatten()
+}
+
 fn run_call_with_scope(
     route: &Route,
     call: &ToolCall,
@@ -1514,7 +1589,7 @@ fn run_call_with_scope(
     }
     let deadline = ASK_DEADLINE;
     let result = match route {
-        Route::Memory(socket, faces) => {
+        Route::Memory(socket, faces, reminders) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
@@ -1576,7 +1651,18 @@ fn run_call_with_scope(
                         ) =>
                     {
                         let started = std::time::Instant::now();
-                        match lease.keeper_within(crate::memory_scope::KEEPER_WAIT) {
+                        // A line A's only by the one-face rule, its reads
+                        // the room's: its `remember`, never a forget, is
+                        // A's (`LAMP_PERSON_SCOPE_ONE_FACE`, option 2 of
+                        // reviewer-three's P1 on #4584).
+                        let keeper = lease
+                            .keeper_within(crate::memory_scope::KEEPER_WAIT)
+                            .or_else(|| {
+                                (model.name == crate::remember::REMEMBER)
+                                    .then(|| lease.kept_by_one_face())
+                                    .flatten()
+                            });
+                        match keeper {
                             Some(person) => {
                                 eprintln!(
                                     "lamp-voice: request {request}: a memory write in a line admitted as the room's goes to the known face the eyes named by its end ({} ms)",
@@ -1631,6 +1717,24 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the name typed at setup, on the same mark and rule (#4461),
+            // after the place, which finds the owner by that name.
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::person::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
+            // And the reminders they set, once their memory is emptied
+            // (#4527's P2): never the room's, nor anyone else's.
+            let (told, answered) = match (reminders, lease) {
+                (Some(directory), Some(lease))
+                    if heard && model.name == crate::remember::FORGET_EVERYTHING =>
+                {
+                    schedule_whose::forget_reminders((told, answered), directory, lease)
+                }
+                _ => (told, answered),
+            };
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
@@ -1640,7 +1744,12 @@ fn run_call_with_scope(
         ),
         Route::Schedule(directory) => (
             "the schedule through the executive",
-            ask_schedule(directory, call, deadline),
+            ask_schedule_for(
+                directory,
+                call,
+                deadline,
+                Some(&schedule_whose::caller(lease, &call.name)),
+            ),
         ),
         // A face is the person's at the lamp: only words they said there
         // may keep or forget one, never a request the lamp wrote or a text
@@ -1695,6 +1804,13 @@ fn run_call_with_scope(
                 && let Some(lease) = lease
             {
                 lease.face_remembered();
+            }
+            // A face saved while the walk leads "who you are" to its end:
+            // the name it was saved under is kept in that person's own
+            // memory, off this call's path (`remember::keep_name_with_face`,
+            // the onboarding forgets report). Read before the mailbox below.
+            if let Some(name) = name_kept_with_face(call, &told.0, onboarding.as_deref()) {
+                crate::remember::keep_name_with_face(name);
             }
             // A face saved while the walk leads "who you are" ends that step
             // (#3740), through the mailbox `setup_step` writes; one saved
@@ -1842,13 +1958,28 @@ fn take_requested_audio(
 /// may follow a committed mutation; do not turn it into a claim of failure or
 /// silently repeat the call under a new identity.
 pub fn ask_schedule(directory: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
+    ask_schedule_for(directory, call, deadline, None)
+}
+
+/// [`ask_schedule`] for a line's `caller` ([`schedule_whose::caller`]):
+/// whose reminders it hears and changes, and whose one it sets is. With
+/// none, the executive takes the call as nobody's.
+pub fn ask_schedule_for(
+    directory: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    caller: Option<&Value>,
+) -> (Value, bool) {
     if !is_schedule_tool(&call.name) {
         return (unavailable(), false);
     }
     let Some(until) = Instant::now().checked_add(deadline) else {
         return (unavailable(), false);
     };
-    let line = json!({"op":"call","name":call.name,"args":call.args});
+    let mut line = json!({"op":"call","name":call.name,"args":call.args});
+    if let Some(caller) = caller {
+        line["caller"] = caller.clone();
+    }
     match lamp_schedule::client::exchange(&directory.join(CALL_SOCKET), &line, until) {
         Ok(answer) => {
             let told = match answer.get("ok").and_then(Value::as_bool) {
@@ -2033,7 +2164,7 @@ mod tests {
             name: crate::remember::RECALL.into(),
             args: json!({}),
         };
-        let route = Route::Memory(PathBuf::from("/missing-memory.sock"), None);
+        let route = Route::Memory(PathBuf::from("/missing-memory.sock"), None, None);
         assert_eq!(
             run_call_scoped(&route, &call, 2, true, &lease),
             ("nobody", (unavailable(), false))
@@ -2246,7 +2377,7 @@ mod tests {
             onboarding: Some(file.clone()),
             ..Settings::default()
         };
-        let memory = Route::Memory(dir.join("memory.sock"), None);
+        let memory = Route::Memory(dir.join("memory.sock"), None, None);
         let mailbox =
             || std::fs::read_to_string(crate::onboarding::mailbox_of(&file)).unwrap_or_default();
         let kept = json!({"forgotten": true, "everything": false,
@@ -2495,6 +2626,7 @@ mod tests {
     fn with_every_switch_on_the_voices_own_functions_are_a_list_the_link_takes() {
         let settings = Settings {
             sleep_asked: false,
+            shutdown_from_app: false,
             decline: true,
             use_skill: false,
             requested_audio: true,
@@ -2529,6 +2661,8 @@ mod tests {
             photo_faces: false,
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
+            onboarding_room_sounds: false,
+            onboarding_face_expressions: false,
             reports_stop: true,
         };
         let mut tools = declared(&settings);
@@ -2575,14 +2709,20 @@ mod tests {
     }
 
     fn schedule_directory(name: &str) -> PathBuf {
+        // A count of its own beside the time: the two `scoped_audio` tests
+        // both ask for "audio-scope", and on a Mac, whose wall clock reads
+        // in whole microseconds, two that started together got one name and
+        // the second `create_dir` failed `AlreadyExists` (#1569).
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let base = if Path::new("/private/tmp").is_dir() {
             PathBuf::from("/private/tmp")
         } else {
             std::env::temp_dir()
         };
         let path = base.join(format!(
-            "lvs-{name}-{}-{:x}",
+            "lvs-{name}-{}-{}-{:x}",
             std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -2665,6 +2805,41 @@ mod tests {
             assert_eq!(settings.schedule_speak, on, "{speak:?}");
             assert_eq!(crate::reminders::speaks(speak), on, "{speak:?}");
         }
+    }
+
+    /// lamp-52e6 on 30 Oct (8811, #3769): `LAMP_FACE_EXPRESSIONS_ASK`
+    /// unset, the model was still told of face_expressions by `setup_step`
+    /// and, after the hello, asked "Do you mind if I notice whether you're
+    /// smiling or frowning". The worker's functions name the step only with
+    /// its flag.
+    #[test]
+    fn a_face_expressions_step_that_is_off_is_never_told_to_the_model() {
+        let told = |extra: &[&str]| {
+            let mut flags: Vec<String> = vec![
+                crate::onboarding::FLAG.into(),
+                "/var/lib/onboarding.json".into(),
+            ];
+            flags.extend(extra.iter().map(|flag| flag.to_string()));
+            let (settings, rest) = take(&flags).unwrap();
+            assert!(rest.is_empty(), "{rest:?}");
+            serde_json::to_string(
+                &declared(&settings)
+                    .into_iter()
+                    .map(|tool| json!([tool.name, tool.description, tool.parameters]))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+        };
+        let off = told(&[]);
+        assert!(off.contains(crate::onboarding::STEP), "{off}");
+        for word in ["face", "smil", "frown", "express"] {
+            assert!(!off.contains(word), "{word}: {off}");
+        }
+        let on = told(&["--onboarding-face-expressions"]);
+        assert!(
+            on.contains("face_expressions is done only after a clear yes"),
+            "{on}"
+        );
     }
 
     #[test]
@@ -2763,6 +2938,7 @@ mod tests {
             settings,
             Settings {
                 sleep_asked: false,
+                shutdown_from_app: false,
                 decline: true,
                 use_skill: false,
                 requested_audio: false,
@@ -2781,6 +2957,8 @@ mod tests {
                 photo_faces: false,
                 mark: None,
                 onboarding: None,
+                onboarding_room_sounds: false,
+                onboarding_face_expressions: false,
                 reports_stop: false,
             }
         );
@@ -3561,7 +3739,7 @@ mod tests {
         for name in ["remember", "recall", "forget"] {
             assert_eq!(
                 route(&with, name),
-                Route::Memory("/run/lampos-memory/memory.sock".into(), None)
+                Route::Memory("/run/lampos-memory/memory.sock".into(), None, None)
             );
         }
         assert_eq!(route(&with, "light_on"), Route::Executive(dir.clone()));
@@ -4967,6 +5145,80 @@ mod tests {
         assert_eq!(asked["person"], json!(ann), "{asked}");
     }
 
+    /// `LAMP_PERSON_SCOPE_ONE_FACE` (option 2 of reviewer-three's P1 on
+    /// #4584): on a line Ann's only by her face the one face in view, her
+    /// `remember` is asked in her scope; a recall and a single-item forget
+    /// are asked in the room's, never hers.
+    #[test]
+    fn a_one_face_lines_keep_is_theirs_and_its_recall_and_forget_the_rooms() {
+        let ann = crate::remember::person_id("Ann");
+        for (at, (name, args, reply, person)) in [
+            (
+                crate::remember::REMEMBER,
+                json!({"text":"Flying to Tokyo next week."}),
+                "{\"ok\":true,\"id\":1}\n",
+                Some(ann.clone()),
+            ),
+            (
+                crate::remember::RECALL,
+                json!({"query":"doctor"}),
+                "{\"ok\":true,\"items\":[]}\n",
+                None,
+            ),
+            (
+                crate::remember::FORGET,
+                json!({}),
+                "{\"ok\":true,\"removed\":1}\n",
+                None,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let socket =
+                std::env::temp_dir().join(format!("one-face-{at}-{}.sock", std::process::id()));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                stream.write_all(reply.as_bytes()).unwrap();
+                serde_json::from_str::<Value>(&line).unwrap()
+            });
+            let request = 4_584 + at as u64;
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x45; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Ann"),
+            );
+            let lease = owner.lease();
+            assert!(lease.take_by_one_face());
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "o1".into(),
+                name: name.into(),
+                args,
+            };
+            answer_scoped(&settings, &call, request, false, &lease);
+            let asked = served.join().unwrap();
+            std::fs::remove_file(socket).unwrap();
+            assert_eq!(
+                asked.get("person").and_then(Value::as_str),
+                person.as_deref(),
+                "{name}: {asked}"
+            );
+        }
+    }
+
     /// A genuinely unknown speaker's keep (nobody known by the end of the
     /// wait) keeps the documented room rule: "said in this room; speaker
     /// unknown", with no person, as before.
@@ -5049,5 +5301,51 @@ mod tests {
         let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
         let asked = forget("unknown", cache, Box::new(|| {}));
         assert!(asked.get("person").is_none(), "{asked}");
+    }
+
+    /// The Reviewer-lead's P3 on #4530: a face saved while the walk leads
+    /// "who you are" keeps its name in that person's memory; after the walk
+    /// is past that step (done, skipped, failed, later, the file kept), or
+    /// with no walk, a `remember_my_face` by anyone keeps no name.
+    #[test]
+    fn a_face_saved_keeps_its_name_only_while_who_you_are_is_running() {
+        let dir = std::env::temp_dir().join(format!("lamp-name-kept-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("progress.json");
+        let call = ToolCall {
+            id: "face".into(),
+            name: crate::known_faces::REMEMBER.into(),
+            args: json!({"name": "Sam"}),
+        };
+        let saved = json!({"ok": true, "remembered": "Sam"});
+        let walk =
+            |steps: Value| std::fs::write(&file, json!({"steps": steps}).to_string()).unwrap();
+        walk(json!({"where_you_sit": {"outcome": "done", "at_unix_s": 1}}));
+        assert_eq!(
+            name_kept_with_face(&call, &saved, Some(&file)),
+            Some("Sam"),
+            "during the walk"
+        );
+        assert_eq!(
+            name_kept_with_face(&call, &json!({"ok": true}), Some(&file)),
+            Some("Sam"),
+            "the name asked when the eyes name none"
+        );
+        assert_eq!(
+            name_kept_with_face(&call, &json!({"ok": false}), Some(&file)),
+            None,
+            "a refused save"
+        );
+        assert_eq!(name_kept_with_face(&call, &saved, None), None, "no walk");
+        for outcome in ["done", "skipped", "failed", "later"] {
+            walk(json!({"who_you_are": {"outcome": outcome, "at_unix_s": 2}}));
+            assert_eq!(
+                name_kept_with_face(&call, &saved, Some(&file)),
+                None,
+                "{outcome}"
+            );
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

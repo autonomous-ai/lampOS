@@ -1435,6 +1435,133 @@ fn the_product_keeps_a_repeated_thing_once() {
     }
 }
 
+/// Within a conversation going on, a known person's line no face was seen
+/// speaking stays theirs to be told from (`LAMP_CONVERSATION_CARRIES`, #4339),
+/// beside the scope by sight it acts with: on lamp-3e83 on 29 Oct one such
+/// line dropped to the room's and the lamp asked its question again.
+#[test]
+fn the_product_carries_a_conversation_through_an_unseen_line() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_CARRIES=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A carried line's keep waits for that person's seen yes
+/// (`LAMP_CONVERSATION_CARRIED_SAVES`, #4339, approved 30 Oct; #4508),
+/// beside the carry and the scope by sight it acts with: "we booked the Pine
+/// Hill Hotel" said with the face slipped was lost ("I can't save that just
+/// now").
+#[test]
+fn the_product_saves_a_carried_line_into_its_conversation() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_CARRIES=on",
+        "Environment=LAMP_CONVERSATION_CARRIED_SAVES=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A silent face doesn't count against a carry
+/// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`, #4339): on lamp-3e83 on 30 Oct the
+/// known face was in all 30 looks of a line and alone in none, so 4 lines
+/// carried while one conversation split in two.
+#[test]
+fn the_product_carries_a_conversation_past_a_silent_face() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_CARRIES=on",
+        "Environment=LAMP_JOIN_CUT_WORDS=on",
+        "Environment=LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A person's turn is also told the room's lines of the same conversation
+/// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339): on lamp-3e83 on 30 Oct a
+/// search answered in the room's thread was unknown to the person's next
+/// turn.
+#[test]
+fn the_product_tells_a_person_the_rooms_lines_of_their_conversation() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A known person's keep on a line no face was seen speaking is theirs when
+/// their own known face was the one face in view and no other voice was
+/// heard (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers' item 1 on
+/// #3997): on lamp-220c on 30 Oct the owner's face was in 17 looks, read
+/// speaking in none, and their own memory stayed empty. Its reads stay the
+/// room's: a guest off camera reads the same (reviewer-three's P1 on #4584).
+/// Beside the scope by sight it acts with, and the line rooms that record
+/// another voice.
+#[test]
+fn the_product_keeps_a_keep_theirs_with_one_known_face_in_view() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PERSON_SCOPE_SEEN=on",
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
+        "Environment=LAMP_JOIN_CUT_WORDS=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// A long conversation keeps its rules and score past the thread's view
+/// (`LAMP_CONVERSATION_SUMMARY`, #1693's long-conversation plan, step 3): on
+/// lamp-06c1 on 29 Oct, 11 exchanges after a quiz's rules the lamp said
+/// there was no quiz.
+#[test]
+fn the_product_summarises_a_long_conversation() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_CONVERSATION_SUMMARY=on"),
+        "the voice lacks LAMP_CONVERSATION_SUMMARY=on"
+    );
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.
@@ -2039,10 +2166,10 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
     // Not feeling well came with the product after its lamp check (#1681);
-    // the seven of PRODUCT_SKILLS_OFF come installed disabled; the startle
+    // the eight of PRODUCT_SKILLS_OFF come installed disabled; the startle
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
     // Head pat and its wiggle since #4133's design owner's yes (29 Oct).
-    assert_eq!(installed.len(), 27);
+    assert_eq!(installed.len(), 28);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -2073,7 +2200,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 27);
+    assert_eq!(inventory.len(), 28);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed

@@ -42,6 +42,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     (lamp, bus_root)

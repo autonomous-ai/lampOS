@@ -27,8 +27,8 @@ use crate::{
 };
 use lamp_bus::{Bus, Notice, Publisher, Subscriber};
 use lamp_msgs::{
-    AddonAsk, Decision, Diagnostic, Faces, Level, NameHeard, RoomState, Rules, SkillAsk, Speech,
-    TaskStatus, Voice, VoiceArrival, VoiceState, VoiceTurn,
+    AddonAsk, Addressed, Decision, Diagnostic, Faces, Level, NameHeard, RoomState, Rules, SkillAsk,
+    Speech, TaskStatus, Voice, VoiceArrival, VoiceState, VoiceTurn,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -170,6 +170,16 @@ pub enum Note {
         took_ms: u32,
         /// A hard rule that answered `wait`, or turned a yes to it.
         guard: Option<hello::Hold>,
+    },
+    /// The judge's answer for a hello the hard rules decided
+    /// (`--hello-by-rule`), asked in shadow: never acted on.
+    HelloJudged {
+        arrival: u64,
+        decided: progress::Choice,
+        /// What the judge would have decided, if it answered.
+        judged: Option<(progress::Choice, f32)>,
+        took_ms: u32,
+        failed: Option<&'static str>,
     },
     /// A decision was made.
     Decided {
@@ -315,6 +325,26 @@ impl fmt::Display for Note {
                 if by_rule { RULE } else { "model" },
                 guard.map_or("none", hello::Hold::as_str),
             ),
+            Self::HelloJudged {
+                arrival,
+                decided,
+                judged,
+                took_ms,
+                failed,
+            } => match judged {
+                Some((choice, probability)) => write!(
+                    f,
+                    "hello judge in shadow arrival={arrival} decided={} judge={} probability={probability:.3} took_ms={took_ms}",
+                    decided.as_str(),
+                    choice.as_str(),
+                ),
+                None => write!(
+                    f,
+                    "hello judge in shadow arrival={arrival} decided={} judge=none failed={} took_ms={took_ms}",
+                    decided.as_str(),
+                    failed.unwrap_or("unknown"),
+                ),
+            },
             Self::Decided {
                 number,
                 choice,
@@ -629,6 +659,13 @@ enum Ask {
 
 /// A hearing of the lamp's name is kept this long.
 const NAMES_KEPT: Duration = Duration::from_secs(60);
+/// The voice's likeness to the conversation's asker for a request
+/// (`attention/addressed`'s `like_asker`, #4306) is kept this long, and for
+/// no more than this many requests: a request's number is joined to what
+/// was heard of it within seconds, and a voice started again numbers its
+/// requests afresh.
+const LIKES_KEPT: Duration = Duration::from_secs(60);
+const MOST_LIKES: usize = 16;
 /// The name counts for what was said if it was heard from this long
 /// before the voice began to listen: the name is what makes it listen.
 const NAME_BEFORE: Duration = Duration::from_secs(1);
@@ -809,6 +846,10 @@ struct Policy<'a> {
     names: VecDeque<(Instant, f32)>,
     name_listening: bool,
     spoke_from: Option<Instant>,
+    /// How alike each request's voice was to the conversation's asker's, as
+    /// the voice said it, newest last: the request, the cosine, and when it
+    /// came.
+    likes: VecDeque<(u64, f32, Instant)>,
     record: Record,
     out: Option<Publisher>,
     /// Where the policy says how it is itself: every `report_every`, once a
@@ -856,6 +897,7 @@ impl Policy<'_> {
                 .spoke
                 .map(|at| utterance.began.saturating_duration_since(at).as_secs_f32()),
             name_heard: self.name_heard(&utterance),
+            like_asker: self.like_asker(utterance.request),
         };
         if self.waiting.len() == MOST_WAITING {
             self.waiting.pop_front();
@@ -987,11 +1029,17 @@ impl Policy<'_> {
         let answer = answer.unwrap_or(Err(Failed::Withdrawn));
         let Waiting {
             utterance,
-            context,
+            mut context,
             seen,
             local: _,
             eligible: _,
         } = waiting;
+        // The voice may say how alike the request's voice was to the
+        // asker's a moment after its words are over: what came by now
+        // counts. It is of what was said, never of the lamp's answer.
+        if context.like_asker.is_none() {
+            context.like_asker = self.like_asker(utterance.request);
+        }
         let connection = answer.as_ref().ok().and_then(|asked| asked.connection);
         // The second judgement, in shadow, only from a model's answers.
         let mut next = None;
@@ -1296,6 +1344,20 @@ impl Policy<'_> {
             (now.saturating_duration_since(at) <= seen_for)
                 .then_some((Some(near > 0), (near > 0).then_some(facing > 0)))
         });
+        // The judge's answer asked in shadow (`--hello-by-rule`): written
+        // down only, after the hello it is about was decided and published.
+        if let Some(judged) = self.hello.as_mut().and_then(Hello::judge_turn) {
+            self.write_line(judged.at_unix_ms, &judged);
+            (self.say)(Note::HelloJudged {
+                arrival: judged.context.arrival,
+                decided: judged.decided,
+                judged: judged
+                    .judgement
+                    .map(|judgement| (judgement.choice, judgement.probability)),
+                took_ms: judged.took_ms,
+                failed: judged.failed,
+            });
+        }
         let Some(decided) = self
             .hello
             .as_mut()
@@ -1306,7 +1368,23 @@ impl Policy<'_> {
         // Published first: the voice is waiting for it.
         self.publish(&decided.decision);
         let line = &decided.line;
-        match self.record.write(line.at_unix_ms, line) {
+        self.write_line(line.at_unix_ms, line);
+        let number = self.hello.as_ref().map_or(0, |h| h.totals().decided);
+        (self.say)(Note::HelloDecided {
+            number,
+            arrival: line.context.arrival,
+            choice: line.judgement.choice,
+            probability: line.judgement.probability,
+            by_rule: line.judgement.from_rule,
+            took_ms: line.took_ms,
+            guard: line.guard,
+        });
+    }
+
+    /// Write one line to the decisions log, saying when writing fails and
+    /// when it works again.
+    fn write_line<T: serde::Serialize>(&mut self, unix_ms: u64, line: &T) {
+        match self.record.write(unix_ms, line) {
             Ok(()) => {
                 if let Some(missing) = self.log.right() {
                     (self.say)(Note::LogWriting { missing });
@@ -1319,16 +1397,6 @@ impl Policy<'_> {
                 }
             }
         }
-        let number = self.hello.as_ref().map_or(0, |h| h.totals().decided);
-        (self.say)(Note::HelloDecided {
-            number,
-            arrival: line.context.arrival,
-            choice: line.judgement.choice,
-            probability: line.judgement.probability,
-            by_rule: line.judgement.from_rule,
-            took_ms: line.took_ms,
-            guard: line.guard,
-        });
     }
 
     fn publish(&mut self, decision: &Decision) {
@@ -1378,6 +1446,20 @@ impl Policy<'_> {
                 .map(|(_, score)| *score)
                 .fold(0.0, f32::max),
         )
+    }
+
+    /// How alike the voice of the request `request` was to the
+    /// conversation's asker's, as the voice said it on `attention/addressed`
+    /// (#4306): joined by the request's number, the newest said for it.
+    /// Nothing for an utterance with no number, or one the voice said none
+    /// for.
+    fn like_asker(&self, request: Option<u64>) -> Option<f32> {
+        let request = request?;
+        self.likes
+            .iter()
+            .rev()
+            .find(|(of, _, _)| *of == request)
+            .map(|(_, like, _)| *like)
     }
 
     /// How the policy itself is, for the lamp's health (`diagnostics`).
@@ -1457,10 +1539,19 @@ impl Policy<'_> {
                     .with("hello_said", totals.said)
                     .with("hello_held_talking", totals.held_talking)
                     .with("hello_held_recent", totals.held_recent)
+                    .with("hello_held_person", totals.held_person)
                     .with("hello_late", totals.late);
                 // Only with `--rules`.
                 let report = if hello.obeys_rules() {
                     report.with("hello_held_rule", totals.held_rule)
+                } else {
+                    report
+                };
+                // Only with `--hello-by-rule`: the judge asked in shadow.
+                let report = if hello.by_rule() {
+                    report
+                        .with("hello_judged", totals.judged)
+                        .with("hello_judge_differs", totals.judge_differs)
                 } else {
                     report
                 };
@@ -1712,6 +1803,7 @@ fn run_inner<D: Decider + Send + 'static>(
     let mut room = Ear::new(bus, RoomState::TOPIC, RoomState::TYPE)?;
     let mut eyes = Ear::new(bus, Faces::TOPIC, Faces::TYPE)?;
     let mut names = Ear::new(bus, NameHeard::TOPIC, NameHeard::TYPE)?;
+    let mut addressed = Ear::new(bus, Addressed::TOPIC, Addressed::TYPE)?;
     // Without `--progress` the topic is not subscribed to at all.
     let mut tasks = match progress {
         Some(_) => Some(Ear::new(bus, TaskStatus::TOPIC, TaskStatus::TYPE)?),
@@ -1779,6 +1871,7 @@ fn run_inner<D: Decider + Send + 'static>(
         names: VecDeque::new(),
         name_listening: false,
         spoke_from: None,
+        likes: VecDeque::new(),
         record: Record::new(&options.log_dir),
         out: None,
         reports: None,
@@ -1939,6 +2032,28 @@ fn run_inner<D: Decider + Send + 'static>(
             policy.names.push_back((began, heard.score));
         }
         names.source(policy.say);
+        // How alike each request's voice was to the conversation's asker's
+        // (#4306), only as the voice says it: a message that does not add
+        // up is passed over, as a skill's ask is.
+        for said in addressed.take::<Addressed>(Duration::ZERO, unreadable, policy.say) {
+            if said.check().is_err() {
+                continue;
+            }
+            if let Some(like) = said.like_asker {
+                if policy.likes.len() == MOST_LIKES {
+                    policy.likes.pop_front();
+                }
+                policy.likes.push_back((said.request, like, now));
+            }
+        }
+        addressed.sources_unsaid();
+        while policy
+            .likes
+            .front()
+            .is_some_and(|(_, _, at)| now.saturating_duration_since(*at) > LIKES_KEPT)
+        {
+            policy.likes.pop_front();
+        }
         // What the people at the lamp asked about speaking first, newest,
         // with `--rules` only. Kept when the voice goes: a rule does not end
         // with it.

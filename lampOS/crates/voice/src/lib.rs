@@ -51,6 +51,7 @@ pub mod camera_worker;
 pub mod capture_cores;
 pub mod choreography;
 pub mod config;
+pub mod conversation_summary;
 pub mod cut_in_told;
 pub mod diagnostic_control;
 pub mod diagnostics;
@@ -85,11 +86,15 @@ pub mod scoped_session;
 pub mod sign_in;
 pub mod spoken_stop;
 pub mod turned_away;
+pub mod untied_going_on;
 pub use lamp_ipc::log_relay;
 pub mod head_cue;
 pub mod name_or_follow_up;
 pub mod not_speech;
 pub mod onboarding;
+// Used by the Linux audio workers, and by tests anywhere.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+pub(crate) mod open_at_start;
 pub mod options;
 pub mod others_answer;
 #[cfg(target_os = "linux")]
@@ -121,6 +126,7 @@ pub mod ring_face;
 pub mod ring_head;
 pub mod ring_light;
 pub mod ring_mood;
+pub mod ring_night;
 pub mod ring_requests;
 pub mod ring_sight;
 pub mod ring_unplug;
@@ -164,6 +170,7 @@ pub mod visual_context;
 pub mod voice_tone;
 pub mod wait_words;
 pub mod wire;
+pub mod without_a_tool;
 pub mod worker_scheduling;
 
 #[cfg(target_os = "linux")]

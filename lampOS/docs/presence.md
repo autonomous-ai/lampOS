@@ -136,8 +136,8 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
 
 `skills/light-out/skill.toml`, in `lamp-skills`' schema
 ([skills.md](skills.md)): a core skill (`kind = "core"`, version 1.0.0,
-#1698) that may read `room/presence` and `voice/state` and use the light,
-and nothing more (`[permissions]`). A core skill comes with the lamp, so
+#1698) that may read `room/presence`, `voice/state` and `memory/rules` ("Keep
+the light on", below) and use the light, and nothing more (`[permissions]`). A core skill comes with the lamp, so
 this one is installed, but disabled until its lamp check
 (`install::PRODUCT_SKILLS_OFF`): presence will be switched on for Messages
 too, and that must not put the light out on lamps where nobody has watched
@@ -213,9 +213,9 @@ heard, so `someone` comes back and the skill's ask ends with it.
    it there disabled until its lamp check (`install::PRODUCT_SKILLS_OFF`,
    with why); its own `skill.toml` copied over the installed one turns it
    on.
-4. `lamp-skills` with `--zone system` (the product's) for the quiet hours;
-   without a zone a skill with quiet hours never starts itself, which
-   lamp-4ace's unit is today.
+4. `lamp-skills` with `--zone system` (the product's and lamp-4ace's) for
+   the quiet hours; without a zone a skill with quiet hours never starts
+   itself.
 
 ## Tests
 
@@ -236,11 +236,11 @@ heard, so `someone` comes back and the skill's ask ends with it.
   program asking the ring for the light off with its fade and giving it back
   when the trigger ends, and leaving the light alone without the ring's
   switch.
-- `skills/light-out/tests/`, five cases written by a script in the format
+- `skills/light-out/tests/`, six cases written by a script in the format
   `lamp-bus record` writes (no lamp has published `room/presence` yet):
   out at ten minutes and back when someone sits down; waiting for the lamp
   to finish speaking; the night waited out to 06:00; nothing at night; back
-  when the eyes stop looking.
+  when the eyes stop looking; on when asked to keep the light on.
 
 ## The lamp check (Nine's)
 
@@ -266,9 +266,9 @@ On a lamp with the switches above, the office empty, nothing played:
 - A face that never moves (a poster, a photo on the desk, a face on a
   screen) keeps `someone` true, so the light never goes out there: the
   safe way to be wrong. The eyes leave such faces out only with
-  `--leave-still-faces on` (off unless given, [switches.md](switches.md));
-  lamp-4ace's unit runs without it, so its check says whether any still
-  face was in view (the reviewer on #1721).
+  `--leave-still-faces on` (off unless given, [switches.md](switches.md)).
+  lamp-4ace's unit gives it and the product's does not, so on the product a
+  still face keeps the light on (the reviewer on #1721).
 - A voice from a call or a television counts as someone: the light stays on
   then, which is the safe way to be wrong.
 - `light/reached` is said 350 ms into a fade, before the light is there; no

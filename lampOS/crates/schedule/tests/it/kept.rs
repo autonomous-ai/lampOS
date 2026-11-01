@@ -49,6 +49,7 @@ fn guard<P: Persistence>(engine: &Engine<P>) -> Guard {
 
 fn set<P: Persistence>(engine: &mut Engine<P>, text: &str, when: When, at: u64) -> Value {
     let request = Request::Set {
+        person: None,
         guard: guard(engine),
         text: text.into(),
         when,
@@ -103,6 +104,7 @@ fn write_a_state_fixture() {
     );
     engine.tick(&now(60_000)).unwrap();
     let snooze = Request::Snooze {
+        asker: None,
         guard: guard(&engine),
         id: 1,
         delivery: 1,
@@ -209,6 +211,26 @@ fn each_kept_state_reads_with_its_items() {
                 ],
                 "{day}"
             );
+            // Each says when it was set, from the creation time the store
+            // has always kept: the fixture's, 14 Oct at 08:00 UTC.
+            let set = engine
+                .answer(
+                    Request::ListSet {
+                        asker: None,
+                        after_id: 0,
+                        limit: 8,
+                        pending_only: false,
+                    },
+                    &at,
+                )
+                .unwrap();
+            for item in set["items"].as_array().unwrap() {
+                assert_eq!(
+                    (item["set_local"].as_str(), item["set_day"].as_str()),
+                    (Some("2026-10-14T08:00:00+00:00[Etc/UTC]"), Some("today")),
+                    "{day}: {item}"
+                );
+            }
             let snoozed = engine.answer(Request::Get { id: 1 }, &at).unwrap();
             let item = &snoozed["item"];
             assert_eq!(

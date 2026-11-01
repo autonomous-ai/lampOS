@@ -157,7 +157,8 @@ pub enum Outcome {
     /// Without `apply`: what would be done.
     Would(Vec<String>),
     /// Installed beside the old build, or not even that, and not switched:
-    /// no quiet moment came. The next round tries again.
+    /// no quiet moment came, or another holder had lamp-update's lock and
+    /// nothing was tried (#4524). The next round tries again.
     NotQuiet(String),
     /// Switched, and every part well.
     Switched(u64),
@@ -457,6 +458,13 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     }
     run.held = Some(match run.records.lock() {
         Ok(lock) => lock,
+        // Another holder at work (another lamp-update, or setup's helper
+        // restarting a part under the lock, #4490): nothing was tried, so
+        // not a failure, and no update alert says one. The next round tries
+        // again, as after no quiet moment.
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+            return Outcome::NotQuiet(error.to_string());
+        }
         Err(error) => return Outcome::Failed(error.to_string()),
     });
     (run.world.phase)("checking");

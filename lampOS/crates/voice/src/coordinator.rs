@@ -78,6 +78,7 @@ mod model_refusing;
 mod notices;
 mod open_name;
 mod requested_media;
+mod signed_out;
 use requested_media::RequestedMedia;
 mod second;
 mod service;
@@ -1624,7 +1625,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     health: Option<crate::bus_out::WaitHealth>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
-        &mut dyn FnMut() -> Result<bool>,
+        &mut dyn FnMut(crate::service_privacy_controls::Keep<'_>) -> Result<bool>,
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     muted_wait_pulsing(
@@ -1670,7 +1671,7 @@ fn muted_wait_pulsing<
     light: Option<crate::ring_light::RingLight>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
-        &mut dyn FnMut() -> Result<bool>,
+        &mut dyn FnMut(crate::service_privacy_controls::Keep<'_>) -> Result<bool>,
     ) -> Result<crate::service_privacy::WaitOutcome>,
 ) -> Result<crate::service_privacy::WaitOutcome> {
     let trace = RefCell::new(trace);
@@ -1684,8 +1685,13 @@ fn muted_wait_pulsing<
     let sleep_face = RefCell::new(sleep_face);
     let owed_since = std::cell::Cell::new(None::<Instant>);
     let light = RefCell::new(light);
+    // With LAMP_STALLS=on, each of the wait's checks of 50 ms or more is a
+    // line of its own, by name (#4332).
+    let calls = RefCell::new(WaitCalls::from_environment());
     let outcome = wait(
         &mut |state, boot, at_us| {
+            let mut calls = calls.borrow_mut();
+            let pass = calls.state.begin();
             slide.set(Some(state));
             // The slide closed: a hand's sleep's face gives the ring to the
             // slide's indication before the wait starts it (#1362, #795).
@@ -1704,19 +1710,45 @@ fn muted_wait_pulsing<
                 json!({"kind":"service_privacy_state", "at_us":at_us,"privacy_worker_session":boot,"state":format!("{state:?}"),"audio_workers_open":false}),
             )?;
             flush_cues(&mut trace, cues);
+            pass.done();
             Ok(())
         },
-        &mut || {
-            if let Some(reminders) = reminders.borrow_mut().as_mut() {
-                reminders.poll(monotonic_us());
+        // `keep` renews the privacy worker's Denied authority, at most each
+        // 50 ms, between these checks, named by the check just done, which
+        // a refused renewal says (#4332): on lamp-06c1's cold boot they
+        // took past its 250 ms lease in all and the voice ended.
+        &mut |keep| {
+            let mut calls = calls.borrow_mut();
+            #[cfg(test)]
+            test_wait_check()?;
+            {
+                let pass = calls.reminders.begin();
+                if let Some(reminders) = reminders.borrow_mut().as_mut() {
+                    reminders.poll(monotonic_us());
+                }
+                pass.done();
             }
+            keep("reminders")?;
+            #[cfg(test)]
+            test_wait_check()?;
             // The say socket answers through the wait; nothing is said
             // while the microphones are closed (#3697).
-            crate::say::Says::refuse_parked("the lamp is muted");
+            {
+                let pass = calls.say.begin();
+                crate::say::Says::refuse_parked("the lamp is muted");
+                pass.done();
+            }
+            keep("say")?;
             // The person's light, said and taken; nothing is drawn (#1816).
             if let Some(light) = light.borrow_mut().as_mut() {
+                let pass = calls.light.begin();
                 light.tick(monotonic_us());
+                pass.done();
+                keep("light")?;
             }
+            #[cfg(test)]
+            test_wait_check()?;
+            let pass = calls.controls.begin();
             let (allowed, asleep, restored) = match &mut *controls.borrow_mut() {
                 None => (true, false, false),
                 Some(controls) => {
@@ -1746,6 +1778,10 @@ fn muted_wait_pulsing<
                     (allowed, observation.asleep, controls.restored_after_fault())
                 }
             };
+            pass.done();
+            keep("controls")?;
+            #[cfg(test)]
+            test_wait_check()?;
             let now = monotonic_us();
             let unreadable = unread_since.get().is_some_and(|since| {
                 now.saturating_sub(since) >= crate::bus_out::WAIT_UNREADABLE_AFTER_US
@@ -1758,10 +1794,12 @@ fn muted_wait_pulsing<
             // it also runs at every start while the switch is first read,
             // and a reminder pending then is no mute's (the reviewer on
             // #1551).
+            let pass = calls.owed.begin();
             let owed = match reminders.borrow_mut().as_mut() {
                 Some(reminders) if waiting.closed() => reminders.owed_while_muted(now),
                 _ => None,
             };
+            pass.done();
             if owed == Some(true) {
                 record(
                     &mut trace.borrow_mut(),
@@ -1786,8 +1824,11 @@ fn muted_wait_pulsing<
             }
             // No session runs while it waits, so the wait says how the
             // voice is: its microphones off, and why (#1371).
+            keep("owed")?;
             if let Some(health) = &mut health {
+                let pass = calls.health.begin();
                 health.report(now, waiting, owed.is_some());
+                pass.done();
             }
             Ok(allowed)
         },
@@ -1814,6 +1855,53 @@ fn muted_wait_pulsing<
         health.report(monotonic_us(), crate::bus_out::Waiting::Opening, false);
     }
     outcome
+}
+
+/// The muted wait's own stall recorders (`LAMP_STALLS=on`, #4332), one a
+/// check, so a slow one is named by its file: `stalls-wait-<check>.log`.
+/// In each, a `work` line is that check; a `gap` line is the rest of the
+/// wait between two of its calls. The wait's looks are `stalls-wait.log`
+/// (`service_privacy_controls`). Off unless set: nothing is started.
+struct WaitCalls {
+    reminders: crate::stalls::Stalls,
+    say: crate::stalls::Stalls,
+    light: crate::stalls::Stalls,
+    controls: crate::stalls::Stalls,
+    owed: crate::stalls::Stalls,
+    health: crate::stalls::Stalls,
+    state: crate::stalls::Stalls,
+}
+
+impl WaitCalls {
+    fn from_environment() -> Self {
+        use crate::stalls::Stalls;
+        Self {
+            reminders: Stalls::from_environment("wait-reminders"),
+            say: Stalls::from_environment("wait-say"),
+            light: Stalls::from_environment("wait-light"),
+            controls: Stalls::from_environment("wait-controls"),
+            owed: Stalls::from_environment("wait-owed"),
+            health: Stalls::from_environment("wait-health"),
+            state: Stalls::from_environment("wait-state"),
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// A wait test's slow checks (#4332): each of the gate's four stretches
+    /// between its renewals first sleeps this long.
+    static TEST_WAIT_CHECK: std::cell::Cell<Duration> =
+        const { std::cell::Cell::new(Duration::ZERO) };
+}
+
+#[cfg(test)]
+fn test_wait_check() -> Result<()> {
+    let slow = TEST_WAIT_CHECK.with(std::cell::Cell::get);
+    if !slow.is_zero() {
+        std::thread::sleep(slow);
+    }
+    Ok(())
 }
 
 /// One look of the muted wait at the head (#711): a tap taken while the
@@ -5106,6 +5194,10 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
     /// A loop test's `LAMP_TASK_NEWS_AT_PAUSE=on` (#560), as `TEST_FULL_LOOK`.
     static TEST_NEWS_AT_PAUSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's speech cache for the hold's sleep line (#3748), as
+    /// `TEST_TASK_NEWS`.
+    static TEST_SPEECH_CACHE: std::cell::RefCell<Option<std::sync::Arc<crate::say::tts_cache::TtsCache>>> =
+        const { std::cell::RefCell::new(None) };
     /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
     static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
         const { std::cell::RefCell::new(None) };
@@ -5792,8 +5884,12 @@ fn conversation_with_gate_inner(
     let mut key_refusals = key_refusals::KeyRefusals::default();
     // With `LAMP_SECOND_REFUSED_HOLD=on`: the model service refusing every
     // turn is said once and held, not failed turn by turn (#4265).
-    let refused_hold = std::env::var(model_refusing::ENVIRONMENT).ok().as_deref() == Some("on");
+    let refused_hold = model_refusing::switched_on();
     let mut model_refusing = model_refusing::ModelRefusing::default();
+    // With `LAMP_SIGNED_OUT=on`: the login no longer accepted is said, and
+    // turns wait for a new one.
+    let signed_out_line = signed_out::switched_on();
+    let mut signed_out = signed_out::SignedOut::from_environment();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
     let mut last_spoke_us: Option<u64> = None;
@@ -5842,6 +5938,25 @@ fn conversation_with_gate_inner(
     let sleep_breath = if controls.as_ref().is_some_and(HandControls::head_sleep) {
         let level = crate::head_cue::level_from_environment().map_err(io::Error::other)?;
         Some(crate::head_cue::breath(level))
+    } else {
+        None
+    };
+    // With `LAMP_SLEEP_LINE=on` (#3748): "Going to sleep. Tap my head to
+    // wake me." in the breath's place, from the speech cache, rendered at
+    // start in the product voice (`tts_cache::WARM`); read at each hold, one
+    // file read, never rendered on this path, so a line the warm thread
+    // renders after this loop started is said at the next hold (the
+    // reviewer on #4478). In the owner's language when it is kept, the
+    // English otherwise (#4473 (c)). The breath plays while neither is kept
+    // yet. Either way the hold's sleep waits for its cue
+    // (`HandControls::sleep_cue_sounding`).
+    let sleep_line_on = controls.as_ref().is_some_and(HandControls::sleep_line);
+    let sleep_line_cache = if sleep_breath.is_some() && sleep_line_on {
+        #[cfg(test)]
+        let cache = TEST_SPEECH_CACHE.with(|cache| cache.borrow_mut().take());
+        #[cfg(not(test))]
+        let cache = crate::say::tts_cache::from_environment();
+        cache
     } else {
         None
     };
@@ -6656,6 +6771,7 @@ fn conversation_with_gate_inner(
         }
         termination.check()?;
         let clock = monotonic_us();
+        signed_out.read(clock);
         if cloud.available() {
             if link_down_since.take().is_some() {
                 // Not after the service's line: the internet never left.
@@ -6676,6 +6792,8 @@ fn conversation_with_gate_inner(
         let offline = offline_now(offline_voice, link_down_since, clock, verdict);
         let service_down = service_down_now(service_down_line, link_down_since, clock, verdict);
         let paused = (rig.paused)();
+        // Nothing the lamp starts by itself is sent while signed out.
+        let unasked_paused = paused || signed_out.holds();
         if paused != was_paused {
             was_paused = paused;
             refused_while_paused = false;
@@ -7005,6 +7123,16 @@ fn conversation_with_gate_inner(
                 ),
             }
         }
+        // The hold's sleep cue still sounding (#3748, `LAMP_SLEEP_LINE`):
+        // an owed sleep waits for it.
+        if sleep_line_on
+            && let Some(controls) = controls.as_mut()
+            && reply
+                .as_ref()
+                .is_some_and(|current| current.notice.origin() == SpeechOrigin::SleepBreath)
+        {
+            controls.sleep_cue_sounding(monotonic_us());
+        }
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
             None => None,
@@ -7037,7 +7165,19 @@ fn conversation_with_gate_inner(
         let speaking = reply
             .as_ref()
             .is_some_and(|current| current.had_audio || current.playback.is_some());
-        let head_stop = speaking && head_touch_at_us.is_some();
+        // A hand let go before the hold's 3 s while its sleep cue sounds
+        // (#3748, `LAMP_SLEEP_LINE`): the cue is cut at once, as a head
+        // touch cuts speech, and no sleep follows.
+        let cue_let_go = observation.as_ref().is_some_and(|seen| seen.head_lifted)
+            && reply
+                .as_ref()
+                .is_some_and(|current| current.notice.origin() == SpeechOrigin::SleepBreath);
+        if cue_let_go {
+            eprintln!(
+                "lamp-voice: a hand let go of the head before the hold's 3 s: its sleep cue is cut, no sleep"
+            );
+        }
+        let head_stop = speaking && head_touch_at_us.is_some() || cue_let_go;
         // A stop phrase said over the lamp and heard while it speaks
         // (#828, `LAMP_STOP_WORDS=heard-always`) stops it as the hand does,
         // and so does one said before its answer began, heard as a waited
@@ -7852,12 +7992,56 @@ fn conversation_with_gate_inner(
                     record(trace, row)?;
                 }
                 ProviderOutput::SleepAsked { request } => {
-                    // Asked once its line has been heard whole, or at the
-                    // cap while it is still sounding.
-                    sleep_owed.asked(request, monotonic_us());
-                    eprintln!(
-                        "lamp-voice: request {request}: asked to sleep; once its line has played"
-                    );
+                    // With `LAMP_SLEEP_LINE=on` and the line kept (#3748
+                    // part 3): the same recording a hand's hold says, in
+                    // place of the model's own words. The model's turn is
+                    // cut as the shutdown's last words cut it, and the sleep
+                    // is owed as a hold's is, until that cue has played.
+                    let line = sleep_line_cache
+                        .as_ref()
+                        .filter(|_| {
+                            reply
+                                .as_ref()
+                                .is_some_and(|current| current.owner.turn() == request)
+                        })
+                        .and_then(|cache| cache.sleep_line());
+                    if let (Some(line), Some(controls)) = (line, controls.as_mut()) {
+                        let (draining, _) = cut_for_last_words(
+                            owner,
+                            reply,
+                            &mut provider_queue,
+                            &mut speaker_pending,
+                            &mut admission,
+                            &mut detector,
+                            trace,
+                            |state| rig.publish(state),
+                        )?;
+                        submission_draining |= draining;
+                        let (now_state, _) = speaker_tone::commit_sound_turn(
+                            owner,
+                            reply,
+                            NoticeDelivery::sound(SpeechOrigin::SleepBreath, line),
+                            "asked_sleep_line",
+                            "the person asked the lamp to sleep: the cached sleep line in the model's place, nothing sent to the provider",
+                            0,
+                            rig.playout_start_now(),
+                            trace,
+                            |state| rig.publish(state),
+                        )?;
+                        snapshot = now_state;
+                        last_publish = monotonic_us();
+                        controls.owe_sleep(monotonic_us());
+                        eprintln!(
+                            "lamp-voice: request {request}: asked to sleep; the sleep line plays in the model's place, the sleep once it has played"
+                        );
+                    } else {
+                        // Asked once its line has been heard whole, or at the
+                        // cap while it is still sounding.
+                        sleep_owed.asked(request, monotonic_us());
+                        eprintln!(
+                            "lamp-voice: request {request}: asked to sleep; once its line has played"
+                        );
+                    }
                 }
                 ProviderOutput::LookNoCall { request, session } => {
                     // Only the look's own turn, still in hand on its session.
@@ -9554,7 +9738,9 @@ fn conversation_with_gate_inner(
                         &mut submission_draining,
                         trace,
                     )?;
-                    let held_refused = refused_hold && model_refusing.holds(monotonic_us());
+                    let held_signed_out = signed_out.holds();
+                    let held_refused =
+                        held_signed_out || (refused_hold && model_refusing.holds(monotonic_us()));
                     let Some(provider_session) = cloud.ready_session().filter(|_| {
                         provider_control_empty && !submission_draining && !held_refused
                     }) else {
@@ -9568,7 +9754,12 @@ fn conversation_with_gate_inner(
                                 &mut provider_queue,
                                 accepted,
                                 rig.playout_start_now(),
-                                (service_down && !offline) || held_refused,
+                                notices::LocalOnly {
+                                    speech: false,
+                                    back: false,
+                                    service: (service_down && !offline) || held_refused,
+                                    signed_out: held_signed_out,
+                                },
                                 trace,
                                 |state| rig.publish(state),
                             )?;
@@ -9592,9 +9783,13 @@ fn conversation_with_gate_inner(
                     };
                     // Someone is answered: the lamp has shown it is back.
                     back_owed_since = None;
-                    // Sent while refusing: the service is tried, and the
-                    // turns after it held for the time again (#4265).
-                    model_refusing.tried(monotonic_us());
+                    // Sent while refusing, a spoken line is not yet a try
+                    // (#4265): only its chat asks the service, and a line
+                    // heard as no words or as no speech never asks. A
+                    // refused chat holds the turns after it again
+                    // (`ModelRefusing::observe`); on lamp-52e6 on 30 Oct
+                    // the room's short sounds took each minute's try, and
+                    // every ask after them was held.
                     // Taking over from the lamp's own answer is cutting in,
                     // and taking over from something that was said is going
                     // on with it. Taking over from a sound is neither.
@@ -9851,10 +10046,9 @@ fn conversation_with_gate_inner(
                         });
                         let resumed_at = monotonic_us();
                         let opening_blocks = opening.len();
-                        match cloud
-                            .ready_session()
-                            .filter(|_| provider_control_empty && !submission_draining)
-                        {
+                        match cloud.ready_session().filter(|_| {
+                            provider_control_empty && !submission_draining && !signed_out.holds()
+                        }) {
                             Some(provider_session) => {
                                 let not_now = sleep_not_now(
                                     crate::sleep_asked::switched_on(),
@@ -10129,6 +10323,10 @@ fn conversation_with_gate_inner(
                     // through, nor a scrap too short to be a request.
                     if let Some(local) = current.local_only.as_mut() {
                         local.speech = !as_sound && said_turn == Some(current.owner.turn());
+                        // Signed out, the line is bounded: the breath between.
+                        if local.signed_out && !signed_out.may_say_heard(monotonic_us()) {
+                            local.speech = false;
+                        }
                     }
                     if sent.is_none() {
                         // Only the lamp's name, and nothing more in its
@@ -10408,6 +10606,7 @@ fn conversation_with_gate_inner(
             )?;
         }
         outage.note_delivery(reply);
+        signed_out.note_delivery(reply, monotonic_us());
         select_failure_notice_in(notices, reply, &speaker_pending, &mut outage, trace)?;
         if let Some((request, why)) = reply.as_ref().and_then(|current| {
             current
@@ -10673,7 +10872,9 @@ fn conversation_with_gate_inner(
                 choreography,
                 reply.as_ref().map(|current| current.notice.origin()),
             );
-            choreography.set_offline(offline || service_down || model_refusing.refusing());
+            choreography.set_offline(
+                offline || service_down || model_refusing.refusing() || signed_out.holds(),
+            );
         }
         if let Some(current) = reply
             .as_ref()
@@ -10745,6 +10946,7 @@ fn conversation_with_gate_inner(
             bus.set_ring_off(rig.ring.off_for_good());
             bus.set_chat_key_refused(key_refusals.said(clock));
             bus.set_model_refusing(model_refusing.health(clock));
+            bus.set_signed_out(signed_out.holds());
             bus.report(
                 cloud.available(),
                 cloud.refusal(),
@@ -10909,7 +11111,7 @@ fn conversation_with_gate_inner(
                         .second
                         .as_ref()
                         .is_some_and(second::Route::second_active)
-                    || unasked_session(&cloud, paused).is_some_and(|ready| ready != session)
+                    || unasked_session(&cloud, unasked_paused).is_some_and(|ready| ready != session)
             });
             if (by_tool.is_none() || tool_look_due(reply.as_ref(), turn))
                 && !asked_again
@@ -10958,7 +11160,7 @@ fn conversation_with_gate_inner(
                         && !admission.owns_stream()
                         && !submission_draining
                         && snapshot.listening_ready(now())
-                        && let Some(provider_session) = unasked_session(&cloud, paused)
+                        && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
                     {
                         look_wanted = None;
                         let (note, with_picture) = look.turn();
@@ -11101,7 +11303,7 @@ fn conversation_with_gate_inner(
                         (submission_draining, "submission_draining"),
                         (!snapshot.listening_ready(now()), "not_listening_ready"),
                         (
-                            unasked_session(&cloud, paused).is_none(),
+                            unasked_session(&cloud, unasked_paused).is_none(),
                             "no_ready_session_or_paused",
                         ),
                     ]
@@ -11120,7 +11322,7 @@ fn conversation_with_gate_inner(
                         && !admission.owns_stream()
                         && !submission_draining
                         && snapshot.listening_ready(now())
-                        && let Some(provider_session) = unasked_session(&cloud, paused)
+                        && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
                     {
                         asking.done();
                         snapshot = commit_written_turn(
@@ -11188,7 +11390,9 @@ fn conversation_with_gate_inner(
             if let Some(started) = start_timed_fixture(
                 &mut fixture_due_us,
                 clock,
-                at_rest.then(|| unasked_session(&cloud, paused)).flatten(),
+                at_rest
+                    .then(|| unasked_session(&cloud, unasked_paused))
+                    .flatten(),
                 owner,
                 reply,
                 &mut provider_queue,
@@ -11212,7 +11416,7 @@ fn conversation_with_gate_inner(
                 cycle_started_us: reminder_cycle_started_us,
                 last_speech_us,
                 last_capture_us: last_capture,
-                session: unasked_session(&cloud, paused),
+                session: unasked_session(&cloud, unasked_paused),
                 worker: rig.provider.boot,
                 snapshot: &snapshot,
                 admission: &admission,
@@ -11242,7 +11446,7 @@ fn conversation_with_gate_inner(
                 cycle_started_us: reminder_cycle_started_us,
                 last_speech_us,
                 last_capture_us: last_capture,
-                session: unasked_session(&cloud, paused),
+                session: unasked_session(&cloud, unasked_paused),
                 worker: rig.provider.boot,
                 snapshot: &snapshot,
                 admission: &admission,
@@ -11297,7 +11501,7 @@ fn conversation_with_gate_inner(
             && !admission.owns_stream()
             && !submission_draining
             && snapshot.listening_ready(now())
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
         {
             let heard_it = second_look.is_for(provider_session);
             second_look.taken();
@@ -11349,13 +11553,50 @@ fn conversation_with_gate_inner(
                 )
                 && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
             {
-                snapshot =
-                    commit_back_online(owner, reply, rig.playout_start_now(), trace, |state| {
-                        rig.publish(state)
-                    })?;
+                snapshot = commit_own_line(
+                    owner,
+                    reply,
+                    rig.playout_start_now(),
+                    false,
+                    trace,
+                    |state| rig.publish(state),
+                )?;
                 last_publish = monotonic_us();
                 back_owed_since = None;
             }
+        }
+        // "I've been signed out." (`LAMP_SIGNED_OUT`): once a spell, unasked,
+        // to someone at the lamp, when nothing holds it and the room is quiet.
+        if signed_out.owed()
+            && crate::reminders::someone_here(
+                presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock)),
+                said_at_us,
+                clock,
+            )
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && speaker_pending.is_none()
+            && !paused
+            && playback_mask.available(clock)
+            && reminder_quiet(
+                clock,
+                reminder_cycle_started_us,
+                last_speech_us,
+                last_capture,
+            )
+            && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
+        {
+            snapshot = commit_own_line(
+                owner,
+                reply,
+                rig.playout_start_now(),
+                true,
+                trace,
+                |state| rig.publish(state),
+            )?;
+            last_publish = monotonic_us();
         }
         // Finish the camera/name follow-ups owed above before a reminder can
         // take the next turn. A reminder is not someone speaking first.
@@ -11395,7 +11636,7 @@ fn conversation_with_gate_inner(
                 last_capture,
             )
             && playback_mask.available(reminder_now_us)
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             && let Some(offer) = idle_reminder_offer(
                 reminders,
                 reply,
@@ -11471,11 +11712,20 @@ fn conversation_with_gate_inner(
                         last_capture,
                     )
                     && playback_mask.available(say_now_us)))
-            && let Some(provider_session) = unasked_session(&cloud, paused)
-            && let Some((turn, priority, ticket, quoted)) = says.take(say_now_us)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+            // The model service refusing (#4265, the lead's call on #1711):
+            // while turns are held, a skill's fixed words are said as they
+            // are, and a note the model must word waits for the minute's
+            // try, as a spoken line does, or for its own expiry.
+            && let Some((turn, priority, ticket, quoted)) =
+                if refused_hold && model_refusing.holds(say_now_us) {
+                    says.take_while_refused(say_now_us)
+                } else {
+                    says.take(say_now_us)
+                }
         {
             if ticket.last_words() {
-                submission_draining |= cut_for_last_words(
+                let (draining, now_state) = cut_for_last_words(
                     owner,
                     reply,
                     &mut provider_queue,
@@ -11483,7 +11733,11 @@ fn conversation_with_gate_inner(
                     &mut admission,
                     &mut detector,
                     trace,
+                    |state| rig.publish(state),
                 )?;
+                submission_draining |= draining;
+                snapshot = now_state;
+                last_publish = monotonic_us();
             }
             // An add-on's quoted line is the second route's alone: there its
             // turn is asked with no functions (#2530 part 2). The Live
@@ -11518,6 +11772,14 @@ fn conversation_with_gate_inner(
                     json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session,"told_who":told_who,"familiar":familiar}),
                 )?;
                 let turn = crate::person::told_who(turn, ticket.told_who(), here);
+                // And the part of the day from the lamp's own time, and a
+                // hello and the name only (the first builder, 30 Oct, on the
+                // launch testers' findings: "Evening" at 15:42).
+                let turn = crate::person::told_hello(
+                    turn,
+                    ticket.told_who(),
+                    crate::local_time::hello_told_here,
+                );
                 snapshot = commit_written_turn(
                     owner,
                     reply,
@@ -11630,13 +11892,16 @@ fn conversation_with_gate_inner(
                 && playback_mask.available(monotonic_us())
                 && !submission_draining
                 && snapshot.listening_ready(now())
-                && unasked_session(&cloud, paused).is_some();
+                && unasked_session(&cloud, unasked_paused).is_some();
             let face = walk.face_now(clock);
             let still = walk.still_now(clock);
             // The model service refusing (#4265): the walk begins nothing
             // while turns are held, so its re-offer is the minute's try.
-            if refused_hold {
-                walk.set_model_refusing(model_refusing.refusing(), model_refusing.holds(clock));
+            if refused_hold || signed_out_line {
+                walk.set_model_refusing(
+                    model_refusing.refusing() || signed_out.holds(),
+                    model_refusing.holds(clock) || signed_out.holds(),
+                );
             }
             let note = walk.tick(
                 clock,
@@ -11657,7 +11922,7 @@ fn conversation_with_gate_inner(
             {
                 if let (Some(words), Some(provider_session)) = (
                     walk.take_invitation(offer.invitation, monotonic_us()),
-                    unasked_session(&cloud, paused),
+                    unasked_session(&cloud, unasked_paused),
                 ) {
                     snapshot = commit_written_turn(
                         owner,
@@ -11717,7 +11982,7 @@ fn conversation_with_gate_inner(
                 )?;
             }
             if let Some(note) = note
-                && let Some(provider_session) = unasked_session(&cloud, paused)
+                && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             {
                 snapshot = commit_written_turn(
                     owner,
@@ -11838,11 +12103,30 @@ fn conversation_with_gate_inner(
                     "boundary":"this decision, at Controls' hand time on the head; the first sample is head_sleep_breath_first_write"}),
             )?;
             if decided.is_ok() {
+                // The recorded line in the breath's place (#3748).
+                let sleep_line = sleep_line_cache
+                    .as_ref()
+                    .and_then(|cache| cache.sleep_line());
+                if sleep_line_cache.is_some() && sleep_line.is_none() {
+                    eprintln!(
+                        "lamp-voice: the sleep line is not in the speech cache yet: a hand's hold plays the breath"
+                    );
+                }
+                let (cue, basis) = match &sleep_line {
+                    Some(line) => {
+                        eprintln!(
+                            "lamp-voice: a hand's hold: the sleep line starts {} ms after the hold's 2 s",
+                            held_us.saturating_sub(crate::head_cue::BREATH_FROM_US) / 1_000
+                        );
+                        (line, "head_sleep_line")
+                    }
+                    None => (sound, "head_sleep_breath"),
+                };
                 let (now_state, _) = speaker_tone::commit_sound_turn(
                     owner,
                     reply,
-                    NoticeDelivery::sound(SpeechOrigin::SleepBreath, sound.clone()),
-                    "head_sleep_breath",
+                    NoticeDelivery::sound(SpeechOrigin::SleepBreath, cue.clone()),
+                    basis,
                     "a hand kept on the head: the lamp settles to sleep, nothing heard, nothing sent to the provider",
                     0,
                     rig.playout_start_now(),
@@ -12080,7 +12364,7 @@ fn conversation_with_gate_inner(
             && !submission_draining
             && snapshot.listening_ready(now())
             && clock.saturating_sub(last_turn_us) >= 3_000_000
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
         {
             // The eyes took it as asked: say it now. Else ask them to.
             if let Some(name) = watch.asked() {
@@ -12143,7 +12427,7 @@ fn conversation_with_gate_inner(
             && !admission.owns_stream()
             && !submission_draining
             && snapshot.listening_ready(now())
-            && let Some(provider_session) = unasked_session(&cloud, paused)
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
             && let Some(ticket) = news_for_skill(news, says.as_mut(), news_by_skill, &mut news_held)
             // With the switch, tasks that finished together are told in
             // one turn (the reviewer on #1161). Not while news waits for a
@@ -12847,7 +13131,7 @@ fn play_skill_sound(
     submission_draining: &mut bool,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
-    publish: impl FnMut(Snapshot) -> io::Result<()>,
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Option<Snapshot>> {
     let Some((samples, ticket)) = says.take_sound(at_us) else {
         return Ok(None);
@@ -12874,7 +13158,9 @@ fn play_skill_sound(
             admission,
             detector,
             trace,
-        )?;
+            &mut publish,
+        )?
+        .0;
     }
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
@@ -12900,7 +13186,14 @@ fn play_skill_sound(
 /// still being said, drained until its end. Without the drain that line's
 /// microphone frames went on into the last words' turn, which sends nothing,
 /// and filled the provider queue past its bound (lamp-52e6, 27 Oct: the voice
-/// ended). Whether input is now drained.
+/// ended). The cut revokes the speaker itself, as a hand's Stop does
+/// (`hand::cancel`): the ownerless authority is published before the next
+/// turn is admitted, so the speaker drops the cut reply's queued audio as an
+/// expected discard. Admitted first, that next turn's input-active authority
+/// kept the audio as a cancelled tail superseded by it, which only a person's
+/// interruption may have (lamp-52e6, 30 Oct: "Lamp, go to sleep", its line,
+/// then "cancelled tail has no unique matching supersession" and the voice
+/// ended). Whether input is now drained, and the authority published.
 #[allow(clippy::too_many_arguments)]
 fn cut_for_last_words(
     owner: &mut Controller,
@@ -12910,14 +13203,17 @@ fn cut_for_last_words(
     admission: &mut InputAdmission,
     detector: &mut TurnDetector,
     trace: &mut SessionState,
-) -> Result<bool> {
-    cancel_reply(owner, reply, trace, "last_words")?;
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<(bool, Snapshot)> {
+    cancel_reply(owner, reply, trace, crate::receipt_history::LAST_WORDS)?;
     provider_queue.clear();
     *speaker_pending = None;
+    let snapshot = owner.snapshot(now())?;
+    publish(snapshot)?;
     let at_us = monotonic_us();
     admission.abandon_until_end(at_us)?;
     detector.abandon_input(at_us);
-    Ok(admission.draining())
+    Ok((admission.draining(), snapshot))
 }
 
 /// When a turn's answer begins to be heard, for the session's records
@@ -14010,7 +14306,7 @@ fn commit_offline_input(
     provider_queue: &mut VecDeque<ProviderInput>,
     accepted: Accepted,
     playout_start: PlayoutStart,
-    service: bool,
+    local: notices::LocalOnly,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Snapshot> {
@@ -14038,7 +14334,8 @@ fn commit_offline_input(
             "prefix_first_host_read_us":accepted.audio.first().map(|p|p.captured_at_us),
             "candidate":accepted.candidate.id,"admission_basis":accepted.basis,
             "provider_session":null,"local_only":true,
-            "boundary":if service {"the voice service cannot be reached: listened to, never sent"}
+            "boundary":if local.signed_out {"this lamp is signed out: listened to, never sent"}
+                else if local.service {"the voice service cannot be reached: listened to, never sent"}
                 else {"the internet cannot be reached: listened to, never sent"}}),
     )?;
     let mut current = Reply {
@@ -14058,11 +14355,7 @@ fn commit_offline_input(
         playback_gaps: 0,
         notice: NoticeDelivery::default(),
         media: Default::default(),
-        local_only: Some(notices::LocalOnly {
-            speech: false,
-            back: false,
-            service,
-        }),
+        local_only: Some(local),
         reminder: None,
         say: None,
         news: Vec::new(),
@@ -14189,11 +14482,13 @@ fn reach_verdict(on: bool, bus: io::Result<lamp_bus::Bus>) -> ReachVerdict {
 /// The link is back after an outage in which the lamp said it could not
 /// reach the internet (#830): a turn the lamp takes for itself, with no
 /// input, to say "I'm back online." through the same speaker path and
-/// permits. Its request, as the offline turn's, is never sent.
-fn commit_back_online(
+/// permits. Its request, as the offline turn's, is never sent. With
+/// `signed_out`, the same turn says the lamp is signed out instead.
+fn commit_own_line(
     owner: &mut Controller,
     reply: &mut Option<Reply>,
     playout_start: PlayoutStart,
+    signed_out: bool,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Snapshot> {
@@ -14208,8 +14503,10 @@ fn commit_back_online(
         trace,
         json!({"kind":"input_admitted","owner":turn,"turn":turn.turn(),"at_us":monotonic_us(),
             "authority_issued_at_us":snapshot.issued_at().as_micros(),
-            "admission_basis":"back_online","provider_session":null,"local_only":true,
-            "boundary":"no sound was heard: the lamp says the internet is back"}),
+            "admission_basis":if signed_out {"signed_out"} else {"back_online"},
+            "provider_session":null,"local_only":true,
+            "boundary":if signed_out {"no sound was heard: the lamp says it is signed out"}
+                else {"no sound was heard: the lamp says the internet is back"}}),
     )?;
     let current = Reply {
         owner: turn,
@@ -14232,6 +14529,7 @@ fn commit_back_online(
             speech: true,
             back: true,
             service: false,
+            signed_out,
         }),
         reminder: None,
         say: None,
@@ -15294,6 +15592,7 @@ mod tests {
     mod termination;
     mod tool_look;
     mod turn_taking;
+    mod wait_leases;
 
     use super::*;
 

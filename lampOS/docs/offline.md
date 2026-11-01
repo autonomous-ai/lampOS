@@ -84,6 +84,11 @@ breaks, a part that says whether the lamp is online, show it) come after it.
 | surround | Only when an operator stages a release | That command fails | No | — |
 | memory, eyes, schedule, health, actions, body, controls, expression, air, ears, keeper | No (no network crate, no socket; checked in each `Cargo.toml` and `src`) | Work | No | — |
 
+Two cells have changed since that read at `4ad0ec5c3`. Health can now ask
+the internet itself with `--reach-probe on` (`crates/health/src/reach.rs`,
+below), which the product's unit doesn't pass. And the second voice's doc is on `lamp-voice` as
+[second-voice.md](second-voice.md).
+
 ## Each part with a clock not set
 
 The lamp has no battery clock. After power it starts at its last saved time
@@ -158,7 +163,7 @@ tested both ways
 on the stepped clock): with the switch, a link 3 s past the budget gives the
 line once, then readiness, and the service runs on to a mute; without it,
 the service ends at the budget with "voice input never became ready". The
-units get the switch after a minute on a lamp with its Wi-Fi off.
+product's voice unit sets it (`LAMP_START_OFFLINE=on`).
 
 **A session the provider refuses at start (#1567, lamp-75c9, 19 Oct):** the
 model's account out of quota, the provider worker says `unavailable`
@@ -190,23 +195,23 @@ lamp-75c9 (2026-10-16) the clock is kept by chrony, there is no
 Kind: off unless set (`timesync`, the default, reads as before).
 
 `lamp-schedule serve --kernel-clock` trusts the wall clock also when the
-kernel says it is set, so a lamp can drop `--trust-clock` (both lamps' units
-have it, and it trusts a clock never set): calendar reminders and new
-requests then wait (`waiting_for_clock`, "trusted wall clock required")
-until chrony sets the clock. One reader for both, `lamp_ipc::clock_synced`.
-Kind: off unless set. The units are not changed here: swapping
-`--trust-clock` for `--kernel-clock` is each lamp's change, after its
-minute.
+kernel says it is set, so a lamp can drop `--trust-clock` (it trusts a clock
+never set): calendar reminders and new requests then wait
+(`waiting_for_clock`, "trusted wall clock required") until chrony sets the
+clock. One reader for both, `lamp_ipc::clock_synced`. Kind: off unless set.
+The product's schedule unit has `--kernel-clock` in place of `--trust-clock`;
+lamp-4ace's and lamp-52e6's units still have `--trust-clock`.
 
 `lamp-expression serve --kernel-clock` gives the alive layer the time of day
 only while the kernel says the clock is set; with none it knows no night, so
 it does not fall asleep or wake by a wrong clock, and says once when the
-clock is found not set and again when it is set. Off unless set.
+clock is found not set and again when it is set. Off unless set; the
+product's expression unit sets it.
 
 The voice with `LAMP_KERNEL_CLOCK=on` asks the kernel before telling a time:
 while the clock is not set, `the_time` says it has not been set and a new
 session is told it does not know the time, never to guess
-([tools.md](tools.md)). Off unless set.
+([tools.md](tools.md)). Off unless set; the product's voice unit sets it.
 This reaches the provider and second workers, where `the_time` is
 answered, only since #1158 (17 October): they start with a cleared
 environment, and before then the switch never got there. No lamp run before
@@ -218,8 +223,9 @@ it showed "not set", and none has since.
   `LAMP_BUS=on` and `LAMP_VOICE_LINK=on` the voice publishes it once a
   second beside its `diagnostics`: ready, or unavailable once the link has
   been down for 5 s (`LINK_GRACE_US`, so a session renewing itself is not
-  an outage), with the reason `transport` (the coordinator keeps only
-  whether the link is up). Off unless set.
+  an outage), with the reason `transport`. A refusal is said at once, with
+  no grace, as `authentication` or `limited` (#2231, `link_state`). Off
+  unless set; the product's voice unit sets it.
 - **`lamp/online`** (`crates/msgs/src/online.rs`, `Online`), published by
   `lamp-health serve --online on`, which already runs and already hears every
   part's `diagnostics`: online while the voice's fresh report says its link
@@ -299,10 +305,11 @@ internet, not the relay, and nothing in #830 depends on the relay.
   add nothing there: the worker's own check is already the internet's.
 - **What the product sets** (#830, 17 Oct): `LAMP_START_OFFLINE=on` and
   `LAMP_OFFLINE_VOICE=on` in the voice, `--online on` in health, and no
-  probe, since it has no second route. Any link loss, the internet's or the
-  relay's, gets the offline line once and the breath; the relay's is said
-  in the internet's words, but never dropped in silence. lamp-4ace sets the
-  probe too, beside its second route. `install`'s
+  probe: its voice's only route is the second one (`LAMP_VOICE_ROUTE=second`),
+  whose worker already checks the internet itself (above). Any link loss,
+  the internet's or the relay's, gets the offline line once and the breath;
+  the relay's is said in the internet's words, but never dropped in silence.
+  lamp-4ace's and lamp-52e6's units set no probe either. `install`'s
   `a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence`
   holds it: the probe only where `LAMP_VOICE_SECOND_CONFIG` is set.
 - Tests: `reach::tests` (a target answering, none answering and asked again

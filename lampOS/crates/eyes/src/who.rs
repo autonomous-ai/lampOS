@@ -93,6 +93,16 @@ pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Optio
     }
 }
 
+/// A held check (a miss within [`KNOWN_HOLD`]): the known file's words and
+/// its face beside it stay as they are, and only its modified time is set to
+/// now, so the voice, which takes the file as fresh for a few seconds after
+/// it was written, keeps naming the one held until the hold lets them go.
+pub fn renew_known(path: &Path) {
+    if let Ok(file) = std::fs::File::options().write(true).open(path) {
+        let _ = file.set_modified(std::time::SystemTime::now());
+    }
+}
+
 /// The file of names Who was here may say (`lamp-skills --tellable-file`,
 /// #1997): `tellable` beside the known file.
 pub fn tellable_of(known: &Path) -> PathBuf {
@@ -106,7 +116,13 @@ pub fn keep_tellable(path: &Path, names: &[String]) {
         let _ = std::fs::remove_file(path);
         return;
     }
-    replace_line(path, &names.join("\n"));
+    let text = names.join("\n");
+    // The same names are not written again: the file's modified time is
+    // what the voice takes as a change of who said yes (#4493).
+    if std::fs::read_to_string(path).is_ok_and(|kept| kept == format!("{text}\n")) {
+        return;
+    }
+    replace_line(path, &text);
 }
 
 fn replace_line(path: &Path, line: &str) {
@@ -1724,7 +1740,23 @@ pub fn full_crop_on() -> bool {
     std::env::var(FULL_CROP_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// With [`FULL_CROP_ENVIRONMENT`] on, a known person stays known through
+/// Off unless `LAMP_FACE_KNOWN_HOLD=on` on lamp-eyes: the known person is held
+/// through a short miss ([`Held`]) without [`FULL_CROP_ENVIRONMENT`]'s
+/// crop (#4493).
+pub const KNOWN_HOLD_ENVIRONMENT: &str = "LAMP_FACE_KNOWN_HOLD";
+
+pub fn known_hold_on() -> bool {
+    std::env::var(KNOWN_HOLD_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Whether the known person is held through a short miss: with either
+/// switch on.
+pub fn hold_on(full_crop: bool, known_hold: bool) -> bool {
+    full_crop || known_hold
+}
+
+/// With the hold on ([`FULL_CROP_ENVIRONMENT`] or [`KNOWN_HOLD_ENVIRONMENT`]),
+/// a known person stays known through
 /// checks that find nobody for this long after they last matched: one
 /// missed check (they come every [`RECOGNISE_EVERY`]) keeps them, a second
 /// lets them go. On lamp-4ace the same face scored either side of
@@ -2619,6 +2651,20 @@ mod tests {
         assert!(!held.keeps(start + RECOGNISE_EVERY));
     }
 
+    /// #4493: `LAMP_FACE_KNOWN_HOLD=on` holds the known person through one
+    /// missed check without the full crop; with neither switch, nobody.
+    #[test]
+    fn a_known_hold_without_full_crop_holds_one_missed_check() {
+        let start = Instant::now();
+        let mut held = Held::new(hold_on(false, true));
+        held.matched(start, None);
+        assert!(held.keeps(start + RECOGNISE_EVERY));
+        assert!(!held.keeps(start + KNOWN_HOLD));
+        let mut neither = Held::new(hold_on(false, false));
+        neither.matched(start, None);
+        assert!(!neither.keeps(start + Duration::from_millis(1)));
+    }
+
     fn print(seed: f32) -> Vec<f32> {
         unit(
             (0..PRINT)
@@ -3394,6 +3440,62 @@ mod tests {
         keep_known(&known, None, None, Some("f4"));
         assert!(!known.exists() && !beside.exists());
         std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #4493: a held check renews the known file's time, so the voice keeps
+    /// it fresh, and leaves its words and the face beside it as they were.
+    #[test]
+    fn a_held_check_renews_the_known_file_and_keeps_its_words_and_face() {
+        let known = file("known-renew").with_file_name("known");
+        let beside = known_face_of(&known);
+        keep_known(&known, Some("Alpha"), Some("p-7"), Some("f3"));
+        let words = std::fs::read(&known).unwrap();
+        let face = std::fs::read(&beside).unwrap();
+        let back = std::time::SystemTime::now() - Duration::from_millis(2_500);
+        std::fs::File::options()
+            .write(true)
+            .open(&known)
+            .unwrap()
+            .set_modified(back)
+            .unwrap();
+        let before = std::time::SystemTime::now();
+        renew_known(&known);
+        assert!(std::fs::metadata(&known).unwrap().modified().unwrap() >= before);
+        assert_eq!(std::fs::read(&known).unwrap(), words);
+        assert_eq!(std::fs::read(&beside).unwrap(), face);
+        // No file (nobody known): renewing writes none.
+        keep_known(&known, None, None, None);
+        renew_known(&known);
+        assert!(!known.exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #4493: the same names are not written again (the voice reads the
+    /// file's time as a change); other names are.
+    #[test]
+    fn tellable_is_not_rewritten_with_the_same_names() {
+        let tellable = file("tellable-same").with_file_name("tellable");
+        let set_back = || {
+            let back = std::time::SystemTime::now() - Duration::from_secs(10);
+            std::fs::File::options()
+                .write(true)
+                .open(&tellable)
+                .unwrap()
+                .set_modified(back)
+                .unwrap();
+            back
+        };
+        keep_tellable(&tellable, &["Alpha".to_owned()]);
+        let back = set_back();
+        keep_tellable(&tellable, &["Alpha".to_owned()]);
+        assert_eq!(
+            std::fs::metadata(&tellable).unwrap().modified().unwrap(),
+            back
+        );
+        keep_tellable(&tellable, &["Alpha".to_owned(), "Beta".to_owned()]);
+        assert_eq!(std::fs::read_to_string(&tellable).unwrap(), "Alpha\nBeta\n");
+        assert!(std::fs::metadata(&tellable).unwrap().modified().unwrap() > back);
+        std::fs::remove_dir_all(tellable.parent().unwrap()).unwrap();
     }
 
     /// #1505: the people file as a later build writes it, with a field this

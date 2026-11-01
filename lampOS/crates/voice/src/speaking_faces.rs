@@ -498,6 +498,94 @@ impl SpeakingFaces {
             && still * 2 < during.len()
     }
 
+    /// Whether the known face `face` (`boot/f3`, [`Self::known_with_boot`])
+    /// was the one face the eyes saw through a line from `from` to `to`
+    /// (`LAMP_PERSON_SCOPE_ONE_FACE`, the launch testers' item 1 on #3997):
+    /// tracked in at least [`FEWEST_LOOKS`] of the eyes' own looks in it,
+    /// and no look of it with any other face. A look with nobody in it is
+    /// no other face. Unlike [`Self::alone_in_view`] the mouth is not read:
+    /// on lamp-220c (30 Oct) the owner's face was in 17 looks and read
+    /// speaking in none, so every line was kept as the room's.
+    pub fn one_face_in_view(&self, face: &str, from: Instant, to: Instant) -> bool {
+        let Ok(looks) = self.looks.lock() else {
+            return false;
+        };
+        let during: Vec<_> = looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= from && look.at <= to && !look.boot.is_empty())
+            .collect();
+        let own = |look: &Look, id: &String| format!("{}/{id}", look.boot) == face;
+        during
+            .iter()
+            .all(|look| look.tracked.iter().all(|id| own(look, id)))
+            && during
+                .iter()
+                .filter(|look| look.tracked.iter().any(|id| own(look, id)))
+                .count()
+                >= FEWEST_LOOKS
+    }
+
+    /// Whether the eyes saw through a line from `from` to `to`, and no face
+    /// but `face` (`boot/f3`, [`Self::known_with_boot`]; none: no face at
+    /// all) in any look of it: at least one of their own looks fell in it,
+    /// and each tracked nobody or `face` alone (#4339). A line with no look
+    /// in it, the eyes stalled or the camera covered, is not: nothing then
+    /// shows nobody else was there.
+    pub fn no_other_face_in_view(&self, face: Option<&str>, from: Instant, to: Instant) -> bool {
+        let Ok(looks) = self.looks.lock() else {
+            return false;
+        };
+        let mut during = looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= from && look.at <= to && !look.boot.is_empty())
+            .peekable();
+        during.peek().is_some()
+            && during.all(|look| {
+                look.tracked
+                    .iter()
+                    .all(|id| face.is_some_and(|face| format!("{}/{id}", look.boot) == face))
+            })
+    }
+
+    /// Whether the eyes made any look of their own from `from` to `to`,
+    /// whoever it tracked: a line carried past silent faces
+    /// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`, #4339) needs the eyes to
+    /// have looked through it, so no face seen speaking it means one was
+    /// watched for. The eyes stalled or the camera covered is not.
+    pub fn looked_between(&self, from: Instant, to: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            looks
+                .kept
+                .iter()
+                .any(|look| look.at >= from && look.at <= to && !look.boot.is_empty())
+        })
+    }
+
+    /// Whether the face `face` (`boot/f3`, [`Self::known_with_boot`]; none:
+    /// never) was tracked in any of the eyes' own looks from `since` to
+    /// `to`: for a line carried with no face seen speaking it, their face in
+    /// view through it or within a few seconds before it began (#4339, the
+    /// Reviewer-lead's P2 on #4479). An empty view from the start, or their
+    /// face gone longer, is not.
+    pub fn face_seen_between(&self, face: Option<&str>, since: Instant, to: Instant) -> bool {
+        let Some(face) = face else {
+            return false;
+        };
+        self.looks.lock().is_ok_and(|looks| {
+            looks
+                .kept
+                .iter()
+                .filter(|look| look.at >= since && look.at <= to && !look.boot.is_empty())
+                .any(|look| {
+                    look.tracked
+                        .iter()
+                        .any(|id| format!("{}/{id}", look.boot) == face)
+                })
+        })
+    }
+
     /// For the journal when no face was seen speaking a line: how many of
     /// the eyes' own looks it had, how many held one face only, and of
     /// `face`'s (the known one, `boot/f3`) how many read speaking, still or
@@ -821,6 +909,177 @@ pub fn seen_speaking_note(
 mod tests {
     use super::*;
     use lamp_msgs::{Face, Speaking};
+
+    /// #4339: no face but theirs (or none) in any of the eyes' looks
+    /// through a line, and at least one look there; another face in one, or
+    /// no look at all, is not.
+    /// The Reviewer-lead's P2 on #4479: a line is carried unseen only with
+    /// their face in view through it or within
+    /// [`crate::second_provider::CARRY_UNSEEN_WITHIN`] before it began: 3 s
+    /// after it left, carried; 8 s after, the room's; an empty view from the
+    /// start, the room's.
+    #[test]
+    fn an_unseen_line_carries_only_soon_after_their_face_was_in_view() {
+        let within = crate::second_provider::CARRY_UNSEEN_WITHIN;
+        let face = Face {
+            id: "f1".to_owned(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: None,
+            speaking: None,
+        };
+        let start = Instant::now();
+        let eyes = SpeakingFaces::default();
+        eyes.look(start, Some((("b", 1), &Faces { faces: vec![face] })));
+        let left = start + Duration::from_millis(500);
+        eyes.look(left, Some((("b", 2), &Faces { faces: vec![] })));
+        let seen = |begun: Instant| {
+            eyes.face_seen_between(Some("b/f1"), begun - within, begun + Duration::from_secs(1))
+        };
+        assert!(seen(left + Duration::from_secs(3)), "3 s after: carried");
+        assert!(
+            !seen(left + Duration::from_secs(8)),
+            "8 s after: the room's"
+        );
+        assert!(seen(start), "still in view through the line");
+        assert!(
+            !eyes.face_seen_between(None, start - within, left),
+            "no face"
+        );
+        let empty = SpeakingFaces::default();
+        empty.look(start, Some((("b", 1), &Faces { faces: vec![] })));
+        assert!(
+            !empty.face_seen_between(Some("b/f1"), start - within, start + Duration::from_secs(1)),
+            "an empty view from the start: the room's"
+        );
+    }
+
+    #[test]
+    fn no_other_face_in_view_needs_a_look_and_no_face_but_theirs() {
+        let face = |id: &str| Face {
+            id: id.to_owned(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: None,
+            speaking: Some(Speaking {
+                state: SpeakingState::No,
+                score: 0.9,
+                from: None,
+            }),
+        };
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        assert!(
+            !eyes.no_other_face_in_view(Some("b/f1"), from, Instant::now()),
+            "no look"
+        );
+        eyes.look(Instant::now(), Some((("b", 1), &Faces { faces: vec![] })));
+        eyes.look(
+            Instant::now(),
+            Some((
+                ("b", 2),
+                &Faces {
+                    faces: vec![face("f1")],
+                },
+            )),
+        );
+        let to = Instant::now();
+        assert!(eyes.no_other_face_in_view(Some("b/f1"), from, to));
+        assert!(
+            !eyes.no_other_face_in_view(None, from, to),
+            "f1 is someone's face"
+        );
+        assert!(!eyes.no_other_face_in_view(Some("b/f2"), from, to));
+        let later = Instant::now();
+        eyes.look(Instant::now(), Some((("b", 3), &Faces { faces: vec![] })));
+        assert!(
+            eyes.no_other_face_in_view(None, later, Instant::now()),
+            "nobody in view"
+        );
+        eyes.look(
+            Instant::now(),
+            Some((
+                ("b", 4),
+                &Faces {
+                    faces: vec![face("f1"), face("f2")],
+                },
+            )),
+        );
+        assert!(
+            !eyes.no_other_face_in_view(Some("b/f1"), from, Instant::now()),
+            "f2 too"
+        );
+        // Looked through, whoever was tracked; not before any look.
+        assert!(
+            eyes.looked_between(from, Instant::now()),
+            "two faces looked at"
+        );
+        let after = Instant::now();
+        assert!(!eyes.looked_between(after, Instant::now()), "no look since");
+    }
+
+    /// `LAMP_PERSON_SCOPE_ONE_FACE` (the launch testers' item 1 on #3997):
+    /// the known face in at least `FEWEST_LOOKS` looks and no other face in
+    /// any, its mouth never read speaking; empty looks between are no other
+    /// face. One look with a second face, an unknown face alone, too few
+    /// looks, or another boot's `f1`, and it is not.
+    #[test]
+    fn one_face_in_view_needs_their_face_in_enough_looks_and_no_other_in_any() {
+        let face = |id: &str| Face {
+            id: id.to_owned(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: None,
+            speaking: Some(Speaking {
+                state: SpeakingState::No,
+                score: 0.9,
+                from: None,
+            }),
+        };
+        let looks = |frames: &[&[&str]]| {
+            let eyes = SpeakingFaces::default();
+            let from = Instant::now();
+            for (seq, ids) in frames.iter().enumerate() {
+                let faces = Faces {
+                    faces: ids.iter().map(|id| face(id)).collect(),
+                };
+                eyes.look(Instant::now(), Some((("b", seq as u64 + 1), &faces)));
+            }
+            (eyes, from, Instant::now())
+        };
+        let alone = |frames: &[&[&str]]| {
+            let (eyes, from, to) = looks(frames);
+            eyes.one_face_in_view("b/f1", from, to)
+        };
+        assert!(
+            alone(&[&["f1"], &["f1"], &[], &["f1"]]),
+            "theirs, never speaking"
+        );
+        assert!(
+            !alone(&[&["f1"], &["f1"], &["f1", "f2"], &["f1"]]),
+            "a second face in one look"
+        );
+        assert!(!alone(&[&["f2"], &["f2"], &["f2"]]), "an unknown face");
+        assert!(!alone(&[&["f1"], &["f1"]]), "too few looks");
+        assert!(!alone(&[&[], &[], &[]]), "no face");
+        let (eyes, from, to) = looks(&[&["f1"], &["f1"], &["f1"]]);
+        assert!(
+            !eyes.one_face_in_view("other-boot/f1", from, to),
+            "another boot's f1"
+        );
+    }
 
     #[test]
     fn with_person_scope_seen_a_line_no_face_was_seen_speaking_is_not_theirs() {

@@ -439,6 +439,14 @@ fn reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_termina
 
 #[test]
 fn reminder_waits_for_named_request_second_look_before_its_window_can_expire() {
+    // On the scenario clock, as its sibling that renews the same heartbeat
+    // (`reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_terminal`)
+    // is: the one input heartbeat (`renew_input_evidence`) lasts the owner's
+    // whole input lease, `MAX_INPUT_LEASE_US` (1 s), of stepped time. On the
+    // host's clock a stall of over 1 s before the follow-up's completion
+    // revoked the turn, so that completion said `StaleOwner` (#1569).
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     let mut fixture = RoundtripFixture::new();
     let mut test = Test::new();
     test.reply.as_mut().unwrap().reminder = None;
@@ -1395,7 +1403,7 @@ fn waiting_with_a_due_reminder(
             }
             for look in 0..looks {
                 between(fixture, look);
-                gate()?;
+                gate(&mut |_| Ok(()))?;
             }
             Ok(WaitOutcome::Allowed)
         },
@@ -1706,7 +1714,7 @@ fn told_the_face(
                     on_state(switch, crate::process::new_boot().unwrap(), 1)?;
                 }
                 fixture.tick();
-                gate()?;
+                gate(&mut |_| Ok(()))?;
                 told.push(owed.showing());
             }
             Ok(WaitOutcome::Allowed)
@@ -1882,7 +1890,12 @@ fn offline_user_interruption_retries_only_after_successful_authority_publication
             &mut queue,
             accepted,
             PlayoutStart::default(),
-            false,
+            notices::LocalOnly {
+                speech: false,
+                back: false,
+                service: false,
+                signed_out: false,
+            },
             &mut test.trace,
             |snapshot| {
                 assert_ne!(snapshot.owner(), Some(chunk.permit.owner()));
@@ -1950,7 +1963,12 @@ fn user_interruption_cannot_retry_a_failed_provider_with_unretired_audio() {
         &mut queue,
         accepted,
         PlayoutStart::default(),
-        false,
+        notices::LocalOnly {
+            speech: false,
+            back: false,
+            service: false,
+            signed_out: false,
+        },
         &mut test.trace,
         |snapshot| {
             assert_ne!(snapshot.owner(), Some(chunk.permit.owner()));

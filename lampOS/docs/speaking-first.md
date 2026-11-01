@@ -29,7 +29,7 @@ What the voice's hello did, and where it went:
 | nothing said to the lamp or by it for 30 s | Welcome back's two `voice/state` conditions: resting for 5 s, and the lamp not speaking for 30 s (#1140, [skills.md](skills.md)) |
 | the keeper's pause | the say service's gates (below) |
 | the Policy asked first (`LAMP_HELLO_ASKS_POLICY`, `voice/arrival`) | Welcome back's `[ask] policy = "hello"`, through `lamp-skills`' ask (`LAMP_SKILLS_ASK=policy`) |
-| by the name typed at setup | the name is in the model's instruction (`person::told`, below), and the skill's note says "by name if you know it" |
+| by the name typed at setup | the name is in the model's instruction (`person::told`, below), and the skill's note says "their name if you know it" |
 | by a known face's name | told with Welcome back's note while someone is at the lamp, by its `who = true` permission, which no other skill has: "(The person at the lamp now is NAME: you know their face.)" (`person::at_the_lamp`, `known_faces::note`) |
 | one beat warmer for someone Mood calls `regular` or `close` (#1670) | told with Welcome back's note the same way: "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)" (`person::OFTEN`) |
 | for someone `close`, no hello within the hour | **dropped**: `lamp-skills` has no cooldown by how familiar someone is, and Mood carries no identity, so the hour counted any hello, not one to this person; the 20 minutes hold for everyone |
@@ -66,6 +66,21 @@ turn as it came), `say::tests::who_goes_only_with_a_note`, lamp-skills'
 and Who was here are not given it),
 `speak_up::tests::the_familiar_level_is_read_from_moods_fresh_state_only`.
 No test runs the whole loop with a presence file.
+
+A `who` note is also told, last and whether or not anyone is at the lamp,
+the part of the day from the lamp's own time and to say a hello and the
+name only: "(It is the afternoon here now: if you name the part of the day,
+it is the afternoon, never another. Say only a hello and their name if you
+know it: no weather, no day or date, no time, no question and no offer.)"
+The part is the one the session's time names (morning 5-11, afternoon
+12-16, evening 17-20); at night, or while the clock is not set or the zone
+cannot be read, it is told not to name one and just say hello. A hello at
+15:42 had said "Evening" and added the weather, the weekday and "how's it
+going" (the first builder, 30 Oct, on the launch testers' findings: the
+part of the day from the local time, never the model's own). Any other
+skill's note is unchanged (`local_time::hello_told`, `person::told_hello`;
+tests `local_time::tests::a_hello_is_told_the_part_of_the_day_from_the_lamps_own_time`,
+`person::tests::only_a_note_that_asked_is_told_the_part_of_the_day`).
 
 The say's `skill_says` record keeps whether its note was told
 (`told_who`, true or false) and Mood's level it was told with (`familiar`:
@@ -170,7 +185,7 @@ connection resumed from it (the reviewer's two P2s on #3050):
   real Live connection takes longer to open.
 
 Without a memory the Live route has no lease of a person, so it never
-tells the name. Welcome back's "by name if you know it" has the typed name
+tells the name. Welcome back's "their name if you know it" has the typed name
 only where a line was told it; a known face's own name is told as before
 (`person::at_the_lamp`).
 
@@ -444,6 +459,18 @@ open until then:
   `audio_written_with_playback_gaps_unscored`). Never tried again here: the
   asker decides.
 - `{"outcome":"expired"}`.
+
+**While the model service refuses** (#4265, `LAMP_SECOND_REFUSED_HOLD=on`,
+the lead's call on #1711; [failure-notices.md](failure-notices.md)): while
+turns are held, a `text` is said as the lamp's own line, its words as they
+are and no chat asked (`Says::take_while_refused`, `onboarding::said_as_is`;
+a `text` with a `"` in it can't be held so and waits); a skill's own sound,
+a recording or a cached line never needed the model and plays as before.
+A `note` or a `quoted` line needs the model to word it: it waits, as a
+spoken line does, and is said once the hold lifts (the minute's try or the
+service answering again), or `expired` at its own time. Sent with the try,
+it spends it only if its chat is refused; its answer ends the refusal. Words
+said as they are end none.
 - `{"outcome":"refused","why":"…"}`: a request that is not one (the reason
   names the field and never repeats what was asked), no whole line within
   1 s of being taken (one deadline for the line, so that a client sending a
@@ -513,15 +540,29 @@ applied, and its speech-to-text language). A hit is played with no
 network. A miss is rendered once through the speech service the voice
 already speaks with (`Tts::speak`, ElevenLabs through the relay), within
 5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
-the lamp is unplugged after a shutdown) and played; at most 16 lines and
+the lamp is unplugged after a shutdown) and played; at most 48 lines and
 20 s each are kept, a line past that is played but not kept. Without the
 second route's configuration, or offline on a miss, it is refused at once
 with why (`the speech cache is off`, `not in the speech cache, and not
 rendered: …`), and the asker says the words another way. Its samples are
 played as a skill's sound is, with the same gates. At start the voice
-renders the cache's fixed lines, the shutdown's `lamp_msgs::GOING_TO_SLEEP`
-alone, on a thread of its own, tried again each minute until kept, so
-the first shutdown is said from the cache even with no network then.
+renders the cache's fixed lines (`tts_cache::WARM`), the shutdown's
+`lamp_msgs::GOING_TO_SLEEP` first, then a hand's hold's sleep line
+`lamp_msgs::SLEEP_LINE` (#3748, `LAMP_SLEEP_LINE`, controls.md), on a
+thread of its own, tried again until kept (after a minute, then twice as
+long each time, at most hourly; a line that renders empty or past 20 s is
+never asked for again in that run), so the first
+shutdown is said from the cache even with no network then. The cache is
+made once per process and shared: the coordinator reads the sleep line
+from it once per conversation (`TtsCache::kept`), a file read only, never
+a render. With an owner's language other than English (#4473 (c),
+second-voice.md, "The fixed lines"), its eighteen fixed lines in that language
+are warmed first, then these two, and a cached `text` that is one of them
+is played in the owner's words when kept, its English otherwise; a plain
+`text` that is one of them (the first stand's) is told to the model in the
+owner's words. Every
+warmed line is tried each round, so one that can't be kept holds back no
+other.
 
 **When it is said.** After a due reminder and before the news, through a reminder's gates: no reply owed or queued, the speaker
 free, nobody's utterance pending, the microphone's capture fresh and a

@@ -35,6 +35,8 @@ const READ: &[(&str, &str, Type)] = &[
     ("system.info", "versions.firmware", Type::Text),
     ("system.info", "network.private_ip", Type::Text),
     ("system.info", "host.hostname", Type::Text),
+    // The owner's language (#4473), always said: `en` with no file.
+    ("system.info", "host.language", Type::Text),
     ("volume.get", "volume", Type::Percent),
     ("volume.get", "raw", Type::Whole),
     ("volume.get", "max_volume", Type::Whole),
@@ -172,6 +174,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -279,6 +282,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -432,6 +436,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -495,6 +500,86 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+/// #4527's P2: the app removing a person entirely cancels every reminder
+/// they set, by the memory id it forgets, and says how many; the face only
+/// leaves them, and a lamp that gives lamp-cloud no schedule answers as
+/// before.
+#[test]
+fn face_remove_entirely_cancels_the_persons_reminders() {
+    const STORE: &str = "0123456789abcdef0123456789abcdef";
+    let root = PathBuf::from(format!("/tmp/lcfr-{}", std::process::id()));
+    let places = lamp(&root);
+    let who = root.join("who.sock");
+    let listener = UnixListener::bind(&who).unwrap();
+    let eyes = std::thread::spawn(move || {
+        for _ in 0..3 {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(&stream, "{}", json!({"forgot": true})).unwrap();
+        }
+    });
+    let socket = root.join("schedule.sock");
+    let serving = schedule(
+        &socket,
+        vec![
+            (
+                "status",
+                json!({"ok": true, "store_id": STORE, "revision": 4}),
+            ),
+            (
+                "forget",
+                json!({"ok": true, "store_id": STORE, "revision": 5, "forgotten": 2}),
+            ),
+        ],
+    );
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: Some(lamp_cloud::faces::Eyes {
+            socket: who,
+            memory: None,
+        }),
+        schedule: Some(lamp_actions::schedule::Adapter::new(socket.clone()).unwrap()),
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        share: None,
+        shutdown: None,
+    };
+    let removed = answer(&mut real, "face.remove", &json!({"name": "Lan"}))
+        .unwrap()
+        .unwrap();
+    assert_eq!(removed["reminders"], json!({"cancelled": 2}), "{removed}");
+    serving.join().unwrap();
+    let face_only = answer(
+        &mut real,
+        "face.remove",
+        &json!({"name": "Bo", "entirely": false}),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(face_only.get("reminders").is_none(), "{face_only}");
+    real.schedule = None;
+    let kept = answer(&mut real, "face.remove", &json!({"name": "Mai"}))
+        .unwrap()
+        .unwrap();
+    assert!(kept.get("reminders").is_none(), "{kept}");
+    eyes.join().unwrap();
+    let _ = std::fs::remove_dir_all(root);
+}
+
 /// #2194: `update.status` for the Lamp 2 page, from lamp-update's kept
 /// `update/status` on the bus, with the field types the app takes; `now`
 /// is `unknown` before lamp-update has said anything, and without
@@ -524,6 +609,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -705,6 +791,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         restart: Some(socket),
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -774,6 +861,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -871,6 +959,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
         restart: None,
         guard: None,
         make_skill: None,
+        share: None,
         shutdown: None,
     };
     let me = Identity {
@@ -918,4 +1007,68 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
     let data = mic(&mut real, &json!({"muted": true, "reason": "sleep"}));
     assert_eq!(data["muted_by"], "sleep", "{data}");
     let _ = std::fs::remove_dir_all(root);
+}
+
+/// `LAMP_SIGNED_OUT`: `system.info` and `lamp.health` read the state from
+/// `account/state`. No state at all (the switch off, an older lamp-cloud) and
+/// a state of signed in say no field.
+#[test]
+fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
+    use lamp_msgs::{AccountState, Health};
+    let root = tempfile::tempdir().unwrap();
+    let places = lamp(&root.path().to_path_buf());
+    let bus_root = root.path().join("bus");
+    let bus = Bus::new(&bus_root).unwrap();
+    let mut health = bus
+        .publisher_declared(Health::TOPIC, &Health::declaration(), "health")
+        .unwrap();
+    health
+        .publish_json(
+            1,
+            &json!({"level":"ok","message":"","items":[],"missing":[]}),
+        )
+        .unwrap();
+    let mut real = Real {
+        places,
+        bus: Some(Bus::new(&bus_root).unwrap()),
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        make_skill: None,
+        share: None,
+        shutdown: None,
+    };
+    let said = |real: &mut Real, kind: &str| answer(real, kind, &Value::Null).unwrap().unwrap();
+    assert!(said(&mut real, "system.info").get("account").is_none());
+    assert!(said(&mut real, "lamp.health").get("account").is_none());
+    let mut state = bus
+        .publisher_declared(AccountState::TOPIC, &AccountState::declaration(), "cloud")
+        .unwrap();
+    state
+        .publish_json(lamp_ipc::monotonic_us(), &AccountState::default())
+        .unwrap();
+    assert!(said(&mut real, "system.info").get("account").is_none());
+    state
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &AccountState {
+                signed_out: true,
+                for_s: 3,
+            },
+        )
+        .unwrap();
+    assert_eq!(said(&mut real, "system.info")["account"], "signed_out");
+    assert_eq!(said(&mut real, "lamp.health")["account"], "signed_out");
 }

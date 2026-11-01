@@ -870,7 +870,15 @@ fn a_ring_live_at_the_stop_is_not_dated_before_it() {
     assert_eq!(exit["exited_before_stop"], false, "{exit}");
 }
 
-/// One tick of the ring's restart, held to the loop's bound: it only looks
+/// The longest one tick of the ring's restart may take: the loop's bound. A
+/// tick that waited on the startup thread would take the startup's whole
+/// `WORKER_STARTUP_TIMEOUT` (3 s), since these tests' peers say Ready only
+/// between ticks. Nor does a tick do file work: the old worker's drop, which
+/// removes its folder, runs on the restart's thread. On the loop it took
+/// 56 to 116 ms on a Mac beside other processes' file churn (#1569, #4658).
+const TICK_BOUND: Duration = Duration::from_millis(50);
+
+/// One tick of the ring's restart, held to [`TICK_BOUND`]: it only looks
 /// at the startup thread, never waits on it (#1620).
 fn restart_tick_at(rig: &mut Rig, trace: &mut SessionState, at_us: impl FnMut() -> u64) -> bool {
     let started = Instant::now();
@@ -880,8 +888,8 @@ fn restart_tick_at(rig: &mut Rig, trace: &mut SessionState, at_us: impl FnMut() 
         .unwrap();
     let took = started.elapsed();
     assert!(
-        took < Duration::from_millis(50),
-        "restart tick took {took:?}"
+        took < TICK_BOUND,
+        "restart tick took {took:?}, past the loop's {TICK_BOUND:?}"
     );
     adopted
 }
