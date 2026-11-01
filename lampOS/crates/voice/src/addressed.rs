@@ -206,7 +206,32 @@ pub fn judge(
         facing_close,
         name_score: request.name_score.clamp(0.0, 1.0),
         addressed: near == Some(true) && facing_close == Some(true),
+        like_asker: None,
     }
+}
+
+/// How alike the line `request` sounds to the person the lamp is in
+/// conversation with, for the judgement's `like_asker` (#4306): the cosine
+/// of its voice print against the print of the line that began the
+/// conversation ([`crate::same_voice::Voices::like_asker`]). Nothing without
+/// the same-voice check (`LAMP_SAME_VOICE_MODEL`), while no conversation is
+/// going on (`going_on`: the thread's `going_on`, an exchange with the
+/// lamp's words in it within [`crate::thread::GOING_ON_FOR`]), or while
+/// either print is not known: a
+/// line under 1.5 s has none, and one whose print is still being made when
+/// it is judged has none yet. Only told: no rule reads it.
+pub fn like_asker<P: crate::same_voice::Printer>(
+    voices: Option<&mut crate::same_voice::Voices<P>>,
+    request: u64,
+    going_on: bool,
+) -> Option<f32> {
+    if !going_on {
+        return None;
+    }
+    voices?
+        .like_asker(request)
+        .filter(|like| like.is_finite())
+        .map(|like| like.clamp(-1.0, 1.0))
 }
 
 /// `attention/addressed` on the bus: once for each request.
@@ -589,6 +614,61 @@ mod tests {
         let later = judge(request(1_000_000, None), &rises, &looks, 2_000_000);
         assert!(later.addressed);
         assert_eq!(later.ended_us, None);
+    }
+
+    /// Prints by a line's first sample, given at once: 1 the asker's voice,
+    /// 3 the asker's a little off (0.90 against it), 4 a colleague's (0.20).
+    #[derive(Default)]
+    struct ByFirstSample(VecDeque<(u64, Result<Vec<f32>, String>)>);
+
+    impl crate::same_voice::Printer for ByFirstSample {
+        fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+            let print = match samples[0] {
+                1 => vec![1.0, 0.0, 0.0],
+                3 => vec![0.9, 0.0, -0.436],
+                _ => vec![0.2, 0.0, 0.98],
+            };
+            self.0.push_back((request, Ok(print)));
+            true
+        }
+        fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+            self.0.pop_front()
+        }
+    }
+
+    /// #4306: a follow-up in the asker's voice reads high, a colleague's
+    /// line at the desk low; nothing while no conversation is going on or
+    /// without the same-voice check. Beside the judgement it is a message
+    /// the Policy takes.
+    #[test]
+    fn like_asker_is_told_only_in_a_conversation_and_high_in_the_askers_voice() {
+        use crate::same_voice::{LEAST_SAMPLES, Voices};
+        let mut voices = Voices::new(ByFirstSample::default());
+        let say = |voices: &mut Voices<ByFirstSample>, request: u64, voice: i16| {
+            voices.began(request, true);
+            voices.heard(request, &vec![voice; LEAST_SAMPLES * 2]);
+            voices.ended(request);
+        };
+        say(&mut voices, 1, 1);
+        voices.decided(1, true, false);
+        say(&mut voices, 2, 3);
+        say(&mut voices, 3, 4);
+        let near = |like: Option<f32>, to: f32| like.is_some_and(|like| (like - to).abs() < 0.01);
+        assert!(near(like_asker(Some(&mut voices), 2, true), 0.9));
+        assert!(near(like_asker(Some(&mut voices), 3, true), 0.2));
+        assert_eq!(like_asker(Some(&mut voices), 2, false), None);
+        assert_eq!(like_asker::<ByFirstSample>(None, 2, true), None);
+        let said = Addressed {
+            like_asker: like_asker(Some(&mut voices), 3, true),
+            ..judge(
+                request(1_000_000, Some(1_500_000)),
+                &VecDeque::new(),
+                &Looks::default(),
+                1_600_000,
+            )
+        };
+        assert!(said.like_asker.is_some());
+        assert!(said.check().is_ok());
     }
 
     #[test]
