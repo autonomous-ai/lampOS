@@ -948,7 +948,8 @@ pub enum ProviderOutput {
         request: u64,
         idle: bool,
     },
-    /// The whole answer was a short holding phrase with no function call.
+    /// A holding answer (a short wait phrase, or a last sentence promising
+    /// a check, `holding_answer::holding_only`) with no function call.
     /// Observed before its idle TurnComplete; no input or speech is granted.
     HoldingAnswer {
         request: u64,
