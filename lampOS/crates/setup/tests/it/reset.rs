@@ -1591,12 +1591,19 @@ fn check_reads_the_product_plan_install_places() {
     }
 }
 
+/// How far after its folder a store's rest may be named: the farthest on
+/// 1 Nov, `people.json.from-photos`, ends 187 bytes after
+/// `/var/lib/lampos-eyes/`.
+const NAMED_NEAR: usize = 240;
+
 /// setup.md's "The person's data, which reset wipes" is the docs' list of
 /// what a reset wipes, and it had fallen twelve stores behind the plan
 /// (`seems.log`, `skills-dev`, the Wi-Fi's file, …). Each path the product
-/// plan wipes is named there,
-/// whole or as a folder (`/var/lib/lampos-eyes/`) with its rest in backticks
-/// (`seems.log`).
+/// plan wipes is named there, whole or as a folder (`/var/lib/lampos-eyes/`)
+/// with its rest in backticks (`seems.log`) soon after it, within
+/// [`NAMED_NEAR`] bytes: a rest named only beside another folder, a later
+/// store's `mute` beside the voice's, is not its store named (Reviewer-two's
+/// P3 on #4830).
 #[test]
 fn setup_md_names_every_store_the_product_plan_wipes() {
     let plan: serde_json::Value =
@@ -1616,8 +1623,13 @@ fn setup_md_names_every_store_the_product_plan_wipes() {
         .filter(|path| {
             !section.contains(path)
                 && !path.match_indices('/').any(|(at, _)| {
-                    section.contains(&path[..=at])
-                        && section.contains(&format!("`{}`", &path[at + 1..]))
+                    let rest = format!("`{}`", &path[at + 1..]);
+                    section.match_indices(&path[..=at]).any(|(folder, _)| {
+                        let after = &section[folder + at + 1..];
+                        after
+                            .find(&rest)
+                            .is_some_and(|near| near + rest.len() <= NAMED_NEAR)
+                    })
                 })
         })
         .collect();
