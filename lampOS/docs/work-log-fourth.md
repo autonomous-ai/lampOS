@@ -1,3 +1,13 @@
+## 2026-11-01 16:37 ICT — train 498 gates, two independent reads, speech-tail boundary
+
+Ready for lamp-voice: #4847 is non-draft with green gates; exact-head read carry requested. #4848 and #4782 remain no.
+
+- Rebased all three authored patches unchanged onto train 498 (`ee178fd5c7`). #4847 `f4b95813b9`: ARM64 41292531897 passed 8,985 selected / 57 skipped plus doc/process checks, Linux Clippy 41292531863 and docs green. Third's read carry from identical `9509a74a8` requested. #4848 `683c5c95ee`: ARM64 41292539378 passed 8,989 / 57 skipped, Linux Clippy 41292539391 and docs green; the two full reads and integration after #4847 remain. #4782 `e4f6b08bf7` remains draft for the search replay; rebase CI still monitored.
+- READ-OK #4752 `9260ad9d5`, both design pages and updated delta: privacy/replay source checks; 200 questions plus 24 follow-ups, pinned 512-token/eight-round policy; exact planning sum $603.6424194375; all 15 recorded arm manifest hashes and the aging manifest match. No model, spending, device, current-price or full-ledger verification claim.
+- READ-OK #4850 `fa6914948`: production/test/doc read and an actual-source 18-case access matrix passed. The old predicate fails the intended unknown/unowned case. Optional P3 asks for mixed owned/unowned pagination coverage; no source defect found. No full local Cargo or lamp run.
+- First builder assigned the unreported room/consent deletion outcomes to Third after #4850; #4848 stays as-is. Asked the owner to name the active Bench successor/alternate for the second full privacy read.
+- Provider-queue-only speech follow-up scope approved (Queue 6556066180), with required maximum emitted/unplayed audio at admitted forget, in milliseconds; above about one second needs a later coordinator/playback-owner piece. Source permits 30 seconds in Reply.pcm and its host test approaches that cap. This is capacity, not the requested forget-admission measurement. Reported it on Queue 6556111165; no implementation before #4848 lands and no device action.
+
 ## 2026-11-01 16:17 ICT — all current gates green; dated build-row read
 
 Ready for lamp-voice: yes (#4847 `9509a74a8`); no (#4848 `13bea0a193`, #4782 `2645cbe6c3`).
