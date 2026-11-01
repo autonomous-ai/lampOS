@@ -928,8 +928,9 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
 /// Every folder the product keeps across a boot, the tmpfiles' `d` and `D`
 /// lines and each product unit's `StateDirectory=`, is the reset's: the
 /// shipped plan wipes it, a folder above it, or what in it is the person's
-/// (its marker and journal count). So is each `/var/lib` path a product
-/// unit's lines name, a flag's or a switch's (`--dir /var/lib/lampOS/skills`):
+/// (its marker and journal count). So is each `/var/lib` path the product's
+/// files name, outside a comment, in any unit, drop-in or setting, a flag's or
+/// a switch's (`--dir /var/lib/lampOS/skills`):
 /// a part can keep a store in a folder no tmpfiles line or `StateDirectory=`
 /// makes, as the skills made by voice are (the Queue, #4710, 1 Nov 02:4x).
 /// The rest is on [`KEPT`], each with why, and a path in a kept folder is
@@ -977,17 +978,32 @@ fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
             }
         }
     }
+    // Every file under deploy/product but its README: the units, the
+    // `.path` and `.target`, the drop-ins and the settings (Third's note on
+    // #4837: those named only stores the plan wipes, until a later one).
     let mut named = Vec::new();
-    for entry in fs::read_dir(&product).unwrap() {
-        let path = entry.unwrap().path();
-        let unit = path.extension().is_some_and(|kind| {
-            ["service", "socket", "timer"]
-                .iter()
-                .any(|unit| kind == *unit)
-        });
-        if !unit {
-            continue;
+    let mut files = Vec::new();
+    let mut folders_left = vec![product.clone()];
+    while let Some(folder) = folders_left.pop() {
+        for entry in fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                folders_left.push(path);
+            } else if path.extension().is_none_or(|kind| kind != "md") {
+                files.push(path);
+            }
         }
+    }
+    assert!(
+        files
+            .iter()
+            .any(|path| path.ends_with("lampos-setup-done.path"))
+            && files
+                .iter()
+                .any(|path| path.ends_with("settings/records.json")),
+        "the product's files were walked: {files:?}"
+    );
+    for path in files {
         for line in fs::read_to_string(&path).unwrap().lines() {
             if line.trim_start().starts_with('#') {
                 continue;
