@@ -89,7 +89,7 @@ agent ──MCP over HTTPS──▶ backend ──MQTT (lamp-cloud's channel)─
 - **The lamp says whose words.** The first line an agent has the lamp say in
   a sitting begins with its name ("A message from fo: …"), so the person knows
   who speaks through their lamp. This is the living-thing rule (rule 8 of the
-  repository's root [CLAUDE.md](../../CLAUDE.md)) applied to speech that isn't the lamp's own.
+  repository's root [CLAUDE.md](https://github.com/autonomous-ai/Physical-AI-Operating-System/blob/main/CLAUDE.md)) applied to speech that isn't the lamp's own.
 
 ## Offline, asleep, private or quiet: refused, never queued
 
@@ -106,7 +106,7 @@ The person's lamp is already a signed-in Harness machine on their account
 (`docs/tasks.md`), and fo and Devin Cloud already run as Harness cloud
 harnesses on that same account. openharness has a machine link that asks the
 owner (`OWNER_REQUIRED`) and names the asking machine from its pairing record
-(openharness#1717). The repository's root [CLAUDE.md](../../CLAUDE.md)
+(openharness#1717). The repository's root [CLAUDE.md](https://github.com/autonomous-ai/Physical-AI-Operating-System/blob/main/CLAUDE.md)
 ("Harness integration context") asks lampOS not to invent another pairing flow,
 transport or credential beside Harness's. So there are two routes for the
 owner to choose between:

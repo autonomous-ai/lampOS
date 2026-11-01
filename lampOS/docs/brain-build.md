@@ -323,7 +323,7 @@ web server is disabled.
 
 The Harness computer side, the agent engines, the provider and Jev stay
 where they are. The lamp's Harness client is built to the Harness team's
-existing contract ([../../docs/harness.md](../../docs/harness.md)); nothing
+existing contract ([../../docs/harness.md](https://github.com/autonomous-ai/Physical-AI-Operating-System/blob/main/docs/harness.md)); nothing
 here invents a pairing flow, a transport or a credential.
 
 ## The evidence behind four of the changes
@@ -423,7 +423,7 @@ Three mechanisms already in the voice runtime do the job without a hold:
   place of speech (`InputSender::try_written`,
   [speaking-first.md](speaking-first.md)): the model says in its own voice
   what the note gives it to say. V1 delivers Harness results the same way
-  ([../../docs/harness.md](../../docs/harness.md), "Spoken Harness
+  ([../../docs/harness.md](https://github.com/autonomous-ai/Physical-AI-Operating-System/blob/main/docs/harness.md), "Spoken Harness
   updates"). Silent probe: a hello 0.91 s after the note.
 - **The lamp's own opening words as a signal.** When its answer begins
   "Let me look", the runtime takes the look

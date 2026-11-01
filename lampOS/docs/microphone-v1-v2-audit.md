@@ -2,10 +2,11 @@
 
 This audit uses V1 main commit
 `d5efe9d7b73cc529b34cd4abe97624682a82ca94`, not the modified installed V1.
-The complete source review, original line references and 34-file SHA inventory
-are in [the audit evidence](../artifacts/v1-main-microphone-audit-20261010/report.md).
-These are source findings; saved device flags and input mode can change the
-actual path.
+The earlier audit referenced a full report, original line references and a
+34-file SHA inventory at `artifacts/v1-main-microphone-audit-20261010/report.md`.
+That artifact is not in this source tree; the summary below is the available
+source review, not the complete evidence packet. Saved device flags and input
+mode can change the actual path.
 
 ## What V1 does
 

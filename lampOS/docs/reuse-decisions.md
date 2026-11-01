@@ -1030,7 +1030,7 @@ This is a source review of the current V1 checkout for [Controls](controls.md),
 not another hardware measurement. The control surface on the base is MPR121;
 the TTP223 pads on the head are pet input only. GPIO and the base must stop
 speech; a pet must not interrupt it. The detailed V1 behavior is in
-[`physical-controls.md`](../../robots/lamp/docs/physical-controls.md).
+[`physical-controls.md`](https://github.com/autonomous-ai/Physical-AI-Operating-System/blob/main/robots/lamp/docs/physical-controls.md).
 
 **Keep the button's edge rule:** `hal/drivers/gpio_button.py::_on_edge`
 suppresses repeated presses for 200 ms and repeated releases independently for
