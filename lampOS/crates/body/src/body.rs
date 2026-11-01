@@ -3288,8 +3288,8 @@ fn let_go_at_end<P: PortIo, R: Runtime>(bus: &mut Bus<'_, P, R>, report: &mut Bo
 /// goal set to its position, torque on. Folded, the arm is at its lowest and
 /// stays where it is let go, and a joint wedged against its stop stops
 /// pushing there. The read after, or the first failure. A failed write
-/// never leaves a joint limp: a torque-off that fails part-way puts torque
-/// back on the joints it let go, and torque comes back on each joint
+/// never leaves a joint limp: a torque-off that fails puts torque back on
+/// every arm joint, and torque comes back on each joint
 /// whatever its goal write did.
 fn release_arm<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
@@ -3297,7 +3297,10 @@ fn release_arm<P: PortIo, R: Runtime>(
 ) -> Result<[Sample; 5], String> {
     let mut holding = ARM.to_vec();
     if let Some(detail) = torque_off(bus, report, &mut holding) {
-        for joint in ARM.into_iter().filter(|joint| !holding.contains(joint)) {
+        // Every arm joint, not only those dropped from `holding`: a joint
+        // that took its torque-off but whose answer was lost is limp too,
+        // and a torque-on to a joint still holding does nothing.
+        for joint in ARM {
             report.torque_writes = report.torque_writes.saturating_add(1);
             let _ = bus.write_patiently(joint, &torque_write(joint, 1));
         }
