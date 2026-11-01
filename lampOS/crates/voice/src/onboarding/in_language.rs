@@ -636,6 +636,9 @@ const KOREAN: Lexicon = Lexicon {
         "하세요",
         "돼요",
         "됩니다",
+        // Casual "do it" ("어, 해"): a whole word, so "해도" is none.
+        "해요",
+        "해",
         "요",
     ],
     question: &[
@@ -865,7 +868,21 @@ impl Lexicon {
     }
 
     fn read(&self, text: &str) -> Reading {
-        let line = plain(text);
+        let mut line = plain(text);
+        // Korean: a casual 어 opening the line is a yes, as 응 is, when the
+        // line is 어 alone or 어 and a bare yes ("어, 해", "어 좋아");
+        // otherwise it is a hesitation and drops ("어… 민수예요" is a name,
+        // "어, 잠깐만" a put-off). A Korean commenter's note on #4473.
+        if self.found == Found::WordStart
+            && let Some(rest) = line.strip_prefix(" 어 ")
+        {
+            let yes = format!(" 응 {rest}");
+            line = if self.bare_yes(&yes) {
+                yes
+            } else {
+                format!(" {rest}")
+            };
+        }
         // A bare yes ending as a question may ("물론이죠") is no question.
         let asks = text.contains('?')
             || text.contains('？')
@@ -1904,6 +1921,26 @@ mod tests {
             let read = ko(line);
             assert!(read.greets && !read.names_someone, "{line}");
         }
+        // A Korean commenter's note on #4473: a casual 어 opening the line
+        // is a yes, alone or with a bare yes.
+        for line in ["어", "어.", "어, 해", "어 좋아", "어, 네", "어 응"] {
+            let read = ko(line);
+            assert!(read.agrees, "{line}");
+            assert_eq!(read.yes_or_no, Some(true), "{line}");
+            assert!(read.hello_yes && !read.names_someone, "{line}");
+        }
+        // Before a wait, a "but" or a no, or inside a longer line, it is a
+        // hesitation, no yes.
+        for line in ["어, 잠깐만", "어, 근데", "어 잠시만요", "음 어 좋아"] {
+            let read = ko(line);
+            assert!(!read.agrees && read.yes_or_no.is_none(), "{line}");
+            assert!(!read.names_someone, "{line}");
+        }
+        assert_eq!(ko("어, 아니").yes_or_no, Some(false));
+        assert!(ko("어?").asks && !ko("어?").agrees);
+        // Before a name, it drops: the name is heard, and no yes.
+        let named = ko("어… 민수예요");
+        assert!(named.names_someone && !named.agrees && named.yes_or_no.is_none());
     }
 
     #[test]
