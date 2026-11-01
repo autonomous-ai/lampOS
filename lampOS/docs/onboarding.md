@@ -631,25 +631,40 @@ a one-syllable yes (네, 예, 응) is a whole word too, alone or with its "요",
 so "예린" is a name and no yes; and a put-off is never a name ("잠시만요").
 Hangul is matched by the syllable, so a refusal is listed in each form
 ("아니" and "아닙니다", "안 돼" and "안 됩니다"); 괜찮아요, 알겠어요 and 그래요
-are asked again (a Korean customer's review of #4506). Once the hello is asked, it takes only that bare yes or a short
+are asked again (a Korean customer's review of #4506). A casual 어
+opening a Korean line is a yes, as 응 is, when the line is 어 alone or 어
+and a bare yes ("어, 해", "어 좋아"); otherwise it is a hesitation and
+drops, so "어, 잠깐만" and "어, 근데" are put-offs and "어… 민수예요" is a
+name (a Korean commenter's note on #4473). A Korean strict no after a
+"but" (근데, 하지만, 그런데, 그렇지만, 다만) is a clear no at any length,
+never put off: "고마워, 하지만 안 해도 돼" is a no, while "네, 근데요" and
+"아니, 하지만 해도 돼" stay no answer. 그래 and 맞아맞아 are strict yeses,
+"하지 않아도 돼" a strict no; 됐어 ("I'm ready" or "no thanks"), 다음 and
+패스 are no answer and no name (the same commenter's second read). Once the hello is asked, it takes only that bare yes or a short
 strict no (`yes_or_no`, as the face consent does). It's #4480's English
 rule (`PUTS_OFF`, `PUTS_OFF_TOGETHER`, short or firm) made strict. English
 keeps its own rules (#4469, #4480). An hour
 counts with its own "o'clock" (十時, 十点, 열 시, mười giờ), since that is
 already the time cue English needs a "from" or an "at" for. With the nudge
 on, no name is taken from a line in another language, so none is asked back
-and the model keeps "who you are".
+and the model keeps "who you are". In Korean, the name `remember_my_face`
+keeps (and the owner's name "who you are" keeps and greets) drops the casual
+vocative copula (`language::without_vocative`, a Korean commenter's note on
+#4473): 민수야 and 민준이야 are 민수 and 민준, not "민수야 님". 야 goes only
+after a syllable with no final consonant and 이야 only after one with it; a
+stem of one syllable keeps its 야 ("수야"), and a name ending in 아 keeps it
+("지아"). The name is checked against what was heard as said.
 
 | Words | vi | ja | zh | ko |
 |---|---|---|---|---|
 | yes | có, vâng, dạ, ừ, ờ, được, ok, okay, oke, đồng ý, đúng, chắc chắn, tất nhiên, ổn | はい, うん, ええ, いいよ, いいですよ, どうぞ, オッケー, ok, もちろん, お願い, そうです, 了解, わかりました | 是的, 是啊, 好, 可以, 行啊, 行吧, 对, 当然, 同意, ok | 네, 예, 응, "그래 ", 좋아, 좋습니다, 물론, 맞아, 맞습니다, 오케이, ok, okay, 알겠, 돼요, 됩니다, 그럼요, 넵, 넹, 그러세요, 당연, 허락 |
 | no | không, ko, đừng, chưa, khỏi | いいえ, いや, だめ, ダメ, ない, 結構です, やめて, しないで, 嫌, やだ | 不, 没有, 别, 没 | 아니, 아닙니다, 아뇨, 싫, 안 돼, 안돼, 안 됩니다, 안됩니다, 안 해, 하지 마, 하지마, 하지 말아, 않, 없, 말아 |
 | yes phrases | không sao, không vấn đề gì, không phiền, cứ tự nhiên, sao cũng được | 問題ない, 問題ありません, 構わない, かまわない, 構いません, かまいません, 気にしない | 没问题, 没关系, 没事, 不介意, 无所谓, 不错, 没错 | 상관없, 문제없, 문제 없 |
-| strict yes (`yes_or_no`) | có, vâng, dạ, ừ, được, đồng ý, đúng, chắc chắn | はい, うん, ええ, いいよ, いいですよ, もちろん, そうです | 是的, 是啊, 好, 可以, 对, 当然 | 네, 예, 응, 좋아, 좋아요, 맞아, 맞아요, 맞습니다, 물론, 물론이죠, 물론이에요, 넵, 네네, 예예, 넹, 그럼요, 그러세요, 당연하죠, 당연하지, 좋습니다, 오케이, 허락할게요 |
+| strict yes (`yes_or_no`) | có, vâng, dạ, ừ, được, đồng ý, đúng, chắc chắn | はい, うん, ええ, いいよ, いいですよ, もちろん, そうです | 是的, 是啊, 好, 可以, 对, 当然 | 네, 예, 응, 좋아, 좋아요, 맞아, 맞아요, 맞습니다, 물론, 물론이죠, 물론이에요, 넵, 네네, 예예, 넹, 그럼요, 그러세요, 당연하죠, 당연하지, 좋습니다, 오케이, 허락할게요, 그래, 맞아맞아 |
 | put off (no answer) | có lẽ, có thể, để mình nghĩ, để tôi nghĩ, để em nghĩ, để xem, chờ, đợi, chưa biết, không biết, nhưng, ừm, ờm, ơ, lát nữa, để sau, từ từ, nói chậm, kiểm tra, giải thích | ちょっと, 待って, 考え, わから, かな, ええと, えーと, えっと, そうですね, でも, うーん, ふうん, たぶん, 多分, あとで, 後で, ゆっくり, 確認, 説明 | 想想, 想一下, 好像, 等, 不知道, 对了, 但是, 可是, 也许, 可能, 嗯, 呃, 以后再, 稍后, 晚点, 慢点, 解释, 一会儿 | 나중에, 천천히, 설명, 확인, 잠시, 그래서, 글쎄, 잠깐, 생각, 예를, 근데, 하지만, 아마, 그런데, 그렇지만, 그래도, 어쩌면, 혹시, 이따, 다음에, 모르겠, 아직, 다만, "음 " |
 | a question without its mark | | ですか, ますか, でしょうか, かな (ending a phrase) | 吗, 呢 | 까요, 나요, 니까, 인가요, 건가요, 는가요, 래요, 죠, 지요 (ending a word, unless a bare yes) |
-| strict no | không, ko, đừng, sai | いいえ, いや, だめ, ダメ, 嫌, やだ, 違, 結構です | 不, 没有, 别, 错 | 아니, 아닙니다, 아뇨, 싫, 안 돼, 안돼, 안 됩니다, 안됩니다, 안 해, 하지 마, 하지마, 하지 말아, 말아, 틀려 |
-| polite (may go with a bare yes) | ạ, nhé, nha, rồi, làm ơn, cảm ơn | お願いします, お願い, どうぞ, です, よ, ね | 请, 谢谢, 的, 啊, 呀, 哦 | 부탁해요, 부탁합니다, 부탁드려요, 주세요, 감사합니다, 고마워요, 그렇게 하세요, 그러세요, 해도 돼요, 하세요, 돼요, 됩니다, 요 |
+| strict no | không, ko, đừng, sai | いいえ, いや, だめ, ダメ, 嫌, やだ, 違, 結構です | 不, 没有, 别, 错 | 아니, 아닙니다, 아뇨, 싫, 안 돼, 안돼, 안 됩니다, 안됩니다, 안 해, 하지 마, 하지마, 하지 말아, 말아, 틀려, 않아도 |
+| polite (may go with a bare yes) | ạ, nhé, nha, rồi, làm ơn, cảm ơn | お願いします, お願い, どうぞ, です, よ, ね | 请, 谢谢, 的, 啊, 呀, 哦 | 부탁해요, 부탁합니다, 부탁드려요, 주세요, 감사합니다, 고마워요, 그렇게 하세요, 그러세요, 해도 돼요, 하세요, 돼요, 됩니다, 해요, 해, 요 |
 | about the hello | chào, lời chào | あいさつ, 挨拶, こんにちは | 打招呼, 招呼, 问好, 你好 | 인사, 안녕 |
 | greetings | chào buổi sáng, chào buổi chiều, chào buổi tối, xin chào, chào, alo, hello, hi | こんにちは, こんばんは, おはよう, やあ, もしもし, ハロー, hello | 早上好, 下午好, 晚上好, 你好, 您好, 早安, 晚安, 嗨, 哈喽, hello | 좋은 아침, 좋은 저녁, 안녕, 여보세요, 반가워, 반갑, 하이, 헬로, hello, hi |
 | again | lặp lại, nói lại, gì cơ, cái gì, nói gì, sao cơ, chưa nghe, không nghe, nghe không rõ | もう一度, もう一回, もういちど, なんて, 何て, 聞こえない, 聞こえなかった, 聞き取れない, 聞き取れなかった, 繰り返 | 再说, 重复, 什么, 没听清, 没听到, 听不清, 再一遍, 啥 | 다시, 뭐, 못 들었, 잘 안 들, 안 들려, 안 들렸, 못 알아들, 한 번 더 |
@@ -657,7 +672,7 @@ and the model keeps "who you are".
 | a time (with any digit) | sáng, trưa, chiều, tối, đêm, khuya, nửa đêm, sau, trước, hai giờ … mười hai giờ | 夜, 朝, 午前, 午後, 夕方, 昼, 深夜, 真夜中, 以降, 以前, 過ぎ, 二時 … 十二時 | 晚上, 早上, 上午, 下午, 中午, 凌晨, 半夜, 午夜, 夜里, 以后, 之后, 以前, 之前, 两点, 二点 … 十二点, 点钟 | 밤, 아침, 저녁, 오후, 오전, 새벽, 낮, 자정, 정오, 이후, 이전, 전에, 후에, 한 시 … 열두 시, 한시 … 열두시 |
 | quiet, hours | yên lặng, im lặng, yên tĩnh, giờ, tiếng | 静か, 時間, 音 | 安静, 时间, 小时, 时段 | 조용, 시간 |
 | a name told | tên, gọi tôi, gọi mình, gọi em, gọi anh, gọi chị, tôi là, mình là, em là; or 1 to 3 words alone | と呼んで, って呼んで, 名前は, 私は, わたしは, 僕は, 俺は; or 1 to 6 letters alone | 我叫, 叫我, 我是, 名字; or 1 to 6 letters alone | 이름, 불러, 저는, 나는; or 1 to 2 words alone |
-| not a name | khỏe, đây, sẵn sàng, bận, mệt, lamp, ừm, à, hả | 元気, 大丈夫, ここ, すみません, ごめん, 忙し, 疲れ, lamp, えっと, うーん, あの | 很好, 这里, 对不起, 抱歉, 忙, 累, lamp, 嗯, 呃, 那个 | 괜찮, 여기, 미안, 죄송, 바빠, 바쁘, 피곤, lamp, "음 ", "어 ", 저기, 잠시, 잠깐, 글쎄, 나중, 아직, 그냥, 몰라, 모르겠, 램프, 헤이 |
+| not a name | khỏe, đây, sẵn sàng, bận, mệt, lamp, ừm, à, hả | 元気, 大丈夫, ここ, すみません, ごめん, 忙し, 疲れ, lamp, えっと, うーん, あの | 很好, 这里, 对不起, 抱歉, 忙, 累, lamp, 嗯, 呃, 那个 | 괜찮, 여기, 미안, 죄송, 바빠, 바쁘, 피곤, lamp, "음 ", "어 ", 저기, 잠시, 잠깐, 글쎄, 나중, 아직, 그냥, 몰라, 모르겠, 램프, 헤이, 됐, 다음, 패스 (a leading "어 " is a yes or drops, above) |
 
 Like English, "one" is no hour (一点 is "a little" in Chinese), and a name
 is never a question, a yes, a no, a greeting or a request to hear it again.

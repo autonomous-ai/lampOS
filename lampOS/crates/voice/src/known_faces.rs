@@ -1328,6 +1328,8 @@ pub fn run_scoped(
     }
     let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true)
         && spelled_by_them(name, &said.this);
+    // Kept without a Korean vocative ("민수야" is 민수), checked as said.
+    let name = crate::language::without_vocative(name, crate::language::at_start());
     let line = json!({"remember_speaker": {
         "name": name,
         "face": proof.face,
@@ -1462,6 +1464,13 @@ fn run_switched(
     // #2269), so it goes without and the eyes ask about it again.
     let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true)
         && spelled_by_them(name, &said.this);
+    // A face is kept without a Korean vocative ("민수야" is 민수), checked
+    // above as said.
+    let name = if call.name == REMEMBER {
+        crate::language::without_vocative(name, crate::language::at_start())
+    } else {
+        name
+    };
     let line = match call.name.as_str() {
         // `apart` only when true: eyes from before #2176 row 4 refuse a
         // field they don't know.
