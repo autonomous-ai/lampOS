@@ -1,3 +1,39 @@
+## 2026-11-01 — room reminders and documentation links
+
+Ready for lamp-voice: no
+
+Taken from the first builder's 14:1x answers on Queue #4710, starting at
+lamp-voice `e34f3db38`, with no lamp.
+
+- **Room reminders:** on `third/room-reminders-1101`, unowned reminders and
+  timers become the room's, while known-person items still require their
+  exact person id. No stored format or wire field changes. The local
+  Schedule/Actions pass is 350 passed and 9 ignored; strict Clippy passed
+  for the affected dependent crates. The wider test run stopped in the
+  unchanged Memory socket health test with `WouldBlock` after its
+  five-second read timeout. It passed alone in 0.27 s; a serial Memory run,
+  remaining package tests and the workspace build are still in progress.
+  The first sandboxed socket run failed with permission errors, so socket
+  tests were rerun with local IPC permitted. Tests and Reviewer-three are
+  the two required external readers; no readiness or device result claimed.
+- **[Docs links, #4845](https://github.com/autonomous-ai/lampOS/pull/4845)**,
+  `dfb5c8fd9`: one docs PR job, nine checker tests, 185 maintained docs and
+  1,725 local links checked. Six confirmed link/evidence repairs; the old
+  eleven-link count included already-merged repairs. A standalone source
+  copy passes, and CLI controls prove missing files and headings exit 1.
+  The edited brain-build doc's existing Rust consumer passes (1 test,
+  124 filtered). The new Node 22/Linux job passed in 12 s
+  ([run 41285525392](https://github.com/autonomous-ai/lampOS/actions/runs/41285525392));
+  broader CI and the read remain pending, so the PR is draft.
+- **9276:** stable publication checked: sequence 9276, `a05080631`,
+  `min_updater` 9, 33 files; promotion run 41283635819 succeeded. No
+  post-promotion 9adf/52e6 receipt was available in the bounded read. This
+  proves publication, not a lamp's update or healthy answered turn.
+- **Reset follow-up:** source-only read of #4839 `45c67c2a7` found no P1/P2
+  in the durable pending rename, markerless resume and staging cleanup.
+  No independent test execution or READ-OK was claimed; its HOLD remains
+  with the assigned reader. No device commands were run.
+
 ## 2026-10-29 06:00 — the first real promote over my pieces
 
 - **8389 is stable (promoted 04:23, run 40771220724).** Both of my promote-side pieces ran for real. The notes listed 33 PRs, all landed. The cleanup took the one stale stage (`staged-8163`), leaving 17 backups and 18 assets. Posted on #3976 and #4161, with a correction to each: I wrote 05:49 for a 05:47 post, and "16 backups" for 17.
