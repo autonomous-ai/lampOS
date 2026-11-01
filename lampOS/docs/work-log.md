@@ -8318,3 +8318,10 @@ step checked out the promoted `a05080631` and listed 189 switches for sequence
 9276; stable notes include `LAMP_WINDOW_FROM_START`. No post-promotion holder
 receipt for 9adf or 52e6 was present when checked. Published availability is not
 a device-update result. The expected rounds were reported on Queue #4710.
+
+Second, 14:34 +07: all current-head CI gates are green on `45c67c2a7`.
+ARM64 41284715307: 12,958 tests passed, 107 skipped; doc tests passed.
+Linux fmt/strict Clippy 41284715290 and published Cloud/Surround reader
+compatibility 41284715336 / 41284715238 passed. Reviewer-three's source reread
+finds both P1s repaired; its independent 100-scenario retry matrix passed.
+Draft remains for fresh READ-OK markers; the old head's reads are not counted.
