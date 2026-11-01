@@ -1767,3 +1767,46 @@ fn the_status_says_own_keys_from_the_hotspots_start_but_never_in_a_recovery() {
         );
     }
 }
+
+/// setup.md's "What setup writes, and what a 5 s reset does with it" is where
+/// a person checking a lamp after setup or a reset looks each file up, and it
+/// had no row for the own keys' folder. Each file the product's setup can
+/// write has a row there, by the path the product's configuration gives it.
+#[test]
+fn setup_md_has_a_row_for_every_file_setup_writes() {
+    let config = fixture(include_str!("../../fixtures/serve-own-page.json"));
+    let doc = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/setup.md");
+    let doc = fs::read_to_string(doc).unwrap();
+    let table = doc
+        .split("\n**What setup writes, and what a 5 s reset does with it:**\n")
+        .nth(1)
+        .expect("docs/setup.md has \"What setup writes, and what a 5 s reset does with it\"");
+    let rows: Vec<&str> = table
+        .lines()
+        .skip_while(|line| !line.starts_with('|'))
+        .take_while(|line| line.starts_with('|'))
+        .filter_map(|line| line.strip_prefix("| `")?.split('`').next())
+        .collect();
+    let rowless: Vec<&std::path::Path> = [
+        &config.marker,
+        &config.credential,
+        &config.policy_key,
+        &config.name,
+        &config.localtime,
+        &config.timezone_file,
+        &config.zone_env,
+        &config.backend,
+        &config.reports,
+        &config.display_name,
+        &config.language,
+        &config.own_keys,
+    ]
+    .into_iter()
+    .map(PathBuf::as_path)
+    .filter(|path| !rows.iter().any(|row| std::path::Path::new(row) == *path))
+    .collect();
+    assert!(
+        rowless.is_empty(),
+        "docs/setup.md's \"What setup writes\" has no row for {rowless:?}"
+    );
+}
