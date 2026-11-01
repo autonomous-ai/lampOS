@@ -308,3 +308,36 @@ an aging result still needs its live prerequisite audit. Safety/privacy needs
 and human audit remain explicit retention criteria; the report never removes a
 tier automatically. Partial current-product coverage and the stronger common
 forget restart remain written beside the results.
+
+
+### Preliminary run kind
+
+A policy with `"preliminary": true` is a quick one-run look, never a
+registered result. It admits exactly one fixture, named `development` (the
+held-back persona cannot be named), one repetition, and exactly four setups
+in their registered relative order: `none`, `full_history`,
+`lampos_today_partial` and `tiers`. Everything else is checked as for the
+registered kind: pins, approval cap, one shared speech cache, ordered
+attempts, the common answer loop and the blind judge. The field is omitted
+when false, so registered policy hashes do not change.
+
+Every manifest, result and failure it writes says `preliminary: one run,
+development month, not the registered score`, and each manifest carries
+`"preliminary": true`. `campaign-card` refuses a preliminary policy, and a
+preliminary ledger placed in a registered slot reads `invalid` there; a
+registered ledger likewise cannot fill a preliminary slot.
+
+```
+lamp-memory-bench preliminary-card POLICY APPROVAL CAMPAIGN live
+```
+
+reads the campaign without spending and shows each setup's single run with
+the same verification as a registered slot, its reported chat models, the
+spend, and ten example questions chosen by registration order alone (the
+first question of each kind), with every setup's answers and score. It never
+computes a three-run mean. `preliminary/policy.template.json` is the policy
+the lamp runbook fills: its placeholders are the runner and Tiers checksums
+and revision, the audio manifest, the relay's chat and speech addresses and
+the reported model. Its allowances total $39 under a $40 approval; a test
+keeps the template valid against the compiled evaluation policy and the
+development registration.

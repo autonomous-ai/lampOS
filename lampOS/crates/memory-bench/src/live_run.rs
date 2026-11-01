@@ -207,10 +207,26 @@ fn manifest(
         transcript_hash: None,
         timezone: source.corpus.persona.timezone.clone(),
         model: policy.chat.requested_model.clone(),
-        config: json!({"policy_sha256":policy.hash()?,"fixture":name,"runner_revision":policy.runner_revision,"runner_sha256":policy.runner_sha256,"evaluation_sha256":policy.evaluation_sha256,"label":if mode==Mode::Live{"live; provisional"}else{"plumbing check"}}),
+        config: json!({"policy_sha256":policy.hash()?,"fixture":name,"runner_revision":policy.runner_revision,"runner_sha256":policy.runner_sha256,"evaluation_sha256":policy.evaluation_sha256,"label":label(policy.preliminary,mode,"live; provisional","plumbing check")}),
         budget_microusd: budget,
         seed: source.corpus.persona.seed,
     })
+    .map(|mut m| {
+        if policy.preliminary {
+            m.config["preliminary"] = json!(true);
+        }
+        m
+    })
+}
+/// The registered labels stay as they were; a preliminary policy says so in
+/// every manifest, result and failure it writes.
+fn label(preliminary: bool, mode: Mode, live: &str, recorded: &str) -> String {
+    let text = if mode == Mode::Live { live } else { recorded };
+    if preliminary {
+        format!("{text}; {}", crate::live_plan::PRELIMINARY_LABEL)
+    } else {
+        text.into()
+    }
 }
 fn worker<P: Provider + Send + 'static>(
     provider: P,
@@ -236,7 +252,13 @@ fn worker<P: Provider + Send + 'static>(
             }),
     )
 }
-fn finish(mut worker: Worker, ledger: &Log, mode: Mode, result: Result<Value>) -> Result<Value> {
+fn finish(
+    mut worker: Worker,
+    ledger: &Log,
+    preliminary: bool,
+    mode: Mode,
+    result: Result<Value>,
+) -> Result<Value> {
     let settled = worker.settle(Instant::now() + Duration::from_millis(MODEL_MS));
     let account = worker.account()?;
     let settled = if settled.is_ok() {
@@ -284,7 +306,7 @@ fn finish(mut worker: Worker, ledger: &Log, mode: Mode, result: Result<Value>) -
             log(
                 ledger,
                 "failed",
-                json!({"error":error.to_string(),"scores":null,"model_calls":account.receipts.len(),"charged_microusd":account.charged_microusd,"label":if mode==Mode::Live{"failed live attempt"}else{"failed plumbing check"}}),
+                json!({"error":error.to_string(),"scores":null,"model_calls":account.receipts.len(),"charged_microusd":account.charged_microusd,"label":label(preliminary,mode,"failed live attempt","failed plumbing check")}),
             )?;
             Err(error)
         }
@@ -459,12 +481,22 @@ pub fn execute(
             worker: &mut worker,
         }
         .run(|kind, data| log(&ledger, kind, data))?;
+        let mut result = result;
+        if policy.preliminary {
+            result["label"] = json!(label(
+                policy.preliminary,
+                mode,
+                "live; provisional pending human audit",
+                "plumbing check"
+            ));
+            result["preliminary"] = json!(true);
+        }
         let closed = runner.execute(Request::new("close", Op::Close, json!({})), &mut worker)?;
         log(&ledger, "closed", json!({"outcome":closed}))?;
         drop(runner);
         Ok(result)
     })();
-    finish(worker, &ledger, mode, result)
+    finish(worker, &ledger, policy.preliminary, mode, result)
 }
 pub fn create_speech(
     policy: &Policy,
@@ -550,7 +582,7 @@ pub fn create_speech(
         fixture_transport,
         &mut worker,
     );
-    finish(worker, &ledger, mode, result)
+    finish(worker, &ledger, policy.preliminary, mode, result)
 }
 #[cfg(test)]
 mod completion_tests {
@@ -603,7 +635,13 @@ mod completion_tests {
             .unwrap(),
         )
         .unwrap();
-        let outcome = finish(worker, &log, Mode::Recorded, Ok(json!({"scores":null})));
+        let outcome = finish(
+            worker,
+            &log,
+            false,
+            Mode::Recorded,
+            Ok(json!({"scores":null})),
+        );
         let joined = dropped.load(Ordering::SeqCst);
         drop(log);
         std::fs::remove_dir_all(&path).unwrap();

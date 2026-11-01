@@ -38,7 +38,16 @@ pub struct Policy {
     pub repetitions: u32,
     pub fixtures: BTreeMap<String, Fixture>,
     pub adapters: BTreeMap<String, Adapter>,
+    /// A one-run look at four setups, never a registered result. Omitted when
+    /// false, so registered policy hashes are unchanged by this field.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub preliminary: bool,
 }
+/// Setups of the preliminary run, in their registered relative order.
+pub const PRELIMINARY_ORDER: [&str; 4] = ["none", "full_history", "lampos_today_partial", "tiers"];
+/// Written on every preliminary manifest, result and report.
+pub const PRELIMINARY_LABEL: &str =
+    "preliminary: one run, development month, not the registered score";
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Run {
@@ -62,8 +71,13 @@ impl Policy {
         self.chat.validate(fixture_transport)?;
         self.speech.validate(fixture_transport)?;
         self.speech_prices.validate()?;
+        // The preliminary kind runs once, on one month fixture, and never feeds
+        // the registered card; the registered kind keeps its three runs.
+        let repetitions = if self.preliminary { 1 } else { 3 };
         if self.version != 1
-            || self.repetitions != 3
+            || self.repetitions != repetitions
+            || (self.preliminary
+                && (self.fixtures.len() != 1 || !self.fixtures.contains_key("development")))
             || !revision(&self.runner_revision)
             || !digest(&self.runner_sha256)
             || self.evaluation_sha256 != hash(&serde_json::to_vec(&crate::evaluation::policy())?)
@@ -76,11 +90,15 @@ impl Policy {
         {
             return Err(invalid("invalid or stale public live policy"));
         }
-        let month: Vec<_> = ["none", "full_history", "lampos_today_partial"]
-            .into_iter()
-            .chain(files::ARMS)
-            .map(str::to_owned)
-            .collect();
+        let month: Vec<_> = if self.preliminary {
+            PRELIMINARY_ORDER.map(str::to_owned).to_vec()
+        } else {
+            ["none", "full_history", "lampos_today_partial"]
+                .into_iter()
+                .chain(files::ARMS)
+                .map(str::to_owned)
+                .collect()
+        };
         let aging = vec!["tiers".to_owned(), "tiers_minus_fading".to_owned()];
         let mut admitted = BTreeSet::new();
         let mut months = 0;
@@ -91,7 +109,7 @@ impl Policy {
                     months += 1;
                     &month
                 }
-                "aging" => {
+                "aging" if !self.preliminary => {
                     aging_count += 1;
                     &aging
                 }

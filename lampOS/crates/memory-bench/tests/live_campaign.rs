@@ -3,7 +3,7 @@ use lamp_memory_bench::{
     audio, campaign, evaluation, files, hash,
     ledger::{self, Ledger, Manifest, Mode},
     live_http,
-    live_plan::{Adapter, Fixture, Policy, Run},
+    live_plan::{Adapter, Fixture, PRELIMINARY_LABEL, PRELIMINARY_ORDER, Policy, Run},
     live_run, live_speech, model,
     protocol::EventKind,
     speech,
@@ -106,7 +106,18 @@ fn policy() -> Policy {
                 )
             })
             .collect(),
+        preliminary: false,
     }
+}
+fn preliminary_policy() -> Policy {
+    let mut p = policy();
+    p.preliminary = true;
+    p.repetitions = 1;
+    p.fixtures.get_mut("development").unwrap().setup_order =
+        PRELIMINARY_ORDER.map(str::to_owned).to_vec();
+    p.adapters
+        .retain(|name, _| PRELIMINARY_ORDER.contains(&name.as_str()));
+    p
 }
 fn approval(policy: &Policy) -> campaign::Plan {
     campaign::Plan {
@@ -286,7 +297,9 @@ impl Chat {
         let done = stop.clone();
         let seen = counts.clone();
         let worker = thread::spawn(move || {
-            let until = Instant::now() + Duration::from_secs(300);
+            // Two fake-service months may run at once on a loaded debug host;
+            // the server outlives them so a slow run is not cut off midway.
+            let until = Instant::now() + Duration::from_secs(900);
             while !done.load(Ordering::Relaxed) && Instant::now() < until {
                 let (mut stream, _) = match listener.accept() {
                     Ok(s) => s,
@@ -556,4 +569,198 @@ fn empty_campaign_card_keeps_all_registered_slots_and_refuses_a_substituted_pare
     fs::DirBuilder::new().mode(0o700).create(&other).unwrap();
     symlink(&other, root.join("runs")).unwrap();
     assert!(lamp_memory_bench::comparison::report(&p, approval(&p), &root, true).is_err());
+}
+#[test]
+fn preliminary_policy_is_one_development_run_of_four_setups() {
+    let registered = policy();
+    assert!(
+        serde_json::to_value(&registered)
+            .unwrap()
+            .get("preliminary")
+            .is_none(),
+        "the registered policy hash must not change"
+    );
+    let p = preliminary_policy();
+    p.check_approval(&approval(&p), true).unwrap();
+    assert_eq!(
+        p.planned_microusd().unwrap(),
+        4 * 1_000_000 + p.fixtures["development"].speech_budget_microusd
+    );
+    assert_ne!(p.hash().unwrap(), registered.hash().unwrap());
+    let mut changed = p.clone();
+    changed.repetitions = 3;
+    assert!(changed.validate(true).is_err());
+    let mut changed = registered.clone();
+    changed.repetitions = 1;
+    assert!(changed.validate(true).is_err());
+    let mut changed = registered.clone();
+    changed.preliminary = true;
+    changed.repetitions = 1;
+    assert!(
+        changed.validate(true).is_err(),
+        "full order is not preliminary"
+    );
+    let mut changed = p.clone();
+    changed
+        .fixtures
+        .get_mut("development")
+        .unwrap()
+        .setup_order
+        .swap(0, 1);
+    assert!(changed.validate(true).is_err());
+    let mut changed = p.clone();
+    let f = changed.fixtures.remove("development").unwrap();
+    changed.fixtures.insert("held-back".into(), f);
+    assert!(changed.validate(true).is_err(), "development month only");
+    let mut changed = p.clone();
+    changed.fixtures.get_mut("development").unwrap().profile = "aging".into();
+    assert!(changed.validate(true).is_err());
+    assert!(p.admitted(&run("none", 2)).is_err());
+    assert!(p.admitted(&run("tiers_minus_facts", 1)).is_err());
+    p.admitted(&run("tiers", 1)).unwrap();
+}
+fn copy_tree(from: &Path, to: &Path) {
+    fs::DirBuilder::new().mode(0o700).create(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+#[test]
+fn score_card_refuses_a_preliminary_ledger() {
+    let d = Dir::new();
+    let chat = Chat::start();
+    let speech = Speech::start();
+    let mut p = preliminary_policy();
+    p.chat.endpoint = chat.endpoint.clone();
+    p.speech.endpoint = speech.endpoint.clone();
+    let audio = prepare_audio(&d.0.join("audio"));
+    p.fixtures
+        .get_mut("development")
+        .unwrap()
+        .audio_manifest_sha256 = audio.clone();
+    let root = d.0.join("preliminary");
+    live_run::initialize(&p, approval(&p), &root, true).unwrap();
+    live_run::create_speech(
+        &p,
+        approval(&p),
+        &root,
+        "development",
+        &source(),
+        &d.0.join("audio"),
+        true,
+    )
+    .unwrap();
+    let result = live_run::execute(&p, approval(&p), &root, &run("none", 1), true).unwrap();
+    assert_eq!(result["preliminary"], true);
+    assert!(
+        result["label"]
+            .as_str()
+            .unwrap()
+            .ends_with(PRELIMINARY_LABEL)
+    );
+    let id = live_run::run_id("development", "none", 1).unwrap();
+    let path = root.join("runs").join(&id);
+    let manifest: Manifest = files::json_file(&path.join("manifest.json")).unwrap();
+    assert_eq!(manifest.config["preliminary"], true);
+    assert!(
+        manifest.config["label"]
+            .as_str()
+            .unwrap()
+            .ends_with(PRELIMINARY_LABEL)
+    );
+    let card =
+        lamp_memory_bench::comparison::preliminary_report(&p, approval(&p), &root, true).unwrap();
+    assert!(card["label"].as_str().unwrap().contains(PRELIMINARY_LABEL));
+    let setups = card["setups"].as_array().unwrap();
+    assert_eq!(setups.len(), 4);
+    assert_eq!(setups[0]["run"]["status"], "completed");
+    assert!(setups[0]["run"]["scores"].is_null());
+    assert_eq!(
+        setups[0]["run"]["reported_models"],
+        json!(["fixture-model"])
+    );
+    for setup in &setups[1..] {
+        assert_eq!(setup["run"]["status"], "not started");
+    }
+    let examples = card["examples"].as_array().unwrap();
+    assert_eq!(examples.len(), 10);
+    let mut kinds: Vec<_> = examples.iter().map(|e| e["kind"].clone()).collect();
+    kinds.dedup();
+    assert_eq!(kinds.len(), 10, "one example per question kind");
+    for example in examples {
+        let none = &example["setups"]["none"];
+        assert!(!none["answers"].as_array().unwrap().is_empty());
+        assert!(none["score"].is_null(), "fixture runs publish no score");
+        assert!(example["setups"]["tiers"].is_null());
+    }
+    assert!(
+        lamp_memory_bench::comparison::report(&p, approval(&p), &root, true)
+            .unwrap_err()
+            .to_string()
+            .contains("preliminary")
+    );
+    // The same ledger placed in a registered campaign's slot is refused there.
+    let mut r = policy();
+    r.chat.endpoint = chat.endpoint.clone();
+    r.speech.endpoint = speech.endpoint.clone();
+    r.fixtures
+        .get_mut("development")
+        .unwrap()
+        .audio_manifest_sha256 = audio;
+    let registered = d.0.join("registered");
+    live_run::initialize(&r, approval(&r), &registered, true).unwrap();
+    copy_tree(&path, &registered.join("runs").join(&id));
+    let card = lamp_memory_bench::comparison::report(&r, approval(&r), &registered, true).unwrap();
+    let slot = &card["fixtures"][0]["setups"][0]["runs"][0];
+    assert_eq!(slot["status"], "invalid");
+    assert!(slot["scores"].is_null());
+    assert!(
+        slot["reason"]
+            .as_str()
+            .unwrap()
+            .contains("preliminary ledger is not a registered result")
+    );
+    assert!(
+        lamp_memory_bench::comparison::preliminary_report(&r, approval(&r), &registered, true)
+            .is_err()
+    );
+}
+#[test]
+fn preliminary_template_validates_once_filled_and_fits_the_cap() {
+    let template = fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("preliminary/policy.template.json"),
+    )
+    .unwrap();
+    let filled = [
+        ("@RUNNER_REVISION@", "a".repeat(40)),
+        ("@RUNNER_SHA256@", "b".repeat(64)),
+        ("@TIERS_SHA256@", "c".repeat(64)),
+        ("@AUDIO_SHA256@", "d".repeat(64)),
+        (
+            "@CHAT_ENDPOINT@",
+            "https://relay.example.invalid/deepseek/chat/completions".into(),
+        ),
+        (
+            "@SPEECH_ENDPOINT@",
+            "wss://relay.example.invalid/ws/audio/transcriptions".into(),
+        ),
+        ("@REPORTED_MODEL@", "deepseek-v4-flash".into()),
+    ]
+    .iter()
+    .fold(template, |text, (from, to)| text.replace(from, to));
+    assert!(!filled.contains('@'), "every placeholder is named here");
+    let p: Policy = serde_json::from_str(&filled).unwrap();
+    p.validate(false).unwrap();
+    assert!(p.preliminary);
+    assert!(p.planned_microusd().unwrap() <= 40_000_000);
+    assert_eq!(
+        p.fixtures["development"].registration_sha256,
+        hash(&fs::read(source().join("registration.json")).unwrap())
+    );
 }

@@ -26,6 +26,19 @@ fn run(args: &[String]) -> Result<()> {
                 )?
             );
         }
+        [command, policy, approval, campaign, mode] if command == "preliminary-card" => {
+            let policy = files::json_file(Path::new(policy))?;
+            let approval = files::json_file(Path::new(approval))?;
+            println!(
+                "{}",
+                lamp_memory_bench::comparison::preliminary_report(
+                    &policy,
+                    approval,
+                    Path::new(campaign),
+                    fixture_mode(mode)?
+                )?
+            );
+        }
         [command, policy, approval, campaign, mode] if command == "campaign-init" => {
             let policy = files::json_file(Path::new(policy))?;
             let approval = files::json_file(Path::new(approval))?;
@@ -229,7 +242,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         _ => {
             return Err(invalid(
-                "usage: lamp-memory-bench campaign-card POLICY APPROVAL CAMPAIGN MODE | validate-policy POLICY MODE | campaign-init POLICY APPROVAL NEW_CAMPAIGN MODE | campaign-speech POLICY APPROVAL CAMPAIGN FIXTURE SOURCE AUDIO MODE | campaign-run POLICY APPROVAL CAMPAIGN RUN_SPEC MODE | generate PERSONA NEW_DIRECTORY | validate DIRECTORY | verify-ledger DIRECTORY | score QUESTIONS_JSONL ANSWERS_JSONL | smoke ADAPTER ARM FULL_REVISION NEW_STATE_DIRECTORY",
+                "usage: lamp-memory-bench campaign-card POLICY APPROVAL CAMPAIGN MODE | preliminary-card POLICY APPROVAL CAMPAIGN MODE | validate-policy POLICY MODE | campaign-init POLICY APPROVAL NEW_CAMPAIGN MODE | campaign-speech POLICY APPROVAL CAMPAIGN FIXTURE SOURCE AUDIO MODE | campaign-run POLICY APPROVAL CAMPAIGN RUN_SPEC MODE | generate PERSONA NEW_DIRECTORY | validate DIRECTORY | verify-ledger DIRECTORY | score QUESTIONS_JSONL ANSWERS_JSONL | smoke ADAPTER ARM FULL_REVISION NEW_STATE_DIRECTORY",
             ));
         }
     }

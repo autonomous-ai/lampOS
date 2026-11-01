@@ -211,6 +211,15 @@ fn attempt(
     }
     let verified = ledger::verify(&path)?;
     let m: Manifest = files::json_file(&path.join("manifest.json"))?;
+    // A preliminary ledger is never a registered result, and a registered
+    // ledger never fills a preliminary slot, whatever else matches.
+    if (m.config["preliminary"] == true) != policy.preliminary {
+        return Err(invalid(if policy.preliminary {
+            "registered ledger is not a preliminary run"
+        } else {
+            "preliminary ledger is not a registered result"
+        }));
+    }
     let f = &policy.fixtures[fixture];
     let a = &policy.adapters[arm];
     if m.run_id != id
@@ -415,6 +424,11 @@ pub fn report(
     root: &Path,
     fixture_transport: bool,
 ) -> Result<Value> {
+    if policy.preliminary {
+        return Err(invalid(
+            "a preliminary campaign has no registered score card",
+        ));
+    }
     policy.check_approval(&approval, fixture_transport)?;
     let campaign = Campaign::inspect(root, approval)?;
     let mode = if fixture_transport {
@@ -487,6 +501,165 @@ pub fn report(
     }
     Ok(
         json!({"label":if mode==Mode::Recorded{"plumbing check; no scores"}else{"live; provisional pending human audit"},"policy_sha256":policy.hash()?,"charged_microusd":campaign.charged_microusd(),"remaining_microusd":campaign.remaining_microusd(),"spending_stopped":campaign.stopped()||campaign.remaining_microusd()==0,"fixtures":fixtures,"optional_outside_systems":"excluded; not priced or approved","selection_rule":"all registered setups and all three attempts remain; missing or failed attempts never become zero and prevent a three-run mean"}),
+    )
+}
+/// Reported models seen in a run's verified chat evidence.
+fn reported_models(entries: &[Entry]) -> Result<BTreeSet<String>> {
+    let mut models = BTreeSet::new();
+    for row in entries
+        .iter()
+        .filter(|e| e.kind == "model_accounting" && e.data["stage"] == "model_completed")
+    {
+        let p = &row.data["receipt"]["provenance"];
+        if p.is_null() {
+            continue;
+        }
+        let p: Provenance = serde_json::from_value(p.clone())?;
+        models.insert(p.reported_model.unwrap_or_else(|| "not reported".into()));
+    }
+    Ok(models)
+}
+/// Ten questions fixed by registration order alone, with each verified run's
+/// answer turns and score; a setup without a completed run shows null.
+fn examples(
+    questions: &[Question],
+    order: &[String],
+    ledgers: &BTreeMap<String, Vec<Entry>>,
+) -> Vec<Value> {
+    let mut kinds = BTreeSet::new();
+    questions
+        .iter()
+        .filter(|q| kinds.insert(q.category.clone()))
+        .take(10)
+        .map(|q| {
+            let answers: BTreeMap<_, _> = order
+                .iter()
+                .map(|arm| {
+                    let row = ledgers.get(arm).map(|entries| {
+                        let of = |kind: &'static str| {
+                            entries.iter().filter(move |e| {
+                                e.kind == kind && e.data["question"] == q.id.as_str()
+                            })
+                        };
+                        let turns: Vec<_> = of("candidate_answer")
+                            .map(|e| e.data["result"]["answer"]["answer"].clone())
+                            .collect();
+                        let score = of("question_evaluation")
+                            .next()
+                            .map(|e| e.data["evaluation"]["score"]["fraction"].clone())
+                            .unwrap_or(Value::Null);
+                        json!({"answers":turns,"score":score})
+                    });
+                    (arm.clone(), row.unwrap_or(Value::Null))
+                })
+                .collect();
+            let asked: Vec<_> = std::iter::once(&q.query)
+                .chain(&q.followups)
+                .map(|t| t.heard.clone())
+                .collect();
+            json!({"question":q.id,"kind":q.category,"asked":asked,"rule":q.rule,"setups":answers})
+        })
+        .collect()
+}
+/// One run of each preliminary setup, checked as strictly as a registered
+/// slot. It never computes a three-run mean and is labelled preliminary.
+pub fn preliminary_report(
+    policy: &Policy,
+    approval: Plan,
+    root: &Path,
+    fixture_transport: bool,
+) -> Result<Value> {
+    if !policy.preliminary {
+        return Err(invalid("registered policy; use the registered score card"));
+    }
+    policy.check_approval(&approval, fixture_transport)?;
+    let campaign = Campaign::inspect(root, approval)?;
+    let mode = if fixture_transport {
+        Mode::Recorded
+    } else {
+        Mode::Live
+    };
+    private_directory(&root.join("runs"))?;
+    let (name, f) = policy
+        .fixtures
+        .iter()
+        .next()
+        .ok_or_else(|| invalid("preliminary policy has no fixture"))?;
+    let mut admitted = BTreeSet::from([live_run::speech_id(name)]);
+    for arm in &f.setup_order {
+        admitted.insert(live_run::run_id(name, arm, 1)?);
+    }
+    for entry in fs::read_dir(root.join("runs"))? {
+        let entry = entry?
+            .file_name()
+            .into_string()
+            .map_err(|_| invalid("invalid run directory name"))?;
+        if !admitted.contains(&entry) {
+            return Err(invalid("campaign contains an unregistered attempt"));
+        }
+    }
+    let speech_account = campaign.run_accounting(&live_run::speech_id(name));
+    let (speech, cache) = match speech_ready(root, policy, name, mode, &campaign) {
+        Ok(pin) => (
+            json!({"status":"completed","cache_sha256":pin,"accounting":speech_account}),
+            Some(pin),
+        ),
+        Err(e) => (
+            json!({"status":"unavailable","reason":e.to_string(),"accounting":speech_account}),
+            None,
+        ),
+    };
+    let mut setups = Vec::new();
+    let mut ledgers = BTreeMap::new();
+    for arm in &f.setup_order {
+        let id = live_run::run_id(name, arm, 1)?;
+        let mut row = match attempt(
+            root,
+            policy,
+            (name, arm, 1),
+            mode,
+            &campaign,
+            cache.as_deref(),
+        ) {
+            Ok(a) => a.row,
+            Err(e) => {
+                json!({"repetition":1,"status":"invalid","reason":e.to_string(),"scores":null,"accounting":campaign.run_accounting(&id)})
+            }
+        };
+        let path = root.join("runs").join(&id);
+        if row["status"] == "completed" {
+            let entries: Vec<Entry> = files::lines(&path.join("events.jsonl"))?;
+            row["reported_models"] = json!(reported_models(&entries)?);
+            ledgers.insert(arm.clone(), entries);
+        }
+        setups.push(json!({"arm":arm,"label":label(arm),"revision":policy.adapters[arm].revision,"executable_sha256":policy.adapters[arm].executable_sha256,"run":row}));
+    }
+    let examples = if cache.is_some() {
+        let source = root
+            .join("runs")
+            .join(live_run::speech_id(name))
+            .join("source");
+        json!(examples(
+            &files::read_corpus(&source)?.questions,
+            &f.setup_order,
+            &ledgers
+        ))
+    } else {
+        Value::Null
+    };
+    let label = if mode == Mode::Recorded {
+        format!(
+            "plumbing check; no scores; {}",
+            crate::live_plan::PRELIMINARY_LABEL
+        )
+    } else {
+        format!(
+            "{}; rubric results provisional pending human audit",
+            crate::live_plan::PRELIMINARY_LABEL
+        )
+    };
+    Ok(
+        json!({"label":label,"policy_sha256":policy.hash()?,"chat_endpoint":policy.chat.endpoint,"chat_requested_model":policy.chat.requested_model,"speech_endpoint":policy.speech.endpoint,"charged_microusd":campaign.charged_microusd(),"remaining_microusd":campaign.remaining_microusd(),"spending_stopped":campaign.stopped()||campaign.remaining_microusd()==0,"fixture":name,"registration_sha256":f.registration_sha256,"speech":speech,"setups":setups,"examples":examples,"example_rule":"the first registered question of each kind, in order of first appearance, up to ten; chosen before any answer is read","gaps":["one run per setup: no spread and no registered three-run mean","partial current product is not a complete product baseline","no second identified person in the development fixture","fixed-text probes; misheard questions require a separate voice test","current-product in-turn forgetting is weaker than the uniform bench restart","scripted companion acknowledgements do not test real lamp replies or promises","fading not exercised by this month"]}),
     )
 }
 #[cfg(test)]
