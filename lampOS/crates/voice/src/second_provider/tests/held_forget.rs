@@ -76,12 +76,28 @@ async fn run_seen(turns: &[Turn], sight: Option<&[Sight]>) -> Ran {
 /// [`run_seen`], its first turn request `first`: lines seen are kept for
 /// the whole process, so a test that reads them takes numbers of its own.
 async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> Ran {
-    run_switched(turns, sight, first, false).await
+    run_switched(turns, sight, first, false, json!({"ok": true})).await
 }
 
-/// [`run_seen_from`], a held face forget lasting through a spelling
+/// [`run_seen_from`], each forget answered with `result`.
+async fn run_seen_from_result(
+    turns: &[Turn],
+    sight: Option<&[Sight]>,
+    first: u64,
+    result: Value,
+) -> Ran {
+    run_switched(turns, sight, first, false, result).await
+}
+
+/// [`run_seen_from_result`], a held face forget lasting through a spelling
 /// question when `spelling` (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7).
-async fn run_switched(turns: &[Turn], sight: Option<&[Sight]>, first: u64, spelling: bool) -> Ran {
+async fn run_switched(
+    turns: &[Turn],
+    sight: Option<&[Sight]>,
+    first: u64,
+    spelling: bool,
+    result: Value,
+) -> Ran {
     use crate::speaking_faces::{SpeakingFaces, known_face_of};
     use std::sync::atomic::{AtomicBool, Ordering};
     let mut chats = VecDeque::new();
@@ -130,7 +146,8 @@ async fn run_switched(turns: &[Turn], sight: Option<&[Sight]>, first: u64, spell
             .lock()
             .unwrap()
             .push((request, crate::speaking_faces::line_seen(request)));
-        Box::pin(async { json!({"ok": true}) })
+        let result = result.clone();
+        Box::pin(async move { result })
     });
     let path = std::env::temp_dir().join(format!(
         "held-forget-{}-{:?}",
@@ -145,8 +162,10 @@ async fn run_switched(turns: &[Turn], sight: Option<&[Sight]>, first: u64, spell
             lamp_turn_owner::BootId::new([12; 16]).unwrap(),
             cache.clone(),
             runner,
-            Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
-                Told::from("SYSTEM".to_owned())
+            Some(Arc::new(|_: &crate::memory_scope::ScopeLease| Told {
+                text: "SYSTEM with old private context".into(),
+                after: Some("old private context".into()),
+                history: vec![Message::assistant("old private context")],
             })),
         )
         .announcing(false)
@@ -855,6 +874,12 @@ async fn the_forget_descriptions_and_the_hold_agree() {
     // The yes turn was told it ran.
     let yes = &ran.asked[2];
     assert!(
+        !serde_json::to_string(yes)
+            .unwrap()
+            .contains("old private context")
+    );
+    assert_eq!(yes.last(), Some(&Message::user("Yes.")));
+    assert!(
         yes.iter()
             .any(|message| format!("{message:?}").contains("has run")),
         "the yes turn is told the forget ran"
@@ -1368,7 +1393,32 @@ async fn with_the_record_switch_a_held_face_forget_lasts_through_the_spelling_qu
         ),
     ];
     for (at, (turns, on, want)) in cases.iter().enumerate() {
-        let ran = run_switched(turns, None, 1, *on).await;
+        let ran = run_switched(turns, None, 1, *on, json!({"ok": true})).await;
         assert_eq!(&ran.forgets, want, "case {at}");
     }
+}
+
+#[tokio::test]
+async fn a_held_memory_forgets_uncertain_result_cannot_copy_old_context() {
+    let ran = run_seen_from_result(
+        &[
+            (
+                "A",
+                "What do you remember?",
+                Lamp::Calls(EVERYTHING, "Shall I forget everything about you?"),
+                0,
+            ),
+            ("A", "Yes.", Lamp::Says("I could not confirm that."), 5),
+        ],
+        None,
+        938001,
+        json!({"error": "old private context"}),
+    )
+    .await;
+    assert_eq!(ran.forgets.len(), 1);
+    let yes = ran.asked.last().unwrap();
+    let encoded = serde_json::to_string(yes).unwrap();
+    assert!(!encoded.contains("old private context"), "{encoded}");
+    assert!(encoded.contains("uncertain"));
+    assert_eq!(yes.last(), Some(&Message::user("Yes.")));
 }
