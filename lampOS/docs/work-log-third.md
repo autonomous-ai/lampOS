@@ -5,34 +5,39 @@ Ready for lamp-voice: no
 Taken from the first builder's 14:1x answers on Queue #4710, starting at
 lamp-voice `e34f3db38`, with no lamp.
 
-- **Room reminders:** on `third/room-reminders-1101`, unowned reminders and
-  timers become the room's, while known-person items still require their
-  exact person id. No stored format or wire field changes. The local
-  Schedule/Actions pass is 350 passed and 9 ignored; strict Clippy passed
-  for the affected dependent crates. The wider test run stopped in the
-  unchanged Memory socket health test with `WouldBlock` after its
-  five-second read timeout. It passed alone in 0.27 s; a serial Memory run,
-  remaining package tests and the workspace build are still in progress.
-  The first sandboxed socket run failed with permission errors, so socket
-  tests were rerun with local IPC permitted. Tests and Reviewer-three are
-  the two required external readers; no readiness or device result claimed.
+- **Room reminders:** `third/room-reminders-1101` makes unowned reminders
+  and timers the room's; known-person items still require their exact
+  setter id. No store or wire changes. Schedule/Actions initially passed
+  350 tests (nine ignored), and strict Clippy passed for ten affected and
+  dependent crates. The new full-store timing test also passes. The broad
+  run stopped in unchanged Memory health test
+  `held_publication_cannot_block_a_real_socket_or_bounded_shutdown`
+  (`WouldBlock` after five seconds). Its isolated rerun passed in 0.27 s;
+  the full serial Memory run passed 360 tests, nine ignored. Remaining
+  dependent tests and workspace build are still running. The initial
+  sandbox denied socket access; local IPC was permitted for reruns.
+- **Latency:** loaded x86_64 Mac visibility first 0.725 ms, p95 0.906 ms,
+  max 1.093 ms against a 1 ms target. Real Actions/Schedule sockets with
+  SQLite FULL succeeded on all 21 writes, but first 482.141 ms and p95
+  488.493 ms exceeded the existing 250 ms target. Preserve both results;
+  no lamp or acoustic latency claim. Tests and Reviewer-three are the
+  required two external readers when the reminder draft opens.
 - **[Docs links, #4845](https://github.com/autonomous-ai/lampOS/pull/4845)**,
-  `dfb5c8fd9`: one docs PR job, nine checker tests, 185 maintained docs and
-  1,725 local links checked. Six confirmed link/evidence repairs; the old
-  eleven-link count included already-merged repairs. A standalone source
-  copy passes, and CLI controls prove missing files and headings exit 1.
-  The edited brain-build doc's existing Rust consumer passes (1 test,
-  124 filtered). The new Node 22/Linux job passed in 12 s
-  ([run 41285525392](https://github.com/autonomous-ai/lampOS/actions/runs/41285525392));
-  broader CI and the read remain pending, so the PR is draft.
-- **9276:** stable publication checked: sequence 9276, `a05080631`,
-  `min_updater` 9, 33 files; promotion run 41283635819 succeeded. No
-  post-promotion 9adf/52e6 receipt was available in the bounded read. This
-  proves publication, not a lamp's update or healthy answered turn.
-- **Reset follow-up:** source-only read of #4839 `45c67c2a7` found no P1/P2
-  in the durable pending rename, markerless resume and staging cleanup.
-  No independent test execution or READ-OK was claimed; its HOLD remains
-  with the assigned reader. No device commands were run.
+  current `029b633cf` on train 496: nine checker tests, 185 maintained docs,
+  1,729 local links, zero broken. Standalone source and CLI positive/
+  negative controls passed. The brain-build Rust consumer passed one test.
+  Both earlier heads passed all CI; current Node 22 docs run 41287659963
+  and Linux Clippy 41287659964 pass, ARM64 41287659867 remains running.
+  Fourth read the previous head OK; range-diff proves the authored patch
+  unchanged, and confirmation on the current head is requested. Draft.
+- **9276:** public stable sequence 9276, `a05080631`, minimum updater 9,
+  33 files; promotion run 41283635819 succeeded. A further bounded search
+  of Queue #4710, #1812 and #3796 found no new 9adf/52e6 device receipt.
+  Publication does not prove installed files, settings or a healthy turn.
+- **Reset follow-up:** source-only #4839 read at `45c67c2a7` found no P1/P2
+  in pending rename, markerless resume or staging cleanup. No independent
+  Cargo/device run or READ-OK by Third. Reviewer-three subsequently posted
+  READ-OK and resolved the HOLD; the assigned second reader remains theirs.
 
 ## 2026-10-29 06:00 — the first real promote over my pieces
 
