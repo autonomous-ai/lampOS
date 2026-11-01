@@ -351,6 +351,9 @@ mod tests {
             fn clear_volatile(&mut self) -> io::Result<()> {
                 panic!("no start in place after a stop that failed");
             }
+            fn remove_installed_skills(&mut self) -> io::Result<usize> {
+                panic!("no wipe after a stop that failed");
+            }
         }
         let root = Root::new();
         let marker = root.0.join("done");

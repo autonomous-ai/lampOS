@@ -150,7 +150,14 @@ beside it; both reset plans wipe both files.
 The product unit names that canonical file and turns `LAMP_ONBOARDING` on.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.
-The installed core skill in `/var/lib/lampOS/skills/onboarding` is kept.
+The installed core skill in `/var/lib/lampOS/skills/onboarding` is kept, as is
+every skill that comes with the lamp. A skill put on from a package, made by
+voice or from the Store, is the person's: each folder in `/var/lib/lampOS/skills`
+holding `.package.json` goes, folder and all (`reset::remove_installed_skills`).
+The installer's `.install-NAME-PID` and `.removed-NAME-PID` folders go too,
+including an install stopped before writing its package mark. Links are not
+followed. The reset's `.reset-skill-pending` folder is always finished;
+folders with other names and no package mark stay.
 A known older deployment using another progress path requires an explicit
 migration; arbitrary legacy environment paths are not imported, and old progress
 alone is not proof that the privacy exercise was completed.
@@ -227,7 +234,22 @@ lamp-setup reset-now`). That unit, in this order:
    `.conf.lamp-setup-tmp`), matched by name so plans installed before them
    wipe them too, and `wifi-restore` puts no old network back while a reset
    is journalled (Third on #3579). Every wiped path's staging copy from
-   setup (`.lamp-setup-tmp`, left by a write cut mid-way) goes with it;
+   setup (`.lamp-setup-tmp`, left by a write cut mid-way) goes with it.
+   Last, each skill in `/var/lib/lampOS/skills` put on from a package (its
+   `.package.json`, which no skill that comes with the lamp has) is removed
+   with its folder, and said by count, never by name (a made skill's name
+   is the person's words). Each selected folder is renamed to the reserved
+   `.reset-skill-pending` and its parent synced before deleting contents.
+   Resume always finishes this pending folder first, even after its package
+   mark is gone; neither private files nor the person's chosen folder name
+   survive a completed reset. The pending folder is removed and its parent
+   synced before proceeding. A non-directory at that reserved path refuses
+   cleanup and keeps the reset journal. The installer's reserved
+   `.install-NAME-PID` and `.removed-NAME-PID` folders are also removed,
+   even before they have a package mark, through the same durable rename.
+   `NAME` and `PID` follow the installer's bounds (1–64
+   lowercase letters, digits or hyphens, and 1–10 digits). A link there is
+   passed over, and links inside a removed folder are unlinked, never followed;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl
