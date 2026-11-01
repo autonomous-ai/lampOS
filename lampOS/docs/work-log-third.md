@@ -29,7 +29,10 @@ Taken from the first builder's 14:1x decisions on Queue #4710, with no lamp.
   `0b3db9c13`; Schedule/Actions passed 351 / 0 / 9. Final `fa6914948` has
   identical Rust crates, manifests and lockfile; only docs and completed
   evidence changed. Voice scope tests passed all three. Final-head Linux Clippy, docs and
-  root CI pass; ARM64 remains active and both required reads are pending.
+  root CI pass; ARM64 41290736475 passed 12,957 tests with 107 skipped,
+  plus doc/process checks. Its checkout names fa6914948 into 179f60e99 and
+  the three new/updated room cases explicitly pass. Both required reads
+  remain pending, so #4850 stays draft.
 - **Timing:** loaded Mac visibility first 0.725 ms / p95 0.906 / max 1.093
   against 1 ms; durable writes first 482 ms / p95 488 against 250 ms. After
   build/full-suite completion, the same tests meet host targets: visibility
