@@ -37,7 +37,7 @@ pub fn policy() -> Value {
         "judge_sources":"gold and eligible candidate-cited scripted records plus fixed probe questions; generated candidate answers have explicit IDs and can witness timing or dialogue, never establish independent owner facts",
         "probe_citations":"an answer may cite a source from the main prefix or an earlier completed exchange in its own isolated probe, never a future or current exchange; restoration removes probe sources",
         "deterministic_precedence":"exact/date/abstention/forbidden claims and unsupported citations cannot be overruled by the judge",
-        "invalid_output":"failed or malformed answer/judge output leaves the trial incomplete; no numerical score, silent repair or unregistered retry",
+        "invalid_output":"an answer reply that is empty, whitespace, not the registered JSON or out of bounds is recorded as a malformed answer and its question scores 0 with audit, with no judge call; a malformed judge reply scores its question 0 with audit; both are counted in the run summary; a failed call still leaves the trial incomplete; no silent repair or unregistered retry",
         "forget_restart":"after an actual forget attempt, drop the current round and all cached memory, take a fresh snapshot and restart from the current question plus a content-free forget-status note; apply uniformly to every setup",
         "current_product_forget_gap":"the current product clears future recent history but retains the current request prefix and previous tool results; the uniform bench restart is stronger and may improve its measured forgetting",
         "forget_probe_replay":"when an actual action suppresses confirmation, keep the answer in evaluation evidence but omit its post-answer memory ingest and source eligibility; original scripted ingestion remains unchanged",
@@ -236,6 +236,22 @@ pub fn evaluate(
         worker,
     )
 }
+/// The reasons a question scores 0 under the policy's `invalid_output`.
+pub const MALFORMED_ANSWER: &str = "malformed answer recorded; scored 0 without a judge";
+pub const MALFORMED_JUDGE: &str = "malformed judge reply; scored 0";
+/// A question scored 0 with audit for a malformed answer or judge reply.
+pub fn malformed(reason: &str, judge_request_hash: Option<String>) -> Evaluation {
+    Evaluation {
+        score: Score {
+            fraction: Some(0.0),
+            needs_judge: false,
+            needs_audit: true,
+            reason: reason.into(),
+        },
+        judge: None,
+        judge_request_hash,
+    }
+}
 pub fn evaluate_with_history(
     question: &Question,
     answers: &[Answer],
@@ -260,13 +276,15 @@ pub fn evaluate_with_history(
     if !reply.tool_calls.is_empty() {
         return Err(invalid("blind judge requested tools"));
     }
-    let text = reply
+    let judge = reply
         .content
-        .ok_or_else(|| invalid("blind judge omitted text"))?;
-    let judge: JudgeOutput = serde_json::from_str(&text)?;
-    if judge.explanation.len() > 16_384 || judge.evidence_ids.len() > 128 {
-        return Err(invalid("blind judge exceeded output bounds"));
-    }
+        .as_deref()
+        .filter(|text| !text.trim().is_empty())
+        .and_then(|text| serde_json::from_str::<JudgeOutput>(text).ok())
+        .filter(|judge| judge.explanation.len() <= 16_384 && judge.evidence_ids.len() <= 128);
+    let Some(judge) = judge else {
+        return Ok(malformed(MALFORMED_JUDGE, Some(call.request_hash()?)));
+    };
     scored_question.evidence_ids = supplied_judge_ids(question, answers);
     let score = score::judge_score(&scored_question, &aggregate, &judge)?;
     Ok(Evaluation {

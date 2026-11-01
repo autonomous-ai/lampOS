@@ -2,7 +2,7 @@
   "version": 1,
   "runner_revision": "@RUNNER_REVISION@",
   "runner_sha256": "@RUNNER_SHA256@",
-  "evaluation_sha256": "7f2555d34379ef02c0f70e22e27fa8ece8cc0704742ec8dcf794ee31a8e3b0fe",
+  "evaluation_sha256": "c903dfd56cfad0a892bddb63b7d2a485b5894a6f13b1354f12eac55af0448994",
   "chat": {
     "endpoint": "@CHAT_ENDPOINT@",
     "requested_model": "deepseek-flash",

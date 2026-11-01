@@ -28,6 +28,26 @@ pub struct Turn {
     pub forget_effect: ForgetEffect,
     pub model_rounds: usize,
     pub tools_executed: usize,
+    /// The model's final reply was empty, whitespace, not the registered JSON
+    /// or outside its bounds. The answer is recorded empty and its question
+    /// scores 0 with audit (evaluation policy `invalid_output`); no retry.
+    pub malformed: bool,
+}
+/// The registered answer shape, or None for a reply the policy records as
+/// malformed: no text, only whitespace, not the JSON object, or out of bounds.
+fn registered_answer(text: Option<&str>) -> Option<Answer> {
+    let text = text?;
+    if text.trim().is_empty() {
+        return None;
+    }
+    let answer: Answer = serde_json::from_str(text).ok()?;
+    let bounded = answer.answer.len() <= 32_768
+        && answer.evidence_ids.len() <= 128
+        && answer
+            .evidence_ids
+            .iter()
+            .all(|id| crate::protocol::valid_id(id));
+    bounded.then_some(answer)
 }
 /// The loop owns no provider and cannot bypass the run's accounting worker.
 pub struct Answerer<'a> {
@@ -208,24 +228,29 @@ impl Answerer<'_> {
                 json!({"probe":query.probe_id,"at_unix_ms":query.at_unix_ms,"round":round,"request_hash":request_hash,"reply":reply}),
             )?;
             if reply.tool_calls.is_empty() {
-                let text = reply
-                    .content
-                    .ok_or_else(|| invalid("answer omitted text"))?;
-                let answer: Answer = serde_json::from_str(&text)?;
-                if answer.answer.len() > 32_768
-                    || answer.evidence_ids.len() > 128
-                    || answer
-                        .evidence_ids
-                        .iter()
-                        .any(|id| !crate::protocol::valid_id(id))
-                {
-                    return Err(invalid("answer exceeds bounded format"));
-                }
+                let (answer, malformed) = match registered_answer(reply.content.as_deref()) {
+                    Some(answer) => (answer, false),
+                    None => {
+                        log(
+                            "answer_malformed",
+                            json!({"probe":query.probe_id,"at_unix_ms":query.at_unix_ms,"round":round,"request_hash":request_hash,"content_bytes":reply.content.as_ref().map(String::len)}),
+                        )?;
+                        (
+                            Answer {
+                                answer: String::new(),
+                                evidence_ids: Vec::new(),
+                                abstain: false,
+                            },
+                            true,
+                        )
+                    }
+                };
                 return Ok(Turn {
                     answer,
                     forget_effect: combined,
                     model_rounds: round + 1,
                     tools_executed: executed,
+                    malformed,
                 });
             }
             // Validate the whole offered batch before any of its side effects.
