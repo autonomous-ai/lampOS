@@ -132,6 +132,9 @@ struct Fake {
     fail_forget: bool,
     writes_on_stop: Option<PathBuf>,
     pending: Option<PathBuf>,
+    /// What [`reset::remove_installed_skills`] removed in the product's
+    /// skills folder, which a test can't reach.
+    installed: Vec<PathBuf>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -228,6 +231,10 @@ impl Effects for Fake {
         }
         Ok(())
     }
+    fn remove_installed_skills(&mut self) -> io::Result<Vec<PathBuf>> {
+        self.calls.borrow_mut().push("skills".into());
+        Ok(self.installed.clone())
+    }
 }
 
 /// A unit name against a `systemctl` pattern, `*` standing for any run of
@@ -294,6 +301,7 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "show",
             "list-units",
             "stop",
+            "skills",
             "sync",
             "sync",
             "reboot"
@@ -613,7 +621,7 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     let steps = reset::resume(&plan, &mut start).unwrap();
     wiped(&root);
     assert!(!steps.contains(&Step::Rebooting));
-    assert_eq!(*start.calls.borrow(), ["sync", "sync"]);
+    assert_eq!(*start.calls.borrow(), ["skills", "sync", "sync"]);
     // Nothing left to finish.
     assert!(
         reset::resume(&plan, &mut Fake::default())
@@ -2339,4 +2347,83 @@ fn a_reset_in_place_stops_lamp_peek_and_leaves_it_off_for_setup() {
         start.iter().any(|unit| unit == "lamp-setup.service"),
         "{start:?}"
     );
+}
+
+/// The skills made by voice outlived the plan's wipes in the product's skills
+/// folder (the Queue, #4710, 1 Nov 02:4x). Each skill there put on from a
+/// package, its `.package.json` beside it, goes with its folder; a skill that
+/// comes with the lamp has none and stays, as does a link and a plain file.
+#[test]
+fn a_reset_removes_each_skill_put_on_from_a_package_and_keeps_the_lamps_own() {
+    let root = Root::new();
+    let skills = root.path("skills");
+    let made = skills.join("water-the-plants");
+    fs::create_dir_all(made.join("sounds")).unwrap();
+    fs::write(made.join("lamp-skill.json"), b"{}").unwrap();
+    fs::write(made.join("sounds/chime.wav"), b"x").unwrap();
+    fs::write(
+        made.join(lamp_skills::package::INSTALLED_FROM),
+        b"{\"sha256\":\"x\"}",
+    )
+    .unwrap();
+    let store = skills.join("stretch-break");
+    fs::create_dir_all(&store).unwrap();
+    fs::write(store.join(lamp_skills::package::INSTALLED_FROM), b"{}").unwrap();
+    let own = skills.join("onboarding");
+    fs::create_dir_all(&own).unwrap();
+    fs::write(own.join("skill.json"), b"{}").unwrap();
+    let elsewhere = root.path("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    fs::write(elsewhere.join(lamp_skills::package::INSTALLED_FROM), b"{}").unwrap();
+    symlink(&elsewhere, skills.join("linked")).unwrap();
+    fs::write(skills.join("README"), b"x").unwrap();
+
+    let removed = reset::remove_installed_skills(&skills).unwrap();
+    assert_eq!(removed, [store.clone(), made.clone()]);
+    assert!(!made.exists() && !store.exists());
+    assert!(own.join("skill.json").exists());
+    assert!(
+        elsewhere
+            .join(lamp_skills::package::INSTALLED_FROM)
+            .exists()
+    );
+    assert!(fs::symlink_metadata(skills.join("linked")).is_ok());
+    assert!(skills.join("README").exists());
+    // Again, and with no folder at all: nothing to remove.
+    assert!(reset::remove_installed_skills(&skills).unwrap().is_empty());
+    assert!(
+        reset::remove_installed_skills(&root.path("none"))
+            .unwrap()
+            .is_empty()
+    );
+    // The product's folder is the one install and each round put skills in.
+    assert_eq!(reset::SKILLS, "/var/lib/lampOS/skills");
+}
+
+/// The reset's last wipe, before the marker and the journal go: the skills
+/// removed are said as wiped, so a reset cut after them resumes with them
+/// gone and the steps name each.
+#[test]
+fn the_reset_removes_installed_skills_after_the_plans_wipes_and_says_each() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let made = PathBuf::from("/var/lib/lampOS/skills/water-the-plants");
+    let mut fake = Fake {
+        installed: vec![made.clone()],
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    let at = steps
+        .iter()
+        .position(|step| *step == Step::Wiped(made.clone()))
+        .expect("the made skill said as wiped");
+    assert!(
+        steps[..at]
+            .iter()
+            .filter(|step| matches!(step, Step::Wiped(_)))
+            .count()
+            == plan.wipe.len()
+    );
+    assert_eq!(steps[at + 1..].first(), Some(&Step::JournalRemoved));
 }

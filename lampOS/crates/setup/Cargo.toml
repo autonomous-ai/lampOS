@@ -24,6 +24,9 @@ lamp-local-time = { path = "../local-time" }
 # The quiet an update waits for before it restarts the voice: a zone changed
 # after setup restarts lamp-schedule only then (src/change.rs, #1959).
 lamp-update = { path = "../update" }
+# Which skills a person put on from a package (`package::INSTALLED_FROM`),
+# removed by the reset (src/reset.rs).
+lamp-skills = { path = "../skills" }
 # The app's restart and shutdown (src/change.rs, #3697): their requests,
 # answers and the update lock they are refused under, one copy with the
 # keeper's.

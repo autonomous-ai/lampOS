@@ -296,6 +296,51 @@ pub trait Effects {
     fn forget(&mut self, argv: &[String]) -> io::Result<()> {
         self.run(argv)
     }
+    /// The skills a person put on from a package removed, [`remove_installed_skills`]
+    /// in [`SKILLS`]; the folders removed.
+    fn remove_installed_skills(&mut self) -> io::Result<Vec<PathBuf>>;
+}
+
+/// The product's skills folder (`lamp_update::product_skills::FOLDER`).
+pub const SKILLS: &str = lamp_update::product_skills::FOLDER;
+
+/// Each skill in `folder` a person put on from a package, made by voice
+/// (`LAMP_MAKE_SKILL`) or from the Store, removed with its folder: it holds
+/// `lamp_skills::package::INSTALLED_FROM`, which a skill that comes with
+/// the lamp never does, so the lamp's own stay, as install and each round
+/// put them back. A made skill is the person's, and it outlived the plan's
+/// wipes (the Queue, #4710, 1 Nov 02:4x). Not a plan path: the plan empties
+/// a path and keeps it, and a plan field this build doesn't know refuses
+/// the whole reset. A link is passed over and a missing folder removes
+/// nothing. Returns the folders removed, in order.
+pub fn remove_installed_skills(folder: &Path) -> io::Result<Vec<PathBuf>> {
+    let entries = match fs::read_dir(folder) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let mut skills = Vec::new();
+    for entry in entries {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let skill = entry.path();
+        match fs::symlink_metadata(skill.join(lamp_skills::package::INSTALLED_FROM)) {
+            Ok(_) => skills.push(skill),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    skills.sort();
+    for skill in &skills {
+        wipe(skill)?;
+        fs::remove_dir(skill)?;
+    }
+    if !skills.is_empty() {
+        File::open(folder)?.sync_all()?;
+    }
+    Ok(skills)
 }
 
 /// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
@@ -342,6 +387,9 @@ impl Effects for System {
     }
     fn forget(&mut self, argv: &[String]) -> io::Result<()> {
         run_within(argv, crate::wifi::QUERY_TIMEOUT)
+    }
+    fn remove_installed_skills(&mut self) -> io::Result<Vec<PathBuf>> {
+        remove_installed_skills(Path::new(SKILLS))
     }
 }
 
@@ -880,6 +928,9 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         wipe(&path.with_extension(STAGED))?;
         wipe(path)?;
         steps.push(Step::Wiped(path.clone()));
+    }
+    for skill in effects.remove_installed_skills()? {
+        steps.push(Step::Wiped(skill));
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {
