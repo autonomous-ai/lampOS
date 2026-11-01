@@ -1,3 +1,11 @@
+## 2026-11-01 17:37 ICT — both current train-500 gates green
+
+Ready for lamp-voice: no (#4848 needs TWO READS; #4782 needs its lamp replay).
+
+- Exact #4848 head `1afc977f1a`: ARM64 41296982004 passed 8,996 selected tests / 57 skipped plus doc/process checks, including all three combined regression functions (five scenarios). Linux Clippy 41296982008 and docs passed. Body and reader handoff updated; two full independent reads remain and no active Bench successor has yet been named in received responses.
+- Exact #4782 head `b00c0e1afd`: ARM64 41296930803, Linux Clippy 41296930790 and docs passed. Body records the current gate and keeps the off/on search replay and unit evidence comment outstanding.
+- Both authored patches are unchanged by their train-500 rebases. No further code changes or device action. Native watch processes completed successfully; returning to the review/assignment dependencies.
+
 ## 2026-11-01 17:22 ICT — forget-state regressions pass; train 500 rebases; memory-store read
 
 Ready for lamp-voice: no (#4848 and #4782 await required external evidence).
