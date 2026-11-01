@@ -1,6 +1,7 @@
 //! The engine against scripted services: no network.
 use super::*;
 
+mod after_forget;
 mod checking_line;
 mod cut_to_a_person;
 mod decline_silent;
@@ -7996,70 +7997,68 @@ async fn dropping_engine_revokes_memory_scope_even_when_task_holds_a_lease() {
 
 #[tokio::test]
 async fn revoked_tool_result_is_not_sent_to_another_chat_round() {
-    let script = Arc::new(Script {
-        heard: Mutex::new([Ok("Recall my note".to_owned())].into()),
-        chats: Mutex::new(
-            [vec![
-                Ok(ChatEvent::ToolCalls(vec![call(
-                    "private",
-                    "recall",
-                    json!({}),
-                )])),
-                Ok(ChatEvent::Done),
-            ]]
-            .into(),
-        ),
-        ..Script::default()
-    });
-    let entered = Arc::new(tokio::sync::Notify::new());
-    let release = Arc::new(tokio::sync::Notify::new());
-    let runner: ScopedToolRunner = {
-        let entered = entered.clone();
-        let release = release.clone();
-        Arc::new(move |_, _, _, _, _| {
+    for (name, words) in [("recall", "Recall my note"), ("forget", "Forget that.")] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(words.to_owned())].into()),
+            chats: Mutex::new(
+                [vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("private", name, json!({}))])),
+                    Ok(ChatEvent::Done),
+                ]]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let entered = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let runner: ScopedToolRunner = {
             let entered = entered.clone();
             let release = release.clone();
-            Box::pin(async move {
-                entered.notify_one();
-                release.notified().await;
-                json!({"private":"must never reach next chat"})
+            Arc::new(move |_, _, _, _, _| {
+                let entered = entered.clone();
+                let release = release.clone();
+                Box::pin(async move {
+                    entered.notify_one();
+                    release.notified().await;
+                    json!({"private":"must never reach next chat"})
+                })
             })
-        })
-    };
-    let (engine, _, _) = scripted(script.clone());
-    let mut engine = engine
-        .with_memory_scope(
-            lamp_turn_owner::BootId::new([11; 16]).unwrap(),
-            Arc::default(),
-            runner,
-            Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
-                Told::from("SYSTEM".to_owned())
-            })),
+        };
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine
+            .with_memory_scope(
+                lamp_turn_owner::BootId::new([11; 16]).unwrap(),
+                Arc::default(),
+                runner,
+                Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+                    Told::from("SYSTEM".to_owned())
+                })),
+            )
+            .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        tokio::time::timeout(Duration::from_secs(2), entered.notified())
+            .await
+            .unwrap();
+        engine
+            .turn
+            .as_ref()
+            .unwrap()
+            .memory_scope
+            .as_ref()
+            .unwrap()
+            .revoke();
+        release.notify_one();
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            &mut engine.turn.as_mut().unwrap().task,
         )
-        .announcing(false);
-    engine.submit(start(1));
-    engine.submit(audio(1, 1));
-    engine.submit(end(1));
-    tokio::time::timeout(Duration::from_secs(2), entered.notified())
         .await
+        .unwrap()
         .unwrap();
-    engine
-        .turn
-        .as_ref()
-        .unwrap()
-        .memory_scope
-        .as_ref()
-        .unwrap()
-        .revoke();
-    release.notify_one();
-    tokio::time::timeout(
-        Duration::from_secs(2),
-        &mut engine.turn.as_mut().unwrap().task,
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert_eq!(script.asked.lock().unwrap().len(), 1);
+        assert_eq!(script.asked.lock().unwrap().len(), 1);
+    }
 }
 
 /// #1712, lamp-4ace 19 Oct 15:56: "what's the weather" called a search, and

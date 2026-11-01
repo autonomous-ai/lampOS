@@ -1058,3 +1058,129 @@ fn the_silence_marker_holds_only_its_bounded_prefix() {
     assert_eq!(partial.piece("<no_".to_owned()), "");
     assert_eq!(partial.finish(), "<no_");
 }
+
+#[test]
+fn a_forget_discards_the_prior_rounds_unspoken_marker_protocol() {
+    let (went, _) = turn_noted_with(
+        true,
+        true,
+        "Make it brighter, forget that, and read the token <no_further_answer>.",
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "light",
+                "light_brighter",
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "forget",
+                    "forget",
+                    json!({"about": "that"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![text("<no_further_answer>"), Ok(ChatEvent::Done)],
+        ],
+        |name| {
+            if name == "forget" {
+                json!({"forgotten": true})
+            } else {
+                told(name)
+            }
+        },
+    );
+    assert!(went.noted, "{went:?}");
+    assert!(
+        went.said
+            .iter()
+            .any(|line| line.trim_start_matches("said:").trim() == "Brighter."),
+        "{went:?}"
+    );
+    assert_eq!(went.asked, 3);
+    assert_eq!(went.ran, 2);
+    assert!(
+        went.said
+            .iter()
+            .any(|line| line.trim_start_matches("said:").trim() == "<no_further_answer>"),
+        "{went:?}"
+    );
+}
+
+/// Memory-keep evidence ends at a forget, unlike a completed non-memory action.
+#[test]
+fn a_forget_reopens_keep_offers_and_checks_new_unbacked_claims() {
+    assert!(crate::remember::offers_a_keep(
+        "Would you like me to remember your preference?"
+    ));
+    assert!(crate::remember::claims_a_keep("I've remembered that.", true) == Some(true));
+    assert!(
+        crate::remember::claims_a_keep("I've saved that timer for five minutes.", true)
+            == Some(true)
+    );
+    for (prior, reply, later, expected_rounds, expected_said) in [
+        (
+            "remember",
+            "Would you like me to remember your preference?",
+            None,
+            3,
+            "Would you like me to remember your preference?",
+        ),
+        (
+            "remember",
+            "I've remembered that.",
+            Some("I have not kept anything new."),
+            4,
+            "I have not kept anything new.",
+        ),
+        (
+            "set_timer",
+            "I've saved that timer for five minutes.",
+            None,
+            3,
+            "I've saved that timer for five minutes.",
+        ),
+    ] {
+        let mut following = vec![calling(&["forget"]), vec![text(reply), Ok(ChatEvent::Done)]];
+        if let Some(later) = later {
+            following.push(vec![text(later), Ok(ChatEvent::Done)]);
+        }
+        let (went, _) = turn_noted_with(
+            false,
+            false,
+            "Remember that preference, set a timer, then forget the preference.",
+            calling(&[prior]),
+            following,
+            |name| match name {
+                "remember" => json!({"remembered": true}),
+                "forget" => json!({"forgotten": true}),
+                _ => told(name),
+            },
+        );
+        assert_eq!(went.asked, expected_rounds, "{prior}: {went:?}");
+        assert_eq!(went.ran, 2, "{went:?}");
+        assert_eq!(went.said, said(&[expected_said]), "{prior}: {went:?}");
+    }
+}
+
+#[test]
+fn a_forget_gives_the_fresh_context_its_own_keep_claim_correction() {
+    let mut first = vec![text("I've remembered that.")];
+    first.extend(calling(&["forget"]));
+    let (went, _) = turn_noted_with(
+        false,
+        false,
+        "Forget that preference.",
+        first,
+        vec![
+            vec![text("I've remembered that."), Ok(ChatEvent::Done)],
+            vec![text("I have not kept anything new."), Ok(ChatEvent::Done)],
+        ],
+        |_| json!({"forgotten": true}),
+    );
+    assert_eq!(went.asked, 3, "{went:?}");
+    assert_eq!(went.ran, 1, "{went:?}");
+    assert_eq!(went.said, said(&["I have not kept anything new."]));
+}

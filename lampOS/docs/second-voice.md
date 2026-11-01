@@ -3660,6 +3660,36 @@ after a take-over, but now for every turn:
       has in hand. A forget that was done has its answer said but kept out
       of the thread the next turn is given, since it may name what went
       ([memory.md](memory.md), "A forget's answer stays out of the thread").
+    - **The active turn forgets its copied context too.** Once an admitted
+      `forget` or `forget_everything` call returns, including an uncertain
+      failure, the next round starts with the configured character and
+      language, the current text-only question, and content-free names and
+      outcomes of calls already run. It carries no earlier exchanges,
+      memory notes, injected personal names, tool arguments or results,
+      reasoning, per-turn notes, or picture. A confirmed held forget before
+      round 1 uses the same boundary. Locally held or refused calls do not
+      clear the context. Custom character-file text remains configuration.
+      Calls left in that model batch are not run: their arguments came from
+      the old context. The next round may plan the remaining work afresh,
+      and is told not to repeat calls already run. Partial deletion and
+      uncertain outcomes are not described as complete. Setup-name, place
+      and reminder deletion results retain only fixed success, kept or
+      uncertain states; an unreported step is never assumed successful.
+      A failed or uncertain step downgrades an `everything=true` claim,
+      including reminder cancellation failures whose producer leaves it true.
+      The reset also clears the prior acting answer’s silence-marker state,
+      so the fresh round does not inherit its unspoken-reply protocol.
+      Earlier memory-keep evidence and its claim-correction allowance reset
+      too: a fresh offer to remember stays audible, and an unsupported new
+      keep claim is checked again. Completed non-memory calls retain their
+      existing confirmation allowance.
+      This reset does not read the memory service or add a chat round;
+      normal context is composed again on the next turn. Face-only forgets retain their
+      existing path. Tests are in `second_provider/tests/after_forget.rs`
+      and `held_forget.rs`, with the prior acting-answer case in
+      `short_done.rs`; a lamp replay is still needed. This boundary
+      clears model context, not speech already queued: a pre-forget piece,
+      including one carried after a TTS `UNSAID`, can still be spoken.
     - **A stop:** the held answers go first, then the writer has up to
       150 ms to write them, then the open session closes
       (`remember::close_at_exit`).

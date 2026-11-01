@@ -61,6 +61,7 @@ use tokio::{
     task::{JoinHandle, JoinSet},
 };
 
+mod after_forget;
 pub mod link;
 pub mod net;
 mod own_echo;
@@ -1224,6 +1225,7 @@ struct Shared {
     scoped_tools: Option<ScopedToolRunner>,
     requested_audio: Option<(String, RequestedAudioRunner)>,
     system: System,
+    after_forget_instruction: String,
     scoped_system: Option<ScopedSystem>,
     /// Without scoped context, the turn's `system` given its line's lease,
     /// read only for the typed name (#2602, [`Engine::reading_the_lease_for_the_name`]).
@@ -2873,6 +2875,10 @@ impl Engine {
                 scoped_tools: None,
                 requested_audio: None,
                 system,
+                after_forget_instruction: crate::language::instruction(
+                    crate::config::CHAT_INSTRUCTION.to_owned(),
+                    crate::language::at_start(),
+                ),
                 scoped_system: None,
                 lease_system: None,
                 clock,
@@ -3000,6 +3006,15 @@ impl Engine {
             privacy: None,
             on_privacy: None,
         }
+    }
+
+    /// Static configured instructions used after an admitted memory forget.
+    /// They must contain no injected name, recalled memory, or conversation.
+    pub(crate) fn with_after_forget_instruction(mut self, instruction: String) -> Self {
+        Arc::get_mut(&mut self.shared)
+            .expect("configure before the engine runs")
+            .after_forget_instruction = instruction;
+        self
     }
 
     /// `forget` is told each time the camera or the microphone is closed or
@@ -9453,6 +9468,8 @@ async fn answer(
         // spoken turn: never on a line the rule holds, and with the Policy's
         // decision.
         let mut held_forget_ran = false;
+        let mut call_statuses = Vec::new();
+        let mut forgot_before_question = false;
         if let Some(call) = held_forget_runs.take() {
             let by_rule = shared
                 .hold
@@ -9505,7 +9522,17 @@ async fn answer(
                     "lamp-voice second: request {request}: ran a held forget ({})",
                     call.name
                 );
-                messages.push(Message::system(if call.name == crate::remember::REMEMBER {
+                call_statuses.push(after_forget::status(&call.name, &result));
+                if after_forget::is_memory_forget(&call.name) {
+                    messages = after_forget::context(
+                        &shared.after_forget_instruction,
+                        &words,
+                        &call_statuses,
+                        0,
+                    );
+                    forgot_before_question = true;
+                } else {
+                    messages.push(Message::system(if call.name == crate::remember::REMEMBER {
                     format!(
                         "(For you to know: they said yes, so what you asked to keep for them is kept now, with this result: {result}. Say in a few words that it is kept, and do not call remember again for it.)"
                     )
@@ -9515,6 +9542,7 @@ async fn answer(
                         call.name
                     )
                 }));
+                }
                 held_forget_ran = true;
             }
         }
@@ -9522,12 +9550,16 @@ async fn answer(
         if let Some(told) = unseen_yes {
             messages.push(Message::system(told));
         }
-        messages.push(question);
+        if !forgot_before_question {
+            messages.push(question);
+        } else {
+            seeing = false;
+        }
         // What round 1 was asked, kept for the rounds after it.
         if let Some(prepared) = &prepared {
             messages.clone_from(&prepared.messages);
         }
-        let asked_at = messages.len() - 1;
+        let mut asked_at = messages.len() - 1;
         // Round 1's bounds run from here, or from its one ask again after a
         // line lost on the network (`LAMP_RESEND_LOST_LINE`).
         let mut from = begun;
@@ -9554,6 +9586,9 @@ async fn answer(
         // a reply that said it kept something with none was asked again
         // once ([`crate::remember::claims_a_keep`], finding K on #3504).
         let mut kept_now = false;
+        // A forget invalidates earlier memory-keep evidence, while completed
+        // non-memory actions may still have their content-free confirmation.
+        let mut confirmed_other_call = false;
         let mut keep_claim_asked = false;
         // Told before the round after one whose claim went unsaid beside
         // other calls, once those calls are answered.
@@ -10266,8 +10301,7 @@ async fn answer(
                 &calls,
                 reasoning.take(),
             ));
-            // A call the Policy held ends the turn after this round.
-            let mut policy_held = false;
+            let mut forgot_this_round = false;
             // A skill's call answered with `"look": true`, by its name, with
             // its arguments and its note for the picture
             // (`LAMP_SECOND_SKILL_LOOK`).
@@ -10304,7 +10338,11 @@ async fn answer(
                 }
                 _ => vec![Policed::Run; calls.len()],
             };
-            for ((call, held), policed) in calls.iter().zip(held_by_rule).zip(policed) {
+            // A held call still ends the turn even if a forget stops the batch.
+            let policy_held = policed.contains(&Policed::Held);
+            for (call_index, ((call, held), policed)) in
+                calls.iter().zip(held_by_rule).zip(policed).enumerate()
+            {
                 if held {
                     eprintln!(
                         "lamp-voice second: request {request} asked for {}: held, nothing shows it was said to the lamp",
@@ -10317,7 +10355,6 @@ async fn answer(
                     continue;
                 }
                 if policed == Policed::Held {
-                    policy_held = true;
                     messages.push(Message::tool(
                         call.id.clone(),
                         crate::policy_holds::held().to_string(),
@@ -10541,6 +10578,29 @@ async fn answer(
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }
+                call_statuses.push(after_forget::status(&call.name, &answer.told));
+                if after_forget::is_memory_forget(&call.name) {
+                    messages = after_forget::context(
+                        &shared.after_forget_instruction,
+                        &words,
+                        &call_statuses,
+                        calls.len() - call_index - 1,
+                    );
+                    asked_at = messages.len() - 1;
+                    seeing = false;
+                    prepared = None;
+                    short_line = None;
+                    answered_at_once = false;
+                    kept_now = confirmed_other_call;
+                    remember_ran = false;
+                    keep_claim_asked = false;
+                    keep_claim_note = false;
+                    offer_hold = crate::remember::OfferHold::default();
+                    forgot_this_round = true;
+                    // Later calls were planned from the context just discarded.
+                    // Ask again from the person's words, never run those arguments.
+                    break;
+                }
                 // A finished task's news asked about (`check_agent_task`):
                 // its key is never the model's, and the coordinator puts it
                 // on this turn, so the tasks part is told it was heard once
@@ -10595,6 +10655,7 @@ async fn answer(
                 {
                     kept_now = true;
                     remember_ran |= call.name == crate::remember::REMEMBER;
+                    confirmed_other_call |= call.name != crate::remember::REMEMBER;
                 }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {
@@ -10621,6 +10682,9 @@ async fn answer(
                     words_out.load(Ordering::Relaxed)
                 );
                 return Err(Stop::Held);
+            }
+            if forgot_this_round {
+                continue;
             }
             // A skill asked for a look (#941): as a look by its own call, the
             // coordinator takes the turn's full look once the lamp's words

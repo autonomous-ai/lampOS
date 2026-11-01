@@ -411,15 +411,21 @@ impl ProviderConfig {
     /// owner's line ([`crate::person::may_tell`], #2602).
     pub fn instruction(&self, camera: bool) -> io::Result<String> {
         // The owner's language (#4473): English leaves it as it is.
-        let character = crate::language::instruction(
-            self.character(camera)?,
-            crate::language::from_environment(),
-        );
+        let character = self.instruction_without_person(camera)?;
         Ok(match crate::person::for_instruction() {
             Some(name) => format!("{character}\n\n{}", crate::person::told(&name)),
             None => character,
         })
     }
+    /// The configured character and language without the injected setup name.
+    /// Used after a forget, when prior personal context must not be copied.
+    pub(crate) fn instruction_without_person(&self, camera: bool) -> io::Result<String> {
+        Ok(crate::language::instruction(
+            self.character(camera)?,
+            crate::language::from_environment(),
+        ))
+    }
+
     fn character(&self, camera: bool) -> io::Result<String> {
         let Some(path) = &self.instruction_file else {
             return Ok(if camera {
@@ -807,6 +813,11 @@ mod tests {
                 .unwrap()
                 .instruction(false)
                 .unwrap();
+            let after_forget = ProviderConfig::load(&provider)
+                .unwrap()
+                .instruction_without_person(false)
+                .unwrap();
+            assert_eq!(after_forget, CHAT_INSTRUCTION);
             crate::person::set_for_test(None);
             assert_eq!(session.instruction_text(), backup);
             backup

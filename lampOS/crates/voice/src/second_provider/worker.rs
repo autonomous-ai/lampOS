@@ -2275,24 +2275,27 @@ pub fn serve(
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
-    let character = spoken_character(&character, look_by_call, tools.memory.is_some());
-    // Nothing said beside a call the acting part answers at once
-    // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
-    let character = quiet_with_calls(
-        character,
-        says_at_once(
-            std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
-                .ok()
-                .as_deref()
-                == Some("on"),
-            crate::language::at_start(),
-        ),
-    );
-    let character = if speech_tags == Some(true) {
-        format!("{character}{}", crate::second_provider::speech_tags::NOTE)
-    } else {
-        character
-    };
+    let forget_character = provider.instruction_without_person(false)?;
+    let [character, forget_character] = [character, forget_character].map(|character| {
+        let character = spoken_character(&character, look_by_call, tools.memory.is_some());
+        // Nothing said beside a call the acting part answers at once
+        // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
+        let character = quiet_with_calls(
+            character,
+            says_at_once(
+                std::env::var(crate::second_provider::SAY_WITH_CALL_ENVIRONMENT)
+                    .ok()
+                    .as_deref()
+                    == Some("on"),
+                crate::language::at_start(),
+            ),
+        );
+        if speech_tags == Some(true) {
+            format!("{character}{}", crate::second_provider::speech_tags::NOTE)
+        } else {
+            character
+        }
+    });
     let reopen_quiet =
         days && std::env::var(REOPEN_QUIET_ENVIRONMENT).ok().as_deref() == Some("on");
     if reopen_quiet {
@@ -2645,6 +2648,7 @@ pub fn serve(
         },
         runner.clone(),
     )
+    .with_after_forget_instruction(forget_character)
     .with_memory_scope(boots.own, face_cache.clone(), scoped_runner, scoped_system)
     .reading_the_lease_for_the_name(lease_system)
     .checking_sounds(checked)
