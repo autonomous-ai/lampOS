@@ -928,15 +928,23 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
 /// Every folder the product keeps across a boot, the tmpfiles' `d` and `D`
 /// lines and each product unit's `StateDirectory=`, is the reset's: the
 /// shipped plan wipes it, a folder above it, or what in it is the person's
-/// (its marker and journal count). The rest is on [`KEPT`], each with why. A
-/// new data folder fails this until the plan or the list names it, so it
-/// fails on a Mac, not after a reset on a lamp (Reviewer-three's P3 beside
-/// #4542: `/var/lib/lampOS/skills-dev` on #4514).
+/// (its marker and journal count). So is each `/var/lib` path a product
+/// unit's lines name, a flag's or a switch's (`--dir /var/lib/lampOS/skills`):
+/// a part can keep a store in a folder no tmpfiles line or `StateDirectory=`
+/// makes, as the skills made by voice are (the Queue, #4710, 1 Nov 02:4x).
+/// The rest is on [`KEPT`], each with why, and a path in a kept folder is
+/// kept. A new data folder fails this until the plan or the list names it,
+/// so it fails on a Mac, not after a reset on a lamp (Reviewer-three's P3
+/// beside #4542: `/var/lib/lampOS/skills-dev` on #4514).
 #[test]
 fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
-    const KEPT: [(&str, &str); 4] = [
+    const KEPT: [(&str, &str); 5] = [
         // The factory's self-test record, kept on purpose (install.md).
         ("/var/lib/lamp-selftest", "the self-test's runs"),
+        // The product's skills, which install and each round put back. A
+        // skill made by voice kept there is the open reset finding (the
+        // Queue, #4710, 1 Nov 02:4x), which waits on the first builder.
+        ("/var/lib/lampOS/skills", "the product's skills"),
         // The updater's records: the builds, its state, its lock.
         ("/var/lib/lampos-update", "the update's records"),
         // PulseAudio's client setting (#4487), no one's data.
@@ -969,6 +977,35 @@ fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
             }
         }
     }
+    let mut named = Vec::new();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        let unit = path.extension().is_some_and(|kind| {
+            ["service", "socket", "timer"]
+                .iter()
+                .any(|unit| kind == *unit)
+        });
+        if !unit {
+            continue;
+        }
+        for line in fs::read_to_string(&path).unwrap().lines() {
+            if line.trim_start().starts_with('#') {
+                continue;
+            }
+            for (at, _) in line.match_indices("/var/lib/") {
+                let named_path: String = line[at..]
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || "_.@-/".contains(*c))
+                    .collect();
+                named.push(named_path.trim_end_matches(['/', '.']).to_owned());
+            }
+        }
+    }
+    assert!(
+        named.iter().any(|path| path == "/var/lib/lampOS/skills"),
+        "the units' paths were read: {named:?}"
+    );
+    folders.extend(named);
     folders.sort();
     folders.dedup();
     assert!(
@@ -997,7 +1034,11 @@ fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
                 .iter()
                 .any(|path| folder.starts_with(path) || path.starts_with(folder))
         })
-        .filter(|folder| !KEPT.iter().any(|(kept, _)| kept == folder))
+        .filter(|folder| {
+            !KEPT
+                .iter()
+                .any(|(kept, _)| Path::new(folder).starts_with(kept))
+        })
         .collect();
     assert!(
         unnamed.is_empty(),
