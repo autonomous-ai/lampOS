@@ -130,6 +130,21 @@ const WITH_NAME: ([f64; 7], f64, f64, f64, f64) = (
 /// measured at.
 pub const NAME_HEARD_FROM: f32 = 0.9;
 
+/// What is added, in the sum without the name and in the one with it, for
+/// each unit a line's voice is more like the conversation's asker's than
+/// [`LIKE_ASKER_FROM`] ([`Context::like_asker`], #4306). Inside a
+/// conversation a follow-up and desk talk look alike to the seven questions
+/// (on lamp-4ace's played rounds of 30 Oct, `follows_lamp` 0.61 against
+/// 0.42, `others_business` 0.57 against 0.56); whose voice it is tells them
+/// apart. 0 until fitted on a lamp's run with the sign, so every decision is
+/// the one it was without it.
+const LIKE_ASKER: f64 = 0.0;
+const WITH_NAME_LIKE_ASKER: f64 = 0.0;
+/// Where the term is 0: the voice's own bar for two prints being one
+/// person's (`lamp-voice`'s `same_voice::SAME_FROM`). Above it the term
+/// counts for the line, below it against, by the fitted weight.
+pub const LIKE_ASKER_FROM: f32 = 0.70;
+
 /// What the room sounds like, as far as anyone has judged.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -174,6 +189,15 @@ pub struct Context {
     /// The model is not shown it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name_heard: Option<f32>,
+    /// How alike the voice of what was said is to the voice of the person
+    /// the lamp is in conversation with, who said the line that began it:
+    /// the cosine of the two voice prints, from -1 to 1, as the voice said
+    /// it for the request on `attention/addressed`. Nothing when the voice
+    /// did not say it: no same-voice check, no conversation going on, a
+    /// print not known, or no request to join it by. The model is not shown
+    /// it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub like_asker: Option<f32>,
 }
 
 impl Context {
@@ -513,6 +537,19 @@ fn sum(answers: &Answers, context: &Context) -> f64 {
     if context.was_called() {
         sum += WITH_NAME.4;
     }
+    // Only when the voice said it, and only a cosine: at a weight of 0 the
+    // term adds nothing, and the sum is the one before it (#4306).
+    if let Some(like) = context
+        .like_asker
+        .filter(|like| like.is_finite() && (-1.0..=1.0).contains(like))
+    {
+        let weight = if listening {
+            WITH_NAME_LIKE_ASKER
+        } else {
+            LIKE_ASKER
+        };
+        sum += weight * f64::from(like - LIKE_ASKER_FROM);
+    }
     sum
 }
 
@@ -546,6 +583,7 @@ mod tests {
             lamp_last_said: None,
             seconds_since_lamp_spoke: None,
             name_heard: None,
+            like_asker: None,
         }
     }
 
@@ -602,6 +640,7 @@ mod tests {
             lamp_last_said: Some("It will rain this afternoon.".into()),
             seconds_since_lamp_spoke: Some(3.44),
             name_heard: None,
+            like_asker: None,
         };
         assert!(replying.in_conversation());
         let text = state_text(&replying);
@@ -898,6 +937,78 @@ mod tests {
             serde_json::to_value(listening(0.5)).unwrap()["name_heard"],
             0.5
         );
+    }
+
+    /// #4306: how alike a line's voice is to the conversation's asker's is
+    /// known beside the rest, written down, never shown to the model, and at
+    /// its weight of 0 changes no decision, to the bit: with the name or
+    /// without, in either room, in conversation or not.
+    #[test]
+    fn like_asker_is_written_down_not_shown_and_at_weight_0_changes_nothing() {
+        assert_eq!((LIKE_ASKER, WITH_NAME_LIKE_ASKER), (0.0, 0.0));
+        assert_eq!(LIKE_ASKER_FROM, 0.70);
+        let sevens = [
+            answers([0.5; 7]),
+            answers([0.05, 0.9, 0.95, 0.1, 0.05, 0.05, 0.02]),
+            answers([0.6, 0.05, 0.05, 0.9, 0.05, 0.02, 0.02]),
+            answers([0.2, 0.1, 0.57, 0.4, 0.61, 0.1, 0.0]),
+            answers([0.0; 7]),
+            answers([1.0; 7]),
+        ];
+        let mut contexts = Vec::new();
+        for room in [Room::Quiet, Room::Busy, Room::Unknown] {
+            for name_heard in [None, Some(0.0), Some(0.95)] {
+                for (speaking, said, ago) in [
+                    (false, None, None),
+                    (false, Some("It will rain."), Some(4.0)),
+                    (true, None, Some(0.0)),
+                ] {
+                    contexts.push(Context {
+                        room,
+                        name_heard,
+                        lamp_is_speaking: speaking,
+                        lamp_last_said: said.map(str::to_owned),
+                        seconds_since_lamp_spoke: ago,
+                        ..heard("And tomorrow?")
+                    });
+                }
+            }
+        }
+        for context in &contexts {
+            for like in [-1.0, -0.3, 0.0, 0.29, 0.7, 0.95, 1.0] {
+                let alike = Context {
+                    like_asker: Some(like),
+                    ..context.clone()
+                };
+                for seven in &sevens {
+                    let (with, without) = (combine(seven, &alike), combine(seven, context));
+                    assert_eq!(with.probability.to_bits(), without.probability.to_bits());
+                    assert_eq!(with.choice, without.choice);
+                    let (with, without) =
+                        (combine_next(seven, &alike), combine_next(seven, context));
+                    assert_eq!(with.probability.to_bits(), without.probability.to_bits());
+                }
+                assert_eq!(fallback(&alike), fallback(context));
+                // The model is shown the state it was measured with.
+                assert_eq!(state_text(&alike), state_text(context));
+            }
+        }
+        // Written down only when the voice said it, and read back from an
+        // older line without it as nothing.
+        let alike = Context {
+            like_asker: Some(0.86),
+            ..heard("And tomorrow?")
+        };
+        assert_eq!(
+            serde_json::to_value(&alike).unwrap()["like_asker"],
+            0.86_f32
+        );
+        let unsaid = serde_json::to_value(heard("And tomorrow?")).unwrap();
+        assert!(unsaid.get("like_asker").is_none());
+        let back: Context = serde_json::from_value(unsaid).unwrap();
+        assert_eq!(back.like_asker, None);
+        let back: Context = serde_json::from_value(serde_json::to_value(&alike).unwrap()).unwrap();
+        assert_eq!(back, alike);
     }
 
     #[test]

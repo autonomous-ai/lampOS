@@ -809,6 +809,25 @@ What it does:
    answer begins if that comes first, for the Policy and anything else.
    A turn the lamp wrote itself (a hello, a look) is not told, nor a
    request cancelled before either.
+
+   With the same-voice check (`LAMP_SAME_VOICE_MODEL`), it also says
+   `like_asker` (#4306): how alike the request's voice is to the voice of
+   the person the lamp is in conversation with, the one who said the line
+   that began the conversation. It is the cosine of the two lines' voice
+   prints, from -1 to 1: the same person reads high (0.70 and over is the
+   voice's own bar for one person), someone else at the desk low. The
+   asker's print is the opening line's, kept apart from the conversation's
+   voice, so a second person's line let out as the conversation going on
+   never becomes it ([same-voice.md](same-voice.md), "The asker's voice").
+   It is left out when no conversation is going on (the voice's thread has
+   no exchange with the lamp's words in it from the last 45 s), when either
+   print is not known (a line under 1.5 s
+   has none, and one whose print is not back yet when the request is
+   judged has none yet), and without the check. Only the number leaves the
+   voice, never a print. No rule in the voice reads it. It is for the
+   Policy: to its seven questions, a follow-up and desk talk inside a
+   conversation look alike ([policy.md](policy.md), "How alike to the
+   asker").
 2. **In the rule.** In a busy room, an answer the rule would hold is let
    out for a request said to the lamp, with the reason "someone close to
    the lamp and turned to it spoke". It never changes an answer the rule
