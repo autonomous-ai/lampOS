@@ -296,17 +296,23 @@ pub trait Effects {
     fn forget(&mut self, argv: &[String]) -> io::Result<()> {
         self.run(argv)
     }
-    /// The skills a person put on from a package removed, [`remove_installed_skills`]
-    /// in [`SKILLS`]; the folders removed.
-    fn remove_installed_skills(&mut self) -> io::Result<Vec<PathBuf>>;
+    /// The skills a person put on from a package removed,
+    /// [`remove_installed_skills`] in [`SKILLS`]; how many.
+    fn remove_installed_skills(&mut self) -> io::Result<usize>;
 }
 
 /// The product's skills folder (`lamp_update::product_skills::FOLDER`).
 pub const SKILLS: &str = lamp_update::product_skills::FOLDER;
 
+/// What a skill put on from a package keeps beside it,
+/// `lamp_skills::package::INSTALLED_FROM`, named here so the reset needs no
+/// skills crate, and with it no voice (Third on the branch, 1 Nov 11:30); a
+/// test holds the two equal.
+pub const INSTALLED_FROM: &str = ".package.json";
+
 /// Each skill in `folder` a person put on from a package, made by voice
 /// (`LAMP_MAKE_SKILL`) or from the Store, removed with its folder: it holds
-/// `lamp_skills::package::INSTALLED_FROM`, which a skill that comes with
+/// [`INSTALLED_FROM`], which a skill that comes with
 /// the lamp never does, so the lamp's own stay, as install and each round
 /// put them back. A made skill is the person's, and it outlived the plan's
 /// wipes (the Queue, #4710, 1 Nov 02:4x). Not a plan path: the plan empties
@@ -326,7 +332,7 @@ pub fn remove_installed_skills(folder: &Path) -> io::Result<Vec<PathBuf>> {
             continue;
         }
         let skill = entry.path();
-        match fs::symlink_metadata(skill.join(lamp_skills::package::INSTALLED_FROM)) {
+        match fs::symlink_metadata(skill.join(INSTALLED_FROM)) {
             Ok(_) => skills.push(skill),
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
@@ -388,8 +394,8 @@ impl Effects for System {
     fn forget(&mut self, argv: &[String]) -> io::Result<()> {
         run_within(argv, crate::wifi::QUERY_TIMEOUT)
     }
-    fn remove_installed_skills(&mut self) -> io::Result<Vec<PathBuf>> {
-        remove_installed_skills(Path::new(SKILLS))
+    fn remove_installed_skills(&mut self) -> io::Result<usize> {
+        remove_installed_skills(Path::new(SKILLS)).map(|removed| removed.len())
     }
 }
 
@@ -415,6 +421,10 @@ pub enum Step {
     Wiped(PathBuf),
     MarkerRemoved,
     JournalRemoved,
+    /// Skills put on from a package removed, [`remove_installed_skills`]: by
+    /// count, never by name, since a made skill's name is the person's words
+    /// and the journal outlives the reset (Reviewer-two's P3 on the branch).
+    InstalledSkillsRemoved,
     /// Setup and what a boot starts, started in place of a reboot (#4500).
     Started,
     Rebooting,
@@ -929,8 +939,10 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         wipe(path)?;
         steps.push(Step::Wiped(path.clone()));
     }
-    for skill in effects.remove_installed_skills()? {
-        steps.push(Step::Wiped(skill));
+    let removed = effects.remove_installed_skills()?;
+    if removed > 0 {
+        eprintln!("lamp-setup: reset: removed {removed} skills put on from a package");
+        steps.push(Step::InstalledSkillsRemoved);
     }
     // Already gone after `reset`; this covers a journal found without one.
     if remove_if_present(&plan.marker)? {

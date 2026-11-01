@@ -132,9 +132,9 @@ struct Fake {
     fail_forget: bool,
     writes_on_stop: Option<PathBuf>,
     pending: Option<PathBuf>,
-    /// What [`reset::remove_installed_skills`] removed in the product's
-    /// skills folder, which a test can't reach.
-    installed: Vec<PathBuf>,
+    /// How many skills [`reset::remove_installed_skills`] removed in the
+    /// product's skills folder, which a test can't reach.
+    installed: usize,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -231,9 +231,9 @@ impl Effects for Fake {
         }
         Ok(())
     }
-    fn remove_installed_skills(&mut self) -> io::Result<Vec<PathBuf>> {
+    fn remove_installed_skills(&mut self) -> io::Result<usize> {
         self.calls.borrow_mut().push("skills".into());
-        Ok(self.installed.clone())
+        Ok(self.installed)
     }
 }
 
@@ -2361,20 +2361,16 @@ fn a_reset_removes_each_skill_put_on_from_a_package_and_keeps_the_lamps_own() {
     fs::create_dir_all(made.join("sounds")).unwrap();
     fs::write(made.join("lamp-skill.json"), b"{}").unwrap();
     fs::write(made.join("sounds/chime.wav"), b"x").unwrap();
-    fs::write(
-        made.join(lamp_skills::package::INSTALLED_FROM),
-        b"{\"sha256\":\"x\"}",
-    )
-    .unwrap();
+    fs::write(made.join(reset::INSTALLED_FROM), b"{\"sha256\":\"x\"}").unwrap();
     let store = skills.join("stretch-break");
     fs::create_dir_all(&store).unwrap();
-    fs::write(store.join(lamp_skills::package::INSTALLED_FROM), b"{}").unwrap();
+    fs::write(store.join(reset::INSTALLED_FROM), b"{}").unwrap();
     let own = skills.join("onboarding");
     fs::create_dir_all(&own).unwrap();
     fs::write(own.join("skill.json"), b"{}").unwrap();
     let elsewhere = root.path("elsewhere");
     fs::create_dir_all(&elsewhere).unwrap();
-    fs::write(elsewhere.join(lamp_skills::package::INSTALLED_FROM), b"{}").unwrap();
+    fs::write(elsewhere.join(reset::INSTALLED_FROM), b"{}").unwrap();
     symlink(&elsewhere, skills.join("linked")).unwrap();
     fs::write(skills.join("README"), b"x").unwrap();
 
@@ -2382,11 +2378,7 @@ fn a_reset_removes_each_skill_put_on_from_a_package_and_keeps_the_lamps_own() {
     assert_eq!(removed, [store.clone(), made.clone()]);
     assert!(!made.exists() && !store.exists());
     assert!(own.join("skill.json").exists());
-    assert!(
-        elsewhere
-            .join(lamp_skills::package::INSTALLED_FROM)
-            .exists()
-    );
+    assert!(elsewhere.join(reset::INSTALLED_FROM).exists());
     assert!(fs::symlink_metadata(skills.join("linked")).is_ok());
     assert!(skills.join("README").exists());
     // Again, and with no folder at all: nothing to remove.
@@ -2396,28 +2388,30 @@ fn a_reset_removes_each_skill_put_on_from_a_package_and_keeps_the_lamps_own() {
             .unwrap()
             .is_empty()
     );
-    // The product's folder is the one install and each round put skills in.
+    // The product's folder is the one install and each round put skills in,
+    // and the mark the skills' own install writes.
     assert_eq!(reset::SKILLS, "/var/lib/lampOS/skills");
+    assert_eq!(reset::INSTALLED_FROM, lamp_skills::package::INSTALLED_FROM);
 }
 
-/// The reset's last wipe, before the marker and the journal go: the skills
-/// removed are said as wiped, so a reset cut after them resumes with them
-/// gone and the steps name each.
+/// The reset's last wipe, before the marker and the journal go, so a reset
+/// cut after it resumes with them gone. Said once, by no name: a made
+/// skill's name is the person's words, and the steps are printed to a
+/// journal the reset keeps (Reviewer-two's P3 on the branch).
 #[test]
-fn the_reset_removes_installed_skills_after_the_plans_wipes_and_says_each() {
+fn the_reset_removes_installed_skills_after_the_plans_wipes_by_no_name() {
     let root = Root::new();
     let plan = lamp(&root);
-    let made = PathBuf::from("/var/lib/lampOS/skills/water-the-plants");
     let mut fake = Fake {
-        installed: vec![made.clone()],
+        installed: 2,
         ..Fake::default()
     };
     let steps = reset::reset(&plan, &mut fake).unwrap();
     wiped(&root);
     let at = steps
         .iter()
-        .position(|step| *step == Step::Wiped(made.clone()))
-        .expect("the made skill said as wiped");
+        .position(|step| *step == Step::InstalledSkillsRemoved)
+        .expect("the skills removed said");
     assert!(
         steps[..at]
             .iter()
@@ -2426,4 +2420,13 @@ fn the_reset_removes_installed_skills_after_the_plans_wipes_and_says_each() {
             == plan.wipe.len()
     );
     assert_eq!(steps[at + 1..].first(), Some(&Step::JournalRemoved));
+    assert_eq!(
+        serde_json::to_value(&steps[at]).unwrap(),
+        serde_json::json!({"step": "installed_skills_removed"})
+    );
+    // None removed, none said.
+    let root = Root::new();
+    let plan = lamp(&root);
+    let steps = reset::reset(&plan, &mut Fake::default()).unwrap();
+    assert!(!steps.contains(&Step::InstalledSkillsRemoved));
 }

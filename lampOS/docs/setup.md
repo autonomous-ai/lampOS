@@ -233,7 +233,8 @@ lamp-setup reset-now`). That unit, in this order:
    setup (`.lamp-setup-tmp`, left by a write cut mid-way) goes with it.
    Last, each skill in `/var/lib/lampOS/skills` put on from a package (its
    `.package.json`, which no skill that comes with the lamp has) is removed
-   with its folder, and said as wiped. A link there is passed over;
+   with its folder, and said by count, never by name (a made skill's name
+   is the person's words). A link there is passed over;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl
