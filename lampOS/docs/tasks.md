@@ -2139,7 +2139,8 @@ The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
   sha256 …` or why not, with `lamp-skills`' exit code only: never the files,
   the name or `lamp-skills`' words, which can quote the agent's.
 - **The reset** wipes `/var/lib/lampOS/voice/made-skills` with the person's
-  other stores ([setup.md](setup.md)).
+  other stores, and removes each made skill put on in `/var/lib/lampOS/skills`
+  (its `.package.json`) with its folder ([setup.md](setup.md)).
 - **Without the switch** a `make_skill` call does nothing.
 
 ### Asked of the staff, done by the lamp (#854, `LAMP_TASKS_ASKED=on`, on in the product)

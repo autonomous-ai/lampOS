@@ -132,6 +132,9 @@ struct Fake {
     fail_forget: bool,
     writes_on_stop: Option<PathBuf>,
     pending: Option<PathBuf>,
+    /// How many skills [`reset::remove_installed_skills`] removed in the
+    /// product's skills folder, which a test can't reach.
+    installed: usize,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
@@ -228,6 +231,10 @@ impl Effects for Fake {
         }
         Ok(())
     }
+    fn remove_installed_skills(&mut self) -> io::Result<usize> {
+        self.calls.borrow_mut().push("skills".into());
+        Ok(self.installed)
+    }
 }
 
 /// A unit name against a `systemctl` pattern, `*` standing for any run of
@@ -294,6 +301,7 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
             "show",
             "list-units",
             "stop",
+            "skills",
             "sync",
             "sync",
             "reboot"
@@ -613,7 +621,7 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     let steps = reset::resume(&plan, &mut start).unwrap();
     wiped(&root);
     assert!(!steps.contains(&Step::Rebooting));
-    assert_eq!(*start.calls.borrow(), ["sync", "sync"]);
+    assert_eq!(*start.calls.borrow(), ["skills", "sync", "sync"]);
     // Nothing left to finish.
     assert!(
         reset::resume(&plan, &mut Fake::default())
@@ -943,8 +951,9 @@ fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
         // The factory's self-test record, kept on purpose (install.md).
         ("/var/lib/lamp-selftest", "the self-test's runs"),
         // The product's skills, which install and each round put back. A
-        // skill made by voice kept there is the open reset finding (the
-        // Queue, #4710, 1 Nov 02:4x), which waits on the first builder.
+        // skill put on from a package there, made by voice or from the
+        // Store, is the person's: the reset removes it in its own step
+        // (`reset::remove_installed_skills`, #4839), not as a plan path.
         ("/var/lib/lampOS/skills", "the product's skills"),
         // The updater's records: the builds, its state, its lock.
         ("/var/lib/lampos-update", "the update's records"),
@@ -2339,4 +2348,123 @@ fn a_reset_in_place_stops_lamp_peek_and_leaves_it_off_for_setup() {
         start.iter().any(|unit| unit == "lamp-setup.service"),
         "{start:?}"
     );
+}
+
+/// The skills made by voice outlived the plan's wipes in the product's skills
+/// folder (the Queue, #4710, 1 Nov 02:4x). Each skill there put on from a
+/// package, its `.package.json` beside it, goes with its folder; a skill that
+/// comes with the lamp has none and stays, as does a link and a plain file.
+#[test]
+fn a_reset_removes_each_skill_put_on_from_a_package_and_keeps_the_lamps_own() {
+    let root = Root::new();
+    let skills = root.path("skills");
+    let made = skills.join("water-the-plants");
+    fs::create_dir_all(made.join("sounds")).unwrap();
+    fs::write(made.join("lamp-skill.json"), b"{}").unwrap();
+    fs::write(made.join("sounds/chime.wav"), b"x").unwrap();
+    fs::write(made.join(reset::INSTALLED_FROM), b"{\"sha256\":\"x\"}").unwrap();
+    let store = skills.join("stretch-break");
+    fs::create_dir_all(&store).unwrap();
+    fs::write(store.join(reset::INSTALLED_FROM), b"{}").unwrap();
+    let own = skills.join("onboarding");
+    fs::create_dir_all(&own).unwrap();
+    fs::write(own.join("skill.json"), b"{}").unwrap();
+    let elsewhere = root.path("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    fs::write(elsewhere.join(reset::INSTALLED_FROM), b"{}").unwrap();
+    symlink(&elsewhere, skills.join("linked")).unwrap();
+    fs::write(skills.join("README"), b"x").unwrap();
+
+    let removed = reset::remove_installed_skills(&skills).unwrap();
+    assert_eq!(removed, [store.clone(), made.clone()]);
+    assert!(!made.exists() && !store.exists());
+    assert!(own.join("skill.json").exists());
+    assert!(elsewhere.join(reset::INSTALLED_FROM).exists());
+    assert!(fs::symlink_metadata(skills.join("linked")).is_ok());
+    assert!(skills.join("README").exists());
+    // Again, and with no folder at all: nothing to remove.
+    assert!(reset::remove_installed_skills(&skills).unwrap().is_empty());
+    assert!(
+        reset::remove_installed_skills(&root.path("none"))
+            .unwrap()
+            .is_empty()
+    );
+    // The product's folder is the one install and each round put skills in,
+    // and the mark the skills' own install writes.
+    assert_eq!(reset::SKILLS, "/var/lib/lampOS/skills");
+    assert_eq!(reset::INSTALLED_FROM, lamp_skills::package::INSTALLED_FROM);
+}
+
+/// The reset's last wipe, before the marker and the journal go, so a reset
+/// cut after it resumes with them gone. Said once, by no name: a made
+/// skill's name is the person's words, and the steps are printed to a
+/// journal the reset keeps (Reviewer-two's P3 on the branch).
+#[test]
+fn the_reset_removes_installed_skills_after_the_plans_wipes_by_no_name() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        installed: 2,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    let at = steps
+        .iter()
+        .position(|step| *step == Step::InstalledSkillsRemoved)
+        .expect("the skills removed said");
+    assert!(
+        steps[..at]
+            .iter()
+            .filter(|step| matches!(step, Step::Wiped(_)))
+            .count()
+            == plan.wipe.len()
+    );
+    assert_eq!(steps[at + 1..].first(), Some(&Step::JournalRemoved));
+    assert_eq!(
+        serde_json::to_value(&steps[at]).unwrap(),
+        serde_json::json!({"step": "installed_skills_removed"})
+    );
+    // None removed, none said.
+    let root = Root::new();
+    let plan = lamp(&root);
+    let steps = reset::reset(&plan, &mut Fake::default()).unwrap();
+    assert!(!steps.contains(&Step::InstalledSkillsRemoved));
+}
+
+/// The package install and reset removal together: Desk tutor put on from
+/// its package, as the Store and a made skill are, is removed, and
+/// Onboarding, which comes with the lamp as a folder, stays and still loads.
+#[test]
+fn a_skill_the_skills_install_put_on_from_a_package_goes_and_the_lamps_own_stays() {
+    fn copy(from: &Path, to: &Path) {
+        fs::create_dir_all(to).unwrap();
+        for entry in fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            let target = to.join(entry.file_name());
+            if entry.path().is_dir() {
+                copy(&entry.path(), &target);
+            } else {
+                fs::copy(entry.path(), target).unwrap();
+            }
+        }
+    }
+    let root = Root::new();
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+    let skills = root.path("skills");
+    fs::create_dir_all(&skills).unwrap();
+    copy(&repository.join("onboarding"), &skills.join("onboarding"));
+    copy(
+        &repository.join("desk-tutor"),
+        &root.path("tutor/desk-tutor"),
+    );
+    let package =
+        lamp_skills::package::pack(&root.path("tutor/desk-tutor"), &root.path("tutor")).unwrap();
+    lamp_skills::package::install(&skills, None, &package).unwrap();
+    assert!(lamp_skills::package::installed_from(&skills.join("desk-tutor")).is_some());
+
+    let removed = reset::remove_installed_skills(&skills).unwrap();
+    assert_eq!(removed, [skills.join("desk-tutor")]);
+    assert!(!skills.join("desk-tutor").exists());
+    assert!(lamp_skills::load(&skills.join("onboarding")).is_ok());
 }

@@ -51,6 +51,9 @@ ring = "0.17"
 subtle = "2"
 
 [dev-dependencies]
+# Only for reset's package-install and naming-contract tests: the reset itself
+# stays without the skills crate and the voice it brings (Third, 1 Nov 11:30).
+lamp-skills = { path = "../skills" }
 tower = { version = "0.5", features = ["util"] }
 tokio = { version = "1", features = ["macros", "rt"] }
 

@@ -2255,6 +2255,7 @@ dependencies = [
  "lamp-local-time",
  "lamp-msgs",
  "lamp-ring",
+ "lamp-skills",
  "lamp-update",
  "reqwest",
  "ring",
