@@ -1,3 +1,13 @@
+## 2026-11-01 16:08 ICT — unspoken follow-up ready
+
+Ready for lamp-voice: yes ([#4847](https://github.com/autonomous-ai/lampOS/pull/4847), `9509a74a8`).
+
+- ARM64 41290619042 passed 8,976 selected tests / 57 skipped plus doc/process checks; Linux Clippy 41290618843 and docs passed. Third read the exact head and independently ran two extracted-parser tests, both passing. The first builder's lamp-4ace yes and the warmer/freezing no-call limitation remain as recorded below. Marked non-draft and sent to the train.
+- #4848 `13bea0a193` remains not ready: Third confirmed its P2 resolved in source, but the two assigned full reads and ARM64 completion remain. Combining it with #4847 needs `answered_at_once=false` at the forget reset; the integration regression is prepared, not yet run.
+- #4782 rebased to train 497 as `2645cbe6c3`. Its conflict was adjacent switch-table context; exact added/deleted lines are unchanged. It remains draft for the first builder's search replay and evidence comment.
+- Scoped source-only integration read on #4850 `fa6914948`: reminder outcome shapes and exact-person forget remain unchanged; no conflict found with #4848. Not a replacement for its assigned full reads.
+- Separate finding sent to Friday/first builder: room `forget_said` and household consent-file cleanup can log failures without returning them. No producer edit. Queued-speech design audit confirms that provider cancellation cannot retract output already in coordinator/playback queues mid-request with today's protocol. Raised that scope boundary; no second playback authority or device action.
+
 ## 2026-11-01 15:54 ICT — deletion outcomes retained; replay and independent reads
 
 Ready for lamp-voice: no ([#4848](https://github.com/autonomous-ai/lampOS/pull/4848), [#4847](https://github.com/autonomous-ai/lampOS/pull/4847)).
