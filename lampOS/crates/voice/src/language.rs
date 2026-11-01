@@ -506,9 +506,58 @@ pub fn announce(asks: crate::say::OwnAsks) {
         });
 }
 
+/// A spoken name without the casual vocative copula Korean ends it with,
+/// in Korean only: "민수야" is 민수 and "민준이야" is 민준, so the lamp never
+/// keeps or greets "민수야 님" (a Korean commenter's note on #4473). 야 goes
+/// only after a syllable with no final consonant and 이야 only after one
+/// with it; a stem of one syllable keeps its 야 ("수야"), and a name ending
+/// in 아 keeps it ("지아").
+pub fn without_vocative(name: &str, language: Option<Language>) -> &str {
+    if language != Some(Language::Korean) {
+        return name;
+    }
+    // Whether a Hangul syllable ends in a consonant (has a final jamo).
+    let closed =
+        |c: char| ('가'..='힣').contains(&c) && !(c as u32 - '가' as u32).is_multiple_of(28);
+    for (ending, after_closed) in [("이야", true), ("야", false)] {
+        if let Some(stem) = name.strip_suffix(ending)
+            && stem.chars().count() >= 2
+            && stem
+                .chars()
+                .last()
+                .is_some_and(|c| closed(c) == after_closed)
+        {
+            return stem;
+        }
+    }
+    name
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_korean_name_drops_its_vocative_copula() {
+        let ko = |name| without_vocative(name, Some(Language::Korean));
+        for (said, name) in [
+            ("민수야", "민수"),
+            ("민준이야", "민준"),
+            ("지아", "지아"),
+            ("지아야", "지아"),
+            ("수야", "수야"),
+            ("야", "야"),
+            ("민수", "민수"),
+            ("민준", "민준"),
+        ] {
+            assert_eq!(ko(said), name, "{said}");
+        }
+        assert_eq!(without_vocative("민수야", None), "민수야");
+        assert_eq!(
+            without_vocative("민수야", Some(Language::Japanese)),
+            "민수야"
+        );
+    }
     use std::path::PathBuf;
 
     fn scratch(name: &str) -> PathBuf {

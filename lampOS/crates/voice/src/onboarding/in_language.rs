@@ -16,7 +16,7 @@
 use crate::language::Language;
 
 /// What a line says, as the walk's rules read it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Reading {
     /// A yes, with no no word.
     pub(super) agrees: bool,
@@ -51,9 +51,6 @@ pub(super) struct Reading {
     pub(super) answers_hello: bool,
     /// The line asks the hello back or puts it off: never its answer.
     pub(super) holds_hello: bool,
-    /// The name told, where the language takes one from the line (Korean
-    /// only): "내 이름은 민수야" is 민수.
-    pub(super) name: Option<String>,
 }
 
 /// How a language's words are found in a line.
@@ -952,60 +949,8 @@ impl Lexicon {
             puts_off,
             answers_hello: yes_or_no.is_some(),
             holds_hello: asks || again || puts_off,
-            name: (names_someone && self.found == Found::WordStart)
-                .then(|| korean_name(&line))
-                .flatten(),
         }
     }
-}
-
-/// The name in a Korean line read as naming someone: the one word left
-/// once "내 이름은", "나", "저는" and the like are out, without its copula
-/// ending: 민수예요, 민준이에요, 민수입니다 and the casual 민수야, 민준이야
-/// are 민수 and 민준 (a Korean commenter's note on #4473: not "민수야 님").
-/// 야 goes only after a syllable with no final consonant and 이야 only after
-/// one with it, and a stem of one syllable keeps its 야 ("수야"); a name
-/// ending in 아 keeps it ("지아예요" is 지아). None when more than one word
-/// is left.
-fn korean_name(line: &str) -> Option<String> {
-    const MARKS: &[&str] = &[
-        "내",
-        "제",
-        "나",
-        "저",
-        "난",
-        "전",
-        "이름은",
-        "이름이",
-        "이름",
-        "저는",
-        "나는",
-    ];
-    let mut words = line.split_whitespace().filter(|word| !MARKS.contains(word));
-    let word = words.next()?;
-    if words.next().is_some() {
-        return None;
-    }
-    // Whether a Hangul syllable ends in a consonant (has a final jamo).
-    let closed =
-        |c: char| ('가'..='힣').contains(&c) && !(c as u32 - '가' as u32).is_multiple_of(28);
-    for (ending, after_closed, least) in [
-        ("입니다", None, 1),
-        ("이에요", Some(true), 1),
-        ("예요", Some(false), 1),
-        ("이야", Some(true), 2),
-        ("야", Some(false), 2),
-    ] {
-        if let Some(stem) = word.strip_suffix(ending)
-            && stem.chars().count() >= least
-            && stem.chars().last().is_some_and(|c| {
-                after_closed.is_none_or(|closed_wanted| closed(c) == closed_wanted)
-            })
-        {
-            return Some(stem.to_owned());
-        }
-    }
-    Some(word.to_owned())
 }
 
 /// `text` read in `language`.
@@ -1996,33 +1941,6 @@ mod tests {
         // Before a name, it drops: the name is heard, and no yes.
         let named = ko("어… 민수예요");
         assert!(named.names_someone && !named.agrees && named.yes_or_no.is_none());
-        assert_eq!(named.name.as_deref(), Some("민수"));
-        // The casual "it's ...": the vocative copula 야 (after an open
-        // syllable) or 이야 (after a closed one) is no part of the name.
-        for (line, name) in [
-            ("내 이름은 민수야", "민수"),
-            ("나 민수야", "민수"),
-            ("민수야", "민수"),
-            ("내 이름은 민준이야", "민준"),
-            ("민준이야", "민준"),
-            ("제 이름은 민수예요", "민수"),
-            ("저는 민준이에요", "민준"),
-            ("저는 민수입니다", "민수"),
-            // A name ending in 아 keeps it.
-            ("지아예요", "지아"),
-            ("지아", "지아"),
-            ("나 지아야", "지아"),
-            // One syllable and 야 is the name itself.
-            ("수야", "수야"),
-            ("민수", "민수"),
-        ] {
-            let named = ko(line);
-            assert!(named.names_someone, "{line}");
-            assert_eq!(named.name.as_deref(), Some(name), "{line}");
-        }
-        assert_eq!(ko("네").name, None);
-        // Only Korean takes a name from the line.
-        assert_eq!(read(Language::Vietnamese, "tôi là Minh").name, None);
     }
 
     #[test]

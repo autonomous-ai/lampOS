@@ -2369,13 +2369,10 @@ impl Onboarding {
         // Only the first line after the lamp has asked its question.
         if led.step == Step::WhoYouAre && led.spoke && !led.name_heard {
             led.name_heard = true;
-            // ponytail: of the other languages only Korean takes a name from
-            // the line; in the rest none is asked back and the model keeps
-            // the step. The nudge is off in the product.
-            led.name = match language {
-                None => name_in(text),
-                Some(language) => in_language::read(language, text).name,
-            };
+            // ponytail: no name is taken from a line in another language, so
+            // none is asked back and the model keeps the step; the nudge is
+            // off in the product. Read names there if the nudge is turned on.
+            led.name = language.is_none().then(|| name_in(text)).flatten();
         }
         if led.confirm == Confirm::Asked(None) {
             led.confirm = Confirm::Asked(reading(language, text).yes_or_no);
@@ -3280,7 +3277,7 @@ impl Onboarding {
                 .flatten()
                 .map(str::trim)
                 .filter(|name| !name.is_empty() && name.len() <= 64)
-                .map(str::to_owned);
+                .map(|name| crate::language::without_vocative(name, self.language).to_owned());
             if led && step.reportable(outcome) {
                 self.nudge_record(!by_face, now_us);
                 if by_face {
@@ -3754,8 +3751,6 @@ fn reading(language: Option<crate::language::Language>, text: &str) -> in_langua
         // ([`puts_off_the_hello`]) is the walk's to wait for (Reviewer-three's
         // P2s on #4480).
         holds_hello: again || text.contains('?') || puts_off_the_hello(&words),
-        // English takes its name by `name_in`.
-        name: None,
     }
 }
 
@@ -5620,6 +5615,15 @@ mod tests {
         early.wait(20 * S, Some(NEAR_MIDDLE));
         assert_eq!(early.outcome(Step::WhoYouAre), Some(Outcome::Done));
         assert_eq!(early.walk.desired.owner.as_deref(), Some("Example Name"));
+        // In Korean the owner is kept without a vocative 야 (a Korean
+        // commenter's note on #4473): "민수야" is 민수, never "민수야 님".
+        let mut korean = Room::new("owner-ko");
+        korean.walk.language = Some(crate::language::Language::Korean);
+        face_saved(&korean.walk.file, Some("민수야"));
+        korean.wait(7 * S, Some(NEAR_MIDDLE));
+        korean.wait(20 * S, Some(NEAR_MIDDLE));
+        assert_eq!(korean.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(korean.walk.desired.owner.as_deref(), Some("민수"));
     }
 
     /// The onboarding forgets report (30 Oct), fix C: a face saved while
