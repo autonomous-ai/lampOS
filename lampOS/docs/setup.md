@@ -103,7 +103,7 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 
 ## The person's data, which reset wipes
 
-From lamp-4ace's units: memory `/var/lib/lampos-memory`, faces
+From the units (lamp-4ace's and the product's) and the reset plans: memory `/var/lib/lampos-memory`, faces
 `/var/lib/lampos-eyes/people.json`, its exact interrupted-write siblings
 `people.json.new` and `people.json.repair.new` in the same directory, the
 faces from photos not yet confirmed (`people.json.from-photos`, only with
