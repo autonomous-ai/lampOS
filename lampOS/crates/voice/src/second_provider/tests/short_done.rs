@@ -76,15 +76,29 @@ fn turn_noted(
     first: Vec<net::Result<ChatEvent>>,
     later: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> (Went, Vec<String>) {
+    turn_noted_with(short, at_once, heard, first, later, told)
+}
+
+/// [`turn_noted`], with the tool's result supplied by the case.
+fn turn_noted_with(
+    short: bool,
+    at_once: bool,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+    answer_for: fn(&str) -> Value,
+) -> (Went, Vec<String>) {
+    let (speech_ready, mut speech) = mpsc::unbounded_channel();
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
+        speech_ready: Some(speech_ready),
         ..Script::default()
     });
     let ran: Calls = Arc::default();
     let seen = ran.clone();
     let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
-        let answer = told(&name);
+        let answer = answer_for(&name);
         seen.lock().unwrap().push((name, args, heard));
         Box::pin(async move { answer })
     });
@@ -107,10 +121,23 @@ fn turn_noted(
             engine.submit(end(1));
             turn(&mut engine).await
         });
-    let said = labels
+    let said: Vec<String> = labels
         .into_iter()
         .filter(|label| label.starts_with("said:"))
         .collect();
+    // Every TTS result has exactly one transcript label. A consumed marker
+    // must reach neither, even when there are already words in this turn.
+    let mut voiced = Vec::new();
+    while let Ok(line) = speech.try_recv() {
+        voiced.push(format!("said:{line}"));
+    }
+    voiced.sort();
+    let mut labelled: Vec<String> = said
+        .iter()
+        .map(|line| format!("said:{}", line.trim_start_matches("said:").trim()))
+        .collect();
+    labelled.sort();
+    assert_eq!(voiced, labelled);
     let asked = script.asked.lock().unwrap();
     let notes: Vec<String> = asked
         .iter()
@@ -813,6 +840,18 @@ fn a_line_asks_more_with_a_clause_its_calls_did_not_answer() {
     }
 }
 
+/// Known miss of the set-off name heuristic (Reviewer-two on #4789): the
+/// first word after a greeting is treated as the lamp's name, even when
+/// "weather" could be another ask. Pin that tradeoff explicitly; this
+/// follow-up does not change which requests are judged to ask more.
+#[test]
+fn a_set_off_weather_after_a_greeting_is_a_known_missed_extra_ask() {
+    assert!(!asks_more(
+        "Okay weather, make it warmer.",
+        &[call("c0", "light_warmer", json!({}))],
+    ));
+}
+
 /// Candidate 9276 on lamp-4ace (the first builder on #4710, 21:4x): lights
 /// at their limit said their "already" at once, then round 2 said it again
 /// ("Already as warm as I go — that's my limit."). "Hey Lamp" was heard as
@@ -887,4 +926,135 @@ fn an_already_said_at_once_is_said_once() {
             .any(|note| note.contains("the lamp itself says")),
         "{notes:?}"
     );
+}
+
+/// The exact heard line from the lamp-4ace case (`rUX4789-2245`, 31 Oct
+/// 22:45), with lamp-actions' own already result. The marker is scripted:
+/// a real model replay still has to show that it uses the new instruction.
+#[test]
+fn the_recorded_warmer_line_can_end_after_its_already_answer() {
+    fn already_warm(name: &str) -> Value {
+        if name == "light_warmer" {
+            lamp_actions::Outcome::Already(
+                "My light is already as warm as it goes, orange.".to_owned(),
+            )
+            .line_for(name, true)["result"]
+                .clone()
+        } else {
+            told(name)
+        }
+    }
+    let (went, notes) = turn_noted_with(
+        true,
+        true,
+        "Make it warmer. It's freezing in here.",
+        calling(&["light_warmer"]),
+        vec![vec![
+            text("<no_"),
+            text("further_answer>"),
+            Ok(ChatEvent::Done),
+        ]],
+        already_warm,
+    );
+    assert_eq!(
+        went,
+        Went {
+            said: said(&["I'm already as warm as I go."]),
+            asked: 2,
+            ran: 1,
+            noted: true,
+        },
+    );
+    assert!(notes.iter().any(|note| note.contains(SILENT_AFTER_MARKER)));
+}
+
+/// A silence marker is control text only after the acting part answered.
+/// In particular, ordinary "Nothing." can answer a further real question.
+#[test]
+fn an_answer_at_once_can_end_without_speaking_its_silence() {
+    let own = "I'm already as cool as I go.";
+    for chunks in [
+        vec![SILENT_AFTER_MARKER],
+        vec!["<no_", "further_", "answer>"],
+        vec![" \n", "<", "no_further_answer", ">", " \n"],
+    ] {
+        let reply = chunks
+            .into_iter()
+            .map(text)
+            .chain([Ok(ChatEvent::Done)])
+            .collect();
+        assert_eq!(
+            turn_with(
+                true,
+                true,
+                "Make it cooler. It's freezing in here.",
+                calling(&["light_cooler"]),
+                vec![reply]
+            ),
+            Went {
+                said: said(&[own]),
+                asked: 2,
+                ran: 1,
+                noted: true
+            },
+        );
+    }
+    for (chunks, expected) in [
+        (vec!["Nothing."], "Nothing."),
+        (
+            vec!["Nothing more to give, I'm afraid."],
+            "Nothing more to give, I'm afraid.",
+        ),
+        (vec!["<no_further_answer>", " It is sunny."], "It is sunny."),
+        (vec!["<no_further_answer>It is sunny."], "It is sunny."),
+        (vec!["<no_"], "<no_"),
+        (vec!["<no_", "problem>"], "<no_problem>"),
+    ] {
+        let reply = chunks
+            .into_iter()
+            .map(text)
+            .chain([Ok(ChatEvent::Done)])
+            .collect();
+        let went = turn_with(
+            true,
+            true,
+            "Make it cooler and tell me what else I owe.",
+            calling(&["light_cooler"]),
+            vec![reply],
+        );
+        assert_eq!(went.said, said(&[own, &format!(" {expected}")]), "{went:?}");
+        assert_eq!(went.asked, 2, "{went:?}");
+    }
+    // The switch off does not give an ordinary reply a new control marker.
+    let went = turn_with(
+        false,
+        false,
+        "Tell me that marker.",
+        vec![text(SILENT_AFTER_MARKER), Ok(ChatEvent::Done)],
+        vec![],
+    );
+    assert_eq!(went.said, said(&[SILENT_AFTER_MARKER]));
+    assert_eq!(went.asked, 1);
+}
+
+#[test]
+fn the_silence_marker_holds_only_its_bounded_prefix() {
+    for split in 0..=SILENT_AFTER_MARKER.len() {
+        let mut silent = SilentAfter::default();
+        assert_eq!(silent.piece(SILENT_AFTER_MARKER[..split].to_owned()), "");
+        assert!(silent.held.len() <= SILENT_AFTER_MARKER.len());
+        assert_eq!(silent.piece(SILENT_AFTER_MARKER[split..].to_owned()), "");
+        assert_eq!(silent.finish(), "");
+    }
+    let mut silent = SilentAfter::default();
+    assert_eq!(silent.piece("<no_".to_owned()), "");
+    assert_eq!(silent.piece("problem>".to_owned()), "<no_problem>");
+    assert!(silent.held.is_empty());
+    assert_eq!(silent.piece(" More.".to_owned()), " More.");
+    let mut ordinary = SilentAfter::default();
+    assert_eq!(ordinary.piece("Nothing".to_owned()), "Nothing");
+    assert!(ordinary.held.is_empty());
+    let mut partial = SilentAfter::default();
+    assert_eq!(partial.piece("<no_".to_owned()), "");
+    assert_eq!(partial.finish(), "<no_");
 }

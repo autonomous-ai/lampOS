@@ -906,6 +906,18 @@ order is kept. A written turn is the same from the chat on.
   nothing, and a round asked after an answer at once is told
   the line was already said aloud (`said_at_once_note`), in the words
   `said_once_note` gives the model's own.
+  The 31 Oct 22:45 lamp-4ace replay (`rUX4789-2245`, `c65affbf56`)
+  then heard "Make it warmer. It's freezing in here." and said its own
+  "already" line, followed by "Nothing.". Follow-up rounds after the
+  acting part's answer now use `<no_further_answer>` for silence instead
+  of being asked to reply with "nothing". That leading marker is removed
+  before speech or transcript text, even across streamed chunks, with no
+  extra chat round. Only its possible prefix waits (at most 19 bytes);
+  divergent text is released in the same chunk, and an incomplete marker
+  at the end is kept as text. Ordinary "Nothing." answers and substantive
+  words after the marker are preserved. The local processing target is
+  under 1 ms; the prompt's effect on the model and acoustic latency still
+  need a lamp replay.
 - **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
   tag** (off unless set, on in the product unit from 28 Oct, the owner's
   pick at lamp-52e6; #2901, the lead's proposal on #1711, 22 Oct). The
