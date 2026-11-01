@@ -82,6 +82,10 @@ struct Lexicon {
     /// consents or the hello, whatever yes it holds (Reviewer-three's P1 on
     /// #4506).
     put_off: &'static [&'static str],
+    /// The put-offs that are a "but": a strict no after one is a clear no,
+    /// at any length ("고마워, 하지만 안 해도 돼", a Korean commenter's note
+    /// on #4473). Korean only.
+    but: &'static [&'static str],
     /// What may go with a bare yes and nothing else: a politeness ending,
     /// "please" or "thanks" ([`Lexicon::bare_yes`]).
     polite: &'static [&'static str],
@@ -176,6 +180,7 @@ const VIETNAMESE: Lexicon = Lexicon {
         "kiểm tra",
         "giải thích",
     ],
+    but: &[],
     polite: &["ạ", "nhé", "nha", "rồi", "làm ơn", "cảm ơn"],
     question: &[],
     hello: &["chào", "lời chào"],
@@ -323,6 +328,7 @@ const JAPANESE: Lexicon = Lexicon {
         "確認",
         "説明",
     ],
+    but: &[],
     polite: &["お願いします", "お願い", "どうぞ", "です", "よ", "ね"],
     question: &["ですか ", "ますか ", "でしょうか ", "かな "],
     strict_no: &[
@@ -449,6 +455,7 @@ const CHINESE: Lexicon = Lexicon {
         "解释",
         "一会儿",
     ],
+    but: &[],
     polite: &["请", "谢谢", "的", "啊", "呀", "哦"],
     question: &["吗", "呢"],
     strict_no: &["不", "没有", "别", "错"],
@@ -593,6 +600,10 @@ const KOREAN: Lexicon = Lexicon {
         "좋습니다",
         "오케이",
         "허락할게요",
+        // Casual, whole words: "그래 맞아" is a yes, "그래요" still none.
+        "그래",
+        // Said quickly, written as one word.
+        "맞아맞아",
     ],
     put_off: &[
         "나중에",
@@ -621,6 +632,7 @@ const KOREAN: Lexicon = Lexicon {
         // A whole word: "음악" and "음성" are no "음".
         "음 ",
     ],
+    but: &["근데", "하지만", "그런데", "그렇지만", "다만"],
     polite: &[
         "부탁해요",
         "부탁합니다",
@@ -667,6 +679,8 @@ const KOREAN: Lexicon = Lexicon {
         "하지 말아",
         "말아",
         "틀려",
+        // "하지 않아도 돼": "you don't have to".
+        "않아도",
     ],
     hello: &["인사", "안녕"],
     greet: &[
@@ -758,6 +772,10 @@ const KOREAN: Lexicon = Lexicon {
         "모르겠",
         "램프",
         "헤이",
+        // "됐어" ("I'm ready" or "no thanks"), "다음" ("next"), "패스".
+        "됐",
+        "다음",
+        "패스",
     ],
     short_answer: 4,
     short_name: 2,
@@ -895,7 +913,18 @@ impl Lexicon {
             .copied()
             .filter(|word| word.contains(' '))
             .collect();
-        let puts_off = self.any(&self.without(&line, &longer).0, self.put_off);
+        // A strict no after a "but" is a clear no, never put off and at any
+        // length: "고마워, 하지만 안 해도 돼".
+        let but_no = !asks
+            && self.but.iter().any(|word| {
+                line.find(&format!(" {word}"))
+                    .is_some_and(|at| self.any(&line[at + 1..], self.strict_no))
+            });
+        let mut put_off_line = self.without(&line, &longer).0;
+        if but_no {
+            put_off_line = self.without(&put_off_line, self.but).0;
+        }
+        let puts_off = self.any(&put_off_line, self.put_off);
         let greets = self.any(&line, self.greet);
         let again = self.any(&line, self.again);
         // What is left to hold a yes or a no.
@@ -910,7 +939,7 @@ impl Lexicon {
         let size = self.size(&line);
         let (timed, _) = self.without(&line, self.greet);
         let names_a_time = self.any(&timed, self.when) || timed.chars().any(|c| c.is_numeric());
-        let yes_or_no = (size > 0 && size <= self.short_answer && !asks && !puts_off)
+        let yes_or_no = (but_no || (size > 0 && size <= self.short_answer && !asks && !puts_off))
             .then(|| {
                 if self.any(&rest, self.strict_no) {
                     Some(false)
@@ -1953,6 +1982,62 @@ mod tests {
             for line in lines.yes.iter().chain(lines.no).chain(lines.greetings) {
                 assert!(!read(language, line).names_someone, "{language:?}: {line}");
             }
+        }
+    }
+
+    /// A Korean commenter's second read on #4473: everyday answers.
+    #[test]
+    fn korean_everyday_answers_read_as_meant() {
+        let ko = |line| read(Language::Korean, line);
+        // A casual yes, and one said twice quickly as one word.
+        for line in ["그래 맞아", "그래", "맞아맞아"] {
+            let read = ko(line);
+            assert!(read.agrees && !read.refuses, "{line}");
+            assert_eq!(read.yes_or_no, Some(true), "{line}");
+            assert!(!read.names_someone, "{line}");
+        }
+        // "It's 민수": a yes to the name asked back, no new name; a kept name
+        // drops its 야 (`language::without_vocative`).
+        let named = ko("맞아, 민수야");
+        assert!(named.agrees && !named.names_someone && !named.refuses);
+        assert_eq!(named.yes_or_no, None);
+        assert_eq!(
+            crate::language::without_vocative("민수야", Some(Language::Korean)),
+            "민수"
+        );
+        // "You don't have to" is a no: its 해도 돼 or 돼 never agrees.
+        for line in [
+            "안 해도 돼",
+            "하지 않아도 돼",
+            "아니야 괜찮아",
+            "고마워, 하지만 안 해도 돼",
+            "고마워요, 그런데 안 해도 돼요",
+        ] {
+            let read = ko(line);
+            assert!(read.refuses && !read.agrees, "{line}");
+            assert_eq!(read.yes_or_no, Some(false), "{line}");
+            assert!(!read.puts_off && !read.names_someone, "{line}");
+        }
+        // A "but" before a yes, or with no no after it, still puts it off.
+        for line in [
+            "아니, 하지만 해도 돼",
+            "네, 근데요",
+            "안 돼, 근데 생각해 볼게",
+        ] {
+            let read = ko(line);
+            assert!(!read.agrees && read.yes_or_no.is_none(), "{line}");
+        }
+        // "됐어" is "I'm ready" or "no thanks": no answer to a consent. "다음"
+        // and "패스" are no answer either, and none is a name.
+        for line in ["됐어", "됐어요", "다음", "패스"] {
+            let read = ko(line);
+            assert!(!read.agrees && !read.refuses, "{line}");
+            assert_eq!(read.yes_or_no, None, "{line}");
+            assert!(!read.names_someone, "{line}");
+        }
+        // 엉, 웅 and 응응 are no yes: the commenter finds them childish or rude.
+        for line in ["엉", "웅", "응응"] {
+            assert!(!ko(line).agrees && ko(line).yes_or_no.is_none(), "{line}");
         }
     }
 }
