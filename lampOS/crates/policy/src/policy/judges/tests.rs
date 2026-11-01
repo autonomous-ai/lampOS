@@ -18,6 +18,7 @@ fn context() -> Context {
         lamp_last_said: None,
         seconds_since_lamp_spoke: None,
         name_heard: None,
+        like_asker: None,
     }
 }
 

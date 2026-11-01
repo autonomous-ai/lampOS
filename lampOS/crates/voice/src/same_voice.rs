@@ -36,6 +36,11 @@
 //!   prints, under [`DIFFERENT_BELOW`], is another voice, and no
 //!   conversation is going on for it. The same voice, or no verdict, is as without the
 //!   model.
+//! - **The asker's voice** ([`Voices::like_asker`], #4306): the print of the
+//!   line that began the conversation, kept apart from the conversation's
+//!   voice, which a line let out as going on can add to. How alike a line
+//!   is to it goes to the Policy on `attention/addressed` as `like_asker`,
+//!   and is no part of the rule.
 use std::{
     collections::VecDeque,
     io::{self, BufRead, BufReader, Write},
@@ -528,6 +533,12 @@ pub struct Voices<P: Printer> {
     /// line after it (the first builder on #1445, 10:3x, after the Sixth's
     /// finding there).
     conversation: VecDeque<Vec<f32>>,
+    /// The print of the line that began the conversation: let out for
+    /// itself, or, with [`Self::callers_only`], the first going-on line seen
+    /// spoken by the caller when the call had none. Never a line let out
+    /// only as the conversation going on, so a second person's line taken
+    /// for the conversation's never becomes it (#4306).
+    asker: Option<Vec<f32>>,
     /// A line whose answer was let out and whose print is still to come,
     /// and whether it began a conversation of its own.
     answered: Option<(u64, bool)>,
@@ -564,6 +575,7 @@ impl<P: Printer> Voices<P> {
             asked: VecDeque::new(),
             prints: VecDeque::new(),
             conversation: VecDeque::new(),
+            asker: None,
             answered: None,
             judged: None,
             late_other: None,
@@ -780,6 +792,18 @@ impl<P: Printer> Voices<P> {
         cosine(self.print(a)?, self.print(b)?)
     }
 
+    /// How alike the line `request` sounds to the conversation's asker: the
+    /// cosine of its print against the print of the line that began the
+    /// conversation, kept as it began, once both are known. A sign for the
+    /// Policy (`attention/addressed`'s `like_asker`, #4306), read at any
+    /// time and never the line's one judgement ([`Self::likeness`]). The
+    /// caller says whether a conversation is going on at all: what is kept
+    /// here lasts until the next one begins.
+    pub fn like_asker(&mut self, request: u64) -> Option<f32> {
+        self.poll();
+        cosine(self.asker.as_deref()?, self.print(request)?)
+    }
+
     /// Whether the line `request` has a print, come and kept, for the
     /// journal of a line not joined ([`Self::alike`]).
     pub fn printed(&mut self, request: u64) -> bool {
@@ -887,12 +911,14 @@ impl<P: Printer> Voices<P> {
                     (self.journal)(&format!(
                         "lamp-voice provider: request {request}: seen spoken by the caller alone: its print is the conversation's voice"
                     ));
+                    self.asker = Some(print.clone());
                     self.keep(print);
                 }
             }
             _ if going_on => self.keep(print),
             _ => {
                 self.begin_afresh();
+                self.asker = Some(print.clone());
                 self.keep(print);
             }
         }
@@ -904,6 +930,7 @@ impl<P: Printer> Voices<P> {
     /// call ended the call's own conversation at the next line).
     fn begin_afresh(&mut self) {
         self.conversation.clear();
+        self.asker = None;
         self.late_other = None;
         self.answered = None;
     }
@@ -1445,6 +1472,52 @@ exec sleep 30"#,
         assert_eq!(voices.likeness(4), Some(0.0));
     }
 
+    /// #4306: how alike a line is to the conversation's asker. A follow-up
+    /// in the asker's voice reads high, another person's line low, and a
+    /// line let out as going on is never the asker's, though it joins the
+    /// conversation's voice. Read without using up the line's judgement.
+    #[test]
+    fn like_asker_is_against_the_line_that_began_the_conversation_alone() {
+        let mut voices = Voices::new(StandIn::default());
+        // No conversation yet: nothing.
+        said(&mut voices, 1, 1, 48_000);
+        assert_eq!(voices.like_asker(1), None);
+        // A's call answered: A is the asker.
+        voices.decided(1, true, false);
+        // A's follow-up, a little off: 0.90, and still judged after.
+        said(&mut voices, 2, 3, 48_000);
+        let like =
+            |like: Option<f32>, near: f32| like.is_some_and(|like| (like - near).abs() < 0.01);
+        assert!(like(voices.like_asker(2), 0.9));
+        assert!(like(voices.likeness(2), 0.9));
+        voices.decided(2, true, true);
+        // A colleague's line at the desk: 0.20.
+        said(&mut voices, 3, 4, 48_000);
+        assert!(like(voices.like_asker(3), 0.2));
+        // A line with A's voice and something else in it, let out as going
+        // on: it joins the conversation's voice, so the same print reads
+        // 1.0 against that, and stays 0.50 against the asker.
+        said(&mut voices, 4, 2, 48_000);
+        voices.decided(4, true, true);
+        said(&mut voices, 5, 2, 48_000);
+        assert!(like(voices.likeness_so_far(5), 1.0));
+        assert!(like(voices.like_asker(5), 0.5));
+        // B's call let out for itself: B is the asker now, and A's line is
+        // another's.
+        said(&mut voices, 6, -1, 48_000);
+        voices.decided(6, true, false);
+        said(&mut voices, 7, 1, 48_000);
+        assert_eq!(voices.like_asker(7), Some(0.0));
+        // A line with no print of its own: nothing.
+        said(&mut voices, 8, 0, 48_000);
+        assert_eq!(voices.like_asker(8), None);
+        // A call too short to print begins a conversation with no asker.
+        said(&mut voices, 9, -1, 16_000);
+        voices.decided(9, true, false);
+        said(&mut voices, 10, -1, 48_000);
+        assert_eq!(voices.like_asker(10), None);
+    }
+
     /// The conversation keeps the last [`KEPT`] of its prints, and a line
     /// that began a conversation of its own starts them afresh.
     #[test]
@@ -1699,9 +1772,12 @@ exec sleep 30"#,
             }
             voices.decided(2, true, true);
             said(&mut voices, 3, -1, 48_000);
+            // The line seen from the caller is the asker's too (#4306).
             if seen {
+                assert_eq!(voices.like_asker(3), Some(0.0), "unlike the caller");
                 assert_eq!(voices.likeness(3), Some(0.0), "another voice");
             } else {
+                assert_eq!(voices.like_asker(3), None, "no asker known");
                 assert_eq!(voices.likeness(3), None, "still no voice");
             }
         }

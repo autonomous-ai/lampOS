@@ -243,6 +243,7 @@ fn a_30_second_exchange_is_not_the_policy_20_second_conversation_flag() {
         lamp_last_said: Some("Rain this afternoon.".into()),
         seconds_since_lamp_spoke: Some(30.0),
         name_heard: None,
+        like_asker: None,
     };
     assert!(!context.in_conversation());
     // The fixture explicitly supplies Voice's 45-second exchange flag.

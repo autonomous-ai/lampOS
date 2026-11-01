@@ -8606,7 +8606,7 @@ impl Heeding {
             let none = std::collections::VecDeque::new();
             let rises = self.levels.as_ref().and_then(|levels| levels.lock().ok());
             let looks = looks.lock().ok();
-            let said = crate::addressed::judge(
+            let mut said = crate::addressed::judge(
                 in_hand,
                 rises.as_deref().unwrap_or(&none),
                 looks
@@ -8614,6 +8614,14 @@ impl Heeding {
                     .unwrap_or(&crate::addressed::Looks::default()),
                 now,
             );
+            // How alike its voice is to the conversation's asker's: told to
+            // the Policy, read by no rule (#4306).
+            let going_on = crate::thread::current(self.thread.as_deref(), |thread| {
+                thread.going_on(Instant::now())
+            })
+            .unwrap_or_default();
+            said.like_asker =
+                crate::addressed::like_asker(self.voices.as_mut(), said.request, going_on);
             attention.set_addressed(said.addressed);
             if said.addressed {
                 eprintln!(
