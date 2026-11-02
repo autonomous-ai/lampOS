@@ -79,13 +79,13 @@ impl Wire {
         &mut self,
         id: &str,
         call: u64,
-        input: &SleepInput,
+        input: &str,
+        prompt: &str,
         weekly: bool,
         config: &Config,
     ) -> Result<String> {
-        let input = input.json()?;
         let call_id = format!("tiers-model-{call}");
-        self.write(&json!({"v":2,"id":id,"model_request":{"call_id":call_id,"kind":"chat","purpose":if weekly{"reflect"}else{"sleep"},"messages":[{"role":"system","content":PROMPT},{"role":"user","content":input}],"max_output_tokens":config.max_output_tokens,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}})).await?;
+        self.write(&json!({"v":2,"id":id,"model_request":{"call_id":call_id,"kind":"chat","purpose":if weekly{"reflect"}else{"sleep"},"messages":[{"role":"system","content":prompt},{"role":"user","content":input}],"max_output_tokens":config.max_output_tokens,"response_format":{"type":"json_object"},"tools":[],"tool_choice":"none"}})).await?;
         let response =
             tokio::time::timeout(Duration::from_millis(config.model_timeout_ms), self.read())
                 .await
@@ -115,7 +115,12 @@ impl Wire {
         let content = model["content"]
             .as_str()
             .ok_or(Error::Model("missing model content"))?;
-        SleepProposal::parse(content)?;
+        if prompt == TOPIC_PROMPT
+            && model["usage"].is_null()
+            && content.len() > config.max_output_tokens as usize
+        {
+            return Err(Error::Model("topic usage is unknown for an overlong reply"));
+        }
         Ok(content.into())
     }
 }
@@ -190,6 +195,8 @@ struct PolicyState {
     last_timed_out: bool,
     recalls: u64,
     misses: u64,
+    // Only source ids from the last rejected bounded batch; probe-local like cursors.
+    rejected_topic_batch: Option<Vec<String>>,
 }
 struct Context {
     store: Store,
@@ -216,6 +223,9 @@ struct Adapter {
     config: Config,
     requests: BTreeSet<String>,
     model_calls: u64,
+    skipped_sleeps: u64,
+    topic_batches: u64,
+    topic_fallbacks: u64,
     usage: diagnostics::Usage,
     closed: bool,
 }
@@ -231,10 +241,18 @@ impl Default for Adapter {
             config: Config::default(),
             requests: BTreeSet::new(),
             model_calls: 0,
+            skipped_sleeps: 0,
+            topic_batches: 0,
+            topic_fallbacks: 0,
             usage: diagnostics::Usage::default(),
             closed: false,
         }
     }
+}
+/// A sleep the store refused: not applied, and no pending work, since the
+/// runner refuses pending work without a cursor; the records stay eligible.
+fn skipped_night(reason: &str) -> Value {
+    json!({"applied":false,"source_ids":[],"reason":format!("skipped night: {reason}"),"pending":false,"next_cursor":null})
 }
 fn parse<T: serde::de::DeserializeOwned>(value: Value) -> Result<T> {
     serde_json::from_value(value).map_err(|_| Error::Invalid("invalid operation data"))
@@ -406,6 +424,7 @@ impl Adapter {
                         Command::Pause => {
                             handled_control = true;
                             context.store.pause(true)?;
+                            context.policy.rejected_topic_batch = None;
                             invalidate_snapshot(&mut context.policy);
                         }
                         Command::Resume => {
@@ -414,20 +433,23 @@ impl Adapter {
                         }
                         other if access.alone => {
                             let keep = matches!(other, Command::Remember);
-                            if let Some(id) = context.store.ingest(Incoming {
-                                text: event.heard,
-                                speaker: Speaker::Owner,
-                                at_ms: event.at_unix_ms,
-                                stt_confidence: event.stt_confidence,
-                                strength: Strength::Said,
-                                addressed_to_lamp: true,
-                                topic: event
-                                    .cues
-                                    .topic
-                                    .filter(|s| !s.trim().is_empty())
-                                    .unwrap_or_else(|| "conversation".into()),
-                                remember: keep && self.arm != Arm::TiersMinusImportance,
-                            })? {
+                            if let Some(id) = context.store.ingest_in_session(
+                                Incoming {
+                                    text: event.heard,
+                                    speaker: Speaker::Owner,
+                                    at_ms: event.at_unix_ms,
+                                    stt_confidence: event.stt_confidence,
+                                    strength: Strength::Said,
+                                    addressed_to_lamp: true,
+                                    topic: event
+                                        .cues
+                                        .topic
+                                        .filter(|s| !s.trim().is_empty())
+                                        .unwrap_or_else(|| "conversation".into()),
+                                    remember: keep && self.arm != Arm::TiersMinusImportance,
+                                },
+                                &event.session_id,
+                            )? {
                                 context.policy.records.insert(id, event.record_id.clone());
                                 sources.push(event.record_id.clone());
                                 if keep {
@@ -461,6 +483,61 @@ impl Adapter {
                 context.store.maintain(at, self.arm)?;
                 context.policy.clock = at;
                 invalidate_snapshot(&mut context.policy);
+                if kind == PassKind::Nightly
+                    && self.arm != Arm::TiersSessionCuttingOnly
+                    && let Some(input) = context
+                        .store
+                        .prepare_topics_with_output_limit(at, self.config.max_output_tokens)?
+                {
+                    self.model_calls = self.model_calls.checked_add(1).ok_or(Error::Budget)?;
+                    let topic_config = Config {
+                        max_output_tokens: input.output_allowance()?,
+                        ..self.config.clone()
+                    };
+                    let proposal = wire
+                        .propose(
+                            &request.id,
+                            self.model_calls,
+                            &input.json()?,
+                            TOPIC_PROMPT,
+                            false,
+                            &topic_config,
+                        )
+                        .await?;
+                    let sources = source_ids(
+                        &context.policy,
+                        &input.records().iter().map(|r| r.id).collect::<Vec<_>>(),
+                    )?;
+                    let (report, fallback) = match context.store.apply_topics(&input, &proposal) {
+                        Ok(report) => (report, false),
+                        Err(Error::Invalid(reason)) => {
+                            self.skipped_sleeps += 1;
+                            if context.policy.rejected_topic_batch.as_ref() != Some(&sources) {
+                                context.policy.rejected_topic_batch = Some(sources);
+                                return Ok(skipped_night(reason));
+                            }
+                            // A second rejected proposal cannot starve later batches.
+                            // Keep this bounded session batch together, through the same
+                            // source, forgetting and transactional checks as model output.
+                            let first = input.records().first().ok_or(Error::Stale)?.id;
+                            let last = input.records().last().ok_or(Error::Stale)?.id;
+                            let single = json!({"segments":[{"first_record_id":first,"last_record_id":last}]}).to_string();
+                            (context.store.apply_topics(&input, &single)?, true)
+                        }
+                        Err(error) => return Err(error),
+                    };
+                    context.policy.rejected_topic_batch = None;
+                    // Score counters describe committed main-session batches, not
+                    // retry attempts or hypothetical work discarded with a probe.
+                    if self.probe.is_none() {
+                        self.topic_batches += 1;
+                        self.topic_fallbacks += u64::from(fallback);
+                    }
+                    let pending = report.pending || self.arm != Arm::TiersMinusNightlySleep;
+                    return Ok(json!({"applied":true,"source_ids":sources,
+                            "reason":if fallback {Some("topic session-only fallback")} else {None},
+                            "pending":pending,"next_cursor":if pending{input.records().last().map(|r|format!("topics-after-{}",r.id))}else{None}}));
+                }
                 if self.arm == Arm::TiersMinusNightlySleep && kind == PassKind::Nightly {
                     context.policy.clock = at;
                     return Ok(
@@ -480,12 +557,24 @@ impl Adapter {
                     .propose(
                         &request.id,
                         self.model_calls,
-                        &input,
+                        &input.json()?,
+                        PROMPT,
                         kind == PassKind::Weekly,
                         &self.config,
                     )
                     .await?;
-                let proposal = self.arm.filter_proposal(&proposal)?;
+                // A proposal the store refuses (too many, too large, a bad schema) is a
+                // skipped night: nothing of it is applied, its records stay for the
+                // next night, and the run goes on (the bench, 2 Nov: one over-cap
+                // night ended a whole Tiers setup).
+                let proposal = match self.arm.filter_proposal(&proposal) {
+                    Ok(proposal) => proposal,
+                    Err(Error::Invalid(reason)) => {
+                        self.skipped_sleeps += 1;
+                        return Ok(skipped_night(reason));
+                    }
+                    Err(error) => return Err(error),
+                };
                 match context.store.apply_sleep(&input, &proposal) {
                     Ok(report) => {
                         let sources = source_ids(
@@ -498,9 +587,10 @@ impl Adapter {
                             json!({"applied":true,"source_ids":sources,"reason":null,"pending":report.pending,"next_cursor":if report.pending {input.records().last().map(|r|format!("after-{}",r.id))}else{None}}),
                         )
                     }
-                    Err(Error::Invalid(reason)) => Ok(
-                        json!({"applied":false,"source_ids":[],"reason":reason,"pending":true,"next_cursor":null}),
-                    ),
+                    Err(Error::Invalid(reason)) => {
+                        self.skipped_sleeps += 1;
+                        Ok(skipped_night(reason))
+                    }
                     Err(error) => Err(error),
                 }
             }
@@ -692,7 +782,7 @@ impl Adapter {
                     self.arm,
                 )?);
                 Ok(
-                    json!({"owner_model":lines,"retained_record_ids":retained,"stats":{"records":records.len(),"last_context_bytes":context.policy.last_bytes,"snapshot_bytes":context.policy.snapshot_bytes,"last_recall_timed_out":context.policy.last_timed_out,"recalls":context.policy.recalls,"recall_misses":context.policy.misses,"model_calls":self.model_calls,"arm_description":self.arm.description()},"diagnostics":diagnostics}),
+                    json!({"owner_model":lines,"retained_record_ids":retained,"stats":{"records":records.len(),"last_context_bytes":context.policy.last_bytes,"snapshot_bytes":context.policy.snapshot_bytes,"last_recall_timed_out":context.policy.last_timed_out,"recalls":context.policy.recalls,"recall_misses":context.policy.misses,"model_calls":self.model_calls,"skipped_sleeps":self.skipped_sleeps,"topic_batches":self.topic_batches,"topic_fallbacks":self.topic_fallbacks,"arm_description":self.arm.description()},"diagnostics":diagnostics}),
                 )
             }
             "close" => {
@@ -849,6 +939,7 @@ fn forget_text(context: &mut Context, text: &str) -> Result<Option<usize>> {
     Ok(Some(count))
 }
 fn prune_sources(context: &mut Context) -> Result<()> {
+    context.policy.rejected_topic_batch = None;
     let retained: BTreeSet<_> = context
         .store
         .records(Access::OWNER_ALONE)?

@@ -113,7 +113,7 @@ fn fading_does_not_reconstruct_erased_detail() {
 #[test]
 fn all_registered_policies_are_unique_and_filter_exact_components() {
     let names: std::collections::BTreeSet<_> = Arm::ALL.iter().map(|a| a.name()).collect();
-    assert_eq!(names.len(), 11);
+    assert_eq!(names.len(), 12);
     for arm in Arm::ALL {
         assert_eq!(Arm::parse(&arm.name()).unwrap(), arm);
         let mut q = query();

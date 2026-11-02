@@ -83,6 +83,10 @@ impl ArmProcess {
         let v = self.request("probe_begin", json!({"probe_id":probe,"at_unix_ms":at}));
         assert_eq!(v["ok"], true, "{v}");
     }
+    fn end_session(&mut self, at: i64) {
+        let id = format!("session-end-{}", self.seq);
+        assert_eq!(self.request("ingest",json!({"event":{"record_id":id,"at_unix_ms":at,"session_id":"session-a","kind":"session_end","person":"owner","person_id":"owner-a","presence":"owner_alone","heard":"","said":"","stt_confidence":null,"cues":{"activity":"away","objects":[],"topic":null}}}))["ok"],true);
+    }
     fn end(&mut self, probe: &str) {
         assert_eq!(
             self.request("probe_end", json!({"probe_id":probe}))["ok"],
@@ -133,6 +137,22 @@ impl Drop for ArmProcess {
 }
 fn proposal() -> String {
     json!({"facts":[{"key":"note","claim":"May prefer a blue notebook.","record_ids":[1],"strength":"said","kind":"preference","true_since_ms":1000,"true_until_ms":null,"supersedes":null}],"lines":[{"replaces":null,"kind":"owner_model","text":"May prefer a blue notebook.","fact_ids":[],"fact_keys":["note"]}],"episodes":[]}).to_string()
+}
+fn model_input(call: &Value) -> Value {
+    serde_json::from_str(
+        call["model_request"]["messages"][1]["content"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap()
+}
+fn assert_topic_stats(p: &mut ArmProcess, calls: u64, skipped: u64, batches: u64, fallbacks: u64) {
+    let inspect = p.inspect();
+    let stats = &inspect["data"]["stats"];
+    assert_eq!(stats["model_calls"], calls, "{inspect}");
+    assert_eq!(stats["skipped_sleeps"], skipped, "{inspect}");
+    assert_eq!(stats["topic_batches"], batches, "{inspect}");
+    assert_eq!(stats["topic_fallbacks"], fallbacks, "{inspect}");
 }
 #[test]
 fn diagnostics_are_count_only_and_usage_survives_probe_restoration() {
@@ -369,7 +389,7 @@ fn invalid_order_and_duplicate_ids_do_not_move_the_clock() {
     p.close();
 }
 #[test]
-fn all_arms_initialize_and_nightly_removal_makes_no_model_request() {
+fn all_arms_initialize_and_nightly_removal_skips_consolidation_for_open_sessions() {
     for arm in lamp_memory_tiers::Arm::ALL {
         let mut p = ArmProcess::new(&arm.name());
         assert_eq!(
@@ -381,6 +401,127 @@ fn all_arms_initialize_and_nightly_removal_makes_no_model_request() {
             let result = p.request("sleep", json!({"at_unix_ms":1100,"cadence":"nightly"}));
             assert_eq!(result["data"]["reason"], "not_applicable");
             assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 0);
+        }
+        p.close();
+    }
+}
+
+#[test]
+fn every_removal_keeps_topic_calls_and_session_only_keeps_old_prompt() {
+    let cuts=json!({"segments":[{"first_record_id":1,"last_record_id":1},{"first_record_id":2,"last_record_id":2}]}).to_string();
+    let empty = r#"{"facts":[],"lines":[],"episodes":[]}"#;
+    for arm in lamp_memory_tiers::Arm::ALL {
+        let mut p = ArmProcess::new(&arm.name());
+        p.ingest("source-1", "A blue notebook.", 1000);
+        p.ingest("source-2", "A fern needs water.", 1001);
+        p.end_session(1002);
+        if arm == lamp_memory_tiers::Arm::TiersSessionCuttingOnly {
+            let (call, result) = p.sleep(1100, empty);
+            assert_eq!(
+                call["model_request"]["messages"][0]["content"],
+                lamp_memory_tiers::model::PROMPT
+            );
+            assert_eq!(result["data"]["pending"], false);
+            assert_eq!(
+                p.inspect()["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+                1
+            );
+            assert_topic_stats(&mut p, 1, 0, 0, 0);
+        } else {
+            let (call, result) = p.sleep(1100, &cuts);
+            assert_eq!(call["model_request"]["purpose"], "sleep");
+            assert_eq!(call["model_request"]["max_output_tokens"], 160);
+            assert_eq!(
+                call["model_request"]["messages"][0]["content"],
+                lamp_memory_tiers::TOPIC_PROMPT
+            );
+            assert_eq!(result["data"]["applied"], true, "{result}");
+            assert_eq!(
+                result["data"]["pending"],
+                arm != lamp_memory_tiers::Arm::TiersMinusNightlySleep
+            );
+            if arm != lamp_memory_tiers::Arm::TiersMinusNightlySleep {
+                let (call, result) = p.sleep(1100, empty);
+                assert_eq!(
+                    call["model_request"]["messages"][0]["content"],
+                    lamp_memory_tiers::model::PROMPT
+                );
+                assert_eq!(result["data"]["pending"], false);
+            }
+            let inspect = p.inspect();
+            assert_eq!(
+                inspect["data"]["stats"]["model_calls"],
+                if arm == lamp_memory_tiers::Arm::TiersMinusNightlySleep {
+                    1
+                } else {
+                    2
+                }
+            );
+            assert_eq!(inspect["data"]["stats"]["recall_misses"], 0);
+            assert_eq!(
+                inspect["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+                if arm == lamp_memory_tiers::Arm::TiersMinusEpisodes {
+                    0
+                } else {
+                    2
+                }
+            );
+        }
+        p.close();
+    }
+}
+
+#[test]
+fn probe_restoration_reverts_topic_membership_but_keeps_model_accounting() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "A blue notebook.", 1000);
+    p.ingest("source-2", "A fern needs water.", 1001);
+    p.end_session(1002);
+    p.begin("topic-probe", 1100);
+    let cuts=json!({"segments":[{"first_record_id":1,"last_record_id":1},{"first_record_id":2,"last_record_id":2}]}).to_string();
+    assert_eq!(p.sleep(1100, &cuts).1["data"]["applied"], true);
+    assert_eq!(
+        p.inspect()["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+        2
+    );
+    assert_topic_stats(&mut p, 1, 0, 0, 0);
+    p.end("topic-probe");
+    let main = p.inspect();
+    assert_eq!(main["data"]["diagnostics"]["tiers"]["episodes"]["items"], 1);
+    assert_eq!(main["data"]["stats"]["model_calls"], 1);
+    assert_eq!(p.sleep(1100, &cuts).1["data"]["applied"], true);
+    assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 2);
+    assert_topic_stats(&mut p, 2, 0, 1, 0);
+    p.close();
+}
+
+#[test]
+fn topic_ranges_cannot_cross_wire_sessions_even_if_an_end_event_was_missing() {
+    for arm in ["tiers", "tiers_session_cutting_only"] {
+        let mut p = ArmProcess::new(arm);
+        p.ingest("first-session-source", "First session words.", 1000);
+        let result=p.request("ingest",json!({"event":{"record_id":"second-session-source","at_unix_ms":1001,"session_id":"session-b","kind":"utterance","person":"owner","person_id":"owner-a","presence":"owner_alone","heard":"Second session words.","said":"","stt_confidence":null,"cues":{"activity":"at_desk","objects":[],"topic":null}}}));
+        assert_eq!(result["ok"], true);
+        let view = p.inspect();
+        assert_eq!(view["data"]["diagnostics"]["tiers"]["episodes"]["items"], 1);
+        if arm == "tiers" {
+            p.end_session(1002);
+            let (call, rejected) = p.sleep(
+                1100,
+                r#"{"segments":[{"first_record_id":1,"last_record_id":2}]}"#,
+            );
+            let input: Value = serde_json::from_str(
+                call["model_request"]["messages"][1]["content"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(input["records"].as_array().unwrap().len(), 1);
+            assert_eq!(rejected["data"]["applied"], false);
+            assert_eq!(
+                p.inspect()["data"]["diagnostics"]["tiers"]["episodes"]["items"],
+                1
+            );
         }
         p.close();
     }
@@ -439,6 +580,343 @@ fn broker_timeout_is_bounded_and_never_retries() {
 }
 
 #[test]
+fn rejected_sleep_rolls_back_earlier_facts_and_retries_the_same_records() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "Maybe I prefer a blue notebook.", 1000);
+    let mut invalid: Value = serde_json::from_str(&proposal()).unwrap();
+    let mut outside = invalid["facts"][0].clone();
+    outside["key"] = json!("outside");
+    outside["record_ids"] = json!([999]);
+    invalid["facts"].as_array_mut().unwrap().push(outside);
+    let (call, rejected) = p.sleep(1100, &invalid.to_string());
+    let prompt = call["model_request"]["messages"][0]["content"]
+        .as_str()
+        .unwrap();
+    assert!(prompt.contains("json"));
+    assert!(prompt.contains("32 facts, 32 lines and 32 episodes"));
+    assert_eq!(rejected["ok"], true, "{rejected}");
+    assert_eq!(rejected["data"]["applied"], false);
+    assert_eq!(rejected["data"]["pending"], false);
+    assert_eq!(rejected["data"]["next_cursor"], Value::Null);
+    assert_eq!(p.inspect()["data"]["owner_model"], json!([]));
+    let conn = rusqlite::Connection::open(p._dir.path().join("tiers.sqlite")).unwrap();
+    let count: i64 = conn
+        .query_row("SELECT count(*) FROM facts", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        count, 0,
+        "the first fact must roll back with the rejected second fact"
+    );
+    let (_, next) = p.sleep(1200, &proposal());
+    assert_eq!(next["data"]["applied"], true, "{next}");
+    assert_eq!(next["data"]["source_ids"], json!(["source-1"]));
+    assert_eq!(p.inspect()["data"]["stats"]["skipped_sleeps"], 1);
+    assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 2);
+    p.close();
+}
+
+#[test]
+fn rejected_topic_night_preserves_records_for_the_next_partition() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "A blue notebook.", 1000);
+    p.ingest("source-2", "A green garden.", 1001);
+    p.end_session(1002);
+    // Missing the second record is a well-formed but incomplete partition.
+    let (call, rejected) = p.sleep(
+        1100,
+        r#"{"segments":[{"first_record_id":1,"last_record_id":1}]}"#,
+    );
+    assert!(
+        call["model_request"]["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("json")
+    );
+    assert_eq!(rejected["ok"], true, "{rejected}");
+    assert_eq!(rejected["data"]["applied"], false);
+    assert_eq!(rejected["data"]["pending"], false);
+    assert_eq!(rejected["data"]["next_cursor"], Value::Null);
+    assert_eq!(rejected["data"]["source_ids"], json!([]));
+    let (retry, next) = p.sleep(
+        1200,
+        r#"{"segments":[{"first_record_id":1,"last_record_id":2}]}"#,
+    );
+    let first: Value = serde_json::from_str(
+        call["model_request"]["messages"][1]["content"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    let again: Value = serde_json::from_str(
+        retry["model_request"]["messages"][1]["content"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(first["records"], again["records"]);
+    assert_eq!(next["data"]["applied"], true, "{next}");
+    assert_eq!(next["data"]["source_ids"], json!(["source-1", "source-2"]));
+    assert_eq!(p.inspect()["data"]["stats"]["skipped_sleeps"], 1);
+    assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 2);
+    assert_topic_stats(&mut p, 2, 1, 1, 0);
+    p.close();
+}
+
+#[test]
+fn repeated_invalid_topic_nights_fall_back_then_reach_consolidation_and_later_sessions() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "A blue notebook.", 1000);
+    p.ingest("source-2", "A green garden.", 1001);
+    p.end_session(1002);
+    let invalid = r#"{"segments":[{"first_record_id":1,"last_record_id":999}]}"#;
+    let (first, rejected) = p.sleep(1100, invalid);
+    assert_eq!(rejected["ok"], true, "{rejected}");
+    assert_eq!(rejected["data"]["applied"], false);
+    assert_eq!(rejected["data"]["pending"], false);
+    assert_eq!(rejected["data"]["next_cursor"], Value::Null);
+    assert_topic_stats(&mut p, 1, 1, 0, 0);
+
+    let (second, fallback) = p.sleep(1200, invalid);
+    assert_ne!(
+        first["model_request"]["call_id"],
+        second["model_request"]["call_id"]
+    );
+    assert_eq!(
+        model_input(&first)["records"],
+        model_input(&second)["records"]
+    );
+    assert_eq!(fallback["ok"], true, "{fallback}");
+    assert_eq!(fallback["data"]["applied"], true);
+    assert_eq!(fallback["data"]["reason"], "topic session-only fallback");
+    assert_eq!(
+        fallback["data"]["source_ids"],
+        json!(["source-1", "source-2"])
+    );
+    assert_eq!(fallback["data"]["pending"], true);
+    assert!(fallback["data"]["next_cursor"].is_string());
+    assert_topic_stats(&mut p, 2, 2, 1, 1);
+
+    // Code selects one range from the offered records, never the model's 999.
+    let conn = rusqlite::Connection::open(p._dir.path().join("tiers.sqlite")).unwrap();
+    let assigned: (i64, i64) = conn
+        .query_row(
+            "SELECT count(*),count(DISTINCT topic_episode_id) FROM topic_assignments",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(assigned, (2, 1));
+    let records: Vec<(i64, String)> = conn
+        .prepare("SELECT id,json_extract(body,'$.text') FROM records ORDER BY id")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert_eq!(
+        records,
+        vec![
+            (1, "A blue notebook.".into()),
+            (2, "A green garden.".into())
+        ]
+    );
+    drop(conn);
+
+    let empty = r#"{"facts":[],"lines":[],"episodes":[]}"#;
+    let (call, consolidated) = p.sleep(1200, empty);
+    assert_eq!(
+        call["model_request"]["messages"][0]["content"],
+        lamp_memory_tiers::model::PROMPT
+    );
+    assert_eq!(consolidated["data"]["applied"], true, "{consolidated}");
+    assert_eq!(consolidated["data"]["pending"], false);
+    assert_eq!(
+        consolidated["data"]["source_ids"],
+        json!(["source-1", "source-2"])
+    );
+
+    p.ingest("source-3", "A silver ruler.", 1300);
+    p.ingest("source-4", "A yellow pencil.", 1301);
+    p.end_session(1302);
+    let (call, later) = p.sleep(
+        1400,
+        r#"{"segments":[{"first_record_id":3,"last_record_id":4}]}"#,
+    );
+    let ids: Vec<i64> = model_input(&call)["records"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![3, 4]);
+    assert_eq!(later["data"]["applied"], true, "{later}");
+    assert_eq!(later["data"]["reason"], Value::Null);
+    assert_eq!(later["data"]["source_ids"], json!(["source-3", "source-4"]));
+    let (_, consolidated) = p.sleep(1400, empty);
+    assert_eq!(consolidated["data"]["applied"], true, "{consolidated}");
+    assert_eq!(consolidated["data"]["pending"], false);
+    assert_eq!(
+        consolidated["data"]["source_ids"],
+        json!(["source-3", "source-4"])
+    );
+    assert_topic_stats(&mut p, 5, 2, 2, 1);
+    assert_eq!(
+        p.inspect()["data"]["retained_record_ids"],
+        json!(["source-1", "source-2", "source-3", "source-4"])
+    );
+    p.close();
+}
+
+#[test]
+fn probe_topic_fallbacks_restore_retry_identity_and_do_not_count_main_batches() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "A blue notebook.", 1000);
+    p.ingest("source-2", "A green garden.", 1001);
+    p.end_session(1002);
+    let invalid = r#"{"segments":[{"first_record_id":1,"last_record_id":999}]}"#;
+    p.begin("fresh-retry-probe", 1100);
+    assert_eq!(p.sleep(1100, invalid).1["data"]["applied"], false);
+    let (_, fallback) = p.sleep(1200, invalid);
+    assert_eq!(fallback["data"]["applied"], true, "{fallback}");
+    assert_eq!(fallback["data"]["reason"], "topic session-only fallback");
+    assert_topic_stats(&mut p, 2, 2, 0, 0);
+    p.end("fresh-retry-probe");
+
+    // The probe's rejected passes cannot make this main-session first try fall back.
+    let (_, rejected) = p.sleep(1100, invalid);
+    assert_eq!(rejected["data"]["applied"], false, "{rejected}");
+    assert_topic_stats(&mut p, 3, 3, 0, 0);
+    p.begin("inherited-retry-probe", 1200);
+    let (_, fallback) = p.sleep(1200, invalid);
+    assert_eq!(fallback["data"]["applied"], true, "{fallback}");
+    assert_eq!(fallback["data"]["reason"], "topic session-only fallback");
+    assert_topic_stats(&mut p, 4, 4, 0, 0);
+    p.end("inherited-retry-probe");
+
+    // Clearing retry state after probe success cannot clear the saved main state.
+    let (_, fallback) = p.sleep(1200, invalid);
+    assert_eq!(fallback["data"]["applied"], true, "{fallback}");
+    assert_eq!(fallback["data"]["reason"], "topic session-only fallback");
+    assert_eq!(
+        fallback["data"]["source_ids"],
+        json!(["source-1", "source-2"])
+    );
+    assert_topic_stats(&mut p, 5, 5, 1, 1);
+    assert_eq!(
+        p.inspect()["data"]["retained_record_ids"],
+        json!(["source-1", "source-2"])
+    );
+    p.close();
+}
+
+#[test]
+fn forgetting_clears_topic_retry_identity_even_when_the_offered_batch_survives() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "A blue notebook.", 1000);
+    p.ingest("source-2", "A green garden.", 1001);
+    p.end_session(1002);
+    p.ingest("source-3", "A disposable orange pencil.", 1003);
+    let invalid = r#"{"segments":[{"first_record_id":1,"last_record_id":999}]}"#;
+    let (first, rejected) = p.sleep(1100, invalid);
+    assert_eq!(rejected["data"]["applied"], false);
+    let forgotten = p.request(
+        "forget",
+        json!({"at_unix_ms":1150,"person_id":"owner-a","record_ids":["source-3"],"text":""}),
+    );
+    assert_eq!(forgotten["ok"], true, "{forgotten}");
+    assert_eq!(forgotten["data"]["removed_count"], 1);
+
+    let (after_forget, rejected) = p.sleep(1200, invalid);
+    assert_eq!(
+        model_input(&first)["records"],
+        model_input(&after_forget)["records"]
+    );
+    assert_eq!(rejected["data"]["applied"], false, "{rejected}");
+    assert_eq!(rejected["data"]["pending"], false);
+    assert_topic_stats(&mut p, 2, 2, 0, 0);
+    let (_, fallback) = p.sleep(1300, invalid);
+    assert_eq!(fallback["data"]["applied"], true, "{fallback}");
+    assert_eq!(fallback["data"]["reason"], "topic session-only fallback");
+    assert_eq!(
+        fallback["data"]["source_ids"],
+        json!(["source-1", "source-2"])
+    );
+    assert_topic_stats(&mut p, 3, 3, 1, 1);
+    assert_eq!(
+        p.inspect()["data"]["retained_record_ids"],
+        json!(["source-1", "source-2"])
+    );
+    p.close();
+}
+
+#[test]
+fn pause_and_resume_reset_topic_retry_identity_for_the_same_batch() {
+    let mut p = ArmProcess::new("tiers");
+    p.ingest("source-1", "A blue notebook.", 1000);
+    p.ingest("source-2", "A green garden.", 1001);
+    p.end_session(1002);
+    let invalid = r#"{"segments":[{"first_record_id":1,"last_record_id":999}]}"#;
+    let (first, rejected) = p.sleep(1100, invalid);
+    assert_eq!(rejected["data"]["applied"], false);
+    assert_eq!(p.ingest("pause", "pause memory", 1150)["ok"], true);
+    let paused = p.request("sleep", json!({"at_unix_ms":1160,"cadence":"nightly"}));
+    assert_eq!(paused["ok"], true, "{paused}");
+    assert_eq!(paused["data"]["applied"], false);
+    assert_topic_stats(&mut p, 1, 1, 0, 0);
+    assert_eq!(p.ingest("resume", "resume memory", 1170)["ok"], true);
+
+    let (after_resume, rejected) = p.sleep(1200, invalid);
+    assert_eq!(
+        model_input(&first)["records"],
+        model_input(&after_resume)["records"]
+    );
+    assert_eq!(rejected["data"]["applied"], false, "{rejected}");
+    assert_eq!(rejected["data"]["pending"], false);
+    assert_topic_stats(&mut p, 2, 2, 0, 0);
+    let (_, fallback) = p.sleep(1300, invalid);
+    assert_eq!(fallback["data"]["applied"], true, "{fallback}");
+    assert_eq!(fallback["data"]["reason"], "topic session-only fallback");
+    assert_eq!(
+        fallback["data"]["source_ids"],
+        json!(["source-1", "source-2"])
+    );
+    assert_topic_stats(&mut p, 3, 3, 1, 1);
+    p.close();
+}
+
+#[test]
+fn an_over_cap_night_is_skipped_and_the_next_night_still_applies() {
+    let mut p = ArmProcess::new("tiers");
+    assert_eq!(
+        p.ingest("source-1", "Maybe I prefer a blue notebook.", 1000)["ok"],
+        true
+    );
+    let facts: Vec<Value> = (0..33)
+        .map(|i| json!({"key":format!("note-{i}"),"claim":"May prefer a blue notebook.","record_ids":[1],"strength":"said","kind":"preference","true_since_ms":1000,"true_until_ms":null,"supersedes":null}))
+        .collect();
+    let over = json!({"facts":facts,"lines":[],"episodes":[]}).to_string();
+    let (_, skipped) = p.sleep(1100, &over);
+    assert_eq!(skipped["ok"], true, "{skipped}");
+    assert_eq!(skipped["data"]["applied"], false);
+    assert_eq!(skipped["data"]["pending"], false);
+    assert_eq!(skipped["data"]["next_cursor"], Value::Null);
+    assert_eq!(skipped["data"]["source_ids"], json!([]));
+    assert!(
+        skipped["data"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("too many proposals"),
+        "{skipped}"
+    );
+    let (_, next) = p.sleep(1200, &proposal());
+    assert_eq!(next["ok"], true, "{next}");
+    assert_eq!(next["data"]["applied"], true);
+    assert_eq!(next["data"]["source_ids"], json!(["source-1"]));
+    assert_eq!(p.inspect()["data"]["stats"]["skipped_sleeps"], 1);
+    assert_eq!(p.inspect()["data"]["stats"]["model_calls"], 2);
+    p.close();
+}
+#[test]
 fn bounded_sleep_reports_pending_and_rejection_keeps_the_batch() {
     let mut p = ArmProcess::new("tiers");
     for i in 0..129 {
@@ -458,7 +936,10 @@ fn bounded_sleep_reports_pending_and_rejection_keeps_the_batch() {
     assert_eq!(first["data"]["source_ids"].as_array().unwrap().len(), 128);
     let (_, rejected) = p.sleep(2000, &proposal());
     assert_eq!(rejected["data"]["applied"], false);
-    assert_eq!(rejected["data"]["pending"], true);
+    // A refused night is skipped with no pending work (the runner refuses pending work
+    // without a cursor); its batch stays for the next night.
+    assert_eq!(rejected["data"]["pending"], false);
+    assert_eq!(rejected["data"]["next_cursor"], Value::Null);
     assert_eq!(
         p.ingest("backdated", "An earlier observation.", 1900)["ok"],
         false
