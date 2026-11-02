@@ -2229,7 +2229,9 @@ Nothing above changes with the switch off.
    The model is then told to ask once more in the ask's own words
    (`make_skill_local::not_to_the_ask`), so the next yes counts: an ask in
    other words ("shall I put the red glow on the lamp?") was refused at
-   every yes (lamp-9adf, 2 Nov 22:26).
+   every yes (lamp-9adf, 2 Nov 22:26). The ask counts in any case and inside
+   a sentence (`made_skill::says_the_ask`): "Just to be sure: shall I put
+   it on the lamp?" was refused once for its small "s" (22:51).
 5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, and with the one more try after a failure and the
    one repair after a refusal, two asks of two tries each: about 120 s at

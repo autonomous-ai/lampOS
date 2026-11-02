@@ -358,7 +358,7 @@ fn yes_is_to_the_ask(
     match answered {
         None => true,
         Some((said, ago)) => {
-            said.contains(made_skill::ASK_TO_PUT_ON)
+            made_skill::says_the_ask(said)
                 || now_unix_ms.saturating_sub(ago.as_millis() as u64) < asked_at
         }
     }
@@ -393,8 +393,7 @@ pub(crate) fn asked_at_yes(
 ) -> std::io::Result<bool> {
     match answered {
         Some((lamp_said, ago))
-            if ago <= made_skill::PUT_ON_WITHIN
-                && lamp_said.contains(made_skill::ASK_TO_PUT_ON) =>
+            if ago <= made_skill::PUT_ON_WITHIN && made_skill::says_the_ask(&lamp_said) =>
         {
             match untold(directory, now_unix_ms).as_slice() {
                 [(_, sha256)] => made_skill::offered(directory, sha256, now_unix_ms).map(|()| true),
@@ -864,6 +863,16 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(yes_is_to_the_ask(
             &keeping.directory,
             Some(&(made_skill::ASK_TO_PUT_ON.to_owned(), Duration::from_secs(2))),
+            now
+        ));
+        // The ask run into a sentence, lower case, is the same ask
+        // (lamp-9adf, 2 Nov 22:51).
+        assert!(yes_is_to_the_ask(
+            &keeping.directory,
+            Some(&(
+                "Just to be sure: shall I put it on the lamp?".to_owned(),
+                Duration::from_secs(2)
+            )),
             now
         ));
         let _ = std::fs::remove_dir_all(&root);
