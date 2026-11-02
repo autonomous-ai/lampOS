@@ -1,0 +1,43 @@
+{
+  "exact_shapes_equal": true,
+  "our": {
+    "topic_segmentation": {
+      "calls": 240,
+      "characters": 529833,
+      "bytes": 529833,
+      "output": 86583
+    },
+    "empty_consolidation": {
+      "calls": 42,
+      "characters": 805933,
+      "bytes": 805933,
+      "output": 172032
+    },
+    "fixed_answer": {
+      "calls": 224,
+      "characters": 629679,
+      "bytes": 629679,
+      "output": 114688
+    }
+  },
+  "peer": {
+    "topic_segmentation": {
+      "calls": 240,
+      "characters": 529833,
+      "bytes": 529833,
+      "output": 86583
+    },
+    "empty_consolidation": {
+      "calls": 42,
+      "characters": 805933,
+      "bytes": 805933,
+      "output": 172032
+    },
+    "fixed_answer": {
+      "calls": 224,
+      "characters": 629679,
+      "bytes": 629679,
+      "output": 114688
+    }
+  }
+}

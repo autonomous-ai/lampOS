@@ -1,0 +1,6 @@
+{
+  "content": "{\"answer\":\"I do not know.\",\"evidence_ids\":[],\"abstain\":true}",
+  "tool_calls": [],
+  "vectors": [],
+  "usage": {"input_tokens": 1, "output_tokens": 1}
+}

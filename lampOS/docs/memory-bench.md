@@ -621,7 +621,131 @@ consenting real-owner trials and a human diary of useful or awkward memory
 moments are separate evidence. Neither step is authorized by this host-only
 benchmark task.
 
-## Pre-score timing revision (31 October)
+### Common answer and judge policy registered before scoring
+
+The 31 October 2026 ruling keeps all 224 month probe turns as fixed text. Only
+the scripted month passes through the shared real speech-to-text cache. A
+misheard question can change the memory skill being tested, so noisy probe
+questions belong in a separate voice fixture. This choice can make results
+kinder than real spoken use; it adds no speech allowance for probes.
+
+Every setup uses the same frozen answer prompt, model settings, 512-token
+output limit and eight-round tool loop. The rubric judge sees all turns of a
+probe together, the frozen criteria and eligible scripted source evidence.
+It receives no setup name, run identity, cost or tier diagnostics. Generated
+candidate replies can witness dialogue or timing but cannot establish an
+independent owner fact. Exact, date, abstention, forbidden-claim and source
+eligibility checks take precedence over the judge. Invalid outputs leave the
+attempt incomplete; no silent repair or unregistered retry is allowed.
+Rubric results remain provisional until the registered human audit.
+
+The live campaign policy pins both model routes, dated prices, fixture and
+audio registrations, evaluation prompts, executable hashes and revisions,
+setup order, three repetitions and all spending allowances. The separate
+approval records that policy hash and the owner's cap. Every service call
+uses the shared durable cost journal; uncertain work remains charged after
+failure. No new attempt can reset the balance. Every failed, incomplete or
+missing repetition remains in the comparison and prevents a three-run mean.
+Recorded outputs and fake-server tests always keep accuracy scores null.
+
+## What was not shown
+
+Real cached speech-to-text, live baseline scores, an independent persona,
+human audit, and real-device latency remain unmeasured. Host-only fake-service
+checks do not establish any of them. The
+implemented software is listed below; no baseline number is claimed by this
+plan. Relay access and an explicit run cost ceiling
+are needed before live calls; they do not block recorded-output tests.
+
+## Implementation progress
+
+The first benchmark chunk provides the versioned wire types, recorded model
+client and budget accounting, exact/date/abstention scorers, a rubric gate,
+private append-only run ledger, and deterministic corpus generation and
+validation. The development fixture contains 2,220 events (50 utterances, eight
+conversation starts/ends and four arrivals/departures per day) and 200 questions. Its registration records
+hashes and the fixed twelve-arm candidate order; human review is still pending.
+
+From `lampOS/`, `cargo run -p lamp-memory-bench -- generate PERSONA NEW_DIRECTORY`
+writes separate observed events, evaluator-only answer keys/questions, and
+registration hashes. `validate DIRECTORY` checks those hashes, chronology,
+question schedules and citation eligibility. `score QUESTIONS ANSWERS` runs
+the deterministic scorers; rubric results remain pending. `verify-ledger RUN`
+checks a run's manifest and hash-linked append-only rows, preserving an
+interrupted attempt as incomplete.
+
+The process transport uses nonblocking pipes and absolute read/write deadlines.
+It checks operation order, logical clocks and unique identities, sends model
+RPCs through the central client, and drains late recall/snapshot responses
+in a bounded background worker before another operation. Deadline misses
+return empty memory while answer work can proceed. Adapters get
+no inherited environment; stderr is discarded to prevent unbounded diagnostic
+output. These are reviewed local processes, not an operating-system sandbox.
+Adapters must keep helpers in their owned process group and close them on
+exit. Failed runs terminate that owned group with a bounded reap attempt.
+
+The client supports an append-and-sync audit hook: reservations are durable
+before dispatch, and an audit failure stops further calls. Token debits use
+conservative ordinary-input rates, including cached input; they are not a
+provider invoice. Usage remains in receipts even for invalid or late replies.
+Structured assistant tool messages may omit content; optional provider
+`reasoning_details` are preserved when returned. Adapter-owned call purposes
+remain limited to extraction, sleep, reflection and retrieval.
+One bounded worker serializes model/accounting work. A slow reservation audit
+cannot hold the recall caller past its deadline or dispatch afterward. Every
+run must settle outstanding accounting before a complete ledger/scorecard.
+
+`smoke ADAPTER ARM FULL_REVISION NEW_STATE_DIRECTORY` exercises the shared
+protocol on two fictional component operations, without loading a persona,
+calling a model or producing a score. It checks the pinned revision, an empty
+sleep, snapshot/recall bounds, deletion invalidation and probe restoration.
+
+The runner is an ordinary binary target, covered by the standard ARM64 and
+Linux clippy workflows. It must be classified as a development executable in
+the separately owned deployment inventory; product crates do not link it.
+
+The orchestration CLI, in-tree arms, real speech-to-text cache, live provider
+transport, model rubric invocation and scorecard are still being implemented.
+No generated fixture or software test is a baseline score.
+
+### Recorded execution checkpoint
+
+The benchmark branch provides `plumbing` and `plumbing-card` for the complete
+scripted month using a fixed synthetic recorded answer. Every output is a
+**plumbing check**, with null scores, zero live model calls and explicit
+clean-text input. This exercises isolated question/follow-up execution,
+nightly bounded draining, recent-conversation effects, budget accounting and
+the append-only ledger without supplying performance evidence.
+
+The reference child implements `none`, `full_history` and
+`lampos_today_partial`. Full history uses a declared lexical forget recognizer
+and keyed suppression fingerprints; it never truncates to fit. The partial
+arm currently exercises the real Days library/protocol directly, including
+store aging and isolated copies of the closed database. It does **not** test
+socket transport or the voice tool/observation/talk-note/summary paths. Its
+natural-language forget dispatch is also absent. It cannot be substituted for
+`lampos_today`. See the [fixture README](../fixtures/memory-bench/README.md)
+for exact limitations and invocation. No recorded result satisfies a scored
+baseline, speech-to-text, blinded-judge or human-audit acceptance gate.
+
+The `speech-prepare` implementation writes WAV files only, with per-record
+script/audio/PCM hashes, synthesis settings and a frozen service request plan.
+It has no playback or network invocation. Its current recorded cache checks
+cover missing/changed inputs, unknown confidence and refusal to treat a
+recorded transcript as live. A real service pass and verified raw-response
+cache remain required; file synthesis alone does not meet that gate.
+
+The external recorded-month runner pins the adapter and runner independently.
+Fixed empty consolidation proposals exercise the broker and bounded batches
+without pretending to produce learned memory. Nightly work runs after the
+final event of each local calendar day, and weekly work after every seventh day;
+each pending batch must finish before the next main event. This common
+calendar schedule is frozen before scored runs. The two scripted forgetting
+requests are main-stream utterances before every forgetting-persistence probe,
+not mutations inside a disposable question child.
+
+
+### Pre-score timing revision (31 October)
 
 Registration version 3 replaces nine-minute spacing between all utterances.
 That spacing made each line its own conversation under the product's
@@ -655,42 +779,6 @@ facts or promises. This is also registered before scoring: the month does
 **not** test the lamp's own promises or its real replies. Those require a
 separate future fixture. Recorded empty consolidation proposals still only
 exercise interfaces; synthetic usage is not a bill.
-
-### Common answer and judge policy registered before scoring
-
-The 31 October 2026 ruling keeps all 224 month probe turns as fixed text. Only
-the scripted month passes through the shared real speech-to-text cache. A
-misheard question can change the memory skill being tested, so noisy probe
-questions belong in a separate voice fixture. This choice can make results
-kinder than real spoken use; it adds no speech allowance for probes.
-
-Every setup uses the same frozen answer prompt, model settings, 512-token
-output limit and eight-round tool loop. The rubric judge sees all turns of a
-probe together, the frozen criteria and eligible scripted source evidence.
-It receives no setup name, run identity, cost or tier diagnostics. Generated
-candidate replies can witness dialogue or timing but cannot establish an
-independent owner fact. Exact, date, abstention, forbidden-claim and source
-eligibility checks take precedence over the judge. Invalid outputs leave the
-attempt incomplete; no silent repair or unregistered retry is allowed.
-Rubric results remain provisional until the registered human audit.
-
-The live campaign policy pins both model routes, dated prices, fixture and
-audio registrations, evaluation prompts, executable hashes and revisions,
-setup order, three repetitions and all spending allowances. The separate
-approval records that policy hash and the owner's cap. Every service call
-uses the shared durable cost journal; uncertain work remains charged after
-failure. No new attempt can reset the balance. Every failed, incomplete or
-missing repetition remains in the comparison and prevents a three-run mean.
-Recorded outputs and fake-server tests always keep accuracy scores null.
-
-## What was not shown
-
-The month, 200 questions, scorers and executable contract are implemented on
-the separate benchmark branch, with recorded plumbing checks only. Real
-speech-to-text, live baseline scores, an independent persona, human audit and
-real-device latency remain to be implemented or measured. No baseline number
-is claimed by this plan. Relay access and an explicit run cost ceiling
-are needed before live calls; they do not block recorded-output tests.
 
 ### Optional inspection diagnostics (minor version 2.1)
 

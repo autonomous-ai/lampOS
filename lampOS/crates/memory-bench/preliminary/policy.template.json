@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "runner_revision": "@RUNNER_REVISION@",
+  "runner_sha256": "@RUNNER_SHA256@",
+  "evaluation_sha256": "7f2555d34379ef02c0f70e22e27fa8ece8cc0704742ec8dcf794ee31a8e3b0fe",
+  "chat": {
+    "endpoint": "@CHAT_ENDPOINT@",
+    "requested_model": "deepseek-flash",
+    "expected_reported_model": "@REPORTED_MODEL@",
+    "context_tokens": 1048576
+  },
+  "chat_prices": {
+    "source": "https://api-docs.deepseek.com/quick_start/pricing/ list price, cache miss; the relay's own billing is not reported to the lamp",
+    "date": "2026-10-31",
+    "input_microusd_per_million": 300000,
+    "output_microusd_per_million": 1200000
+  },
+  "speech": {
+    "endpoint": "@SPEECH_ENDPOINT@",
+    "expected_model_arch": "nova-3",
+    "expected_model_revision": null
+  },
+  "speech_prices": {
+    "source": "https://deepgram.com/pricing Nova-3 streaming plus keyterm, list price",
+    "date": "2026-10-31",
+    "microusd_per_minute": 9000
+  },
+  "repetitions": 1,
+  "fixtures": {
+    "development": {
+      "profile": "month",
+      "setup_order": ["none", "full_history", "lampos_today_partial", "tiers"],
+      "registration_revision": "6420a2f490263df664a12c8f8848c95421c30abd",
+      "registration_sha256": "3ee255b5921100c268314c905094094d8d2bc4bd87fd46a271c11a287ff50a35",
+      "audio_manifest_sha256": "@AUDIO_SHA256@",
+      "speech_budget_microusd": 1000000
+    }
+  },
+  "adapters": {
+    "none": {
+      "revision": "@RUNNER_REVISION@",
+      "executable_sha256": "@RUNNER_SHA256@",
+      "arguments": ["arm", "@RUNNER_REVISION@"],
+      "budget_microusd": 4000000
+    },
+    "full_history": {
+      "revision": "@RUNNER_REVISION@",
+      "executable_sha256": "@RUNNER_SHA256@",
+      "arguments": ["arm", "@RUNNER_REVISION@"],
+      "budget_microusd": 20000000
+    },
+    "lampos_today_partial": {
+      "revision": "@RUNNER_REVISION@",
+      "executable_sha256": "@RUNNER_SHA256@",
+      "arguments": ["arm", "@RUNNER_REVISION@"],
+      "budget_microusd": 4000000
+    },
+    "tiers": {
+      "revision": "7d6d0a2364bc2052c323327334633a97450b12b3",
+      "executable_sha256": "@TIERS_SHA256@",
+      "arguments": [],
+      "budget_microusd": 10000000
+    }
+  },
+  "preliminary": true
+}
