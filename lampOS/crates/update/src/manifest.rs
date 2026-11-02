@@ -36,8 +36,9 @@ pub const SCHEMA: u32 = 1;
 /// (crate::companion). 8: a product unit the lamp lacks added
 /// (crate::added). 9: a round stops the voice first and starts it again
 /// after the parts it reads (#4431), which every product build asks for
-/// ([`ORDER_UPDATER`]).
-pub const UPDATER: u64 = 9;
+/// ([`ORDER_UPDATER`]). 10: the Skills Store's switch file among the
+/// settings ([`STORE_ENV_UPDATER`]).
+pub const UPDATER: u64 = 10;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
@@ -56,6 +57,15 @@ pub const ADDS_UPDATER: u64 = 8;
 /// the lamp-update the build carries, and that one, in the same `serve`,
 /// runs the switch in its own order.
 pub const ORDER_UPDATER: u64 = 9;
+/// The level a build that carries the Skills Store's switch file
+/// ([`STORE_ENV`]) needs: an older updater refuses its path among the
+/// settings, so it climbs first.
+pub const STORE_ENV_UPDATER: u64 = 10;
+/// The Skills Store's switch, read by lamp-cloud and the skills manage
+/// helper. Install wrote it alone until build 10's updater; a round now
+/// writes the build's while the lamp's copy is the build's before, and
+/// keeps one changed on the lamp.
+pub const STORE_ENV: &str = "/etc/lampOS/skills/store.env";
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
@@ -102,7 +112,11 @@ pub const MOST_SETTINGS_BYTES: usize = 160 * 1024;
 /// the update key: those are the person's or the lamp's (docs/updates.md).
 /// The one key a build carries is the Skills Store's public key in the
 /// skills folder (`install::STORE_KEY_SETTING`, #3692).
-pub const SETTING_FILES: &[&str] = &["/etc/lampOS/records.json", "/etc/tmpfiles.d/lampos.conf"];
+pub const SETTING_FILES: &[&str] = &[
+    "/etc/lampOS/records.json",
+    "/etc/tmpfiles.d/lampos.conf",
+    STORE_ENV,
+];
 pub const SETTING_FOLDERS: &[&str] = &[
     "/etc/lampOS/expression/",
     "/etc/lampOS/controls/",
