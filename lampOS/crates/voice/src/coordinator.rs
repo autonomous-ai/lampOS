@@ -7967,7 +7967,13 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 ProviderOutput::HoldingAnswer { request, session } => {
-                    holding_answer.observed(request, session, rig.provider.boot, reply.as_ref());
+                    holding_answer.observed(
+                        request,
+                        session,
+                        rig.provider.boot,
+                        reply.as_ref(),
+                        look_wanted,
+                    );
                 }
                 // A call's line whose words were the lamp's name alone
                 // (#3923): its speech's start goes to the step, which counts

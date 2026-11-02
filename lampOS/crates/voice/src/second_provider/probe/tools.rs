@@ -790,7 +790,8 @@ pub fn answered_after_the_hum(text: &str, called: bool) -> bool {
 }
 
 /// The promised answer in words (391), nothing called, never another
-/// holding phrase.
+/// holding answer (an answer with a trailing offer such as "I'll check
+/// again if you like." is no holding answer, so it went on).
 pub fn went_on(text: &str, called: bool) -> bool {
     !called
         && !crate::holding_answer::holding_only(text)
@@ -1605,6 +1606,8 @@ mod tests {
         assert!(went_on("It's three hundred and ninety-one.", false));
         assert!(!went_on("One moment.", false));
         assert!(!went_on("Just a second.", false));
+        // The answer given, then an offer to check again: it went on.
+        assert!(went_on("It's 391. I'll check again if you like.", false));
     }
 
     /// Each sayings line is asked as the route asks it: the spoken
