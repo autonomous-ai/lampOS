@@ -2192,8 +2192,14 @@ Nothing above changes with the switch off.
 3. The answer is kept as any made skill is (`made_skill::keep`, from
    `local:<ms>`): the two files, the cap, `lamp-skills pack`, at most five.
    One that doesn't pass is told as not made ("the skill couldn't be made:
-   …"), with no technical words for the person, and nothing is kept; there
-   is no repair round.
+   …"), with no technical words for the person, and nothing is kept. One
+   the lamp's check refused goes back to the model once with the check's
+   lines (`made_skill::repair_brief`, as a computer's agent's repair), and
+   that answer is kept or told as not made; never a third. The model is
+   shown a whole skill the check takes (`make_skill_local::EXAMPLE`, light
+   on someone being there) and told that a skill can't speak or keep time:
+   on lamp-9adf on 2 Nov, before both, its first two skills were refused
+   for a trigger field and a light step the check didn't know.
 4. Kept, the model is told its name, what it does and what it uses, and to
    ask "Shall I put it on the lamp?" in the same answer. It is not kept as
    asked then (the Reviewer-lead's P2 on #4914): only when a yes comes right
