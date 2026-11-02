@@ -2475,6 +2475,7 @@ dependencies = [
  "lamp-health",
  "lamp-ipc",
  "lamp-local-time",
+ "lamp-memory",
  "lamp-msgs",
  "lamp-near-call",
  "lamp-policy",
