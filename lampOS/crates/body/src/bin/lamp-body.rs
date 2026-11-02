@@ -964,6 +964,8 @@ struct LeaseDoor {
     /// The holder's `look`, and how far it may take the head.
     looking: lamp_body::lease::Looking,
     reach: lamp_body::lease::Reach,
+    /// The holder's pose of the head's roll and the arm.
+    posing: lamp_body::lease::Posing,
 }
 
 // Used by the Linux body and its Linux-only test.
@@ -994,6 +996,7 @@ impl LeaseDoor {
             holder: None,
             lease: Default::default(),
             looking: Default::default(),
+            posing: Default::default(),
             reach: lamp_body::lease::Reach {
                 yaw: 0.0,
                 up: 0.0,
@@ -1021,6 +1024,14 @@ impl LeaseDoor {
         if let Some(said) = self.looking.end("the run ended") {
             look_answered(&said);
         }
+        if let Some(said) = self.posing.end("the run ended") {
+            look_answered(&said);
+        }
+    }
+
+    /// The roll, shoulder and elbow the holder asks, while it holds the body.
+    fn pose(&self, now: std::time::Instant) -> Option<[f32; 3]> {
+        self.lease.holds(now).then(|| self.posing.pose()).flatten()
     }
 
     /// Where the holder asks the head to look, while it holds the body.
@@ -1035,6 +1046,7 @@ impl LeaseDoor {
         around: lamp_body::lease::Around,
         now: std::time::Instant,
         seen: Option<([u16; 3], [u16; 3])>,
+        posed: Option<lamp_body::lease::PoseSeen>,
     ) -> bool {
         use lamp_body::lease::Said;
         use std::io::Write;
@@ -1092,6 +1104,25 @@ impl LeaseDoor {
                     look_answered(&said);
                     out += &said;
                 }
+            } else if lamp_body::lease::Posing::is_pose(&line[..end]) {
+                let held = self.lease.holds(now);
+                let now_posed =
+                    posed.map_or(Err("the body has not said its pose yet"), |seen| seen.posed);
+                let answer = self.posing.ask(&line[..end], held, now_posed, now);
+                if let Some(pose) = self.posing.pose().filter(|_| {
+                    !answer
+                        .as_deref()
+                        .is_some_and(|said| said.contains("\"refused\""))
+                }) {
+                    eprintln!(
+                        "lamp-body: a holder's pose asked: roll {:.1}, shoulder {:.1}, elbow {:.1} degrees",
+                        pose[0], pose[1], pose[2]
+                    );
+                }
+                if let Some(said) = answer {
+                    look_answered(&said);
+                    out += &said;
+                }
             } else {
                 out += &self.lease.ask(&line[..end], around, now).line();
             }
@@ -1114,6 +1145,10 @@ impl LeaseDoor {
             look_answered(&said);
             out += &said;
         }
+        if let Some(said) = self.posing.step(held, posed, now) {
+            look_answered(&said);
+            out += &said;
+        }
         if !out.is_empty() && stream.write_all(out.as_bytes()).is_err() {
             gone = true;
         }
@@ -1122,6 +1157,9 @@ impl LeaseDoor {
             eprintln!("lamp-body: the lease's holder went: the lamp's own life is back");
             self.lease.end();
             if let Some(said) = self.looking.end("its holder went") {
+                look_answered(&said);
+            }
+            if let Some(said) = self.posing.end("its holder went") {
                 look_answered(&said);
             }
         }
@@ -1133,7 +1171,15 @@ impl LeaseDoor {
 /// angles kept and whether they were cut), cut short (why) or refused (why).
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn look_answered(said: &str) {
-    eprintln!("lamp-body: a holder's look answered {}", said.trim_end());
+    eprintln!(
+        "lamp-body: a holder's {} answered {}",
+        if said.starts_with("{\"pose\"") {
+            "pose"
+        } else {
+            "look"
+        },
+        said.trim_end()
+    );
 }
 
 /// What the holder sent, read into `pending` without waiting: at most
@@ -1496,6 +1542,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // The body's last step, for a holder's look to be there.
     let lease_seen = std::cell::Cell::new(None);
     let lease_aimed = std::cell::Cell::new(None);
+    let lease_posed = std::cell::Cell::new(None);
     let moves = moves_of(arguments.moves.as_deref());
     // `--hold-from` (#2668): a hand on the head from a test input, for
     // tests on a lamp only; what it says this step, for the journal.
@@ -1832,6 +1879,16 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         lease_slumped.set(slumped_now(glimpse));
         lease_seen.set(Some((glimpse.goals, glimpse.positions)));
         lease_aimed.set(glimpse.look_aimed);
+        lease_posed.set(Some(lamp_body::lease::PoseSeen {
+            posed: match (glimpse.posed, glimpse.unposed) {
+                (Some(posed), None) => Ok(posed),
+                (_, why) => Err(why.unwrap_or("the lamp is not standing still at its full height")),
+            },
+            reached: glimpse.reached.or(glimpse.posed).unwrap_or_default(),
+            roll: (glimpse.goals[1], glimpse.positions[1]),
+            arm_goals: glimpse.arm_goals,
+            arm_positions: glimpse.arm_positions,
+        }));
         step_said(&notify, &ready);
         if glimpse.waiting != waiting_said {
             waiting_said = glimpse.waiting;
@@ -2234,6 +2291,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                pose: None,
                 unseat: false,
             };
             // Read all the same, so that nothing kept from before the pause
@@ -2306,12 +2364,13 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                     };
                     let now = std::time::Instant::now();
                     door.looking.applied(lease_aimed.get());
-                    if door.turn(around, now, lease_seen.get()) {
+                    if door.turn(around, now, lease_seen.get(), lease_posed.get()) {
                         lamp_body::body::Asked {
                             still: true,
                             expression: None,
                             held: true,
                             aim: door.aim(now),
+                            pose: door.pose(now),
                             ..asked
                         }
                     } else {
@@ -3342,13 +3401,13 @@ mod tests {
         let mut line = String::new();
         // Not held yet: refused, nothing aimed.
         holder.write_all(b"{\"look\":\"ahead\"}\n").unwrap();
-        assert!(!door.turn(quiet, now, None));
+        assert!(!door.turn(quiet, now, None, None));
         heard.read_line(&mut line).unwrap();
         assert!(line.starts_with("{\"look\":\"refused\""), "{line}");
         holder
             .write_all(b"{\"hold\":{\"for_ms\":5000}}\n{\"look\":{\"yaw\":0,\"pitch\":10}}\n")
             .unwrap();
-        assert!(door.turn(quiet, now, None));
+        assert!(door.turn(quiet, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
         assert_eq!(line, "{\"lease\":\"held\"}\n");
@@ -3357,7 +3416,7 @@ mod tests {
         let there = ([1678, 2060, 2012], [1680, 2060, 2012]);
         // The first step only sees the goals; then they must stay still.
         for _ in 0..=THERE_STEPS {
-            door.turn(quiet, now, Some(there));
+            door.turn(quiet, now, Some(there), None);
         }
         line.clear();
         heard.read_line(&mut line).unwrap();
@@ -3367,8 +3426,79 @@ mod tests {
         );
         // Let go: the aim goes with the lease.
         holder.write_all(b"{\"let_go\":true}\n").unwrap();
-        assert!(!door.turn(quiet, now, Some(there)));
+        assert!(!door.turn(quiet, now, Some(there), None));
         assert_eq!(door.aim(now), None);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// The door takes a holder's pose only while held, answers it once the
+    /// arm is there, as the body kept it, and lets it go with the lease.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_lease_door_poses_its_holders_arm_and_says_when_it_is_there() {
+        use lamp_body::lease::{Around, PoseSeen, THERE_STEPS};
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixStream;
+        let directory = std::env::temp_dir().join(format!("lamp-body-pose-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("lease.sock");
+        let mut door = LeaseDoor::bind(&path, Box::new(|caller| caller.is_some())).unwrap();
+        let quiet = Around::default();
+        let now = std::time::Instant::now();
+        let standing = |posed: [f32; 3], arm: [u16; 2]| {
+            Some(PoseSeen {
+                posed: Ok(posed),
+                reached: posed,
+                roll: (2_044, 2_044),
+                arm_goals: arm,
+                arm_positions: arm,
+            })
+        };
+        let mut holder = UnixStream::connect(&path).unwrap();
+        let mut heard = BufReader::new(holder.try_clone().unwrap());
+        let mut line = String::new();
+        // Not held yet: refused, nothing posed.
+        holder.write_all(b"{\"pose\":{\"shoulder\":30}}\n").unwrap();
+        assert!(!door.turn(
+            quiet,
+            now,
+            None,
+            standing([0.0, 52.7, 48.5], [2_650, 2_600])
+        ));
+        heard.read_line(&mut line).unwrap();
+        assert!(line.starts_with("{\"pose\":\"refused\""), "{line}");
+        holder
+            .write_all(b"{\"hold\":{\"for_ms\":5000}}\n{\"pose\":{\"shoulder\":30,\"elbow\":20}}\n")
+            .unwrap();
+        assert!(door.turn(
+            quiet,
+            now,
+            None,
+            standing([0.0, 52.7, 48.5], [2_650, 2_600])
+        ));
+        line.clear();
+        heard.read_line(&mut line).unwrap();
+        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(door.pose(now), Some([0.0, 30.0, 20.0]));
+        for _ in 0..=THERE_STEPS {
+            door.turn(
+                quiet,
+                now,
+                None,
+                standing([0.0, 30.0, 20.0], [2_391, 2_275]),
+            );
+        }
+        line.clear();
+        heard.read_line(&mut line).unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&line).unwrap(),
+            serde_json::json!({"pose": "there", "roll": 0.0, "shoulder": 30.0, "elbow": 20.0, "clamped": false})
+        );
+        // Let go: the pose goes with the lease.
+        holder.write_all(b"{\"let_go\":true}\n").unwrap();
+        assert!(!door.turn(quiet, now, None, None));
+        assert_eq!(door.pose(now), None);
         let _ = std::fs::remove_dir_all(&directory);
     }
 
@@ -3386,12 +3516,12 @@ mod tests {
         let mut door = LeaseDoor::bind(&path, Box::new(|caller| caller.is_some())).unwrap();
         let quiet = Around::default();
         let now = std::time::Instant::now();
-        assert!(!door.turn(quiet, now, None), "nobody holds it");
+        assert!(!door.turn(quiet, now, None, None), "nobody holds it");
         let mut holder = UnixStream::connect(&path).unwrap();
         let mut heard = BufReader::new(holder.try_clone().unwrap());
         let mut line = String::new();
         holder.write_all(b"{\"hold\":{\"for_ms\":5000}}\n").unwrap();
-        assert!(door.turn(quiet, now, None));
+        assert!(door.turn(quiet, now, None, None));
         heard.read_line(&mut line).unwrap();
         assert_eq!(line, "{\"lease\":\"held\"}\n");
         // A conversation suspends it, said unasked.
@@ -3399,17 +3529,17 @@ mod tests {
             conversation: true,
             ..quiet
         };
-        assert!(!door.turn(talking, now, None));
+        assert!(!door.turn(talking, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
         assert_eq!(line, "{\"lease\":\"suspended\",\"why\":\"conversation\"}\n");
-        assert!(door.turn(quiet, now, None));
+        assert!(door.turn(quiet, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
         assert_eq!(line, "{\"lease\":\"held\"}\n");
         // A second holder is refused while there is one.
         let other = UnixStream::connect(&path).unwrap();
-        assert!(door.turn(quiet, now, None));
+        assert!(door.turn(quiet, now, None, None));
         let mut refused = String::new();
         BufReader::new(other).read_line(&mut refused).unwrap();
         assert_eq!(
@@ -3419,7 +3549,7 @@ mod tests {
         // Its holder gone, the body is its own again at once.
         drop(holder);
         drop(heard);
-        assert!(!door.turn(quiet, now, None));
+        assert!(!door.turn(quiet, now, None, None));
         assert!(door.holder.is_none());
         // One `may` refuses is told why and never holds it.
         let mut shut = LeaseDoor::bind(&directory.join("shut.sock"), Box::new(|_| false)).unwrap();
@@ -3427,14 +3557,14 @@ mod tests {
         stranger
             .write_all(b"{\"hold\":{\"for_ms\":5000}}\n")
             .unwrap();
-        assert!(!shut.turn(quiet, now, None));
+        assert!(!shut.turn(quiet, now, None, None));
         let mut refused = String::new();
         BufReader::new(stranger).read_line(&mut refused).unwrap();
         assert_eq!(
             refused,
             "{\"lease\":\"refused\",\"why\":\"only lamp-control may hold the body\"}\n"
         );
-        assert!(!shut.turn(quiet, now, None));
+        assert!(!shut.turn(quiet, now, None, None));
         let _ = std::fs::remove_dir_all(&directory);
     }
 
@@ -3465,7 +3595,7 @@ mod tests {
         let mut turns = 0;
         while door.holder.is_some() || turns == 0 {
             let began = std::time::Instant::now();
-            assert!(!door.turn(quiet, began, None));
+            assert!(!door.turn(quiet, began, None, None));
             assert!(began.elapsed() < std::time::Duration::from_millis(50));
             turns += 1;
             assert!(turns < 50, "a flood still holds the door");
@@ -3486,7 +3616,7 @@ mod tests {
         let strangers: Vec<_> = (0..10)
             .map(|_| UnixStream::connect(directory.join("shut.sock")).unwrap())
             .collect();
-        shut.turn(quiet, std::time::Instant::now(), None);
+        shut.turn(quiet, std::time::Instant::now(), None, None);
         let answered = strangers
             .iter()
             .filter(|stranger| {
@@ -3571,7 +3701,7 @@ mod tests {
         let mut door = LeaseDoor::bind(&path, Box::new(|caller| caller.is_some())).unwrap();
         let mut holder = UnixStream::connect(&path).unwrap();
         holder.write_all(b"{\"hold\":{\"for_ms\":5000}}\n").unwrap();
-        assert!(door.turn(Around::default(), std::time::Instant::now(), None));
+        assert!(door.turn(Around::default(), std::time::Instant::now(), None, None));
         let mut heard = BufReader::new(holder.try_clone().unwrap());
         let mut line = String::new();
         heard.read_line(&mut line).unwrap();
@@ -3598,8 +3728,8 @@ mod tests {
         ] {
             let mut holder = UnixStream::connect(&path).unwrap();
             holder.write_all(asked).unwrap();
-            door.turn(Around::default(), std::time::Instant::now(), None);
-            door.turn(then, std::time::Instant::now(), None);
+            door.turn(Around::default(), std::time::Instant::now(), None, None);
+            door.turn(then, std::time::Instant::now(), None, None);
             let mut heard = BufReader::new(holder.try_clone().unwrap());
             let mut told = Vec::new();
             door.ended(Some("slumped"));

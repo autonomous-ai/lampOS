@@ -1964,6 +1964,7 @@ answered `refused` with why and closed. Lines of JSON each way
 | `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
 | `{"let_go":true}` | `{"lease":"free"}` |
 | `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive) or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
+| `{"pose":{"roll":R,"shoulder":S,"elbow":E}}` (degrees, one at least; as `get('body')` counts them), while held | once, later: `{"pose":"there","roll":…,"shoulder":…,"elbow":…,"clamped":…}`, or `{"pose":"cut_short","why":…}`; at once while not held, while the body takes no pose, or for another pose: `{"pose":"refused","why":…}` |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
 
 **A holder's look** (`lease::Looking`, the protocol's `look`): degrees become
@@ -1987,6 +1988,49 @@ order alone: a line that isn't JSON goes to the lease as any other and is
 `{"lease":"refused"}`, and lamp-control only ever sends well-formed looks.
 Tests: `a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go`,
 `the_lease_door_aims_its_holders_look_and_says_when_it_is_there`.
+
+**A holder's pose** (`lease::Posing`, the protocol's `joints` past yaw and
+pitch; no lamp-control code sends it yet, so `joints` still refuses roll,
+shoulder and elbow until that routing lands): the head's roll from the found home and the shoulder and the elbow
+from the folded arm, in degrees, each rising with counts, as `get('body')`
+says them. A joint not named keeps where it is. The body takes it only while
+held and standing still at its full height (a lamp given `--stand`) with no
+gesture playing; otherwise it is refused with why ("this lamp's arm has no
+stand pose (--stand)", "the lamp is not standing still at its full height",
+"a gesture plays"), or an owed pose is cut short with it. It is laid on the
+stand as a gesture's offsets are (`Asked::pose`, `POSE_REACH`), eased at the
+gesture's step (21 counts of the arm a step), so every guard of a gesture
+holds:
+- each arm goal is cut into its window between the fold and the stand
+  before it is made, and `Bus::goal_refused` still checks it;
+- the roll stays inside the body's own roll reach (`--reach`, the stand's
+  roll, as far as the lamp has stood), cut there as a glance is, whatever
+  `POSE_REACH` allows: the product's 1 count keeps it level, and the answer
+  says `clamped`;
+- V1's anti-tip rule cuts any step that leans the lamp back, as every goal's.
+  Only leaning back is guarded: a shoulder and elbow pose inside the
+  fold–stand box is not checked for leaning forward, which is V1's own
+  scope;
+- the heat, load and strain stops, a hand and the lease's ends all hold.
+
+It is `there` once the arm's goals have not moved for 10 steps and each of
+the roll, the shoulder and the elbow is within 6 counts of its goal, or has
+stopped (its position still within a count) within 50 counts of it
+(`POSE_SAG_WITHIN`): a standing arm sags under its own load (lamp-75c9 on
+2 Nov, at its stand: goals 2,639 and 2,570, positions 2,620 and 2,535, loads
+88 and 152). One stopped farther short is held by something: the pose stays
+owed and is cut short in time. `there` says the degrees the positions
+reached, sag and all, and `clamped` when the window or the reach cut the
+goal by more than half a degree. A pose not there in 6 s (`LONGEST_POSE`) is
+cut short, "something holds the arm". A conversation keeps it for when the lease is
+held again; any other end lets it go, back to the stand. Tests:
+`a_held_standing_lamp_takes_its_holders_pose_inside_the_arms_window`,
+`a_lamp_not_standing_says_why_it_takes_no_pose`,
+`a_pose_is_refused_unless_held_and_a_named_joint_keeps_the_rest`,
+`a_pose_is_there_once_still_and_says_what_was_kept`,
+`a_pose_after_a_conversation_is_there_with_the_arm_sagging_short`,
+`a_pose_stopped_far_short_of_its_goal_is_cut_short`,
+`a_pose_with_a_joint_still_moving_stays_owed`.
 
 Said unasked when it changes:
 - `{"lease":"suspended","why":"conversation"}` while the mood is listening,
