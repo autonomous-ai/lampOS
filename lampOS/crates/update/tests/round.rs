@@ -227,6 +227,7 @@ struct Running {
     sub: String,
     pid: u32,
     restarts: u32,
+    result: String,
 }
 
 struct FakeSystemd {
@@ -315,6 +316,7 @@ impl FakeSystemd {
                 sub: "auto-restart".into(),
                 pid: 0,
                 restarts: 1,
+                ..Running::default()
             }
         } else {
             Running {
@@ -322,6 +324,7 @@ impl FakeSystemd {
                 sub: "running".into(),
                 pid: self.next_pid,
                 restarts: 0,
+                ..Running::default()
             }
         };
         self.units.insert(unit.to_owned(), running);
@@ -365,6 +368,7 @@ impl Systemd for FakeSystemd {
                     sub: running.sub,
                     pid: running.pid,
                     restarts: running.restarts,
+                    result: running.result,
                 }
             })
             .collect())
@@ -401,6 +405,7 @@ impl Systemd for FakeSystemd {
                 sub: "auto-restart".into(),
                 pid: 0,
                 restarts: 1,
+                ..Running::default()
             }
         } else {
             self.next_pid += 1;
@@ -409,6 +414,7 @@ impl Systemd for FakeSystemd {
                 sub: "running".into(),
                 pid: self.next_pid,
                 restarts: 0,
+                ..Running::default()
             }
         };
         self.units.insert(unit.to_owned(), running);
@@ -3176,6 +3182,7 @@ fn update_unit(active: &str, sub: &str) -> UnitState {
         sub: sub.into(),
         pid: 0,
         restarts: 0,
+        result: String::new(),
     }
 }
 
