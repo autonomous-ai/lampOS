@@ -34,6 +34,18 @@
 //!
 //! The head keeps looking there while the lease is held, and comes back to
 //! the pose's own direction when it ends.
+//!
+//! And where the head's roll and the arm are ([`Posing`], the protocol's
+//! `joints` past yaw and pitch): `{"pose":{"roll":R,"shoulder":S,"elbow":E}}`
+//! in degrees, each optional but one, as `get('body')` counts them: the roll
+//! from the found home, the shoulder and the elbow from the folded arm, each
+//! rising with counts. The body takes it only while it stands still at its
+//! full height (a lamp given `--stand`), the arm inside its window between
+//! the fold and the stand and V1's anti-tip rule cutting any step. It is
+//! answered once, as a look is: `{"pose":"there","roll":…,"shoulder":…,
+//! "elbow":…,"clamped":…}`, `{"pose":"cut_short","why":…}` or
+//! `{"pose":"refused","why":…}`. The pose is kept while held and let go,
+//! back to the stand, when the lease ends.
 
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
@@ -415,6 +427,207 @@ impl Looking {
         self.aim = None;
         self.asked.take().map(|_| cut_short(why))
     }
+}
+
+/// A pose not there by then is cut short: something holds the arm.
+pub const LONGEST_POSE: Duration = Duration::from_secs(6);
+/// How far short of its goal (counts) a joint that has stopped may rest and
+/// still have arrived: a standing arm sags under its own load (lamp-75c9 at
+/// its stand, 2 Nov: 19 and 35 counts short at loads 88 and 152). A joint
+/// stopped farther short is held by something, and the pose stays owed.
+pub const POSE_SAG_WITHIN: f32 = 50.0;
+/// How near (degrees) the pose the body applies must be to the asked one,
+/// for `there` to say it as asked rather than `clamped`.
+const POSE_KEPT_WITHIN: f32 = 0.5;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PoseLine {
+    pose: PoseJoints,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct PoseJoints {
+    roll: Option<f32>,
+    shoulder: Option<f32>,
+    elbow: Option<f32>,
+}
+
+/// A pose asked and not yet answered.
+#[derive(Clone, Copy, Debug)]
+struct PoseOwed {
+    since: Instant,
+    settled: u32,
+    arm_goals: Option<[u16; 2]>,
+    /// The roll's and the arm's positions the step before.
+    positions: Option<[u16; 3]>,
+}
+
+/// The holder's pose of the head's roll and the arm ([`Posing::ask`]), in
+/// degrees as `get('body')` says them, and the answer still owed for it.
+#[derive(Debug, Default)]
+pub struct Posing {
+    pose: Option<[f32; 3]>,
+    asked: Option<PoseOwed>,
+}
+
+/// What the body says of a pose each step: the roll, shoulder and elbow
+/// it has now (degrees, as `get('body')` counts them), or why it takes no
+/// pose now, and its arm's goals and positions.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PoseSeen {
+    pub posed: Result<[f32; 3], &'static str>,
+    /// The roll, shoulder and elbow their positions say (degrees, as
+    /// `posed`): what `there` reports, sag and all.
+    pub reached: [f32; 3],
+    pub roll: (u16, u16),
+    pub arm_goals: [u16; 2],
+    pub arm_positions: [u16; 2],
+}
+
+impl Posing {
+    /// Whether a holder's line is a pose, for [`Posing::ask`].
+    pub fn is_pose(line: &[u8]) -> bool {
+        serde_json::from_slice::<serde_json::Value>(line)
+            .is_ok_and(|value| value.get("pose").is_some())
+    }
+
+    /// A pose from the holder: its answer now, if one is due now (a
+    /// refusal, or the pose it replaces cut short). `now_posed` is the pose
+    /// the body has now, which a joint not named keeps.
+    pub fn ask(
+        &mut self,
+        line: &[u8],
+        held: bool,
+        now_posed: Result<[f32; 3], &'static str>,
+        now: Instant,
+    ) -> Option<String> {
+        let joints = match serde_json::from_slice::<PoseLine>(line) {
+            Ok(PoseLine { pose }) if pose != PoseJoints::default() => pose,
+            _ => {
+                return Some(pose_refused(
+                    "a pose is {\"roll\":R,\"shoulder\":S,\"elbow\":E} in degrees, one at least",
+                ));
+            }
+        };
+        let named = [joints.roll, joints.shoulder, joints.elbow];
+        if named.iter().flatten().any(|degrees| !degrees.is_finite()) {
+            return Some(pose_refused("a pose's degrees are numbers"));
+        }
+        if !held {
+            return Some(pose_refused("the body is not held"));
+        }
+        let posed = match now_posed {
+            Ok(posed) => posed,
+            Err(why) => return Some(pose_refused(why)),
+        };
+        let before = self.asked.take().map(|_| pose_cut_short("another pose"));
+        let kept = self.pose.unwrap_or(posed);
+        self.pose = Some(std::array::from_fn(|index| {
+            named[index].unwrap_or(kept[index])
+        }));
+        self.asked = Some(PoseOwed {
+            since: now,
+            settled: 0,
+            arm_goals: None,
+            positions: None,
+        });
+        before
+    }
+
+    /// The pose asked (roll, shoulder, elbow in degrees), as the body's
+    /// `Asked::pose` takes it.
+    pub fn pose(&self) -> Option<[f32; 3]> {
+        self.pose
+    }
+
+    /// The body's last step and whether the body is held now, or why not:
+    /// the answer owed, once it is due.
+    pub fn step(
+        &mut self,
+        held: Result<(), &'static str>,
+        seen: Option<PoseSeen>,
+        now: Instant,
+    ) -> Option<String> {
+        if let Err(why) = held {
+            if why != "conversation" {
+                self.pose = None;
+            }
+            return self.asked.take().map(|_| pose_cut_short(why));
+        }
+        let asked = self.asked.as_mut()?;
+        if let Some(seen) = seen {
+            let posed = match seen.posed {
+                Ok(posed) => posed,
+                Err(why) => {
+                    self.asked = None;
+                    return Some(pose_cut_short(why));
+                }
+            };
+            // Each joint has arrived near its goal, or stopped where its
+            // own load holds it, within `POSE_SAG_WITHIN`: a standing arm
+            // rests short of its goals (lamp-75c9, 2 Nov: goals [2639, 2570],
+            // positions [2620, 2535] at its stand, loads 88 and 152). One
+            // stopped farther short is held, and the pose stays owed.
+            let goals = [seen.roll.0, seen.arm_goals[0], seen.arm_goals[1]];
+            let positions = [seen.roll.1, seen.arm_positions[0], seen.arm_positions[1]];
+            let stopped = asked.positions;
+            let arrived = (0..3).all(|index| {
+                let short = (f32::from(goals[index]) - f32::from(positions[index])).abs();
+                short <= THERE_WITHIN
+                    || (short <= POSE_SAG_WITHIN
+                        && stopped
+                            .is_some_and(|before| before[index].abs_diff(positions[index]) <= 1))
+            });
+            let still = asked.arm_goals.is_some_and(|before| {
+                (0..2).all(|index| before[index].abs_diff(seen.arm_goals[index]) <= 1)
+            });
+            asked.arm_goals = Some(seen.arm_goals);
+            asked.positions = Some(positions);
+            let near = arrived;
+            asked.settled = if near && still { asked.settled + 1 } else { 0 };
+            if asked.settled >= THERE_STEPS {
+                self.asked = None;
+                let wanted = self.pose.unwrap_or(posed);
+                let clamped =
+                    (0..3).any(|index| (posed[index] - wanted[index]).abs() > POSE_KEPT_WITHIN);
+                // Said as reached: a developer sees the sag.
+                return Some(pose_there(seen.reached, clamped));
+            }
+        }
+        if now.duration_since(asked.since) >= LONGEST_POSE {
+            self.asked = None;
+            return Some(pose_cut_short("not there in time: something holds the arm"));
+        }
+        None
+    }
+
+    /// The lease ended: the arm and the roll go back to the stand, and a
+    /// pose owed is cut short.
+    pub fn end(&mut self, why: &'static str) -> Option<String> {
+        self.pose = None;
+        self.asked.take().map(|_| pose_cut_short(why))
+    }
+}
+
+fn pose_there(reached: [f32; 3], clamped: bool) -> String {
+    let round = |degrees: f32| (f64::from(degrees) * 10.0).round() / 10.0;
+    line(serde_json::json!({
+        "pose": "there",
+        "roll": round(reached[0]),
+        "shoulder": round(reached[1]),
+        "elbow": round(reached[2]),
+        "clamped": clamped,
+    }))
+}
+
+fn pose_cut_short(why: &str) -> String {
+    line(serde_json::json!({"pose": "cut_short", "why": why}))
+}
+
+fn pose_refused(why: &str) -> String {
+    line(serde_json::json!({"pose": "refused", "why": why}))
 }
 
 fn line(value: serde_json::Value) -> String {
@@ -818,5 +1031,227 @@ mod tests {
             Said::refused("not a lease request").line(),
             said(r#"{"lease":"refused","why":"not a lease request"}"#)
         );
+    }
+
+    fn seen(posed: [f32; 3], arm_goals: [u16; 2]) -> Option<PoseSeen> {
+        Some(PoseSeen {
+            posed: Ok(posed),
+            reached: posed,
+            roll: (2_044, 2_044),
+            arm_goals,
+            arm_positions: arm_goals,
+        })
+    }
+
+    /// A pose names one joint at least, in numbers, and only while held;
+    /// a joint not named keeps where the body has it.
+    #[test]
+    fn a_pose_is_refused_unless_held_and_a_named_joint_keeps_the_rest() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        let has = Ok([0.0, 52.7, 48.5]);
+        for (line, why) in [
+            (&br#"{"pose":{}}"#[..], "one at least"),
+            (br#"{"pose":{"wrist":3}}"#, "one at least"),
+            (br#"{"pose":"up"}"#, "one at least"),
+        ] {
+            let answer = posing.ask(line, true, has, now).unwrap();
+            assert_eq!(value(&answer)["pose"], "refused");
+            assert!(
+                value(&answer)["why"].as_str().unwrap().contains(why),
+                "{answer}"
+            );
+        }
+        let answer = posing
+            .ask(br#"{"pose":{"shoulder":30}}"#, false, has, now)
+            .unwrap();
+        assert_eq!(value(&answer)["why"], "the body is not held");
+        let answer = posing
+            .ask(
+                br#"{"pose":{"shoulder":30}}"#,
+                true,
+                Err("a gesture plays"),
+                now,
+            )
+            .unwrap();
+        assert_eq!(value(&answer)["why"], "a gesture plays");
+        assert_eq!(posing.pose(), None);
+        assert_eq!(
+            posing.ask(br#"{"pose":{"shoulder":30}}"#, true, has, now),
+            None
+        );
+        assert_eq!(posing.pose(), Some([0.0, 30.0, 48.5]));
+        // Another pose cuts the first short, and keeps its shoulder.
+        let answer = posing
+            .ask(br#"{"pose":{"elbow":20}}"#, true, has, now)
+            .unwrap();
+        assert_eq!(value(&answer)["pose"], "cut_short");
+        assert_eq!(posing.pose(), Some([0.0, 30.0, 20.0]));
+    }
+
+    /// lamp-75c9's stand, as its arm rests: goals [2639, 2570], positions
+    /// as given, its stand [49.5, 46.1] degrees from the fold.
+    fn standing_at(arm_positions: [u16; 2]) -> Option<PoseSeen> {
+        let degrees = |position: u16, folded: u16| {
+            (f32::from(position) - f32::from(folded)) / COUNTS_PER_DEGREE
+        };
+        Some(PoseSeen {
+            posed: Ok([0.0, 49.5, 46.1]),
+            reached: [
+                0.0,
+                degrees(arm_positions[0], 2_076),
+                degrees(arm_positions[1], 2_045),
+            ],
+            roll: (2_059, 2_060),
+            arm_goals: [2_639, 2_570],
+            arm_positions,
+        })
+    }
+
+    /// lamp-75c9 at its stand, 2 Nov: the arm sags 19 and 35 counts short of
+    /// its goals under its own load. After a conversation, a pose past the
+    /// window (kept at the stand) is there once the arm is still, said
+    /// `clamped` and as reached, sag and all.
+    #[test]
+    fn a_pose_after_a_conversation_is_there_with_the_arm_sagging_short() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        let stand = [0.0, 49.5, 46.1];
+        posing.ask(
+            br#"{"pose":{"shoulder":49.5,"elbow":46.1}}"#,
+            true,
+            Ok(stand),
+            now,
+        );
+        let said = posing.step(Err("conversation"), None, now).unwrap();
+        assert_eq!(value(&said)["why"], "conversation");
+        assert_eq!(
+            posing.ask(br#"{"pose":{"shoulder":80}}"#, true, Ok(stand), now),
+            None
+        );
+        let mut answer = None;
+        for step in 0..=THERE_STEPS {
+            answer = posing.step(Ok(()), standing_at([2_620, 2_535]), now);
+            if answer.is_some() {
+                assert_eq!(step, THERE_STEPS, "settled over THERE_STEPS, no sooner");
+                break;
+            }
+        }
+        let answer = value(&answer.expect("there, not left owed"));
+        assert_eq!(answer["pose"], "there");
+        assert_eq!(answer["clamped"], true);
+        // As reached: 19 and 35 counts under the stand's goals.
+        assert_eq!(answer["shoulder"], 47.8);
+        assert_eq!(answer["elbow"], 43.1);
+    }
+
+    /// Stopped farther short than a sag (`POSE_SAG_WITHIN`): something holds
+    /// the arm, and the pose is cut short in time, as before.
+    #[test]
+    fn a_pose_stopped_far_short_of_its_goal_is_cut_short() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        posing.ask(
+            br#"{"pose":{"shoulder":49.5}}"#,
+            true,
+            Ok([0.0, 49.5, 46.1]),
+            now,
+        );
+        let held = standing_at([2_489, 2_570]);
+        for step in 0..=THERE_STEPS * 3 {
+            assert_eq!(posing.step(Ok(()), held, now), None, "step {step}");
+        }
+        let said = posing.step(Ok(()), held, now + LONGEST_POSE).unwrap();
+        assert_eq!(value(&said)["pose"], "cut_short");
+        assert_eq!(
+            value(&said)["why"],
+            "not there in time: something holds the arm"
+        );
+    }
+
+    /// A joint still moving, even inside the sag, keeps the pose owed: the
+    /// elbow 48 to 8 counts short, rising 2 a step.
+    #[test]
+    fn a_pose_with_a_joint_still_moving_stays_owed() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        posing.ask(
+            br#"{"pose":{"elbow":46.1}}"#,
+            true,
+            Ok([0.0, 49.5, 46.1]),
+            now,
+        );
+        for step in 0..=20 {
+            let moving = standing_at([2_620, 2_522 + 2 * step]);
+            assert_eq!(posing.step(Ok(()), moving, now), None, "step {step}");
+        }
+    }
+
+    /// There once the arm has held its goals for `THERE_STEPS`, said as the
+    /// body kept it (`clamped` when its window cut it); cut short when the
+    /// lease is suspended, the body stops taking a pose, or in time.
+    #[test]
+    fn a_pose_is_there_once_still_and_says_what_was_kept() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        posing.ask(
+            br#"{"pose":{"shoulder":90}}"#,
+            true,
+            Ok([0.0, 52.7, 48.5]),
+            now,
+        );
+        let mut answer = None;
+        for step in 0..=THERE_STEPS {
+            answer = posing.step(Ok(()), seen([0.0, 52.7, 48.5], [2_650, 2_600]), now);
+            if step < THERE_STEPS {
+                assert_eq!(answer, None);
+            }
+        }
+        let answer = value(&answer.unwrap());
+        assert_eq!(answer["pose"], "there");
+        assert_eq!(answer["shoulder"], 52.7);
+        assert_eq!(answer["clamped"], true);
+        // Kept while held: the next pose starts from it.
+        assert_eq!(posing.pose(), Some([0.0, 90.0, 48.5]));
+
+        posing.ask(
+            br#"{"pose":{"elbow":10}}"#,
+            true,
+            Ok([0.0, 52.7, 48.5]),
+            now,
+        );
+        let said = posing.step(Err("conversation"), None, now).unwrap();
+        assert_eq!(value(&said)["why"], "conversation");
+        assert!(posing.pose().is_some(), "a conversation keeps it for later");
+
+        posing.ask(
+            br#"{"pose":{"elbow":10}}"#,
+            true,
+            Ok([0.0, 52.7, 48.5]),
+            now,
+        );
+        let not = Some(PoseSeen {
+            posed: Err("a gesture plays"),
+            ..seen([0.0; 3], [2_650, 2_600]).unwrap()
+        });
+        let said = posing.step(Ok(()), not, now).unwrap();
+        assert_eq!(value(&said)["why"], "a gesture plays");
+
+        posing.ask(
+            br#"{"pose":{"elbow":10}}"#,
+            true,
+            Ok([0.0, 52.7, 48.5]),
+            now,
+        );
+        let moving = |goal| seen([0.0, 52.7, 48.5], [2_650, goal]);
+        assert_eq!(posing.step(Ok(()), moving(2_500), now), None);
+        let said = posing
+            .step(Ok(()), moving(2_480), now + LONGEST_POSE)
+            .unwrap();
+        assert_eq!(value(&said)["pose"], "cut_short");
+
+        let said = posing.end("let go");
+        assert_eq!(said, None, "nothing owed");
+        assert_eq!(posing.pose(), None, "the lease's end lets the pose go");
     }
 }
