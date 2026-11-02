@@ -6803,6 +6803,9 @@ fn conversation_with_gate_inner(
         // LAMP_MEMORY_NIGHTLY=on (`nightly`): idle, at night, with the slide
         // open; never said.
         crate::nightly::start_from_environment();
+        // The memory's night through the relay, with LAMP_MEMORY_TIERS
+        // (`tiers_night`): idle, at night, with the slide open; never said.
+        crate::tiers_night::start_from_environment();
     }
     leases.keep(rig, owner, &mut stalls)?;
     // The level under which sound is not speech, which may follow the room;
@@ -14477,6 +14480,10 @@ fn observe_prospective_heard(
     // (`LAMP_MEMORY_NIGHTLY`); off, one load.
     if !matches!(activity, Activity::Quiet | Activity::Fault(_)) {
         crate::nightly::stir();
+    }
+    // Speech heard stops the memory's night at once (`LAMP_MEMORY_TIERS`).
+    if !matches!(activity, Activity::Quiet | Activity::Fault(_)) {
+        crate::tiers_night::stir();
     }
     let ended = matches!(activity, Activity::End(_));
     Ok((admission.observe(activity, context, at_us)?, ended))

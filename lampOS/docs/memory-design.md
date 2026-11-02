@@ -230,11 +230,34 @@ the shape and what it leaves open:
   tiered store; a request only takes Days' in-memory change log and
   `try_send`s it. The worker's writes share the lamp's disk with Days'
   synchronous commits, which the played test must measure.
-- **No model on the lamp yet.** lamp-memory runs with `PrivateNetwork=yes`
-  and no adapter, so each night ends episodes, expires and fades, prepares
-  the bounded input and is counted `unconfigured`, never a successful night.
-  The relay adapter (DeepSeek through the relay, as above) is its own
-  reviewed change.
+- **The night, through the voice.** lamp-memory stays offline
+  (`PrivateNetwork=yes`, no HTTP client, no relay key): the memory owner's
+  choice (option A, 3 November), with the first builder's bounds (#4710).
+  Each night ends episodes, expires and fades, prepares the bounded input,
+  and queues it as a job (at most 16, all scopes). The voice, with the same
+  switch in its own unit, takes a job on memory's socket
+  (`tiers_sleep_take`) only while the lamp is idle at night: 03:00 to 06:00
+  local, nobody heard or handed a line for 20 minutes, the privacy slide
+  open. It asks the relay's DeepSeek (thinking off, the relay's credential,
+  as the observation pass does) within 60 s a call and at most 16 calls,
+  1 MiB and 200,000 tokens a night for this pass alone (the `nightly`
+  pass keeps its own budget: with `LAMP_MEMORY_NIGHTLY` set too, a night
+  may ask the relay up to twice that; which pass runs is the memory
+  owner's call before the switch goes on), and gives the reply back
+  (`tiers_sleep_give`). The tiered store's validator checks it; memory also
+  checks that every source record is still held by the store and by Days.
+  Speech, a line handed on or the slide closing stops a call at once, the
+  call cancelled and its job dropped (its prompt already sent); no call
+  starts in the night's last 5 minutes. Memory answers each night op
+  within 100 ms (`busy` past it, a give then given again and applied
+  once), so the night never holds its one-at-a-time socket near a turn's
+  first read. A job is given out once: a reply that
+  fails the checks, one the voice could not read, a timed-out call, a job
+  not given back within its 120 s lease, and every job left at 06:00 are
+  dropped and counted, never retried; their records wait for the next
+  night. A forget in a scope drops its jobs. Nothing of the night is ever
+  said or shown. The job carries one scope's words without the scope's
+  name; neither side journals any of its text.
 
 Left open: backfill of earlier Days history; retiring a replaced kept thing
 without a fingerprint; the tiers' `alone` presence condition, which memory
