@@ -4359,12 +4359,17 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   room's`, so with two faces in view the journal says which one a line
   went to (#3699). A face the eyes say `follows` a lost passing id (their
   `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`, #4885, eyes.md "The
-  followed id") is that face: its earlier looks under the same boot are
-  taken as the new id's (`SpeakingFaces::look`; a look with both ids keeps
-  them as two), and a known face file written before the change reads as
-  the new id (`known_with_boot`). So a line across a turn away and back is
-  one face's to `not_theirs` and `no_other_face_in_view`, not two; with the
-  eyes' switches off no link is said and nothing changes. Every person scope taken from a line reads the lease this
+  followed id") is that face, but only on the eyes' word as of the line's
+  end: the links in their last look at or before it, none kept past it,
+  and none whose old id is in that look (`Looks::links_at`, the
+  Reviewer-lead's P1 on #4917: a link the eyes ended is gone at once). Under
+  those links the old id's looks count as the new id's for
+  `speakers_with_boot` and `no_other_face_in_view`, and a look with two
+  faces in it is never one face. The known face is never mapped through a
+  link (`known_with_boot`): only the eyes' file moves it to the new id,
+  once a print of it passes their hold's bar. So a line across a turn away
+  and back is one face's to `not_theirs` and `no_other_face_in_view`, not
+  two; with the eyes' switches off no link is said and nothing changes. Every person scope taken from a line reads the lease this
   narrows (`remember::forget_everything` and `forget_face_memory`, the
   thread's exchanges, `tools.rs`' `keeper_within` and `run_scoped_for`), and
   a narrowed lease never widens (`ScopeLease::late_open`). Risk: an owner
