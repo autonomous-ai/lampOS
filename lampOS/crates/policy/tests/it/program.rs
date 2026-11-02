@@ -620,6 +620,7 @@ fn with_images_the_question_is_asked_again_with_the_eyes_frame_beside_the_decisi
         confidence: 0.9,
         yaw: None,
         facing: Some(true),
+        follows: None,
     };
     eyes.publish_json(0, &Faces { faces: vec![near] }).unwrap();
     thread::sleep(Duration::from_millis(50));

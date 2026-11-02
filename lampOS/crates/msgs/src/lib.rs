@@ -334,6 +334,12 @@ pub struct Face {
     /// "Whether a face is speaking"). Absent when they were not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speaking: Option<Speaking>,
+    /// The passing id of the face this one is taken to be, as the eyes
+    /// followed it across a new track (`f3`), only with the eyes'
+    /// `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on` (#4885). Absent
+    /// otherwise; a reader that does not know it ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub follows: Option<String>,
 }
 
 /// A face's mouth, judged from its landmarks over the last second or so.
@@ -1922,6 +1928,7 @@ mod tests {
             confidence: 0.875,
             yaw: Some(-0.25),
             facing: Some(true),
+            follows: None,
         };
         let unjudged = Face {
             id: "f8".into(),

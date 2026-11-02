@@ -234,6 +234,7 @@ impl Rig {
                     confidence: 0.9,
                     yaw: None,
                     facing: Some(true),
+                    follows: None,
                 };
                 let _ = eyes.publish_json(0, &Faces { faces: vec![near] });
                 thread::sleep(ms(100));

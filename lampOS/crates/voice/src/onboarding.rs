@@ -7779,6 +7779,7 @@ mod tests {
             confidence: 1.0,
             yaw: None,
             facing: None,
+            follows: None,
         };
         let faces = lamp_msgs::Faces {
             faces: vec![face(0.0, 0.0, 0.1), face(0.4, 0.4, 0.2)],

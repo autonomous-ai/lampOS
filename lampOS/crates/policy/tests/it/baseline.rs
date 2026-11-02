@@ -209,6 +209,7 @@ fn a_small_facing_face_opens_voice_even_when_the_policy_near_count_is_zero() {
         confidence: 1.0,
         yaw: Some(0.0),
         facing: Some(true),
+        follows: None,
     };
     face.check().unwrap();
     assert!(face.ymax - face.ymin < 0.15);

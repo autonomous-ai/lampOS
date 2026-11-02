@@ -119,6 +119,7 @@ impl Scene {
                             yaw: None,
                             facing: None,
                             speaking: None,
+                            follows: None,
                         })
                         .collect(),
                 },

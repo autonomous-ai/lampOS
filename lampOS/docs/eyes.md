@@ -780,7 +780,9 @@ this room" until someone asks to be recognised.
   every two seconds again, so two near faces whose largest flips look to
   look force one check each, not a print every look
   (`who::recognise_due_near`). It needs a passing id, so `LAMP_EYES_SPEAKING`;
-  off, the two seconds stand as before. A face from a photo is not: it is
+  off, the two seconds stand as before. With `LAMP_FACE_KNOWN_HOLD=on` as
+  well, that first check of a new id that follows the held one carries the
+  hold to it ([below](#held-through-a-miss-lamp_face_full_cropon-3126), #4885). A face from a photo is not: it is
   named only on its person's yes. The camera gives 320 by 240, so a face at the desk is 35 to
   65 pixels tall. Whether that is enough is to be measured with people
   (the camera can give 640 by 480 if not). With `LAMP_FACE_FULL_CROP=on`
@@ -1086,6 +1088,29 @@ without the full-frame crop, for a lamp that keeps the shrunk picture's
 prints: on lamp-52e6 on 27 Oct each missed check removed the known file
 and the next match wrote it back, and the voice journaled its face cache
 cold each time (8 to 23 times a run).
+
+**The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
+`LAMP_FACE_REFOUND=on` (off unless set; `bus_out::follows_from_environment`).
+A face turned away and back usually comes back on a new passing id, and the
+hold, which needs the match's id, let them go. With both on:
+
+- **Followed.** A new id follows an old one when, as it came, exactly one id
+  kept from the last 1.5 s but not seen in that look, and not followed
+  already, has its box's centre within the new box's width of the new box's
+  centre (`bus_out::Ids::followed`). Two such ids, or two new faces near one
+  lost one, follow nothing; the old id seen again ends the link; it lasts
+  while the new id is kept.
+- **The hold carried.** Within the hold, with one near face whose new id
+  follows the id at the match, that id becomes the match's
+  (`who::Held::follow`), and the known face beside the known file is
+  rewritten to it with the name as it was. The rules above still apply to
+  it: under 0.30 alike lets them go, someone else matched replaces them,
+  and two near faces never follow.
+- **Said on the bus.** `humans/faces/tracked` gives the new face
+  `"follows":"f3"`, the id it follows; the second voice then reads a line
+  across the change as one face's ([second-voice.md](second-voice.md)).
+
+With either switch off nothing is followed and no `follows` is said.
 
 Off, nothing changes: each miss lets go, as before. The lamp check: on
 lamp-52e6, the lead's face from a seat with the switch on and off, the
@@ -1698,6 +1723,8 @@ process, shows there before any trial waits for it. For each face:
 - **a passing id** (`f1`, `f2`, ...): the same from one look to the next
   for as long as its box overlaps where it was within the last 1.5 s,
   a new one after that, never given twice, and never a person's name;
+  with `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`, a new one may
+  say which lost id it follows (`follows`, [above](#held-through-a-miss-lamp_face_full_cropon-3126), #4885);
 - **its box**, each edge as a fraction of the picture;
 - **how sure the detector was**;
 - **how far it is turned**, in radians, and **whether that counts as

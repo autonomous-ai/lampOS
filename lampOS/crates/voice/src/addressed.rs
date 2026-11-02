@@ -287,6 +287,7 @@ mod tests {
             confidence: 0.9,
             yaw: None,
             facing,
+            follows: None,
         }
     }
 

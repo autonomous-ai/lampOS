@@ -203,6 +203,7 @@ async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> R
                                         score: 0.9,
                                         from: None,
                                     }),
+                                    follows: None,
                                 })
                                 .into(),
                         };
