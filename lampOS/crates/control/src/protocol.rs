@@ -485,6 +485,12 @@ pub enum Op {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         size: Option<String>,
     },
+    /// The microphone's sound as binary `microphone.audio` frames, each
+    /// 20 ms block the ears share, until `on: false`, `stop`, the client
+    /// goes, the lamp turns private or no block comes for 2 s
+    /// (`microphone.ended`, with why).
+    #[serde(rename = "microphone.stream")]
+    MicrophoneStream { on: bool },
 }
 
 impl Op {
@@ -532,6 +538,7 @@ impl Op {
                 vec![Grant::Skills]
             }
             Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
+            Self::MicrophoneStream { .. } => vec![Grant::Microphone],
         };
         needs.sort();
         needs.dedup();
@@ -860,7 +867,8 @@ impl Op {
             | Self::Stop {}
             | Self::SkillList {}
             | Self::SoundList {}
-            | Self::CameraSnapshot {} => {}
+            | Self::CameraSnapshot {}
+            | Self::MicrophoneStream { .. } => {}
             Self::Volume { to, step, mute } => {
                 let asked = usize::from(to.is_some())
                     + usize::from(step.is_some())
@@ -1491,6 +1499,21 @@ mod tests {
             let frame = format!(r#"{{"id":1,"op":"camera.stream","on":true,"fps":{fps}}}"#);
             assert_eq!(why(&frame).1, "fps: 1 to 30", "{fps}");
         }
+    }
+
+    #[test]
+    fn a_microphone_stream_is_on_or_off_under_the_microphone_grant() {
+        for on in [true, false] {
+            let frame = format!(r#"{{"id":1,"op":"microphone.stream","on":{on}}}"#);
+            assert_eq!(op(&frame).check(), Ok(()), "{on}");
+            assert_eq!(op(&frame).needs(), [Grant::Microphone]);
+        }
+        // Nothing else: no rate, no size.
+        assert_eq!(
+            why(r#"{"id":1,"op":"microphone.stream","on":true,"fps":5}"#).0,
+            Some(1)
+        );
+        assert_eq!(why(r#"{"id":1,"op":"microphone.stream"}"#).0, Some(1));
     }
 
     #[test]

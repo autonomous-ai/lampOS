@@ -1583,3 +1583,49 @@ test('poses a move cannot make are refused with the joint, before sending', asyn
     assert.deepEqual(sent[0].frames, posesToFrames([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 }));
   });
 });
+
+test('the microphone streams 20 ms blocks with the microphone grant only, says lost blocks, and ends when private', async () => {
+  await withLamp({ grants: ['light', 'microphone'] }, async (lamp, fake) => {
+    const blocks = [];
+    const ended = [];
+    lamp.on('microphone.audio', (block) => blocks.push(block));
+    lamp.on('microphone.ended', (event) => ended.push(event));
+    const reply = await lamp.microphoneStream();
+    assert.deepEqual(
+      [reply.stream, reply.sample_rate, reply.channels, reply.format, reply.block_ms, reply.source],
+      ['on', 16000, 1, 's16le', 20, 'mic1'],
+    );
+    await until(() => blocks.length >= 3);
+    const [first] = blocks;
+    assert.equal(first.ev, 'microphone.audio');
+    assert.equal(first.lost, 0);
+    assert.equal(first.format, 's16le');
+    assert.equal(first.bytes, 640);
+    assert.equal(first.data.length, 640);
+    // Blocks lost on the way are said in the next one.
+    fake.loseAudio(4);
+    await until(() => blocks.some((block) => block.lost === 4));
+    // Off: no more blocks and no event.
+    assert.equal((await lamp.microphoneStream(false)).stream, 'off');
+    const after = blocks.length;
+    await new Promise((r) => setTimeout(r, 80));
+    assert.equal(blocks.length, after);
+    assert.equal(ended.length, 0);
+    // Private: a stream ends at once, and a new one is refused.
+    await lamp.microphoneStream(true);
+    fake.setPrivate();
+    await until(() => ended.length === 1);
+    assert.deepEqual(ended[0], { ev: 'microphone.ended', why: 'the lamp is private' });
+    await assert.rejects(lamp.microphoneStream(true), byCode.private);
+    // Someone else in view: the same, with its own why.
+    fake.setPrivate(false);
+    await lamp.microphoneStream(true);
+    fake.setInView(2);
+    await until(() => ended.length === 2);
+    assert.deepEqual(ended[1], { ev: 'microphone.ended', why: 'someone else is here' });
+    await assert.rejects(lamp.microphoneStream(true), (error) => error instanceof byCode.refused && /someone else/.test(error.message));
+  });
+  await withLamp({}, async (lamp) => {
+    await assert.rejects(lamp.microphoneStream(true), byCode.no_grant);
+  });
+});

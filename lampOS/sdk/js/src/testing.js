@@ -30,6 +30,26 @@ const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 // The fake's camera picture: the smallest whole JPEG (start and end markers).
 export const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 
+// The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
+// 320 samples, mono, 16 kHz, S16LE.
+export const AUDIO_RATE = 16_000;
+export const AUDIO_BLOCK = 320;
+export const AUDIO_EVERY_MS = 20;
+// Why lamp-control refuses or ends a microphone stream with more than one
+// person in view (microphone.rs `SOMEONE_ELSE`).
+export const SOMEONE_ELSE = 'someone else is here';
+
+// Block `sequence` of a quiet tone, as signed 16-bit little-endian samples:
+// 640 bytes, continuous from one block to the next.
+export function toneBlock(sequence, hz = 440, level = 1000) {
+  const samples = Buffer.alloc(AUDIO_BLOCK * 2);
+  const start = sequence * AUDIO_BLOCK;
+  for (let n = 0; n < AUDIO_BLOCK; n += 1) {
+    samples.writeInt16LE(Math.trunc(level * Math.sin((2 * Math.PI * hz * (start + n)) / AUDIO_RATE)), n * 2);
+  }
+  return samples;
+}
+
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
 
 // `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
@@ -334,6 +354,10 @@ export class FakeLamp {
     this.turns = new Map();
     this.mutes = new Map();
     this.clientOf = new Map();
+    // Each connection's microphone stream (`microphone.stream`), and the
+    // made-up ears' next block's `sequence`.
+    this.listening = new Map();
+    this.audioSequence = 0;
   }
 
   async listen() {
@@ -350,6 +374,7 @@ export class FakeLamp {
   }
 
   async stop() {
+    for (const ws of [...this.listening.keys()]) this.stopListening(ws);
     for (const ws of this.wss.clients) ws.terminate();
     await new Promise((resolve) => this.wss.close(resolve));
     this.https.closeAllConnections();
@@ -436,6 +461,61 @@ export class FakeLamp {
     for (const held of [...this.following.keys()]) if (ws === undefined || held === ws) this.following.delete(held);
   }
 
+  // The made-up ears skip `blocks` blocks, as sound lost on the way: the next
+  // block's `sequence` jumps, and each stream says it in `lost`.
+  loseAudio(blocks) { this.audioSequence += blocks; }
+
+  // The privacy switch: on, every microphone stream ends at once with
+  // `microphone.ended`, as lamp-control's do, and a new one is refused.
+  setPrivate(isPrivate = true) {
+    this.state.lamp.private = isPrivate;
+    if (isPrivate) this.endListening('the lamp is private');
+  }
+
+  // How many people are in view (`presence`'s `count`): above one, every
+  // microphone stream ends at once with `microphone.ended` ("someone else is
+  // here"), and a new one is refused, as lamp-control does, since it can't
+  // tell the owner from anyone else.
+  setInView(count) {
+    this.state.presence.count = count;
+    if (count > 1) this.endListening(SOMEONE_ELSE);
+  }
+
+  endListening(why) {
+    for (const ws of [...this.listening.keys()]) {
+      this.stopListening(ws);
+      ws.send(JSON.stringify({ ev: 'microphone.ended', why }));
+    }
+  }
+
+  stopListening(ws) {
+    clearInterval(this.listening.get(ws));
+    this.listening.delete(ws);
+  }
+
+  // One block every 20 ms of a quiet 440 Hz tone, as binary frames: the
+  // header's length, the header, then the samples.
+  listenFor(ws) {
+    let last = null;
+    const block = () => {
+      const sequence = this.audioSequence;
+      this.audioSequence += 1;
+      const lost = last === null ? 0 : Math.max(sequence - last - 1, 0);
+      last = sequence;
+      const samples = toneBlock(sequence);
+      const header = Buffer.from(JSON.stringify({
+        ev: 'microphone.audio', sequence, lost, sample_rate: AUDIO_RATE, channels: 1, format: 's16le', bytes: samples.length,
+      }));
+      const length = Buffer.alloc(4);
+      length.writeUInt32BE(header.length);
+      ws.send(Buffer.concat([length, header, samples]));
+    };
+    block();
+    const timer = setInterval(block, AUDIO_EVERY_MS);
+    timer.unref();
+    this.listening.set(ws, timer);
+  }
+
   unfollow(lease) {
     for (const [held, following] of [...this.following]) if (following.lease === lease) this.following.delete(held);
   }
@@ -495,6 +575,7 @@ export class FakeLamp {
       const gone = this.clientOf.get(ws);
       this.clientOf.delete(ws);
       if (gone && ![...this.clientOf.values()].includes(gone)) this.mutes.delete(gone);
+      this.stopListening(ws);
       for (const [lease, held] of this.leases) if (held.ws === ws) this.leases.delete(lease);
     });
     ws.on('message', (data) => {
@@ -617,6 +698,7 @@ export class FakeLamp {
     return {
       express: ['body', 'light'], light: ['light'],
       'camera.snapshot': ['camera'], 'camera.stream': ['camera'],
+      'microphone.stream': ['microphone'],
       'turn.start': ['speak', 'hear'], 'listen.set': ['hear'],
     }[op] ?? [];
   }
@@ -744,9 +826,21 @@ export class FakeLamp {
         this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
         ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0, fps_now: null }));
         return undefined;
+      case 'microphone.stream':
+        // As lamp-control's microphone.rs: on again replaces it, off ends it
+        // with no event, and none while the lamp is private.
+        this.stopListening(ws);
+        if (!request.on) return this.ok(ws, id, { stream: 'off' });
+        if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'the lamp is private');
+        if (this.state.presence.count > 1) return this.refuse(ws, id, 'refused', SOMEONE_ELSE);
+        this.ok(ws, id, { stream: 'on', sample_rate: AUDIO_RATE, channels: 1, format: 's16le', block_ms: AUDIO_EVERY_MS, source: 'mic1' });
+        this.listenFor(ws);
+        return undefined;
       case 'stop':
-        // The holder's stop ends its following, as any of its actions.
+        // The holder's stop ends its following, as any of its actions, and
+        // its microphone stream, with no event.
         this.stopFollowing(ws);
+        this.stopListening(ws);
         return this.ok(ws, id);
       case 'express': {
         // As lamp-control's feelings.rs: the feelings skill's three, its

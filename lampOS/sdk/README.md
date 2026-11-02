@@ -206,7 +206,7 @@ Python names first, JavaScript where it differs.
 | Kinds of sound | `sound.heard` | `on("sound.heard")` | `lamp_events` | done | Nine | not yet |
 | Open a conversation turn, or end its own | `turn.start`, `turn.end` | `start_turn`, `end_turn` / `startTurn`, `endTurn` | `lamp_start_turn`, `lamp_end_turn` | done | Nine | 75c9 3–4 Nov, combined builds: turn answered, same computer continuing, own end cutting a story (by ear) |
 | A computer's own mute | `listen.set` | `set_listening` / `setListening` | `lamp_set_listening` | done | Nine | not yet |
-| The microphone's audio, local only | `microphone` grant only, not routed yet | — | — | missing | harness-reviewer | not yet |
+| The microphone's audio, local only | `microphone.stream`, `microphone.audio` (binary 20 ms blocks), `microphone.ended`; off unless `--microphone on` | `microphone_stream` / `microphoneStream`, `on("microphone.audio")` | — (a stream is for a program, as the camera's) | missing (local, waits for the owner's privacy yes) | banana | not yet |
 
 ### Eyes and camera
 

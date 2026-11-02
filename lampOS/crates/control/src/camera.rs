@@ -200,15 +200,30 @@ fn drawn_since(drawn: &Drawn, client: &str, since: std::time::Instant) -> bool {
     drawn(client).is_some_and(|at| at >= since && at.elapsed() <= MARK_SHOWN_WITHIN)
 }
 
+/// Whether a stream `client` began at `started` may send now, by its mark
+/// as the ring said it drew it: the camera's pictures and the
+/// microphone's blocks alike.
+pub fn shown(drawn: &Drawn, client: &str, started: std::time::Instant) -> Shown {
+    if drawn_since(drawn, client, started) {
+        Shown::Yes
+    } else if started.elapsed() < MARK_SHOWN_WITHIN {
+        Shown::NotYet
+    } else {
+        Shown::Never
+    }
+}
+
 /// A stream's mark is asked again this often...
 pub const MARK_EVERY: Duration = Duration::from_secs(1);
 /// ...to hold this far ahead, so one lost renewal leaves no gap.
 pub const MARK_HOLDS: Duration = Duration::from_secs(2);
 
 /// The mark asked for on the bus, `lamp_msgs::RingMark` on `light/mark`, on
-/// the boot's monotonic clock `clock_id`, with `publish` sending it.
+/// the boot's monotonic clock `clock_id`, as `kind` (the camera's, or the
+/// microphone's), with `publish` sending it.
 pub fn mark_on(
     clock_id: String,
+    kind: lamp_msgs::MarkKind,
     publish: impl Fn(&lamp_msgs::RingMark) + Send + Sync + 'static,
 ) -> Mark {
     Arc::new(move |client: &str, blink: bool| {
@@ -220,7 +235,7 @@ pub fn mark_on(
                 clock_id: clock_id.clone(),
                 until_us: now_us + u64::try_from(MARK_HOLDS.as_micros()).unwrap_or(u64::MAX),
             },
-            kind: lamp_msgs::MarkKind::Camera,
+            kind,
             blink,
         });
     })
@@ -396,17 +411,13 @@ impl Camera {
                     mark(&client, false);
                     *at = Some(std::time::Instant::now());
                 }
-                if drawn_since(&drawn, &client, started) {
-                    Shown::Yes
-                } else if started.elapsed() < MARK_SHOWN_WITHIN {
-                    Shown::NotYet
-                } else {
-                    Shown::Never
-                }
+                shown(&drawn, &client, started)
             };
             match fast {
                 Some((reader, sink, size)) => {
-                    let send = |frame: &[u8]| sink(&client, turn, frame);
+                    let send = |frame: &[u8]| {
+                        sink(&client, crate::parts::Media::Camera, Some(turn), frame);
+                    };
                     run_fast(
                         reader,
                         size,
@@ -863,10 +874,14 @@ mod tests {
         let got: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
         let into = got.clone();
         let sink: Sink = Arc::default();
-        let _ = sink.set(Arc::new(move |client: &str, _turn: u64, frame: &[u8]| {
-            assert_eq!(client, "c_1");
-            into.lock().unwrap().push(frame.to_vec());
-        }));
+        let _ = sink.set(Arc::new(
+            move |client: &str, media, _turn: Option<u64>, frame: &[u8]| {
+                assert_eq!(client, "c_1");
+                assert_eq!(media, crate::parts::Media::Camera);
+                into.lock().unwrap().push(frame.to_vec());
+                true
+            },
+        ));
         let mut camera = Camera::new(sight, Arc::new(|| false))
             .marking(Arc::new(|_, _| {}), drawn_now())
             .fast(socket, sink);
