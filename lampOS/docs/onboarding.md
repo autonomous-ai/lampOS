@@ -638,9 +638,11 @@ opening a Korean line is a yes, as 응 is, only when a bare yes follows it
 근데" are put-offs and "어… 민수예요" is a name (a Korean commenter's note
 on #4473). A Korean strict no after a
 "but" (근데, 하지만, 그런데, 그렇지만, 다만) is a clear no at any length,
-never put off: "고마워, 하지만 안 해도 돼" is a no, while "네, 근데요" and
-"아니, 하지만 해도 돼" stay no answer. 그래 and 맞아맞아 are strict yeses,
-"하지 않아도 돼" a strict no; 됐어 ("I'm ready" or "no thanks"), 다음 and
+never put off, and it refuses: "고마워, 하지만 안 해도 돼" and "네, 근데
+이름이 틀려요" are a no, while "네, 근데요", "아니, 하지만 해도 돼", a "but"
+with another put-off ("글쎄, 근데 싫지는 않아요") and "아니면" ("or else")
+after it ("좋아, 근데 아니면 말고") stay no answer. 그래 and 맞아맞아 are strict yeses,
+"하지 않아도 돼" a strict no (but "굳이 묻지 않아도 돼요", "no need to ask", is none); 됐어 ("I'm ready" or "no thanks"), 다음 and
 패스 are no answer and no name (the same commenter's second read). Once the hello is asked, it takes only that bare yes or a short
 strict no (`yes_or_no`, as the face consent does). It's #4480's English
 rule (`PUTS_OFF`, `PUTS_OFF_TOGETHER`, short or firm) made strict. English
@@ -664,7 +666,7 @@ stem of one syllable keeps its 야 ("수야"), and a name ending in 아 keeps it
 | strict yes (`yes_or_no`) | có, vâng, dạ, ừ, được, đồng ý, đúng, chắc chắn | はい, うん, ええ, いいよ, いいですよ, もちろん, そうです | 是的, 是啊, 好, 可以, 对, 当然 | 네, 예, 응, 좋아, 좋아요, 맞아, 맞아요, 맞습니다, 물론, 물론이죠, 물론이에요, 넵, 네네, 예예, 넹, 그럼요, 그러세요, 당연하죠, 당연하지, 좋습니다, 오케이, 허락할게요, 그래, 맞아맞아 |
 | put off (no answer) | có lẽ, có thể, để mình nghĩ, để tôi nghĩ, để em nghĩ, để xem, chờ, đợi, chưa biết, không biết, nhưng, ừm, ờm, ơ, lát nữa, để sau, từ từ, nói chậm, kiểm tra, giải thích | ちょっと, 待って, 考え, わから, かな, ええと, えーと, えっと, そうですね, でも, うーん, ふうん, たぶん, 多分, あとで, 後で, ゆっくり, 確認, 説明 | 想想, 想一下, 好像, 等, 不知道, 对了, 但是, 可是, 也许, 可能, 嗯, 呃, 以后再, 稍后, 晚点, 慢点, 解释, 一会儿 | 나중에, 천천히, 설명, 확인, 잠시, 그래서, 글쎄, 잠깐, 생각, 예를, 근데, 하지만, 아마, 그런데, 그렇지만, 그래도, 어쩌면, 혹시, 이따, 다음에, 모르겠, 아직, 다만, "음 " |
 | a question without its mark | | ですか, ますか, でしょうか, かな (ending a phrase) | 吗, 呢 | 까요, 나요, 니까, 인가요, 건가요, 는가요, 래요, 죠, 지요 (ending a word, unless a bare yes) |
-| strict no | không, ko, đừng, sai | いいえ, いや, だめ, ダメ, 嫌, やだ, 違, 結構です | 不, 没有, 别, 错 | 아니, 아닙니다, 아뇨, 싫, 안 돼, 안돼, 안 됩니다, 안됩니다, 안 해, 하지 마, 하지마, 하지 말아, 말아, 틀려, 않아도 |
+| strict no | không, ko, đừng, sai | いいえ, いや, だめ, ダメ, 嫌, やだ, 違, 結構です | 不, 没有, 别, 错 | 아니, 아닙니다, 아뇨, 싫, 안 돼, 안돼, 안 됩니다, 안됩니다, 안 해, 하지 마, 하지마, 하지 말아, 말아, 틀려, 하지 않아도 |
 | polite (may go with a bare yes) | ạ, nhé, nha, rồi, làm ơn, cảm ơn | お願いします, お願い, どうぞ, です, よ, ね | 请, 谢谢, 的, 啊, 呀, 哦 | 부탁해요, 부탁합니다, 부탁드려요, 주세요, 감사합니다, 고마워요, 그렇게 하세요, 그러세요, 해도 돼요, 하세요, 돼요, 됩니다, 해요, 해, 요 |
 | about the hello | chào, lời chào | あいさつ, 挨拶, こんにちは | 打招呼, 招呼, 问好, 你好 | 인사, 안녕 |
 | greetings | chào buổi sáng, chào buổi chiều, chào buổi tối, xin chào, chào, alo, hello, hi | こんにちは, こんばんは, おはよう, やあ, もしもし, ハロー, hello | 早上好, 下午好, 晚上好, 你好, 您好, 早安, 晚安, 嗨, 哈喽, hello | 좋은 아침, 좋은 저녁, 안녕, 여보세요, 반가워, 반갑, 하이, 헬로, hello, hi |
