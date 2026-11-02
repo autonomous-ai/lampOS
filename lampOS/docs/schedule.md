@@ -374,6 +374,19 @@ hour), is stepped over: an `every` is never said twice or out of order. After
 time off, only the newest missed one is due, marked late, as for daily ones.
 "Stop reminding me" cancels the whole series, as `cancel_reminder` does today.
 
+**By voice** (lamp-9adf, 2 Nov 19:13: "stop reminding me to drink water"
+was taken for the wellbeing nudges and turned them off, and "cancel my
+drink water reminder" got words and no call): `cancel_reminder`'s
+description names those phrases and says a reminder the person set is never
+`wellbeing_nudges`. It takes `text` when no id is known: lamp-actions reads
+the line's own list (`list_set`, every page up to eight) and cancels the one
+item whose text holds the words by its id, the same guarded `Cancel`. Two or
+more that match are named back (`"cancelled": false`, `matches`) for the
+model to ask which; none is said as none. Tests:
+`cancel_reminder_names_stop_reminding_me_and_is_never_the_nudges`,
+`cancel_by_text_cancels_the_one_match_and_names_several` (actions'
+`tests/it/schedule.rs`).
+
 **Stored as schema 2, only while one is kept.** `every` is a new stored value,
 so this build reads schema 1 and 2 and writes 2 only while the store holds an
 `every`; otherwise it still writes 1, which a build from before reads as it
@@ -604,7 +617,7 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `set_reminder` | `text`, `time` | `day`, `zone`, `fold` | `Set` with `At` |
 | `repeat_reminder` | `text`, `time`, `every` | `weekday` (required for weekly), `zone` | `Set` with `Daily` or `Weekly` |
 | `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own, and the room's short timers |
-| `cancel_reminder` | `id` | none | `Cancel` of the selected whole item/series, only the line's own |
+| `cancel_reminder` | `id`, or `text` | none | `Cancel` of the selected whole item/series, only the line's own; by `text`, the one item whose text holds the words (case and edge spaces aside), resolved from the line's own list, else the matches named and nothing cancelled |
 | `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, only the line's own |
 
 Text is 1–300 UTF-8 bytes, nonblank and without controls. Seconds are whole
