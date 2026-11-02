@@ -2547,7 +2547,8 @@ with the known face's id the eyes keep beside the known file
   with it off. Offline only: a talking face with one 14 px look reads `yes`,
   a still one `no`; two such looks, or one in a window of five, `unknown`.
 - **The head's own moves, and a meshed face's eye floor
-  (`LAMP_EYES_SPEAKING_STEADY=on`, off unless set, #4558).** Off, a look
+  (`LAMP_EYES_SPEAKING_STEADY=on`, off unless set, #4558; on in the
+  product's `lamp-eyes.service`, the memory owner's yes on #4710).** Off, a look
   taken while the lamp's head turns moves the mesh's crop, and the change
   reads as lips: on #2859's still run on lamp-52e6 two paused faces read
   `yes` together while both boxes moved, and faces under 24 detector pixels
