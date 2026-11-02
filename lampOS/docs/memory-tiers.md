@@ -1,9 +1,11 @@
-# Tiered memory: isolated store and sleep validation
+# Tiered memory: isolated engine and benchmark adapter
 
 This experimental Rust library has its own SQLite database. No product crate
-uses it, no service starts it, and it changes nothing on a lamp. The first
-implementation contains storage and validated consolidation; cue recall and
-the memory-bench adapter follow separately. The approved design is in
+uses it, no service starts it, and it changes nothing on a lamp. The library contains storage, validated consolidation, cue recall and
+registered ablations. Its benchmark adapter is an ordinary binary target, listed
+as development-only in the release inventory and never packaged for a lamp.
+Only that binary can create disposable probe copies; the library has no copy or
+restore API. The approved design is in
 [memory-design.md](memory-design.md); the benchmark boundary is
 [memory-bench.md](memory-bench.md).
 
@@ -41,6 +43,8 @@ This library does not recognize a face or voice and does not infer a different
 speaker from a model's output. `Incoming` includes an explicit addressed-to-lamp
 flag, topic, absolute timestamp, source strength and optional speech confidence.
 Unknown confidence remains `None`; it is not converted to a guessed number.
+The adapter closes an episode on departure/session end only when both the
+observed owner label and person id match this store, as speech capture requires.
 
 | Stored item | Evidence and lifetime |
 |---|---|
@@ -81,7 +85,7 @@ network request inside Store:
    for that local day's pass. The database is released before any model call.
 3. `ModelClient::propose` sends that input using its configured transport.
    Nightly and weekly use the same client. Tests inject fixture responses;
-   the bench adapter will use the runner's broker. No key is needed by an arm.
+   the bench adapter uses the runner's broker and single cost client instead. No key is needed by an arm.
 4. `apply_sleep` parses at most 32 KiB, with at most 32 facts, 32 lines and
    32 episode changes. It rechecks identity, generation, revision and exact
    source content, and validates every proposal inside one write transaction.
@@ -118,8 +122,11 @@ latest source, so late consolidation cannot give an old plan a fresh lifetime.
 Preferences, habits and identity have no age expiry unless an explicit validity
 end was supplied. Expiry keeps fact history while removing its active views.
 Low-importance episodes (below 0.5) lose copied detail after 90 days without a
-recall; their gist and original record remain. Recall reinforcement is part of
-the next implementation, not demonstrated by this first one.
+recall; their gist and original record remain. `recall` is read-only. A caller can separately acknowledge context it actually
+consumed with `acknowledge_recall`; only that action reinforces the episode.
+The benchmark protocol has no consumption acknowledgement, so the adapter does
+not reinforce on selection or on a possibly late response. Probe mutations
+would be discarded in any case.
 
 ## Forgetting and cancellation
 
@@ -156,6 +163,184 @@ The library never caches a serialized request internally after completion.
 Already transmitted bytes cannot be recalled from a provider, and a caller that
 copies source data is responsible for erasing its own conversation/snapshot
 caches. Raw exported records are privileged data, not a revocable capability.
+
+## Cue recall and the session snapshot
+
+A recall receives observed people, activity, objects, topic, words heard so far,
+time, access scope, and a byte limit. It ranks eligible FTS5 matches with
+recency and episode importance, follows fact links to people/place/life-story
+lines, and considers a bounded recent fallback. Up to eight distinct cue terms
+are reserved before question words. Excluded kinds and expired facts do not
+consume the 128-candidate FTS limit. At most eight items are returned; a
+session snapshot may return the bounded 60 owner-model lines.
+
+Facts keep their exact quotes and source certainty. Episode summaries persist
+the actual cited record ids, rather than treating the whole episode as evidence;
+missing or future sources withhold the summary. Unsummarized recent episodes
+use at most four exact owner records. Faded detail is never reconstructed from
+the record on the ordinary recall path. An explicit history request may still
+retrieve an original record, because fading is not forgetting. The adapter
+maps internal numeric ids back to the fixture's stable source ids.
+
+The local budgets are 200 ms for recall and 300 ms for a session snapshot.
+SQLite progress callbacks interrupt expensive reads; a late result is empty.
+Storage contention is an error, not a successful empty lookup. The runner owns
+the complete pipe-to-response deadline and ignores late responses. These limits
+do not promise an operating-system storage latency or first-audio bound.
+
+Byte accounting includes context, owner-model text, memory instructions and any
+memory tools. This adapter advertises no tools. It subtracts a cached session
+snapshot's bytes from each recall allowance and returns no duplicate owner-model
+lines in recall. Forget, sleep changes, session end, and scope changes invalidate
+its snapshot accounting. The caller must also discard previously delivered
+context on those boundaries. The agreed runner rule invalidates all cached
+memory after every ingestion or state-changing operation and refreshes the
+snapshot before reuse, so ordinary forgetting requires no intent guess by the
+runner; a library cannot erase bytes copied by a caller.
+
+## Benchmark protocol and registered arms
+
+Build the isolated adapter from the repository root with its exact revision:
+
+```sh
+LAMP_MEMORY_TIERS_REVISION=$(git rev-parse HEAD) cargo build --manifest-path lampOS/Cargo.toml -p lamp-memory-tiers --bin lamp-memory-tiers-arm
+```
+
+A source-only build can set the same variable from its recorded source manifest.
+Without it, initialization reports `unversioned`, unsuitable for scored runs.
+The process speaks [contract v2](memory-bench.md#json-lines-arm-contract-draft-v21),
+pinned at `5cfcb7455`, on standard input/output. It requires a fresh private
+state directory and an explicit IANA zone. Frames are bounded to 4 MiB. Unknown
+operations, bad ordering, duplicate request ids and backward clocks fail.
+Diagnostics contain no source text. It opens no socket and loads no credential.
+
+Each sleep handles one bounded batch, with one runner-brokered chat request,
+at most 8192 output tokens and a timeout no longer than 60 seconds. Successful
+apply reports whether work remains and an opaque cursor. A sleep or topic
+proposal rejected by validation is initially a skipped night: no proposal changes
+commit, its records remain eligible for a later pass, and the reply has
+`pending=false` with no continuation cursor. On the second rejection of the same
+topic batch, code keeps that bounded batch together as one session-only range,
+through the normal transactional source/forget checks, then continues to the next
+batch and ordinary consolidation. Its reply reports `topic session-only fallback`.
+No model text is accepted from the rejected proposal. Normal batch bounds still
+apply; a hard batch boundary is not merged across. The retry identity holds only
+bounded source ids, is isolated/restored with probes, and is cleared by forgetting
+or pausing. A changed batch starts with one skipped attempt again.
+
+`stats.skipped_sleeps` counts all rejected proposals (including the second one
+that triggers fallback), outside probe restoration; they do not reset model-call
+or cost accounting. `stats.topic_batches` counts completed main-session topic
+batches, including fallbacks; `stats.topic_fallbacks` counts the fallback subset.
+Retries never enlarge this denominator; isolated probes change neither score
+counter. The session-cutting-only control has zero topic batches and fallbacks.
+
+The coordinator's 2 November ruling, before any candidate score: the bench card
+shows both counts, and a run with `topic_fallbacks * 10 > topic_batches` is invalid
+for scoring (score null, ledger retained). Exactly 10% does not invalidate it.
+The bench owns card rendering and score invalidation; these adapter counters do
+not themselves turn an external score null.
+The sleep prompt explicitly limits each proposal kind to 32 items, and both
+prompts contain lowercase `json` for providers requiring it in JSON-object mode.
+Broker refusal, timeout or identity mismatch ends the
+process without retry; the runner records the failure and keeps its reservation.
+A storage error also ends the process, so an uncertain deletion cannot be
+followed by another answer using possibly stale state. It is recorded as a
+failed run, never a successful privacy result.
+The shared memory-text cap counts the UTF-8 owner-model, recalled context and
+memory-instruction text returned by the arm. Runner JSON framing is outside that
+cap and reported separately for every arm; it still belongs to the total model
+input and cost accounting. The 500-byte protocol regression covers text that fits
+while its serialized reply framing exceeds 500 bytes.
+
+The runner is the sole model-cost owner, including calls during isolated probes.
+Unknown provider usage is accepted without substituting zero; the runner keeps
+its full reservation. Owner ids accept the contract's 128-byte limit.
+
+Ordinary English input recognizes explicit remember, pause/resume and forget
+requests using documented deterministic prefixes. Remember copies the owner
+line. Forget supports "forget …", "please forget …", "do not remember …"
+and "do not keep …" (including contractions), the previous line, or an explicit
+full-memory target. A lexical target selects matching record/fact words; code
+then performs the same cascading deletion and fingerprinting. Commands are not
+stored as new evidence. "Don't remember this" pauses capture until an explicit
+resume. An identified owner can erase or pause even with other people present;
+the owner-alone restriction applies to capture and disclosure. This is a limited recognizer, not a claim of general
+paraphrase or multilingual understanding. The main benchmark must measure its
+misses and excessive deletions. No hidden intent flag is accepted. Ingestion
+retains only attributed owner speech in an observed owner-alone room; assistant,
+visitor, unsure and mixed-room speech is not retained by this conservative arm.
+
+Version 2 ingest and forget replies include `forget_effect`: `ran` records
+an admitted forget attempt, including a no-match attempt; it stays false for
+an earlier identity/target refusal or a bare word. `suppress_confirmation` is
+true after actual removal, and false for an explicit no-removal result. The
+runner clears its common recent conversation when the attempt ran and omits
+the confirmation when requested. Direct protocol forgetting uses this admitted
+path; it is not a store-only diagnostic. This adapter accepts v2 requests only
+and echoes unsupported request versions in errors; older recorded v1 data and
+its unknown effect remain the runner reader's responsibility.
+
+`probe_begin` copies the SQLite state and fingerprint key into a private temporary
+child directory owned by the development binary. The main store stays open and
+untouched. The child includes fingerprints, cursors and policy state; `probe_end`
+closes and removes it before resuming the main store. Cleanup failure ends the run.
+Costs and request identities remain outside the child and never roll back. The
+library has no public copy, connection-import or restore API in any build; compile-
+fail tests enforce that boundary. A process crash may leave a private child
+directory in the runner-owned scratch directory, which the runner must dispose of
+after the run. This is synthetic benchmark state, not a product restore facility.
+
+Contract 2.1 keeps the wire envelope at `v: 2` and adds optional, count-only
+`diagnostics` to authorized `inspect` replies. Its `tier-usage-v1` schema reports
+`items`, `text_bytes`, `recall_calls` and `snapshot_calls` per component, plus
+`record`. Missing values mean unknown. The facts-removal arm also reports
+`evidence_only_facts`: these rows support other components, but their use
+counters are always zero and the ordinary facts population is zero.
+
+Population is the current store's query-independent eligible inventory before
+matching, candidate limits and byte selection. It shares recall's evidence,
+expiry, time and arm checks without expiring, fading, acknowledging or otherwise
+mutating memory. Measurement uses a 500 ms cooperative budget; an incomplete scan reports
+null population metrics rather than partial totals. Stored UTF-8 text excludes
+rendered labels, timestamps, JSON and indexes. Facts include their claim and
+copied quote texts; lines include their own text; summarized episodes include
+gist and detail. Raw episode fallback has one eligible episode but zero stored
+episode bytes, since its words are counted in `record`. Capture pause still
+allows inspection of existing authorized memory.
+
+Usage counts a tier once per recall or snapshot response that returns nonempty
+text after byte-cap selection and internal deadline checks. These counters live
+outside probe state and survive restoration. `inspect` does not increment them.
+They never affect ranking, importance, aging or any memory decision, and never
+enter model or judge prompts or scores. They measure returned text, not speech
+delivery or the runner's acceptance of a late response. The runner samples
+population before a question can create memory and reports an empty or unused
+full-engine counterpart as `not exercised`, never as proof of no value.
+
+The ordered [arm manifest](../crates/memory-tiers/arm-manifest.json) registers
+all twelve candidate arms before any candidate score. Every arm runs three times and is
+reported, including failures. Protocol name `tiers` is labelled `ours (tiers)`.
+The seven component removals are episodes, life story, facts/people/places,
+owner model, how-to-be, what is ahead, and feelings. The three mechanism removals
+are nightly consolidation, importance, and fading. Nightly removal retains the
+topic-boundary pass and weekly reflection. Importance removal stores zero proposed importance, removes it
+from ranking and treats all old episodes equally for fading.
+
+The facts arm is exactly **facts not recalled; kept only as evidence**.
+Proof rows still validate the other components, but fact/people/place text is
+never recalled by that arm. All arms preserve provenance, owner attribution,
+uncertainty and forgetting. Prompts and bounds stay the same; code filters the
+removed outputs. The manifest also records the agreed three-run-spread test
+for keeping or removing a tier. No score has yet been used to select a tier.
+The registered development month does not reach the 90-day fading threshold;
+fading is labelled **not exercised by this month**, and its removal still runs.
+Its keep/drop decision requires the separately registered aging test with
+closed, low-importance episodes carrying detail, maintenance after day 90, and
+later questions. Supplied-topic episode cutting remains a library test; the
+month supplies no topic labels or desk-object lists. Its activity signal and
+4,096-byte memory allowance belong to the benchmark registration; full history
+is the context-limited ceiling and no-memory adds no memory text.
 
 ## Model transport and cost
 
@@ -195,10 +380,95 @@ rewrite limits, absolute expiry, word-for-word taught rules, deletion in SQLite
 and FTS bytes, stale-input cancellation, input bounds, cost and timeouts.
 They use made-up people and source text only.
 
-Not yet shown: live relay extraction or actual billed cost, native ARM64 CI,
-cue-recall latency, the bench adapter and ablation scorecard, cross-owner voice
-attribution, natural-language forgetting, device first-audio latency, and any
-real-owner or lamp trial. No product integration or device deployment is part
-of this phase. The adapter target is contract revision `a51e3024f`, with 200 ms
-recall, 300 ms session snapshot, aggregate prompt-byte accounting, and isolated
-probe state that never resets the runner's costs.
+The store/sleep checkpoint passed native Linux ARM64 and Linux clippy. The
+recall/adapter checkpoint adds source-citation, access, aggregate-byte, deadline,
+contention, fading, arm-manifest and subprocess protocol tests. A synthetic
+3000-record lookup test reports first-use and repeated host lookup times; it
+measures local recall only, not a voice turn or a live provider. On macOS x86_64
+with Rust 1.96.0, the first lookup after synthetic ingestion took 1.599 ms and
+the slowest of 20 subsequent lookups took 1.426 ms. The in-memory SQLite pages
+were populated by ingestion; this is not a cold-disk measurement. The ordinary
+workspace ARM64 build/tests and all-target Linux clippy include the adapter.
+The subprocess harness bounds responses and expected child exits at ten
+seconds, retains stderr diagnostics, and checks deadline counters alongside
+empty privacy/forget results. Its broker-timeout case requires the configured
+20 ms timeout to return within a two-second host scheduling allowance.
+
+Not yet shown: live extraction or billed cost, the three-run ledger scorecard
+against every baseline, real STT, held-back human review, cross-owner voice
+attribution, device first-audio latency, or any real-owner/lamp trial. Recorded
+proposals and scripted forgetting tests establish implementation behavior only.
+No product integration or device deployment is part of this phase.
+
+## Nightly topic boundaries
+
+Before consolidation, the full candidate now asks the same bounded model client
+to partition each closed capture session into topic episodes. The boundary-only
+prompt returns inclusive first/last record ids and no words, labels, quotes or
+chosen episode ids. Code validates the complete ordered partition before writing:
+no gap, overlap, reversal, unknown endpoint or crossing into another session is
+accepted. Contiguity means adjacency among surviving records, so forgotten record
+ids need not be consecutive integers. Open sessions remain untouched until their
+authorized ingestion boundary reports that the session ended or the owner left.
+The adapter records immutable wire-session membership separately from episode
+state. Segmentation never combines two wire sessions, even if a missing end
+event left them in one capture episode. This metadata changes no live recall
+or consolidation input, including in the session-only control. Library callers
+without wire ids use explicit capture closure as their session boundary.
+There is no model request on the live reply path.
+
+`prepare_topics` and `apply_topics` are separate from ordinary extraction. Topic
+progress is persisted independently of the processed-record cursor, so a session
+that spans a night still includes its earlier words when it closes. Each request
+contains at most 128 records and 64 KiB. Longer sessions continue with explicit
+before/after flags; the batch boundary is a hard topic boundary and cannot be
+merged by a later batch. That bounded approximation is measured, not hidden as a
+whole-session semantic judgment. A one-range response is valid when there is no
+supported topic change; an empty or partial partition is refused.
+
+The apply transaction rechecks source words, order, membership count, closure and
+privacy generation. It allocates episode ids, moves both stored representations
+of membership, preserves source ids, exact words, speech confidence, uncertainty,
+fact quotes, explicit importance and recall protection, and removes stale parent
+summaries and search entries. Residual boundaries are recomputed from remaining
+records so a later forget cannot leave a moved record’s timestamp behind.
+Recent-episode fallback uses actual time rather than newly allocated ids; the
+session-only control retains its prior ordering. Moved records become pending
+extraction so the
+following consolidation can summarize the new episodes. This may revisit words
+already extracted during a session that spanned nights; those calls and tokens
+remain charged. Forgetting cascades the partition metadata, invalidates an
+outstanding proposal, and removes empty episodes. It also clears inherited
+importance and recall protection across sibling partitions, so a forgotten
+explicit keep cannot continue influencing their ranking or fading. Schema 3 adds
+the code-owned capture membership and assignment tables to schema 2; it never
+resets fingerprints.
+
+The adapter returns after one bounded boundary batch with pending work, allowing
+the runner to drain it before ordinary nightly consolidation. Both kinds of call
+use the same broker, timeout and cumulative cost accounting. Weekly reflection
+can refresh summaries but never repartitions. Boundary calls add to the previous
+cost estimate; their measured request shapes must enter the registered cost table.
+
+The twelfth candidate setup, `tiers_session_cutting_only`, preserves the prior
+checkpoint's prompt and consolidation path. Every other candidate setup,
+including all ten removals, retains topic segmentation. The nightly-removal setup
+therefore means **no consolidation of facts, lines and episode summaries; nightly
+topic-boundary pass still runs**. Its weekly reflection remains enabled. The
+full engine and all removals must use the same segmented build for scoring; the
+three reference setups may be scored earlier. The new comparison and its reason
+were registered before any candidate score.
+
+Each boundary call uses a smaller output allowance: **64 plus the UTF-8 byte
+length of the compact JSON reply that makes every offered record a singleton**.
+For positive record ids this is `78 + sum(39 + 2 * decimal_digits(id))` tokens.
+One byte per token is a conservative bound rather than a tokenizer estimate;
+every compact valid partition fits. A six-record batch with one-digit ids gets
+324 tokens instead of 4,096. `prepare_topics_with_output_limit` also trims a batch
+at its caller's ceiling, preserving explicit continuation. The adapter uses its
+configured ceiling; the direct library default is 8,192. Partitions whose
+canonical encoding exceeds that allowance, or replies reporting
+more output tokens, are refused. Equivalent pretty JSON is allowed when reported
+usage fits; if usage is unknown and raw bytes exceed the token ceiling, the call
+is refused conservatively. Every reply also has the global 32 KiB limit. Unknown
+usage keeps the full reservation. The prompt and range reply shape are unchanged.

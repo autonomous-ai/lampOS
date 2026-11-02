@@ -19,8 +19,23 @@ CREATE TABLE IF NOT EXISTS records (
     at_ms INTEGER NOT NULL, speaker TEXT NOT NULL, body TEXT NOT NULL,
     processed INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS episode_sources (
+    episode_id INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    PRIMARY KEY(episode_id,record_id)
+);
 CREATE INDEX IF NOT EXISTS records_pending ON records(processed,speaker,id);
 CREATE INDEX IF NOT EXISTS records_episode ON records(episode_id,id);
+CREATE TABLE IF NOT EXISTS capture_sessions (
+    record_id INTEGER PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE,
+    session_key TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS topic_assignments (
+    record_id INTEGER PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE,
+    session_episode_id INTEGER NOT NULL,
+    topic_episode_id INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    session_key TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS facts (
     id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT NOT NULL,
     active INTEGER NOT NULL, expires_ms INTEGER, used_ms INTEGER NOT NULL
@@ -68,5 +83,5 @@ END;
 CREATE TRIGGER IF NOT EXISTS line_forget BEFORE DELETE ON lines BEGIN
     DELETE FROM search WHERE kind='line' AND item_id=old.id;
 END;
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 "#;
