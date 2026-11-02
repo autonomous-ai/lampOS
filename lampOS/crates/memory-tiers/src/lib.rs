@@ -2,11 +2,36 @@
 //!
 //! Prepare a bounded sleep input, release the store while the model runs, then
 //! apply its proposal atomically. Forget and corrections invalidate old inputs.
+//!
+//! The library has no probe-copy or snapshot-restore API, including in bench
+//! builds. Only the development executable can create disposable probe stores.
+//!
+//! ```compile_fail,E0599
+//! use lamp_memory_tiers::Store;
+//! let store = Store::in_memory("fictional-owner").unwrap();
+//! store.bench_fork().unwrap();
+//! ```
+//!
+//! ```compile_fail,E0599
+//! use lamp_memory_tiers::Store;
+//! let mut store = Store::in_memory("fictional-owner").unwrap();
+//! store.restore_snapshot("old.sqlite").unwrap();
+//! ```
+//!
+//! ```compile_fail,E0624
+//! use lamp_memory_tiers::Store;
+//! let connection = rusqlite::Connection::open_in_memory().unwrap();
+//! Store::from_connection(connection, "fictional-owner", [0; 32]).unwrap();
+//! ```
 pub mod model;
+mod policy;
+mod recall;
 mod schema;
 mod store;
 mod types;
 
+pub use policy::Arm;
+pub use recall::*;
 pub use store::Store;
 pub use types::*;
 

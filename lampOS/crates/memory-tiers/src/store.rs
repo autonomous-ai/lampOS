@@ -44,7 +44,7 @@ impl Store {
         Self::from_connection(Connection::open_in_memory()?, owner, random_key()?)
     }
     fn from_connection(conn: Connection, owner: &str, fingerprint_key: [u8; 32]) -> Result<Self> {
-        text_valid(owner, 64)?;
+        text_valid(owner, 128)?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version != 0 && version != 2 {
             return Err(Error::Invalid(
@@ -635,6 +635,16 @@ impl Store {
                 "UPDATE episodes SET gist=?,detail=?,importance=max(importance,?) WHERE id=?",
                 params![p.gist, detail, p.importance, p.episode_id],
             )?;
+            tx.execute(
+                "DELETE FROM episode_sources WHERE episode_id=?",
+                [p.episode_id],
+            )?;
+            for source in &p.record_ids {
+                tx.execute(
+                    "INSERT INTO episode_sources VALUES(?,?)",
+                    params![p.episode_id, source],
+                )?;
+            }
             index(&tx, "episode", p.episode_id, &p.gist)?;
         }
         if input.kind == PassKind::Nightly {
@@ -854,6 +864,7 @@ impl Store {
             tx.execute("DELETE FROM lines WHERE id=?", [id])?;
         }
         for id in &affected_episodes {
+            tx.execute("DELETE FROM episode_sources WHERE episode_id=?", [id])?;
             tx.execute(
                 "UPDATE episodes SET topic='',gist='',detail='',importance=0 WHERE id=?",
                 [id],
