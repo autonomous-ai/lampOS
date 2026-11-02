@@ -523,7 +523,7 @@ pub fn announce(asks: crate::say::OwnAsks) {
             let outcome = loop {
                 match answered.recv() {
                     Ok(crate::say::Answer::Done(outcome)) => break outcome,
-                    Ok(crate::say::Answer::Begun(_)) => {}
+                    Ok(crate::say::Answer::Begun(_) | crate::say::Answer::BegunTurn { .. }) => {}
                     Err(_) => {
                         break crate::say::Outcome::Dropped("the voice has gone".into());
                     }

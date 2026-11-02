@@ -189,6 +189,7 @@ impl CloudRequest {
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
+            | ProviderInput::TurnOpened { .. }
             | ProviderInput::End { .. }
                 if self.start_submitted && !self.input_end_submitted =>
             {
@@ -218,7 +219,8 @@ impl CloudRequest {
             | ProviderInput::PauseJoin { .. }
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
-            | ProviderInput::Onboarding { .. } => {}
+            | ProviderInput::Onboarding { .. }
+            | ProviderInput::TurnOpened { .. } => {}
             ProviderInput::Written { .. } | ProviderInput::Reminder { .. } => {
                 self.start_submitted = true;
                 self.input_end_submitted = true;

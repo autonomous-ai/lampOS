@@ -199,6 +199,10 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::TurnOpened {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -4063,6 +4067,13 @@ pub fn serve(
             );
         }
         remarked_by = Some(heeding.clone());
+        // A line begun in a computer's turn is a call, as on the Live route.
+        let opening = heeding.clone();
+        engine = engine.opening(Arc::new(move |request| {
+            if let Ok(mut heeding) = opening.lock() {
+                heeding.attention.turn_opened(request);
+            }
+        }));
         engine = engine.heeding(Arc::new(move |request, said, heard, from, lead| {
             heeding
                 .lock()
@@ -12134,6 +12145,57 @@ mod tests {
             assert!(strict.judge(request, said, "And then?", busy()).is_some());
         }
         assert_eq!(strict.session, 2);
+    }
+
+    /// A line begun in a turn a computer opened (`crate::control_turn`) is
+    /// answered on this route as a tap's would be, in a busy room too, with
+    /// the product's rule: `--spoken-to`, strict, the name or a follow-up
+    /// needed, busy calls narrowed and remarks held; the line after it, and
+    /// the same line without the turn, are held.
+    #[test]
+    fn a_line_begun_in_a_computers_turn_is_answered_in_a_busy_room() {
+        use crate::room_told::Room;
+        let signs = |room| Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let said = (10_000_000, 11_000_000);
+        let heeding = || {
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.attention.speak_when_spoken_to(true);
+            heeding.needing_name_or_follow_up();
+            heeding.narrowing_busy_calls();
+            heeding.holding_remarks_about_it();
+            heeding
+        };
+        let line = "What is on my list today?";
+        for room in [Room::Busy, Room::Quiet, Room::Unknown] {
+            let mut without = heeding();
+            assert!(
+                without.judge(1, said, line, signs(room)).is_some(),
+                "{room:?}: held without the turn"
+            );
+            let mut opened = heeding();
+            // As the route tells it: right after the Start, before its words.
+            opened.attention.turn_opened(2);
+            assert_eq!(
+                opened.judge(2, said, line, signs(room)),
+                None,
+                "{room:?}: answered in the turn"
+            );
+            assert!(
+                opened
+                    .judge(3, (12_000_000, 13_000_000), line, signs(room))
+                    .is_some(),
+                "{room:?}: the next line is not the turn's"
+            );
+        }
     }
 
     /// #1712, the first builder at 18:57: in a busy room, a line let out

@@ -1410,6 +1410,11 @@ pub const NAME_AT_THE_START_US: u64 = 1_300_000;
 /// A request that begins inside it keeps it however long it goes on.
 pub const TAPPED_BEFORE_US: u64 = 2_000_000;
 const TAPPED: &str = "someone tapped its head to talk to it";
+/// A computer opened a turn through lamp-control (`docs/control.md`,
+/// "Turns and listening"), and the line began in its window: a call, as a
+/// tap is. The voice decides the window ([`crate::control_turn::OPEN_FOR_US`]);
+/// this worker is told only which request began in it.
+const OPENED: &str = "a computer opened a turn for it to answer";
 /// A request that begins this long after one that was only the lamp's name
 /// (the call's wait ran out, #891) is that call's (#829, the first builder
 /// at 16:32: "Lamp," then "Check my work." was held in a busy room by day),
@@ -1615,6 +1620,11 @@ pub struct Attention {
     /// request in hand ([`TAPPED_BEFORE_US`]).
     tapped_us: Option<u64>,
     tapped: bool,
+    /// The request that began in a turn a computer opened
+    /// ([`Self::turn_opened`]), and whether the request in hand is it: a
+    /// call as a tap is, by its own reason.
+    opened_request: Option<u64>,
+    opened: bool,
     /// The newest request that was only the lamp's name, when it ended,
     /// and, once the next request began, whether its own hearing showed the
     /// lamp was called; and whether the request in hand began within
@@ -1982,9 +1992,10 @@ impl Attention {
         }
     }
 
-    /// Whether the lamp's head was tapped for the request in hand.
+    /// Whether the lamp's head was tapped for the request in hand, or it
+    /// began in a turn a computer opened ([`Self::turn_opened`]).
     pub fn tapped(&self) -> bool {
-        self.tapped
+        self.tapped || self.opened
     }
 
     /// Whether the words heard of the request in hand call the lamp by name
@@ -2342,6 +2353,7 @@ impl Attention {
         self.tapped = self.tapped_us.is_some_and(|tapped| {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
         });
+        self.opened = self.opened_request == Some(request);
         self.after_call = self.bare_call_us.is_some_and(|(call, ended, shown)| {
             call != request
                 && shown == Some(true)
@@ -2384,6 +2396,7 @@ impl Attention {
     /// its start is; the lead counts only when nothing goes on.
     pub fn continued_at_led(&mut self, request: u64, session: u64, now_us: u64, lead_us: u64) {
         let tapped = session == self.session && self.began_us.is_some() && self.tapped;
+        let opened = session == self.session && self.began_us.is_some() && self.opened;
         let after_call = session == self.session && self.began_us.is_some() && self.after_call;
         let after_another = self.after_another;
         let another_line = self.another_line.clone();
@@ -2461,6 +2474,7 @@ impl Attention {
                 });
         }
         self.tapped |= tapped;
+        self.opened |= opened || self.opened_request == Some(request);
         self.after_call |= after_call;
     }
 
@@ -2520,6 +2534,18 @@ impl Attention {
         }
     }
 
+    /// The request `request` began in a turn a computer opened
+    /// (`ProviderInput::TurnOpened`): a call, as a tap is, whether this
+    /// worker hears of it before the request begins here or after. The
+    /// voice judged the window; no other request is made a call by it,
+    /// and the head tap's own window is untouched.
+    pub fn turn_opened(&mut self, request: u64) {
+        self.opened_request = Some(request);
+        if self.request == request && self.began_us.is_some() {
+            self.opened = true;
+        }
+    }
+
     /// A request began on `session`.
     pub fn began(&mut self, request: u64, session: u64) {
         if session != self.session {
@@ -2538,6 +2564,7 @@ impl Attention {
         self.named = false;
         self.named_sure = false;
         self.tapped = false;
+        self.opened = false;
         self.best_score = 0.0;
         self.near = false;
         self.addressed = false;
@@ -2820,6 +2847,11 @@ impl Attention {
         }
         // A tap on its head (#711) is a call for what is said, not a sound:
         // a short sound after a tap is still judged as a sound, above.
+        if self.opened && !own {
+            let verdict = Verdict::Play(OPENED);
+            self.verdict = Some(verdict);
+            return Some(verdict);
+        }
         if self.tapped && !own {
             let verdict = Verdict::Play(TAPPED);
             self.verdict = Some(verdict);
@@ -3030,6 +3062,8 @@ impl Attention {
             Some(NAMED)
         } else if self.tapped {
             Some(TAPPED)
+        } else if self.opened {
+            Some(OPENED)
         } else if called_in_text {
             Some(CALLED_IN_TEXT)
         } else if self.face_shows(self.judged_room.unwrap_or(Room::Unknown), turned) {
@@ -3078,7 +3112,7 @@ impl Attention {
     /// another person's conversation was going on was judged against that
     /// person's voice).
     pub fn called_for_itself(&self) -> bool {
-        self.named || self.tapped || self.called_in_text()
+        self.named || self.tapped || self.opened || self.called_in_text()
     }
 
     /// Whether the text shows the lamp was called, as the rule reads it
@@ -3651,6 +3685,44 @@ mod tests {
             attention.first_output_busy(1, Room::Busy, false, true, None),
             Some(Verdict::Hold(_))
         ));
+    }
+
+    /// A line begun in a turn a computer opened (`crate::control_turn`) is
+    /// a call in any room, as a tapped one is, by its own reason, whether
+    /// the worker hears of it before the line begins here or after; no
+    /// other line is, and the tap's own window stays two seconds.
+    #[test]
+    fn a_line_begun_in_a_computers_turn_is_a_call_and_the_tap_keeps_two_seconds() {
+        assert_eq!(TAPPED_BEFORE_US, 2_000_000);
+        let busy = |attention: &mut Attention, request| {
+            attention
+                .first_output_busy(request, Room::Busy, false, true, None)
+                .unwrap()
+        };
+        // Told after its Start.
+        let mut attention = Attention::default();
+        attention.began_at(1, 1, 1_000_000);
+        attention.began_at(2, 1, 20_000_000);
+        attention.turn_opened(2);
+        assert_eq!(busy(&mut attention, 2), Verdict::Play(OPENED));
+        assert_eq!(attention.sign(None), Some(OPENED));
+        assert!(attention.called_for_itself());
+        // Told before the line begins here.
+        let mut attention = Attention::default();
+        attention.began_at(1, 1, 1_000_000);
+        attention.turn_opened(2);
+        attention.began_at(2, 1, 20_000_000);
+        assert_eq!(busy(&mut attention, 2), Verdict::Play(OPENED));
+        // The next line is not the turn's.
+        attention.began_at(3, 1, 22_000_000);
+        assert!(matches!(busy(&mut attention, 3), Verdict::Hold(_)));
+        // A tap is still a call for two seconds only.
+        let mut attention = Attention::default();
+        attention.began_at(1, 1, 1_000_000);
+        attention.turn_opened(1);
+        attention.head_tapped(10_000_000);
+        attention.began_at(2, 1, 10_000_000 + TAPPED_BEFORE_US + 1);
+        assert!(matches!(busy(&mut attention, 2), Verdict::Hold(_)));
     }
 
     #[test]
