@@ -689,6 +689,82 @@ pub trait Save {
     fn keeps_settings(&self) -> bool {
         true
     }
+    /// Whether a setup that saved a new login restarts what holds the old
+    /// one (#4710, [`RELOAD_LOGIN`]). Off by default: nothing is read or
+    /// restarted.
+    fn reload_login_on(&self) -> bool {
+        false
+    }
+    /// The login as kept now. Asked only when [`Save::reload_login_on`].
+    fn login(&self) -> Login {
+        Login::default()
+    }
+    /// Restart `units`, which hold a login this setup replaced, once the
+    /// lamp is quiet. Asked only when on, after the marker and the status.
+    fn reload_login(&mut self, _units: &[&'static str]) {}
+}
+
+/// The switch on setup (#4710): `on` restarts the units that hold the
+/// lamp's login after a setup that replaced it. Anything else, and none is.
+pub const RELOAD_LOGIN: &str = "LAMP_SETUP_RELOAD_LOGIN";
+
+/// Whether [`RELOAD_LOGIN`] is on, as `var` gives it.
+pub fn reload_login_on(var: Option<&str>) -> bool {
+    var == Some("on")
+}
+
+/// What holds the backend's link from its start: `lamp-cloud`
+/// (`LoadCredential=account:`).
+pub const LINK_HOLDERS: [&str; 1] = ["lamp-cloud.service"];
+
+/// What holds the voice key from its start: `lamp-cloud`
+/// (`LoadCredential=key:`), the Policy (`LoadCredential=jev.key:`, the same
+/// key, [`Files::credential`]) and the voice, whose second route reads it
+/// once as its worker starts (`second_config::load_from_path`).
+pub const KEY_HOLDERS: [&str; 3] = [
+    "lamp-cloud.service",
+    "lamp-policy.service",
+    "lamp-voice.service",
+];
+
+/// How long a new login waits for the lamp to be quiet: inside serving's
+/// 10 minutes after setup, whose end ends the wait too.
+pub const RELOAD_MOST: Duration = Duration::from_secs(9 * 60);
+
+/// The lamp's login as kept (#4710): the backend's link and the voice key,
+/// each its file's bytes, `None` when there is none. Never printed.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct Login {
+    pub link: Option<Vec<u8>>,
+    pub key: Option<Vec<u8>>,
+}
+
+impl fmt::Debug for Login {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Login")
+            .field("link", &self.link.as_ref().map(|_| HIDDEN))
+            .field("key", &self.key.as_ref().map(|_| HIDDEN))
+            .finish()
+    }
+}
+
+/// The units holding what changed from `before` to `after`: the link's,
+/// the key's, or both, once each. One there was none of before is a first
+/// setup's, which nothing holds yet, so it asks for none.
+pub fn login_holders(before: &Login, after: &Login) -> Vec<&'static str> {
+    let changed = |was: &Option<Vec<u8>>, now: &Option<Vec<u8>>| was.is_some() && was != now;
+    let mut units = Vec::new();
+    if changed(&before.link, &after.link) {
+        units.extend(LINK_HOLDERS);
+    }
+    if changed(&before.key, &after.key) {
+        for unit in KEY_HOLDERS {
+            if !units.contains(&unit) {
+                units.push(unit);
+            }
+        }
+    }
+    units
 }
 
 /// What recovery saves of a setup request (#3020, El's P1 on #3024): the
@@ -967,6 +1043,70 @@ impl Save for Files<'_> {
         )
         .0
     }
+    fn reload_login_on(&self) -> bool {
+        reload_login_on(std::env::var(RELOAD_LOGIN).ok().as_deref())
+    }
+    fn login(&self) -> Login {
+        Login {
+            link: fs::read(&self.0.backend).ok(),
+            key: fs::read(&self.0.credential).ok(),
+        }
+    }
+    fn reload_login(&mut self, units: &[&'static str]) {
+        // Its own thread, so the run ends as before and the wait is
+        // serving's: its end ends the wait.
+        let units = units.to_vec();
+        thread::spawn(move || reload_when_quiet(&units));
+    }
+}
+
+/// [`Files::reload_login`]'s wait and restart, as the keys helper restarts
+/// the voice for new keys (`lamp-setup keys`).
+fn reload_when_quiet(units: &[&'static str]) {
+    use crate::change;
+    let bus = match lamp_bus::Bus::from_environment() {
+        Ok(bus) => bus,
+        Err(error) => {
+            eprintln!(
+                "lamp-setup: the bus cannot be opened ({error}); {} keep the old login until they next start",
+                units.join(", ")
+            );
+            return;
+        }
+    };
+    let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: {line}"));
+    // Quiet, and no update at work, held to the end: a round puts its
+    // build back when a unit it restarted changes process in its watch.
+    let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
+    match change::quiet_and_unlocked(&mut ears, &records, RELOAD_MOST) {
+        // `try-restart`: a unit that isn't running is left so. One at a
+        // time, so one that fails never holds back the rest.
+        Ok(_held) => {
+            for unit in units {
+                match std::process::Command::new("/usr/bin/systemctl")
+                    .args(["try-restart", unit])
+                    .status()
+                {
+                    Ok(status) if status.success() => eprintln!(
+                        "lamp-setup: {unit} restarted if it was running, to take the new login, at a quiet moment"
+                    ),
+                    Ok(status) => {
+                        eprintln!(
+                            "lamp-setup: {unit}'s restart for the new login ended with {status}"
+                        )
+                    }
+                    Err(error) => eprintln!(
+                        "lamp-setup: {unit} could not be restarted for the new login: {error}"
+                    ),
+                }
+            }
+        }
+        Err(why) => eprintln!(
+            "lamp-setup: the lamp was not quiet with no update at work within {} min ({why}); {} keep the old login until they next start",
+            RELOAD_MOST.as_secs() / 60,
+            units.join(", ")
+        ),
+    }
 }
 
 /// Bring the lamp up for setup, in this order: the hotspot, as V1's
@@ -1026,7 +1166,9 @@ pub fn start_unless_stopped(
 
 /// One setup run, after V1's 2 s pause: join, then save, then the marker.
 /// `station_ip` is the address the home network gave, polled every second
-/// while joining so the page learns it before the hotspot is gone.
+/// while joining so the page learns it before the hotspot is gone. With
+/// [`Save::reload_login_on`], a saved link or key unlike the one kept
+/// before asks [`Save::reload_login`] for what holds it (#4710).
 pub fn run(
     status: &Arc<Mutex<Status>>,
     accepted: &Accepted,
@@ -1069,11 +1211,15 @@ pub fn run(
     let joined = wifi::join(host, country, &accepted.ssid, &accepted.password);
     drop(joining);
     let _ = watcher.join();
+    // What holds a login this setup replaced (#4710), to restart once all
+    // is said; read only with the switch on.
+    let mut reload = Vec::new();
     let failure = match joined {
         Joined::Failed { reason } => Some(reason.detail().to_owned()),
         Joined::Connected => {
             let mut reports_kept = false;
             let mut own_answers = std::collections::BTreeMap::new();
+            let login_before = save.reload_login_on().then(|| save.login());
             // The key last, just before the marker, so a name or zone that
             // cannot be saved leaves the key there as it was (the reviewer on
             // #1120).
@@ -1140,6 +1286,11 @@ pub fn run(
                 status.share_reports = saved.is_ok() && reports_kept;
                 status.own_keys = own_answers;
             }
+            if saved.is_ok()
+                && let Some(before) = login_before
+            {
+                reload = login_holders(&before, &save.login());
+            }
             match saved {
                 Ok(()) => None,
                 Err(_) => {
@@ -1155,7 +1306,15 @@ pub fn run(
         }
     };
     let address = failure.is_none().then(|| station_ip()).flatten();
-    let mut status = status.lock().unwrap();
+    say_done(&mut status.lock().unwrap(), failure, address);
+    // After the status, so the page learns at once that it is done.
+    if !reload.is_empty() {
+        save.reload_login(&reload);
+    }
+}
+
+/// The run's end, in the status: set up, or why not.
+fn say_done(status: &mut Status, failure: Option<String>, address: Option<String>) {
     match failure {
         None => {
             // The address once more, now that the join is done: the watcher

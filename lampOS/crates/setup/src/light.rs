@@ -399,6 +399,15 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn keeps_settings(&self) -> bool {
         self.save.keeps_settings()
     }
+    fn reload_login_on(&self) -> bool {
+        self.save.reload_login_on()
+    }
+    fn login(&self) -> crate::serve::Login {
+        self.save.login()
+    }
+    fn reload_login(&mut self, units: &[&'static str]) {
+        self.save.reload_login(units)
+    }
     fn marker(&mut self) -> io::Result<()> {
         if let Some(light) = self.light {
             light.release();
