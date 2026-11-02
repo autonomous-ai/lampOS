@@ -22,7 +22,8 @@ CollectMode=inactive-or-failed
 
 [Service]
 Type=simple
-Environment=LAMP_SKILLS_STORE=off
+# On since the backend listed four approved, signed skills (2 Nov, #4710), shown on lamp-9adf (31 Oct).
+Environment=LAMP_SKILLS_STORE=on
 User=root
 Group=root
 ExecStart=/opt/lampOS/skills/current/lamp-skills asked --dir /var/lib/lampOS/skills --key-file /etc/lampOS/skills/store-key.pub

@@ -1481,7 +1481,8 @@ for it.
   and key checks prevent a fetch. systemd cannot change that permission by
   request within one template, so a remove uses the same sandbox.
   Provision the key and turn on the shared switch as [install.md](install.md),
-  "The Store, prepared but off", describes; nothing enables it automatically.
+  "The Store, prepared but off", describes. Since 2 Nov the product's
+  defaults set the switch on; a lamp installed before keeps its own file.
 - **Only two parts may ask** (the reviewer's P3 on #2429): before reading
   the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
   `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
