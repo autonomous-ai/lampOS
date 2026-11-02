@@ -115,3 +115,18 @@ CREATE TABLE IF NOT EXISTS origins (
     PRIMARY KEY(rid,origin)
 );
 CREATE INDEX IF NOT EXISTS origins_by ON origins(origin);
+-- #4753: a kept thing said again (`remember` with `once` finding it) records
+-- when, so a recall tells when it was last said, not only when it was first
+-- kept: one row a time it was said again, written with the line that said it
+-- (`origin`, that exchange's id in its own scope; never 0). No row: it was
+-- last said at its own `at_unix_ms`, as every kept thing of an older build.
+-- A forget of a time's line takes that time's rows, so a forgotten line
+-- leaves no time behind; a line that only expires leaves them.
+-- Its rows go with the entry. Older builds pass this table over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS said_again (
+    rid INTEGER NOT NULL REFERENCES entries(rid) ON DELETE CASCADE,
+    at_unix_ms INTEGER NOT NULL,
+    origin INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(rid,at_unix_ms,origin)
+);
