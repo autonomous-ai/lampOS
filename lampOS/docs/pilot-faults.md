@@ -610,6 +610,51 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   does, and says `it underran while held up mid-answer; the answer is cut,
   priming again`. More than 3 in 10 s still ends the worker
   (`audio-device-seam.md`).
+- **Capture still opening the microphone when the voice stops.** On
+  a cold boot of lamp-06c1 (boot 1 of 4), the conversation lost its privacy
+  freshness at 18.29 s (`service privacy freshness lost before next
+  observation`), which the voice waits out with the microphones closed.
+  The coordinator sends Stop to every worker at once. Capture was still in
+  `prepare()`; the speaker took its Stop and closed its end of the
+  reference link; capture then told the speaker it was prepared, and the
+  send was refused (`ref.c.capture: Connection refused (os error 111)`).
+  Capture ended with that fault, the cleanup failed (`verified cleanup
+  failed: capture WorkerFault: … capture WorkerExit: … exit status: 1`),
+  and a failed cleanup is never waited out, so the voice exited 1 (#4332).
+  Boot 4's same freshness loss had a clean cleanup and the voice was back
+  in the wait, ready 0.2 s later. Now, once `prepare()` returns, capture
+  reads what the coordinator queued meanwhile (`peer_stop.rs`), keeps it in
+  order for its next tick, and when a Stop is among it tells neither side
+  it is prepared and ends stopped at that tick. Either audio worker whose
+  reference link (`ref.c.*`, `ref.d.*`) is refused with the coordinator's
+  Stop already queued for it ends stopped too, saying `lamp-voice: capture:
+  the speaker had gone at the voice's stop (…); capture ends stopped` (or
+  the speaker's line the other way round). The speaker's end there is its
+  Stop's: the device stopped, a paused answer's gap reported cancelled,
+  the reset recorded. The coordinator still sends the speaker's Stop
+  before capture's, unchanged. Either order leaves one worker a window,
+  of one send on an unblocked socket, in which its link is refused
+  before its own Stop is queued; that end is still a fault. Sending
+  capture's first would move the window to the speaker, not close it, and
+  would mostly lose the speaker's `Stopped` notice, on which capture
+  ends cleanly. A refused link with no Stop
+  queued, a refused coordinator channel, and any other error still end the
+  worker with its fault, and a failed cleanup still ends the voice with
+  the first reason first in its line (`privacy switch unreadable: …;
+  verified cleanup failed: …`). Tests: unit tests of the look for a Stop
+  (a refused link with a Stop queued or read ahead is clean, without one
+  or on another socket it is not, and what is read is held in order,
+  bounded); four Linux tests of the real capture worker with the
+  microphone's open held (a Stop then the speaker gone ends it cleanly,
+  where it ended on `ref.c.capture: Connection refused` before; a Stop with
+  the speaker there tells neither side it is prepared; the speaker gone
+  with no Stop still ends it on the refused link; renewals queued in the
+  open are still taken, and the stream and stop are as before); two Linux
+  tests of the speaker's end on the `null` device with a send refused by
+  a closed capture side (with its Stop queued it ends stopped, the device
+  stopped and the gap reported; without one it is still the fault). The
+  Linux tests run on the ARM64 gate only. Not yet tried on a lamp's cold
+  boots.
 
 - **A wall clock stepped by chrony during start-up.** On lamp-06c1, in 4 of
   4 cold boots, chrony stepped the wall clock by about +20 s some 46 s in,
