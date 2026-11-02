@@ -1118,6 +1118,10 @@ impl SilentAfter {
 /// window begins with its own first sound, else 0 (#4226).
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>, u64) -> Option<&'static str> + Send + Sync>;
+/// The rule is told a request began in a turn a computer opened
+/// (`ProviderInput::TurnOpened`, `crate::control_turn`): its line is a call,
+/// as a tap's (`crate::attention::Attention::turn_opened`).
+pub type Opened = Arc<dyn Fn(u64) + Send + Sync>;
 /// Whether the same person said a line cut short and the line that cut it
 /// ([`Engine::joining_cut_words`]).
 #[derive(Clone, Debug, PartialEq)]
@@ -1329,6 +1333,8 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    /// [`Engine::opening`]: the rule told of a computer's turn.
+    opened: Option<Opened>,
     /// Where each judged turn's verdict is said, when it is.
     verdicts: Option<Verdicts>,
     /// [`Engine::asking_again`]: told of cut-ins, and asked after a hold.
@@ -3228,6 +3234,7 @@ impl Engine {
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                opened: None,
                 verdicts: None,
                 ask_again: None,
                 misheard_at_us: Mutex::new(None),
@@ -4229,6 +4236,16 @@ impl Engine {
     pub fn heeding(mut self, heed: Heed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.heed = Some(heed);
+        }
+        self
+    }
+
+    /// The rule `heed` judges with is told, by `opened`, of a request begun
+    /// in a turn a computer opened (`ProviderInput::TurnOpened`), before its
+    /// words are judged. Before any turn only.
+    pub fn opening(mut self, opened: Opened) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.opened = Some(opened);
         }
         self
     }
@@ -5321,6 +5338,13 @@ impl Engine {
             // in it is not now.
             ProviderInput::Onboarding { request, .. } => {
                 crate::sleep_asked::mark_onboarding(request);
+            }
+            // Begun in a computer's turn: the rule takes its line as a call,
+            // as a tap's, whenever its words are judged.
+            ProviderInput::TurnOpened { request, .. } => {
+                if let Some(opened) = self.shared.opened.as_ref() {
+                    opened(request);
+                }
             }
             // Begun while onboarding waits for a call (#3504): read by the
             // turn's task once its words are in.

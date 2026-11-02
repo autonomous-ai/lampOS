@@ -833,6 +833,15 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// The request in hand began in a turn a computer opened through
+    /// lamp-control (`crate::control_turn`), sent just after its Start:
+    /// the busy-room rule takes it as a call, as a tap on the head
+    /// (`crate::attention::Attention::turn_opened`), on the Live worker
+    /// and on the second route (`second_provider::Engine::opening`).
+    TurnOpened {
+        request: u64,
+        privacy_generation: u64,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -885,6 +894,7 @@ impl ProviderInput {
             | Self::CountOnly { request, .. }
             | Self::StepCall { request, .. }
             | Self::Onboarding { request, .. }
+            | Self::TurnOpened { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
         }
@@ -916,6 +926,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::Onboarding {
+                privacy_generation, ..
+            }
+            | Self::TurnOpened {
                 privacy_generation, ..
             }
             | Self::Written {
@@ -2315,6 +2328,10 @@ async fn serve_with_visual<C: Connect>(
                     && let Some(tapped) = taps.newest(monotonic_us())
                 {
                     attention.head_tapped(tapped);
+                }
+                // A line begun in a computer's turn is a call, as a tap is.
+                if let Some(request) = intake.handoff.opened.take() {
+                    attention.turn_opened(request);
                 }
                 // Heard plainly as this request began: the model is told,
                 // beside what it is hearing, once.
@@ -5284,6 +5301,9 @@ struct InputHandoff {
     /// The open request was only the lamp's name, its call's wait run out
     /// (`ProviderInput::Called`): the model is told so with its End.
     called: Option<u64>,
+    /// The open request began in a computer's turn
+    /// (`ProviderInput::TurnOpened`), until the rule is told.
+    opened: Option<u64>,
     /// The same-voice check's lines and prints (#829): it keeps the first
     /// 3 s of the line in hand until they are asked for.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
@@ -6377,6 +6397,12 @@ impl InputHandoff {
             ProviderInput::Onboarding { .. } => {
                 self.require_open(request)?;
                 crate::sleep_asked::mark_onboarding(request.get());
+            }
+            // Begun in a computer's turn: the worker's rule hears it with
+            // the head's taps.
+            ProviderInput::TurnOpened { .. } => {
+                self.require_open(request)?;
+                self.opened = Some(request.get());
             }
             ProviderInput::End { sound, cut_in, .. } => {
                 self.require_open(request)?;

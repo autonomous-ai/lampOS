@@ -540,6 +540,77 @@ request or extra actuator writer. It is an alternative to every other
 content field; other cue values are refused. Its acoustic result remains
 part of [Bedtime and Morning's lamp comparison](bedtime-morning.md).
 
+**A turn for lamp-control** ([control.md](control.md), "Turns and
+listening"; `crates/voice/src/control_turn.rs`): the skill `control` alone
+(`say::TURN_SKILL`; any other, root's helpers too, is refused `turn is
+lamp-control's only`) may ask the voice to open a conversation turn, or to
+end one it opened. The door does not serve these yet; this is the voice's
+side.
+
+    {"skill": "control", "turn": "start", "expires_in_ms": 10000}
+    {"skill": "control", "turn": "start", "text": "Shall we go over today's list?", "expires_in_ms": 10000}
+    {"skill": "control", "turn": "end", "id": 3}
+
+- **`turn: "start"`** goes with `expires_in_ms` (as a say's) and optionally
+  `text`, the prompt, under a `text`'s rules (1 to 900 bytes, no control
+  characters). Nothing else goes with it (`turn goes with text,
+  expires_in_ms or id only`), not `id` (`id goes only with turn end`).
+- **`turn: "end"`** goes with `id` alone, nonzero (`turn end needs the
+  turn's id`, `turn end goes with its id only`); it names no expiry and
+  waits at most 10 s (`say::TURN_END_EXPIRY_MS`). An `id` on anything else
+  is refused.
+- Unknown fields are still refused (`not a say request`), so a voice from
+  before this refuses `turn`: the door's sign that this voice takes no
+  turns.
+
+A start is **refused at once**, never queued, while the microphone is not
+allowed, by anyone (`the lamp is muted`), while the keeper's pause holds
+(`the lamp is paused`), while a conversation goes on (`a conversation is
+going on`: a line heard now, its answer in hand, the person's last line or
+its answer less than 15 s ago, an answer owed, or a computer's turn still
+going on), and while the lamp's own words or sounds are in hand or playing
+(`the lamp is speaking`). Otherwise it waits for a say's other gates
+(no reminder held, nothing being heard, 15 s since the last turn, listening
+ready, a fresh capture, the playback mask, the model service answering) and
+is `expired` if they don't pass in time. The quiet hours are the door's,
+not the voice's. Then:
+- **Without `text`**, it does what a tap on the head does: the listening
+  face and the "hm?" (at the tap's level, and not held to the tap's one in
+  30 s, as the computer asked for it), and the window opens.
+- **With `text`**, the prompt is said as a `text` say is (`control_turn_prompt`),
+  and the window opens once it was heard whole; a line said over it opens
+  the window there and is the turn's. A prompt cut or dropped ends the turn,
+  `dropped` with its why.
+- **The window**: the next line the person begins within 8 s
+  (`control_turn::OPEN_FOR_US`) is answered as spoken to the lamp. The
+  coordinator follows its Start with `TurnOpened` on the provider worker's
+  input, and the busy-room rule takes it as a call, as a tap
+  (`attention::Attention::turn_opened`; the reason "a computer opened a
+  turn for it to answer"), on either route: the Live worker's rule, and on
+  the second route (the product's) the rule its worker keeps
+  (`Heeding`, told through `Engine::opening`), before the line's words are
+  judged, with `LAMP_SPOKEN_TO` and in a busy room too. The tap's own
+  window stays 2 s.
+- **Answers**: as the window opens, `{"event":"begun","at_us":…,"id":N}`,
+  the turn's id, unique for the voice's life. Then `{"outcome":"spoken"}`
+  once the person spoke and the lamp's answer sounded (heard whole or cut),
+  `{"outcome":"dropped","why":"nobody spoke"}` when the window passes
+  unused, `"not answered"` when the line was not answered, or the voice's
+  why (`the lamp is muted`, `hand_stop`, `spoken_stop`, …).
+- The journal says one line as a turn opens: the skill and the turn's id,
+  never a word heard.
+
+An end with the id of the turn going on ends it, while its prompt plays,
+its window is open, or the conversation its first line began goes on (it
+is over when nothing is in hand and 15 s pass quiet): cut as the button's
+stop cuts (`coordinator/hand.rs`, the reason `control_ended`), its answer,
+what waits to be said and the window. It is answered `{"outcome":"ended"}`,
+and the start `spoken` if its answer had sounded, else `dropped`, `ended by
+the computer`. Any other id, an old one too, is `refused`, `not this
+computer's turn`: never the person's own conversation or the lamp's own
+words. The person wins: the privacy switch, the button, sleep and "stop"
+end a computer's turn as any other.
+
 **A cached line** (#3697, V1's `_TTS_CACHE_DIR`): `{"skill": "shutdown",
 "text": "…", "cache": true, …}`, from root's helpers only (the peer is
 root by `SO_PEERCRED`; anyone else is refused `cache is asked by root's

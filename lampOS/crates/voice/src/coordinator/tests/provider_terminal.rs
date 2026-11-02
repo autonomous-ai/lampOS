@@ -633,7 +633,8 @@ fn run_with_notice_policy(
                                     | ProviderInput::PauseJoin { .. }
                                     | ProviderInput::CountOnly { .. }
                                     | ProviderInput::StepCall { .. }
-                                    | ProviderInput::Onboarding { .. },
+                                    | ProviderInput::Onboarding { .. }
+                                    | ProviderInput::TurnOpened { .. },
                                 ) => {}
                                 None => break,
                             }

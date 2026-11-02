@@ -1085,7 +1085,8 @@ impl Peers {
                     | ProviderInput::PauseJoin { .. }
                     | ProviderInput::CountOnly { .. }
                     | ProviderInput::StepCall { .. }
-                    | ProviderInput::Onboarding { .. },
+                    | ProviderInput::Onboarding { .. }
+                    | ProviderInput::TurnOpened { .. },
                 )) => {}
                 Ok(Some(ProviderInput::Reminder { .. })) => {
                     panic!("reminders are disabled in this fixture")

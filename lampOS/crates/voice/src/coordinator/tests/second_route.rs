@@ -246,6 +246,9 @@ struct Script {
     voiced: bool,
     /// One parsed Say request, read at this capture frame's scenario time.
     say_at_frame: Option<(u64, crate::say::LineForTest)>,
+    /// A second Say request, made as it is read at this capture frame (it
+    /// may name what the first one began).
+    say_later: Option<(u64, std::rc::Rc<dyn Fn() -> crate::say::LineForTest>)>,
     /// Onboarding's near-call try window opens this many milliseconds from
     /// the scenario's start, for its 7 s (#1803).
     near_window_ms: Option<u64>,
@@ -338,6 +341,7 @@ impl Script {
             limit: LIMIT,
             silent: false,
             say_at_frame: None,
+            say_later: None,
             voiced: false,
             near_window_ms: None,
             sentence_window_ms: None,
@@ -485,6 +489,7 @@ fn request_of(input: &ProviderInput) -> u64 {
         | ProviderInput::CountOnly { request, .. }
         | ProviderInput::StepCall { request, .. }
         | ProviderInput::Onboarding { request, .. }
+        | ProviderInput::TurnOpened { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }
@@ -645,6 +650,15 @@ impl Peers {
                 .unwrap()
                 .1
                 .read_at(monotonic_us());
+        }
+        if self
+            .script
+            .say_later
+            .as_ref()
+            .is_some_and(|(frame, _)| self.frames >= *frame)
+        {
+            let (_, line) = self.script.say_later.take().unwrap();
+            line().read_at(monotonic_us());
         }
         if let Some(when) = self.script.speak_again {
             let due = match when {
@@ -4772,6 +4786,203 @@ fn a_scheduled_exact_say_uses_only_the_second_route_and_finishes_spoken() {
     assert_eq!(run.events("skill_says").len(), 1);
     assert_eq!(run.events("skill_says")[0]["skill"], "custom-morning");
     assert!(run.events("skill_sound").is_empty());
+}
+
+/// lamp-control's turn (`crate::control_turn`) through the production loop,
+/// at a quiet moment: the tap's "hm?" plays with no provider input, `begun`
+/// names the turn's id, and with nobody speaking its window passes as
+/// "nobody spoke"; a mute inside the window ends it as the person's.
+#[test]
+fn a_computers_turn_plays_the_cue_opens_eight_seconds_and_ends_on_nobody_or_a_mute() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    for (mute_after_frames, why) in [
+        (1_200, crate::control_turn::NOBODY_SPOKE),
+        (200, crate::control_turn::MUTED),
+    ] {
+        let (says, line, answered) = crate::say::Says::line_for_test(
+            r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
+        );
+        TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+        let run = run(Script {
+            second: false,
+            only: true,
+            silent: true,
+            say_at_frame: Some((1_600, line)),
+            written: Written::Said(12),
+            mute_at_frame: Some(1_600 + mute_after_frames),
+            limit: Duration::from_secs(40),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_SAYS.with(|given| given.borrow_mut().take());
+        let answered: Vec<_> = answered.try_iter().collect();
+        assert!(run.seen.second.is_empty(), "{:?}", run.seen.second);
+        assert!(!run.seen.chunks.is_empty(), "the cue reached the speaker");
+        let [Answer::BegunTurn { id, .. }, Answer::Done(outcome)] = answered.as_slice() else {
+            panic!("{why}: {answered:?}");
+        };
+        assert!(*id > 0);
+        assert_eq!(outcome, &Outcome::Dropped(why.into()), "{answered:?}");
+        assert_eq!(
+            run.events("input_admitted")
+                .iter()
+                .filter(|event| event["admission_basis"] == "control_turn_cue")
+                .count(),
+            1
+        );
+    }
+}
+
+/// A computer's turn on the product's route: the line the person begins in
+/// its window follows its Start with `TurnOpened` to the second route, and
+/// its answer makes the turn `spoken`. An end naming another id, read while
+/// the answer is under way, is refused and changes nothing; an end naming
+/// the turn's id cuts the answer awaited, as the button's stop does.
+fn computers_turn_with_an_end(
+    holds: bool,
+    other_id: bool,
+) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>) {
+    let (says, line, answered) = crate::say::Says::line_for_test(
+        r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
+    );
+    let ending = line.clone();
+    let end_answered = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let kept = end_answered.clone();
+    let end = move || {
+        let id = crate::control_turn::last_opened_for_test() + u64::from(other_id) * 1_000;
+        let (line, answered) =
+            ending.another(&format!(r#"{{"skill":"control","turn":"end","id":{id}}}"#));
+        *kept.borrow_mut() = Some(answered);
+        line
+    };
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    let run = run(Script {
+        second: false,
+        only: true,
+        speech_frames: 0,
+        speak_at: &[1_750],
+        second_holds: holds,
+        say_at_frame: Some((1_600, line)),
+        say_later: Some((1_830, std::rc::Rc::new(end))),
+        written: Written::Said(12),
+        mute_at_frame: Some(3_000),
+        limit: Duration::from_secs(40),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    let ended = end_answered
+        .borrow_mut()
+        .take()
+        .map(|answered| answered.try_iter().collect())
+        .unwrap_or_default();
+    (run, answered.try_iter().collect(), ended)
+}
+
+#[test]
+fn a_line_in_a_computers_window_is_answered_on_the_second_route() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    let (run, answered, ended) = computers_turn_with_an_end(false, true);
+    assert!(
+        matches!(
+            answered.as_slice(),
+            [Answer::BegunTurn { .. }, Answer::Done(Outcome::Spoken)]
+        ),
+        "{answered:?}: {}",
+        run.summary()
+    );
+    assert_eq!(
+        ended,
+        vec![Answer::Done(Outcome::Refused(
+            crate::control_turn::NOT_THIS_TURN.into()
+        ))]
+    );
+    let opened: Vec<u64> = run
+        .seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::TurnOpened { request, .. } => Some(*request),
+            _ => None,
+        })
+        .collect();
+    let started: Vec<u64> = run
+        .seen
+        .second
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Start { request, .. } => Some(*request),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(opened.len(), 1, "{:?}", run.seen.second);
+    assert_eq!(started, opened, "only the line in the window is the turn's");
+    assert!(
+        run.events("hand_control_cancel")
+            .iter()
+            .all(|event| event["reason"] != "control_ended")
+    );
+}
+
+#[test]
+fn a_computers_end_with_its_id_cuts_the_answer_awaited() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    let (run, answered, ended) = computers_turn_with_an_end(true, false);
+    assert!(
+        matches!(
+            answered.as_slice(),
+            [Answer::BegunTurn { .. }, Answer::Done(Outcome::Dropped(why))]
+                if why == crate::control_turn::ENDED_BY_COMPUTER
+        ),
+        "{answered:?}: {}",
+        run.summary()
+    );
+    assert_eq!(ended, vec![Answer::Done(Outcome::Ended)]);
+    assert_eq!(
+        run.events("hand_control_cancel")
+            .iter()
+            .filter(|event| event["reason"] == "control_ended")
+            .count(),
+        1
+    );
+}
+
+/// A computer's turn asked while the person is speaking is refused at once,
+/// never queued behind them.
+#[test]
+fn a_computers_turn_is_refused_while_the_person_speaks() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    let (says, line, answered) = crate::say::Says::line_for_test(
+        r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":60000}"#,
+    );
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    let run = run(Script {
+        second: false,
+        only: true,
+        speech_frames: 500,
+        say_at_frame: Some((100, line)),
+        written: Written::Said(12),
+        mute_at_frame: Some(900),
+        limit: Duration::from_secs(20),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    let answered: Vec<_> = answered.try_iter().collect();
+    assert_eq!(
+        answered,
+        vec![Answer::Done(Outcome::Refused(
+            crate::control_turn::CONVERSATION.into()
+        ))],
+        "{}",
+        run.summary()
+    );
+    assert!(
+        run.events("input_admitted")
+            .iter()
+            .all(|event| event["admission_basis"] != "control_turn_prompt")
+    );
 }
 
 /// The authored Bedtime morning action is cue="hum", not a spoken line.
