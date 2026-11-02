@@ -1207,14 +1207,18 @@ With the switch:
   expected and ends nothing, as for a head tap (the first builder's P1 on
   #1047).
 - **Only a short command stops the reply** (#4868, `short_stop_over`): at
-  most three words (`SHORT_STOP_WORDS`), the stop word or pair first or
-  last: "Stop.", "Stop, stop.", "Stop now", "Wait, wait", "Hold on",
-  "Lamp, stop.", "That's enough." A stop word inside a longer line stops
-  nothing, "We need them before the review, wait for finance" among them.
+  most three words (`SHORT_STOP_WORDS`), a whole stop word or pair
+  beginning or ending it, the one the lamp's own words and "don't" leave
+  standing: "Stop.", "Stop, stop.", "Stop now", "Wait, wait", "Hold on
+  please", "Please hold on", "Lamp, stop.", "That's enough." A stop word
+  inside a longer line stops nothing, "We need them before the review,
+  wait for finance" among them, and nor does "On pause today" (half a pair
+  at the edge, Thirteen on #5003).
   On lamp-52e6 on 3 November, over an office-talk bed with no stop word in
   it, speech to text misheard the bed and a stop word somewhere in a long
   result stopped an answer nobody asked to stop. A longer stop ("Okay,
-  okay, that is enough.") is missed; the recall cost is not measured. A
+  okay, that is enough.") is missed, and so is a short one with the stop
+  word inside ("Please stop now"); the recall cost is not measured. A
   yield's words, and `heard`, are read as before; the counts' `says_stop`
   is still any stop phrase.
 - **`LAMP_STOP_WORDS_HOLD=own-words`** (off unless set; #828 section 2):
