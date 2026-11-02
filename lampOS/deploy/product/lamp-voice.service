@@ -299,6 +299,10 @@ Environment=LAMP_TASK_NEWS=skill
 # ruling on #1711). The app's button shows only while the tasks part has a computer (app_make's `ready`).
 Environment=LAMP_MAKE_SKILL=on
 Environment=LAMP_APP_MAKE_SKILL=on
+# Made by the lamp's own model instead, with no computer and no tasks part (#4914, #4946): the same
+# brief, checks and spoken yes; the app's button shows at once. Played on lamp-9adf on 2 Nov, by voice
+# and from the app, each put on by a plain "Yes." (the owner's ask; the first builder's yes on #4710).
+Environment=LAMP_MAKE_SKILL_LOCAL=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
