@@ -175,6 +175,12 @@ pub struct Journal {
     /// written before.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub harness: bool,
+    /// The switch writes install's `harness-at-boot` record, none being
+    /// there before (#3693): only then does a put-back remove it, never a
+    /// record an earlier `install` or `harness-on` wrote (the
+    /// Reviewer-lead's P2 on #4503). Absent from a journal written before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub harness_record: bool,
 }
 
 impl Journal {
@@ -654,6 +660,7 @@ mod tests {
             models: Vec::new(),
             settings: false,
             harness: false,
+            harness_record: false,
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));
@@ -807,6 +814,7 @@ mod tests {
                 made: Vec::new(),
             }],
             harness: false,
+            harness_record: false,
         };
         (state, journal)
     }

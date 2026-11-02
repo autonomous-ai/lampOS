@@ -1750,7 +1750,9 @@ taken as done. The tests use the round's fake systemd.
 
 A signed build may set `harness: true` in its manifest, with `min_updater`
 9 at least (`manifest::HARNESS_UPDATER`; a lower one is refused before
-anything is fetched, and an updater of level 8 climbs first). Left out
+anything is fetched, and an updater of level 8 climbs first). No tool
+publishes one yet: `lamp-update manifest` writes `false`, and whether a
+product build turns Harness on is the owner's decision. Left out
 when false, the field is not written. The round then does what
 `lamp-update harness-on` does (docs/install.md), in steps that take no
 records lock of their own, since the round holds it (`world::Harness`):
@@ -1773,9 +1775,14 @@ records lock of their own, since the round holds it (`world::Harness`):
   restarted and watched with the rest, whether or not it was running.
 - **On a put-back** (a part not well, or a switch cut short: the journal's
   `harness`): `lamp-tasks.service` is stopped, Harness at boot undone
-  (`harness-off`'s steps), the link removed and the record with it.
+  (`harness-off`'s steps) and the link removed. The record goes too, but
+  only one this switch wrote (the journal's `harness_record`): one an
+  earlier `install` or `harness-on` left stays.
   Harness's home, `/var/lib/lampos-tasks`, is kept. A step that fails is
   said, and the rest of the put-back goes on.
+- **A lamp without the tasks part:** its start fails, and the build is
+  put back with Harness. A build turns Harness on only for lamps that have
+  `lamp-tasks.service`.
 
 Not shown: any of it on a lamp. The tests use stand-ins for Harness and
 systemd (`tests/round/harness.rs`). A lamp-update older than the field that

@@ -286,3 +286,38 @@ fn a_build_that_turns_harness_on_below_its_updater_level_is_refused_before_anyth
             .contains(&sha("voice 1"))
     );
 }
+
+/// A `harness-at-boot` record an earlier `install` or `harness-on` left,
+/// with no Harness at its path, is the lamp's own: a put-back removes only
+/// a record its switch wrote (the Reviewer-lead's P2 on #4503).
+#[test]
+fn a_put_back_keeps_a_harness_record_the_switch_did_not_write() {
+    let mut lamp = tasks_lamp("tasks 1 crash");
+    let done = lamp.root.join(DONE.trim_start_matches('/'));
+    fs::create_dir_all(done.parent().unwrap()).unwrap();
+    fs::write(&done, "lampos /var/lib/lampos-tasks\n").unwrap();
+    publish(&mut lamp, true, Some(manifest::HARNESS_UPDATER));
+    match lamp.round() {
+        Outcome::RolledBack { sequence: 2, .. } => {}
+        other => panic!("{other:?}: {:?}", lamp.said),
+    }
+    assert_eq!(lamp.harness.asked, ["fetch", "link", "off"]);
+    assert!(lamp.exists(DONE), "{:?}", lamp.said);
+}
+
+/// A lamp with no tasks part at all: the tasks part's start fails, and the
+/// build is put back with Harness (the Reviewer-lead's P3 on #4503). A
+/// build turns Harness on only for a lamp that has the tasks part.
+#[test]
+fn a_lamp_without_the_tasks_part_puts_a_harness_build_back() {
+    let mut lamp = Lamp::new();
+    publish(&mut lamp, true, Some(manifest::HARNESS_UPDATER));
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}: {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.harness.asked, ["fetch", "link", "off"]);
+    assert!(!lamp.exists(DONE));
+}

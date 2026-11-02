@@ -429,6 +429,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         apply_failed: false,
         harness_to_link: false,
         harness_linked: false,
+        harness_record: false,
     };
     if !config.apply {
         let state = run.records.peek_state();
@@ -554,6 +555,10 @@ struct Run<'r, 'w> {
     /// The switch may have linked Harness (#3693), as its journal says: a
     /// put-back undoes it.
     harness_linked: bool,
+    /// The switch writes install's `harness-at-boot` record, none being
+    /// there before (#3693), as its journal says: only then does a
+    /// put-back remove it.
+    harness_record: bool,
 }
 
 /// A unit as it is to be put back.
@@ -869,6 +874,11 @@ impl Run<'_, '_> {
         }
         if let Err(why) = self.world.harness.off() {
             self.say(&format!("Harness could not be turned off again: {why}"));
+        }
+        // Only a record this switch wrote: one an earlier `install` or
+        // `harness-on` left stays (the Reviewer-lead's P2 on #4503).
+        if !std::mem::take(&mut self.harness_record) {
+            return;
         }
         let done = self.records.folder().join(install::HARNESS_DONE);
         match fs::remove_file(&done) {
@@ -2401,6 +2411,8 @@ impl Run<'_, '_> {
             settings: !self.setting_writes.is_empty(),
             skills: skills.clone(),
             harness: self.harness_to_link,
+            harness_record: self.harness_to_link
+                && !self.records.folder().join(install::HARNESS_DONE).exists(),
         };
         if let Err(error) = self
             .records
@@ -2410,6 +2422,7 @@ impl Run<'_, '_> {
             return Outcome::Failed(format!("the journal cannot be written: {error}"));
         }
         self.harness_linked = self.harness_to_link;
+        self.harness_record = journal.harness_record;
         // Head pins depend on the candidate units; other settings retain
         // their established apply-before-units ordering.
         let head_pins = changes.iter().any(|change| {
@@ -2880,6 +2893,7 @@ impl Run<'_, '_> {
         self.model_backs = journal.models.clone();
         self.applying = journal.settings.then_some(journal.build.sequence);
         self.harness_linked = journal.harness;
+        self.harness_record = journal.harness_record;
         let mut backs = Vec::new();
         for switching in &journal.units {
             // A unit the switch added is put back by removing it, with what
