@@ -59,7 +59,7 @@ go and lit, and then starts again every `lamp*` unit that was active before its 
 `LAMP_SHUTDOWN` (`on` exactly; off unless set; `switches.md`) is for the ways
 a person asks: `lamp-cloud` reads it for the app (below); the button's, below; the voice's
 comes with a later change. The runner itself is not behind it: it is only ever started by
-one of those, or by hand.
+one of those, or by hand. The product sets it on in every unit whose part reads it (#4867).
 For the button it is set on three units: Controls
 (`lamp-controls.service`), the voice (`lamp-voice.service`, which hands it to
 its ring worker, and to its provider worker so a model with no

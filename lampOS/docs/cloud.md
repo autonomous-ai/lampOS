@@ -254,7 +254,8 @@ is the same light. Two differences from V1 the page should know:
 
 ## A restart from the app (#2193, `system.reboot`)
 
-Off unless `LAMP_APP_RESTART=on`. `lamp-cloud` restarts nothing itself: it
+Off unless `LAMP_APP_RESTART=on`, which the product's `lamp-cloud.service` sets (#4867).
+`lamp-cloud` restarts nothing itself: it
 sends `{"restart":"lamp"}` to setup's change helper on
 `/run/lampos-setup-change/change.sock` (`lamp-setup change`, root's, on every
 lamp; [setup.md](setup.md), "Changed after setup"), and waits at most 2 s
@@ -278,7 +279,8 @@ parts.
 ## The lamp turned off from the app (#3697, `system.shutdown`)
 
 Off unless `LAMP_SHUTDOWN=on` (the switch of every way a person asks to
-turn the lamp off, `switches.md`). The app's off button (Mobile, #3698)
+turn the lamp off, `switches.md`), on in the product since the button's and the app's
+checks (#3697, #3698; #4867). The app's off button (Mobile, #3698)
 sends it. `lamp-cloud` turns nothing off itself (it is not root): it sends
 `{"shutdown":"lamp"}` to setup's change helper, as the restart above, with
 the same 2 s bound. The helper takes lamp-update's lock without waiting:

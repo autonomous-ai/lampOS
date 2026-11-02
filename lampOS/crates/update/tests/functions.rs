@@ -265,13 +265,13 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
 
 /// Migrate's #4595, option (b) (the first builder, 22:1x on 30 Oct): a
 /// product lamp offers no `prepare_to_unplug` (`LAMP_UNPLUG` unset). With
-/// `LAMP_SHUTDOWN` off in the product until the button's check on a product
-/// lamp (#3697, 31 Oct), told "I'm unplugging you" its chat request is told
-/// that pulling the plug is the only way for now, and names no app; with the
-/// switch on, to turn it off from the app first.
+/// `LAMP_SHUTDOWN` on in the product since the button's check on a product
+/// lamp (#3697, 2 Nov; #4867), told "I'm unplugging you" its chat request is
+/// told to turn it off from the app first; with the switch off, that pulling
+/// the plug is the only way for now, and names no app.
 #[test]
 fn a_product_lamp_told_it_is_being_unplugged_says_the_plug_until_the_app_can_turn_it_off() {
-    let Product { chat, unplug, .. } = product_with(&[]);
+    let Product { chat, unplug, .. } = product_with(&[(lamp_msgs::SHUTDOWN_SWITCH, "off")]);
     assert!(
         !chat
             .iter()
@@ -279,11 +279,8 @@ fn a_product_lamp_told_it_is_being_unplugged_says_the_plug_until_the_app_can_tur
         "{chat:?}"
     );
     assert_eq!(unplug, ["plug"]);
-    // With the switch, the app's Turn off first.
-    assert_eq!(
-        product_with(&[(lamp_msgs::SHUTDOWN_SWITCH, "on")]).unplug,
-        ["app"]
-    );
+    // The product, with the switch on: the app's Turn off first.
+    assert_eq!(product_with(&[]).unplug, ["app"]);
 }
 
 /// A product lamp's chat request (lamp-0c89, 21 Oct: "Lamp. Please dance
