@@ -607,9 +607,9 @@ impl BusOut {
         }
     }
 
-    /// Whether the lamp's head was moving at this look
+    /// Whether the lamp's head was moving at this look, `None` unknown
     /// (`speaking::Mouths::set_head_moved`).
-    pub fn set_head_moved(&mut self, moved: bool) {
+    pub fn set_head_moved(&mut self, moved: Option<bool>) {
         if let Some(mouths) = self.ids.mouths.as_mut() {
             mouths.set_head_moved(moved);
         }
