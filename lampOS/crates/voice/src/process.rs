@@ -1711,6 +1711,8 @@ fn second_route_worker_environment(
         crate::second_provider::SHORT_DONE_ENVIRONMENT,
         // An empty answer to a line said by name asked again (#3704).
         crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
+        // A wordless cut-in that ended the answer asks a short question.
+        crate::cut_in_wordless::ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
@@ -1879,6 +1881,7 @@ mod tests {
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
+            crate::cut_in_wordless::ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
@@ -2566,6 +2569,7 @@ mod tests {
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
+                    || name == crate::cut_in_wordless::ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
@@ -2689,6 +2693,7 @@ mod tests {
                     "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
                     "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
+                    "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_DECLINE_SILENT=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",

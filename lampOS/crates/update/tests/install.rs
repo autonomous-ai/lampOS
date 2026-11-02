@@ -1427,6 +1427,30 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
+/// left the lamp quiet mid-story). The wordless cut-in's question stays
+/// off: the lamp's own echo commits as a cut-in with 0 words (7 of 15
+/// stories on lamp-06c1, 3 Nov, #4938), so it would answer its own voice.
+#[test]
+fn the_product_answers_a_stop_and_leaves_the_wordless_question_off() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_SPOKEN_STOP_ENDS=on"),
+        "the voice lacks LAMP_SPOKEN_STOP_ENDS"
+    );
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_CUT_IN_WORDLESS_ASKS=")),
+        "the voice sets LAMP_CUT_IN_WORDLESS_ASKS"
+    );
+}
+
 /// A thing the person already keeps, said again, is that kept thing, not a
 /// second one (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): on lamp-06c1 on 28 Oct
 /// the product unit, without it, kept "the meeting room is called orange"

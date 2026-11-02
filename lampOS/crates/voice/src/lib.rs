@@ -62,6 +62,7 @@ pub mod choreography;
 pub mod config;
 pub mod conversation_summary;
 pub mod cut_in_told;
+pub mod cut_in_wordless;
 pub mod diagnostic_control;
 pub mod diagnostics;
 pub mod early_words;
