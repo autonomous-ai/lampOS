@@ -2214,7 +2214,9 @@ Nothing above changes with the switch off.
    after an answer that asked something else puts nothing on. The second
    route notes a made skill waiting for its yes with the switch too.
 5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
-   for up to 30 s, or about 60 s with the one more try. The person hears
+   for up to 30 s an ask, and with the one more try after a failure and the
+   one repair after a refusal, two asks of two tries each: about 120 s at
+   the most (the Reviewer-lead's P3 on #4914, 16:24). The person hears
    the model's few words that it is making it, said before the call, and
    then the voice's wait sound if `LAMP_SECOND_WAIT_CUE=on`; nothing else
    until the answer. Whether "Stop" ends the wait is measured in the played
