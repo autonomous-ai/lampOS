@@ -250,8 +250,34 @@ line in a loud office), "Lamp, what did I just ask you?" came back as "Lampy,
 [switches.md](switches.md)). On lamp-3e83 on 2 Nov a tester's "Lamp, …"
 came back mostly as "One, …" ("One, how do I make a pour over coffee?",
 "One, what should I eat for lunch?") and each was held as said to someone it
-calls by name (`attention::ONE_STAND_INS`). Set off at a line's start it
-calls the lamp; "One more thing, …" and "Which one?" don't. Deepgram also
+calls by name (`attention::ONE_STAND_INS`). With the switch "One" is
+nobody's name, but it is an everyday reply word, so it calls the lamp only
+as the line's first word past any greeting, set off by a comma, with at
+least three words after it (`attention::ONE_CALL_LEAST_WORDS`): none of the
+first three nor the last a number word or a figure, and not only "please"
+or "thanks" (`attention::opens_with_one`). A number further in belongs to
+the request ("One, set a timer for two minutes."). "One, what time is it?"
+calls; "Yes, one.", "I want one, please.", a bare "One." or "One,", "One,
+please.", short answers to "How many?" ("One, I think.", "One, maybe.",
+"One, no sugar.", "One, or maybe two."; Seventh's P2-1 on #4968), longer
+ones opening with a reply word (`attention::ONE_REPLY_OPENERS`: "maybe",
+"yeah", "yes", "yep", "no", "nope", "if", "or", "sure", "probably" and
+"perhaps"; "One, maybe a bit later.", "One, if that's okay."), "One,
+two, three, go!", "One more thing, …" and "Which one?" don't. Not "I": "One,
+I need a timer." calls. The rule's known residual: a longer ordinary reply
+opening with another word ("One, I think so too.", "One, I'm not sure.")
+still calls the lamp in a room not known to be busy. A second: a request
+opening with one of those reply openers ("One, no wait, turn it off.", "One,
+sure set it for ten.") is missed. "Just", "okay", "ok" and "actually" open
+ordinary calls ("One, just turn the light off.", "One, okay, what time is
+it?"), so they are no reply openers; the replies they open are held by the
+number or three-word rule ("One, just one please.", "One, okay."; Seventh's
+P2-1 on #4968, 01:46). A bare "One," cut at a pause is not carried as a call the way
+"Lynn," is (`written_for_the_name`, `only_the_name`): its call needs the
+words after the comma. And in a busy room "One," never shows the call by its
+text, as a stand-in never does there (`called_by_real_name`; Seventh's P2
+on #4953): the name heard, a face or a conversation going on still lets it
+out. Deepgram also
 wrote "Wang, …" and "Lung, …" there. They are people's names, so with the
 switch they are the lamp's only with the second sign a set-off name that is
 also a word needs (`NAMES_ALSO_WORDS`, below): a conversation with the lamp
@@ -1837,7 +1863,14 @@ are read lower case, split as `called` splits them, without the opening word
 set off as a name ("One,", "Wang,", "Daniel,", "Yes,"; past a greeting) and
 without fillers (`RETRY_FILLERS`: um, uh, oh, hey, hello, okay, so, well, …).
 It is a retry when at least 6 in 10 of the held line's words, and at least
-3, are in it. On lamp-3e83 on 2 Nov, "One, how do I make for over coffee?"
+3, are in it, and only when the held line opens with a word Deepgram writes
+for the lamp's name, set off ("One,", "Wang,", "Lung,";
+`ONE_STAND_INS`, `STAND_INS_WITH_A_SIGN`). After a real name a reply echoes
+a short question: "I can send you the file." after "Daniel, can you send me
+the file?" and "Yes, I'm coming to the meeting." after "Daniel, are you
+coming to the meeting?" stay Daniel's (Seventh's P2 on #4953). A line in
+unspaced Japanese, Chinese or Korean is one word as split here, so it is
+never a retry, and is judged as before. On lamp-3e83 on 2 Nov, "One, how do I make for over coffee?"
 after "One, how do I make a pour over coffee?" (6 of 8) and "How much is
 100 US dollars in Vietnamese dump?" after "One, how much is, 100 US dollars
 in Vietnamese loan?" (7 of 8) were held as replies. A different reply, "Yes,
