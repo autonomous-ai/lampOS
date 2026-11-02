@@ -1029,6 +1029,24 @@ impl Thread {
             })
     }
 
+    /// [`Self::said_last_but`]'s answer and how long ago that same exchange
+    /// was, so the words and their age come from one exchange (the
+    /// Reviewer-lead's P3 on #4880).
+    pub fn answered_last_but(&self, request: u64, now: Instant) -> Option<(String, Duration)> {
+        let exchange = self
+            .exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))?;
+        let lamp = if exchange.lamp.ends_with(exchange.tail.as_str()) {
+            exchange.lamp.clone()
+        } else {
+            format!("{} {}", exchange.lamp, exchange.tail)
+        };
+        Some((lamp, now.saturating_duration_since(exchange.at)))
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
@@ -3690,5 +3708,23 @@ mod tests {
         );
         let short = Thread::new();
         assert!(short.said_last_but(1, &[]).is_none());
+    }
+
+    /// The Reviewer-lead's P3 on #4880: the answer and its age come from one
+    /// exchange, the newest with the lamp's words but `request`'s.
+    #[test]
+    fn answered_last_but_ties_the_words_to_their_age() {
+        let mut thread = Thread::new();
+        let then = Instant::now();
+        thread.person("Is my skill ready?", true, then);
+        thread.lamp(1, "It is. Shall I put it on the lamp?", then);
+        let later = then + Duration::from_secs(4);
+        thread.person("Yes", true, later);
+        thread.lamp(2, "Putting it on.", later);
+        let now = later + Duration::from_secs(1);
+        let (lamp, ago) = thread.answered_last_but(2, now).unwrap();
+        assert!(lamp.contains("Shall I put it on the lamp?"), "{lamp}");
+        assert_eq!(ago, Duration::from_secs(5));
+        assert!(Thread::new().answered_last_but(1, now).is_none());
     }
 }
