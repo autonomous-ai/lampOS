@@ -3101,10 +3101,14 @@ pub fn serve(
                         let now_unix_ms = SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .map_or(0, |since| since.as_millis() as u64);
-                        crate::made_skill::waiting_note(
-                            std::path::Path::new(crate::made_skill::DIRECTORY),
-                            now_unix_ms,
-                        )
+                        let directory = std::path::Path::new(crate::made_skill::DIRECTORY);
+                        crate::made_skill::waiting_note(directory, now_unix_ms).or_else(|| {
+                            crate::make_skill_local::from_environment()
+                                .then(|| {
+                                    crate::make_skill_local::untold_note(directory, now_unix_ms)
+                                })
+                                .flatten()
+                        })
                     })
                     .flatten()
             })
