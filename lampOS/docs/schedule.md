@@ -315,6 +315,8 @@ not calculate an epoch timestamp from a conversation's opening time.
 | `{"kind":"at","time":"09:00","day":"2028-02-29","zone":"Asia/Ho_Chi_Minh"}` | An exact valid calendar date and explicit IANA zone. |
 | `{"kind":"daily","time":"09:00"}` | Every local date at 09:00, initially strictly after now. |
 | `{"kind":"weekly","weekday":"monday","time":"09:00"}` | Every Monday at 09:00, initially strictly after now. Weekdays are full lowercase English names. |
+| `{"kind":"every","hours":1}` | With `LAMP_SCHEDULE_EVERY=on` only: every hour, the first an hour from now, up to the whole minute. `minutes` or `hours`, never both, 15 minutes to 24 hours in all (the first builder on #4710, 2 Nov 17:4x: "a lamp reminding someone every few minutes is a nag"). |
+| `{"kind":"every","minutes":90,"from":"08:00","to":"18:00"}` | Every 90 minutes inside a daily window: its start (08:00), then each step while still inside it; after its end, its next start. `from` and `to` are both given or neither, any `HH:MM`; a window across midnight (`22:00` to `02:00`) runs into the next day, and equal ones are the whole day, the same as none. |
 
 Times are exact ASCII `HH:MM` on a 24-hour clock. `9:00`, `09:0`, AM/PM strings,
 seconds, unknown fields, and invented relative-day words are refused. Dates are
@@ -362,6 +364,21 @@ requested civil occurrence, not from delivery time. A whole-day zone jump can
 map two distinct civil dates to the same instant, as in Apia in 2011; both
 occurrences are retained, with different delivery tokens. Advancement is
 receipt-driven, so equal instants do not create a timer loop.
+
+An `every` reminder steps in civil time, under the same `Compatible` policy.
+Its `repeat` keeps this occurrence's civil date and `HH:MM`, its step in
+minutes, and its window, so the next one is that civil time plus the step, or,
+past the window's end, the window's next start. A step that lands in a gap,
+or on the same or an earlier instant than the one before (a spring-forward
+hour), is stepped over: an `every` is never said twice or out of order. After
+time off, only the newest missed one is due, marked late, as for daily ones.
+"Stop reminding me" cancels the whole series, as `cancel_reminder` does today.
+
+**Stored as schema 2, only while one is kept.** `every` is a new stored value,
+so this build reads schema 1 and 2 and writes 2 only while the store holds an
+`every`; otherwise it still writes 1, which a build from before reads as it
+always did. A build from before that meets a schema 2 store sets it aside, as
+any newer store (`set_aside`, above).
 
 Supported Unix milliseconds are 0 through **253,402,207,200,999**, inclusive:
 1970-01-01T00:00:00Z through 9999-12-30T22:00:00.999Z. Jiff reserves its maximum

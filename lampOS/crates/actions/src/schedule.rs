@@ -4,7 +4,10 @@ use crate::Function;
 use lamp_schedule::{
     client,
     protocol::{Asker, Guard, Request},
-    time::{Deadline, Fold, MAX_AFTER_SECONDS, Repeat, Weekday, When, validate_zone},
+    time::{
+        Deadline, Fold, MAX_AFTER_SECONDS, MAX_EVERY_MINUTES, MIN_EVERY_MINUTES, Repeat, Weekday,
+        When, validate_zone,
+    },
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -16,6 +19,14 @@ use std::{
 };
 
 pub const DEFAULT_SOCKET: &str = "/run/lampos-schedule/call.sock";
+/// `on`: `repeat_reminder` also takes a reminder every so many minutes or
+/// hours (`interval`), as `lamp-schedule` with the same switch keeps one.
+pub const EVERY_SWITCH: &str = "LAMP_SCHEDULE_EVERY";
+
+/// Whether [`EVERY_SWITCH`] is `on` in this process's environment.
+pub fn every_from_environment() -> bool {
+    std::env::var_os(EVERY_SWITCH).as_deref() == Some(OsStr::new("on"))
+}
 pub const DEADLINE: Duration = Duration::from_millis(1250);
 /// Told beside a list asked `pending_only` that left out items set but not
 /// yet due (#1595).
@@ -60,6 +71,12 @@ pub fn is_tool(name: &str) -> bool {
 /// The existing provider's small Schema vocabulary. Runtime validation below
 /// is stricter than a model schema; byte limits and unknown fields are checked.
 pub fn catalog() -> Vec<Function> {
+    catalog_with(every_from_environment())
+}
+
+/// [`catalog`] with [`EVERY_SWITCH`] on (`every`) or off: off, it is the
+/// catalog as it was, byte for byte.
+pub fn catalog_with(every: bool) -> Vec<Function> {
     let text = json!({"type":"string","description":"A short label: 1 to 300 UTF-8 bytes, without control characters."});
     let seconds = json!({"type":"integer","minimum":1,"maximum":MAX_AFTER_SECONDS});
     let time =
@@ -84,12 +101,21 @@ pub fn catalog() -> Vec<Function> {
             json!({"text":text,"time":time,"day":{"type":"string","description":"today, tomorrow, next, or exact YYYY-MM-DD; omitted means the next strictly future occurrence."},"zone":zone,"fold":{"type":"string","enum":["earlier","later","reject"]}}),
             json!(["text", "time"]),
         ),
-        function(
-            NAMES[2],
-            "Repeat a reminder daily or weekly at the requested local time. Weekly needs a weekday; daily must omit it.",
-            json!({"text":text,"time":time,"every":{"type":"string","enum":["daily","weekly"]},"weekday":{"type":"string","enum":["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]},"zone":zone}),
-            json!(["text", "time", "every"]),
-        ),
+        if every {
+            function(
+                NAMES[2],
+                "Repeat a reminder daily or weekly at the requested local time, or every so many minutes or hours. Weekly needs a weekday; daily must omit it; both need time. For 'every hour', 'every 2 hours' or 'every 20 minutes', use every interval with whole minutes or whole hours, never both, from 15 minutes to 24 hours, and no time; with a span such as 'from 8 to 6', add from and to as HH:MM (either order; one across midnight is fine). 'Stop reminding me' cancels the whole series with cancel_reminder.",
+                json!({"text":text,"time":time,"every":{"type":"string","enum":["daily","weekly","interval"]},"weekday":{"type":"string","enum":["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]},"minutes":{"type":"integer","minimum":MIN_EVERY_MINUTES,"maximum":MAX_EVERY_MINUTES},"hours":{"type":"integer","minimum":1,"maximum":MAX_EVERY_MINUTES / 60},"from":time,"to":time,"zone":zone}),
+                json!(["text", "every"]),
+            )
+        } else {
+            function(
+                NAMES[2],
+                "Repeat a reminder daily or weekly at the requested local time. Weekly needs a weekday; daily must omit it.",
+                json!({"text":text,"time":time,"every":{"type":"string","enum":["daily","weekly"]},"weekday":{"type":"string","enum":["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]},"zone":zone}),
+                json!(["text", "time", "every"]),
+            )
+        },
         function(
             NAMES[3],
             LIST_DESCRIBED,
@@ -134,6 +160,8 @@ pub struct Adapter {
     socket: PathBuf,
     /// [`DEADLINE`] for every product path.
     deadline: Duration,
+    /// [`EVERY_SWITCH`]: `repeat_reminder` takes `interval`.
+    every: bool,
 }
 
 impl Adapter {
@@ -142,7 +170,14 @@ impl Adapter {
         Ok(Self {
             socket,
             deadline: DEADLINE,
+            every: every_from_environment(),
         })
+    }
+
+    /// The same adapter with [`EVERY_SWITCH`] taken as `every`, for a test.
+    pub fn with_every(mut self, every: bool) -> Self {
+        self.every = every;
+        self
     }
 
     /// The same adapter, giving one call `deadline` instead of [`DEADLINE`]:
@@ -242,7 +277,9 @@ impl Adapter {
         caller: Option<&Caller>,
     ) -> Value {
         let deadline = Instant::now() + self.deadline;
-        match parse(name, args).and_then(|call| self.perform(call, set_times, caller, deadline)) {
+        match parse(name, args, self.every)
+            .and_then(|call| self.perform(call, set_times, caller, deadline))
+        {
             Ok(result) if result.to_string().len() <= MAX_RESULT_BYTES => {
                 json!({"ok":true,"result":result})
             }
@@ -518,15 +555,26 @@ struct Reminder {
 enum Every {
     Daily,
     Weekly,
+    /// Every so many minutes or hours ([`EVERY_SWITCH`]).
+    Interval,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Repeating {
     text: String,
-    time: String,
+    #[serde(default)]
+    time: Option<String>,
     every: Every,
     weekday: Option<Weekday>,
     zone: Option<String>,
+    #[serde(default)]
+    minutes: Option<u32>,
+    #[serde(default)]
+    hours: Option<u32>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    to: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -617,7 +665,8 @@ fn calendar(time_of_day: &str, zone: Option<&str>) -> Result<(), Failure> {
     }
     Ok(())
 }
-fn parse(name: &str, value: &Value) -> Result<Call, Failure> {
+/// `every`: [`EVERY_SWITCH`] is on, so `repeat_reminder` takes `interval`.
+fn parse(name: &str, value: &Value, every: bool) -> Result<Call, Failure> {
     let call = match name {
         "set_timer" => {
             let a: Timer = decode(value)?;
@@ -645,18 +694,60 @@ fn parse(name: &str, value: &Value) -> Result<Call, Failure> {
         }
         "repeat_reminder" => {
             let a: Repeating = decode(value)?;
-            calendar(&a.time, a.zone.as_deref())?;
             let when = match (a.every, a.weekday) {
-                (Every::Daily, None) => When::Daily {
-                    time: a.time,
-                    zone: a.zone,
-                },
-                (Every::Weekly, Some(weekday)) => When::Weekly {
-                    weekday,
-                    time: a.time,
-                    zone: a.zone,
-                },
-                _ => return Err(Failure::BadArguments),
+                (Every::Interval, None) if every => {
+                    let window = match (a.from, a.to) {
+                        (Some(from), Some(to)) if time(&from) && time(&to) => {
+                            (Some(from), Some(to))
+                        }
+                        (None, None) => (None, None),
+                        _ => return Err(Failure::BadArguments),
+                    };
+                    let step = match (a.minutes, a.hours) {
+                        (Some(minutes), None) => Some(minutes),
+                        (None, Some(hours)) => hours.checked_mul(60),
+                        _ => None,
+                    };
+                    if a.time.is_some()
+                        || !step.is_some_and(|step| {
+                            (MIN_EVERY_MINUTES..=MAX_EVERY_MINUTES).contains(&step)
+                        })
+                        || a.zone.as_deref().is_some_and(|z| validate_zone(z).is_err())
+                    {
+                        return Err(Failure::BadArguments);
+                    }
+                    When::Every {
+                        minutes: a.minutes,
+                        hours: a.hours,
+                        from: window.0,
+                        to: window.1,
+                        zone: a.zone,
+                    }
+                }
+                (Every::Interval, _) => return Err(Failure::BadArguments),
+                (every, weekday) => {
+                    if a.minutes.is_some()
+                        || a.hours.is_some()
+                        || a.from.is_some()
+                        || a.to.is_some()
+                    {
+                        return Err(Failure::BadArguments);
+                    }
+                    let time_of_day = a.time.ok_or(Failure::BadArguments)?;
+                    calendar(&time_of_day, a.zone.as_deref())?;
+                    match (every, weekday) {
+                        (Every::Daily, None) => When::Daily {
+                            time: time_of_day,
+                            zone: a.zone,
+                        },
+                        (Every::Weekly, Some(weekday)) => When::Weekly {
+                            weekday,
+                            time: time_of_day,
+                            zone: a.zone,
+                        },
+                        _ => return Err(Failure::BadArguments),
+                    }
+                }
             };
             Call::Set { text: a.text, when }
         }
@@ -822,9 +913,22 @@ fn item(value: &Value) -> Result<Item, Failure> {
             Repeat::Daily { time, zone, date }
             | Repeat::Weekly {
                 time, zone, date, ..
+            }
+            | Repeat::Every {
+                time, zone, date, ..
             } => (time, zone, date),
         };
         if !time(time_of_day) || validate_zone(zone).is_err() || date.len() != 10 || !day(date) {
+            return Err(Failure::Unavailable);
+        }
+        if let Repeat::Every {
+            minutes, from, to, ..
+        } = repeat
+            && (!(MIN_EVERY_MINUTES..=MAX_EVERY_MINUTES).contains(minutes)
+                || from.is_some() != to.is_some()
+                || from.as_deref().is_some_and(|t| !time(t))
+                || to.as_deref().is_some_and(|t| !time(t)))
+        {
             return Err(Failure::Unavailable);
         }
     }
@@ -889,4 +993,73 @@ fn page(
     Ok(
         json!({"items":items,"next_after_id":next,"pending_only":pending_only,"complete":next.is_none()}),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn repeat(args: Value, every: bool) -> Result<When, Failure> {
+        match parse("repeat_reminder", &args, every)? {
+            Call::Set { when, .. } => Ok(when),
+            _ => Err(Failure::BadArguments),
+        }
+    }
+
+    /// `LAMP_SCHEDULE_EVERY` off: `repeat_reminder` is the catalog it was and
+    /// refuses an interval; on, it takes minutes or hours, 15 minutes to 24
+    /// hours, never both, with an optional window of both ends.
+    #[test]
+    fn interval_repeats_only_with_the_switch_and_within_its_bounds() {
+        let off = catalog_with(false);
+        assert_eq!(
+            off[2].parameters.as_ref().unwrap()["properties"]["every"]["enum"],
+            json!(["daily", "weekly"])
+        );
+        assert!(off[2].parameters.as_ref().unwrap()["properties"]["minutes"].is_null());
+        let on = catalog_with(true);
+        assert_eq!(
+            on[2].parameters.as_ref().unwrap()["properties"]["every"]["enum"],
+            json!(["daily", "weekly", "interval"])
+        );
+        let hourly = json!({"text":"Drink some water","every":"interval","hours":1});
+        assert!(repeat(hourly.clone(), false).is_err());
+        assert_eq!(
+            repeat(hourly, true).unwrap(),
+            When::Every {
+                minutes: None,
+                hours: Some(1),
+                from: None,
+                to: None,
+                zone: None
+            }
+        );
+        let windowed =
+            json!({"text":"Water","every":"interval","minutes":90,"from":"22:00","to":"02:00"});
+        assert!(matches!(
+            repeat(windowed, true).unwrap(),
+            When::Every {
+                minutes: Some(90),
+                from: Some(_),
+                to: Some(_),
+                ..
+            }
+        ));
+        for wrong in [
+            json!({"text":"t","every":"interval","minutes":14}),
+            json!({"text":"t","every":"interval","hours":25}),
+            json!({"text":"t","every":"interval","minutes":60,"hours":1}),
+            json!({"text":"t","every":"interval"}),
+            json!({"text":"t","every":"interval","minutes":60,"from":"08:00"}),
+            json!({"text":"t","every":"interval","minutes":60,"time":"09:00"}),
+            json!({"text":"t","every":"daily","time":"09:00","minutes":60}),
+        ] {
+            assert!(repeat(wrong.clone(), true).is_err(), "{wrong}");
+        }
+        // Daily and weekly are as they were, either way.
+        for every in [false, true] {
+            assert!(repeat(json!({"text":"t","every":"daily","time":"09:00"}), every).is_ok());
+            assert!(repeat(json!({"text":"t","every":"daily"}), every).is_err());
+        }
+    }
 }

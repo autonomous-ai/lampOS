@@ -305,7 +305,9 @@ impl AbsentEvidence {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AckEvidence {
-    attempt: AckAttempt,
+    /// Boxed: a request can carry a `When`, whose `every` made this the
+    /// largest evidence by far.
+    attempt: Box<AckAttempt>,
     committed_revision: u64,
     /// A direct exact replay can return a historical receipt. Only Status's
     /// outer revision is a current store observation.
@@ -331,7 +333,7 @@ impl AckEvidence {
             return Err(error("invalid_ack"));
         }
         Ok(Self {
-            attempt: attempt.clone(),
+            attempt: Box::new(attempt.clone()),
             committed_revision: reply.revision,
             current_revision: None,
         })

@@ -134,6 +134,16 @@ enum SavedRepeat {
         zone: String,
         date: String,
     },
+    Every {
+        minutes: u32,
+        #[serde(default)]
+        from: Option<String>,
+        #[serde(default)]
+        to: Option<String>,
+        time: String,
+        zone: String,
+        date: String,
+    },
 }
 
 impl From<SavedDeadline> for Deadline {
@@ -154,6 +164,21 @@ impl From<SavedDeadline> for Deadline {
                     date,
                 } => Repeat::Weekly {
                     weekday,
+                    time,
+                    zone,
+                    date,
+                },
+                SavedRepeat::Every {
+                    minutes,
+                    from,
+                    to,
+                    time,
+                    zone,
+                    date,
+                } => Repeat::Every {
+                    minutes,
+                    from,
+                    to,
                     time,
                     zone,
                     date,
@@ -225,10 +250,21 @@ mod tests {
                     date,
                 }
             },
+            {
+                let (time, zone, date) = parts();
+                Repeat::Every {
+                    minutes: 60,
+                    from: None,
+                    to: None,
+                    time,
+                    zone,
+                    date,
+                }
+            },
         ];
         for value in &repeats {
             match value {
-                Repeat::Daily { .. } | Repeat::Weekly { .. } => {}
+                Repeat::Daily { .. } | Repeat::Weekly { .. } | Repeat::Every { .. } => {}
             }
         }
         // What this build reads them as, too.
@@ -238,7 +274,7 @@ mod tests {
             date: String::new(),
         };
         match saved {
-            SavedRepeat::Daily { .. } | SavedRepeat::Weekly { .. } => {}
+            SavedRepeat::Daily { .. } | SavedRepeat::Weekly { .. } | SavedRepeat::Every { .. } => {}
         }
         let weekdays: Vec<_> = weekdays
             .iter()
@@ -267,8 +303,8 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                1,
-                "repeat: daily weekly; weekday: monday tuesday wednesday thursday friday saturday sunday"
+                2,
+                "repeat: daily weekly every; weekday: monday tuesday wednesday thursday friday saturday sunday"
             ),
             "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
         );
