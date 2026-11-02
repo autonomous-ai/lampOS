@@ -20,6 +20,8 @@ export const SUMMARISED = new Set(['text', 'data']);
 export const SHOWN = new Set([
   // A dev lamp's `--rates off`, said in hello's limits.
   'rates',
+  // `say`'s choice of the model's words over the exact ones.
+  'rephrase',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',

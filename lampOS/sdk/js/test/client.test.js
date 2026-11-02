@@ -941,3 +941,14 @@ test('a look at the hand needs the body\'s lease socket, as other looks do', asy
     assert.equal(fake.leases.size, 0);
   });
 });
+
+test('a say is exact unless rephrase is asked', async () => {
+  await withLamp({ grants: ['speak'] }, async (lamp, fake) => {
+    await lamp.say('Build passed, 3 tests.');
+    await lamp.say('Tell them the build passed.', { rephrase: true });
+    assert.deepEqual(fake.asked('say'), [
+      { text: 'Build passed, 3 tests.' },
+      { text: 'Tell them the build passed.', rephrase: true },
+    ]);
+  });
+});

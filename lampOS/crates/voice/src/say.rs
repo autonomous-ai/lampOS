@@ -64,6 +64,16 @@
 //!   then a hand's hold's sleep line, #3748) is rendered at start; the
 //!   coordinator reads the sleep line from the same cache, never rendering. It is played as a recording is (the shutdown's skill
 //!   past the gates, as its last words); not kept and not renderable, it is refused at once with why.
+//! - **Exact words** (the local leader's 2 Nov, a paired computer's `say`
+//!   through lamp-control): `text` with `"exact": true`, from any caller, is
+//!   never given to the model. It is rendered on the client's thread
+//!   straight through the speech service the voice speaks with
+//!   ([`tts_cache::TtsCache::render_once`], never kept in the cache) and
+//!   played as a turn of the lamp's own on the head cue's speaker path once
+//!   [`may_play_exact`] says so: it waits while someone is talking with the
+//!   lamp, its speaker is busy or an answer is owed (never for the room's
+//!   speech nobody addresses to it), is refused paused or muted, and has no
+//!   quiet gap or one-in-30-s rarity. `spoken` means played whole, as a sound's.
 //! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
 //!   fixed -20 dBFS default on the client's thread, without a file or model
 //!   request. It is a sound through the same queue, quiet, rarity, privacy
@@ -235,6 +245,14 @@ pub enum Words {
     /// thread takes its samples from the speech cache ([`tts_cache`]).
     Cached(String),
     Sound(Vec<i16>),
+    /// A `text` asked `exact` (a paired computer's `say`, docs/control.md),
+    /// until the client's thread renders it through the speech service
+    /// ([`tts_cache::TtsCache::render_once`]): no model, no tools, the
+    /// words as sent.
+    Exact(String),
+    /// An exact text's samples, played as the lamp's own line once the
+    /// person isn't talking ([`may_play_exact`]).
+    ExactSound(Vec<i16>),
 }
 
 impl Words {
@@ -249,7 +267,9 @@ impl Words {
             | Self::SoundAt(_)
             | Self::Recording(_)
             | Self::Cached(_)
-            | Self::Sound(_) => None,
+            | Self::Sound(_)
+            | Self::Exact(_)
+            | Self::ExactSound(_) => None,
         }
     }
 }
@@ -352,6 +372,10 @@ struct Wire {
     /// A `text` played from the speech cache (#3697): root's helpers only.
     #[serde(default)]
     cache: bool,
+    /// A `text` spoken exactly as sent, straight through the speech service
+    /// with no model ([`Words::Exact`]): a paired computer's `say`.
+    #[serde(default)]
+    exact: bool,
     #[serde(default)]
     unplug_request: Option<String>,
     #[serde(default)]
@@ -539,11 +563,14 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     } else if skill == "prepare-unplug" && matches!(words, Words::Text(_)) {
         return Err("prepare-unplug text requires unplug_request".into());
     }
-    let words = match (wire.cache, words) {
-        (false, words) => words,
-        (true, Words::Text(text)) if caller == Caller::WifiHelper => Words::Cached(text),
-        (true, Words::Text(_)) => return Err("cache is asked by root's helpers only".into()),
-        (true, _) => return Err("cache goes only with text".into()),
+    let words = match (wire.exact, wire.cache, words) {
+        (true, true, _) => return Err("exact and cache: one of them".into()),
+        (true, false, Words::Text(text)) => Words::Exact(text),
+        (true, false, _) => return Err("exact goes only with text".into()),
+        (false, false, words) => words,
+        (false, true, Words::Text(text)) if caller == Caller::WifiHelper => Words::Cached(text),
+        (false, true, Words::Text(_)) => return Err("cache is asked by root's helpers only".into()),
+        (false, true, _) => return Err("cache goes only with text".into()),
     };
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
@@ -749,6 +776,7 @@ pub struct Says {
     order: u64,
     /// When the last skill's sound was played.
     last_sound_us: Option<u64>,
+
     /// Kept so that the socket goes with the voice.
     _socket: Option<Bound>,
     /// Bound at the voice's start ([`Says::start`]): a run that ends hands
@@ -1034,6 +1062,13 @@ impl Says {
         Self::words_for_test(skill, Words::Note(note.into()), priority)
     }
 
+    /// For a test of the voice's loop: one paired computer's exact line,
+    /// rendered already ([`Words::ExactSound`]).
+    #[cfg(test)]
+    pub(crate) fn exact_for_test(skill: &str, samples: Vec<i16>) -> (Self, mpsc::Receiver<Answer>) {
+        Self::words_for_test(skill, Words::ExactSound(samples), NORMAL_PRIORITY)
+    }
+
     /// [`Self::note_for_test`] for any `words`.
     #[cfg(test)]
     pub(crate) fn words_for_test(
@@ -1148,6 +1183,8 @@ impl Says {
                     | Words::Recording(_)
                     | Words::Cached(_)
                     | Words::Sound(_)
+                    | Words::Exact(_)
+                    | Words::ExactSound(_)
             )
         })
     }
@@ -1187,6 +1224,32 @@ impl Says {
     /// A skill's sound was played at `at_us`.
     pub fn sound_played(&mut self, at_us: u64) {
         self.last_sound_us = Some(at_us);
+    }
+
+    /// Whether an exact line waits to be said, without taking it.
+    pub fn exact_waiting(&mut self, now_us: u64) -> bool {
+        self.expire(now_us);
+        self.next_of(|request| matches!(request.words, Words::ExactSound(_)))
+            .is_some()
+    }
+
+    /// The exact line to say next, taken.
+    pub fn take_exact(&mut self, now_us: u64) -> Option<(Vec<i16>, Ticket)> {
+        self.expire(now_us);
+        let index = self.next_of(|request| matches!(request.words, Words::ExactSound(_)))?;
+        let waiting = self.waiting.remove(index);
+        let Words::ExactSound(samples) = waiting.request.words else {
+            unreachable!("next_of chose an exact line");
+        };
+        Some((
+            samples,
+            Ticket {
+                skill: waiting.request.skill,
+                answer: Some(waiting.answer),
+                guard: waiting.guard,
+                who: false,
+            },
+        ))
     }
 
     /// The quiet the next say needs since the last turn, if one waits.
@@ -1444,6 +1507,9 @@ fn serve_client(
                     Words::Cached(text) => {
                         request.words = Words::Sound(recordings.cached(text)?);
                     }
+                    Words::Exact(text) => {
+                        request.words = Words::ExactSound(recordings.rendered(text)?);
+                    }
                     // A fixed line asked as text, the first stand's (#4710),
                     // in the owner's words (#4473 (c)).
                     Words::Text(text) => {
@@ -1600,6 +1666,14 @@ impl Recordings {
     pub fn with_cache(mut self, cache: Option<Arc<tts_cache::TtsCache>>) -> Self {
         self.cache = cache;
         self
+    }
+
+    /// A paired computer's exact `text` rendered now, never kept, or why not.
+    pub fn rendered(&self, text: &str) -> Result<Vec<i16>, String> {
+        self.cache
+            .as_ref()
+            .ok_or_else(|| "the speech service is off (no speech cache)".to_owned())?
+            .render_once(text)
     }
 
     /// The samples of a cached `text`, kept or rendered now, or why not:
@@ -1798,6 +1872,13 @@ pub struct SoundNow {
     pub since_turn_us: u64,
     /// Since the last skill's sound was played, if one was.
     pub since_sound_us: Option<u64>,
+    /// The lamp's speaker is busy: a turn's reply open, speech waiting for
+    /// the speaker, or playback not yet over. Nothing else may play then.
+    pub playing: bool,
+    /// Someone is talking with the lamp: a conversation is going on (the
+    /// voice's thread: an exchange with the lamp's words in it, lately).
+    /// Speech in the room that nobody addresses to the lamp is not this.
+    pub conversing: bool,
 }
 
 /// Whether a skill's sound plays now, or why not: only at rest as a say
@@ -1834,6 +1915,47 @@ pub fn may_play_sound_with(now: &SoundNow, every_sound: bool) -> Result<(), &'st
     } else {
         Ok(())
     }
+}
+
+/// What becomes of a paired computer's exact line now ([`may_play_exact`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExactNow {
+    Play,
+    /// Not yet: it waits, until its expiry.
+    Wait(&'static str),
+    /// Not at all: refused now, with why.
+    Refuse(&'static str),
+}
+
+/// Whether a paired computer's exact line plays now (the local leader's 2
+/// Nov: as soon as nobody is talking to the lamp). The person wins: while a
+/// conversation with the lamp is going on, the lamp's speaker is busy, or
+/// an answer or reminder is owed, it waits. Speech in the room that nobody
+/// addresses to the lamp does not hold it: in an office someone is heard
+/// most of the time, and a line held for that would only lapse (lamp-75c9,
+/// 2 Nov, 19:15: a say waited out its 30 s that way). The keeper's pause
+/// and the privacy switch refuse it. No quiet gap after the room's sound
+/// and no one-in-30-s rarity apply.
+pub fn may_play_exact(now: &SoundNow) -> ExactNow {
+    if now.paused {
+        return ExactNow::Refuse("the lamp is paused");
+    }
+    if now.muted {
+        return ExactNow::Refuse("the lamp is muted");
+    }
+    if now.playing {
+        return ExactNow::Wait("the lamp is speaking");
+    }
+    if now.conversing {
+        return ExactNow::Wait("someone is talking with the lamp");
+    }
+    if now.reply_owed {
+        return ExactNow::Wait("the lamp owes an answer");
+    }
+    if now.reminder_waiting {
+        return ExactNow::Wait("a reminder is said first");
+    }
+    ExactNow::Play
 }
 
 /// Whether the shutdown's last words ([`is_last_words`]) play now: unless
@@ -1980,6 +2102,8 @@ mod tests {
         reminder_waiting: false,
         since_turn_us: QUIET_US,
         since_sound_us: Some(SOUND_EVERY_US),
+        playing: false,
+        conversing: false,
     };
 
     /// A dev lamp's `LAMP_VOICE_EVERY_SOUND=on`: a sound a moment after
@@ -3555,5 +3679,96 @@ mod tests {
         ] {
             assert!(parse(line).is_err(), "{line}");
         }
+    }
+
+    /// A paired computer's `exact` text (lamp-control's `say`): any caller
+    /// may ask it, only with `text`, never with `cache`; it is no written
+    /// turn for the model.
+    #[test]
+    fn an_exact_text_is_words_as_sent_never_a_turn_for_the_model() {
+        let exact = parse(r#"{"skill":"control","text":"Build passed, 3 tests.","exact":true,"expires_in_ms":30000}"#)
+            .unwrap();
+        assert!(matches!(&exact.words, Words::Exact(text) if text == "Build passed, 3 tests."));
+        assert_eq!(exact.words.turn(), None);
+        for (line, why) in [
+            (
+                r#"{"skill":"control","note":"x","exact":true,"expires_in_ms":1}"#,
+                "exact goes only with text",
+            ),
+            (
+                r#"{"skill":"control","text":"x","exact":true,"cache":true,"expires_in_ms":1}"#,
+                "exact and cache: one of them",
+            ),
+        ] {
+            assert_eq!(parse(line).unwrap_err(), why, "{line}");
+        }
+        // Without `exact`, a text is the model's written turn, as before.
+        let written = parse(r#"{"skill":"control","text":"Hi.","expires_in_ms":1}"#).unwrap();
+        assert!(written.words.turn().is_some());
+    }
+
+    /// The local leader's 2 Nov: a computer's exact line waits while a
+    /// conversation with the lamp goes on, its speaker is busy, or an
+    /// answer or reminder is owed; is refused paused or muted; and plays
+    /// through the room's speech that nobody addresses to the lamp, with no
+    /// quiet gap after it and no one-in-30-s rarity.
+    #[test]
+    fn an_exact_line_waits_only_for_speech_to_the_lamp() {
+        assert_eq!(may_play_exact(&REST), ExactNow::Play);
+        // The office talking, heard but not to the lamp: it plays anyway.
+        let room = SoundNow {
+            listening: true,
+            speaking: true,
+            since_turn_us: 0,
+            since_sound_us: Some(1),
+            ..REST
+        };
+        assert_eq!(may_play_exact(&room), ExactNow::Play);
+        for (now, why) in [
+            (
+                SoundNow {
+                    conversing: true,
+                    ..REST
+                },
+                "someone is talking with the lamp",
+            ),
+            (
+                SoundNow {
+                    playing: true,
+                    ..REST
+                },
+                "the lamp is speaking",
+            ),
+            (
+                SoundNow {
+                    reply_owed: true,
+                    ..REST
+                },
+                "the lamp owes an answer",
+            ),
+            (
+                SoundNow {
+                    reminder_waiting: true,
+                    ..REST
+                },
+                "a reminder is said first",
+            ),
+        ] {
+            assert_eq!(may_play_exact(&now), ExactNow::Wait(why));
+        }
+        assert_eq!(
+            may_play_exact(&SoundNow {
+                paused: true,
+                ..REST
+            }),
+            ExactNow::Refuse("the lamp is paused")
+        );
+        assert_eq!(
+            may_play_exact(&SoundNow {
+                muted: true,
+                ..REST
+            }),
+            ExactNow::Refuse("the lamp is muted")
+        );
     }
 }

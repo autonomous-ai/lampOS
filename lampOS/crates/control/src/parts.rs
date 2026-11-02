@@ -357,12 +357,16 @@ impl Lamp {
         }
     }
 
-    fn say(&self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
-        self.to_voice(
-            client,
-            re,
-            json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS}),
-        )
+    /// `say`: the computer's words exactly as sent, rendered straight
+    /// through the voice's speech service with no model or tools (`exact`),
+    /// spoken once the person isn't talking; with `rephrase`, given to the
+    /// voice's model as a written turn, as before.
+    fn say(&self, client: &str, re: u64, text: &str, rephrase: bool) -> Result<Value, Error> {
+        let mut line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
+        if !rephrase {
+            line["exact"] = json!(true);
+        }
+        self.to_voice(client, re, line)
     }
 
     /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
@@ -483,7 +487,7 @@ impl Parts for Lamp {
                 pattern,
                 for_ms,
             } => self.light(client, colour, *level, *pattern, *for_ms),
-            Op::Say { text } => self.say(client, re, text),
+            Op::Say { text, rephrase } => self.say(client, re, text, rephrase.unwrap_or(false)),
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
@@ -853,7 +857,7 @@ mod tests {
         let asked = voice.join().unwrap();
         assert_eq!(
             asked,
-            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000})
+            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000, "exact": true})
         );
         for _ in 0..200 {
             if !told.lock().unwrap().is_empty() {

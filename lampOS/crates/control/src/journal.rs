@@ -269,7 +269,15 @@ impl Journal {
 
 fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
     let inside = match op {
-        Op::Say { text } => said(text),
+        Op::Say { text, rephrase } => format!(
+            "{}{}",
+            said(text),
+            if rephrase == &Some(true) {
+                ", rephrased"
+            } else {
+                ", exact"
+            }
+        ),
         Op::Gesture { name } | Op::Play { name } | Op::Sound { name } => word(name),
         Op::Move { step_ms, frames } => format!("{} frames, step_ms {step_ms}", frames.len()),
         Op::Express { feeling, strength } => format!("{}, strength {strength:.2}", word(feeling)),
