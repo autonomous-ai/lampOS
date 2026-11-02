@@ -1,0 +1,16 @@
+{
+  "before_any_score": true,
+  "prior_revision": "3d8be60e8ff9c4490c128c1d213b14696d0aa86d",
+  "prior_registration_sha256": "8d7b09d0a5ec44f57c5118e938120df1f49e3acf7a8f5b906015c08f0b315490",
+  "new_registration_sha256": "a87489cc380a5674eca844f542ef8500b66ee3d746f8cdce4d87a188d4f4033e",
+  "only_event_change": "cues.activity",
+  "only_query_changes": [
+    "cues.activity",
+    "max_context_bytes"
+  ],
+  "persona_and_answer_key_byte_identical": true,
+  "question_wording_rules_sources_times_and_followups_unchanged": true,
+  "event_count": 2220,
+  "question_count": 200,
+  "reason": "Approved product-observable seat activity, realistic 4096-byte memory cap and metadata-only tier coverage before scoring."
+}
