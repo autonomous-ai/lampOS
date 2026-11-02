@@ -2067,6 +2067,7 @@ dependencies = [
  "lamp-gemini",
  "lamp-ipc",
  "lamp-local-time",
+ "lamp-memory-tiers",
  "lamp-msgs",
  "lamp-voice",
  "rusqlite",

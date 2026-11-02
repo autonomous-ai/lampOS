@@ -15,6 +15,8 @@ pub mod search;
 pub mod server;
 pub mod store;
 pub mod tidy;
+pub mod tiers;
+pub mod tiers_log;
 
 pub use protocol::{Request, Response, handle};
 pub use server::Server;

@@ -1415,6 +1415,19 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// The tiered store beside Days stays off in the product (`LAMP_MEMORY_TIERS`,
+/// #4746): until its played test over days and two reads, no product file
+/// sets it, so lamp-memory serves Days alone.
+#[test]
+fn the_product_leaves_the_tiered_memory_off() {
+    for (file, text) in install::PRODUCT {
+        assert!(
+            !text.contains("LAMP_MEMORY_TIERS"),
+            "{file} sets the tiered memory"
+        );
+    }
+}
+
 /// A thing the person already keeps, said again, is that kept thing, not a
 /// second one (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): on lamp-06c1 on 28 Oct
 /// the product unit, without it, kept "the meeting room is called orange"
