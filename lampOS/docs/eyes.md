@@ -2457,15 +2457,21 @@ with the known face's id the eyes keep beside the known file
   reads as lips: on #2859's still run on lamp-52e6 two paused faces read
   `yes` together while both boxes moved, and faces under 24 detector pixels
   between the eyes (about 0.85 m) read `unknown` (`small`) on every look.
-  On, each look reads `body/joint_states` (`speaking::head_moved`: the
+  On, the eyes keep the last second of `body/joint_states` readings
+  (`speaking::JointHistory`, `JOINT_HISTORY_MS`, the newest read each loop
+  pass) and each look judges its frame by the reading nearest the frame's
+  capture, before or after it (`speaking::head_moved`: the
   camera's aim, `full_look::aim_speeds`, turning faster than
   `HEAD_MOVED_RADIANS_A_SECOND`, the full look's own still bar, 25 counts a
-  second; read as the look begins, before its slow work, and a reading that
-  is missing, expired or stamped more than 160 ms from the frame's capture
-  either way is a head whose motion is unknown, taken as moving, so a
+  second; judged as the look begins, before its slow work, and with no
+  unexpired reading within 160 ms of the frame's capture either way the
+  head's motion is unknown, taken as moving, so a
   stalled joint stream or a move that ends during a slow mesh leaves those
   looks out, and without the body's joint stream every window is
-  `unknown`), and the mesh's score
+  `unknown`). Judged by the newest reading alone, a frame 160 to 240 ms old
+  at its look often had none that fresh: on lamp-52e6 a fit of the taps put
+  30 to 50% of looks there, and talking faces read `unknown`
+  (`few_steady_pairs`) on most windows (#4558). The mesh's score
   leaves out every look-to-look pair with a moving look at either end, and
   every pair whose eye distance (in the mesh's pixels) changes by more than
   5% of the smaller (`MOST_EYES_STEP`): on lamp-52e6 the detector's box on a
@@ -2522,7 +2528,11 @@ with the known face's id the eyes keep beside the known file
   or by the eye step, never `yes` (it read `yes` before the four-pair
   score); three held pairs of 0.02 lip steps after head moves `yes`; a still face while the head moves in bursts never `yes`; a look
   with no fresh reading left out as a moving one is; a reading missing,
-  expired or more than 160 ms from the capture unknown; and a window with
+  expired or more than 160 ms from the capture unknown; a still reading
+  100 ms after the capture still though the newest is 180 ms after it (it
+  was unknown before the history); a moving reading nearest the capture
+  moving; no reading within 160 ms either side unknown and taken as moving;
+  the history held to about a second; and a window with
   one held pair `few_steady_pairs`. Off, nothing is read and nothing changes.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
@@ -2704,7 +2714,10 @@ helps interpret framing but does not prove identity or physical distance.
 only), `too_few_looks`, `jitter`, `few_steady_pairs` (with
 `LAMP_EYES_SPEAKING_STEADY=on` only), `mesh`, or `corners`. With that switch,
 `window_looks` and `window_span_us` count the whole window, while
-`window_mean_eyes_px` and `mesh_window_looks` count the looks kept. `mesh` and
+`window_mean_eyes_px` and `mesh_window_looks` count the looks kept, and two
+more fields say the look's frame: `frame_age_ms`, how old it was at the look,
+and `head`, `moving`, `still` or `unknown` (no joint reading within 160 ms of
+its capture, taken as moving); without the switch neither is written. `mesh` and
 `corners` identify the scoring path, not necessarily speech. Later unevaluated
 metrics are null, including window count/span/mesh count after `invalid_eyes`;
 zero is a measured value. `window_reset=true` means this valid look starts a

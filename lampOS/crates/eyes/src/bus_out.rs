@@ -689,11 +689,11 @@ impl BusOut {
         }
     }
 
-    /// Whether the lamp's head was moving at this look, `None` unknown
-    /// (`speaking::Mouths::set_head_moved`).
-    pub fn set_head_moved(&mut self, moved: Option<bool>) {
+    /// Whether the lamp's head was moving at this look, `None` unknown, and
+    /// how old its frame was (`speaking::Mouths::set_head_moved`).
+    pub fn set_head_moved(&mut self, moved: Option<bool>, frame_age_ms: u64) {
         if let Some(mouths) = self.ids.mouths.as_mut() {
-            mouths.set_head_moved(moved);
+            mouths.set_head_moved(moved, frame_age_ms);
         }
     }
 
