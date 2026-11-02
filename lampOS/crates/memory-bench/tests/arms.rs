@@ -97,12 +97,34 @@ fn forget_probe_restores_history_and_keyed_guards_without_plaintext_fingerprints
     assert_eq!(a.recall(query()).unwrap().source_ids, ["one"]);
     a.ingest(event("three", "Please forget my locker code."))
         .unwrap();
-    let stored = fs::read_to_string(d.0.join("history.json")).unwrap();
-    assert!(!stored.contains("amber"));
-    assert!(!stored.contains("locker"));
+    for file in ["history.json", "history.log"] {
+        let stored = fs::read_to_string(d.0.join(file)).unwrap();
+        assert!(!stored.contains("amber"));
+        assert!(!stored.contains("locker"));
+    }
     a.ingest(event("four", "My locker code is amber comet."))
         .unwrap();
     assert!(a.recall(query()).unwrap().context.is_empty());
+}
+#[test]
+fn full_history_appends_each_ingest_and_keeps_the_snapshot_until_a_forget() {
+    let d = Dir::new();
+    let mut a = Basic::open(BasicKind::FullHistory, "owner-a".into(), &d.0).unwrap();
+    let snapshot = fs::read(d.0.join("history.json")).unwrap();
+    a.ingest(event("one", "My tea is jasmine.")).unwrap();
+    a.ingest(event("two", "My bike is blue.")).unwrap();
+    assert_eq!(snapshot, fs::read(d.0.join("history.json")).unwrap());
+    let log = fs::read_to_string(d.0.join("history.log")).unwrap();
+    assert_eq!(log.lines().count(), 2);
+    assert!(log.contains("jasmine") && log.contains("blue"));
+    a.ingest(event("three", "Please forget my tea.")).unwrap();
+    assert!(
+        fs::read_to_string(d.0.join("history.log"))
+            .unwrap()
+            .is_empty()
+    );
+    let stored = fs::read_to_string(d.0.join("history.json")).unwrap();
+    assert!(!stored.contains("jasmine") && stored.contains("blue"));
 }
 #[test]
 fn no_memory_does_not_keep_dialogue() {

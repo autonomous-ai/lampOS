@@ -18,6 +18,9 @@ pub const JUDGE_PROMPT: &str =
     include_str!("../../../fixtures/memory-bench/live-policy/judge-system.txt");
 pub const OUTPUT_TOKENS: u64 = 512;
 pub const TOOL_ROUNDS: usize = 8;
+/// Pinned sampling temperature for the common answerer and the judge. Arm-owned
+/// calls (extract, sleep, reflect, retrieve) keep the provider's default.
+pub const TEMPERATURE: u64 = 0;
 /// Stable shared provenance ID; ordinary registered IDs retain their v1 spelling.
 pub fn probe_source_id(probe_id: &str, index: usize) -> String {
     let direct = format!("probe-{probe_id}-{index}");
@@ -28,7 +31,9 @@ pub fn probe_source_id(probe_id: &str, index: usize) -> String {
     }
 }
 pub fn policy() -> Value {
-    json!({"version":2,"before_any_score":true,"answer_prompt_sha256":hash(ANSWER_PROMPT.as_bytes()),"judge_prompt_sha256":hash(JUDGE_PROMPT.as_bytes()),"output_tokens":OUTPUT_TOKENS,"tool_rounds":TOOL_ROUNDS,
+    json!({"version":2,"before_any_score":true,"answer_prompt_sha256":hash(ANSWER_PROMPT.as_bytes()),"judge_prompt_sha256":hash(JUDGE_PROMPT.as_bytes()),"output_tokens":OUTPUT_TOKENS,"tool_rounds":TOOL_ROUNDS,"temperature":TEMPERATURE,
+        "temperature_scope":"answer and judge calls send temperature 0; arm-owned extract, sleep, reflect and retrieve calls send none and run at the provider default",
+        "tool_results":"a tool reply reports memory_changed; earlier tool results in the answer are replaced by an invalidation note only after a call that changed memory, so read-only results stay and count together against the prompt cap",
         "probe_input":"fixed registered text, including all 224 month turns; no probe STT allowance",
         "month_input":"one verified real-STT cache shared by all setups and repetitions",
         "probe_boundary_reason":"A misheard question changes the memory skill under test. Noisy questions belong to a separate voice test; these scores can be kinder than real spoken use.",
