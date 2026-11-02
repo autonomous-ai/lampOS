@@ -1254,6 +1254,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         == Some("on"))
     .then(|| lamp_bus::Bus::from_environment().ok())
     .flatten();
+    let mut joint_history = lamp_eyes::speaking::JointHistory::default();
     let voice_bus = answered
         .as_ref()
         .and_then(|_| lamp_bus::Bus::from_environment().ok());
@@ -2154,6 +2155,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             retry_at = Instant::now() + RETRY;
             continue;
         }
+        // With LAMP_EYES_SPEAKING_STEADY, the body's newest joint reading,
+        // kept each pass, so a look finds the one nearest its frame's capture.
+        if let Some(bus) = steady_bus.as_ref()
+            && let Some(message) = bus.latest(lamp_msgs::JointState::TOPIC).ok().flatten()
+            && let Ok(joints) = message.parse::<lamp_msgs::JointState>()
+        {
+            joint_history.push(&joints, message.header.at_unix_ms, message.expired);
+        }
         if let Some(asked) = wanted.as_mut() {
             let now_us = lamp_ipc::monotonic_us();
             // What the body says of the head, read twenty times a second
@@ -2262,27 +2271,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             let frame_us = latest_us;
             let frame_hold = permit.held();
             // With LAMP_EYES_SPEAKING_STEADY, whether the head moved at this
-            // frame, read now, before the look's slow work, and measured
-            // against the frame's capture (on the bus's wall clock), not the
-            // judging: no reading, or none fresh at the capture, is unknown.
-            let head_at_frame = steady_bus.as_ref().map(|joints| {
+            // frame, judged before the look's slow work from the joint
+            // reading nearest the frame's capture (on the bus's wall clock),
+            // not the judging: none within FRESH_MS of it is unknown. With
+            // the frame's age at the look, for the mouth diagnostic.
+            let head_at_frame = steady_bus.as_ref().map(|_| {
                 let now_us = lamp_ipc::monotonic_us();
                 let captured_us = if frame_us > 0 { frame_us } else { now_us };
-                let frame_unix_ms = lamp_eyes::full_look::unix_ms()
-                    .saturating_sub(now_us.saturating_sub(captured_us) / 1_000);
-                let reading = joints.latest(lamp_msgs::JointState::TOPIC).ok().flatten();
-                let parsed = reading.as_ref().and_then(|message| {
-                    message
-                        .parse::<lamp_msgs::JointState>()
-                        .ok()
-                        .map(|state| (state, message.header.at_unix_ms, message.expired))
-                });
-                lamp_eyes::speaking::head_moved_at(
-                    parsed
-                        .as_ref()
-                        .map(|(state, at, expired)| (state, *at, *expired)),
-                    frame_unix_ms,
-                )
+                let age_ms = now_us.saturating_sub(captured_us) / 1_000;
+                let frame_unix_ms = lamp_eyes::full_look::unix_ms().saturating_sub(age_ms);
+                (joint_history.head_moved_at(frame_unix_ms), age_ms)
             });
             looked_at = Instant::now();
             let mut stage_at = looked_at;
@@ -2520,8 +2518,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         if let Some(bus) = bus_out.as_mut() {
                             let now = lamp_ipc::monotonic_us();
                             bus.set_mesh_scale(mesh_scale);
-                            if let Some(moved) = head_at_frame {
-                                bus.set_head_moved(moved);
+                            if let Some((moved, age_ms)) = head_at_frame {
+                                bus.set_head_moved(moved, age_ms);
                             }
                             bus.saw(&faces, &opens, picture.filled, now);
                             if let Some(yes) = yawns_yes {

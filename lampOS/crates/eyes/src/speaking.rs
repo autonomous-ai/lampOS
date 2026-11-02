@@ -146,20 +146,54 @@ pub fn head_moved(joints: &lamp_msgs::JointState) -> bool {
         .any(|turning| turning.abs() > HEAD_MOVED_RADIANS_A_SECOND)
 }
 
-/// [`head_moved`] at a frame captured at `frame_unix_ms`, from the body's
-/// latest reading (its joints, its bus stamp and whether it expired). No
-/// reading, an expired one, or one stamped more than
-/// [`crate::full_look::FRESH_MS`] from the capture either way says nothing of
-/// that frame: `None`, the head's motion unknown.
-pub fn head_moved_at(
-    reading: Option<(&lamp_msgs::JointState, u64, bool)>,
-    frame_unix_ms: u64,
-) -> Option<bool> {
-    reading
-        .filter(|(_, at_unix_ms, expired)| {
-            !expired && at_unix_ms.abs_diff(frame_unix_ms) <= crate::full_look::FRESH_MS
-        })
-        .map(|(joints, _, _)| head_moved(joints))
+/// How long [`JointHistory`] keeps the body's joint readings: well past
+/// [`crate::full_look::FRESH_MS`] on either side of a frame's capture, with
+/// a frame up to a few hundred ms old at its look.
+pub const JOINT_HISTORY_MS: u64 = 1_000;
+
+/// The body's recent `body/joint_states` readings, each its bus stamp and
+/// whether the head moved ([`head_moved`]), filled each loop pass, so a look
+/// judges motion at its frame's capture from the reading nearest it, not
+/// only the newest one (#4558).
+#[derive(Debug, Default)]
+pub struct JointHistory {
+    readings: VecDeque<(u64, bool)>,
+}
+
+impl JointHistory {
+    /// Keeps a reading stamped `at_unix_ms` (an expired one says nothing and
+    /// is not kept; the same stamp again is the same reading; one older than
+    /// the newest means the clock went back, and starts again), and lets go
+    /// of those more than [`JOINT_HISTORY_MS`] older than the newest.
+    pub fn push(&mut self, joints: &lamp_msgs::JointState, at_unix_ms: u64, expired: bool) {
+        match self.readings.back() {
+            _ if expired => return,
+            Some(last) if last.0 == at_unix_ms => return,
+            Some(last) if last.0 > at_unix_ms => self.readings.clear(),
+            _ => {}
+        }
+        self.readings.push_back((at_unix_ms, head_moved(joints)));
+        while self
+            .readings
+            .front()
+            .is_some_and(|first| at_unix_ms - first.0 > JOINT_HISTORY_MS)
+        {
+            self.readings.pop_front();
+        }
+    }
+
+    /// [`head_moved`] at a frame captured at `frame_unix_ms`, from the
+    /// reading nearest the capture, before or after it. None within
+    /// [`crate::full_look::FRESH_MS`] of the capture says nothing of that
+    /// frame: `None`, the head's motion unknown.
+    pub fn head_moved_at(&self, frame_unix_ms: u64) -> Option<bool> {
+        self.readings
+            .iter()
+            .map(|(at, moved)| (at.abs_diff(frame_unix_ms), *moved))
+            .filter(|(off, _)| *off <= crate::full_look::FRESH_MS)
+            .min_by_key(|(off, _)| *off)
+            .map(|(_, moved)| moved)
+    }
 }
 
 /// The mouth's width over the distance between the eyes, that distance in
@@ -201,6 +235,20 @@ pub struct Mouths {
     steady: bool,
     /// [`Mouths::set_head_moved`].
     head_moved: bool,
+    /// [`Mouths::set_head_moved`]: the head as read at this look's frame and
+    /// that frame's age at the look, for the diagnostic; `None` until set.
+    head_at_frame: Option<(HeadAtFrame, u64)>,
+}
+
+/// The head at a look's frame, as [`Mouths::set_head_moved`] was told.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HeadAtFrame {
+    Moving,
+    Still,
+    /// No joint reading within [`crate::full_look::FRESH_MS`] of the capture:
+    /// taken as moving.
+    Unknown,
 }
 
 const UNKNOWN: Speaking = Speaking {
@@ -250,6 +298,12 @@ pub struct MouthDiagnostic {
     /// This valid look begins a new window; invalid looks never claim a reset.
     pub window_reset: bool,
     pub speaking: Speaking,
+    /// With [`STEADY_ENVIRONMENT`], how old this look's frame was at the
+    /// look, and the head as read at its capture; absent without it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frame_age_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub head: Option<HeadAtFrame>,
 }
 
 impl Mouths {
@@ -267,8 +321,16 @@ impl Mouths {
     /// [`STEADY_ENVIRONMENT`]. Unknown (`None`) is taken as moving, so that
     /// look's pairs are left out: a stalled joint stream or a frame older
     /// than its reading may hide a blurred look.
-    pub fn set_head_moved(&mut self, moved: Option<bool>) {
+    /// `frame_age_ms` is how old the frame was at the look, for the
+    /// diagnostic only.
+    pub fn set_head_moved(&mut self, moved: Option<bool>, frame_age_ms: u64) {
         self.head_moved = moved.unwrap_or(true);
+        let head = match moved {
+            Some(true) => HeadAtFrame::Moving,
+            Some(false) => HeadAtFrame::Still,
+            None => HeadAtFrame::Unknown,
+        };
+        self.head_at_frame = Some((head, frame_age_ms));
     }
 
     /// This look of the face `id`: its marks in the detector's pixels, how
@@ -307,6 +369,8 @@ impl Mouths {
             mouth_open: open,
             window_reset: false,
             speaking: UNKNOWN,
+            frame_age_ms: self.head_at_frame.map(|(_, age)| age),
+            head: self.head_at_frame.map(|(head, _)| head),
         };
         let result = self.judge_observed(id, marks, turn_deg, open, now_us, Some(&mut diagnostic));
         diagnostic.speaking = result;
@@ -1435,7 +1499,7 @@ mod steady_tests {
         };
         let mut said = UNKNOWN;
         for look in 0..10 {
-            mouths.set_head_moved(Some(moving.contains(&look)));
+            mouths.set_head_moved(Some(moving.contains(&look)), 0);
             let gap = (!corners).then_some(if open.contains(&look) { 0.06 } else { 0.002 });
             said = mouths.judge(1, &marks(eyes), Some(0.0), gap, look * 250_000);
         }
@@ -1707,7 +1771,7 @@ mod steady_tests {
         };
         (0..eyes.len())
             .map(|look| {
-                mouths.set_head_moved(Some(moving.contains(&look)));
+                mouths.set_head_moved(Some(moving.contains(&look)), 0);
                 mouths
                     .judge(
                         1,
@@ -1801,30 +1865,133 @@ mod steady_tests {
         assert!(!head_moved(&unsaid));
     }
 
+    /// A history holding these readings: each its offset from the capture
+    /// in ms, and whether the head was turning.
+    fn history(capture: u64, readings: &[(i64, bool)]) -> JointHistory {
+        let mut history = JointHistory::default();
+        for (off, moving) in readings {
+            let speed = if *moving {
+                HEAD_MOVED_RADIANS_A_SECOND * 2.0
+            } else {
+                0.0
+            };
+            history.push(&turning(speed), capture.saturating_add_signed(*off), false);
+        }
+        history
+    }
+
     #[test]
     fn a_reading_missing_expired_or_not_fresh_at_the_capture_is_unknown() {
-        let fresh = crate::full_look::FRESH_MS;
-        let moving = turning(HEAD_MOVED_RADIANS_A_SECOND * 2.0);
-        let still = turning(0.0);
+        let fresh = crate::full_look::FRESH_MS as i64;
         let frame = 10_000;
-        assert_eq!(head_moved_at(None, frame), None);
-        assert_eq!(head_moved_at(Some((&moving, frame, true)), frame), None);
+        assert_eq!(JointHistory::default().head_moved_at(frame), None);
+        let mut expired = JointHistory::default();
+        expired.push(&turning(HEAD_MOVED_RADIANS_A_SECOND * 2.0), frame, true);
+        assert_eq!(expired.head_moved_at(frame), None);
         // Older than the capture, or newer (judged after a slow mesh).
         assert_eq!(
-            head_moved_at(Some((&still, frame - fresh - 1, false)), frame),
+            history(frame, &[(-fresh - 1, false)]).head_moved_at(frame),
             None
         );
         assert_eq!(
-            head_moved_at(Some((&still, frame + fresh + 1, false)), frame),
+            history(frame, &[(fresh + 1, false)]).head_moved_at(frame),
             None
         );
         assert_eq!(
-            head_moved_at(Some((&still, frame - fresh, false)), frame),
+            history(frame, &[(-fresh, false)]).head_moved_at(frame),
             Some(false)
         );
         assert_eq!(
-            head_moved_at(Some((&moving, frame + fresh, false)), frame),
+            history(frame, &[(fresh, true)]).head_moved_at(frame),
             Some(true)
+        );
+    }
+
+    #[test]
+    fn a_still_reading_after_the_capture_counts_though_the_newest_is_stale() {
+        // Joints every 80 ms, but the loop kept only what it read between
+        // slow looks: one 200 ms before the capture, then 100 and 180 ms
+        // after it, a frame 200 ms old at its look (lamp-52e6, #4558). The
+        // newest is past FRESH_MS; the one 100 ms after the capture is not.
+        let frame = 50_000;
+        let joints = history(frame, &[(-200, false), (100, false), (180, false)]);
+        assert_eq!(joints.head_moved_at(frame), Some(false));
+    }
+
+    #[test]
+    fn the_reading_nearest_the_capture_says_whether_the_head_moved() {
+        let frame = 50_000;
+        let joints = history(frame, &[(-120, false), (30, true), (150, false)]);
+        assert_eq!(joints.head_moved_at(frame), Some(true));
+        let joints = history(frame, &[(-120, true), (-20, false), (60, true)]);
+        assert_eq!(joints.head_moved_at(frame), Some(false));
+    }
+
+    #[test]
+    fn no_reading_near_the_capture_either_side_is_unknown_and_its_pairs_drop() {
+        let frame = 50_000;
+        let joints = history(frame, &[(-200, false), (170, false), (250, false)]);
+        let moved = joints.head_moved_at(frame);
+        assert_eq!(moved, None);
+        // Unknown is taken as moving: a stale still never counts.
+        let mut mouths = Mouths {
+            steady: true,
+            ..Mouths::default()
+        };
+        mouths.set_head_moved(moved, 200);
+        assert!(mouths.head_moved);
+    }
+
+    #[test]
+    fn the_joint_history_keeps_about_a_second() {
+        let mut joints = JointHistory::default();
+        let still = turning(0.0);
+        for at in (0..100_000).step_by(80) {
+            joints.push(&still, at, false);
+            // The same reading read again on the next pass is not kept twice.
+            joints.push(&still, at, false);
+        }
+        assert!(
+            joints.readings.len() as u64 <= JOINT_HISTORY_MS / 80 + 1,
+            "{}",
+            joints.readings.len()
+        );
+        assert_eq!(joints.head_moved_at(99_920 - JOINT_HISTORY_MS - 200), None);
+        assert_eq!(joints.head_moved_at(99_920), Some(false));
+        // A clock gone back starts again rather than refusing every reading.
+        joints.push(&still, 5_000, false);
+        assert_eq!(joints.readings.len(), 1);
+        assert_eq!(joints.head_moved_at(5_000), Some(false));
+    }
+
+    #[test]
+    fn the_mouth_diagnostic_says_the_frames_age_and_the_head_at_it() {
+        let line = |head: Option<Option<bool>>| {
+            let mut mouths = Mouths {
+                steady: true,
+                ..Mouths::default()
+            };
+            if let Some(moved) = head {
+                mouths.set_head_moved(moved, 230);
+            }
+            let (_, diagnostic) =
+                mouths.judge_with_diagnostics(1, &marks(30.0), Some(0.0), Some(0.01), 0);
+            serde_json::to_string(&diagnostic).unwrap()
+        };
+        for (moved, word) in [
+            (Some(true), "moving"),
+            (Some(false), "still"),
+            (None, "unknown"),
+        ] {
+            let said = line(Some(moved));
+            assert!(said.contains("\"frame_age_ms\":230"), "{said}");
+            assert!(said.contains(&format!("\"head\":\"{word}\"")), "{said}");
+        }
+        // Never told (the switch off): the line is as it was.
+        let said = line(None);
+        assert!(
+            !said.contains("frame_age_ms") && !said.contains("\"head\""),
+            "{said}"
         );
     }
 
@@ -1841,11 +2008,14 @@ mod steady_tests {
             let mut said = UNKNOWN;
             for look in 0..10 {
                 let blind = at.contains(&look);
-                mouths.set_head_moved(if blind && unknown_moves {
-                    None
-                } else {
-                    Some(false)
-                });
+                mouths.set_head_moved(
+                    if blind && unknown_moves {
+                        None
+                    } else {
+                        Some(false)
+                    },
+                    0,
+                );
                 let gap = if blind { 0.06 } else { 0.002 };
                 said = mouths.judge(1, &marks(30.0), Some(0.0), Some(gap), look * 250_000);
             }
@@ -1863,7 +2033,7 @@ mod steady_tests {
         };
         let mut reason = Reason::Mesh;
         for look in 0..10 {
-            mouths.set_head_moved(Some((1..=7).contains(&look)));
+            mouths.set_head_moved(Some((1..=7).contains(&look)), 0);
             let (_, detail) = mouths.judge_with_diagnostics(
                 1,
                 &marks(30.0),
