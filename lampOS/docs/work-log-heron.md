@@ -36,6 +36,14 @@ Ready for lamp-voice: yes (#4954, `94cc64e58`, another lamp's own folder)
   Reviewer-lead on #4710 at 18:33.
 - 18:41: the Reviewer-lead's READ-OK on `94cc64e58`, no findings; clippy run
   41437723564 green. `NEXT TRAIN: #4954` posted on #4710 at 18:44.
+- 18:49: a second read of #4859 (the first builder's, ready, one HOLD and no
+  READ-OK) posted on the PR as HOLD `98bb20b2c`: the Reviewer-lead's P2
+  stands by reading (`hears` from the measuring printer feeds the past-silent
+  carry; `another_voice` can still be set by two faces speaking, so the HOLD's
+  "nothing ever sets it" is one shade too strong, the fault the same); it is
+  62 commits behind lamp-voice and conflicts in `process.rs:2650` (the
+  started-worker test's switch list). On the Mac, on its own head:
+  `measuring_the_asker` 1 passed, `past_silent` 1 passed, clippy clean.
 - #4418's read posted on the PR as READ-OK `4e5696601`: rebases clean onto
   `ab6ef495c`; on the Mac, `cargo fmt -p lamp-voice --check` clean,
   `cargo test -p lamp-voice --lib agent_tasks::tests` 65 passed 0 failed,
