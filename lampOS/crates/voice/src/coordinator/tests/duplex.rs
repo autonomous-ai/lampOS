@@ -564,6 +564,138 @@ fn talk_over_the_lamps_own_line_in_a_busy_room_leaves_no_playback_gap() {
     assert_eq!(h.events("duplex_yield").len(), 1);
 }
 
+/// #4868, the night of 2 Nov (`LAMP_CUT_IN_OVER_BED=on`, a busy room): a
+/// sound over a sounding answer whose onset blocks held none over the lamp
+/// (Under, Unknown, Clear, Still) never yields, so the yield rules never
+/// held it; the mask passed it and it ended the answer `user_interrupted`.
+/// Now the coordinator holds it for the lamp's name or a stop word, as talk
+/// over the lamp's own line in a busy room is held (`ForName`), then lets
+/// it go as the room's (`over_bed`). The switch off, a room not busy, or an
+/// onset heard over the lamp: as before.
+#[test]
+fn over_a_busy_room_a_sound_that_never_yields_waits_for_the_name_then_is_let_go() {
+    // Through the production hearing: an answer sounding, then six blocks of
+    // a person heard in the clear, none over the lamp.
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.let_go = true;
+    h.mask.over_bed(true, true);
+    assert_eq!(dispatched(&h.blocks(20, 0.99, Some(evidence(0, OWN)))), 20);
+    h.blocks(6, 0.9, Some(evidence(40, None)));
+    assert!(h.events("duplex_yield").is_empty());
+    let candidates = h.events("input_candidate");
+    assert_eq!(candidates.len(), 1);
+    let at = |field: &str| candidates[0]["candidate"][field].as_u64().unwrap();
+    let candidate = crate::admission::Candidate {
+        id: crate::admission::CandidateId::for_test(1),
+        capture: h.lineage,
+        displaced_owner: None,
+        trigger_sequence: at("trigger_sequence"),
+        trigger_read_at_us: at("trigger_read_at_us"),
+        first_read_at_us: at("first_read_at_us"),
+        decision_deadline_us: at("decision_deadline_us"),
+    };
+    assert_eq!(
+        h.mask.candidate(candidate).unwrap(),
+        Disposition::Pass,
+        "the mask passes it, as it did"
+    );
+    let turn = h.old().turn();
+    let trigger = candidate.trigger_read_at_us;
+    let holds = |on: bool, busy: bool| {
+        over_bed_holds(
+            on,
+            Some((turn, busy)),
+            &h.reply,
+            &h.mask,
+            &candidate,
+            trigger,
+        )
+    };
+    assert!(holds(true, true));
+    assert!(!holds(false, true), "the switch off");
+    assert!(!holds(true, false), "a room not busy");
+    assert!(
+        !over_bed_holds(
+            true,
+            Some((turn + 1, true)),
+            &h.reply,
+            &h.mask,
+            &candidate,
+            trigger
+        ),
+        "busy as another reply began"
+    );
+    let wait = OwnLineWait {
+        heard: true,
+        over_bed: true,
+        ..OwnLineWait::default()
+    };
+    let judge = |wait, at_us| while_own_line_waits(wait, h.reply.as_ref(), &candidate, at_us);
+    // Held while the name could still come, then the room's.
+    assert_eq!(judge(wait, trigger), WhileOwnLineWaits::ForName);
+    assert_eq!(
+        judge(wait, trigger + OWN_LINE_NAME_LAG_US),
+        WhileOwnLineWaits::LetGo("over_bed")
+    );
+    // The lamp's name or a stop word in it takes the turn as before.
+    let in_it = Some(candidate.first_read_at_us);
+    for (case, said) in [
+        (
+            "the lamp's name",
+            OwnLineWait {
+                name_began_us: in_it,
+                ..wait
+            },
+        ),
+        (
+            "a stop word",
+            OwnLineWait {
+                stop_began_us: in_it,
+                ..wait
+            },
+        ),
+        (
+            "the switch off or a room not busy",
+            OwnLineWait {
+                over_bed: false,
+                ..wait
+            },
+        ),
+    ] {
+        assert_eq!(
+            judge(said, trigger + OWN_LINE_NAME_LAG_US),
+            WhileOwnLineWaits::AsBefore,
+            "{case}"
+        );
+    }
+    // A name heard before the sound began is not in it.
+    assert_eq!(
+        judge(
+            OwnLineWait {
+                name_began_us: Some(trigger - crate::activity::CALL_BEFORE_US - 1),
+                ..wait
+            },
+            trigger + OWN_LINE_NAME_LAG_US
+        ),
+        WhileOwnLineWaits::LetGo("over_bed")
+    );
+    // An onset heard over the lamp is the yield rules' to hold: not this.
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.let_go = true;
+    h.mask.over_bed(true, true);
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    h.blocks(ONSET, 0.9, Some(evidence(0, OVER)));
+    let candidates = h.events("input_candidate");
+    assert_eq!(candidates.len(), 1);
+    let over = crate::admission::Candidate {
+        trigger_sequence: candidates[0]["candidate"]["trigger_sequence"]
+            .as_u64()
+            .unwrap(),
+        ..candidate
+    };
+    assert!(!h.mask.plain_onset(&over));
+}
+
 #[test]
 fn a_person_over_the_lamp_stops_the_speaker_then_interrupts_with_their_opening_words() {
     let mut h = Harness::new(TurnTaking::Duplex, 400);
