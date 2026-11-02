@@ -632,10 +632,11 @@ so "예린" is a name and no yes; and a put-off is never a name ("잠시만요")
 Hangul is matched by the syllable, so a refusal is listed in each form
 ("아니" and "아닙니다", "안 돼" and "안 됩니다"); 괜찮아요, 알겠어요 and 그래요
 are asked again (a Korean customer's review of #4506). A casual 어
-opening a Korean line is a yes, as 응 is, when the line is 어 alone or 어
-and a bare yes ("어, 해", "어 좋아"); otherwise it is a hesitation and
-drops, so "어, 잠깐만" and "어, 근데" are put-offs and "어… 민수예요" is a
-name (a Korean commenter's note on #4473). Once the hello is asked, it takes only that bare yes or a short
+opening a Korean line is a yes, as 응 is, only when a bare yes follows it
+("어, 해", "어 좋아"); otherwise it is a hesitation and drops, so a lone 어
+(or "어…", which is heard as 어) reads as nothing, "어, 잠깐만" and "어,
+근데" are put-offs and "어… 민수예요" is a name (a Korean commenter's note
+on #4473). Once the hello is asked, it takes only that bare yes or a short
 strict no (`yes_or_no`, as the face consent does). It's #4480's English
 rule (`PUTS_OFF`, `PUTS_OFF_TOGETHER`, short or firm) made strict. English
 keeps its own rules (#4469, #4480). An hour
