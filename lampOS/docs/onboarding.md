@@ -241,7 +241,7 @@ said before the next step's invitation:
 | `who_you_are`, led by the model | `first`/`reoffer`: "What should I call you?" (then, with `remember_my_face`, "May I remember your face, so I know you next time?") | `who_again`: "Sorry, what should I call you?" | no fixed line: the model greets them by name itself, and a fixed one would be a third greeting (#4151) | skipped or failed: "That's fine. You can tell me your name any time." |
 | `room_sounds`, led by the model | `first`/`reoffer`: "May I notice music and laughter in the room? Nothing is recorded. Just say yes or no." | an answer it can't tell, asked once: "Sorry, was that a yes or a no?" | after its `setup_step`: "Got it, I'll notice music and laughter." after a yes, "Okay, I won't." otherwise | (90 s, `failed`, unsaid) |
 | `face_expressions`, led by the model | `first`/`reoffer`: "May I notice when people look happy or upset, …? … Just say yes or no." | as `room_sounds`: "Sorry, was that a yes or a no?" | a plain yes or no is the walk's: the note tells the model to say nothing and call nothing, and the walk says "Got it, I'll notice how people look." or "Okay, I won't." (`FACE_EXPRESSIONS_YES`, `FACE_EXPRESSIONS_NO`, in the code, said by the route, never the model), so the line is said once; for any other answer the model calls `setup_step` and says the same words | (90 s, `failed`, unsaid) |
-| `preferences`, led by the model | `first`/`reoffer`: "Are there hours when I should keep quiet? …"; then the walk's own "May I say hello when you sit down?" (`PREFERENCES_HELLO`, in the code), once the quiet hours are first answered | none: any first answer is the quiet hours' answer, so the model never re-asks and the hello follows its few words (the Reviewer-lead's P2 on #4346) | the walk's own, once the step is done (its answers heard or the model's `setup_step`): "Got it, that's everything. You can ask me to redo the setup any time. You'll find what my buttons and touches do in the app, under Lamp, then General, then Buttons and gestures." (`PREFERENCES_DONE`; its last sentence points to the app's guide, #1711 item 1, in the code) | (90 s, `failed`, unsaid) |
+| `preferences`, led by the model | `first`/`reoffer`: "Are there hours when I should keep quiet? …"; then the walk's own "May I say hello when you sit down?" (`PREFERENCES_HELLO`, in the code), once the quiet hours are first answered | none: any first answer is the quiet hours' answer, so the model never re-asks and the hello follows its few words (the Reviewer-lead's P2 on #4346) | the walk's own, once the step is done (its answers heard or the model's `setup_step`): "Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures." (`PREFERENCES_DONE`; its last sentence points to the app's guide, #1711 item 1, in the code) | (90 s, `failed`, unsaid) |
 
 Giving way's lines never mention sleep: the step never puts the lamp to
 sleep (#3747).
@@ -298,8 +298,8 @@ failure says only "That's fine. You can tell me your name any time."
 (`who_again`: "Sorry, what should I call you?"). `preferences`' model asks "Are there
 hours when I should keep quiet? For example, 'after ten at night', or 'no'." and
 only that; the walk asks "May I say hello when you sit down?" and ends with "Got
-it, that's everything. You can ask me to redo the setup any time. You'll find
-what my buttons and touches do in the app, under Lamp, then General, then
+it, that's everything. You can ask me to redo the setup any time. For my buttons
+and touch gestures, open the Autonomous app, select me, then General, About,
 Buttons and gestures." itself, each
 as soon as the lamp may speak after the model's answer (below). `room_sounds` and `face_expressions`
 ask their questions exactly too (see the step table), each ending "Just say yes
