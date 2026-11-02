@@ -636,12 +636,14 @@ It receives no setup name, run identity, cost or tier diagnostics. Generated
 candidate replies can witness dialogue or timing but cannot establish an
 independent owner fact. Exact, date, abstention, forbidden-claim and source
 eligibility checks take precedence over the judge. A malformed answer reply
-(empty, whitespace, not the registered JSON or out of bounds) is recorded and its
+(empty, whitespace, not the registered JSON, out of bounds, or ended by a finish
+other than `stop`, such as `length`, with its usage charged) is recorded and its
 question scores 0 with audit, without a judge call; a malformed judge reply scores
 its question 0 with audit. Both are counted in the run summary. A failed call
 still leaves the attempt incomplete; no silent repair or unregistered retry is
 allowed. DeepSeek's JSON mode can return a whitespace-only reply (the first live
-preliminary run, 1 Nov), which before this stopped the whole setup.
+preliminary run, 1 Nov), and a long reply can end at the output limit (run 4,
+2 Nov); either one before this stopped the whole setup.
 Rubric results remain provisional until the registered human audit.
 
 The live campaign policy pins both model routes, dated prices, fixture and

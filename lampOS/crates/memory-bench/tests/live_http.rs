@@ -342,7 +342,9 @@ fn premature_eof_does_not_turn_a_partial_usage_chunk_into_a_refund() {
     assert!(r.usage.is_none());
 }
 #[test]
-fn truncation_is_a_failure_but_terminal_usage_is_still_charged() {
+fn truncation_is_an_empty_reply_and_terminal_usage_is_still_charged() {
+    // Run 4 on lamp-4ace (2 Nov) stopped a whole setup on a "length" finish;
+    // it is now an empty reply that the answer loop records as malformed.
     let temp = Temp::new();
     let raw = wire(
         &[event(
@@ -352,13 +354,13 @@ fn truncation_is_a_failure_but_terminal_usage_is_still_charged() {
         )],
         true,
     );
-    let mut server = Server::new("200 OK", "text/event-stream", raw, false, Duration::ZERO);
+    let mut server = Server::new("200 OK", "text/event-stream", raw, true, Duration::ZERO);
     let mut client = client(&server, &temp);
-    assert!(
-        client
-            .call(&call(), Instant::now() + Duration::from_secs(3))
-            .is_err()
-    );
+    let reply = client
+        .call(&call(), Instant::now() + Duration::from_secs(3))
+        .unwrap();
+    assert_eq!(reply.content.as_deref(), Some(""));
+    assert!(reply.tool_calls.is_empty());
     server.finish();
     assert_eq!(client.charged_microusd(), 524);
     assert_eq!(
