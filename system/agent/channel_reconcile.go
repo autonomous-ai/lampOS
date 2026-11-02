@@ -46,12 +46,13 @@ func (r *ChannelReconcile) configuredChannels() []domain.AddChannelRequest {
 			SlackSigningSecret: c.LLMAPIKey,
 		})
 	}
-	if c.DiscordBotToken != "" {
+	if c.DiscordManaged && c.DiscordUserID != "" {
+		// Relay mode: the runtime is told only to keep its own Discord channel off.
 		out = append(out, domain.AddChannelRequest{
-			Channel:         domain.ChannelDiscord,
-			DiscordBotToken: c.DiscordBotToken,
-			DiscordGuildID:  c.DiscordGuildID,
-			DiscordUserID:   c.DiscordUserID,
+			Channel:        domain.ChannelDiscord,
+			DiscordManaged: true,
+			DiscordGuildID: c.DiscordGuildID,
+			DiscordUserID:  c.DiscordUserID,
 		})
 	}
 	if c.WhatsappUserID != "" {

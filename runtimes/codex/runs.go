@@ -220,48 +220,6 @@ func (s *CodexService) hasSlackRun(runID string) bool {
 	return ok
 }
 
-// markDiscordRun records a Discord-originated turn (discord.go) so emitFinal
-// can post the reply back to the originating channel.
-func (s *CodexService) markDiscordRun(runID string, channelID string) {
-	if runID == "" || channelID == "" {
-		return
-	}
-	s.discordRunsMu.Lock()
-	if s.discordRuns == nil {
-		s.discordRuns = make(map[string]string)
-	}
-	s.discordRuns[runID] = channelID
-	s.discordRunsMu.Unlock()
-	slog.Info("discord run marked — reply will be posted to discord",
-		"component", "codex", "runID", runID, "channelID", channelID)
-}
-
-// hasDiscordRun reports (non-consuming) whether a Discord-originated run is
-// still awaiting its reply — the typing keeper polls this to know when to stop.
-func (s *CodexService) hasDiscordRun(runID string) bool {
-	if runID == "" {
-		return false
-	}
-	s.discordRunsMu.Lock()
-	_, ok := s.discordRuns[runID]
-	s.discordRunsMu.Unlock()
-	return ok
-}
-
-// consumeDiscordRun is one-shot: returns the channel id for a Discord-
-// originated run and removes the entry, or "" when the run did not come from
-// Discord.
-// Called by emitFinal (reply routing) and handleError (leak prevention).
-func (s *CodexService) consumeDiscordRun(runID string) string {
-	s.discordRunsMu.Lock()
-	channelID, ok := s.discordRuns[runID]
-	if ok {
-		delete(s.discordRuns, runID)
-	}
-	s.discordRunsMu.Unlock()
-	return channelID
-}
-
 // consumeSlackRun is one-shot: returns the origin for a Slack-originated run
 // and removes the entry.
 // Called by emitFinal (reply routing), handleError (leak prevention) and DeliverSlackReply (safety

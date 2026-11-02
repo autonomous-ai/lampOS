@@ -39,7 +39,6 @@ func (s *CodexService) StartWS(ctx context.Context, handler domain.AgentEventHan
 	// lifetime (outside the reconnect loop, so it survives WS drops; ctx-bound
 	// so it dies with the gateway).
 	go s.startTelegramPoll(ctx)
-	go s.startDiscordBot(ctx)
 	for {
 		select {
 		case <-ctx.Done():

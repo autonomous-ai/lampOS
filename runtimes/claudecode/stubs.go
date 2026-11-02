@@ -82,7 +82,7 @@ func (s *ClaudeCodeService) GetConfiguredChannel() string {
 	if s.config.TelegramBotToken != "" {
 		return "telegram"
 	}
-	if s.config.DiscordBotToken != "" {
+	if s.config.DiscordManaged && s.config.DiscordUserID != "" {
 		return "discord"
 	}
 	return "channel"

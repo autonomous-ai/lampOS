@@ -28,9 +28,8 @@ const (
 	// whatsappPluginPackage is the npm package for the externalized WhatsApp plugin (openclaw 2026.5.x+).
 	whatsappPluginPackage = "@openclaw/whatsapp"
 
-	// Base npm names for externalized channel plugins; ensureChannelPlugin pins the version to the running gateway.
-	discordPluginPackage = "@openclaw/discord"
-	slackPluginPackage   = "@openclaw/slack"
+	// Base npm name for the externalized Slack plugin; ensureChannelPlugin pins the version to the running gateway.
+	slackPluginPackage = "@openclaw/slack"
 
 	// channelPluginInstallTimeout bounds enable+install of a channel plugin when invoked outside an existing request context (the setup path).
 	channelPluginInstallTimeout = 5 * time.Minute

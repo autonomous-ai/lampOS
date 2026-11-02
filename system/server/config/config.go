@@ -101,9 +101,12 @@ type Config struct {
 	SlackAppToken string `json:"slack_app_token" yaml:"slackAppToken"`
 	SlackUserID   string `json:"slack_user_id" yaml:"slackUserID"`
 
-	DiscordBotToken string `json:"discord_bot_token" yaml:"discordBotToken"`
-	DiscordGuildID  string `json:"discord_guild_id" yaml:"discordGuildID"`
-	DiscordUserID   string `json:"discord_user_id" yaml:"discordUserID"`
+	// Discord messages travel through the cloud relay over MQTT, so the device
+	// stores only who may talk to it: the owner's user id and, for server
+	// messages, the server (guild) id. DiscordManaged marks relay mode.
+	DiscordManaged bool   `json:"discord_managed" yaml:"discordManaged"`
+	DiscordGuildID string `json:"discord_guild_id" yaml:"discordGuildID"`
+	DiscordUserID  string `json:"discord_user_id" yaml:"discordUserID"`
 
 	// WhatsappUserID is the E.164 phone number permitted to DM the device's
 	// WhatsApp account.
@@ -331,6 +334,7 @@ func Load() (*Config, error) {
 		return &d, fmt.Errorf("parse config %s: %w", configPath, err)
 	}
 	cfg.notify = make(chan bool, 1)
+	adoptDiscordRelay(data, &cfg)
 	return &cfg, nil
 }
 
@@ -449,6 +453,14 @@ func ProvideConfig() *Config {
 		panic(fmt.Errorf("parse config %s: %w", configPath, err))
 	}
 	cfg.notify = make(chan bool, 1)
+
+	// A config written by older firmware may still hold a Discord credential:
+	// switch to relay mode and rewrite the file without it.
+	if adoptDiscordRelay(data, &cfg) {
+		if err := cfg.Save(); err != nil {
+			slog.Error("save config after Discord relay switch failed", "component", "config", "error", err)
+		}
+	}
 
 	if cfg.OpenclawConfigDir == "/root/openclaw" {
 		if err := migrateOpenclawDir("/root/openclaw", "/root/.openclaw"); err != nil {

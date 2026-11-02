@@ -24,15 +24,9 @@ func TestCodexAddChannel(t *testing.T) {
 		t.Errorf("AddChannel(slack) err = %v, want nil (creds in config.json drive the bridge)", err)
 	}
 	if err := s.AddChannel(context.Background(), domain.AddChannelRequest{
-		Channel: domain.ChannelDiscord, DiscordBotToken: "x", DiscordUserID: "42",
+		Channel: domain.ChannelDiscord, DiscordManaged: true, DiscordUserID: "42",
 	}); err != nil {
-		t.Errorf("AddChannel(discord) err = %v, want nil (creds in config.json drive the bot session)", err)
-	}
-	if err := s.AddChannel(context.Background(), domain.AddChannelRequest{Channel: domain.ChannelDiscord, DiscordBotToken: "x"}); err == nil {
-		t.Errorf("AddChannel(discord) without user id must fail (receive path is allowlist-gated)")
-	}
-	if err := s.AddChannel(context.Background(), domain.AddChannelRequest{Channel: domain.ChannelDiscord, DiscordUserID: "42"}); err == nil {
-		t.Errorf("AddChannel(discord) without bot token must fail")
+		t.Errorf("AddChannel(discord) err = %v, want nil (Discord runs through the cloud relay; nothing to write)", err)
 	}
 	err := s.AddChannel(context.Background(), domain.AddChannelRequest{Channel: domain.ChannelWhatsapp, WhatsappUserID: "x"})
 	if !errors.Is(err, domain.ErrChannelNotSupported) {

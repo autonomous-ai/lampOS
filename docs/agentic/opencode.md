@@ -284,13 +284,14 @@ secret lives only in `.env`).
 
 ## 5. Channels
 
-Telegram, Slack and Discord are **device-owned** under OpenCode — identical to
-codex (`SupportedChannels()` → `["telegram", "slack", "discord"]`). os-server runs
+Telegram and Slack are **device-owned** under OpenCode — identical to
+codex (`SupportedChannels()` → `["telegram", "slack", "discord"]`); Discord goes
+through the cloud relay ([`discord-relay.md`](../discord-relay.md)). os-server runs
 the receive loops itself, driven by `config.json` tokens read fresh on each use, so
 there is nothing runtime-side to write and no restart needed. The full behavior
 (receive loop, sender-metadata prefix, silent-run tracking, `stripForChannel`
 cleanup, typing keepers, reply fan-out at `session.idle`) mirrors
-[`codex.md` §5](codex.md) 1:1 — see `runtimes/opencode/{telegram_poll,slack,discord}.go`.
+[`codex.md` §5](codex.md) 1:1 — see `runtimes/opencode/{telegram_poll,slack}.go`.
 `AddChannel` / `RefreshChannelConfig` are honest no-op successes for the supported
 channels and return `domain.ErrChannelNotSupported` for anything else (whatsapp).
 

@@ -19,8 +19,8 @@ wire the switch, install, migration, skills, hooks, and reset.
 > [`hermes.md`](hermes.md) (Hermes, a full backend) · [`picoclaw.md`](picoclaw.md)
 > (PicoClaw, client-only gateway with install/presync scripts) ·
 > [`claudecode.md`](claudecode.md) (Claude Code behind a local bridge,
-> device-owned Telegram/Slack/Discord channels — native channel plugins
-> deliberately not used — claude.ai OAuth login). Per-backend
+> device-owned Telegram/Slack channels and Discord through the cloud relay —
+> native channel plugins deliberately not used — claude.ai OAuth login). Per-backend
 > protocol/quirks live in those; the generic mechanics + checklist live here.
 
 ---
@@ -489,11 +489,12 @@ runtime changes.
   - hermes → `[telegram, slack, discord]` (`runtimes/hermes/channels.go`)
   - picoclaw → `[telegram]` (`runtimes/picoclaw/channels.go`)
   - claudecode → `[telegram, slack, discord]` (`runtimes/claudecode/channels.go`
-    — all device-owned, mirroring codex: `telegram_poll.go` getUpdates loop,
-    `discord.go` discordgo session, `slack.go` MQTT bridge; Claude Code's
-    native channel plugins are deliberately not used)
+    — telegram and slack device-owned, mirroring codex: `telegram_poll.go` getUpdates loop,
+    `slack.go` MQTT bridge; discord runs through the cloud relay
+    ([`discord-relay.md`](../discord-relay.md)); Claude Code's native channel
+    plugins are deliberately not used)
   - opencode → `[telegram, slack, discord]` (`runtimes/opencode/channels.go`
-    — all device-owned, mirroring codex/claudecode)
+    — telegram and slack device-owned, mirroring codex/claudecode)
 - Helper `domain.ChannelSupported(gw, channel) bool` (`domain/channel.go`) — the
   one place callers test membership.
 - Shared sentinels in package `domain` (`domain/channel.go`):

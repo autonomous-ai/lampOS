@@ -156,9 +156,10 @@ và thử lại ở poll kế tiếp.
   đuôi `/v1`, khác hermes), `.security.yml` `model_list."autonomous:0".api_keys` +
   `"autonomous_vision:0".api_keys` từ `llm_api_key`, bearer token `pico` (phải khớp `constants.go` `Token`), và mỗi kênh non-pico **chỉ
   bật khi có credential**: telegram (`telegram_bot_token` + `telegram_user_id`),
-  discord (`discord_bot_token` + `discord_user_id`), slack (`slack_bot_token` +
+  slack (`slack_bot_token` +
   `slack_app_token` + `slack_user_id`), whatsapp native (`whatsapp_user_id` →
-  `allow_from`, không token, quét QR lần đầu). Secrets nằm trong `.security.yml` dưới
+  `allow_from`, không token, quét QR lần đầu). Discord không bao giờ được bật: nó đi qua
+  cloud relay nên presync giữ `channel_list.discord` ở trạng thái tắt và xoá settings của nó khỏi `.security.yml`. Secrets nằm trong `.security.yml` dưới
   `channel_list.<ch>.settings`; phần cấu trúc ở `config.json`. Có bot token Telegram
   mà thiếu `telegram_user_id` thì kênh vẫn tắt: `allow_from` rỗng sẽ cho bất kỳ ai tìm
   thấy bot ra lệnh cho thiết bị.

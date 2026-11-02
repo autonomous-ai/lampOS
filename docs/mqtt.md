@@ -35,7 +35,7 @@ The OS server uses MQTT to communicate with the backend server (status reporting
 
 ```json
 {
-  "cmd": "info|add_channel|slack_event|slack_command|whatsapp_pair|claudecode_login|claudecode_login_code|ota|data",
+  "cmd": "info|add_channel|slack_event|slack_command|discord_event|whatsapp_pair|claudecode_login|claudecode_login_code|ota|data",
   ...payload fields
 }
 ```
@@ -147,7 +147,7 @@ users in the process.
     // telegram: bot_token + chat_id
     // slack:    bot_token + app_token + channel_id        (socket mode, default)
     // slack:    bot_token + mode:"http" + signing_secret  (+ optional webhook_path, default /slack/events)
-    // discord:  bot_token + guild_id  + user_id
+    // discord:  user_id (+ optional guild_id, managed:true)  — no bot token; any bot_token is ignored
     // whatsapp: user_id (E.164 phone — only field; the bot logs in via Baileys)
   }
 }
@@ -287,6 +287,39 @@ window) and forwards headers verbatim so OpenClaw's signature check validates.
 For the proxy to route inbound events back to the right device, each `/ping` includes
 `slack_team_id` — the workspace ID the device resolves on-device via Slack `auth.test`
 against its stored `botToken` (cached, sent once resolved).
+
+### `discord_event` — Deliver a Discord message (cloud relay)
+
+The device holds no Discord bot token; the cloud relay sends each Discord message
+for the device here and posts the device's reply. Full behaviour: [discord-relay.md](discord-relay.md).
+
+**Receive:**
+```json
+{
+  "cmd": "discord_event",
+  "event_id": "…",
+  "discord_user_id": "…",
+  "guild_id": "…",
+  "discord_channel_id": "…",
+  "author_username": "…",
+  "bot_user_id": "…",
+  "mentions_bot": true,
+  "text": "…"
+}
+```
+
+There is no acknowledgement. The device drops the message unless it is from the configured
+`discord_user_id` (a server message must also come from `discord_guild_id` and mention the bot),
+and ignores an `event_id` it saw in the last 5 minutes. An accepted message runs as a normal
+agent turn. The answer goes up the device channel with the standard envelope plus the channel:
+
+```json
+{"type":"discord_typing","discord_channel_id":"…"}
+{"type":"discord_reply","discord_channel_id":"…","text":"…"}
+```
+
+`discord_typing` is repeated every 8 s while the turn runs; `discord_reply` is sent once when it
+finishes (not at all when the turn has nothing to say).
 
 ### `slack_command` — Forward a Slack slash command (HTTP mode)
 

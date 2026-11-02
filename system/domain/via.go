@@ -9,6 +9,7 @@ const (
 	ViaSchedule     = "schedule"      // a schedule run from the device's schedule runner
 	ViaSystem       = "system"        // device-generated notices: wake greeting, skill updates, rename
 	ViaSlack        = "slack"         // a Slack message relayed by os-server into Hermes
+	ViaDiscord      = "discord"       // a Discord message delivered through the cloud relay
 	ViaVoiceHistory = "voice_history" // realtime voice answered alone; the agent gets a history copy
 	ViaExternal     = "external"      // history copy from another external agent
 )

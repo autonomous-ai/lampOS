@@ -79,7 +79,6 @@ export default function WifiProvision() {
   const [slackBotToken, setSlackBotToken] = useState("");
   const [slackAppToken, setSlackAppToken] = useState("");
   const [slackUserId, setSlackUserId] = useState("");
-  const [discordBotToken, setDiscordBotToken] = useState("");
   const [discordUserId, setDiscordUserId] = useState("");
 
   useEffect(() => {
@@ -188,7 +187,6 @@ export default function WifiProvision() {
         slack_bot_token: slackBotToken || undefined,
         slack_app_token: slackAppToken || undefined,
         slack_user_id: slackUserId || undefined,
-        discord_bot_token: discordBotToken || undefined,
         discord_user_id: discordUserId || undefined,
       });
     } catch {
@@ -330,11 +328,6 @@ export default function WifiProvision() {
             )}
             {channel === "discord" && (
               <>
-                <Field label="Bot Token">
-                  <PasswordInput value={discordBotToken} onChange={setDiscordBotToken}
-                    placeholder="MTIzNDU2..."
-                    disabled={submitting || phase === "connecting"} />
-                </Field>
                 <Field label="User ID">
                   <TextInput value={discordUserId} onChange={setDiscordUserId}
                     placeholder="123456789012345678"

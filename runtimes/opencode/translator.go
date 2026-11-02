@@ -393,13 +393,6 @@ func (s *OpenCodeService) emitFinal(dispatch func(domain.WSEvent)) {
 		go s.finishSlackTurn(o, stripForChannel(finalText))
 	}
 
-	// Discord-originated turn (discord.go): post the reply back to the
-	// originating channel (chunked at Discord's 2000-char limit).
-	// Best-effort in a goroutine: the read loop must not block on the Discord API.
-	if channelID := s.consumeDiscordRun(runID); channelID != "" && finalText != "" {
-		go s.finishDiscordTurn(channelID, stripForChannel(finalText))
-	}
-
 	if finalText != "" {
 		deltaPayload, _ := json.Marshal(map[string]any{
 			"runId":      runID,
@@ -456,13 +449,6 @@ func (s *OpenCodeService) handleError(msg string, dispatch func(domain.WSEvent))
 		slog.Warn("slack-originated turn failed — reply dropped",
 			"component", "opencode", "runID", runID, "channel", o.channel)
 		go s.finishSlackTurn(o, "")
-	}
-
-	// Discord-originated turn: consume the tracker so the map doesn't leak
-	// (and the typing keeper stops).
-	if channelID := s.consumeDiscordRun(runID); channelID != "" {
-		slog.Warn("discord-originated turn failed — reply dropped",
-			"component", "opencode", "runID", runID, "channelID", channelID)
 	}
 
 	payload, _ := json.Marshal(map[string]any{

@@ -209,6 +209,10 @@ func (s *Server) handleSetUpCompleteChange(setupCompleted bool) {
 					finishSetup(setupErr)
 				}()
 			}
+			// First: no runtime may hold Discord settings (Discord goes through the
+			// cloud relay), before any reconcile below re-applies runtime config.
+			s.discordRelayReconcile.Reconcile()
+
 			s.personaMigration.Reconcile()
 
 			s.configMigration.Reconcile()

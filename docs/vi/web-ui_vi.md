@@ -27,7 +27,9 @@ File build output (`dist/`) được nginx serve tại root `/` trên thiết b�
 
 Trong lần setup đầu, **Channels** là tuỳ chọn và mặc định là **Not now**.
 Chọn Telegram, Slack hoặc Discord sẽ hiện các field credential, nhưng user có
-thể để trống hoặc cấu hình channel sau trong Settings.
+thể để trống hoặc cấu hình channel sau trong Settings. Discord chỉ hỏi user ID của
+chủ thiết bị (và tuỳ chọn server ID) — không có field bot token; tin nhắn đi qua
+cloud relay ([discord-relay_vi.md](discord-relay_vi.md)).
 
 Lần setup đầu cũng có thể giữ kết nối Wi-Fi đang có Internet mà không yêu cầu
 nhập lại mật khẩu. Để trống SSID được chọn hoặc chọn đúng SSID hiện tại; khi gửi

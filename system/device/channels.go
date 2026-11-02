@@ -36,7 +36,8 @@ func (s *Service) AddChannel(ctx context.Context, data domain.AddChannelRequest)
 			c.SlackAppToken = data.SlackAppToken
 			c.SlackUserID = data.SlackUserID
 		case domain.ChannelDiscord:
-			c.DiscordBotToken = data.DiscordBotToken
+			// Discord runs through the cloud relay: no bot token is stored.
+			c.DiscordManaged = true
 			c.DiscordGuildID = data.DiscordGuildID
 			c.DiscordUserID = data.DiscordUserID
 		case domain.ChannelWhatsapp:
@@ -95,10 +96,9 @@ func (s *Service) RefreshChannelConfig(ctx context.Context, channel string) (str
 		req.SlackMode = "http"
 		req.SlackSigningSecret = s.config.LLMAPIKey
 	case domain.ChannelDiscord:
-		if s.config.DiscordBotToken == "" {
+		if s.config.DiscordUserID == "" {
 			return "", ErrSlackCredentialsMissing
 		}
-		req.DiscordBotToken = s.config.DiscordBotToken
 		req.DiscordGuildID = s.config.DiscordGuildID
 		req.DiscordUserID = s.config.DiscordUserID
 	case domain.ChannelTelegram:

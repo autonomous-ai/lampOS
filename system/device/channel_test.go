@@ -88,7 +88,7 @@ func TestRefreshChannelConfigRejectsUnsupported(t *testing.T) {
 
 func TestRefreshChannelConfigDiscordBuildsRequest(t *testing.T) {
 	gw := &fakeGateway{supported: []string{domain.ChannelDiscord}}
-	cfg := &config.Config{DiscordBotToken: "dtok", DiscordGuildID: "g1", DiscordUserID: "u1"}
+	cfg := &config.Config{DiscordManaged: true, DiscordGuildID: "g1", DiscordUserID: "u1"}
 	s := newService(gw, cfg)
 
 	if _, err := s.RefreshChannelConfig(context.Background(), domain.ChannelDiscord); err != nil {
@@ -98,8 +98,8 @@ func TestRefreshChannelConfigDiscordBuildsRequest(t *testing.T) {
 		t.Fatalf("gateway.RefreshChannelConfig called %d times, want 1", len(gw.refreshCalls))
 	}
 	got := gw.refreshCalls[0]
-	if got.Channel != domain.ChannelDiscord || got.DiscordBotToken != "dtok" || got.DiscordGuildID != "g1" {
-		t.Errorf("refresh request = %+v, want discord creds from config", got)
+	if got.Channel != domain.ChannelDiscord || got.DiscordGuildID != "g1" || got.DiscordUserID != "u1" {
+		t.Errorf("refresh request = %+v, want discord ids from config", got)
 	}
 }
 

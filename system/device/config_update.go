@@ -81,7 +81,6 @@ func (s *Service) GetPublicConfig() domain.ConfigPublicResponse {
 		HasTelegramBotToken:      s.config.TelegramBotToken != "",
 		HasSlackBotToken:         s.config.SlackBotToken != "",
 		HasSlackAppToken:         s.config.SlackAppToken != "",
-		HasDiscordBotToken:       s.config.DiscordBotToken != "",
 		HasBluebubblesPassword:   s.config.BluebubblesPassword != "",
 		HasLLMAPIKey:             s.config.LLMAPIKey != "",
 		HasDeepgramAPIKey:        s.config.DeepgramAPIKey != "",
@@ -211,7 +210,6 @@ type channelSnapshot struct {
 	slackBotToken            string
 	slackAppToken            string
 	slackUserID              string
-	discordBotToken          string
 	discordGuildID           string
 	discordUserID            string
 	bluebubblesServerURL     string
@@ -228,7 +226,6 @@ func channelFields(c *config.Config) channelSnapshot {
 		slackBotToken:            c.SlackBotToken,
 		slackAppToken:            c.SlackAppToken,
 		slackUserID:              c.SlackUserID,
-		discordBotToken:          c.DiscordBotToken,
 		discordGuildID:           c.DiscordGuildID,
 		discordUserID:            c.DiscordUserID,
 		bluebubblesServerURL:     c.BluebubblesServerURL,
@@ -278,7 +275,7 @@ func applyUpdate(c *config.Config, data domain.UpdateConfigRequest, adminHash st
 		Channel:          c.Channel,
 		TelegramBotToken: c.TelegramBotToken, TelegramUserID: c.TelegramUserID,
 		SlackBotToken: c.SlackBotToken, SlackAppToken: c.SlackAppToken, SlackUserID: c.SlackUserID,
-		DiscordBotToken: c.DiscordBotToken, DiscordGuildID: c.DiscordGuildID, DiscordUserID: c.DiscordUserID,
+		DiscordManaged: c.DiscordManaged, DiscordGuildID: c.DiscordGuildID, DiscordUserID: c.DiscordUserID,
 		BluebubblesServerURL:     c.BluebubblesServerURL,
 		BluebubblesPassword:      c.BluebubblesPassword,
 		BluebubblesUserAddress:   c.BluebubblesUserAddress,
@@ -460,9 +457,8 @@ func applyChannelPatch(c *config.Config, data domain.UpdateConfigRequest) {
 			c.SlackUserID = data.SlackUserID
 		}
 	case domain.ChannelDiscord:
-		if data.DiscordBotToken != "" {
-			c.DiscordBotToken = data.DiscordBotToken
-		}
+		// Discord runs through the cloud relay; the device keeps no bot token.
+		c.DiscordManaged = true
 		if data.DiscordGuildID != "" {
 			c.DiscordGuildID = data.DiscordGuildID
 		}

@@ -7,15 +7,15 @@ import (
 	"go.autonomous.ai/os/system/domain"
 )
 
-// SupportedChannels — all three channels are device-owned (mirroring runtimes/codex).
+// SupportedChannels — telegram and slack are device-owned (mirroring runtimes/codex);
+// discord messages arrive through the cloud relay and are driven by os-server.
 func (s *ClaudeCodeService) SupportedChannels() []string {
 	return []string{domain.ChannelTelegram, domain.ChannelSlack, domain.ChannelDiscord}
 }
 
 // AddChannel — all supported channels are honest no-op successes: the
 // device-owned loops read creds fresh from Device config on each use (the
-// telegram poll loop per iteration, the discord bot per (re)connect attempt,
-// the Slack bridge per event/Web API call), so the creds the caller just
+// telegram poll loop per iteration, the Slack bridge per event/Web API call), so the creds the caller just
 // persisted (persist-then-apply) are all that is needed — nothing agent-side
 // to write, no bridge restart.
 func (s *ClaudeCodeService) AddChannel(_ context.Context, data domain.AddChannelRequest) error {

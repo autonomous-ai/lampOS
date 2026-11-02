@@ -6,7 +6,6 @@ export interface SetupUrlParams {
   slackBotToken: string;
   slackAppToken: string;
   slackUserId: string;
-  discordBotToken: string;
   discordGuildId: string;
   discordUserId: string;
   llmApiKey: string;
@@ -77,7 +76,6 @@ export function useSetupUrlParams(): SetupUrlParams {
       slackBotToken: INITIAL_PARAMS.get("slack_bot_token") ?? "",
       slackAppToken: INITIAL_PARAMS.get("slack_app_token") ?? "",
       slackUserId: INITIAL_PARAMS.get("slack_user_id") ?? "",
-      discordBotToken: INITIAL_PARAMS.get("discord_bot_token") ?? "",
       discordGuildId: INITIAL_PARAMS.get("discord_guild_id") ?? "",
       discordUserId: INITIAL_PARAMS.get("discord_user_id") ?? "",
       llmApiKey: INITIAL_PARAMS.get("llm_api_key") ?? "",

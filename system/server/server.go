@@ -19,6 +19,7 @@ import (
 	"go.autonomous.ai/os/system/agent"
 	"go.autonomous.ai/os/system/ambient"
 	"go.autonomous.ai/os/system/device"
+	"go.autonomous.ai/os/system/discordrelay"
 	"go.autonomous.ai/os/system/domain"
 	"go.autonomous.ai/os/system/environment"
 	"go.autonomous.ai/os/system/externalhistory"
@@ -88,19 +89,20 @@ type Server struct {
 	buddyHandler      *_buddyHttpDeliver.BuddyHandler
 	pluginHandler     _pluginHttpDeliver.PluginHandler
 
-	agentGateway     domain.AgentGateway
-	chatStream       *_deviceMQTTDeliver.ChatStream
-	personaMigration *agent.PersonaMigration
-	configMigration  *agent.ConfigMigration
-	channelReconcile *agent.ChannelReconcile
-	mcpReconcile     *agent.MCPReconcile
-	userReconcile    *agent.UserProfileReconcile
-	memoryGuard      *agent.MemoryGuard
-	networkService   *network.Service
-	deviceService    *device.Service
-	ambientService   *ambient.Service
-	healthWatch      *healthwatch.Service
-	statusLED        *statusled.Service
+	agentGateway          domain.AgentGateway
+	chatStream            *_deviceMQTTDeliver.ChatStream
+	personaMigration      *agent.PersonaMigration
+	configMigration       *agent.ConfigMigration
+	channelReconcile      *agent.ChannelReconcile
+	discordRelayReconcile *agent.DiscordRelayReconcile
+	mcpReconcile          *agent.MCPReconcile
+	userReconcile         *agent.UserProfileReconcile
+	memoryGuard           *agent.MemoryGuard
+	networkService        *network.Service
+	deviceService         *device.Service
+	ambientService        *ambient.Service
+	healthWatch           *healthwatch.Service
+	statusLED             *statusled.Service
 
 	// mqttFactory is the optional MQTT factory (nil when broker not configured).
 	mqttFactory *mqtt.Factory
@@ -163,6 +165,8 @@ func ProvideServer(
 	pm *agent.PersonaMigration,
 	cm *agent.ConfigMigration,
 	cr *agent.ChannelReconcile,
+	drr *agent.DiscordRelayReconcile,
+	discordRelay *discordrelay.Relay,
 	mr *agent.MCPReconcile,
 	upr *agent.UserProfileReconcile,
 	mg *agent.MemoryGuard,
@@ -174,32 +178,34 @@ func ProvideServer(
 	chatStream *_deviceMQTTDeliver.ChatStream,
 ) *Server {
 	sensingH.SetOnRealtimeHandled(agentH.CancelSpeechForNewerTurn)
+	agentH.SetDiscordRelay(discordRelay)
 	s := &Server{
 		environmentStartup: environment.NewStartupCoordinator(),
 
-		config:            cfg,
-		healthHandler:     hh,
-		networkHandler:    nh,
-		deviceHandler:     dh,
-		deviceMQTTHandler: dqth,
-		agentHandler:      agentH,
-		sensingHandler:    sensingH,
-		buddyHandler:      buddyH,
-		pluginHandler:     pluginH,
-		agentGateway:      agentGW,
-		personaMigration:  pm,
-		configMigration:   cm,
-		channelReconcile:  cr,
-		mcpReconcile:      mr,
-		userReconcile:     upr,
-		memoryGuard:       mg,
-		networkService:    ns,
-		deviceService:     ds,
-		mqttFactory:       mqttFactory,
-		ambientService:    ambientSvc,
-		healthWatch:       hw,
-		statusLED:         sled,
-		chatStream:        chatStream,
+		config:                cfg,
+		healthHandler:         hh,
+		networkHandler:        nh,
+		deviceHandler:         dh,
+		deviceMQTTHandler:     dqth,
+		agentHandler:          agentH,
+		sensingHandler:        sensingH,
+		buddyHandler:          buddyH,
+		pluginHandler:         pluginH,
+		agentGateway:          agentGW,
+		personaMigration:      pm,
+		configMigration:       cm,
+		channelReconcile:      cr,
+		discordRelayReconcile: drr,
+		mcpReconcile:          mr,
+		userReconcile:         upr,
+		memoryGuard:           mg,
+		networkService:        ns,
+		deviceService:         ds,
+		mqttFactory:           mqttFactory,
+		ambientService:        ambientSvc,
+		healthWatch:           hw,
+		statusLED:             sled,
+		chatStream:            chatStream,
 	}
 	harnessConnected := func() bool {
 		if s.harnessService == nil {

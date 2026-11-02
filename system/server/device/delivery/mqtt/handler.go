@@ -14,6 +14,7 @@ import (
 	"go.autonomous.ai/os/runtimes/openclaw"
 	"go.autonomous.ai/os/system/buddy"
 	"go.autonomous.ai/os/system/device"
+	"go.autonomous.ai/os/system/discordrelay"
 	"go.autonomous.ai/os/system/domain"
 	"go.autonomous.ai/os/system/harness"
 	"go.autonomous.ai/os/system/lib/mqtt"
@@ -73,6 +74,10 @@ type DeviceMQTTHandler struct {
 	// scheduleAlert, when non-nil, receives every schedule ops alert
 	// (alertScheduleEvent) synchronously INSTEAD of the real transport.
 	scheduleAlert func(title, detail string)
+
+	// discordRelay takes Discord messages the cloud relay sends down (cmd
+	// "discord_event") and returns the agent's replies up (see discord_event_handler.go).
+	discordRelay *discordrelay.Relay
 }
 
 // SetHarnessService attaches the server-owned Harness service after Wire construction.
@@ -165,7 +170,7 @@ func (h *DeviceMQTTHandler) refreshableConnectorWriters() []ConnectorWriter {
 }
 
 // ProvideDeviceMQTTHandler creates DeviceMQTTHandler with all command handlers.
-func ProvideDeviceMQTTHandler(cfg *config.Config, mqttFactory *mqtt.Factory, ds *device.Service, ns *network.Service, gw domain.AgentGateway, chatStream *ChatStream, buddyService *buddy.Service) DeviceMQTTHandler {
+func ProvideDeviceMQTTHandler(cfg *config.Config, mqttFactory *mqtt.Factory, ds *device.Service, ns *network.Service, gw domain.AgentGateway, chatStream *ChatStream, buddyService *buddy.Service, discordRelay *discordrelay.Relay) DeviceMQTTHandler {
 	configsDir := filepath.Join(cfg.OpenclawConfigDir, "workspace", "configs")
 	// schedules.json is a SIBLING of config.json, never inside it — see
 	// schedule.Store's doc comment and config.Dir().
@@ -188,7 +193,9 @@ func ProvideDeviceMQTTHandler(cfg *config.Config, mqttFactory *mqtt.Factory, ds 
 		chatStream:              chatStream,
 		scheduleStore:           scheduleStore,
 		scheduleIntents:         scheduleIntents,
+		discordRelay:            discordRelay,
 	}
+	discordRelay.SetUplink(&discordUplink{h: &h})
 	// Bound to this local h (wire_gen copies the struct): safe only because
 	// the callbacks read pointer/never-mutated fields shared by every copy.
 	h.scheduleRunner = schedule.NewRunner(scheduleStore, gw, cfg.DeviceID, h.publishScheduleRunReport)
@@ -197,9 +204,16 @@ func ProvideDeviceMQTTHandler(cfg *config.Config, mqttFactory *mqtt.Factory, ds 
 }
 
 func (h *DeviceMQTTHandler) publish(data interface{}) error {
+	return h.publishAs("device-"+h.config.DeviceID, data)
+}
+
+// publishAs publishes to the device channel over a short-lived connection with the
+// given client id. A broker drops an older connection that shares a client id, so
+// publishers that can overlap with the default one use their own id.
+func (h *DeviceMQTTHandler) publishAs(clientID string, data interface{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), publishTimeout)
 	defer cancel()
-	mqttClient := h.mqttFactory.GetClient("device-" + h.config.DeviceID)
+	mqttClient := h.mqttFactory.GetClient(clientID)
 	if err := mqttClient.Connect(ctx); err != nil {
 		return err
 	}
@@ -394,6 +408,8 @@ func (h *DeviceMQTTHandler) HandleMessage(topic string, payload []byte) error {
 		return h.handleSlackEvent(cmd)
 	case domain.CommandSlackCommand:
 		return h.handleSlackCommand(cmd)
+	case domain.CommandDiscordEvent:
+		return h.handleDiscordEvent(cmd)
 	case domain.CommandWhatsappPair:
 		return h.handleWhatsappPair(cmd)
 	case domain.CommandClaudeCodeLogin:

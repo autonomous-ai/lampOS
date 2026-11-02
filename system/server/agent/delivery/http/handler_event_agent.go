@@ -248,6 +248,9 @@ func (h *AgentHandler) handleAgentStreamEvent(evt domain.WSEvent) error {
 			// Error skips the lifecycle-end Cancel below, so clean filler state here.
 			if payload.Data.Phase == "error" {
 				sensinghttp.DefaultFillerManager.Cancel(flowRunID)
+				// A failed Discord-origin turn has no reply; end it so the typing signal stops.
+				h.discordRelay.Finish(flowRunID, "")
+				h.discordRelay.Finish(payload.RunID, "")
 				// Error also skips the Slack finalize below; DeliverSlackReply("") only cleans up.
 				if sb, ok := h.agentGateway.(domain.SlackBridge); ok {
 					go func() {
@@ -758,6 +761,11 @@ func (h *AgentHandler) handleAgentStreamEvent(evt domain.WSEvent) error {
 			// Peek only; DeliverSlackReply consumes at reply time. False for non-SlackBridge runtimes.
 			slackBridge, _ := h.agentGateway.(domain.SlackBridge)
 			isSlackRun := slackBridge != nil && slackBridge.IsSlackOriginRun(flowRunID)
+			discordRunID := flowRunID
+			if !h.discordRelay.IsOriginRun(discordRunID) {
+				discordRunID = payload.RunID
+			}
+			isDiscordRun := h.discordRelay.IsOriginRun(discordRunID)
 
 			// Markers: /broadcast fans out to Telegram, /speak forces TTS, /dm targets one Telegram user.
 			var dmTelegramID string
@@ -907,6 +915,10 @@ func (h *AgentHandler) handleAgentStreamEvent(evt domain.WSEvent) error {
 				if isSlackRun {
 					isChannelRun = true
 				}
+				// A Discord-origin turn replies in Discord, never on the speaker.
+				if isDiscordRun {
+					isChannelRun = true
+				}
 				if isChannelRun {
 					// Channel users still get the text via OpenClaw's own fan-out.
 					slog.Info("assistant turn done, TTS suppressed (channel run)", "component", "agent", "text", text[:min(len(text), 100)], "broadcast", isBroadcastRun, "force_tts", forceTTS, "cron_fire", isCronFire, "heartbeat", isHeartbeatRun)
@@ -976,7 +988,19 @@ func (h *AgentHandler) handleAgentStreamEvent(evt domain.WSEvent) error {
 					}
 				}(slackText)
 			}
+
+			// Finalize Discord on every end outcome so the typing signal stops; NO_REPLY → "".
+			if isDiscordRun {
+				discordText := text
+				if isAgentNoReply(text) {
+					discordText = ""
+				}
+				h.discordRelay.Finish(discordRunID, discordText)
+			}
 		}
+		// A turn that ended with nothing to say still ends its Discord run.
+		h.discordRelay.Finish(flowRunID, "")
+		h.discordRelay.Finish(payload.RunID, "")
 	}
 
 	return nil

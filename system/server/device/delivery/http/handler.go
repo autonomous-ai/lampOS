@@ -545,9 +545,6 @@ func mergeMissingFromConfig(req *domain.SetupRequest, cfg *config.Config) {
 	if req.SlackUserID == "" {
 		req.SlackUserID = cfg.SlackUserID
 	}
-	if req.DiscordBotToken == "" {
-		req.DiscordBotToken = cfg.DiscordBotToken
-	}
 	if req.DiscordGuildID == "" {
 		req.DiscordGuildID = cfg.DiscordGuildID
 	}

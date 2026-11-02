@@ -12,7 +12,7 @@ export function ChannelSection({
   active, channel, setChannel, channelLoaded,
   teleToken, setTeleToken, teleUserId, setTeleUserId,
   slackBotToken, setSlackBotToken, slackAppToken, setSlackAppToken, slackUserId, setSlackUserId,
-  discordBotToken, setDiscordBotToken, discordGuildId, setDiscordGuildId, discordUserId, setDiscordUserId,
+  discordGuildId, setDiscordGuildId, discordUserId, setDiscordUserId,
   bluebubblesServerUrl, setBluebubblesServerUrl,
   bluebubblesPassword, setBluebubblesPassword,
   bluebubblesUserAddress, setBluebubblesUserAddress,
@@ -27,7 +27,6 @@ export function ChannelSection({
   slackBotToken: string; setSlackBotToken: (v: string) => void;
   slackAppToken: string; setSlackAppToken: (v: string) => void;
   slackUserId: string; setSlackUserId: (v: string) => void;
-  discordBotToken: string; setDiscordBotToken: (v: string) => void;
   discordGuildId: string; setDiscordGuildId: (v: string) => void;
   discordUserId: string; setDiscordUserId: (v: string) => void;
   bluebubblesServerUrl: string; setBluebubblesServerUrl: (v: string) => void;
@@ -90,7 +89,6 @@ export function ChannelSection({
       )}
       {channel === "discord" && (
         <>
-          <SecretUpdateField configured={channelLoaded.discordBotToken} label="Bot Token" id="discord_bot_token" value={discordBotToken} onChange={setDiscordBotToken} placeholder="Bot token" />
           <LockedField lockedInitially={channelLoaded.discordGuildId} label="Guild ID" id="discord_guild_id" value={discordGuildId} onChange={setDiscordGuildId} placeholder="123456789" />
           <LockedField lockedInitially={channelLoaded.discordUserId} label="User ID" id="discord_user_id" value={discordUserId} onChange={setDiscordUserId} placeholder="123456789" />
         </>
