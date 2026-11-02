@@ -298,7 +298,10 @@ that connection, which pairing's proof and hello's signature cover:
 3. **The lamp** checks the proof, keeps `{key, name, grants, paired_at}` in
    `/var/lib/lampos-control/clients.json` (0600, written whole and renamed
    over, at most 16 computers; the code isn't spent when the lamp is full,
-   and the same key pairing again replaces itself), answers
+   and the same key pairing again replaces itself; a grant the file names
+   that this build doesn't know, a newer lamp-control's kept before an
+   update went back, is never granted and is written back as it was, so an
+   older lamp-control still starts and going forward again keeps it), answers
    `{"re":1,"ok":true,"client":"c_3f9a","grants":["body","light","speak"]}`,
    and gives a small nod with the ring's "someone new paired" cue.
 4. **No pairing without the app's pin.** A code alone, said aloud or typed
