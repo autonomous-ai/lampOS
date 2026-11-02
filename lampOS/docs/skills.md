@@ -1561,7 +1561,14 @@ for it.
     again; a yes that can't be taken back removes nothing. **Only the
     Store keeps a name's yes across an install:** a Store package
     (`install_from_url`, signed with the Store's key) that puts the same
-    name in place keeps it, as an update of the same catalogue entry. Any
+    name in place keeps it, as an update of the same catalogue entry, and
+    it replaces only a skill the Store put there (`.package.json` with
+    `from_store`, below): a skill of the owner's by that name (made here,
+    shared, pushed or put in by hand, or one whose record predates
+    `from_store`) is refused, "a skill called NAME is already on this lamp,
+    and it wasn't added from the Skills Store: remove it first to add this
+    one", its folder and yes as they were (the Reviewer-lead's P2 on #4875).
+    Any
     other install that puts a skill in place under a name with a yes (by
     hand, `lamp-skills install` of a folder or a package, whose
     `--state-dir` is `/var/lib/lampos-skills-state` by default; or a skill
@@ -1808,7 +1815,9 @@ in as from a folder.
 **What an installed package keeps** (#2801). A skill put on from a package
 (by hand, from the Skills Store or made by voice) keeps, in its own folder,
 `.package.json`: the SHA-256 of the package's bytes, the one the Store's
-catalogue names, and its `lamp-skill.json` as installed
+catalogue names, its `lamp-skill.json` as installed, and `from_store: true`
+when it came from the Skills Store (absent otherwise, and in a record
+written before it, read as not the Store's)
 (`package::INSTALLED_FROM`, read by `package::installed_from`). It is
 written into the folder before the folder is moved in, so it comes and goes
 with the skill: the next install replaces it whole, and a remove deletes

@@ -495,6 +495,67 @@ fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
     assert_eq!(store.join().unwrap(), 4);
 }
 
+/// The Reviewer-lead's P2 on #4875: a Store package never replaces a skill
+/// of the owner's under the same name (made here, shared, pushed, or put
+/// in by hand, so no Store record), nor one whose record predates
+/// `from_store`. Such a skill would be deleted with no word, and its camera
+/// yes handed to the package's code. Refused, the owner's folder and yes
+/// stay as they were. One the Store put on is replaced as before.
+#[test]
+fn a_store_package_never_replaces_a_skill_of_the_owners_with_its_name() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = skills(dir.path());
+    let camera = skills
+        .with_extension("state")
+        .join(lamp_skills::CAMERA_FILE);
+    let channel = key(1);
+    let key_file = key_file(dir.path(), &channel);
+    let bytes = packed(dir.path(), Some(&channel));
+    // The owner's own desk-tutor, with no Store record, its camera yes kept.
+    let own = skills.join("desk-tutor");
+    copy(&skills_root().join("desk-tutor"), &own);
+    fs::write(
+        own.join("SKILL.md"),
+        "---\nname: desk-tutor\ndescription: Mine.\n---\n",
+    )
+    .unwrap();
+    let (port, store) = serve(vec![ok(&bytes), ok(&bytes), ok(&bytes)]);
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(!done, "{answer}");
+    assert_eq!(
+        refused(&answer),
+        "not installed: a skill called desk-tutor is already on this lamp, and it wasn't \
+         added from the Skills Store: remove it first to add this one"
+    );
+    assert!(
+        fs::read_to_string(own.join("SKILL.md"))
+            .unwrap()
+            .contains("Mine.")
+    );
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "desk-tutor\n");
+    // A record from before `from_store` (a package's, not marked as the
+    // Store's) is refused the same way.
+    let record = serde_json::json!({
+        "sha256": "a".repeat(64),
+        "manifest": {"format": 1, "name": "desk-tutor", "version": "1.0.0", "files": []},
+    });
+    fs::write(own.join(package::INSTALLED_FROM), record.to_string()).unwrap();
+    assert!(package::installed_from(&own).is_some_and(|was| !was.from_store));
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(!done, "{answer}");
+    assert!(
+        refused(&answer).contains("wasn't added from the Skills Store"),
+        "{answer}"
+    );
+    // Removed by the owner, the Store's goes on, marked as the Store's, and
+    // its update then replaces it.
+    fs::remove_dir_all(&own).unwrap();
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(done, "{answer}");
+    assert!(package::installed_from(&own).is_some_and(|was| was.from_store));
+    assert_eq!(store.join().unwrap(), 3);
+}
+
 /// Format 2 (#3822's gap 7): `look` is presence alone, so a Store package
 /// that asks only it is no camera package. It installs with no yes kept,
 /// and none is written for it.
@@ -1191,7 +1252,10 @@ fn an_older_version_is_refused_and_the_same_or_a_newer_one_taken() {
     );
     assert_eq!(installed(&skills), "version = \"2.0.0\"");
     // An installed one whose version can't be ordered is not replaced by a
-    // Store package until the person removes it.
+    // Store package until the person removes it. Its version changed by
+    // hand, it is no longer the Store's package (`installed_from`), so it
+    // is refused as a skill of the owner's is (the Reviewer-lead's P2 on
+    // #4875).
     let toml = fs::read_to_string(skills.join("desk-tutor/skill.toml")).unwrap();
     fs::write(
         skills.join("desk-tutor/skill.toml"),
@@ -1202,7 +1266,7 @@ fn an_older_version_is_refused_and_the_same_or_a_newer_one_taken() {
     let (answer, done) = ask(&skills, &key_file, port, install(URL));
     assert!(!done, "{answer}");
     assert!(
-        refused(&answer).contains("can't be compared with 2.0.0"),
+        refused(&answer).contains("wasn't added from the Skills Store"),
         "{answer}"
     );
 }
