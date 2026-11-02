@@ -1005,7 +1005,8 @@ of `--stand-share` for as long as it is kept, never above it: a lamp brought up 
 (`skills/pose`, its tool `set_pose`) publishes it through lamp-skills' `stand`
 step: 100 for normal, 60 for lower, 30 for sit, only with
 `LAMP_BODY_POSE_ASK=on` in lamp-skills' environment too ([skills.md](skills.md),
-`do.stand`). Asked taller than its usual height, the lamp says so in words and
+`do.stand`); the product's units set it in both since lamp-52e6's run of 29 Oct.
+Asked taller than its usual height, the lamp says so in words and
 calls nothing:
 
 - The arm goes there at the stand's own pace (the same spring as rising),
