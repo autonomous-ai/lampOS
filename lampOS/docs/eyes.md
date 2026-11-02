@@ -2401,7 +2401,8 @@ with the known face's id the eyes keep beside the known file
   face's last ten looks. `yes` from 0.02 eye distances a look.
 - **`unknown`, never `no`,** while the face has fewer than 5 looks in the
   window, its eyes are under 24 detector pixels apart on average, it is
-  turned more than 30 degrees or its turn was not measured (see above), or
+  turned more than 30 degrees (40 with `LAMP_EYES_SPEAKING_STEADY=on`) or
+  its turn was not measured (see above), or
   the eye line bends more than 0.1 radians a look.
 - **One misread look (`LAMP_EYES_SPEAKING_DROP_OUTLIER=on`, off unless
   set, #3296).** Off, one look whose landmarks misread (on lamp-52e6 a look
@@ -2438,19 +2439,36 @@ with the known face's id the eyes keep beside the known file
   still, so they are judged as a still window's are, `yes` or
   `no`; such a pair is not a gap (counting it as one read a talking face on
   lamp-52e6 `unknown`, `reason` `mesh`, for about 2 s after every head move,
-  #4585). Only a window left with fewer than four still pairs
-  (`LEAST_LOOKS - 1`) is `unknown` (`reason` `mesh`). And a window
+  #4585). Only a window left with fewer than two still pairs
+  (`LEAST_HELD_PAIRS`) is `unknown` (`reason` `mesh`): a talking face's own
+  landmarks step its eye distance past 5% on about 53% of steps at 20 px
+  between the eyes, a still face's on 5%, and in an offline replay of a
+  lamp-52e6 run at about 20 px two pairs instead of four raised the talking
+  windows read `yes` (3 to 10 of 24, 28 to 31 of 36, 7 to 56, 39 to 66) and
+  left none on four still sets; one pair let three single still pairs score
+  above 0.015. And a window
   the mesh read on every look is held to 16 px between the eyes
   (`LEAST_MESHED_EYES_PX`, in the pixels the mesh saw) instead of 24; a window
   judged by the corners keeps 24. The 16 is to be confirmed by the 52e6 size
-  ladder on #4558. Host tests only: a still face whose mouth jumps only on
+  ladder on #4558. And a face may be turned up to 40 degrees instead of 30
+  (`STEADY_MOST_TURN_DEG`): the 30 is about one mouth corner hiding the
+  other, and at 30 to 40 degrees the mesh still sees both well enough. In the
+  same replay, talking looks turned 32.5 to 38.7 degrees were lost to the 30,
+  and five still looks turned 32 to 39 degrees stayed `no` or `unknown`
+  under 40; with two pairs and 40 degrees, the talking windows read `yes` 14
+  of 24 and 56 of 77 at 20 px, 31 of 36 and 66 of 81 at 24 px, and the still
+  sets none (0 of 44, 99, 100 and 167). Host tests only: a still face whose mouth jumps only on
   moving looks reads `no` on, `yes` off; the same jumps on a still head
   `yes` either way; a meshed face at 18 px `unknown` off and judged on; a
   corners-only one at 18 px `unknown` either way; a talking window with one
-  moving look `yes` either way, and one with a move every third look
-  `unknown` on; a still 17 px face whose box flips `unknown` on (it read
-  `yes` before `MOST_EYES_STEP`) and off, and a talking face whose eyes vary
-  1% `yes` on. Off, nothing is read and nothing changes.
+  moving look `yes` either way, and one left with a single still pair
+  `unknown` on; a still 17 px face whose box flips `unknown`, then `no` once
+  two steady pairs remain, on (it read `yes` before `MOST_EYES_STEP`) and
+  `unknown` off; a talking face whose eyes vary 1% `yes` on, a talking 20 px
+  face whose eyes step past 5% on most steps `yes` on with two or three
+  steady pairs, and one left with one steady pair `unknown`; a talking face
+  turned 35 degrees `yes` on and `unknown` off, and a still one turned 35
+  degrees never `yes` on. Off, nothing is read and nothing changes.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
