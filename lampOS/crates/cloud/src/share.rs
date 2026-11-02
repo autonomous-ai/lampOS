@@ -453,10 +453,21 @@ fn answered(status: u16, body: &[u8]) -> Result<Value, String> {
     })
 }
 
-/// `skills.share {"name", "author"?}`: `{"sent": {"id", "name", "version",
-/// "review_status"}}`, or why not. With `"preview": true`, nothing is sent:
-/// `{"preview": {"name", "files": [{"path", "text"}]}}`, the text exactly as
-/// it would leave, for the app to show before Send.
+/// What a share is told when no `sha256` names the package the owner saw.
+pub const NOT_SEEN: &str = "show what would be sent first, then send that";
+/// What a share is told when the skill changed after the owner saw it.
+pub const CHANGED: &str = "the skill changed since you looked: look again before sending";
+
+/// `skills.share {"name", "author"?, "sha256"}`: `{"sent": {"id", "name",
+/// "version", "review_status"}}`, or why not. With `"preview": true`,
+/// nothing is sent: `{"preview": {"name", "sha256", "files": [{"path",
+/// "text"}]}}`, the text exactly as it would leave and the SHA-256 of the
+/// package it would be, for the app to show before Send. A send must name
+/// that same SHA-256, so the lamp sends only the bytes the owner saw: none,
+/// [`NOT_SEEN`]; another, as when the skill was made again since,
+/// [`CHANGED`] (the Reviewer-lead's P2 on #4948). The package carries no
+/// time (`lamp_skills::package`), so packing the same files again gives the
+/// same bytes.
 pub fn share(
     store: &Store,
     places: &crate::skills::Places,
@@ -468,9 +479,19 @@ pub fn share(
     let folder = made_here_and_on(places, &name)?;
     if data.get("preview").and_then(Value::as_bool) == Some(true) {
         let files = preview(&folder, scratch)?;
-        return Ok(json!({ "preview": {"name": name, "files": files} }));
+        let (_, tar) = pack(&folder, scratch)?;
+        return Ok(
+            json!({ "preview": {"name": name, "sha256": lamp_skills::package::sha256_hex(&tar), "files": files} }),
+        );
     }
+    let seen = data
+        .get("sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| NOT_SEEN.to_owned())?;
     let (file_name, tar) = pack(&folder, scratch)?;
+    if lamp_skills::package::sha256_hex(&tar) != seen {
+        return Err(CHANGED.to_owned());
+    }
     let (boundary, body) = multipart(&file_name, &tar, author.as_deref());
     let (status, reply) = exchange(
         store,
