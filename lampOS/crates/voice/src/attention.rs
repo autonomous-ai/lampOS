@@ -871,6 +871,14 @@ struct Written {
     /// "Lắm." is "a lot."): they count only in the line's first clause,
     /// greeted ("Hây lăm.") or with more clauses after ("Làm, mấy giờ rồi?").
     everyday: bool,
+    /// Stand-ins that are also common words anywhere else (前 is "before",
+    /// "front": 「前に」, 「この前」, 「前の日」, 「駅の前で」, a bare 「前。」 as
+    /// "forward." in a reply): a call only as the line's whole first token,
+    /// with no greeting, followed by punctuation, a space or the line's end.
+    /// 前 joined to what follows (「前のプレゼント…」, the call merged into a
+    /// word, seen on lamp-52e6, #4866) and 前 after a filler (「はい、前。」)
+    /// are misses, taken over answering room talk that opens with 「前の…」.
+    line_start: &'static [&'static str],
 }
 
 fn written(language: Language) -> Written {
@@ -884,6 +892,8 @@ fn written(language: Language) -> Written {
             whole_words: false,
             not_the_name: |c| matches!(c, '\u{30A0}'..='\u{30FF}'),
             everyday: false,
+            // 「前、今何時？」 for "Hey Lamp, …" on lamp-52e6 (#4866).
+            line_start: &["前"],
         },
         Language::Chinese => Written {
             greetings: &["hey", "嘿", "嗨"],
@@ -892,6 +902,7 @@ fn written(language: Language) -> Written {
             whole_words: false,
             not_the_name: |_| false,
             everyday: false,
+            line_start: &[],
         },
         Language::Korean => Written {
             greetings: &["hey", "헤이"],
@@ -900,6 +911,7 @@ fn written(language: Language) -> Written {
             whole_words: false,
             not_the_name: |c| "가를이은는의도".contains(c),
             everyday: false,
+            line_start: &[],
         },
         // "Lamp" stays Latin and is read as English reads it; "làm" and
         // "lắm" are everyday words, so never one mid-sentence.
@@ -910,6 +922,7 @@ fn written(language: Language) -> Written {
             whole_words: true,
             not_the_name: |_| false,
             everyday: true,
+            line_start: &[],
         },
     }
 }
@@ -952,9 +965,11 @@ fn calls_by_clause(heard: &str, language: Option<Language>) -> Vec<Option<Writte
         .iter()
         .enumerate()
         .map(|(at, clause)| {
-            opens_as_written(clause, &written).filter(|call| {
-                call.real || !written.everyday || at == 0 && (call.greeted || at < last)
-            })
+            opens_as_written(clause, &written)
+                .filter(|call| {
+                    call.real || !written.everyday || at == 0 && (call.greeted || at < last)
+                })
+                .or_else(|| (at == 0).then(|| opens_line(heard, &written)).flatten())
         })
         .collect()
 }
@@ -998,6 +1013,26 @@ fn opens_as_written(clause: &str, written: &Written) -> Option<WrittenCall> {
             greeted,
             set_off,
         })
+    })
+}
+
+/// The line opening with one of [`Written::line_start`] as its whole first
+/// token: nothing before it, and after it punctuation, a space or the
+/// line's end, never another character. Set off when nothing else is in
+/// its clause.
+fn opens_line(heard: &str, written: &Written) -> Option<WrittenCall> {
+    let after =
+        (written.line_start.iter()).find_map(|word| heard.trim_start().strip_prefix(word))?;
+    if after.starts_with(char::is_alphanumeric) {
+        return None;
+    }
+    let clause = clauses(after)
+        .next()
+        .filter(|_| after.starts_with(char::is_whitespace));
+    Some(WrittenCall {
+        real: false,
+        greeted: false,
+        set_off: clause.is_none(),
     })
 }
 
@@ -2947,6 +2982,51 @@ mod tests {
     }
 
     use super::*;
+
+    /// #4866, lamp-52e6 on 2 Nov: with `ja`, "Hey Lamp." came back as 「前」
+    /// opening the line. Only the line's whole first token set off counts;
+    /// 前 joined to anything after it, or past the first clause, is none.
+    #[test]
+    fn a_ja_line_opening_with_mae_set_off_is_the_call() {
+        use Language::{Chinese, Japanese, Korean, Vietnamese};
+        let called = |heard: &str, language| calls_as_written(heard, language).next().is_some();
+        for heard in [
+            "前、今何時？",
+            "前。ちょっと疲れやすいんです。",
+            "前 今夜は何を食べようかな。",
+            "前",
+            "前。",
+        ] {
+            assert!(called(heard, Some(Japanese)), "{heard}");
+            assert!(!called(heard, None), "English adds nothing: {heard}");
+        }
+        for heard in [
+            // Merged into the next word: a miss, taken over a false call.
+            "前のプレゼントを探しています。",
+            // A filler before it puts it past the line's first clause.
+            "はい、前。明日の朝は早いです。",
+            "前に言ったけど、明日は休みだよ。",
+            "前回の話",
+            "前の日",
+            "この前の話",
+            "駅の前で待ってる。",
+            "どっちに行く？前。",
+            "エイ前。",
+        ] {
+            assert!(!called(heard, Some(Japanese)), "{heard}");
+        }
+        assert!(begins_as_written("前、今何時？", Some(Japanese)));
+        assert!(only_the_name_as_written("前。", Some(Japanese)));
+        assert!(!only_the_name_as_written("前 今夜は", Some(Japanese)));
+        for (language, heard) in [
+            (Chinese, "前，现在几点？"),
+            (Korean, "前, 지금 몇 시야?"),
+            (Vietnamese, "前, mấy giờ rồi?"),
+        ] {
+            assert!(!called(heard, Some(language)), "{heard}");
+            assert!(!called(heard, None), "{heard}");
+        }
+    }
 
     /// #4473, lamp-52e6 on 30 Oct: with `ja`, "Hey Lamp. 今何時ですか？" came
     /// back as 「エイランク、今何時ですか。」 and was not taken as a call. The
