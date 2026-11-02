@@ -97,7 +97,11 @@ impl PrivacyGate {
         } else if self.allowed_since.is_none() {
             self.allowed_since = Some(acquired);
         }
-        self.allowed(now)
+        let allowed = self.allowed(now);
+        // The memory's night works only with the slide open and stops the
+        // moment it closes (`LAMP_MEMORY_TIERS`).
+        crate::tiers_night::privacy(allowed);
+        allowed
     }
 
     pub fn allowed(&self, now: MonoTime) -> bool {
@@ -131,6 +135,7 @@ impl PrivacyGate {
         // Keep sequence high-water: a reordered packet must not reopen privacy.
         self.allowed_since = None;
         self.last_muted = None;
+        crate::tiers_night::privacy(false);
     }
 }
 

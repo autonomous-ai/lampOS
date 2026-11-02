@@ -90,6 +90,20 @@ impl Sleeper for Model {
     }
 }
 
+/// The fake model's proposal from the input as the voice is given it.
+fn propose(input: &Value) -> Value {
+    let records = input["records"].as_array().unwrap();
+    let mut facts = vec![];
+    let mut lines = vec![];
+    for r in records.iter().filter(|r| r["speaker"] == "owner") {
+        let (id, text) = (r["id"].as_i64().unwrap(), r["text"].as_str().unwrap());
+        let key = format!("k{id}");
+        facts.push(json!({"key":key,"claim":format!("They said {text}"),"record_ids":[id],"strength":"said","kind":"preference","true_since_ms":r["at_ms"],"true_until_ms":null,"supersedes":null}));
+        lines.push(json!({"replaces":null,"kind":"owner_model","text":format!("Cares about {text}"),"fact_ids":[],"fact_keys":[key]}));
+    }
+    json!({"facts":facts,"lines":lines,"episodes":[]})
+}
+
 /// A model that holds the worker until told to go on.
 struct Held(Arc<Mutex<mpsc::Receiver<()>>>);
 impl Sleeper for Held {
@@ -162,6 +176,36 @@ impl Lamp {
     fn tally(&self) -> Tally {
         assert!(self.tiered.settle());
         self.tiered.tally()
+    }
+    /// 07:00 the same morning, past the night's hours, and the worker's
+    /// look at it.
+    fn morning(&self) {
+        self.clock
+            .store(NIGHT + 3 * HOUR + HOUR / 2, Ordering::SeqCst);
+        assert!(self.tiered.settle());
+        assert!(self.tiered.settle());
+    }
+    /// The voice's take: its line, and its job if it has one.
+    fn take_line(&mut self) -> (String, Option<Value>) {
+        let line = self
+            .tiered
+            .answer(
+                json!({"op":"tiers_sleep_take"}).to_string().as_bytes(),
+                NOON,
+            )
+            .line;
+        let answer: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(answer["ok"], true, "{line}");
+        let job = Some(answer["job"].clone()).filter(|j| !j.is_null());
+        (line, job)
+    }
+    fn take(&mut self) -> Option<Value> {
+        self.take_line().1
+    }
+    fn give(&mut self, id: &Value, reply: Value) -> String {
+        let answer = self.ask(json!({"op":"tiers_sleep_give","job":id,"reply":reply}));
+        assert_eq!(answer["ok"], true, "{answer}");
+        answer["outcome"].as_str().unwrap().to_owned()
     }
     /// The clock at 03:30, and the worker's night run.
     fn sleep(&self) {
@@ -373,24 +417,225 @@ fn the_night_runs_once_and_what_it_made_from_forgotten_words_goes() {
     );
 }
 
-/// Without a model (the product's lamp-memory has no network) the night
-/// still ends episodes and expires, and is counted unconfigured.
+/// Without a model in lamp-memory (it has no network) the night is a job
+/// for the voice; one morning reaches untaken is counted unconfigured.
 #[test]
-fn a_night_without_a_model_is_counted_unconfigured() {
+fn a_night_without_a_model_is_a_job_for_the_voice_and_morning_expires_it() {
     let scratch = Scratch::new("unconfigured");
     let mut lamp = lamp(&scratch, Mode::Shadow, None);
     lamp.exchange(P1, "I like green tea", "Me too");
     lamp.sleep();
     let tally = lamp.tally();
     assert_eq!(
-        (
-            tally.nights,
-            tally.nights_unconfigured,
-            tally.nights_applied
-        ),
-        (1, 1, 0)
+        (tally.nights, tally.jobs_queued, tally.nights_applied),
+        (1, 1, 0),
+        "{tally:?}"
     );
     assert!(lamp.view(P1).facts.is_empty());
+    lamp.morning();
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_expired, tally.nights_unconfigured),
+        (1, 1),
+        "{tally:?}"
+    );
+    lamp.clock.store(NIGHT, Ordering::SeqCst);
+    assert!(lamp.take().is_none());
+}
+
+/// The voice's night: its take gives the input without the scope's name;
+/// its give of the model's reply applies it; the next take finds none.
+#[test]
+fn a_job_taken_and_given_back_makes_the_nights_tiers() {
+    let scratch = Scratch::new("voice-night");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.sleep();
+    let (line, job) = lamp.take_line();
+    assert!(!line.contains(P1), "the scope is named: {line}");
+    let job = job.expect("a job");
+    assert_eq!(job["system"], lamp_memory_tiers::model::PROMPT);
+    let reply = propose(&job["input"]);
+    assert_eq!(lamp.give(&job["id"], reply), "applied");
+    let view = lamp.view(P1);
+    assert!(view.facts.iter().any(|f| f.contains("peanuts")), "{view:?}");
+    assert!(view.lines.iter().any(|l| l.contains("peanuts")), "{view:?}");
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_taken, tally.jobs_applied, tally.nights_applied),
+        (1, 1, 1)
+    );
+    assert!(lamp.take().is_none());
+    // A forget takes what the voice's night made of it.
+    lamp.ask(json!({"op":"forget_last","person":P1}));
+    assert!(!lamp.view(P1).holds("peanuts"));
+}
+
+/// A reply that fails the store's checks is dropped and never offered
+/// again; so is one the voice could not read (`null`).
+#[test]
+fn an_invalid_reply_is_dropped_never_retried() {
+    let scratch = Scratch::new("voice-invalid");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I play chess on Fridays", "Fun");
+    lamp.exchange(P2, "I play the cello", "Lovely");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    // A fact citing a record outside the batch.
+    let bad = json!({"facts":[{"key":"k","claim":"They said x","record_ids":[999],"strength":"said","kind":"preference","true_since_ms":NOON,"true_until_ms":null,"supersedes":null}],"lines":[],"episodes":[]});
+    assert_eq!(lamp.give(&job["id"], bad), "invalid");
+    let other = lamp.take().unwrap();
+    assert_ne!(other["id"], job["id"]);
+    assert_eq!(lamp.give(&other["id"], Value::Null), "invalid");
+    assert!(lamp.take().is_none());
+    assert_eq!(lamp.give(&job["id"], propose(&job["input"])), "unknown");
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_invalid, tally.jobs_applied),
+        (2, 0),
+        "{tally:?}"
+    );
+    assert!(lamp.view(P1).facts.is_empty() && lamp.view(P2).facts.is_empty());
+}
+
+/// A forget between the take and the give: the job is stale and nothing
+/// of it is applied.
+#[test]
+fn a_forget_between_take_and_give_makes_the_job_stale() {
+    let scratch = Scratch::new("voice-forgot");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.exchange(P1, "I love hiking in Sapa", "Sounds fun");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    let reply = propose(&job["input"]);
+    lamp.ask(json!({"op":"forget_last","person":P1}));
+    assert_eq!(lamp.give(&job["id"], reply), "unknown");
+    let view = lamp.view(P1);
+    assert!(view.facts.is_empty() && !view.holds("Sapa"), "{view:?}");
+    assert!(lamp.tally().jobs_stale >= 1);
+    // A forget of everything of the scope, likewise.
+    let scratch = Scratch::new("voice-forgot-all");
+    let mut lamp = self::lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    lamp.ask(json!({"op":"forget_all","person":P1}));
+    assert_eq!(lamp.give(&job["id"], propose(&job["input"])), "unknown");
+    assert!(lamp.tiered.view(P1).is_none_or(|v| v.facts.is_empty()));
+}
+
+/// Morning: a job taken but not given back, or never taken, expires; a
+/// give after it finds nothing. A taken job not given within its lease
+/// is dropped, not offered again.
+#[test]
+fn jobs_expire_by_morning_and_after_their_lease() {
+    let scratch = Scratch::new("voice-expire");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.exchange(P2, "I play the cello", "Lovely");
+    lamp.sleep();
+    let first = lamp.take().unwrap();
+    lamp.clock.store(
+        NIGHT + tiers::JOB_LEASE.as_millis() as u64 + 1,
+        Ordering::SeqCst,
+    );
+    let second = lamp.take().unwrap();
+    assert_ne!(first["id"], second["id"]);
+    assert_eq!(lamp.give(&first["id"], propose(&first["input"])), "unknown");
+    lamp.morning();
+    assert_eq!(
+        lamp.give(&second["id"], propose(&second["input"])),
+        "unknown"
+    );
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_expired, tally.jobs_applied),
+        (2, 0),
+        "{tally:?}"
+    );
+    assert!(lamp.view(P1).facts.is_empty());
+}
+
+/// End to end with the voice's own night (`lamp_voice::tiers_night`) and a
+/// fake model: quiet at night, a night makes the tiers' summaries.
+#[test]
+fn the_voices_night_with_a_fake_model_makes_the_tiers() {
+    use lamp_voice::tiers_night::{self as night, Job, Lamp as _};
+    let scratch = Scratch::new("voice-e2e");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.exchange(P2, "I play the cello", "Lovely");
+    lamp.sleep();
+    struct Direct<'a>(&'a mut Tiered);
+    impl night::Memory for Direct<'_> {
+        fn take(&mut self) -> Option<Job> {
+            let line = json!({"op":"tiers_sleep_take"}).to_string();
+            let answer: Value =
+                serde_json::from_str(&self.0.answer(line.as_bytes(), NIGHT).line).ok()?;
+            night::job_of(&answer)
+        }
+        fn give(&mut self, id: &str, reply: Value) -> Option<String> {
+            let line = json!({"op":"tiers_sleep_give","job":id,"reply":reply}).to_string();
+            let answer: Value =
+                serde_json::from_str(&self.0.answer(line.as_bytes(), NIGHT).line).ok()?;
+            answer["outcome"].as_str().map(str::to_owned)
+        }
+    }
+    struct Quiet;
+    impl night::Lamp for Quiet {
+        fn stirs(&self) -> u64 {
+            0
+        }
+        fn quiet_for(&self) -> Duration {
+            night::QUIET_FOR
+        }
+        fn open(&self) -> bool {
+            true
+        }
+    }
+    struct Fake;
+    impl night::Model for Fake {
+        fn ask<'a>(&'a self, system: &'a str, input: &'a str) -> night::Asked<'a> {
+            assert_eq!(system, lamp_memory_tiers::model::PROMPT);
+            let reply = propose(&serde_json::from_str(input).unwrap()).to_string();
+            Box::pin(async move {
+                Some(night::Reply {
+                    text: reply,
+                    tokens: Some(100),
+                })
+            })
+        }
+    }
+    assert!(Quiet.open());
+    {
+        let mut voice =
+            night::Night::new(Direct(&mut lamp.tiered), Quiet, Fake, LocalTime::Offset(0)).unwrap();
+        voice.clock = Box::new(|| NIGHT);
+        voice.log = Arc::new(|_| {});
+        assert_eq!(voice.step(), night::Step::Given("applied".into()));
+        assert_eq!(voice.step(), night::Step::Given("applied".into()));
+        assert_eq!(voice.step(), night::Step::NoJob);
+    }
+    assert!(lamp.view(P1).facts.iter().any(|f| f.contains("peanuts")));
+    assert!(lamp.view(P2).facts.iter().any(|f| f.contains("cello")));
+    assert!(!lamp.view(P1).holds("cello") && !lamp.view(P2).holds("peanuts"));
+}
+
+/// Switch off, Days alone refuses the night's ops as any unknown op, and
+/// nothing is written beside it.
+#[test]
+fn switch_off_the_nights_ops_are_refused_and_nothing_changes() {
+    let scratch = Scratch::new("voice-off");
+    let mut days = scratch.days();
+    let take = ask(&mut days, json!({"op":"tiers_sleep_take"}));
+    assert_eq!(take["ok"], false, "{take}");
+    let give = ask(
+        &mut days,
+        json!({"op":"tiers_sleep_give","job":"x","reply":{}}),
+    );
+    assert_eq!(give["ok"], false, "{give}");
+    assert!(!scratch.0.join(tiers::DIR).exists());
 }
 
 #[test]
