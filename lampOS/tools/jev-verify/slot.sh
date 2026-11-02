@@ -37,7 +37,7 @@ finish() { rc=$?; [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && { kill -TERM "$
   # replay.sh writes its own loans.txt lines once the lock check passed; before that, this writes one.
   grep -q '^loans.txt: start line written' "$OUT/run.txt" 2>/dev/null || loans "$TAG: aborted, nothing ran"
   r=$(cat "$OUT/aborted" 2>/dev/null || grep -E '^pulled:' "$OUT/run.txt" 2>/dev/null | tail -1)
-  back="Speaker and lamp-policy put back"
+  back="Speaker and lamp-policy put back"; [ "$TAG" = "#4306" ] || back="Light and Speaker put back"
   grep -q 'LAMP-POLICY NOT PUT BACK' "$OUT/run.txt" 2>/dev/null && back="LAMP-POLICY NOT PUT BACK: its /run drop-in needs removing by hand"
   grep -q 'LIGHT OR SPEAKER NOT PUT BACK' "$OUT/run.txt" 2>/dev/null && back="LIGHT OR SPEAKER NOT PUT BACK: the dead-man timer stays armed to restore them"
   # Busy-labelled lines played, and how many of them read room/state busy just before (the rest are background talk).
