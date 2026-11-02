@@ -731,7 +731,10 @@ from the task 18 host implementation:
   says them 12.5 times a second whether or not the head moves, stale at
   300 ms) and fresh room state (the voice's worker says it again every
   second, stale at 5 s). Missing, one of them means a part is not running
-  or not publishing.
+  or not publishing, with one exception: put to sleep, the voice says no
+  timing until it opens, only its mute, and while that mute says sleep its
+  last timing is kept as a resting voice, so it is not reported missing
+  ([alive.md](alive.md), #3748).
 - **The body can take its requests** (`crates/body/src/expression_in.rs`,
   `LAMP_EXPRESSION_BODY=on`, off by default and on in the product's body
   unit; [body.md](body.md), "What
