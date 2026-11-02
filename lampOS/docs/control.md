@@ -469,6 +469,9 @@ which back. An SDK's wait for them returns at the answer.
 | `sound.list` | — | `speak` | — |
 | `sound.remove` | `name` | `speak` | — |
 | `stop` | — | — | — |
+| `turn.start` | optional `prompt`: words said first, ≤ 300 chars. **Not built yet** ("Turns and listening") | `speak` + `hear` | — |
+| `turn.end` | —; only a turn this computer started. **Not built yet** | `speak` | — |
+| `listen.set` | `on`: `true` or `false`. **Not built yet** | `hear` | — |
 | `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |
 | `skill.list` | — | `skills` | — |
 | `camera.snapshot` | — | `camera` | — |
@@ -496,6 +499,42 @@ takes. A client's light goes as a `light/request` at the priority
 light comes back when it ends. While anyone holds a lease, the ring shows a
 small steady "held" mark. A client's `say` is always in the lamp's own voice,
 through its own gates.
+
+## Turns and listening (not built yet)
+
+**Not built yet:** this is the design of three ops for the draft that
+builds them (the turn and listening op, claimed on #4710 on 2 Nov). Until
+the door serves them, each is a `bad_request`, an op it doesn't know.
+`control.schema.json` gains them with the SDKs' calls and lamp-mcp's tools,
+as its tests want every op it names to have both.
+
+A computer can start a conversation turn, end one, and set the lamp's
+listening. The person wins over each, as "Who wins" says.
+
+| op | what the lamp does |
+|---|---|
+| `turn.start` | Opens a turn as a tap on the head does: the next line the person starts within 8 s is answered as spoken to the lamp. With `prompt`, the lamp says it first, and the 8 s start when it ends. The lamp shows its normal listening cue, and the journal names the computer. `done`: `finished` when the person spoke and the lamp answered, or `dropped` with why (`nobody spoke`, `muted`, `busy`, `refused: …`). |
+| `turn.end` | Ends a turn this computer started with `turn.start`, and the conversation that grew from it, as the button's stop does: the answer playing, what waits to be said, and the open window. Never the person's own conversation, another computer's turn or the lamp's own words: the conversation outranks a computer ("Who wins"), so any other is refused `busy`, "not this computer's turn". |
+| `listen.set` | `false`: this computer's mute, `muted_by: control`, shown on the ring the way the person's mute is shown, so nobody thinks the lamp listens when it doesn't, and journaled with the computer. `true`: lifts only this computer's own mute, never another computer's, nor the person's switch, button or sleep mute. While two computers hold one, the lamp listens again only when both are lifted. A computer's mute ends when its connection does, or when it is revoked, so a computer gone can't leave the lamp deaf; the person's hand on the head lifts it too, as it lifts the restart guard's. |
+
+- **The person wins.** The privacy switch, the button, sleep and "stop" are
+  checked before any of these. The person's mute ends the whole
+  conversation, a computer's turn with it.
+- **When `turn.start` is refused:** while the lamp is muted, by anyone;
+  while the person's own conversation goes on; and while the lamp speaks
+  its own words. It is never queued behind them. With or without a
+  `prompt`, it meets the same quiet-hours and night gates as a `say`.
+- **No microphone the person closed is opened.** `listen.set true` can't
+  open the switch, the button's mute or sleep, as the app's `mic.set`
+  can't.
+- **Nothing heard crosses the door:** no audio and no transcript. A
+  computer learns what it learns today: its own phrases (`phrase.heard`),
+  the name (`name.heard`) and the `done`. The 16-phrase and
+  6-changes-a-minute caps stay, as `hear`'s privacy bound.
+- **No touch is faked.** The ops go to the voice over its say socket, as
+  new request kinds beside `say`, under the same gates. A voice that
+  doesn't know them refuses them, and the door answers `refused`, "the
+  voice here doesn't take turns from a computer".
 
 ## Limits, rates and quiet hours
 
