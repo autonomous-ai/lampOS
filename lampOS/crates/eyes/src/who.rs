@@ -1793,6 +1793,9 @@ pub struct Held {
     /// ([`Held::follow`]): with `LAMP_FACE_KNOWN_HOLD=on` and
     /// `LAMP_FACE_REFOUND=on` only (#4885).
     follows: bool,
+    /// The new passing id this check found following the match's, until a
+    /// print of it passes [`HOLD_LIKENESS`] ([`Held::carry`]).
+    pending: Option<String>,
 }
 
 impl Held {
@@ -1802,6 +1805,7 @@ impl Held {
             matched_at: None,
             matched_id: None,
             follows: false,
+            pending: None,
         }
     }
 
@@ -1814,10 +1818,12 @@ impl Held {
 
     /// The near face `near` is a new passing id that follows `followed`, the
     /// id the held match had (`bus_out::Ids::followed`): within the hold, and
-    /// with `near_faces` one, the match's id becomes `near`, so the checks
-    /// that need the same id ([`Held::keeps_print`], [`Held::keeps_unprinted`])
-    /// keep the one known on it, and the known face is to be rewritten to it.
-    /// Two near faces never follow (#4885). Whether it did.
+    /// with `near_faces` one, `near` may carry the hold, but only through a
+    /// print of it: [`Held::keeps_print`] then takes it as the match's id at
+    /// [`HOLD_LIKENESS`], and [`Held::carry`] makes it so. Unprinted, it is
+    /// another id ([`Held::keeps_unprinted`] lets go), so the one known's name
+    /// never goes on an id no print has shown is theirs (the Reviewer-lead's
+    /// P2 on #4917). Two near faces never follow (#4885). Whether it follows.
     pub fn follow(
         &mut self,
         now: Instant,
@@ -1830,11 +1836,19 @@ impl Held {
             && near_faces == 1
             && followed.is_some()
             && self.matched_id.as_deref() == followed;
-        if let Some(near) = near.filter(|_| follows) {
-            self.matched_id = Some(near.to_owned());
-            return true;
+        self.pending = near.filter(|_| follows).map(str::to_owned);
+        self.pending.is_some()
+    }
+
+    /// A held check whose print of `id` passed: if `id` is the followed id
+    /// ([`Held::follow`]), it becomes the match's id, and the known face is
+    /// to be rewritten to it. Whether it did.
+    pub fn carry(&mut self, id: Option<&str>) -> bool {
+        let carried = id.is_some() && self.pending.as_deref() == id;
+        if carried {
+            self.matched_id = self.pending.take();
         }
-        false
+        carried
     }
 
     pub fn on(&self) -> bool {
@@ -1845,6 +1859,7 @@ impl Held {
     pub fn matched(&mut self, now: Instant, id: Option<String>) {
         self.matched_at = Some(now);
         self.matched_id = id;
+        self.pending = None;
     }
 
     /// Whether a check that found nobody keeps the one known: only within
@@ -1860,14 +1875,14 @@ impl Held {
     /// one known: within the hold, only while that face is still at least
     /// [`HOLD_LIKENESS`] to the held person's prints (`likeness`, `None` if
     /// they are no longer kept) and, when the match had a passing id, has
-    /// the same one. A stranger sitting down is let go at once.
+    /// the same one, or the one that follows it ([`Held::follow`]). A
+    /// stranger sitting down is let go at once.
     pub fn keeps_print(&self, now: Instant, likeness: Option<f32>, id: Option<&str>) -> bool {
         self.keeps(now)
             && likeness.is_some_and(|likeness| likeness >= HOLD_LIKENESS)
-            && self
-                .matched_id
-                .as_deref()
-                .is_none_or(|matched| id == Some(matched))
+            && self.matched_id.as_deref().is_none_or(|matched| {
+                id == Some(matched) || (id.is_some() && id == self.pending.as_deref())
+            })
     }
 
     /// Whether a check with no print keeps the one known: within the hold,
@@ -1887,6 +1902,7 @@ impl Held {
     pub fn let_go(&mut self) {
         self.matched_at = None;
         self.matched_id = None;
+        self.pending = None;
     }
 }
 
@@ -2881,8 +2897,10 @@ mod tests {
         assert!(held.follow(then, Some("f4"), Some("f3"), 1));
         assert!(held.keeps_print(then, Some(0.32), Some("f4")));
         assert!(!held.keeps_print(then, Some(0.25), Some("f4")));
+        // Carried by that print: the new id is theirs, the old no longer.
+        assert!(!held.carry(Some("f5")));
+        assert!(held.carry(Some("f4")));
         assert!(held.keeps_unprinted(then, true, Some("f4")));
-        // The old id is no longer theirs.
         assert!(!held.keeps_print(then, Some(0.32), Some("f3")));
         // Past the hold, nothing follows.
         let mut late = Held::new(true).following(true);
@@ -2894,6 +2912,29 @@ mod tests {
             assert!(!off.follow(then, Some("f4"), Some("f3"), 1));
             assert!(!off.keeps_print(then, Some(0.32), Some("f4")));
         }
+    }
+
+    /// #4885, the Reviewer-lead's P2 on #4917: a followed id carries the hold
+    /// only once a print of it passes the hold's bar. Followed but not
+    /// printed (turned, too small), it is another id, and the one known goes,
+    /// as before the followed id: their name is never kept on it unprinted.
+    #[test]
+    fn a_followed_id_carries_the_hold_only_once_its_print_passes() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut held = Held::new(true).following(true);
+        held.matched(start, Some("f3".to_owned()));
+        held.follow(then, Some("f4"), Some("f3"), 1);
+        assert!(!held.keeps_unprinted(then, true, Some("f4")));
+        // Nor is it carried by a print of nothing.
+        assert!(!held.carry(None));
+        assert!(!held.keeps_unprinted(then, true, Some("f4")));
+        let mut printed = Held::new(true).following(true);
+        printed.matched(start, Some("f3".to_owned()));
+        printed.follow(then, Some("f4"), Some("f3"), 1);
+        assert!(printed.keeps_print(then, Some(0.32), Some("f4")));
+        assert!(printed.carry(Some("f4")));
+        assert!(printed.keeps_unprinted(then, true, Some("f4")));
     }
 
     #[test]
