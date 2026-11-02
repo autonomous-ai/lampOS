@@ -6616,16 +6616,13 @@ fn conversation_with_gate_inner(
     // Over a room busy as the answer began, sound alone ends no answer
     // (#4868, `LAMP_CUT_IN_OVER_BED=on`): a stop word, a forced yield, the
     // lamp's name, a tap or the button do. Off unless set.
-    let cut_in_over_bed = duplex && crate::turn_taking::cut_in_over_bed();
-    if cut_in_over_bed {
-        eprintln!(
-            "lamp-voice: cut-ins over a bed: in a room busy as the answer began, talk alone ends no answer, only a stop word, the lamp's name, a tap or the button{}",
-            if stop_words.is_some() {
-                ""
-            } else {
-                "; LAMP_STOP_WORDS is off, so a spoken stop ends it only through lamp-name's stop"
-            }
-        );
+    // Inert without stop words: a plain "Stop." must still stop the lamp.
+    let (cut_in_over_bed, over_bed_line) = crate::turn_taking::over_bed_switch(
+        duplex && crate::turn_taking::cut_in_over_bed(),
+        stop_words.is_some(),
+    );
+    if let Some(line) = over_bed_line {
+        eprintln!("{line}");
     }
     // A backchannel held as a yield (#2939, `LAMP_BACKCHANNEL_HOLDS=on`):
     // only with a yield's words heard (`LAMP_STOP_WORDS=heard` or
