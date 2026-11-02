@@ -3345,6 +3345,18 @@ pub fn serve(
                 heeding.keeping_the_name_in_its_line();
             }
         }
+        // "One," at a line's start is the lamp's name, "Wang," and "Lung,"
+        // with a second sign, and a retry of a held line is no reply to the
+        // one it named (`LAMP_ONE_AS_LAMP=on`, #4710).
+        if std::env::var(crate::attention::ONE_AS_LAMP_ENVIRONMENT).is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: \"One,\" set off at a line's start is the lamp's name, \"Wang,\" and \"Lung,\" too with one person at the lamp in a conversation going on, and a line that mostly repeats one held as said to someone by name is judged on its own (LAMP_ONE_AS_LAMP)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.count_one_as_the_lamp(true);
+            }
+        }
         // The name opening a line that repeats the line before's last words
         // is no call by its text (`LAMP_NAME_REPEAT_NOT_A_CALL=on`, #3923).
         if std::env::var(crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT)
@@ -9108,7 +9120,11 @@ impl Heeding {
         // One person must be seen: with no fresh look (the camera closed for
         // privacy, the eyes stopped, the look expired) nobody knows how many
         // are there, and the name stays a name (Reviewer-three's P2 on #4460).
-        let one_person = crate::attention::opens_with_a_name_also_a_word(&seen.heard)
+        // With `LAMP_ONE_AS_LAMP=on`, also for a line opening with "Wang,"
+        // or "Lung,", Deepgram's words for "Lamp," that are names (#4710).
+        let one_person = (crate::attention::opens_with_a_name_also_a_word(&seen.heard)
+            || self.attention.counts_one_as_the_lamp()
+                && crate::attention::opens_with_a_name_needing_a_sign(&seen.heard))
             && !seen.other_voice
             && !someone_else
             && seen.speakers.len() <= 1

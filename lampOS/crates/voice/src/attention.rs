@@ -481,7 +481,12 @@ pub fn addresses_someone_else(heard: &str) -> bool {
 /// person's name, when `stand_alone_ins`: on the second route only
 /// ([`Attention::count_stand_alone_ins`]).
 pub fn addresses_someone_else_on(heard: &str, stand_alone_ins: bool) -> bool {
-    let alone = stand_alone(stand_alone_ins);
+    addresses_someone_else_among(heard, stand_alone(stand_alone_ins))
+}
+
+/// [`addresses_someone_else`], with the words in `alone` taken as the
+/// lamp's, never as a person's name.
+fn addresses_someone_else_among(heard: &str, alone: &[&str]) -> bool {
     let is_name = |word: &str| {
         word.chars().next().is_some_and(char::is_uppercase)
             && word.chars().all(char::is_alphabetic)
@@ -632,9 +637,91 @@ const STAND_INS: &[&str] = &[
 /// (`LAMP_NAME_NEAR`) could not take it. "Lampy" too: on lamp-4ace on 26 Oct
 /// (6999, 14:1x) "Lamp, what did I just ask you?" came back as "Lampy, …"
 /// and was held as said to someone it calls by name.
+///
+/// "One" too, with `LAMP_ONE_AS_LAMP=on` only ([`ONE_STAND_INS`]): on
+/// lamp-3e83 on 2 Nov a tester's "Lamp, …" came back mostly as "One, …"
+/// ("One, how do I make a pour over coffee?", "One, what should I eat for
+/// lunch?") and each was held as said to someone it calls by name (#4710).
 const STAND_ALONE_INS: &[&str] = &[
     "lynn", "len", "lin", "lump", "land", "line", "palin", "palan", "louvre", "lampy",
 ];
+
+/// Where the second worker reads whether "One," at a line's start is the
+/// lamp's name, "Wang," and "Lung," with a second sign, and a line that
+/// mostly repeats a held one is no reply to the one it named (`on`, and
+/// nothing else; [`Attention::count_one_as_the_lamp`], #4710).
+pub const ONE_AS_LAMP_ENVIRONMENT: &str = "LAMP_ONE_AS_LAMP";
+
+/// With `LAMP_ONE_AS_LAMP=on`, one of [`STAND_ALONE_INS`] on its own
+/// switch: Deepgram's most frequent word for "Lamp," on lamp-3e83 on 2 Nov
+/// (#4710). Nobody's name; set off at a line's start, never "One more
+/// thing" or "Which one?".
+const ONE_STAND_INS: &[&str] = &["one"];
+
+/// With `LAMP_ONE_AS_LAMP=on`, what Deepgram also wrote for "Lamp," on
+/// lamp-3e83 on 2 Nov ("Wang, what did I ask you a minute ago?", "Lung,
+/// …"). They are people's names, so they stand in for the lamp's only
+/// with a second sign: the one that lets a name that is also a word go
+/// ([`NAMES_ALSO_WORDS`], [`Attention::one_person_present`]), a
+/// conversation with the lamp going on, in a room not known to be busy,
+/// with only one person at the lamp. Then nobody else is there to be
+/// called. Elsewhere they are names as before.
+const STAND_INS_WITH_A_SIGN: &[&str] = &["wang", "lung"];
+
+/// Whether `heard` opens, past any greeting, with a word on
+/// [`STAND_INS_WITH_A_SIGN`] set off by a comma: the worker then reads
+/// whether only one person is at the lamp, as for [`NAMES_ALSO_WORDS`].
+pub(crate) fn opens_with_a_name_needing_a_sign(heard: &str) -> bool {
+    heard
+        .split_whitespace()
+        .find(|word| !is_greeting(word.trim_end_matches(',')))
+        .and_then(|word| word.strip_suffix(','))
+        .is_some_and(|word| {
+            STAND_INS_WITH_A_SIGN
+                .iter()
+                .any(|name| word.eq_ignore_ascii_case(name))
+        })
+}
+
+/// With `LAMP_ONE_AS_LAMP=on`, a line that follows one held as said to
+/// someone it calls by name is no reply to that someone when it mostly
+/// repeats it: at least this share of the held line's words (in tenths)
+/// and at least [`RETRY_LEAST_WORDS`] of them are in it (#4710: "One, how
+/// do I make for over coffee?" after "One, how do I make a pour over
+/// coffee?", 6 of 8). It is then judged on its own.
+const RETRY_SHARE_TENTHS: usize = 6;
+const RETRY_LEAST_WORDS: usize = 3;
+
+/// Words that say nothing of what a line asks, left out when a retry is
+/// measured ([`retries`]).
+const RETRY_FILLERS: &[&str] = &[
+    "um", "uh", "er", "hmm", "hm", "oh", "ah", "hey", "hi", "hello", "okay", "ok", "so", "well",
+    "like",
+];
+
+/// A line's words as a retry is measured: lower case, split as [`called`]
+/// splits them, its opening word set off as a name is left out ("One,",
+/// "Daniel,", "Yes,"; past a greeting), and [`RETRY_FILLERS`], each once.
+fn retry_words(line: &str) -> std::collections::BTreeSet<String> {
+    let from = crate::second_provider::first_word_set_off(line).map_or(0, |(_, end)| end);
+    line[from..]
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .filter(|word| !RETRY_FILLERS.contains(&word.as_str()))
+        .collect()
+}
+
+/// Whether `line` mostly repeats `held`: at least [`RETRY_SHARE_TENTHS`]
+/// of `held`'s words ([`retry_words`]) are in it, and at least
+/// [`RETRY_LEAST_WORDS`]. "Yes, I can." after "Daniel, can you come at
+/// two?" shares one word of five, and is no retry.
+pub(crate) fn retries(held: &str, line: &str) -> bool {
+    let held = retry_words(held);
+    let line = retry_words(line);
+    let shared = held.intersection(&line).count();
+    shared >= RETRY_LEAST_WORDS && shared * 10 >= held.len() * RETRY_SHARE_TENTHS
+}
 
 /// Words a line opens with, set off, when it is said to a person, not to
 /// the lamp (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945): "Ma'am, could you
@@ -717,17 +804,16 @@ pub fn called_by_name(heard: &str) -> bool {
 /// alone ([`STAND_ALONE_INS`]) counted as its call when `stand_alone_ins`:
 /// on the second route only ([`Attention::count_stand_alone_ins`]).
 pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
-    name_said_to(heard, stand_alone_ins, true)
+    name_said_to(heard, stand_alone(stand_alone_ins), true)
 }
 
 /// A literal "lamp" or "lamb" in a call position. The busy-room text
 /// exemption has no name-listener evidence for recognizer stand-ins.
 pub(crate) fn called_by_real_name(heard: &str) -> bool {
-    name_said_to(heard, false, false)
+    name_said_to(heard, &[], false)
 }
 
-fn name_said_to(heard: &str, stand_alone_ins: bool, recognizer_stand_ins: bool) -> bool {
-    let alone = stand_alone(stand_alone_ins);
+fn name_said_to(heard: &str, alone: &[&str], recognizer_stand_ins: bool) -> bool {
     // Words, and the punctuation between them that marks a sentence's start
     // or a comma.
     #[derive(Clone, Copy, PartialEq)]
@@ -1375,6 +1461,16 @@ pub struct Attention {
     /// The words written for the lamp's name standing alone count as its
     /// call ([`STAND_ALONE_INS`]): the second route's rule only.
     stand_alone_ins: bool,
+    /// "One," is the lamp's name, "Wang," and "Lung," with a second sign,
+    /// and a retry of a held line is no reply (`LAMP_ONE_AS_LAMP=on`,
+    /// [`Self::count_one_as_the_lamp`], #4710); and whether the request in
+    /// hand has that sign ([`STAND_INS_WITH_A_SIGN`]), judged with it.
+    one_as_lamp: bool,
+    names_with_a_sign: bool,
+    /// With `one_as_lamp`, the words of the line the request in hand
+    /// follows as a reply ([`ANOTHER_REPLY_US`]): a retry of it is judged
+    /// on its own ([`retries`]).
+    another_line: Option<String>,
     request: u64,
     /// The session the request began on, and how many requests that were
     /// heard have begun on it. A turn the lamp wrote itself is not one:
@@ -1784,7 +1880,7 @@ impl Attention {
     /// Whether the words heard of the request in hand call the lamp by name
     /// ("Lamp.", "Hey Lamp, …"), not someone else.
     pub fn called_in_its_words(&self) -> bool {
-        called_by_name_on(&self.heard, self.stand_alone_ins)
+        self.called_by_name_here(&self.heard)
     }
 
     /// From now on, in a busy room, a face turned to the lamp lets no line
@@ -2021,8 +2117,10 @@ impl Attention {
                 .ended_us
                 .or(self.began_us)
                 .is_some_and(|end| end.saturating_add(ANOTHER_REPLY_US) >= now_us)
-            && addresses_someone_else_on(&self.heard, self.stand_alone_ins)
+            && self.addresses_another(&self.heard)
             && !self.name_taken_as_a_word;
+        // With `LAMP_ONE_AS_LAMP`, that line's words, for a retry of it.
+        let another_line = (self.one_as_lamp && after_another).then(|| self.heard.clone());
         // The line before, if it was a question the lamp left unanswered
         // and ended just now (#829, 15:40).
         let after_question = self.spoken_to
@@ -2118,6 +2216,7 @@ impl Attention {
         self.began(request, session);
         self.line_before = None;
         self.after_another = after_another;
+        self.another_line = another_line;
         self.after_question = after_question;
         self.after_unanswered = after_unanswered;
         self.began_us = Some(now_us);
@@ -2154,10 +2253,10 @@ impl Attention {
     /// reviewer on #1158). The eyes are not read for a bare call, so only
     /// its words or a sure hearing show it then.
     fn call_shown(&self) -> bool {
-        !addresses_someone_else_on(&self.heard, self.stand_alone_ins)
+        !self.addresses_another(&self.heard)
             && (self.named_sure
                 || self.near && self.best_score >= NEAR_SCORE && !self.day_bars()
-                || called_by_name_on(&self.heard, self.stand_alone_ins))
+                || self.called_by_name_here(&self.heard))
     }
 
     /// A request began on `session` at `now_us` that continues the one in
@@ -2177,6 +2276,7 @@ impl Attention {
         let tapped = session == self.session && self.began_us.is_some() && self.tapped;
         let after_call = session == self.session && self.began_us.is_some() && self.after_call;
         let after_another = self.after_another;
+        let another_line = self.another_line.clone();
         let after_question = self.after_question;
         let after_unanswered = self.after_unanswered;
         let before = (session == self.session && self.began_us.is_some()).then(|| {
@@ -2232,6 +2332,7 @@ impl Attention {
                         start.is_some_and(|b| n <= b.saturating_add(NAME_AT_THE_START_US))
                     }));
             self.after_another = after_another;
+            self.another_line = another_line;
             self.after_question = after_question;
             self.after_unanswered = after_unanswered;
             // Its words go on from the first part's, which may end with
@@ -2333,6 +2434,7 @@ impl Attention {
         self.sound = false;
         self.cut_in = false;
         self.one_person = false;
+        self.names_with_a_sign = false;
         self.name_taken_as_a_word = false;
     }
 
@@ -2355,6 +2457,56 @@ impl Attention {
     /// the first builder at 22:38). Off, as the Live worker's rule is.
     pub fn count_stand_alone_ins(&mut self, on: bool) {
         self.stand_alone_ins = on;
+    }
+
+    /// Count "One," set off at a line's start as the lamp's name
+    /// ([`ONE_STAND_INS`]), "Wang," and "Lung," with a second sign
+    /// ([`STAND_INS_WITH_A_SIGN`]), and judge a line that mostly repeats one
+    /// held as said to someone it calls by name on its own, not as that
+    /// someone's reply ([`retries`]): `LAMP_ONE_AS_LAMP=on`, #4710. Off,
+    /// as before.
+    pub fn count_one_as_the_lamp(&mut self, on: bool) {
+        self.one_as_lamp = on;
+    }
+
+    /// Whether [`Self::count_one_as_the_lamp`] is on.
+    pub fn counts_one_as_the_lamp(&self) -> bool {
+        self.one_as_lamp
+    }
+
+    /// The words taken as the lamp's name standing alone for the request
+    /// in hand: [`STAND_ALONE_INS`] on the second route, and with
+    /// [`Self::count_one_as_the_lamp`], [`ONE_STAND_INS`], and
+    /// [`STAND_INS_WITH_A_SIGN`] with its sign.
+    fn alone_ins(&self) -> Vec<&'static str> {
+        let mut words = stand_alone(self.stand_alone_ins).to_vec();
+        if self.one_as_lamp {
+            words.extend(ONE_STAND_INS);
+            if self.names_with_a_sign {
+                words.extend(STAND_INS_WITH_A_SIGN);
+            }
+        }
+        words
+    }
+
+    /// [`addresses_someone_else_on`] as the request in hand reads it
+    /// ([`Self::alone_ins`]).
+    fn addresses_another(&self, heard: &str) -> bool {
+        addresses_someone_else_among(heard, &self.alone_ins())
+    }
+
+    /// [`called_by_name_on`] as the request in hand reads it
+    /// ([`Self::alone_ins`]).
+    fn called_by_name_here(&self, heard: &str) -> bool {
+        name_said_to(heard, &self.alone_ins(), true)
+    }
+
+    /// With [`Self::count_one_as_the_lamp`], whether the request in hand
+    /// mostly repeats the line it would be a reply to ([`retries`]).
+    fn retries_the_held_line(&self) -> bool {
+        self.another_line
+            .as_deref()
+            .is_some_and(|held| retries(held, &self.heard))
     }
 
     /// Whether the lamp's last line was a question, for the next judgement.
@@ -2474,6 +2626,10 @@ impl Attention {
         self.went_on = false;
         let fresh = self.begun <= FRESH_REQUESTS;
         self.name_taken_as_a_word = false;
+        // `LAMP_ONE_AS_LAMP`: "Wang," and "Lung," are the lamp's name only
+        // with the sign a name that is also a word needs (#4710).
+        self.names_with_a_sign =
+            self.one_as_lamp && going_on && room != Room::Busy && self.one_person;
         let another = self.another(room, going_on, own);
         self.name_taken_as_a_word =
             self.spoken_to && !own && another.is_none() && self.name_as_a_word(room, going_on);
@@ -2599,9 +2755,8 @@ impl Attention {
         // its own words calling it by name. On lamp-4ace on 16 October at
         // 17:08, request 169 played on the near rule alone and answered
         // colleagues talking about eye drops beside it.
-        let near_shows = !self.day_bars()
-            || turned == Some(true)
-            || called_by_name_on(&self.heard, self.stand_alone_ins);
+        let near_shows =
+            !self.day_bars() || turned == Some(true) || self.called_by_name_here(&self.heard);
         if strict && room == Room::Busy && self.near && self.best_score >= NEAR_SCORE && near_shows
         {
             let verdict = Verdict::Play(NAMED_NEAR);
@@ -2822,7 +2977,7 @@ impl Attention {
     /// [`Self::called_in_text`] for `heard`.
     fn calls_in(&self, heard: &str) -> bool {
         let read = if self.name_in_passing_ignored {
-            called_by_name_on(heard, self.stand_alone_ins)
+            self.called_by_name_here(heard)
         } else {
             called(heard)
         };
@@ -2857,9 +3012,11 @@ impl Attention {
     fn another(&self, room: Room, going_on: bool, own: bool) -> Option<&'static str> {
         if !self.spoken_to || own {
             None
-        } else if self.after_another {
+        } else if self.after_another && !self.retries_the_held_line() {
+            // With `LAMP_ONE_AS_LAMP`, a line that mostly repeats the held
+            // one is its speaker trying again, judged on its own (#4710).
             Some(ANSWERING_ANOTHER)
-        } else if addresses_someone_else_on(&self.heard, self.stand_alone_ins)
+        } else if self.addresses_another(&self.heard)
             && self.heard.contains('?')
             && !self.name_as_a_word(room, going_on)
         {
@@ -4964,6 +5121,306 @@ mod tests {
             "",
         ] {
             assert!(!addresses_someone_else(not), "{not}");
+        }
+    }
+
+    /// The lines of a run on the second route as the product unit runs it
+    /// (`LAMP_SPOKEN_TO=on`, `LAMP_NAME_IN_PASSING=ignored`), with
+    /// `LAMP_ONE_AS_LAMP` as `one`: each `(heard, one person at the lamp)`
+    /// begun 3 s after the one before, said for 2 s, in `room`. A
+    /// conversation is going on from the first line the lamp answered.
+    fn judged_run(one: bool, room: Room, lines: &[(&str, bool)]) -> Vec<Verdict> {
+        const S: u64 = 1_000_000;
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.ignore_name_in_passing(true);
+        attention.count_stand_alone_ins(true);
+        attention.count_one_as_the_lamp(one);
+        let mut going_on = false;
+        let mut verdicts = Vec::new();
+        for (at, (heard, one_person)) in (0u64..).zip(lines) {
+            let request = 100 + at;
+            attention.began_at(request, 9, (10 + 3 * at) * S);
+            attention.heard(heard);
+            attention.ended(request, (12 + 3 * at) * S);
+            attention.one_person_present(*one_person);
+            let verdict = attention
+                .first_output_busy(request, room, going_on, false, None)
+                .unwrap();
+            going_on |= matches!(verdict, Verdict::Play(_));
+            verdicts.push(verdict);
+        }
+        verdicts
+    }
+
+    /// #4710: on lamp-3e83 on 2 Nov a tester's "Lamp, …" was written
+    /// "One, …" (and "Wang, …"), held as said to someone it calls by name,
+    /// and her retries and a bare "Hello?" held as that someone's replies.
+    /// With `LAMP_ONE_AS_LAMP=on` every one of them is answered.
+    #[test]
+    fn with_one_as_lamp_the_lamp_3e83_lines_are_answered() {
+        let alone = |heard| (heard, false);
+        for room in [Room::Quiet, Room::Busy] {
+            for heard in [
+                "One, how do I make a pour over coffee?",
+                "One, how much is, 100 US dollars in Vietnamese loan?",
+                "One, what should I eat for lunch?",
+                "One, recommend a book for the weekend.",
+                "One, what did I ask you a minute about?",
+            ] {
+                assert!(!addresses_someone_else_among(heard, ONE_STAND_INS));
+                assert!(
+                    matches!(
+                        judged_run(true, room, &[alone(heard)])[..],
+                        [Verdict::Play(_)]
+                    ),
+                    "{heard} {room:?}"
+                );
+            }
+        }
+        for run in [
+            [
+                "One, how do I make a pour over coffee?",
+                "One, how do I make for over coffee?",
+                "One, how do I make a pour over happy?",
+            ],
+            [
+                "One, how much is, 100 US dollars in Vietnamese loan?",
+                "One, how much is 100 US dollars in Vietnamese dome?",
+                "How much is 100 US dollars in Vietnamese dump?",
+            ],
+        ] {
+            let verdicts = judged_run(true, Room::Quiet, &run.map(alone));
+            assert!(
+                verdicts.iter().all(|v| matches!(v, Verdict::Play(_))),
+                "{run:?} {verdicts:?}"
+            );
+        }
+        // "Wang," with nobody known to be alone at the lamp is a name, as
+        // before; her retry with "One," is no reply to Wang, and answered,
+        // and so is the "Hello?" after it.
+        assert!(matches!(
+            judged_run(
+                true,
+                Room::Quiet,
+                &[
+                    alone("Wang, what did I ask you a minute ago?"),
+                    alone("One, what did I ask you a minute about?"),
+                    alone("Hello?"),
+                ]
+            )[..],
+            [
+                Verdict::Hold(TO_ANOTHER),
+                Verdict::Play(_),
+                Verdict::Play(_)
+            ]
+        ));
+        // "Wang," and "Lung," with the second sign (a conversation going
+        // on, a room not known to be busy, one person at the lamp) are the
+        // lamp's name; without it, or in a busy room, a person's.
+        for name in ["Wang", "Lung"] {
+            let asked = format!("{name}, what did I ask you a minute ago?");
+            assert!(opens_with_a_name_needing_a_sign(&asked), "{asked}");
+            let after = |room: Room, one_person: bool| {
+                judged_run(
+                    true,
+                    room,
+                    &[
+                        alone("One, what should I eat for lunch?"),
+                        (asked.as_str(), one_person),
+                    ],
+                )[1]
+            };
+            assert!(
+                matches!(after(Room::Quiet, true), Verdict::Play(_)),
+                "{name}"
+            );
+            assert_eq!(
+                after(Room::Quiet, false),
+                Verdict::Hold(TO_ANOTHER),
+                "{name}"
+            );
+            assert!(
+                matches!(after(Room::Busy, true), Verdict::Hold(_)),
+                "{name}"
+            );
+            assert!(matches!(
+                judged_run(true, Room::Quiet, &[(asked.as_str(), true)])[..],
+                [Verdict::Hold(TO_ANOTHER)]
+            ));
+        }
+        // Still no call: "one" not set off, or not opening the line.
+        for heard in [
+            "One more thing, can you dim the light?",
+            "Which one, the red one?",
+            "Just one, please.",
+        ] {
+            assert!(!name_said_to(heard, ONE_STAND_INS, false), "{heard}");
+        }
+    }
+
+    /// #4710, the first builder's second change: with `LAMP_ONE_AS_LAMP=on`
+    /// a line that mostly repeats one held as said to someone by name is
+    /// that speaker trying again, judged on its own; a different reply
+    /// within [`ANOTHER_REPLY_US`] is still that someone's.
+    #[test]
+    fn with_one_as_lamp_a_retry_is_no_reply_and_a_real_reply_still_is() {
+        let alone = |heard| (heard, false);
+        // A retry with no name at all, in a conversation going on from
+        // before: judged on its own, it goes on.
+        let retry = |one: bool| {
+            judged_run(
+                one,
+                Room::Quiet,
+                &[
+                    alone("One, what should I eat for lunch?"),
+                    alone("Wang, how much is 100 US dollars in Vietnamese loan?"),
+                    alone("How much is 100 US dollars in Vietnamese dump?"),
+                ],
+            )
+        };
+        assert!(matches!(
+            retry(true)[..],
+            [
+                Verdict::Play(_),
+                Verdict::Hold(TO_ANOTHER),
+                Verdict::Play(_)
+            ]
+        ));
+        for reply in [
+            "Yes, I can.",
+            "Sure, tomorrow.",
+            "Yes, give me five minutes.",
+            "Yes, I'm coming to the meeting.",
+            "Hello?",
+        ] {
+            let verdicts = judged_run(
+                true,
+                Room::Quiet,
+                &[
+                    alone("One, what should I eat for lunch?"),
+                    alone("Daniel, are you coming to the meeting at two?"),
+                    alone(reply),
+                ],
+            );
+            assert_eq!(verdicts[2], Verdict::Hold(ANSWERING_ANOTHER), "{reply}");
+        }
+        // The measure: at least 6 in 10 of the held line's words, and 3.
+        for (held, line) in [
+            (
+                "One, how do I make a pour over coffee?",
+                "One, how do I make for over coffee?",
+            ),
+            (
+                "One, how do I make a pour over coffee?",
+                "One, how do I make a pour over happy?",
+            ),
+            (
+                "One, how much is, 100 US dollars in Vietnamese loan?",
+                "How much is 100 US dollars in Vietnamese dump?",
+            ),
+            (
+                "Wang, what did I ask you a minute ago?",
+                "One, what did I ask you a minute about?",
+            ),
+        ] {
+            assert!(retries(held, line), "{held} / {line}");
+        }
+        for (held, line) in [
+            ("Daniel, can you come at two?", "Yes, I can."),
+            ("Daniel, are you coming?", "Yes, are you?"),
+            (
+                "Daniel, are you coming to the meeting at two?",
+                "Sure, tomorrow.",
+            ),
+            (
+                "Daniel, are you coming to the meeting at two?",
+                "Yes, I'm coming to the meeting.",
+            ),
+            ("Wang, what did I ask you a minute ago?", "Hello?"),
+        ] {
+            assert!(!retries(held, line), "{held} / {line}");
+        }
+    }
+
+    /// #4710: with `LAMP_ONE_AS_LAMP` off, every line of lamp-3e83's run is
+    /// judged as before: "One," and "Wang," are names, and what follows
+    /// within [`ANOTHER_REPLY_US`] their replies.
+    #[test]
+    fn without_one_as_lamp_the_lamp_3e83_lines_are_held_as_before() {
+        let alone = |heard| (heard, false);
+        assert_eq!(
+            judged_run(
+                false,
+                Room::Quiet,
+                &[
+                    alone("One, how do I make a pour over coffee?"),
+                    alone("One, how do I make for over coffee?"),
+                    alone("One, how do I make a pour over happy?"),
+                ]
+            ),
+            [
+                Verdict::Hold(TO_ANOTHER),
+                Verdict::Hold(ANSWERING_ANOTHER),
+                Verdict::Hold(ANSWERING_ANOTHER)
+            ]
+        );
+        assert_eq!(
+            judged_run(
+                false,
+                Room::Quiet,
+                &[
+                    alone("Wang, what did I ask you a minute ago?"),
+                    alone("One, what did I ask you a minute about?"),
+                    alone("Hello?"),
+                ]
+            ),
+            [
+                Verdict::Hold(TO_ANOTHER),
+                Verdict::Hold(ANSWERING_ANOTHER),
+                Verdict::Hold(ANSWERING_ANOTHER)
+            ]
+        );
+        // A retry with no name in a conversation going on: a reply, held.
+        assert!(matches!(
+            judged_run(
+                false,
+                Room::Quiet,
+                &[
+                    alone("Lamp, what should I eat for lunch?"),
+                    alone("Wang, how much is 100 US dollars in Vietnamese loan?"),
+                    alone("How much is 100 US dollars in Vietnamese dump?"),
+                ],
+            )[..],
+            [
+                Verdict::Play(_),
+                Verdict::Hold(TO_ANOTHER),
+                Verdict::Hold(ANSWERING_ANOTHER)
+            ]
+        ));
+        // "Wang," with the sign that lets it go when the switch is on.
+        assert_eq!(
+            judged_run(
+                false,
+                Room::Quiet,
+                &[
+                    alone("Lamp, what should I eat for lunch?"),
+                    ("Wang, what did I ask you a minute ago?", true),
+                ],
+            )[1],
+            Verdict::Hold(TO_ANOTHER)
+        );
+        for heard in [
+            "One, what should I eat for lunch?",
+            "One, recommend a book for the weekend.",
+        ] {
+            assert!(
+                matches!(
+                    judged_run(false, Room::Quiet, &[alone(heard)])[..],
+                    [Verdict::Hold(_)]
+                ),
+                "{heard}"
+            );
         }
     }
 
