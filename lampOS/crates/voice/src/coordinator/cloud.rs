@@ -185,6 +185,7 @@ impl CloudRequest {
             ProviderInput::Audio { .. }
             | ProviderInput::Called { .. }
             | ProviderInput::Paused { .. }
+            | ProviderInput::PauseJoin { .. }
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
@@ -211,6 +212,7 @@ impl CloudRequest {
             ProviderInput::Audio { .. }
             | ProviderInput::Called { .. }
             | ProviderInput::Paused { .. }
+            | ProviderInput::PauseJoin { .. }
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. } => {}

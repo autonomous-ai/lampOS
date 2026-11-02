@@ -1682,6 +1682,8 @@ fn second_route_worker_environment(
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
+        // A line cut at a thinking pause keeps its answer back (#4449).
+        crate::pause_join::ENVIRONMENT,
         crate::second_provider::OPEN_NAME_ENVIRONMENT,
         crate::second_provider::NAME_CARRIES_ENVIRONMENT,
         crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
@@ -1899,6 +1901,7 @@ mod tests {
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
+            crate::pause_join::ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::NAME_CARRIES_ENVIRONMENT,
             crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
@@ -2589,6 +2592,7 @@ mod tests {
                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
+                    || name == crate::pause_join::ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::NAME_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT
@@ -2701,6 +2705,7 @@ mod tests {
                     "LAMP_CONVERSATION_SUMMARY=on",
                     "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_DECLINE_SILENT=on",
+                    "LAMP_ENDPOINT_PAUSE_JOIN=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_FACE_GAP_HOLD=on",

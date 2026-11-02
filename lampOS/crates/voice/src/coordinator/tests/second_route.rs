@@ -481,6 +481,7 @@ fn request_of(input: &ProviderInput) -> u64 {
         | ProviderInput::End { request, .. }
         | ProviderInput::Called { request, .. }
         | ProviderInput::Paused { request, .. }
+        | ProviderInput::PauseJoin { request, .. }
         | ProviderInput::CountOnly { request, .. }
         | ProviderInput::StepCall { request, .. }
         | ProviderInput::Onboarding { request, .. }

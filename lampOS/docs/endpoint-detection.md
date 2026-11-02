@@ -293,6 +293,110 @@ Each `Activity::End` records an `EndpointDecision`:
     privacy decision, or teardown success criterion. Lamp measurements are
     still required before choosing a different bound.
 
+## A thinking pause joined (`LAMP_ENDPOINT_PAUSE_JOIN`, #4449)
+
+At a thinking pause Smart Turn often scores 0.92 to 0.99, so the 400 ms
+commit ends a line the person has not finished ("I need a gift for my
+sister." scores 0.98) and its first half is answered before they go on.
+On the desk-kit-2 replay (below) 8 of the 16 pause and long lines came
+whole.
+
+`LAMP_ENDPOINT_PAUSE_JOIN=on`, off by default, the second route only and
+only with `LAMP_JOIN_CUT_WORDS=on` (`crate::pause_join::from_environment`):
+
+- **The grace.** A line ended by a confident verdict (`model_complete`)
+  keeps its answer back until `GRACE` (1.5 s) after its speech ended (the
+  block that ended it less the quiet the decision waited). The coordinator
+  queues `ProviderInput::PauseJoin { kept_ms }` before the line's `End`
+  (`pause_join_note`), and records a `pause_join` trace. In the second
+  worker the answer's first sound, its wait sound, its words and **any
+  tool call of its chat** wait for the rest of the grace
+  (`Shared::kept_for_the_pause`), decided once for the request. Its chat
+  and speech go on meanwhile. The listening cue and the ring are not
+  touched.
+- **Speech in the grace.** Speech set off up to 1.4 s after the line's
+  speech ended (the grace less `DECIDE_REACH_US`, 100 ms, for the Start to
+  reach the worker), the line's answer still unheard, is heard as any
+  sound while an answer waits (`LAMP_WAIT_KEEPS_ANSWER`,
+  `LAMP_MOTION_KEEPS_ANSWER`): the body's own motors and a cough that ends
+  or goes quiet are let go, and the kept answer goes on. It is decided by
+  the grace's decision point (`pause_join::decide_by`, the line's speech
+  end plus 1.4 s) or the wait's own 1 s, whichever comes first
+  (`coordinator::in_the_grace`): quiet for 300 ms by then, it is let go;
+  still talking, it takes the turn (a `pause_join_taken` trace). It then
+  cuts the first line short before any of its answer was heard, so
+  `LAMP_JOIN_CUT_WORDS` asks the two as one line when one person said both
+  (its own same-person guards; nothing new is joined by this switch),
+  drops the first chat, and takes its unplayed answer out of the thread.
+  The first piece's answer never plays and its calls never run.
+  A sound set off late in the grace (after about 1.1 s) cannot show 300 ms
+  of quiet by the decision point, so a cough there takes the turn: the
+  first line is then answered in the empty line's place, by a new chat,
+  about 1.6 to 1.8 s later than its kept answer would have played. This is
+  accepted, not fixed: deciding later would pass the worker's hold, which
+  the coordinator cannot lengthen (Seventh's P3 on #4916), so the lamp
+  check counts these late coughs.
+- **Another person in the grace.** Not joined, the first line is still
+  answered: the second line is asked with a note giving the first line's
+  words, to be answered first (`pause_join::EARLIER_LINE`), so the asker
+  still comes first, in the same answer with no extra chat round (Sixth's
+  P2 on #4916). A bare name is not told so. The second line's memory scope
+  is then narrowed to the room's for its whole answer
+  (`ScopeLease::narrow_to_room`, Seventh's P2 on #4916): the first words
+  may be a guest's, so their "remember…" is never kept as the second
+  line's person's, and a chat begun early on the second line is dropped.
+  The first words stay with the second line's in flight, apart, never
+  joined (`Carried::earlier`), so a line that cuts the second short in
+  turn, joined or not, or a held line answering it, still tells them
+  first, while at most 20 s old (`CHAIN_MOST_FOR`) (Seventh's P3).
+- **No speech in the grace.** The answer plays as before, no sooner than
+  the grace's end. Speech after the grace is a new turn.
+- **A line begun with the name** set off at its start ("Lamp, can you
+  tell me", "Hey Lamp, …") is never held as a short sound, however many
+  words follow (`second_provider::name_at_start`). The name later in a
+  line, or not set off ("Lamp is broken"), is held as before. The rule
+  still judges the words: a repeat of the line before's end stays no call
+  with `LAMP_NAME_REPEAT_NOT_A_CALL`. `NAME_FIRST_MORE` and the name's
+  carry are unchanged.
+
+**Replay.** `turn_end_replay --pause-join on` (the product profile, the
+night dials, one person assumed) joins a turn begun within the grace after
+a confident end into it. Off, the output is byte for byte the run without
+the flag.
+
+| Clips | Off: whole | On: whole |
+|---|---|---|
+| Pause (p) and long (l) lines | 8 of 16 | 14 of 16 |
+| Ask lines (a) | 7 of 10 | 9 of 10 |
+| Desk lines (d) | 12 of 12 | 12 of 12 |
+| Other lines (f) | 12 of 12 | 12 of 12 |
+
+The two pause lines still split were ended by the silence window or an
+unfinished verdict (`silence_fallback`, `model_incomplete`), which the
+switch leaves alone.
+
+**Added first-answer delay**, from 85 answered second-route requests in
+the lamp journals under `verification/` (lamp-c0a4, 06c1 and 52e6, 15 to 30
+Oct). The answer is kept 1.1 s from the `End` (1.5 s less the 400 ms
+commit). Each line's own time from `End` to its first answer audio (or to
+its first round's tool call) is its words heard plus the first audio (or
+the round's first event):
+
+| Lines | n | Own time, median / p90 | Added, median / p90 / most |
+|---|---|---|---|
+| Ask lines (more than 3 words) | 74 | 1.73 / 2.48 s | 0 / 0 / 50 ms |
+| Short lines (3 words or fewer) | 9 | 1.77 / 2.46 s | 0 / 0 / 0 ms |
+| Light actions (`light_on`, `light_dimmer`) | 2 | 4.63 / 6.38 s | 0 / 0 / 0 ms |
+| First round called a tool | 31 | 1.57 / 2.57 s | 0 / 0 / 50 ms |
+
+These are the journals' times put against the grace, not a played A/B.
+No timer line was in them. A chat begun on early words
+(`LAMP_SECOND_PREPARED`, off in the product) could call a tool sooner;
+its call would then wait up to about 0.9 s.
+
+Not yet done: a played check on a lamp, the pause lines and short
+actions, on against off.
+
 ## Evidence
 
 The cohorts are kept separate. Every result below is a digital replay on a
