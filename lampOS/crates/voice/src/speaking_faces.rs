@@ -427,6 +427,14 @@ impl SpeakingFaces {
         })
     }
 
+    /// Whether the eyes' last look at or before `to` says a new id follows
+    /// `face` (`boot/f1`), their link still pending ([`Looks::links_at`]).
+    pub fn follow_of(&self, face: &str, to: Instant) -> bool {
+        self.looks
+            .lock()
+            .is_ok_and(|looks| looks.links_at(to).iter().any(|(old, _)| old == face))
+    }
+
     /// One face seen speaking this line, for requested enrollment. A brief
     /// competitor still refuses it; a majority is insufficient for saving
     /// someone's face. Unknown looks never count as positive evidence.
@@ -887,6 +895,57 @@ fn face_in(path: &Path) -> Option<(String, SystemTime)> {
         .then(|| (id.to_owned(), written))
 }
 
+/// How long past a line's end the eyes' known file is waited for when a
+/// follow of the known face is pending ([`known_once_decided`], #4966): the
+/// eyes check a new near id at the first look at least `REFOUND_RETRY`
+/// (0.5 s) after their last check (`who::recognise_due_near`), a print
+/// takes 152 ms on the lamp (eyes.md), then the known file is written
+/// (`keep_held`) or removed. 0.5 s, a look and the print, with margin.
+pub const FOLLOW_DECIDED_WITHIN: Duration = Duration::from_secs(1);
+
+/// The known person and face (`known`, as [`SpeakingFaces::known_with_boot`]
+/// read it at the line's end `to`), once the eyes' print has decided a
+/// follow of that face (#4966, the Reviewer-lead's P2 on #4967). A link is
+/// position only: someone else may sit where they were. So the known face
+/// is never mapped through it; when the eyes' last look still says a new
+/// id follows it, the known file is read again every [`EVERY`] until it
+/// names another face or none, at most `within` past `to`. A file moved to
+/// the new id, once its print passed the eyes' hold, makes the line theirs;
+/// one still on the old id at the bound, or gone, leaves it the room's.
+/// With `LAMP_FACE_KNOWN_HOLD` or `LAMP_FACE_REFOUND` off no link is said,
+/// and nothing waits.
+pub async fn known_once_decided(
+    eyes: &std::sync::Arc<SpeakingFaces>,
+    known_file: &Path,
+    known: Option<(String, String)>,
+    to: Instant,
+    within: Duration,
+) -> Option<(String, String)> {
+    let Some(face) = known.as_ref().map(|(_, face)| face.clone()) else {
+        return known;
+    };
+    if !eyes.follow_of(&face, to) {
+        return known;
+    }
+    let until = to + within;
+    let mut known = known;
+    while known.as_ref().is_some_and(|(_, now)| *now == face) {
+        if Instant::now() >= until {
+            eprintln!(
+                "lamp-voice second: the eyes did not decide a follow of the known face within {within:?} of the line's end: the known file as it stands"
+            );
+            break;
+        }
+        tokio::time::sleep(EVERY.min(until.saturating_duration_since(Instant::now()))).await;
+        let (eyes, file) = (eyes.clone(), known_file.to_owned());
+        known = tokio::task::spawn_blocking(move || eyes.known_with_boot(&file))
+            .await
+            .ok()
+            .flatten();
+    }
+    known
+}
+
 /// Whether a line admitted for `person` may be someone else's: a face
 /// spoke through it that is not the face of the person the eyes know now,
 /// or the eyes now know someone other than `person`. No face speaking
@@ -1312,6 +1371,152 @@ mod tests {
         both.faces[1].follows = Some("f1".to_owned());
         eyes.look(from + EVERY, Some((("b", 1), &both)));
         assert!(!eyes.no_other_face_in_view(Some("b/f2"), from, from + EVERY * 2));
+    }
+
+    /// #4966: a known file in a fresh folder naming A on `f1`, and the
+    /// eyes' looks through a line: `f1` speaking (with `on_f1`), then `f2`
+    /// speaking, which with `link` the eyes say follows `f1`. Gives the
+    /// line's end.
+    fn follow_seen(
+        tag: &str,
+        link: bool,
+        on_f1: bool,
+    ) -> (std::sync::Arc<SpeakingFaces>, PathBuf, Instant, Instant) {
+        let dir = std::env::temp_dir().join(format!(
+            "speaking-faces-decided-{tag}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let eyes = std::sync::Arc::new(SpeakingFaces::default());
+        // The line ends now, as the voice reads it.
+        let from = Instant::now() - EVERY * 4;
+        for index in 0..4u32 {
+            let mut look = faces(&[(if on_f1 && index < 2 { "f1" } else { "f2" }, Yes)]);
+            if link && index >= 2 {
+                look.faces[0].follows = Some("f1".to_owned());
+            }
+            eyes.look(from + EVERY * index, Some((("b", u64::from(index)), &look)));
+        }
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        (eyes, known, from, from + EVERY * 4)
+    }
+
+    /// The line's known pair once the eyes decided, and whether the line
+    /// is theirs to `not_theirs`.
+    async fn decided(
+        eyes: &std::sync::Arc<SpeakingFaces>,
+        known: &Path,
+        from: Instant,
+        to: Instant,
+        within: Duration,
+    ) -> (Option<String>, bool) {
+        let pair = eyes.known_with_boot(known);
+        let pair = known_once_decided(eyes, known, pair, to, within).await;
+        let face = pair.as_ref().map(|(_, face)| face.clone());
+        let theirs = !not_theirs(
+            &eyes.speakers_with_boot(from, to),
+            &crate::known_faces::memory_person("Lan"),
+            pair,
+            true,
+        );
+        (face, theirs)
+    }
+
+    /// #4966, the Reviewer-lead's P2 on #4967: A (known, on `f1`) gets up
+    /// and B sits in the same spot as `f2`, which the eyes say follows
+    /// `f1`; B's print never passes, so the known file stays on `f1`. B's
+    /// line spoken on `f2` alone, or one begun on `f1`, is the room's. The
+    /// line is the room's: not told or kept as A's, so its reply reads none
+    /// of A's memory. The link alone never makes it A's.
+    #[tokio::test]
+    async fn a_follower_the_eyes_never_printed_as_theirs_leaves_the_line_the_rooms() {
+        let (eyes, known, from, to) = follow_seen("never", true, false);
+        let within = Duration::from_millis(300);
+        let (face, theirs) = decided(&eyes, &known, from, to, within).await;
+        assert_eq!(face.as_deref(), Some("b/f1"));
+        assert!(!theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        let (eyes, known, from, to) = follow_seen("never-f1", true, true);
+        let (face, theirs) = decided(&eyes, &known, from, to, within).await;
+        assert_eq!(face.as_deref(), Some("b/f1"));
+        assert!(!theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        // The eyes let them go (no print, or under 0.30): the file goes.
+        let (eyes, known, from, to) = follow_seen("let-go", true, true);
+        let file = known.clone();
+        let gone = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            std::fs::remove_file(known_face_of(&file)).unwrap();
+        });
+        let (face, theirs) = decided(&eyes, &known, from, to, FOLLOW_DECIDED_WITHIN).await;
+        gone.join().unwrap();
+        assert_eq!(face, None);
+        assert!(!theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #4966: A re-found, a line spoken on `f1` and carried on across the
+    /// re-find on `f2` (Fifth's case on #4967). Their print of `f2` passes
+    /// the eyes' hold, which rewrites the known face to `f2` within the
+    /// bound: the line is A's.
+    #[tokio::test]
+    async fn a_follower_the_eyes_printed_as_theirs_makes_the_line_theirs() {
+        let (eyes, known, from, to) = follow_seen("printed", true, true);
+        let file = known.clone();
+        let carried = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            std::fs::write(known_face_of(&file), "f2\n").unwrap();
+        });
+        let (face, theirs) = decided(&eyes, &known, from, to, FOLLOW_DECIDED_WITHIN).await;
+        carried.join().unwrap();
+        assert_eq!(face.as_deref(), Some("b/f2"));
+        assert!(theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #4966: the eyes undecided at the bound: the wait ends there, and the
+    /// line is the room's.
+    #[tokio::test]
+    async fn an_undecided_follow_waits_no_longer_than_the_bound() {
+        let (eyes, known, from, to) = follow_seen("bound", true, true);
+        let within = Duration::from_millis(400);
+        let (face, theirs) = decided(&eyes, &known, from, to, within).await;
+        let past = Instant::now().saturating_duration_since(to);
+        assert!(
+            past >= within && past < within + Duration::from_millis(300),
+            "{past:?}"
+        );
+        assert_eq!(face.as_deref(), Some("b/f1"));
+        assert!(!theirs);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    /// #4966: with `LAMP_FACE_KNOWN_HOLD` or `LAMP_FACE_REFOUND` off no
+    /// `follows` is said: nothing waits, the known face is as read, and a
+    /// line spoken on a new id is the room's as before. A link only in an
+    /// older look, or whose old id is in the last look, waits for nothing.
+    #[tokio::test]
+    async fn with_no_follow_pending_nothing_waits() {
+        let (eyes, known, from, to) = follow_seen("off", false, true);
+        let started = Instant::now();
+        let (face, theirs) = decided(&eyes, &known, from, to, FOLLOW_DECIDED_WITHIN).await;
+        assert!(started.elapsed() < Duration::from_millis(100));
+        assert_eq!(face.as_deref(), Some("b/f1"));
+        assert!(!theirs);
+        let mut older = faces(&[("f2", Yes)]);
+        older.faces[0].follows = Some("f1".to_owned());
+        eyes.look(to, Some((("b", 4), &older)));
+        eyes.look(to + EVERY, Some((("b", 5), &faces(&[("f2", Yes)]))));
+        assert!(eyes.follow_of("b/f1", to));
+        assert!(!eyes.follow_of("b/f1", to + EVERY));
+        let mut both = faces(&[("f2", Yes), ("f1", No)]);
+        both.faces[0].follows = Some("f1".to_owned());
+        eyes.look(to + EVERY * 2, Some((("b", 6), &both)));
+        assert!(!eyes.follow_of("b/f1", to + EVERY * 2));
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
     }
 
     /// lamp-3e83 (stable 8163, 28 Oct 16:30): the known person alone at the
