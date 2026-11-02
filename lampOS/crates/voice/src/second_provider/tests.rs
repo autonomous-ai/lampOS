@@ -15111,13 +15111,11 @@ fn speech_tags_reach_only_the_voice_and_only_with_the_switch() {
             vec!["Ha, good one.", "Ok then."],
             vec!["said:Ha, good one.", "said: Ok then."],
         ),
+        // Off, no tag reaches the voice or the words either (29e7 item 5).
         (
             None,
-            vec!["[laughs] Ha, good one.", "[sighs] [hums] Ok then."],
-            vec![
-                "said:[laughs] Ha, good one.",
-                "said: [sighs] [hums] Ok then.",
-            ],
+            vec!["Ha, good one.", "Ok then."],
+            vec!["said:Ha, good one.", "said: Ok then."],
         ),
     ] {
         let (ready, mut spoken) = mpsc::unbounded_channel();
@@ -15155,10 +15153,67 @@ fn speech_tags_reach_only_the_voice_and_only_with_the_switch() {
         }
         assert_eq!(given, voice, "{tags:?}");
         let lamp_said = engine.shared.lamp_said.lock().unwrap().1.clone();
+        assert!(!lamp_said.contains('['), "{tags:?} {lamp_said}");
+    }
+}
+
+/// 29e7 item 5 (lamp-29e7, from `lamp_last_said`): tool text, a closing
+/// tag and a stage direction whose `[` came in an earlier piece were
+/// spoken and kept as the lamp's. None of it reaches the voice, the lamp's
+/// words or what the lamp is said to have said, with or without the speech
+/// tags switch.
+#[test]
+fn tool_text_tags_and_stage_directions_are_never_said() {
+    for tags in [None, Some(true)] {
+        let (ready, mut spoken) = mpsc::unbounded_channel();
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [vec![
+                    text("\\light_dim"),
+                    text("mer\\</antml> The light's already at its dimmest… [The "),
+                    text("…lights warm up fromblue into a soft warm white]"),
+                    text(" How's that — warm white instead of blue?"),
+                    Ok(ChatEvent::Done),
+                ]]
+                .into(),
+            ),
+            speech_ready: Some(ready),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.announcing(false).speaking_tags(tags);
+        let labels = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(written(1, "Make it warmer."));
+                turn(&mut engine).await
+            });
+        let said: Vec<&str> = labels
+            .iter()
+            .map(String::as_str)
+            .filter(|label| label.starts_with("said:"))
+            .collect();
         assert_eq!(
-            lamp_said.contains('['),
-            tags.is_none(),
-            "{tags:?} {lamp_said}"
+            said,
+            ["said:The light's already at its dimmest… How's that — warm white instead of blue?"],
+            "{tags:?}"
+        );
+        let mut given = Vec::new();
+        while let Ok(text) = spoken.try_recv() {
+            given.push(text);
+        }
+        assert_eq!(
+            given,
+            ["The light's already at its dimmest… How's that — warm white instead of blue?"],
+            "{tags:?}"
+        );
+        let lamp_said = engine.shared.lamp_said.lock().unwrap().1.clone();
+        assert_eq!(
+            lamp_said.trim(),
+            "The light's already at its dimmest… How's that — warm white instead of blue?",
+            "{tags:?}"
         );
     }
 }

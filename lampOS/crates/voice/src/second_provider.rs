@@ -9609,6 +9609,10 @@ async fn answer(
             let mut reasoning = None;
             let mut called_us = 0;
             let mut silent_after = answered_at_once.then(SilentAfter::default);
+            // Tool text, tags and stage directions out of the round's text
+            // before anything reads it (29e7 item 5); a listed speech tag
+            // stays for the queue's own `Tags`.
+            let mut stage = speech_tags::Stage::new(shared.speech_tags.is_some());
             // A reply's opening, held until it is known whether it says
             // something was kept; one that does is held to the round's end,
             // when its calls say whether it was. Not while something of
@@ -9784,6 +9788,7 @@ async fn answer(
                             Some(silent) => silent.piece(piece),
                             None => piece,
                         };
+                        let piece = stage.piece(&piece);
                         if piece.is_empty() {
                             continue;
                         }
@@ -9897,12 +9902,15 @@ async fn answer(
             }
             // A partial marker has not reached the other opening filters
             // yet. Give it to their normal end-of-round path too.
-            if let Some(silent) = silent_after.as_mut() {
-                let rest = silent.finish();
-                if !rest.is_empty() {
-                    text.push_str(&rest);
-                    aloud_held.get_or_insert_default().push_str(&rest);
-                }
+            // So does what the stage filter still waited on.
+            let mut rest = silent_after
+                .as_mut()
+                .map(|silent| stage.piece(&silent.finish()))
+                .unwrap_or_default();
+            rest.push_str(&stage.finish());
+            if !rest.is_empty() {
+                text.push_str(&rest);
+                aloud_held.get_or_insert_default().push_str(&rest);
             }
             // The round ended with its opening still not known whether it
             // narrates a call: whole now. A narration is not said.
