@@ -18,7 +18,7 @@
 //! points, so the opening itself is not seen. On a small face the width's
 //! change is about as much as the marks jitter, so a face whose eyes are
 //! less than [`LEAST_EYES_PX`] apart, turned more than [`MOST_TURN_DEG`]
-//! ([`STEADY_MOST_TURN_DEG`] with the switch),
+//! ([`STEADY_MOST_TURN_DEG`] for a meshed window with the switch),
 //! too new, or with jittering marks is `unknown`, never `no`.
 use lamp_msgs::{Speaking, SpeakingFrom, SpeakingState};
 use serde::Serialize;
@@ -88,8 +88,9 @@ pub const LEAST_LOOKS: usize = 5;
 pub const LEAST_EYES_PX: f32 = 24.0;
 /// A face turned further than this hides one corner behind the other.
 pub const MOST_TURN_DEG: f32 = 30.0;
-/// With [`STEADY_ENVIRONMENT`], the turn a face may have and still be judged,
-/// instead of [`MOST_TURN_DEG`]: at 30 to 40 degrees the mesh still sees both
+/// With [`STEADY_ENVIRONMENT`], the turn a face in a window the mesh read on
+/// every look may have and still be judged, instead of [`MOST_TURN_DEG`]
+/// (a corners-only window keeps that): at 30 to 40 degrees the mesh still sees both
 /// mouth corners well enough. In an offline replay of a lamp-52e6 run, talking
 /// looks turned 32.5 to 38.7 degrees were lost to the 30, and five still looks
 /// turned 32 to 39 degrees stayed `no` or `unknown` under 40 (#4585).
@@ -334,16 +335,18 @@ impl Mouths {
             .collect();
         let looks: Vec<_> = kept.iter().flatten().copied().collect();
         let outliers = mouth.looks.len() - looks.len();
-        let most_turn = if self.steady {
+        // A window the mesh read on every look is judged by the mesh, so
+        // its eyes are counted in the pixels the mesh saw; any other, by the
+        // corners, in the detector's.
+        let all_meshed = looks.iter().all(|look| look.4.is_some());
+        // The mesh sees both mouth corners further round than the corners
+        // themselves do, so only a meshed window takes the wider turn.
+        let most_turn = if self.steady && all_meshed {
             STEADY_MOST_TURN_DEG
         } else {
             MOST_TURN_DEG
         };
         let turned = turn_deg.is_none_or(|degrees| degrees > most_turn);
-        // A window the mesh read on every look is judged by the mesh, so
-        // its eyes are counted in the pixels the mesh saw; any other, by the
-        // corners, in the detector's.
-        let all_meshed = looks.iter().all(|look| look.4.is_some());
         let mean_eyes = looks
             .iter()
             .map(|look| if all_meshed { look.5 } else { look.2 })
@@ -1616,6 +1619,25 @@ mod steady_tests {
             "{on:?}"
         );
         assert!(on[4..].contains(&SpeakingState::No), "{on:?}");
+    }
+
+    #[test]
+    fn a_corners_only_face_turned_35_degrees_stays_unknown_with_the_switch() {
+        let mut mouths = Mouths {
+            steady: true,
+            ..Mouths::default()
+        };
+        let said: Vec<_> = (0..10)
+            .map(|look| {
+                mouths
+                    .judge(1, &marks(30.0), Some(35.0), None, look * 250_000)
+                    .state
+            })
+            .collect();
+        assert!(
+            said.iter().all(|state| *state == SpeakingState::Unknown),
+            "{said:?}"
+        );
     }
 
     #[test]
