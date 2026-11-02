@@ -13,6 +13,33 @@ other is not a result on a lamp.
 
 ## Found, not mine
 
+## 2026-11-02 — lamp-fc4b read, #4954
+
+Ready for lamp-voice: yes (#4954, `94cc64e58`, another lamp's own folder)
+
+- Taken 18:32 as heron's first piece under "Moving labelled work" rule 4,
+  proposed on #4710 at 18:17 with no "no" in 15 minutes. No issue yet; the
+  first builder was asked for the `builder:heron` label.
+- 18:20: one ssh session to lamp-fc4b.local, read-only, by key, with the
+  person's yes (asked and given this session). What it runs is in
+  `deploy/lamp-fc4b/README.md`: a product lamp on stable 9528 (lamp-voice
+  `ba17e5438`) since 16:29 +07, switched by lamp-update from 9497; set up
+  with a phone at 14:59; no V1 units; 22 parts with their `current` builds;
+  the body's poses (`lamp.env`, measured 2026-10-30) copied into the folder.
+- Not shown: anything needing root (`sudo -n` asks for a password on this
+  lamp): `fuser`, the updater's `state.json`, `switch-drift.sh`. The lamp
+  was not heard, seen or touched.
+- Branch `heron/lamp-fc4b-runs` from `origin/lamp-voice` at `ab6ef495c`,
+  one commit. Gate: no crate touched; `git grep` finds nothing in
+  `crates/`, `tools/` or the workflows reading `deploy/lamp-fc4b/`. The
+  PR's ARM64 run starts on its own; docs-only by rule 6. READ ASK to the
+  Reviewer-lead on #4710 at 18:33.
+- #4418's read posted on the PR as READ-OK `4e5696601`: rebases clean onto
+  `ab6ef495c`; on the Mac, `cargo fmt -p lamp-voice --check` clean,
+  `cargo test -p lamp-voice --lib agent_tasks::tests` 65 passed 0 failed,
+  `cargo clippy -p lamp-voice --all-targets -- -D warnings` clean. The rest
+  of lamp-voice's tests were not run. The privacy call is the first builder's.
+
 ## 2026-11-02 — second session, from 18:09
 
 Ready for lamp-voice: no (nothing to offer yet)
