@@ -108,6 +108,19 @@ These you can run on their own:
   and the story stops within about 1 s (`$PLAYED_OUT/scenarios/cut-in-keeps-LABEL.txt`).
   Its stand-in test is `cut-in-keeps-test.sh`.
 
+- `stop-lines.sh LABEL [ROUNDS]`, about 8 minutes a round
+  (#4710): on the second route, a stop always gets "Okay, I'll stop there."
+  (`LAMP_SPOKEN_STOP_ENDS`) and a cut-in that ended the answer with no words
+  gets "Did someone say something?" (`LAMP_CUT_IN_WORDLESS_ASKS`). Each round
+  plays "Stop." and "Stop Lamp." over a story, "Stop." about 1 s after a short
+  answer ended (its turn's `turn_finished` by the lamp's clock, not a playback
+  interval's retirement, which a wait sound or a gap between sentences also
+  makes), and a short system sound over a story, at 45% volume (put
+  back after), and counts from the journal which line fired and whether its
+  `first answer audio` followed (`$PLAYED_OUT/scenarios/stop-lines-LABEL.txt`).
+  `STOP_LINES_ENV` puts switches on through a /run drop-in, taken off after.
+  Its stand-in test is `stop-lines-test.sh`.
+
 - `cutin.sh LABEL [IDLE_STORIES] [ROUNDS]`, about 25 minutes with the
   defaults (3 and 1; #2602 "Cutting in", the measurement before any bound
   changes): long stories with nobody talking, counting false yields per
