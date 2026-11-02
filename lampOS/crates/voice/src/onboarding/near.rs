@@ -128,6 +128,11 @@ const TEXT_WAIT_US: u64 = 1_500_000;
 /// second). A line whose words came back fewer is a fragment.
 const MS_A_WORD: u64 = 1_000;
 
+/// Whether `words` cover a line of `speech_ms` of speech ([`MS_A_WORD`]).
+pub(super) fn words_cover(words: u64, speech_ms: u64) -> bool {
+    words * MS_A_WORD >= speech_ms
+}
+
 /// What fell short in a sentence try: the coaching it gets.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Short {
@@ -1042,7 +1047,7 @@ impl Onboarding {
                     Some(Short::Coverage)
                 } else if !close(&line) {
                     Some(Short::Level)
-                } else if words * MS_A_WORD < line.speech_ms {
+                } else if !words_cover(words, line.speech_ms) {
                     Some(Short::Coverage)
                 } else {
                     None

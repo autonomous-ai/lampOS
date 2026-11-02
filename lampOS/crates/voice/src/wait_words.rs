@@ -67,13 +67,42 @@ fn asks_nothing(word: &str) -> bool {
         || (word.contains('h') && word.chars().all(|c| matches!(c, 'h' | 'a' | 'e')))
 }
 
+/// Unspaced Japanese or Chinese counts one word for each this many of its
+/// characters (#4866). Ordinary speech is about 5 to 6 written characters a
+/// second in Japanese (kana are morae, a kanji one to two) and 4 to 5 in
+/// Chinese (a character a syllable), against 2 to 3 English words, so 2
+/// characters a word puts both at about 2 to 3 words a second, as English is.
+/// Characters, not morae: a kanji's reading is not known from the text.
+const CJK_CHARS_A_WORD: usize = 2;
+
+/// Whether `c` is Han, Hiragana or Katakana, written without spaces.
+/// Hangul is not: Korean is spaced, and counted by its spaces.
+fn unspaced(c: char) -> bool {
+    matches!(c,
+        '\u{3040}'..='\u{30FF}' // Hiragana, Katakana and the long-vowel mark
+        | '\u{31F0}'..='\u{31FF}' // Katakana extensions
+        | '\u{3400}'..='\u{4DBF}' // Han extension A
+        | '\u{4E00}'..='\u{9FFF}' // Han
+        | '\u{F900}'..='\u{FAFF}' // Han compatibility
+        | '\u{FF66}'..='\u{FF9F}' // half-width Katakana
+        | '\u{20000}'..='\u{3134F}') // Han extensions B to G
+}
+
 /// How many words of `text` ask something: its words past those that ask
-/// nothing (fillers, acknowledgements, hums and laughs).
+/// nothing (fillers, acknowledgements, hums and laughs). A run of unspaced
+/// Japanese or Chinese counts one for each [`CJK_CHARS_A_WORD`] characters,
+/// rounded up, and any other letters in the same word one more; text with
+/// none is counted by its spaces exactly as before.
 pub fn words_in(text: &str) -> usize {
     crate::not_speech::plain_words(text)
         .iter()
         .filter(|word| !asks_nothing(word))
-        .count()
+        .map(|word| {
+            let cjk = word.chars().filter(|&c| unspaced(c)).count();
+            let other = word.chars().count() > cjk;
+            usize::from(other) + cjk.div_ceil(CJK_CHARS_A_WORD)
+        })
+        .sum()
 }
 
 /// Words said with a stop that ask nothing more: "Stop it, please.",
@@ -531,6 +560,12 @@ pub(crate) mod tests {
             ("Okay, stop.", 1),
             ("Yeah, no.", 1),
             ("Hey.", 1),
+            ("I left the keys by the door.", 7),
+            ("열쇠는 현관 파란 서랍에 넣어 뒀어요.", 6),
+            ("はい", 1),
+            ("鍵は玄関の青い引き出しに入れてあります。", 10),
+            ("钥匙放在门口那个蓝色的抽屉里了。", 8),
+            ("LINEで送って", 3),
         ] {
             assert_eq!(words_in(said), count, "{said:?}");
         }
