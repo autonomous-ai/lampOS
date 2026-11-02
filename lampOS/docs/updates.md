@@ -895,7 +895,12 @@ each under the quiet rule. A round
    that never reported is judged by systemd alone. A state query that fails
    (`systemctl show`, at most 5 s) is not known yet and is asked again until
    the watch's end; only one still failing then puts the build back
-   ("systemd cannot be asked").
+   ("systemd cannot be asked"). A unit made to end by itself
+   (`judge::ENDS_BY_DESIGN`: `lamp-waking.service`, the waking face, which
+   ends once the voice takes the ring) that is inactive with `Result=success`
+   is well, not stopped; one that failed, crashed or is started again by
+   systemd is still not well. Before this, an awake lamp put the build back:
+   lamp-9adf, 1 Nov, 9276 and 9424, "lamp-waking.service stopped".
 10. **Back.** A part not well: the journal's validated old startup order is
     used without rereading the installed dependency graph. Later changes or
     read failures in that graph cannot veto the saved restart order. Every
