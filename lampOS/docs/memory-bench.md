@@ -237,6 +237,22 @@ removal uses the same segmented build and differs in exactly one named
 component. In particular, disabling nightly consolidation still runs the
 nightly topic-boundary pass. All model calls remain budgeted and audited.
 
+Ruled on 2 November 2026, before any Tiers score exists: a Tiers run (any
+setup whose adapter reports both counts at the month's end) is
+invalid for the score when `stats.topic_fallbacks` × 10 > `stats.topic_batches`.
+`topic_batches` counts completed main-session topic batches, fallbacks
+included, and retries do not add to it. `topic_fallbacks` counts the batches
+consolidated by session only after two rejections. Probe work counts in
+neither. Such a run's score is null, its ledger is kept, it adds to no
+three-run mean, and the card shows both counts with the reason. The adapter
+reports them from [#4783](https://github.com/autonomous-ai/lampOS/pull/4783).
+Ruled the same day, closing a hole in that rule: a Tiers run (every
+`tiers` setup and its ablations) whose adapter leaves out either count is
+invalid for the score in the same way, with the reason "not reported". Any
+setup that reports only one count is invalid too. A setup with no topic
+batches that reports neither (none, full history, lampOS today) is not
+applicable and keeps its score.
+
 If the segmented build is not ready when live access arrives, only the three
 reference setups may start. Hold every Tiers setup until the common build is
 ready. The completed recorded pass measures the bounded boundary-call shapes.
@@ -367,7 +383,7 @@ is an evaluator's hidden correction of an observed mistake.
 | `probe_begin` | `probe_id`, `at_unix_ms` | `isolated: true` |
 | `snapshot` | `query` (shape below, with empty `heard`) | `owner_model`, `source_ids`, `memory_instructions` |
 | `recall` | `query` (shape below) | `context`, `source_ids`, `owner_model`, `tools`, `memory_instructions` |
-| `tool` | `probe_id`, `name`, `arguments` | `result`, `source_ids` |
+| `tool` | `probe_id`, `name`, `arguments` | `result`, `source_ids`, `memory_changed` |
 | `inspect` | `person_id` | `owner_model`, `retained_record_ids`, `stats` |
 | `probe_end` | `probe_id` | `restored: true` |
 | `close` | empty object | empty object, followed by clean exit |
@@ -425,7 +441,14 @@ cached memory text, even when the operation reports no change. A changed
 access scope or probe transition also invalidates it. Before the next answer,
 it requests a fresh snapshot, then fresh recall. This includes ordinary-text
 forget requests handled inside ingestion. No stale snapshot, recall, tool
-schema, or prior tool-result text may remain in a rebuilt answer prompt.
+schema, or stale tool-result text may remain in a rebuilt answer prompt.
+A tool result goes stale when a later call in the same answer changed memory:
+each version 2 `tool` reply reports a boolean `memory_changed`, true for a
+call that wrote, edited or forgot memory and false for a read-only one such
+as a recall. After a changing call the runner replaces every earlier tool
+result in the answer with an invalidation note. Read-only results stay, in
+the same round and across rounds, and all retained results count together
+against the context bound. A reply without the flag invalidates the run.
 Report any selection
 in `stats` when inspected. The example's 16,384-byte bound is illustrative;
 the run manifest fixes one common bound for all arms, plus model token
@@ -630,7 +653,9 @@ questions belong in a separate voice fixture. This choice can make results
 kinder than real spoken use; it adds no speech allowance for probes.
 
 Every setup uses the same frozen answer prompt, model settings, 512-token
-output limit and eight-round tool loop. The rubric judge sees all turns of a
+output limit and eight-round tool loop. Answer and judge calls send
+temperature 0; calls a setup makes for itself (extraction, sleep, reflection,
+retrieval) send none and run at the provider's default. The rubric judge sees all turns of a
 probe together, the frozen criteria and eligible scripted source evidence.
 It receives no setup name, run identity, cost or tier diagnostics. Generated
 candidate replies can witness dialogue or timing but cannot establish an

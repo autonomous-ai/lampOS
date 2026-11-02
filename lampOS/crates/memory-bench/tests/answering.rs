@@ -1,6 +1,6 @@
 use lamp_memory_bench::{
     Result,
-    answering::{Answerer, MemoryMode},
+    answering::{Answerer, MemoryMode, Turn},
     conversation::Conversation,
     model::{Call, Client, Prices, Provider, Reply, Usage},
     model_worker::Worker,
@@ -134,7 +134,26 @@ fn recall(tools: Vec<Value>) -> Value {
     json!({"context":"","source_ids":[],"owner_model":[],"tools":tools,"memory_instructions":""})
 }
 fn mutation(ran: bool) -> Value {
-    json!({"result":{"synthetic":"old private tool result"},"source_ids":[],"forget_effect":{"ran":ran,"suppress_confirmation":ran}})
+    json!({"result":{"synthetic":"old private tool result"},"source_ids":[],"memory_changed":true,"forget_effect":{"ran":ran,"suppress_confirmation":ran}})
+}
+fn lookup(text: &str) -> Value {
+    json!({"result":{"text":text},"source_ids":[],"memory_changed":false,"forget_effect":{"ran":false,"suppress_confirmation":false}})
+}
+fn answer_bounded(
+    runner: &mut Runner,
+    worker: &mut Worker,
+    q: &Query,
+) -> std::result::Result<Turn, String> {
+    let mut recent = Conversation::default();
+    Answerer {
+        runner,
+        worker,
+        recent: &mut recent,
+        timezone: "UTC",
+        mode: MemoryMode::Bounded,
+    }
+    .answer(q, |_, _| Ok(()))
+    .map_err(|e| e.to_string())
 }
 fn setup(dir: &Directory, worker: &mut Worker, tail: String) -> Runner {
     setup_query(dir, worker, tail, &query())
@@ -536,4 +555,93 @@ fn malformed_answer_replies_are_recorded_not_fatal() {
         );
         assert_eq!(finish(worker), 1);
     }
+}
+#[test]
+fn two_read_only_recalls_in_one_batch_both_reach_the_answer() {
+    let dir = Directory::new();
+    let tail = respond(snapshot("model"))
+        + &respond(recall(vec![tool_schema("recall")]))
+        + &respond(lookup("FIRST_RECALL"))
+        + &respond(lookup("SECOND_RECALL"))
+        + &respond(snapshot("model"))
+        + &respond(recall(vec![tool_schema("recall")]));
+    let (mut worker, seen) = worker(vec![
+        reply_tools(vec![tool_call("one", "recall"), tool_call("two", "recall")]),
+        reply_answer(),
+    ]);
+    let mut runner = setup(&dir, &mut worker, tail);
+    let turn = answer_bounded(&mut runner, &mut worker, &query()).unwrap();
+    assert_eq!(turn.tools_executed, 2);
+    let calls = seen.lock().unwrap();
+    let second = serde_json::to_string(&calls[1]).unwrap();
+    assert!(second.contains("FIRST_RECALL"));
+    assert!(second.contains("SECOND_RECALL"));
+    assert!(!second.contains("invalidated by a subsequent"));
+    drop(calls);
+    assert_eq!(finish(worker), 2);
+}
+#[test]
+fn read_only_recalls_across_rounds_stay_until_a_call_changes_memory() {
+    let dir = Directory::new();
+    let tail = respond(snapshot("model"))
+        + &respond(recall(vec![tool_schema("recall"), tool_schema("remember")]))
+        + &respond(lookup("ROUND_ONE_RECALL"))
+        + &respond(snapshot("model"))
+        + &respond(recall(vec![tool_schema("recall"), tool_schema("remember")]))
+        + &respond(lookup("ROUND_TWO_RECALL"))
+        + &respond(snapshot("model"))
+        + &respond(recall(vec![tool_schema("recall"), tool_schema("remember")]))
+        + &respond(mutation(false))
+        + &respond(snapshot("model"))
+        + &respond(recall(vec![tool_schema("recall"), tool_schema("remember")]));
+    let (mut worker, seen) = worker(vec![
+        reply_tools(vec![tool_call("one", "recall")]),
+        reply_tools(vec![tool_call("two", "recall")]),
+        reply_tools(vec![tool_call("three", "remember")]),
+        reply_answer(),
+    ]);
+    let mut runner = setup(&dir, &mut worker, tail);
+    answer_bounded(&mut runner, &mut worker, &query()).unwrap();
+    let calls = seen.lock().unwrap();
+    let third = serde_json::to_string(&calls[2]).unwrap();
+    assert!(third.contains("ROUND_ONE_RECALL"));
+    assert!(third.contains("ROUND_TWO_RECALL"));
+    assert!(!third.contains("invalidated by a subsequent"));
+    // The remember changed memory, so both earlier results are stale now.
+    let fourth = serde_json::to_string(&calls[3]).unwrap();
+    assert!(!fourth.contains("ROUND_ONE_RECALL"));
+    assert!(!fourth.contains("ROUND_TWO_RECALL"));
+    assert!(fourth.contains("invalidated by a subsequent"));
+    drop(calls);
+    assert_eq!(finish(worker), 4);
+}
+#[test]
+fn retained_read_only_results_count_together_against_the_cap() {
+    let dir = Directory::new();
+    let tail = respond(snapshot("model"))
+        + &respond(recall(vec![tool_schema("recall")]))
+        + &respond(lookup(&"a".repeat(350)))
+        + &respond(lookup(&"b".repeat(350)));
+    let (mut worker, seen) = worker(vec![reply_tools(vec![
+        tool_call("one", "recall"),
+        tool_call("two", "recall"),
+    ])]);
+    let mut runner = setup(&dir, &mut worker, tail);
+    let mut q = query();
+    q.max_context_bytes = 600;
+    assert!(answer_bounded(&mut runner, &mut worker, &q).is_err());
+    assert_eq!(seen.lock().unwrap().len(), 1);
+    assert_eq!(finish(worker), 1);
+}
+#[test]
+fn a_tool_reply_without_memory_changed_is_refused() {
+    let dir = Directory::new();
+    let mut bare = lookup("x");
+    bare.as_object_mut().unwrap().remove("memory_changed");
+    let tail =
+        respond(snapshot("model")) + &respond(recall(vec![tool_schema("recall")])) + &respond(bare);
+    let (mut worker, _) = worker(vec![reply_tools(vec![tool_call("one", "recall")])]);
+    let mut runner = setup(&dir, &mut worker, tail);
+    assert!(answer_bounded(&mut runner, &mut worker, &query()).is_err());
+    assert_eq!(finish(worker), 1);
 }
