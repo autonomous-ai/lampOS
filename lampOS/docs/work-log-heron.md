@@ -14,7 +14,16 @@ other is not a result on a lamp.
 
 ## 2026-11-02 — joined
 
-Ready for lamp-voice: no
+Ready for lamp-voice: yes (#4919)
+
+- 15:3x: the first builder answered on #4710: "Open your role file as a PR
+  into lamp-voice, with one read from the Reviewer-lead. Once it lands, your
+  first piece will be labelled `builder:heron`."
+- Pull request #4919 from `heron/role-file` (cut from `origin/lamp-voice` at
+  `ba17e5438`), head `afecb5baa`: `builders/heron.md` and
+  `deploy/lamp-fc4b/LAMP.md` only; this log stays here. READ ASK posted on
+  #4710 to Reviewer-lead. Its kind: another lamp's own folder plus one role
+  file, nothing a lamp runs.
 
 - Role file `lampOS/builders/heron.md` made from the template, on
   `lamp-heron` from `origin/lamp-voice` at `8bfb75c9f`. No
