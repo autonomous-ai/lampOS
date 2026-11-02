@@ -350,8 +350,10 @@ when it keeps them (rendered at start in the lamp's voice, read again each
 time the line is chosen), and from the files above otherwise. The release
 and its manifest are untouched and no kind is added: the cached line is
 recorded under the release's kind, its `wav_sha256` `speech-cache:<key>`.
-`turn_lost` has no words of its own and is unchanged. An English lamp plays
-the files exactly as before.
+`turn_lost`, the failed turn's line, is said the same way (#4883), keyed by
+`language::TURN_LOST` ("Sorry, I couldn't answer that. Could you ask me
+again?"); the release has no `turn_lost` file, so with the line not kept
+the sigh stands in. An English lamp plays the files exactly as before.
 
 `wifi_recovering` (#3743, the words agreed with Sixth on #3020) is new: no
 clip is rendered or pinned yet. It is under 10 s, but its kind is new, so its

@@ -154,6 +154,10 @@ pub const WIFI_RECOVERING: &str =
     "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.";
 
 pub const SIGNED_OUT: &str = "I've been signed out. Please set me up again in the app.";
+/// The failed turn's line (`turn_lost`, #4883): the key of its words in the
+/// owner's language. The release has no English file for it, so an English
+/// lamp still plays the sigh (`docs/failure-notices.md`).
+pub const TURN_LOST: &str = "Sorry, I couldn't answer that. Could you ask me again?";
 
 /// The lamp's fixed lines (#4473 (c)), by their English words, in
 /// Vietnamese, Japanese, Chinese and Korean, in that order: said from the
@@ -202,6 +206,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、今うまく考えられないんだ。ちょっと待ってね。",
             "抱歉，我现在脑子有点转不过来。稍等我一下。",
             "미안해요, 지금은 생각을 할 수가 없어요. 잠깐만 기다려 주세요.",
+        ],
+    ),
+    (
+        TURN_LOST,
+        [
+            "Xin lỗi, mình chưa trả lời được. Bạn hỏi lại mình nhé.",
+            "ごめんね、うまく答えられなかった。もう一度聞いてくれる？",
+            "抱歉，我没能回答。你能再问我一次吗？",
+            "미안해요, 대답하지 못했어요. 다시 한 번 물어봐 주세요.",
         ],
     ),
     (
@@ -687,7 +700,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 18);
+        assert_eq!(FIXED_LINES.len(), 19);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
