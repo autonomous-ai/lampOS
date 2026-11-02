@@ -494,8 +494,11 @@ impl RoomTold {
     /// (`BUSY_UNCALLED`, `BUSY_NAMED_UNTURNED`, and with
     /// `LAMP_NAME_OR_FOLLOW_UP` `BUSY_TURNED_ALONE`) is the same: two people
     /// talking on keep the room busy, and its minute runs from their last
-    /// line (the reviewer's P2 on #2372, the first builder at 04:36). With
-    /// [`Self::count_held_talk`], in a room not known to be busy, a line held
+    /// line (the reviewer's P2 on #2372, the first builder at 04:36). So is
+    /// a line `LAMP_GOING_ON_SAME_ONE` held as not the one the lamp answered
+    /// (#4933: held as nothing, it let the room end a minute after a call,
+    /// and the next colleagues' lines were played as the conversation going
+    /// on). With [`Self::count_held_talk`], in a room not known to be busy, a line held
     /// as said to someone else (`attention::said_to_another`), or as said to
     /// nobody with someone in view and not turned to the lamp
     /// ([`Self::seen_talking`]), is talk, and one in another voice makes the
@@ -522,6 +525,7 @@ impl RoomTold {
             Some(crate::attention::Verdict::Hold(why)) if why == crate::remarks::REMARK => {}
             Some(crate::attention::Verdict::Hold(why))
                 if why == crate::going_on_asks::NOT_THE_LAMPS
+                    || why == crate::going_on_same_one::HELD
                     || self.ends_sooner
                         && (why == crate::attention::BUSY_UNCALLED
                             || why == crate::attention::BUSY_NAMED_UNTURNED
@@ -2076,6 +2080,55 @@ mod tests {
         assert_eq!(after.at(100 * S), Room::Busy);
         assert_eq!(after.at(210 * S), Room::Busy);
         assert_eq!(after.at(212 * S), Room::Quiet);
+    }
+
+    /// #4933, lamp-52e6 on 2 November, `LAMP_GOING_ON_SAME_ONE` on the
+    /// product unit (`LAMP_BUSY_ENDS_SOONER`), seconds from 20:55:00. The
+    /// last talk the model left alone ended at 24 s; the lamp answered a
+    /// call at 79 s; a colleague's line at 105 s was held by the switch as
+    /// not the one it answered. That hold is talk, as the Policy's is: the
+    /// room stays busy, so the colleagues' "Did you book the meeting room
+    /// for Thursday?" (152 s) and "Not yet, I'll do it right after lunch."
+    /// (164 s), after the lamp answered a named call at 137 s, are still in
+    /// a busy room. Counted as no talk, the room had gone quiet at 139 s and
+    /// both were played as the conversation going on.
+    #[test]
+    fn a_line_held_as_not_the_one_it_answered_keeps_the_room_busy() {
+        const S: u64 = 1_000_000;
+        let held = crate::attention::Verdict::Hold(crate::going_on_same_one::HELD);
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.end_busy_sooner(true);
+        room.end_busy_once_answered(true);
+        for (request, at) in [(41, 8), (42, 12), (44, 16), (46, 24)] {
+            room.heard(request, (at - 6) * S);
+            room.ended(request, (at - 1) * S);
+            room.left_unanswered(request, at * S);
+            room.at(at * S);
+        }
+        assert_eq!(room.at(25 * S), Room::Busy);
+        room.heard(48, 74 * S);
+        room.ended(48, 77 * S);
+        room.spoke(48, 79 * S);
+        room.heard(49, 96 * S);
+        room.ended(49, 105 * S);
+        room.judged(49, Some(held), false);
+        room.left_unanswered(49, 109 * S);
+        assert_eq!(room.at(110 * S), Room::Busy);
+        room.heard(50, 131 * S);
+        room.ended(50, 136 * S);
+        assert_eq!(room.at(136 * S), Room::Busy, "the call");
+        room.spoke(50, 137 * S);
+        assert_eq!(
+            room.at(152 * S),
+            Room::Busy,
+            "Did you book the meeting room"
+        );
+        assert_eq!(room.at(164 * S), Room::Busy, "Not yet, after lunch");
+        assert!(
+            !room.talked_past_the_lamp(),
+            "a held line ends no conversation"
+        );
     }
 
     /// #829: the conversation is over only by another voice until talk is
