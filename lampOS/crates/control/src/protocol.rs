@@ -325,8 +325,15 @@ pub enum Op {
         pattern: Option<Pattern>,
         for_ms: u32,
     },
+    /// A line in the lamp's own voice: spoken exactly as sent, straight
+    /// through the speech service, unless `rephrase` asks the voice's model
+    /// to say it in its own words, as before (docs/control.md, "say").
     #[serde(rename = "say")]
-    Say { text: String },
+    Say {
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rephrase: Option<bool>,
+    },
     #[serde(rename = "sound")]
     Sound { name: String },
     /// Ends the client's own actions now. Needs no lease.
@@ -622,7 +629,7 @@ impl Op {
                 }
                 held_for(*for_ms)?;
             }
-            Self::Say { text } => {
+            Self::Say { text, .. } => {
                 let chars = text.chars().count();
                 if !text.chars().any(char::is_alphanumeric)
                     || chars > SAY_MAX_CHARS

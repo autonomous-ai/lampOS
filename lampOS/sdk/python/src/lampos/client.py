@@ -651,8 +651,11 @@ class Lamp:
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)
 
-    async def say(self, text: str) -> dict:
-        return await self._act("say", False, text=text)
+    async def say(self, text: str, *, rephrase: bool = False) -> dict:
+        """Say `text` in the lamp's voice, exactly as written, once the person
+        isn't talking. `rephrase=True` lets the lamp's model say it in its own
+        words instead, as before."""
+        return await self._act("say", False, text=text, rephrase=True if rephrase else None)
 
     async def sound(self, name: str) -> dict:
         return await self._act("sound", False, name=name)

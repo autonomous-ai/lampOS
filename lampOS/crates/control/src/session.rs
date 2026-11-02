@@ -1242,7 +1242,7 @@ mod tests {
         assert_eq!(
             shape(&lines[3]),
             format!(
-                "lamp-control: {who}: say ({}): ok, to the voice, by say.sock",
+                "lamp-control: {who}: say ({}, exact): ok, to the voice, by say.sock",
                 door.journal.said(said)
             )
         );

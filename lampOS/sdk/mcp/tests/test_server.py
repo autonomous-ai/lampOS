@@ -100,6 +100,8 @@ def test_each_tool_sends_its_one_op(tmp_path):
             # 30 s at most, whatever was asked.
             assert fake.asked("light") == [{"colour": "warm", "level": 2, "for_ms": 30_000}]
             assert fake.asked("say") == [{"text": "Build passed."}]
+            assert not (await session.call_tool("lamp_say", {"text": "Hi.", "rephrase": True})).isError
+            assert fake.asked("say")[-1] == {"text": "Hi.", "rephrase": True}
             assert fake.asked("express") == [{"feeling": "glad", "strength": 0.5}]
             state = await session.call_tool("lamp_state", {"which": ["presence"]})
             assert json.loads(text(state)) == {"presence": {"count": 0, "near": 0.0, "facing": False}}
