@@ -1050,6 +1050,31 @@ its only way back once its package carries the unit.
   in radio range could set **their own** network (the Reviewer-lead on
   #3024). The first builder signs off before `LAMP_WIFI_RECOVERY` goes on
   anywhere.
+- **Back to the station when the hotspot closes** (#4863). `device-ap-mode`
+  masks `wpa_supplicant@wlan0`, adds `denyinterfaces wlan0` to
+  `/etc/dhcpcd.conf` and enables `hostapd` and `dnsmasq`, and all of it
+  outlives a boot; only `device-sta-mode` undoes it. So when `recover` is
+  stopped with its hotspot open (a `systemctl stop`, a shutdown), it runs
+  `device-sta-mode` and then `sync` (the root is mounted `commit=600`)
+  (`recover::closed`). Not when the marker is gone (a 5 s reset): setup's own
+  hotspot takes over. During a shutdown systemd refuses the script's
+  restarts, but its lasting steps come before them, so the next boot is a
+  station either way; a failure is said, never fatal.
+- **Repaired at the start, whatever the switch says** (#4863, this changes
+  every lamp's default). A power cut sends no stop, so `recover` first looks
+  at whether the lamp was left a hotspot (`recover::left_as_hotspot`:
+  `wpa_supplicant@wlan0` masked, its unit a link to `/dev/null`, or the
+  `denyinterfaces wlan0` line), before it reads `LAMP_WIFI_RECOVERY`, and if
+  so runs `device-sta-mode` and `sync` (`recover::at_start`). Only with the
+  marker (the unit's `ConditionPathExists=` and the code again: a first
+  setup's hotspot is meant), `lamp-setup.service` not active and no
+  `.lamp-previous` (a Wi-Fi change's). It waits up to 30 s for `wlan0` to
+  appear. The lamp's own state is read, not a note of ours: it repairs a
+  lamp a build before this one left (lamp-0c89, 2 Nov), a failed return
+  leaves it as it was so the next start tries again, and the unit can't
+  write `/var/lib` (`ProtectSystem=strict`). The journal says
+  `the radio was left a hotspot: back to the station`. A stuck lamp on an
+  older build is put back by hand: `sudo /usr/local/bin/device-sta-mode`.
 - **The switch takes effect at the next start, or after the next round.**
   `lamp-setup-recover` is enabled and, as docs/updates.md's "A part added
   over the air" says of every unit that ends at once with nothing to do,
