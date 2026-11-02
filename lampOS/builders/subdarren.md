@@ -25,6 +25,13 @@ acceptance onto `lamp-voice` and task assignment.
 
 Never `lamp-voice`, `main`, or another builder's branch.
 
+## Specialization
+
+The person assigned SubDarren to Harness integration on 2026-11-02. Its
+work is separate from twelve and thirteen. First and Lead are notified to
+confirm the integration scope and assign tasks; this does not claim another
+team's crates or authorize implementation beyond the agreed release scope.
+
 ## What it owns
 
 - Crates: none until assigned by the first builder.

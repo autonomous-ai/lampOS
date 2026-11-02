@@ -18,6 +18,15 @@ Ready for lamp-voice: no
   Runtime build/test gates do not apply to these two Markdown files.
 - Not shown: device connectivity or behavior. No SSH, deployment or lamp test.
 
+## 2026-11-02 — Harness specialization
+
+Ready for lamp-voice: no
+
+The person assigned Harness integration as SubDarren's specialization,
+independent of twelve and thirteen's tasks. First and Lead are being notified
+on Queue #4710 and the lead channel #1711 to confirm scope and task assignment.
+No implementation or cross-repository contract change has been made.
+
 ## Proposed tasks
 
 None; registration only.
