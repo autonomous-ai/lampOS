@@ -3911,6 +3911,7 @@ impl ToolDesk {
             | Route::Schedule(_)
             | Route::Memory(..)
             | Route::Tasks(_)
+            | Route::MakeLocal
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
@@ -3924,6 +3925,7 @@ impl ToolDesk {
             | Route::Schedule(_)
             | Route::Memory(..)
             | Route::Tasks(_)
+            | Route::MakeLocal
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
@@ -3975,6 +3977,7 @@ impl ToolDesk {
                     | Route::UseSkill(_)
                     | Route::Schedule(_)
                     | Route::Tasks(_)
+                    | Route::MakeLocal
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::ReportsStop(_)

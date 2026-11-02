@@ -2167,6 +2167,46 @@ Tests:
 - `task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out`.
 - `crates/skills/tests/it/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
 
+#### Made by the lamp's own model (`LAMP_MAKE_SKILL_LOCAL=on`, off)
+
+The same skill, written by the lamp's own model in place of a computer's
+agent (Fourteen's proposal on #4710, 2 Nov; `crate::make_skill_local`).
+Nothing above changes with the switch off.
+
+1. With the switch, `make_skill` and `put_on_made_skill` are the voice's
+   own, with or without the tasks part: declared once (the tasks part's
+   two are left out), routed to `Route::MakeLocal`, and never handed to a
+   computer. `make_skill` makes at once, with no read-back: the model says
+   in a few words that it is making it, and the person waits.
+   The switch is given to the second route's worker only (`process.rs`),
+   which keeps the chat's configuration as it read it at start, the
+   person's own keys included (`make_skill_local::set_config`); the Live
+   route never offers it.
+2. The same brief (`made_skill::brief`) goes to the second route's chat
+   (`llm_*`, the relay or the person's own DeepSeek), with no tools,
+   streamed, on a thread and runtime of its own, at most 30 s
+   (`WRITE_WITHIN`) and 20 KiB. A 404 (the relay's, about one in ten on
+   2 Nov), a 5xx, a timeout or a broken connection is asked once more
+   (`make_skill_local::again`); anything else is not.
+3. The answer is kept as any made skill is (`made_skill::keep`, from
+   `local:<ms>`): the two files, the cap, `lamp-skills pack`, at most five.
+   One that doesn't pass is told as not made ("the skill couldn't be made:
+   …"), with no technical words for the person, and nothing is kept; there
+   is no repair round.
+4. Kept, the model is told its name, what it does and what it uses, and to
+   ask "Shall I put it on the lamp?" in the same answer, so the ask is kept
+   as made then (`made_skill::offered`). Only a plain spoken yes within
+   120 s calls `put_on_made_skill`, which puts that SHA-256 on through the
+   manage helper, as above. The second route notes a made skill waiting
+   for its yes with the switch too.
+
+Not yet with the switch: a skill typed in the app. `skills.make` still
+hands over to a computer, and `can` still waits for one.
+
+Tests: `make_skill_local::tests` (a good answer kept and asked, a refused
+one kept nothing, a 404 asked once more, a brief refused asking nothing,
+and the switch alone routing and declaring the two functions).
+
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
 The same maker, from words typed in the app; put on only as above, by a

@@ -424,7 +424,7 @@ impl Chat {
         let _ = self.force.set(force);
     }
 
-    fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
+    pub(crate) fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
         let (client, kept) = chat_client()?;
         Ok(Self {
             client,
