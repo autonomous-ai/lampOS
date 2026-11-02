@@ -1300,7 +1300,33 @@ restore_hal_service_state() {
   if hal_was_active; then systemctl restart hal; else systemctl stop hal 2>/dev/null || true; fi
 }
 
-check_hal() {
+# Print why HAL is not serving, so a device that cannot be reached by hand still
+# says why. Kept short: only the tail of the updater output is reported back.
+# HAL logs what users say, and a warning or error can quote it, so journal lines are
+# never matched by keyword. Only structure is kept: traceback locations (file, line,
+# function), exception type names with their message dropped (missing-module errors
+# keep theirs, which names code), and systemd's own "hal.service:" messages.
+hal_failure_diagnostics() {
+  {
+    echo "[software-update] HAL diagnostics:"
+    echo "  unit: $(systemctl show hal -p ActiveState,SubState,Result,ExecMainStatus,NRestarts 2>/dev/null | tr '\n' ' ')"
+    echo "  mem: $(free -m 2>/dev/null | awk '/^Mem:/ {printf "total=%sM avail=%sM ", $2, $7} /^Swap:/ {printf "swap_used=%sM", $3}')"
+    echo "  disk: $(df -h / 2>/dev/null | awk 'NR==2 {print "size=" $2 " used=" $3 " avail=" $4 " use=" $5}')"
+    local errors oom
+    errors=$(timeout 5 journalctl -u hal -n 300 --no-pager -o cat 2>/dev/null | awk '
+      /^hal\.service: /                                          { print substr($0, 1, 130); next }
+      /^ +File "[^"]+", line [0-9]+, in [A-Za-z0-9_<>]+$/        { print substr($0, 1, 130); next }
+      /^(ModuleNotFoundError|ImportError): /                      { print substr($0, 1, 130); next }
+      /^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)/            { sub(/:.*/, ":"); print substr($0, 1, 130); next }
+    ' | tail -n 6)
+    [ -z "$errors" ] || { echo "  hal journal:"; printf '%s\n' "$errors" | sed 's/^/    /'; }
+    oom=$(timeout 5 journalctl -k -n 1000 --no-pager -o cat 2>/dev/null \
+      | grep -iE 'out of memory|oom-kill' | tail -n 2 | cut -c1-130)
+    [ -z "$oom" ] || { echo "  kernel oom:"; printf '%s\n' "$oom" | sed 's/^/    /'; }
+  } >&2 || true
+}
+
+check_hal_runtime() {
   progress_report checking
   [ -f "$HAL_DIR/VERSION_HAL" ] || return 1
   # Only an intentionally stopped, disabled HAL may skip runtime validation.
@@ -1309,6 +1335,12 @@ check_hal() {
   systemctl is-active --quiet hal || return 1
   wait_for_url http://127.0.0.1:5001/health 120 || return 1
   systemctl is-active --quiet hal
+}
+
+check_hal() {
+  check_hal_runtime && return 0
+  hal_failure_diagnostics
+  return 1
 }
 
 # mktemp -d staging dirs are 0700; publish with the live tree's mode (nginx needs to read the web root).

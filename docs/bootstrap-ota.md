@@ -1030,6 +1030,14 @@ skipping health checks. HAL must be active before and after a successful `/healt
 probe; failures trigger rollback. Only a previously inactive, disabled HAL skips
 the runtime probe. Rollback restores the previous installation, not a verified
 repair of corrupted dependency files or their shared cache.
+
+When the HAL health check fails (on the update or on the recovery that follows), the
+updater prints a short "HAL diagnostics" block to its output: the hal unit state, memory
+and swap, root-disk use, structure-only lines from HAL's journal (traceback
+locations, exception type names without their message, and systemd's own `hal.service:`
+messages; free-text lines are never matched because HAL logs what users say) and any
+kernel out-of-memory kills. It
+stays under about 1 KB so it survives the output tail that bootstrap reports.
 After recovery restarts HAL successfully, the updater disarms its exit cleanup
 so returning failure does not restart the recovered service a second time.
 
