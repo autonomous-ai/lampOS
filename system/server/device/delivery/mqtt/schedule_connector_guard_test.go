@@ -221,7 +221,7 @@ func TestProvideDeviceMQTTHandler_RunnerGuardsOnInstalledConnectors(t *testing.T
 	factory, messages := statusBroker(t)
 	cfg := &config.Config{DeviceID: "sched-guard", FDChannel: "test/fd", OpenclawConfigDir: t.TempDir()}
 	gw := &guardGateway{}
-	h := ProvideDeviceMQTTHandler(cfg, factory, nil, nil, gw, nil, nil)
+	h := ProvideDeviceMQTTHandler(cfg, factory, nil, nil, gw, nil, nil, nil)
 
 	if err := h.scheduleStore.Replace([]schedule.Schedule{{
 		ID: "s1", Name: "Inbox digest", Instructions: "Summarize my unread email", Enabled: true,

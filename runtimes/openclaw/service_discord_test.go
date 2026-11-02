@@ -1,53 +1,118 @@
 package openclaw
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
-func TestApplyDiscordChannelConfig_WithGuild(t *testing.T) {
-	m := map[string]any{}
-	applyDiscordChannelConfig(m, "discord-bot-token", "U999", "G123")
+func TestRemoveDiscordChannelConfigDropsChannelAndDisablesPlugin(t *testing.T) {
+	channels := map[string]any{
+		"telegram": map[string]any{"enabled": true},
+		"discord":  map[string]any{"enabled": true, "token": "fake-discord-secret", "dmPolicy": "allowlist"},
+	}
+	entries := map[string]any{"discord": map[string]any{"enabled": true}}
 
-	if m["enabled"] != true {
-		t.Errorf("enabled = %v, want true", m["enabled"])
+	if !removeDiscordChannelConfig(channels, entries) {
+		t.Fatal("expected a change")
 	}
-	if m["dmPolicy"] != "allowlist" {
-		t.Errorf("dmPolicy = %v, want allowlist", m["dmPolicy"])
+	if _, ok := channels["discord"]; ok {
+		t.Error("channels.discord must be removed")
 	}
-	if m["token"] != "discord-bot-token" {
-		t.Errorf("token = %v, want discord-bot-token", m["token"])
+	if _, ok := channels["telegram"]; !ok {
+		t.Error("other channels must be left alone")
 	}
-	if got, ok := m["allowFrom"].([]string); !ok || len(got) != 1 || got[0] != "U999" {
-		t.Errorf("allowFrom = %v, want [U999]", m["allowFrom"])
+	if entries["discord"].(map[string]any)["enabled"] != false {
+		t.Errorf("plugin entry enabled = %v, want false", entries["discord"])
 	}
-	if m["groupPolicy"] != "allowlist" {
-		t.Errorf("groupPolicy = %v, want allowlist", m["groupPolicy"])
-	}
-	guilds, ok := m["guilds"].(map[string]any)
-	if !ok {
-		t.Fatalf("guilds missing/wrong type: %v", m["guilds"])
-	}
-	g, ok := guilds["G123"].(map[string]any)
-	if !ok {
-		t.Fatalf("guild G123 missing: %v", guilds)
-	}
-	if g["requireMention"] != false {
-		t.Errorf("requireMention = %v, want false", g["requireMention"])
-	}
-	if users, ok := g["users"].([]string); !ok || len(users) != 1 || users[0] != "U999" {
-		t.Errorf("guild users = %v, want [U999]", g["users"])
+	if removeDiscordChannelConfig(channels, entries) {
+		t.Error("second pass must be a no-op")
 	}
 }
 
-func TestApplyDiscordChannelConfig_NoGuild(t *testing.T) {
-	m := map[string]any{}
-	applyDiscordChannelConfig(m, "discord-bot-token", "U999", "")
+func TestRemoveDiscordChannelConfigDoesNotCreateEntries(t *testing.T) {
+	channels := map[string]any{}
+	entries := map[string]any{}
+	if removeDiscordChannelConfig(channels, entries) {
+		t.Fatal("nothing to remove, expected no change")
+	}
+	if len(entries) != 0 || len(channels) != 0 {
+		t.Fatalf("maps must stay empty: %v %v", channels, entries)
+	}
+}
 
-	if _, ok := m["groupPolicy"]; ok {
-		t.Errorf("groupPolicy must not be set without a guild id")
+func TestScrubDiscordConfigRewritesOnlyWhenTokenPresent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "openclaw.json")
+	const secret = "fake-discord-secret-for-tests-0005"
+	body := `{"channels":{"telegram":{"enabled":true,"botToken":"tg"},"discord":{"enabled":true,"token":"` + secret + `"}},` +
+		`"plugins":{"entries":{"discord":{"enabled":true}}}}`
+	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+		t.Fatal(err)
 	}
-	if _, ok := m["guilds"]; ok {
-		t.Errorf("guilds must not be set without a guild id")
+
+	changed, err := ScrubDiscordConfig(dir)
+	if err != nil || !changed {
+		t.Fatalf("ScrubDiscordConfig = %v, %v; want true, nil", changed, err)
 	}
-	if m["dmPolicy"] != "allowlist" {
-		t.Errorf("dmPolicy = %v, want allowlist", m["dmPolicy"])
+	got, _ := os.ReadFile(path)
+	if strings.Contains(string(got), secret) {
+		t.Fatalf("credential still on disk: %s", got)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(got, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg["channels"].(map[string]any)["telegram"] == nil {
+		t.Error("telegram channel lost")
+	}
+
+	changed, err = ScrubDiscordConfig(dir)
+	if err != nil || changed {
+		t.Fatalf("second ScrubDiscordConfig = %v, %v; want false, nil", changed, err)
+	}
+}
+
+func TestScrubDiscordConfigMissingFile(t *testing.T) {
+	changed, err := ScrubDiscordConfig(t.TempDir())
+	if err != nil || changed {
+		t.Fatalf("missing file: got %v, %v; want false, nil", changed, err)
+	}
+}
+
+func TestScrubDiscordBackups(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"channels":{"discord":{"token":"fake-discord-secret"},"telegram":{"enabled":true}}}`
+	for _, n := range []string{"openclaw.json.bak", "openclaw.json.bak.1", "openclaw.json.last-good", "openclaw.json.corrupt"} {
+		content := body
+		if n == "openclaw.json.corrupt" {
+			content = "{"
+		}
+		if err := os.WriteFile(filepath.Join(dir, n), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	live := filepath.Join(dir, "openclaw.json")
+	if err := os.WriteFile(live, []byte(body), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	changed, err := ScrubDiscordBackups(dir)
+	if !changed {
+		t.Fatalf("changed = false (err %v)", err)
+	}
+	if err == nil {
+		t.Error("the unreadable backup should be reported")
+	}
+	for _, n := range []string{"openclaw.json.bak", "openclaw.json.bak.1", "openclaw.json.last-good"} {
+		b, _ := os.ReadFile(filepath.Join(dir, n))
+		if strings.Contains(string(b), "fake-discord-secret") || !strings.Contains(string(b), "telegram") {
+			t.Errorf("%s = %s", n, b)
+		}
+	}
+	if b, _ := os.ReadFile(live); !strings.Contains(string(b), "fake-discord-secret") {
+		t.Error("ScrubDiscordBackups must not touch the live file")
 	}
 }

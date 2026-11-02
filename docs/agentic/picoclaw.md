@@ -162,10 +162,10 @@ the watcher leaves that skill's version pending and retries it on the next poll.
   `model_list."autonomous:0".api_keys` + `"autonomous_vision:0".api_keys` from
   `llm_api_key`, the `pico` bearer token (must equal `constants.go` `Token`),
   and each non-pico channel **enabled only when its credentials exist**: telegram
-  (`telegram_bot_token` + `telegram_user_id`), discord (`discord_bot_token` +
-  `discord_user_id`), slack (`slack_bot_token` + `slack_app_token` + `slack_user_id`),
+  (`telegram_bot_token` + `telegram_user_id`), slack (`slack_bot_token` + `slack_app_token` + `slack_user_id`),
   whatsapp native (`whatsapp_user_id` → `allow_from`, no token, QR pairing on first
-  run). Secrets land in `.security.yml` under `channel_list.<ch>.settings`; structure
+  run). Discord is never enabled: it goes through the cloud relay, so presync keeps
+  `channel_list.discord` disabled and removes its settings from `.security.yml`. Secrets land in `.security.yml` under `channel_list.<ch>.settings`; structure
   stays in `config.json`. A Telegram bot token without `telegram_user_id` leaves the
   channel disabled: an empty `allow_from` would let anyone who finds the bot command
   the device.

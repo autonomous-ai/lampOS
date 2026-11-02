@@ -10,10 +10,10 @@ claudecode-specific protocol, layout, and quirks.
 > **Status:** full parity with the checklist — embedded install + presync,
 > WebSocket bridge transport, persona/memory Go migration adapter (lossless with
 > the OpenClaw layout), skills (CDN restore + watcher, native `.claude/skills`),
-> identity watch/rename, real MCP (`.mcp.json`), factory reset, Telegram +
-> Discord device-owned (os-server getUpdates loop `telegram_poll.go` /
-> discordgo session `discord.go` — the native channel plugins are deliberately
-> not used),
+> identity watch/rename, real MCP (`.mcp.json`), factory reset, Telegram
+> device-owned (os-server getUpdates loop `telegram_poll.go`; Discord goes
+> through the cloud relay, see `docs/discord-relay.md` — the native channel
+> plugins are deliberately not used),
 > device-owned **Slack inbound** (HTTP mode, `domain.SlackBridge`),
 > and the **claude.ai OAuth login** flow (§7b) as an alternative to the
 > config.json API key. Known caveats are flagged ⚠️ in §11.
@@ -57,8 +57,8 @@ backend in `system/agent/factory.go`. Switching in/out goes through the generic
    > on devices whose `agent_runtime` is `claudecode`. No rollback backup exists —
    > the installer keeps `~/.local/share/claude/versions/<ver>`, so downgrading
    > means publishing the older version. See `docs/bootstrap-ota.md` §5.
-3. **no bun, no channel plugins** — telegram + discord are device-owned
-   (os-server runs the receive loops itself, §7), so the plugin marketplace
+3. **no bun, no channel plugins** — telegram is device-owned and discord goes
+   through the cloud relay (os-server runs the receive loop itself, §7), so the plugin marketplace
    step is gone entirely;
 4. runs the presync hook once (bridge + env + channel sync);
 5. writes + starts **`claudecode.service`** (unit name == runtime name — no
@@ -246,10 +246,11 @@ memory (MEMORY.md/KNOWLEDGE.md) survives via the imports; only verbatim
 in-session conversation is lost. `CompactSession` returns
 `domain.ErrNotSupportedByRuntime` (no external compact RPC).
 
-## 7. Channels — all device-owned (telegram, discord, slack)
+## 7. Channels (telegram and slack device-owned, discord via the cloud relay)
 
-`SupportedChannels() = [telegram, slack, discord]`. All three receive loops
-run inside os-server, mirroring `runtimes/codex` 1:1. Claude Code's native
+`SupportedChannels() = [telegram, slack, discord]`. The telegram loop and the slack
+bridge run inside os-server, mirroring `runtimes/codex` 1:1; discord messages arrive
+over MQTT (`docs/discord-relay.md`). Claude Code's native
 telegram/discord channel plugins are **deliberately not used**: they proved
 undebuggable in the field (bun children with no journal logs, silent
 allowlist drops, silent death on bridge-restart races), and they would compete
@@ -266,22 +267,14 @@ plugin.
   reply back (`[HW:/...]` markers stripped via `stripForChannel`). Offset
   persists in `/root/.claudecode/telegram_offset.json`. Creds are read fresh
   from config.json every poll iteration — token/user changes need no restart.
-- **Discord** (`discord.go`): Discord has no long-poll receive API, so
-  os-server owns a **discordgo gateway session** (DM + guild-message +
-  message-content intents), started from `StartWS`. Accepted = not a bot,
-  sender == `discord_user_id` (empty allowlist = closed), and either a DM or a
-  message in `discord_guild_id` that **@mentions the bot** (mention stripped
-  from the turn text). Accepted messages inject as turns with flow source
-  `discord` (tracked in `discordRuns`, silent, native typing keeper);
-  `emitFinal` posts the reply back **chunked at Discord's 2000-char limit**.
-  Token is read fresh on every (re)connect attempt; while a session is open,
-  discordgo handles gateway reconnects itself.
+- **Discord** (cloud relay, no code in this package): the device holds no bot token
+  and opens no Discord connection. `system/discordrelay` turns each accepted
+  `discord_event` into a regular chat turn (`[via:discord]`, silent) and
+  returns the finished reply over MQTT. See `docs/discord-relay.md`.
 - `AddChannel`/`RefreshChannelConfig` are honest no-op successes for all three
   channels: the device-owned loops read creds fresh from config.json on each
   use, so persisting the creds is all that is needed (no presync, no bridge
-  restart). Discord nuance: a token saved the first time is picked up within
-  ~30 s, but rotating it while a session is open takes effect on the next
-  session cycle. whatsapp → `domain.ErrChannelNotSupported`.
+  restart); discord has no runtime-side state. whatsapp → `domain.ErrChannelNotSupported`.
 - **Slack is DEVICE-OWNED** (`slack.go` + `slack_sender.go`, a mirror of
   `runtimes/codex/slack.go`): Claude Code has no slack channel plugin ("Claude
   in Slack" is a separate cloud feature that spawns web sessions from `@Claude`

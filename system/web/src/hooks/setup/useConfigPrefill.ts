@@ -81,7 +81,6 @@ export function useConfigPrefill(args: {
         slackBotToken: prev.slackBotToken || cfg.has_slack_bot_token,
         slackAppToken: prev.slackAppToken || cfg.has_slack_app_token,
         slackUserId: prev.slackUserId || !!cfg.slack_user_id,
-        discordBotToken: prev.discordBotToken || cfg.has_discord_bot_token,
         discordGuildId: prev.discordGuildId || !!cfg.discord_guild_id,
         discordUserId: prev.discordUserId || !!cfg.discord_user_id,
         bluebubblesServerUrl: prev.bluebubblesServerUrl || !!cfg.bluebubbles_server_url,

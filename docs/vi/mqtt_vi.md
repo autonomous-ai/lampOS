@@ -35,7 +35,7 @@ OS server sử dụng MQTT để giao tiếp với backend server (báo cáo tr�
 
 ```json
 {
-  "cmd": "info|add_channel|slack_event|slack_command|whatsapp_pair|claudecode_login|claudecode_login_code|ota|data",
+  "cmd": "info|add_channel|slack_event|slack_command|discord_event|whatsapp_pair|claudecode_login|claudecode_login_code|ota|data",
   ...payload fields
 }
 ```
@@ -142,7 +142,7 @@ pool không đụng tới các HTTP user khác trong process.
     // telegram: bot_token + chat_id
     // slack:    bot_token + app_token + channel_id        (socket mode, mặc định)
     // slack:    bot_token + mode:"http" + signing_secret  (+ webhook_path tùy chọn, mặc định /slack/events)
-    // discord:  bot_token + guild_id  + user_id
+    // discord:  user_id (+ guild_id tùy chọn, managed:true) — không có bot token; bot_token nếu có sẽ bị bỏ qua
     // whatsapp: user_id (số điện thoại E.164 — chỉ field này; bot tự login qua Baileys)
   }
 }
@@ -278,6 +278,39 @@ forward headers nguyên văn để signature check của OpenClaw validate đư�
 Để proxy route event inbound về đúng thiết bị, mỗi `/ping` kèm `slack_team_id` — workspace
 ID mà thiết bị tự resolve on-device qua Slack `auth.test` với `botToken` đã lưu (cache lại,
 gửi đi sau khi resolve được).
+
+### `discord_event` — Chuyển một tin nhắn Discord (cloud relay)
+
+Thiết bị không giữ bot token Discord; cloud relay gửi từng tin nhắn Discord của thiết bị xuống đây
+và đăng câu trả lời của thiết bị. Hành vi đầy đủ: [discord-relay_vi.md](discord-relay_vi.md).
+
+**Nhận:**
+```json
+{
+  "cmd": "discord_event",
+  "event_id": "…",
+  "discord_user_id": "…",
+  "guild_id": "…",
+  "discord_channel_id": "…",
+  "author_username": "…",
+  "bot_user_id": "…",
+  "mentions_bot": true,
+  "text": "…"
+}
+```
+
+Không có xác nhận. Thiết bị bỏ tin nhắn trừ khi nó đến từ `discord_user_id` đã cấu hình (tin trong
+server còn phải đến từ `discord_guild_id` và mention bot), và bỏ qua `event_id` đã thấy trong 5 phút
+gần nhất. Tin được nhận chạy như một lượt agent bình thường. Câu trả lời đi lên kênh thiết bị với
+envelope chuẩn cộng với channel:
+
+```json
+{"type":"discord_typing","discord_channel_id":"…"}
+{"type":"discord_reply","discord_channel_id":"…","text":"…"}
+```
+
+`discord_typing` được lặp mỗi 8 giây khi lượt chạy; `discord_reply` gửi một lần khi lượt kết thúc
+(không gửi nếu lượt không có gì để nói).
 
 ### `slack_command` — Forward một Slack slash command (HTTP mode)
 

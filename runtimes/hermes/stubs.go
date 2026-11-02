@@ -62,7 +62,7 @@ func (s *HermesService) GetConfiguredChannel() string {
 	if s.config.SlackBotToken != "" {
 		return domain.ChannelSlack
 	}
-	if s.config.DiscordBotToken != "" {
+	if s.config.DiscordManaged && s.config.DiscordUserID != "" {
 		return domain.ChannelDiscord
 	}
 	return "channel"

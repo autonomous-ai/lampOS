@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.autonomous.ai/os/system/device"
+	"go.autonomous.ai/os/system/discordrelay"
 	"go.autonomous.ai/os/system/domain"
 	"go.autonomous.ai/os/system/lib/flow"
 	"go.autonomous.ai/os/system/lib/hal"
@@ -28,6 +29,10 @@ type AgentHandler struct {
 	monitorBus   *monitor.Bus
 	statusLED    *statusled.Service
 	config       *config.Config // device type → capability gate for agent HW markers
+
+	// discordRelay collects the finished reply of turns that came from Discord. Set
+	// after construction; nil means no relay, and every call on it is a no-op.
+	discordRelay *discordrelay.Relay
 
 	// lastLLMLimitTTS debounces the spoken LLM-usage-limit notice (unix ms).
 	lastLLMLimitTTS atomic.Int64
@@ -158,6 +163,9 @@ type channelTurnState struct {
 // cronFireWindowMs is the max delay between a cron "started" event and its
 // lifecycle_start (observed ~2s).
 const cronFireWindowMs int64 = 10_000
+
+// SetDiscordRelay attaches the Discord relay whose turns this handler finishes.
+func (h *AgentHandler) SetDiscordRelay(r *discordrelay.Relay) { h.discordRelay = r }
 
 // ProvideAgentHandler returns an agent events handler.
 func ProvideAgentHandler(gw domain.AgentGateway, bus *monitor.Bus, sled *statusled.Service, cfg *config.Config) *AgentHandler {

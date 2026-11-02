@@ -534,47 +534,13 @@ target for the `SlackSender` channel sender). The HTTP-mode
 `slack_signing_secret` is consumed by the public proxy, not on the device —
 codex, like the hermes bridge, trusts the authenticated MQTT path.
 
-### Discord (device-owned gateway bot session)
+### Discord (cloud relay)
 
-Discord is also **device-owned**: it requires a Gateway WebSocket bot session
-(there is no long-poll receive API), so os-server runs one via
-[discordgo](https://github.com/bwmarrin/discordgo)
-(`runtimes/codex/discord.go`). Like the telegram loop, the session is started
-from `StartWS` (`go s.startDiscordBot(ctx)`) and lives inside the codex
-service's lifecycle — it runs **only while codex is the active runtime**, so
-it can never fight another runtime's bot session for the same token. The loop
-reads `config.DiscordBotToken` **fresh on every connect attempt** (empty →
-recheck every 30 s; failed open → back off 15 s); once open, discordgo
-handles gateway reconnects itself and the session is closed when the gateway
-ctx ends. Intents: direct messages + guild messages + message content.
-
-A message is accepted only if it is not from a bot (loop guard, covers the
-bot's own messages), the sender id equals `config.DiscordUserID` (**the
-allowlist is required** — empty rejects everyone, since anyone can share a
-guild with the bot), and it is either a **DM** or a message in
-`config.DiscordGuildID` that **@mentions the bot** (mirrors common openclaw
-plugin behavior: guild requires @mention, DM does not — the mention itself is
-stripped from the turn text). Everything else is skipped at debug level.
-
-Each accepted message waits for the agent to go idle (`IsBusy`, 500 ms poll,
-ctx-aware), then is injected via `sendChat` with flow source `discord` and
-the sender-metadata prefix
-`[discord] Message from <Username> [id:<id>]:\n<text>`. The run is marked
-**silent** (no TTS) and tracked in `discordRuns` (runID → channel id); while
-the turn runs, a `discordTypingKeeper` goroutine keeps Discord's **native
-typing indicator** alive (`ChannelTyping` immediately and every 8 s — the
-indicator lasts ~10 s — capped at 10 minutes). At `turn.completed`,
-`emitFinal` consumes the tracker and posts the reply —
-`stripForChannel`-cleaned, like telegram — back to the channel via
-`ChannelMessageSend`, **chunked at Discord's hard 2000-character message
-limit** (splitting on newline boundaries when possible); on `turn.failed` the
-tracker is consumed without a reply so the map cannot leak. The reply sender
-uses a mutex-guarded session handle on the service (nil session → log +
-drop).
-
-Requirements (config.json): `discord_bot_token`, `discord_user_id`
-(allowlist), and `discord_guild_id` when guild mentions should work (DM-only
-setups can leave it empty).
+Discord is **not** a device-owned loop. The device holds no bot token and opens no
+Discord connection; messages arrive over MQTT and replies go back the same way. The
+inbound filter, the chat turn, the typing signal and the reply collection are
+runtime-agnostic and live in `system/discordrelay/` — see
+[`discord-relay.md`](../discord-relay.md). Codex has no Discord-specific code.
 
 ### Channel API
 
@@ -582,11 +548,8 @@ setups can leave it empty).
 `AddChannel` / `RefreshChannelConfig` for all three are honest no-op
 successes — every consumer reads the creds fresh from config.json on each use
 (the telegram loop per iteration, the Slack bridge per event / Web API call,
-the discord bot per connect attempt / message), so there is nothing
-agent-side to write and no restart needed. `AddChannel(discord)` additionally
-validates that `discord_bot_token` and `discord_user_id` are present (the
-receive path cannot work without them — accepting would be fake success).
-Whatsapp has no receive path and returns `domain.ErrChannelNotSupported`. See
+Discord is a relay channel with no runtime-side state), so there is nothing
+agent-side to write and no restart needed. Whatsapp has no receive path and returns `domain.ErrChannelNotSupported`. See
 also [`adding-agent-runtime.md`](adding-agent-runtime.md).
 
 ### Telegram remote coding-sessions (`telegram_coding.go`, `coding_sessions.go`)

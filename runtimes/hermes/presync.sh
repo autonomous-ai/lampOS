@@ -135,9 +135,8 @@ sync_env telegram_user_id   TELEGRAM_ALLOWED_USERS
 sync_env slack_bot_token    SLACK_BOT_TOKEN
 sync_env slack_app_token    SLACK_APP_TOKEN
 sync_env slack_user_id      SLACK_ALLOWED_USERS
-sync_env discord_bot_token  DISCORD_BOT_TOKEN
-sync_env discord_guild_id   DISCORD_GUILD_ID
-sync_env discord_user_id    DISCORD_ALLOWED_USERS
+# Discord goes through the cloud relay, so hermes-gateway keeps no Discord settings.
+if [ -f "$ENV_FILE" ]; then sed -i '/^DISCORD_/d' "$ENV_FILE"; fi
 sync_env whatsapp_user_id   WHATSAPP_ALLOWED_USERS
 sync_env bluebubbles_server_url   BLUEBUBBLES_SERVER_URL
 sync_env bluebubbles_password     BLUEBUBBLES_PASSWORD

@@ -9,6 +9,7 @@ var ProviderSet = wire.NewSet(
 	ProvidePersonaMigration,
 	ProvideConfigMigration,
 	ProvideChannelReconcile,
+	ProvideDiscordRelayReconcile,
 	ProvideMCPReconcile,
 	ProvideUserProfileReconcile,
 	ProvideMemoryGuard,

@@ -240,7 +240,7 @@ export interface WifiProvisionBody {
   slack_bot_token?: string;
   slack_app_token?: string;
   slack_user_id?: string;
-  discord_bot_token?: string;
+  discord_managed?: boolean;
   discord_guild_id?: string;
   discord_user_id?: string;
   bluebubbles_server_url?: string;
@@ -367,7 +367,6 @@ export interface DeviceConfig {
   has_telegram_bot_token: boolean;
   has_slack_bot_token: boolean;
   has_slack_app_token: boolean;
-  has_discord_bot_token: boolean;
   has_bluebubbles_password: boolean;
   has_llm_api_key: boolean;
   has_deepgram_api_key: boolean;

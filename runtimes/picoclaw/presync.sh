@@ -219,17 +219,10 @@ else
   log "telegram: no telegram_bot_token in config.json — left disabled"
 fi
 
-# Discord — enable when bot token present (pico discord format: token + allow_from; discord_guild_id
-# from config.json is not used by this channel).
-DC_TOKEN="$(dev discord_bot_token)"; DC_USER="$(dev discord_user_id)"
-if [ -n "$DC_TOKEN" ]; then
-  enable_channel discord
-  sec_set discord token "$DC_TOKEN"
-  sec_allow_from discord "$DC_USER"
-  log "discord enabled + token synced"
-else
-  log "discord: no discord_bot_token in config.json — left disabled"
-fi
+# Discord goes through the cloud relay: keep the channel off and hold no Discord settings.
+jq_edit "$PICO_CONFIG" '.channel_list.discord.enabled = false'
+yq -i 'del(.channel_list.discord)' "$PICO_SECURITY"
+log "discord: handled by the cloud relay — channel left disabled"
 
 SL_BOT="$(dev slack_bot_token)"; SL_APP="$(dev slack_app_token)"; SL_USER="$(dev slack_user_id)"
 if [ -n "$SL_BOT" ] && [ -n "$SL_APP" ]; then

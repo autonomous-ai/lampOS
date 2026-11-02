@@ -408,7 +408,10 @@ func (s *Service) applySetupChannel(data domain.SetupRequest) {
 		s.config.SlackAppToken = data.SlackAppToken
 		s.config.SlackUserID = data.SlackUserID
 	case "discord":
-		s.config.DiscordBotToken = data.DiscordBotToken
+		// Discord runs through the cloud relay: the device stores who may talk to
+		// it, never a bot token.
+		s.config.DiscordManaged = true
+		s.config.DiscordGuildID = data.DiscordGuildID
 		s.config.DiscordUserID = data.DiscordUserID
 	case domain.ChannelIMessage:
 		s.config.BluebubblesServerURL = data.BluebubblesServerURL
@@ -445,8 +448,9 @@ func (s *Service) applyWifiProvisionChannel(data domain.WifiProvisionRequest) {
 			s.config.SlackUserID = v
 		}
 	case domain.ChannelDiscord:
-		if v := strings.TrimSpace(data.DiscordBotToken); v != "" {
-			s.config.DiscordBotToken = v
+		s.config.DiscordManaged = true
+		if v := strings.TrimSpace(data.DiscordGuildID); v != "" {
+			s.config.DiscordGuildID = v
 		}
 		if v := strings.TrimSpace(data.DiscordUserID); v != "" {
 			s.config.DiscordUserID = v
@@ -478,7 +482,8 @@ func (s *Service) wifiProvisionSetupRequest() domain.SetupRequest {
 		SlackBotToken:          s.config.SlackBotToken,
 		SlackAppToken:          s.config.SlackAppToken,
 		SlackUserID:            s.config.SlackUserID,
-		DiscordBotToken:        s.config.DiscordBotToken,
+		DiscordManaged:         s.config.DiscordManaged,
+		DiscordGuildID:         s.config.DiscordGuildID,
 		DiscordUserID:          s.config.DiscordUserID,
 		BluebubblesServerURL:   s.config.BluebubblesServerURL,
 		BluebubblesPassword:    s.config.BluebubblesPassword,

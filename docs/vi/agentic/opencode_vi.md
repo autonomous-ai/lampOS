@@ -284,14 +284,15 @@ nằm trong `.env`).
 
 ## 5. Kênh
 
-Telegram, Slack và Discord đều **do device sở hữu** dưới OpenCode — y hệt codex
-(`SupportedChannels()` → `["telegram", "slack", "discord"]`). os-server tự chạy
+Telegram và Slack **do device sở hữu** dưới OpenCode — y hệt codex
+(`SupportedChannels()` → `["telegram", "slack", "discord"]`); Discord đi qua cloud
+relay ([`discord-relay_vi.md`](../discord-relay_vi.md)). os-server tự chạy
 các receive loop, driven bởi token trong `config.json` đọc tươi mỗi lần dùng, nên
 không có gì phía runtime để ghi và không cần restart. Toàn bộ hành vi (receive
 loop, prefix metadata người gửi, tracking silent-run, làm sạch `stripForChannel`,
 typing keeper, fan-out reply tại `session.idle`) mirror
 [`codex_vi.md` §5](codex_vi.md) 1:1 — xem
-`runtimes/opencode/{telegram_poll,slack,discord}.go`. `AddChannel` /
+`runtimes/opencode/{telegram_poll,slack}.go`. `AddChannel` /
 `RefreshChannelConfig` là no-op success trung thực cho các kênh được hỗ trợ và
 trả `domain.ErrChannelNotSupported` cho mọi thứ khác (whatsapp).
 

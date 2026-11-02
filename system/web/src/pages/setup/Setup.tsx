@@ -48,7 +48,7 @@ export default function Setup({ mode = "initial" }: SetupProps = {}) {
     channel, setChannel, channelLoaded,
     teleToken, setTeleToken, teleUserId, setTeleUserId,
     slackBotToken, setSlackBotToken, slackAppToken, setSlackAppToken, slackUserId, setSlackUserId,
-    discordBotToken, setDiscordBotToken, discordGuildId, setDiscordGuildId, discordUserId, setDiscordUserId,
+    discordGuildId, setDiscordGuildId, discordUserId, setDiscordUserId,
     sttLanguage, setSttLanguage,
     ttsProvider, setTtsProvider, ttsProviders, ttsVoice, setTtsVoice, ttsVoices,
     faceOwners, loadFaceOwners, canEnrollVoice, canEnrollFace,
@@ -241,7 +241,6 @@ export default function Setup({ mode = "initial" }: SetupProps = {}) {
                       slackBotToken={slackBotToken} setSlackBotToken={setSlackBotToken}
                       slackAppToken={slackAppToken} setSlackAppToken={setSlackAppToken}
                       slackUserId={slackUserId} setSlackUserId={setSlackUserId}
-                      discordBotToken={discordBotToken} setDiscordBotToken={setDiscordBotToken}
                       discordGuildId={discordGuildId} setDiscordGuildId={setDiscordGuildId}
                       discordUserId={discordUserId} setDiscordUserId={setDiscordUserId}
                     />

@@ -68,7 +68,8 @@ func TestReconcileReappliesSupportedAndCollectsUnsupported(t *testing.T) {
 		ChannelsAppliedRuntime: "openclaw",
 		TelegramBotToken:       "t",
 		SlackBotToken:          "s",
-		DiscordBotToken:        "d",
+		DiscordManaged:         true,
+		DiscordUserID:          "u",
 	}
 	r := &ChannelReconcile{cfg: cfg, gw: gw}
 	r.Reconcile()

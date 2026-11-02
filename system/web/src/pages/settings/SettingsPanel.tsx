@@ -165,7 +165,6 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
   const [slackBotToken, setSlackBotToken] = useState("");
   const [slackAppToken, setSlackAppToken] = useState("");
   const [slackUserId, setSlackUserId] = useState("");
-  const [discordBotToken, setDiscordBotToken] = useState("");
   const [discordGuildId, setDiscordGuildId] = useState("");
   const [discordUserId, setDiscordUserId] = useState("");
   const [bluebubblesServerUrl, setBluebubblesServerUrl] = useState("");
@@ -185,7 +184,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
   const [channelLoaded, setChannelLoaded] = useState({
     teleToken: false, teleUserId: false,
     slackBotToken: false, slackAppToken: false, slackUserId: false,
-    discordBotToken: false, discordGuildId: false, discordUserId: false,
+    discordGuildId: false, discordUserId: false,
     bluebubblesServerUrl: false, bluebubblesPassword: false, bluebubblesUserAddress: false,
     bluebubblesCallerContext: false,
   });
@@ -331,7 +330,6 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
           slackBotToken: cfg.has_slack_bot_token,
           slackAppToken: cfg.has_slack_app_token,
           slackUserId: !!cfg.slack_user_id,
-          discordBotToken: cfg.has_discord_bot_token,
           discordGuildId: !!cfg.discord_guild_id,
           discordUserId: !!cfg.discord_user_id,
           bluebubblesServerUrl: !!cfg.bluebubbles_server_url,
@@ -514,7 +512,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     realtimeFastVoiceSilentS !== baseline.realtimeFastVoiceSilentS ||
     !!password || !!adminPassword || !!llmApiKey || !!ttsApiKey ||
     !!sttApiKey || !!deepgramApiKey || !!mqttPassword ||
-    !!teleToken || !!slackBotToken || !!slackAppToken || !!discordBotToken ||
+    !!teleToken || !!slackBotToken || !!slackAppToken ||
     !!realtimeApiKey ||
     bluebubblesServerUrl !== baseline.bluebubblesServerUrl ||
     bluebubblesUserAddress !== baseline.bluebubblesUserAddress ||
@@ -622,7 +620,6 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
       } else if (channel === "discord") {
         body.discord_guild_id = discordGuildId;
         body.discord_user_id = discordUserId;
-        if (discordBotToken) body.discord_bot_token = discordBotToken;
       } else if (channel === "imessage") {
         body.bluebubbles_server_url = bluebubblesServerUrl;
         body.bluebubbles_user_address = bluebubblesUserAddress;
@@ -666,7 +663,6 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
       setLlmApiKey(""); setTtsApiKey(""); setSttApiKey("");
       setDeepgramApiKey(""); setMqttPassword("");
       setTeleToken(""); setSlackBotToken(""); setSlackAppToken("");
-      setDiscordBotToken("");
       setBluebubblesPassword("");
       setRealtimeApiKey("");
       if (wifiMayReconnect) await checkWifi(ssid.trim(), true, controller.signal);
@@ -684,7 +680,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
   }, [
     activeSection, baseline, checkWifi,
     channel, teleToken, teleUserId, slackBotToken, slackAppToken, slackUserId,
-    discordBotToken, discordGuildId, discordUserId,
+    discordGuildId, discordUserId,
     bluebubblesServerUrl, bluebubblesPassword, bluebubblesUserAddress,
     bluebubblesCallerContext,
     ssid, password, adminPassword, llmUrl,
@@ -905,7 +901,6 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
               slackBotToken={slackBotToken} setSlackBotToken={setSlackBotToken}
               slackAppToken={slackAppToken} setSlackAppToken={setSlackAppToken}
               slackUserId={slackUserId} setSlackUserId={setSlackUserId}
-              discordBotToken={discordBotToken} setDiscordBotToken={setDiscordBotToken}
               discordGuildId={discordGuildId} setDiscordGuildId={setDiscordGuildId}
               discordUserId={discordUserId} setDiscordUserId={setDiscordUserId}
               bluebubblesServerUrl={bluebubblesServerUrl} setBluebubblesServerUrl={setBluebubblesServerUrl}

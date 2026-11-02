@@ -129,7 +129,6 @@ export function useSetupController(mode: SetupMode) {
   const [slackBotToken, setSlackBotToken] = useState(urlParams.slackBotToken || "");
   const [slackAppToken, setSlackAppToken] = useState(urlParams.slackAppToken || "");
   const [slackUserId, setSlackUserId] = useState(urlParams.slackUserId || "");
-  const [discordBotToken, setDiscordBotToken] = useState(urlParams.discordBotToken || "");
   const [discordGuildId, setDiscordGuildId] = useState(urlParams.discordGuildId || "");
   const [discordUserId, setDiscordUserId] = useState(urlParams.discordUserId || "");
   const [bluebubblesCallerContext, setBluebubblesCallerContext] = useState("");
@@ -137,7 +136,7 @@ export function useSetupController(mode: SetupMode) {
     teleToken: !!urlParams.teleToken, teleUserId: !!urlParams.teleUserId,
     slackBotToken: !!urlParams.slackBotToken, slackAppToken: !!urlParams.slackAppToken,
     slackUserId: !!urlParams.slackUserId,
-    discordBotToken: !!urlParams.discordBotToken, discordGuildId: !!urlParams.discordGuildId,
+    discordGuildId: !!urlParams.discordGuildId,
     discordUserId: !!urlParams.discordUserId,
     bluebubblesServerUrl: false, bluebubblesPassword: false, bluebubblesUserAddress: false,
     bluebubblesCallerContext: false,
@@ -525,7 +524,6 @@ export function useSetupController(mode: SetupMode) {
           break;
         case "discord":
           channelCredentials = {
-            discord_bot_token: urlParams.discordBotToken || discordBotToken,
             discord_guild_id: urlParams.discordGuildId || discordGuildId,
             discord_user_id: urlParams.discordUserId || discordUserId,
           };
@@ -579,7 +577,7 @@ export function useSetupController(mode: SetupMode) {
     setLoading(false);
   }, [
     channel, urlParams, teleToken, teleUserId, slackBotToken, slackAppToken, slackUserId,
-    discordBotToken, discordGuildId, discordUserId, setupSsid, networkError, password, llmUrl, llmApiKey,
+    discordGuildId, discordUserId, setupSsid, networkError, password, llmUrl, llmApiKey,
     llmModel, llmDisableThinking, sttApiKey, sttBaseUrl, ttsApiKey, ttsBaseUrl, ttsVoice, deviceId,
     mqttEndpoint, mqttPort, mqttUsername, mqttPassword, faChannel, fdChannel,
     sttLanguage, ttsProvider, adminPassword,
@@ -604,7 +602,7 @@ export function useSetupController(mode: SetupMode) {
     channel, setChannel, channelLoaded,
     teleToken, setTeleToken, teleUserId, setTeleUserId,
     slackBotToken, setSlackBotToken, slackAppToken, setSlackAppToken, slackUserId, setSlackUserId,
-    discordBotToken, setDiscordBotToken, discordGuildId, setDiscordGuildId, discordUserId, setDiscordUserId,
+    discordGuildId, setDiscordGuildId, discordUserId, setDiscordUserId,
     bluebubblesCallerContext, setBluebubblesCallerContext,
     sttLanguage, setSttLanguage,
     ttsProvider, setTtsProvider, ttsProviders, ttsVoice, setTtsVoice, ttsVoices,

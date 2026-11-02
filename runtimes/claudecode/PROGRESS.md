@@ -53,7 +53,7 @@ original `feature/claude-code` branch history.
   (getUpdates 409 guard); AddChannel/Refresh telegram → honest no-op (creds
   read live per poll). NOT device-verified (deploy pending — device offline
   mid-session).
-- [x] Discord moved to DEVICE-OWNED too (2026-07-07, same session as telegram):
+- [x] ~~Discord device-owned~~ — SUPERSEDED: Discord now goes through the cloud relay (`discord.go` removed; see docs/discord-relay.md). Original entry (2026-07-07, same session as telegram):
   `discord.go` — discordgo gateway session (DM + guild + message-content
   intents), accept filter (allowlisted `discord_user_id`, DM or
   @mention-in-`discord_guild_id`, mention stripped), busy-wait inject (flow

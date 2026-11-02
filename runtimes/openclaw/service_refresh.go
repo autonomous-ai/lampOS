@@ -50,10 +50,8 @@ func (s *OpenclawService) RefreshChannelConfig(ctx context.Context, req domain.R
 		slackEntryMap := ensureMap(entriesMap, domain.ChannelSlack)
 		slackEntryMap["enabled"] = true
 	case domain.ChannelDiscord:
-		discordMap := ensureMap(channelsMap, domain.ChannelDiscord)
-		applyDiscordChannelConfig(discordMap, req.DiscordBotToken, req.DiscordUserID, req.DiscordGuildID)
-		channelsMap[domain.ChannelDiscord] = discordMap
-		ensureMap(entriesMap, domain.ChannelDiscord)["enabled"] = true
+		// Discord goes through the cloud relay: no native channel, no credential.
+		removeDiscordChannelConfig(channelsMap, entriesMap)
 	case domain.ChannelTelegram:
 		telegramMap := ensureMap(channelsMap, domain.ChannelTelegram)
 		telegramMap["enabled"] = true

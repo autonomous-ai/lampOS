@@ -715,7 +715,7 @@ during install) and does three things, in order:
 | `telegram_bot_token` | → | `.env` `TELEGRAM_BOT_TOKEN` |
 | `telegram_user_id` | → | `.env` `TELEGRAM_ALLOWED_USERS` |
 | `slack_bot_token` / `slack_app_token` / `slack_user_id` | → | `.env` `SLACK_BOT_TOKEN` / `SLACK_APP_TOKEN` / `SLACK_ALLOWED_USERS` |
-| `discord_bot_token` / `discord_guild_id` / `discord_user_id` | → | `.env` `DISCORD_BOT_TOKEN` / `DISCORD_GUILD_ID` / `DISCORD_ALLOWED_USERS` |
+| _(discord)_ | — | none: Discord goes through the cloud relay ([`discord-relay.md`](../discord-relay.md)); presync deletes any `DISCORD_*` line from `.env` |
 | `whatsapp_user_id` | → | `.env` `WHATSAPP_ALLOWED_USERS` |
 
 `.env` `API_SERVER_KEY` must equal `constants.go` `APIKey` (`hermes-local-api-key`) or
@@ -871,8 +871,9 @@ before is the `terminal.cwd` bullet below.
 ### Channel capability & live add/refresh
 
 Hermes is a **first-class channel runtime** in the generic capability flow
-(`runtimes/hermes/channels.go`). Hermes Agent delivers **telegram / slack /
-discord** natively inside its own server — a channel is enabled by the presence of
+(`runtimes/hermes/channels.go`). Hermes Agent delivers **telegram / slack**
+natively inside its own server (Discord goes through the cloud relay, so its `.env`
+holds no `DISCORD_*` settings) — a channel is enabled by the presence of
 its tokens in `~/.hermes/.env` (Slack uses Socket Mode → `SLACK_APP_TOKEN`), which
 the §10 `.env` mapping table above already populates from `config.json`. os-server
 runs **no channel receive loop** of its own; its only job is to land creds in `.env`

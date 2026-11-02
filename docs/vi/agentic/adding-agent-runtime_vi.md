@@ -19,8 +19,8 @@ install, migration, skills, hooks, reset.
 > [`hermes_vi.md`](hermes_vi.md) (Hermes, backend đầy đủ) ·
 > [`picoclaw_vi.md`](picoclaw_vi.md) (PicoClaw, gateway chỉ-client kèm script install/presync) ·
 > [`claudecode_vi.md`](claudecode_vi.md) (Claude Code sau một bridge cục bộ,
-> kênh Telegram/Slack/Discord do device sở hữu — cố ý không dùng channel plugin
-> native — claude.ai OAuth login). Protocol/quirk
+> kênh Telegram/Slack do device sở hữu và Discord qua cloud relay — cố ý không dùng
+> channel plugin native — claude.ai OAuth login). Protocol/quirk
 > đặc thù từng backend nằm ở các file kia; cơ chế generic + checklist nằm ở đây.
 
 ---
@@ -473,11 +473,12 @@ khi runtime đổi.
   - hermes → `[telegram, slack, discord]` (`runtimes/hermes/channels.go`)
   - picoclaw → `[telegram]` (`runtimes/picoclaw/channels.go`)
   - claudecode → `[telegram, slack, discord]` (`runtimes/claudecode/channels.go`
-    — tất cả do device sở hữu, mirror codex: loop getUpdates
-    `telegram_poll.go`, session discordgo `discord.go`, bridge MQTT `slack.go`;
-    channel plugin native của Claude Code cố ý không dùng)
+    — telegram và slack do device sở hữu, mirror codex: loop getUpdates
+    `telegram_poll.go`, bridge MQTT `slack.go`; discord chạy qua cloud relay
+    ([`discord-relay_vi.md`](../discord-relay_vi.md)); channel plugin native của
+    Claude Code cố ý không dùng)
   - opencode → `[telegram, slack, discord]` (`runtimes/opencode/channels.go`
-    — tất cả do device sở hữu, mirror codex/claudecode)
+    — telegram và slack do device sở hữu, mirror codex/claudecode)
 - Helper `domain.ChannelSupported(gw, channel) bool` (`domain/channel.go`) — chỗ
   duy nhất caller kiểm tra thành viên.
 - Sentinel dùng chung trong package `domain` (`domain/channel.go`):

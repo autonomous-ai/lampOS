@@ -14,7 +14,6 @@ export interface ChannelLoadedState {
   slackBotToken: boolean;
   slackAppToken: boolean;
   slackUserId: boolean;
-  discordBotToken: boolean;
   discordGuildId: boolean;
   discordUserId: boolean;
   bluebubblesServerUrl: boolean;

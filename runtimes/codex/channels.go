@@ -10,8 +10,8 @@ import (
 // The Codex CLI has no channel layer, so os-server runs the inbound channel loops itself.
 
 // SupportedChannels — telegram (device-owned receive loop, telegram_poll.go),
-// slack (HTTP-mode proxy path, slack.go) and discord (gateway bot session,
-// discord.go).
+// slack (HTTP-mode proxy path, slack.go) and discord (messages arrive through the
+// cloud relay and are driven by os-server, not by this runtime).
 func (s *CodexService) SupportedChannels() []string {
 	return []string{domain.ChannelTelegram, domain.ChannelSlack, domain.ChannelDiscord}
 }
@@ -20,22 +20,13 @@ func (s *CodexService) SupportedChannels() []string {
 // consumer reads the creds fresh from Device config on each use (the telegram
 // loop reads config.TelegramBotToken / TelegramUserID per iteration; the
 // Slack bridge reads config.SlackUserID per event and config.SlackBotToken
-// per Web API call; the discord bot reads config.DiscordBotToken per connect
-// attempt and DiscordUserID / DiscordGuildID per message), so the creds the
+// per Web API call; Discord is a relay channel with no runtime-side state), so the creds the
 // caller just persisted to config.json are all that is needed — there is
 // nothing agent-side to write.
 func (s *CodexService) AddChannel(_ context.Context, data domain.AddChannelRequest) error {
 	channel := data.EffectiveChannel()
 	if !domain.ChannelSupported(s, channel) {
 		return fmt.Errorf("codex: channel %q: %w", channel, domain.ErrChannelNotSupported)
-	}
-	if channel == domain.ChannelDiscord {
-		if data.DiscordBotToken == "" {
-			return fmt.Errorf("codex: discord_bot_token is required")
-		}
-		if data.DiscordUserID == "" {
-			return fmt.Errorf("codex: discord_user_id is required")
-		}
 	}
 	return nil
 }

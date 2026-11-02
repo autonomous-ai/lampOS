@@ -27,7 +27,9 @@ Build output (`dist/`) is served by nginx at root `/` on the device.
 
 During initial setup, **Channels** is optional and defaults to **Not now**.
 Selecting Telegram, Slack, or Discord reveals its credential fields, but the
-operator may leave them blank or configure a channel later in Settings.
+operator may leave them blank or configure a channel later in Settings. Discord
+asks only for the owner's user ID (and optionally a server ID) — there is no bot
+token field; messages go through the cloud relay ([discord-relay.md](discord-relay.md)).
 
 Initial setup can also keep an existing online Wi-Fi connection without asking
 for its password again. Leave the selected SSID empty or select the current SSID;

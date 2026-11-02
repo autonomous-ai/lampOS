@@ -10,6 +10,7 @@ import (
 	"go.autonomous.ai/os/system/beclient"
 	"go.autonomous.ai/os/system/buddy"
 	"go.autonomous.ai/os/system/device"
+	"go.autonomous.ai/os/system/discordrelay"
 	"go.autonomous.ai/os/system/healthwatch"
 	"go.autonomous.ai/os/system/lib/mqtt"
 	"go.autonomous.ai/os/system/monitor"
@@ -34,6 +35,7 @@ func InitializeServer() (*Server, error) {
 		beclient.ProviderSet,
 		monitor.ProviderSet,
 		agent.ProviderSet,
+		discordrelay.ProviderSet,
 		network.ProviderSet,
 		device.ProviderSet,
 		buddy.ProviderSet,

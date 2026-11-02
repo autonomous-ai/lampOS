@@ -524,57 +524,22 @@ sender `SlackSender`). `slack_signing_secret` của HTTP mode do proxy công kha
 tiêu thụ, không phải trên thiết bị — codex, như bridge của hermes, tin đường
 MQTT đã được xác thực.
 
-### Discord (phiên gateway bot device-owned)
+### Discord (cloud relay)
 
-Discord cũng là **device-owned**: nó yêu cầu một phiên bot Gateway WebSocket
-(không có API nhận kiểu long-poll), nên os-server chạy phiên đó qua
-[discordgo](https://github.com/bwmarrin/discordgo)
-(`runtimes/codex/discord.go`). Như loop telegram, phiên được khởi động từ
-`StartWS` (`go s.startDiscordBot(ctx)`) và sống trong vòng đời của service
-codex — nó chạy **chỉ khi codex là runtime đang active**, nên không bao giờ
-tranh phiên bot với runtime khác trên cùng token. Loop đọc
-`config.DiscordBotToken` **mới trên mỗi lần thử kết nối** (rỗng → kiểm tra
-lại mỗi 30 s; open lỗi → back off 15 s); mở xong thì discordgo tự xử lý
-reconnect gateway, và phiên được đóng khi ctx của gateway kết thúc. Intents:
-direct messages + guild messages + message content.
-
-Tin chỉ được chấp nhận nếu không phải từ bot (loop guard, bao cả tin của
-chính bot), id người gửi bằng `config.DiscordUserID` (**allowlist là bắt
-buộc** — rỗng thì từ chối tất cả, vì ai cũng có thể chung guild với bot), và
-là **DM** hoặc tin trong `config.DiscordGuildID` có **@mention bot** (mirror
-hành vi phổ biến của plugin openclaw: guild yêu cầu @mention, DM thì không —
-bản thân mention bị strip khỏi văn bản turn). Mọi thứ khác bị bỏ qua ở mức
-debug.
-
-Mỗi tin được chấp nhận chờ agent rảnh (`IsBusy`, poll 500 ms, tôn trọng
-ctx), rồi được inject qua `sendChat` với flow source `discord` và prefix
-metadata người gửi
-`[discord] Message from <Username> [id:<id>]:\n<text>`. Run được đánh dấu
-**silent** (không TTS) và theo dõi trong `discordRuns` (runID → channel id);
-trong lúc turn chạy, một goroutine `discordTypingKeeper` giữ **chỉ báo đang
-nhập native** của Discord (`ChannelTyping` lập tức rồi mỗi 8 s — chỉ báo kéo
-dài ~10 s — chặn trần 10 phút). Tại `turn.completed`, `emitFinal` consume
-tracker và post reply — đã làm sạch bằng `stripForChannel`, như telegram — về
-đúng channel qua `ChannelMessageSend`, **chia khúc theo giới hạn cứng 2000 ký
-tự mỗi tin của Discord** (ưu tiên cắt ở ranh giới xuống dòng khi có thể); khi
-`turn.failed`, tracker được consume mà không reply nên map không thể leak.
-Bên gửi reply dùng handle phiên có mutex bảo vệ trên service (phiên nil → log
-+ bỏ).
-
-Yêu cầu (config.json): `discord_bot_token`, `discord_user_id` (allowlist), và
-`discord_guild_id` khi cần mention trong guild hoạt động (setup chỉ dùng DM
-có thể để trống).
+Discord **không** phải loop do device sở hữu. Thiết bị không giữ bot token và không mở
+kết nối nào tới Discord; tin nhắn đến qua MQTT và câu trả lời đi ngược lại cùng đường.
+Bộ lọc inbound, lượt chat, tín hiệu typing và việc thu câu trả lời đều không phụ thuộc
+runtime và nằm ở `system/discordrelay/` — xem [`discord-relay_vi.md`](../discord-relay_vi.md).
+Codex không có code riêng cho Discord.
 
 ### Channel API
 
 `SupportedChannels()` trả `["telegram", "slack", "discord"]`. `AddChannel` /
 `RefreshChannelConfig` cho cả ba đều là no-op success trung thực — mọi
 consumer đọc credential mới từ config.json mỗi lần dùng (loop telegram mỗi
-vòng lặp, bridge Slack mỗi event / lần gọi Web API, bot discord mỗi lần thử
-kết nối / mỗi tin), nên không có gì phía agent để ghi và không cần restart.
-`AddChannel(discord)` kiểm tra thêm rằng `discord_bot_token` và
-`discord_user_id` phải có mặt (đường nhận không thể hoạt động nếu thiếu —
-chấp nhận sẽ là fake success). Whatsapp không có đường nhận và trả
+vòng lặp, bridge Slack mỗi event / lần gọi Web API, Discord là channel qua relay
+và không có state phía runtime), nên không có gì phía agent để ghi và không cần restart.
+Whatsapp không có đường nhận và trả
 `domain.ErrChannelNotSupported`. Xem thêm
 [`adding-agent-runtime_vi.md`](adding-agent-runtime_vi.md).
 

@@ -24,7 +24,8 @@ export interface SetupRequest {
   slack_bot_token?: string;
   slack_app_token?: string;
   slack_user_id?: string;
-  discord_bot_token?: string;
+  discord_managed?: boolean;
+  discord_guild_id?: string;
   discord_user_id?: string;
   llm_base_url: string;
   llm_api_key: string;

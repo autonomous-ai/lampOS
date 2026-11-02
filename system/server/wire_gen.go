@@ -12,6 +12,7 @@ import (
 	"go.autonomous.ai/os/system/beclient"
 	"go.autonomous.ai/os/system/buddy"
 	"go.autonomous.ai/os/system/device"
+	"go.autonomous.ai/os/system/discordrelay"
 	"go.autonomous.ai/os/system/healthwatch"
 	"go.autonomous.ai/os/system/lib/mqtt"
 	"go.autonomous.ai/os/system/monitor"
@@ -53,7 +54,8 @@ func InitializeServer() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	deviceMQTTHandler := mqtthandler.ProvideDeviceMQTTHandler(configConfig, factory, deviceService, service, agentGateway, chatStream, buddyService)
+	relay := discordrelay.ProvideRelay(configConfig, agentGateway)
+	deviceMQTTHandler := mqtthandler.ProvideDeviceMQTTHandler(configConfig, factory, deviceService, service, agentGateway, chatStream, buddyService, relay)
 	agentHandler := http4.ProvideAgentHandler(agentGateway, bus, statusledService, configConfig)
 	v := provideAgentIsSleeping(agentHandler)
 	sensingHandler := http5.ProvideSensingHandler(agentGateway, bus, configConfig, statusledService, v)
@@ -63,11 +65,12 @@ func InitializeServer() (*Server, error) {
 	personaMigration := agent.ProvidePersonaMigration(configConfig)
 	configMigration := agent.ProvideConfigMigration(configConfig, agentGateway)
 	channelReconcile := agent.ProvideChannelReconcile(configConfig, agentGateway)
+	discordRelayReconcile := agent.ProvideDiscordRelayReconcile(configConfig, agentGateway)
 	mcpReconcile := agent.ProvideMCPReconcile(configConfig, agentGateway)
 	userProfileReconcile := agent.ProvideUserProfileReconcile(configConfig)
 	memoryGuard := agent.ProvideMemoryGuard(configConfig)
 	ambientService := ambient.ProvideService(bus, configConfig)
 	healthwatchService := healthwatch.ProvideService(bus, configConfig, statusledService)
-	server := ProvideServer(configConfig, healthHandler, networkHandler, deviceHandler, deviceMQTTHandler, agentHandler, sensingHandler, buddyHandler, pluginHandler, deviceService, agentGateway, personaMigration, configMigration, channelReconcile, mcpReconcile, userProfileReconcile, memoryGuard, service, factory, ambientService, healthwatchService, statusledService, chatStream)
+	server := ProvideServer(configConfig, healthHandler, networkHandler, deviceHandler, deviceMQTTHandler, agentHandler, sensingHandler, buddyHandler, pluginHandler, deviceService, agentGateway, personaMigration, configMigration, channelReconcile, discordRelayReconcile, relay, mcpReconcile, userProfileReconcile, memoryGuard, service, factory, ambientService, healthwatchService, statusledService, chatStream)
 	return server, nil
 }

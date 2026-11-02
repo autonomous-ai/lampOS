@@ -10,8 +10,8 @@ protocol, layout và các quirk đặc thù claudecode.
 > transport bridge WebSocket, adapter migrate persona/memory bằng Go (lossless
 > với layout OpenClaw), skills (restore từ CDN + watcher, `.claude/skills`
 > native), watch/rename identity, MCP thật (`.mcp.json`), factory reset,
-> Telegram + Discord do device sở hữu (loop getUpdates `telegram_poll.go` /
-> session discordgo `discord.go` — channel plugin native cố ý không dùng),
+> Telegram do device sở hữu (loop getUpdates `telegram_poll.go`; Discord đi qua
+> cloud relay, xem `docs/vi/discord-relay_vi.md` — channel plugin native cố ý không dùng),
 > **Slack inbound do device sở hữu** (HTTP mode, `domain.SlackBridge`),
 > và flow **claude.ai OAuth login** (§7b) thay thế cho API key trong
 > config.json. Các caveat đã biết được đánh dấu ⚠️ ở §11.
@@ -55,8 +55,8 @@ resolve backend trong `system/agent/factory.go`. Switch vào/ra đi qua flow
    > `agent_runtime` là `claudecode`. Không có backup rollback — installer vẫn giữ
    > `~/.local/share/claude/versions/<ver>`, nên muốn lùi thì publish bản cũ. Xem
    > `docs/vi/bootstrap-ota.md` §5.
-3. **không bun, không channel plugin** — telegram + discord do device sở hữu
-   (os-server tự chạy các receive loop, §7), nên bước plugin marketplace bỏ
+3. **không bun, không channel plugin** — telegram do device sở hữu còn discord đi
+   qua cloud relay (os-server tự chạy receive loop, §7), nên bước plugin marketplace bỏ
    hẳn;
 4. chạy hook presync một lần (bridge + env + sync channel);
 5. ghi + start **`claudecode.service`** (tên unit == tên runtime — không cần
@@ -241,10 +241,11 @@ session start, nên rotation định kỳ chính là điểm neo lại. Ký ức
 trong session. `CompactSession` trả `domain.ErrNotSupportedByRuntime` (không
 có compact RPC ngoài).
 
-## 7. Kênh — tất cả do device sở hữu (telegram, discord, slack)
+## 7. Kênh (telegram và slack do device sở hữu, discord qua cloud relay)
 
-`SupportedChannels() = [telegram, slack, discord]`. Cả ba receive loop đều
-chạy trong os-server, mirror `runtimes/codex` 1:1. Channel plugin native
+`SupportedChannels() = [telegram, slack, discord]`. Loop telegram và bridge slack
+chạy trong os-server, mirror `runtimes/codex` 1:1; tin nhắn discord đến qua MQTT
+(`docs/vi/discord-relay_vi.md`). Channel plugin native
 telegram/discord của Claude Code **cố ý không dùng**: thực địa cho thấy không
 debug được (bun child không log ra journal, allowlist drop im lặng, chết im
 lặng khi race restart bridge), và chúng sẽ giành bot với các loop device sở
@@ -261,21 +262,14 @@ nào.
   `stripForChannel`). Offset persist ở
   `/root/.claudecode/telegram_offset.json`. Creds đọc tươi từ config.json mỗi
   vòng poll — đổi token/user không cần restart.
-- **Discord** (`discord.go`): Discord không có API nhận kiểu long-poll, nên
-  os-server sở hữu một **session gateway discordgo** (intent DM +
-  guild-message + message-content), khởi động từ `StartWS`. Chấp nhận = không
-  phải bot, sender == `discord_user_id` (allowlist rỗng = đóng), và hoặc là
-  DM hoặc là message trong `discord_guild_id` có **@mention bot** (mention bị
-  strip khỏi text). Message được chấp nhận inject thành turn với flow source
-  `discord` (track trong `discordRuns`, silent, typing keeper native);
-  `emitFinal` post reply ngược về **chunk theo giới hạn 2000 ký tự của
-  Discord**. Token đọc tươi mỗi lần (re)connect; khi session đang mở,
-  discordgo tự xử lý reconnect gateway.
+- **Discord** (cloud relay, package này không có code): thiết bị không giữ bot token
+  và không mở kết nối nào tới Discord. `system/discordrelay` biến mỗi `discord_event`
+  được chấp nhận thành một lượt chat thường (`[via:discord]`, silent) và trả
+  câu trả lời đã xong qua MQTT. Xem `docs/vi/discord-relay_vi.md`.
 - `AddChannel`/`RefreshChannelConfig` là no-op success trung thực cho cả ba
   kênh: các loop device sở hữu đọc creds tươi từ config.json mỗi lần dùng,
-  nên chỉ cần persist creds là đủ (không presync, không restart bridge).
-  Lưu ý discord: token lưu lần đầu được nhặt trong ~30 s, nhưng xoay token khi
-  session đang mở thì có hiệu lực ở chu kỳ session kế. whatsapp →
+  nên chỉ cần persist creds là đủ (không presync, không restart bridge); discord không có
+  state phía runtime. whatsapp →
   `domain.ErrChannelNotSupported`.
 - **Slack do DEVICE SỞ HỮU** (`slack.go` + `slack_sender.go`, mirror của
   `runtimes/codex/slack.go`): Claude Code không có slack channel plugin

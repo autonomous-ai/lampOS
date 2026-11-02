@@ -34,9 +34,11 @@ type SetupRequest struct {
 	SlackAppToken string `json:"slack_app_token"`
 	SlackUserID   string `json:"slack_user_id"`
 
-	DiscordBotToken string `json:"discord_bot_token"`
-	DiscordGuildID  string `json:"discord_guild_id"`
-	DiscordUserID   string `json:"discord_user_id"`
+	// Discord runs through the cloud relay: the device keeps only the owner's ids.
+	// DiscordManaged is accepted for clients that send it; relay mode is the only mode.
+	DiscordManaged bool   `json:"discord_managed"`
+	DiscordGuildID string `json:"discord_guild_id"`
+	DiscordUserID  string `json:"discord_user_id"`
 
 	// BlueBubbles server URL, password, and the operator's iMessage handle.
 	BluebubblesServerURL   string `json:"bluebubbles_server_url"`
@@ -102,7 +104,6 @@ type WifiProvisionRequest struct {
 	SlackBotToken          string `json:"slack_bot_token"`
 	SlackAppToken          string `json:"slack_app_token"`
 	SlackUserID            string `json:"slack_user_id"`
-	DiscordBotToken        string `json:"discord_bot_token"`
 	DiscordGuildID         string `json:"discord_guild_id"`
 	DiscordUserID          string `json:"discord_user_id"`
 	BluebubblesServerURL   string `json:"bluebubbles_server_url"`
@@ -135,12 +136,8 @@ func (r *SetupRequest) ValidateChannel() error {
 			return fmt.Errorf("slack_app_token is required for slack channel")
 		}
 	case "discord":
-		if r.DiscordBotToken == "" {
-			return fmt.Errorf("discord_bot_token is required for discord channel")
-		}
-		if r.DiscordGuildID == "" {
-			return fmt.Errorf("discord_guild_id is required for discord channel")
-		}
+		// Relay mode: no bot token. The user id is the allowlist; the guild id
+		// is optional (without it only direct messages are accepted).
 		if r.DiscordUserID == "" {
 			return fmt.Errorf("discord_user_id is required for discord channel")
 		}
@@ -181,9 +178,10 @@ type AddChannelRequest struct {
 	SlackSigningSecret string `json:"slack_signing_secret,omitempty"`
 	SlackWebhookPath   string `json:"slack_webhook_path,omitempty"` // default /slack/events in http mode
 
-	DiscordBotToken string `json:"discord_bot_token"`
-	DiscordGuildID  string `json:"discord_guild_id"`
-	DiscordUserID   string `json:"discord_user_id"`
+	// DiscordManaged is accepted for clients that send it; relay mode is the only mode.
+	DiscordManaged bool   `json:"discord_managed"`
+	DiscordGuildID string `json:"discord_guild_id"`
+	DiscordUserID  string `json:"discord_user_id"`
 
 	// WhatsappUserID is the operator's E.164 phone number (permitted DM caller).
 	WhatsappUserID string `json:"whatsapp_user_id"`
@@ -210,9 +208,8 @@ type RefreshChannelRequest struct {
 	SlackSigningSecret string
 	SlackWebhookPath   string
 
-	DiscordBotToken string
-	DiscordGuildID  string
-	DiscordUserID   string
+	DiscordGuildID string
+	DiscordUserID  string
 
 	BluebubblesServerURL     string
 	BluebubblesPassword      string
@@ -261,12 +258,7 @@ func (r *AddChannelRequest) ValidateChannel() error {
 			}
 		}
 	case ChannelDiscord:
-		if r.DiscordBotToken == "" {
-			return fmt.Errorf("discord_bot_token is required for discord channel")
-		}
-		if r.DiscordGuildID == "" {
-			return fmt.Errorf("discord_guild_id is required for discord channel")
-		}
+		// Relay mode: no bot token, user id is the allowlist, guild id is optional.
 		if r.DiscordUserID == "" {
 			return fmt.Errorf("discord_user_id is required for discord channel")
 		}
@@ -317,7 +309,45 @@ const (
 
 	// CommandSlackCommand forwards a Slack slash command like CommandSlackEvent; event_id carries trigger_id.
 	CommandSlackCommand = "slack_command"
+
+	// CommandDiscordEvent delivers one Discord message from the cloud relay to the device
+	// (fa_channel). The relay supplies every field the turn needs.
+	//
+	// Wire format: {"cmd":"discord_event","event_id":"...","discord_user_id":"...",
+	//   "guild_id":"...","discord_channel_id":"...","author_username":"...",
+	//   "bot_user_id":"...","mentions_bot":true,"text":"..."}
+	CommandDiscordEvent = "discord_event"
 )
+
+// Discord relay uplink message types (fd_channel). The envelope is the standard
+// device one (device/type/id/version/mac/time) plus discord_channel_id and, for a
+// reply, text:
+//
+//	{"type":"discord_reply","discord_channel_id":"...","text":"..."}
+//	{"type":"discord_typing","discord_channel_id":"..."}
+const (
+	MsgTypeDiscordReply  = "discord_reply"
+	MsgTypeDiscordTyping = "discord_typing"
+)
+
+// MQTTDiscordEventCommand is the fa_channel payload for cmd:"discord_event".
+type MQTTDiscordEventCommand struct {
+	Cmd            string `json:"cmd"`
+	EventID        string `json:"event_id"`
+	DiscordUserID  string `json:"discord_user_id"`
+	GuildID        string `json:"guild_id"`
+	ChannelID      string `json:"discord_channel_id"`
+	AuthorUsername string `json:"author_username"`
+	BotUserID      string `json:"bot_user_id"`
+	MentionsBot    bool   `json:"mentions_bot"`
+	Text           string `json:"text"`
+
+	// Enc and Sealed carry the sealed form: every field above is then inside Sealed
+	// (see discordrelay.Seal). WasSealed is set once the device has opened it.
+	Enc       string `json:"enc,omitempty"`
+	Sealed    string `json:"sealed,omitempty"`
+	WasSealed bool   `json:"-"`
+}
 
 // Data kinds carried inside CommandData envelope.
 const (
@@ -541,7 +571,8 @@ func (r *MQTTAddChannelCommand) ToRequest() AddChannelRequest {
 	cfg := r.Config
 	switch r.Channel {
 	case ChannelDiscord:
-		req.DiscordBotToken, _ = cfg["bot_token"].(string)
+		// Any bot_token the sender includes is ignored: Discord goes through the relay.
+		req.DiscordManaged, _ = cfg["managed"].(bool)
 		req.DiscordGuildID, _ = cfg["guild_id"].(string)
 		req.DiscordUserID, _ = cfg["user_id"].(string)
 	case ChannelSlack:
@@ -1368,7 +1399,6 @@ type ConfigPublicResponse struct {
 	HasTelegramBotToken    bool `json:"has_telegram_bot_token"`
 	HasSlackBotToken       bool `json:"has_slack_bot_token"`
 	HasSlackAppToken       bool `json:"has_slack_app_token"`
-	HasDiscordBotToken     bool `json:"has_discord_bot_token"`
 	HasBluebubblesPassword bool `json:"has_bluebubbles_password"`
 	HasLLMAPIKey           bool `json:"has_llm_api_key"`
 	HasDeepgramAPIKey      bool `json:"has_deepgram_api_key"`
@@ -1402,9 +1432,8 @@ type UpdateConfigRequest struct {
 	SlackAppToken string `json:"slack_app_token"`
 	SlackUserID   string `json:"slack_user_id"`
 
-	DiscordBotToken string `json:"discord_bot_token"`
-	DiscordGuildID  string `json:"discord_guild_id"`
-	DiscordUserID   string `json:"discord_user_id"`
+	DiscordGuildID string `json:"discord_guild_id"`
+	DiscordUserID  string `json:"discord_user_id"`
 
 	WhatsappUserID string `json:"whatsapp_user_id"`
 

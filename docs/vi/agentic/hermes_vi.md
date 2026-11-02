@@ -692,7 +692,7 @@ làm 3 việc theo thứ tự:
 | `telegram_bot_token` | → | `.env` `TELEGRAM_BOT_TOKEN` |
 | `telegram_user_id` | → | `.env` `TELEGRAM_ALLOWED_USERS` |
 | `slack_bot_token` / `slack_app_token` / `slack_user_id` | → | `.env` `SLACK_BOT_TOKEN` / `SLACK_APP_TOKEN` / `SLACK_ALLOWED_USERS` |
-| `discord_bot_token` / `discord_guild_id` / `discord_user_id` | → | `.env` `DISCORD_BOT_TOKEN` / `DISCORD_GUILD_ID` / `DISCORD_ALLOWED_USERS` |
+| _(discord)_ | — | không có: Discord đi qua cloud relay ([`discord-relay_vi.md`](../discord-relay_vi.md)); presync xoá mọi dòng `DISCORD_*` khỏi `.env` |
 | `whatsapp_user_id` | → | `.env` `WHATSAPP_ALLOWED_USERS` |
 
 `.env` `API_SERVER_KEY` phải bằng `constants.go` `APIKey` (`hermes-local-api-key`) nếu
@@ -874,8 +874,9 @@ SOUL.md. Khác biệt là cách xử lý lỗi: reset **ghi cảnh báo rồi fa
 ### Capability kênh & add/refresh live
 
 Hermes là một **channel runtime hạng nhất** trong luồng capability generic
-(`runtimes/hermes/channels.go`). Hermes Agent giao **telegram / slack / discord**
-natively ngay trong server của nó — một kênh được bật khi token của nó có mặt trong
+(`runtimes/hermes/channels.go`). Hermes Agent giao **telegram / slack**
+natively ngay trong server của nó (Discord đi qua cloud relay nên `.env` không có
+setting `DISCORD_*` nào) — một kênh được bật khi token của nó có mặt trong
 `~/.hermes/.env` (Slack dùng Socket Mode → `SLACK_APP_TOKEN`), mà bảng map `.env` ở
 §10 phía trên đã đổ từ `config.json`. os-server **không chạy receive loop kênh** của
 riêng mình; việc duy nhất của nó là đặt creds vào `.env` rồi bounce gateway.

@@ -38,7 +38,6 @@ func (s *ClaudeCodeService) StartWS(ctx context.Context, handler domain.AgentEve
 	// runtime and die with the gateway ctx (no getUpdates competition / duplicate bot sessions
 	// across runtimes; Telegram 409s concurrent pollers).
 	go s.startTelegramPoll(ctx)
-	go s.startDiscordBot(ctx)
 	for {
 		select {
 		case <-ctx.Done():

@@ -193,18 +193,9 @@ func (s *OpenclawService) SetupAgent(data domain.SetupRequest) error {
 		slackEntryMap := ensureMap(entriesMap, "slack")
 		slackEntryMap["enabled"] = true
 	case "discord":
-		slog.Debug("setting channels.discord", "component", "openclaw")
-		pluginCtx, cancel := context.WithTimeout(context.Background(), channelPluginInstallTimeout)
-		err := ensureChannelPlugin(pluginCtx, domain.ChannelDiscord, discordPluginPackage)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("ensure discord plugin: %w", err)
-		}
-		discordMap := ensureMap(channelsMap, "discord")
-		applyDiscordChannelConfig(discordMap, data.DiscordBotToken, data.DiscordUserID, data.DiscordGuildID)
-		channelsMap["discord"] = discordMap
-		discordEntryMap := ensureMap(entriesMap, "discord")
-		discordEntryMap["enabled"] = true
+		// Discord goes through the cloud relay: no native channel, no credential.
+		slog.Debug("discord via cloud relay; no channels.discord", "component", "openclaw")
+		removeDiscordChannelConfig(channelsMap, entriesMap)
 	default:
 		slog.Debug("setting channels.telegram", "component", "openclaw")
 		telegramMap := ensureMap(channelsMap, "telegram")
@@ -371,14 +362,8 @@ func (s *OpenclawService) AddChannel(ctx context.Context, data domain.AddChannel
 		slackEntryMap := ensureMap(entriesMap, domain.ChannelSlack)
 		slackEntryMap["enabled"] = true
 	case domain.ChannelDiscord:
-		if err := ensureChannelPlugin(ctx, domain.ChannelDiscord, discordPluginPackage); err != nil {
-			return fmt.Errorf("ensure discord plugin: %w", err)
-		}
-		discordMap := ensureMap(channelsMap, domain.ChannelDiscord)
-		applyDiscordChannelConfig(discordMap, data.DiscordBotToken, data.DiscordUserID, data.DiscordGuildID)
-		channelsMap[domain.ChannelDiscord] = discordMap
-		discordEntryMap := ensureMap(entriesMap, domain.ChannelDiscord)
-		discordEntryMap["enabled"] = true
+		// Discord goes through the cloud relay: no native channel, no credential.
+		removeDiscordChannelConfig(channelsMap, entriesMap)
 	case domain.ChannelWhatsapp:
 		if err := runOpenclawCLI(ctx, "channels", "add", "--channel", domain.ChannelWhatsapp); err != nil {
 			return fmt.Errorf("openclaw channels add whatsapp: %w", err)

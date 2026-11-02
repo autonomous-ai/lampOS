@@ -148,7 +148,7 @@ stub convention). This file is the running history for whoever picks the task up
       in slack_test.go (parse table, run-map round trip, inbound → injected turn + silent +
       eyes ack via slackSendTurn/slackAPIBase seams, emitFinal reply routing with marker
       strip, error cleanup). NOT device-verified.
-- [x] Discord inbound (2026-07-07): device-owned Gateway WS bot session via
+- [x] ~~Discord inbound~~ — SUPERSEDED: Discord now goes through the cloud relay (`discord.go` removed; see docs/discord-relay.md). Original entry (2026-07-07): device-owned Gateway WS bot session via
       github.com/bwmarrin/discordgo v0.29.0 (discord.go), started from StartWS like the
       telegram loop → active-runtime-only lifecycle, token read fresh per connect attempt
       (empty → 30s recheck, open error → 15s backoff), session closed on ctx.Done. Accept

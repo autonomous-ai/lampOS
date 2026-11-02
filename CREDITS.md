@@ -66,7 +66,7 @@ Each is installed on the robot from its own publisher; none is vendored here.
 ## Everything else
 
 The ordinary dependency list, credited by being in the manifests rather than here: Gin,
-gorilla/websocket, discordgo, paho, wire, fsnotify, go-yaml and the Go standard extras
+gorilla/websocket, paho, wire, fsnotify, go-yaml and the Go standard extras
 (`go.mod`); FastAPI, uvicorn, numpy, scipy, onnxruntime, OpenCV, Pillow, pydantic,
 sounddevice, webrtcvad, LiveKit Agents and the vendor API clients — OpenAI, Google
 GenAI, Anthropic, Deepgram, ElevenLabs (`hal/pyproject.toml`); React, Vite,
