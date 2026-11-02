@@ -91,6 +91,8 @@ struct Lamp {
     /// The goals the body says for its five joints at a time (none by
     /// default).
     goals: fn(u64) -> Vec<f64>,
+    /// The voice says no timing, as while it is muted to sleep (#3748).
+    voice_silent: bool,
 }
 
 impl Lamp {
@@ -112,6 +114,7 @@ impl Lamp {
             faces: Some(vec![]),
             minute: None,
             goals: |_| vec![],
+            voice_silent: false,
         };
         let stamp = lamp.stamp();
         lamp.send(Input::Light {
@@ -199,7 +202,9 @@ impl Lamp {
 
     /// The voice, fresh joints and a quiet room, as said every 100 ms.
     fn say_parts(&mut self) {
-        self.say_voice();
+        if !self.voice_silent {
+            self.say_voice();
+        }
         let stamp = self.stamp();
         self.send(Input::Joints {
             stamp,
@@ -1702,6 +1707,38 @@ mod head {
         // The voice opens: it wakes.
         lamp.mute(false, false);
         let woken = lamp.with_hand(None, 100_000);
+        assert!(named(&woken, "waking"), "{:?}", woken.state);
+    }
+
+    /// lamp-52e6, 2 Nov (#3748): put to sleep, the voice ends its cycle and
+    /// says no timing, only its mute each second. The face stays asleep
+    /// until it opens, not dropped once its last timing is 500 ms old.
+    #[test]
+    fn put_to_sleep_it_stays_asleep_while_the_voice_says_only_its_mute() {
+        let mut lamp = Lamp::new(catalogue());
+        lamp.run(10 * SECOND, |_, _| {});
+        lamp.mute(false, false);
+        lamp.hand(Some((9, 3_000_000)));
+        lamp.head(TouchGesture::Hold, 9, 3_000_000);
+        lamp.mute(true, true);
+        lamp.voice_silent = true;
+        for second in 0..5 {
+            let until = lamp.now + SECOND;
+            while lamp.now < until {
+                let output = lamp.step();
+                assert_eq!(
+                    output.state.asleep,
+                    Some(true),
+                    "{second} s: {:?}",
+                    output.state
+                );
+            }
+            lamp.mute(true, true);
+        }
+        // The voice opens and says its timing again: it wakes.
+        lamp.voice_silent = false;
+        lamp.mute(false, false);
+        let woken = lamp.last(100_000);
         assert!(named(&woken, "waking"), "{:?}", woken.state);
     }
 

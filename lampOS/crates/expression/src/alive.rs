@@ -901,7 +901,7 @@ impl Life {
         }
     }
 
-    fn voice_asleep(&self, now_us: u64) -> Option<bool> {
+    pub(crate) fn voice_asleep(&self, now_us: u64) -> Option<bool> {
         self.voice_said
             .filter(|(at, _)| now_us.saturating_sub(*at) < VOICE_MUTE_KEPT_US)
             .map(|(_, asleep)| asleep)
