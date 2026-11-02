@@ -136,6 +136,22 @@ pub fn head_moved(joints: &lamp_msgs::JointState) -> bool {
         .any(|turning| turning.abs() > HEAD_MOVED_RADIANS_A_SECOND)
 }
 
+/// [`head_moved`] at a frame captured at `frame_unix_ms`, from the body's
+/// latest reading (its joints, its bus stamp and whether it expired). No
+/// reading, an expired one, or one stamped more than
+/// [`crate::full_look::FRESH_MS`] from the capture either way says nothing of
+/// that frame: `None`, the head's motion unknown.
+pub fn head_moved_at(
+    reading: Option<(&lamp_msgs::JointState, u64, bool)>,
+    frame_unix_ms: u64,
+) -> Option<bool> {
+    reading
+        .filter(|(_, at_unix_ms, expired)| {
+            !expired && at_unix_ms.abs_diff(frame_unix_ms) <= crate::full_look::FRESH_MS
+        })
+        .map(|(joints, _, _)| head_moved(joints))
+}
+
 /// The mouth's width over the distance between the eyes, that distance in
 /// pixels, and the eye line's angle. `None` if the eyes sit on one point.
 pub fn shape(marks: &[(f32, f32); 5]) -> Option<(f32, f32, f32)> {
@@ -197,6 +213,10 @@ pub enum Reason {
     Outliers,
     TooFewLooks,
     Jitter,
+    /// With `LAMP_EYES_SPEAKING_STEADY`: too few steady pairs left in a
+    /// window with pairs left out to judge it, or to say `yes`
+    /// ([`LEAST_HELD_PAIRS`]).
+    FewSteadyPairs,
     Mesh,
     Corners,
 }
@@ -232,11 +252,13 @@ impl Mouths {
         self.mesh_scale = Some(scale);
     }
 
-    /// Whether the lamp's head was moving at this look ([`head_moved`]). Set
-    /// once a look, before its faces are judged; read only with
-    /// [`STEADY_ENVIRONMENT`].
-    pub fn set_head_moved(&mut self, moved: bool) {
-        self.head_moved = moved;
+    /// Whether the lamp's head was moving at this look ([`head_moved_at`]).
+    /// Set once a look, before its faces are judged; read only with
+    /// [`STEADY_ENVIRONMENT`]. Unknown (`None`) is taken as moving, so that
+    /// look's pairs are left out: a stalled joint stream or a frame older
+    /// than its reading may hide a blurred look.
+    pub fn set_head_moved(&mut self, moved: Option<bool>) {
+        self.head_moved = moved.unwrap_or(true);
     }
 
     /// This look of the face `id`: its marks in the detector's pixels, how
@@ -425,7 +447,7 @@ impl Mouths {
         // The mesh read every look of the window: its inner lips, not the
         // corners, and its own steadiness is not the eye line's.
         if all_meshed {
-            if let Some(detail) = diagnostic {
+            if let Some(detail) = diagnostic.as_deref_mut() {
                 detail.reason = Reason::Mesh;
             }
             // With the switch, a pair across which the head moved, or the
@@ -442,23 +464,38 @@ impl Mouths {
                         && (a.6 || b.6 || (b.5 - a.5).abs() > MOST_EYES_STEP * a.5.min(b.5)))
                 })
                 .collect();
-            // Only a window the head moved in is held to that count, so a
+            // Only a window with pairs left out is held to that count, so a
             // still one, and every window with the switch off, is judged as
             // before.
-            if held.len() < pairs.len() && held.len() < LEAST_HELD_PAIRS {
+            let dropped = held.len() < pairs.len();
+            if dropped && held.len() < LEAST_HELD_PAIRS {
+                if let Some(detail) = diagnostic {
+                    detail.reason = Reason::FewSteadyPairs;
+                }
                 return UNKNOWN;
             }
-            let score = (held
+            let squares = held
                 .iter()
                 .filter_map(|(a, b)| Some((b.4? - a.4?).powi(2)))
-                .sum::<f32>()
-                / held.len().max(1) as f32)
-                .sqrt();
-            let state = if score >= MESH_SPEAKING_AT {
-                SpeakingState::Yes
-            } else {
-                SpeakingState::No
-            };
+                .sum::<f32>();
+            let score = (squares / held.len().max(1) as f32).sqrt();
+            // With pairs left out, `yes` is scored over the whole window's
+            // pairs, a left-out pair counting as still: one jumpy pair of two
+            // held would otherwise carry half the window (0.022 scores 0.0156
+            // over two, 0.0078 over eight, #4585). `no` stands on the held
+            // pairs; a window between the two is `unknown`.
+            let whole = (squares / pairs.len().max(1) as f32).sqrt();
+            let state =
+                if !dropped && score >= MESH_SPEAKING_AT || dropped && whole >= MESH_SPEAKING_AT {
+                    SpeakingState::Yes
+                } else if score < MESH_SPEAKING_AT {
+                    SpeakingState::No
+                } else {
+                    if let Some(detail) = diagnostic {
+                        detail.reason = Reason::FewSteadyPairs;
+                    }
+                    return UNKNOWN;
+                };
             return Speaking {
                 state,
                 score,
@@ -1388,7 +1425,7 @@ mod steady_tests {
         };
         let mut said = UNKNOWN;
         for look in 0..10 {
-            mouths.set_head_moved(moving.contains(&look));
+            mouths.set_head_moved(Some(moving.contains(&look)));
             let gap = (!corners).then_some(if open.contains(&look) { 0.06 } else { 0.002 });
             said = mouths.judge(1, &marks(eyes), Some(0.0), gap, look * 250_000);
         }
@@ -1649,5 +1686,171 @@ mod steady_tests {
             last(true, 30.0, &all, &every, false).state,
             SpeakingState::Unknown
         );
+    }
+
+    /// Every verdict over meshed looks 250 ms apart with the switch on, each
+    /// look's eye distance and `mouth_open`, the head moving at `moving`.
+    fn moving_each(eyes: &[f32], moving: &[usize], open: &[f32]) -> Vec<SpeakingState> {
+        let mut mouths = Mouths {
+            steady: true,
+            ..Mouths::default()
+        };
+        (0..eyes.len())
+            .map(|look| {
+                mouths.set_head_moved(Some(moving.contains(&look)));
+                mouths
+                    .judge(
+                        1,
+                        &marks(eyes[look]),
+                        Some(0.0),
+                        Some(open[look]),
+                        look as u64 * 250_000,
+                    )
+                    .state
+            })
+            .collect()
+    }
+
+    /// One lip step of 0.022 on the last look, every earlier look 0.002.
+    fn one_step() -> Vec<f32> {
+        (0..10)
+            .map(|look| if look == 9 { 0.024 } else { 0.002 })
+            .collect()
+    }
+
+    #[test]
+    fn two_held_pairs_with_one_lip_step_in_a_moved_window_are_not_yes() {
+        // The review's case: the head moves at looks 1 to 6, so of the
+        // window's eight pairs only (7,8) and (8,9) are held, one stepping
+        // 0.022: sqrt(0.022^2 / 2) = 0.0156 over two pairs, 0.0078 over eight.
+        let said = moving_each(&[30.0; 10], &[1, 2, 3, 4, 5, 6], &one_step());
+        assert_ne!(said[9], SpeakingState::Yes, "{said:?}");
+    }
+
+    #[test]
+    fn two_held_pairs_with_one_lip_step_after_eye_steps_are_not_yes() {
+        // The same two held pairs, the others left out by the eye step alone,
+        // the head still.
+        let eyes = [20.0, 21.5, 20.0, 21.5, 20.0, 21.5, 20.0, 21.5, 21.5, 21.5];
+        let said = moving_each(&eyes, &[], &one_step());
+        assert_ne!(said[9], SpeakingState::Yes, "{said:?}");
+    }
+
+    #[test]
+    fn a_still_face_while_the_head_moves_is_never_speaking() {
+        // The mouth reads open only on moving looks, which come in bursts;
+        // the still looks between jitter by 0.0005.
+        let moving = [2, 3, 7, 8, 9, 13, 16, 17, 18, 19];
+        let open: Vec<f32> = (0..24)
+            .map(|look| {
+                if moving.contains(&look) {
+                    0.06
+                } else {
+                    0.002 + 0.0005 * ((look * 7 % 3) as f32 - 1.0)
+                }
+            })
+            .collect();
+        let said = moving_each(&[30.0; 24], &moving, &open);
+        assert!(!said.contains(&SpeakingState::Yes), "{said:?}");
+        assert!(said.contains(&SpeakingState::No), "{said:?}");
+    }
+
+    fn turning(yaw: f64) -> lamp_msgs::JointState {
+        lamp_msgs::JointState {
+            name: ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"]
+                .map(str::to_owned)
+                .to_vec(),
+            position: vec![0.0; 5],
+            velocity: vec![yaw, 0.0, 0.0, 0.0, 0.0],
+            effort: vec![],
+            commanded: vec![],
+        }
+    }
+
+    #[test]
+    fn the_head_moves_only_when_the_aim_turns_past_the_still_bar() {
+        let bar = HEAD_MOVED_RADIANS_A_SECOND;
+        assert!(head_moved(&turning(bar * 1.5)));
+        assert!(head_moved(&turning(-bar * 1.5)));
+        assert!(!head_moved(&turning(bar * 0.5)));
+        // A reading without speeds says nothing of turning.
+        let mut unsaid = turning(bar * 2.0);
+        unsaid.velocity.clear();
+        assert!(!head_moved(&unsaid));
+    }
+
+    #[test]
+    fn a_reading_missing_expired_or_not_fresh_at_the_capture_is_unknown() {
+        let fresh = crate::full_look::FRESH_MS;
+        let moving = turning(HEAD_MOVED_RADIANS_A_SECOND * 2.0);
+        let still = turning(0.0);
+        let frame = 10_000;
+        assert_eq!(head_moved_at(None, frame), None);
+        assert_eq!(head_moved_at(Some((&moving, frame, true)), frame), None);
+        // Older than the capture, or newer (judged after a slow mesh).
+        assert_eq!(
+            head_moved_at(Some((&still, frame - fresh - 1, false)), frame),
+            None
+        );
+        assert_eq!(
+            head_moved_at(Some((&still, frame + fresh + 1, false)), frame),
+            None
+        );
+        assert_eq!(
+            head_moved_at(Some((&still, frame - fresh, false)), frame),
+            Some(false)
+        );
+        assert_eq!(
+            head_moved_at(Some((&moving, frame + fresh, false)), frame),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn a_look_whose_head_motion_is_unknown_has_its_pairs_left_out() {
+        // The mouth reads open only at looks with no fresh reading: left out
+        // as moving looks are, so `no`; read as still they would be `yes`.
+        let at = [3, 7];
+        let said = |unknown_moves: bool| {
+            let mut mouths = Mouths {
+                steady: true,
+                ..Mouths::default()
+            };
+            let mut said = UNKNOWN;
+            for look in 0..10 {
+                let blind = at.contains(&look);
+                mouths.set_head_moved(if blind && unknown_moves {
+                    None
+                } else {
+                    Some(false)
+                });
+                let gap = if blind { 0.06 } else { 0.002 };
+                said = mouths.judge(1, &marks(30.0), Some(0.0), Some(gap), look * 250_000);
+            }
+            said.state
+        };
+        assert_eq!(said(true), SpeakingState::No);
+        assert_eq!(said(false), SpeakingState::Yes);
+    }
+
+    #[test]
+    fn too_few_steady_pairs_name_their_own_reason() {
+        let mut mouths = Mouths {
+            steady: true,
+            ..Mouths::default()
+        };
+        let mut reason = Reason::Mesh;
+        for look in 0..10 {
+            mouths.set_head_moved(Some((1..=7).contains(&look)));
+            let (_, detail) = mouths.judge_with_diagnostics(
+                1,
+                &marks(30.0),
+                Some(0.0),
+                Some(0.002),
+                look * 250_000,
+            );
+            reason = detail.reason;
+        }
+        assert_eq!(reason, Reason::FewSteadyPairs);
     }
 }
