@@ -201,15 +201,17 @@ impl<L: Lines> PinReader for LinePins<L> {
     }
 }
 
-/// The head pads' lines read from a test input (`serve --touch --touch-from
-/// FILE`, for a test on a lamp, #2602), in place of their GPIO lines. FILE
-/// names the pads touched now, by their names in the pins, separated by
-/// spaces or new lines; `none` or nothing is none touched. It is read at each
-/// acquisition, the pads' own poll, so whoever writes it touches the head with
-/// real timing and the gesture behind [`LinePins`] runs unchanged. A missing
-/// file or a word that is no pad is a read that failed, as a lost chip is.
-/// Every other line (the buttons, reset) is read from `others`, the real
-/// lines. No product unit passes the flag.
+/// Some inputs' lines read from a test input, in place of their GPIO lines:
+/// the head pads (`serve --touch --touch-from FILE`, #2602) or the buttons
+/// and reset (`serve --touch --buttons-from FILE`, #3697), for a test on a
+/// lamp. FILE names the inputs active now (touched or pressed), by their
+/// names in the pins, separated by spaces or new lines; `none` or nothing is
+/// none active. It is read at each acquisition, the inputs' own poll, so
+/// whoever writes it touches or presses with real timing and the gesture
+/// behind [`LinePins`] runs unchanged. A missing file or a word that is none
+/// of these inputs is a read that failed, as a lost chip is. Every other line
+/// is read from `others`: the real lines, or another test input. No product
+/// unit passes either flag.
 pub struct FileLines {
     path: std::path::PathBuf,
     pads: Vec<Pin>,
@@ -241,7 +243,7 @@ impl Lines for FileLines {
                 touched = true;
             } else if word != "none" && !self.pads.iter().any(|pad| pad.name == word) {
                 return Err(io::Error::other(format!(
-                    "{} says {word:?}: not none or a head pad",
+                    "{} says {word:?}: not none or an input it reads",
                     self.path.display()
                 )));
             }

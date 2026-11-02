@@ -287,6 +287,12 @@ fn no_deployed_unit_passes_touch_from() {
             "{} passes --touch-from",
             unit.display()
         );
+        // The buttons' test input (#3697), likewise.
+        assert!(
+            !text.contains("--buttons-from"),
+            "{} passes --buttons-from",
+            unit.display()
+        );
         // discover-head's test input (#2818), likewise.
         assert!(
             !text.contains("--lines-from"),

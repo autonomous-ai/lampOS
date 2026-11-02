@@ -3,6 +3,7 @@
 //! `tests/strip_worker.rs` stays a binary of its own: it runs that binary again
 //! by a test's name, and its children share no process with other tests.
 mod base;
+mod buttons_from;
 mod engine;
 mod head_discovery;
 mod head_pet;

@@ -1859,7 +1859,7 @@ is none touched. For example, `head-3` for 3.5 s and then `none` is the hold
 that asks for sleep; `head-3` for 0.2 s and then `none` is the tap that wakes.
 A missing file or a word that is no pad's name fails the read, as a lost chip
 does. Only the lines are swapped: the buttons and reset stay on their own
-lines, and the acquisition, the head's gesture (touch, stroke, hold, tap),
+lines (unless `--buttons-from` is given too, below), and the acquisition, the head's gesture (touch, stroke, hold, tap),
 `controls/touch` and the touch state are the real path.
 
 The flag needs `--touch` and head pads in `--pins`, and is refused otherwise.
@@ -1871,6 +1871,30 @@ product unit passes it, and a test checks every unit under `deploy/`
 (`no_deployed_unit_passes_touch_from`). Tests: `tests/it/touch_from.rs`
 covers the words read, a hold and a tap from the file giving the same events
 as the lines (sleep and wake), and the flag refused without `--touch`.
+
+### A test input in place of the buttons (#3697)
+
+`serve --touch --buttons-from FILE` is the same for the primary button and
+reset, so the primary button's long press (held 5 to 15 s and released, with
+`LAMP_SHUTDOWN=on`) can be tried on a lamp with no hand on it. Their lines are
+read from FILE instead, through the same `pins::FileLines`, at the same poll.
+FILE names the buttons pressed now, by their names in the pins (`primary`,
+`reset` on the product), or `none`. For example, `primary` for 6 s and then
+`none` is one shutdown request from the button. Reset reads from FILE too: it
+shares the reader's buttons, so taking only the primary would be a second
+mechanism for no gain. Only the lines are swapped: the hold's timing, the
+ring's warning while held and the request to setup are the real path.
+
+The flag needs `--touch` and a primary button or reset in `--pins`, and is
+refused otherwise (`--buttons-from needs --touch and a button or reset in
+--pins`). It may be given with `--touch-from`, each file for its own inputs;
+the head pads stay on their lines without it and are probed at start as usual.
+The journal says once `lamp-controls: buttons from a test input: FILE, not
+their lines`, and the reader session is `touch-test-input-…`. No product unit
+passes it (`no_deployed_unit_passes_touch_from` checks both flags). Tests:
+`tests/it/buttons_from.rs` covers a 6 s hold from the file giving the same
+events and the one shutdown request as the lines, and the flag refused without
+`--touch` or a button.
 
 `discover-head --lines-from FILE` (#2818) is the same for the factory's head
 pads step, so it runs whole with no person: the four candidates' levels are

@@ -17,7 +17,7 @@ use std::{
     },
 };
 
-const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N] [--privacy-from FILE] [--touch-from FILE]\n\
+const USAGE: &str = "lamp-controls serve [--config FILE] [--pins FILE] [--touch] [--enable] [--bus-root PATH] [--clock-id ID] [--record FILE] [--seconds N] [--privacy-from FILE] [--touch-from FILE] [--buttons-from FILE]\n\
 lamp-controls replay --input FILE --config FILE --clock-id ID [--touch --pins FILE] [--enable] [--output FILE] [--until-us N]\n\
 lamp-controls probe --pins FILE\n\
 lamp-controls discover-head --seconds N [--rest-seconds R] [--lines-from FILE]\n\
@@ -40,6 +40,8 @@ Only LAMP_PRIVACY_CONTROLS=on selects an explicit privacy section in --pins; abs
 gap for no reading, fault for an unreadable switch), and the journal says so. No product unit passes it.\n\
 --touch-from FILE is for tests on a lamp only, with --touch: the head pads are read from FILE instead of their lines\n\
 (the touched pads' names, or none), at their own poll; the journal says so. No product unit passes it.\n\
+--buttons-from FILE is the same for the primary button and reset, with --touch and either in --pins (the pressed\n\
+buttons' names, or none); hold, warning and requests are unchanged. It works with --touch-from. No product unit passes it.\n\
 --lines-from FILE is for tests only, with discover-head: the candidates' levels are read from FILE instead of chip 0\n\
 (the high lines' numbers, e.g. 97 98, or none), at each sample; stderr says so. No product unit passes it.\n\
 LAMP_PRIVACY_CONTROLS=no-slide is the route on a lamp with no slide: it refuses a privacy section, opens no chip 1,\n\
@@ -47,6 +49,8 @@ and serve's controls/state says no_privacy_slide at the route's cadence. Replay 
 Replay never opens a bus or hardware. Times are CLOCK_MONOTONIC microseconds.\n\
 Record/output files must not already exist. Acquisition records are capped at 32 MiB.\n\
 No controls message grants microphone/camera permission or reports a verified stop.";
+
+const BUTTONS_FROM_NEEDS: &str = "--buttons-from needs --touch and a button or reset in --pins";
 
 #[derive(Default)]
 struct Args {
@@ -72,6 +76,8 @@ struct Args {
     privacy_from: Option<PathBuf>,
     /// `serve --touch --touch-from FILE`: the head pads read from a test input.
     touch_from: Option<PathBuf>,
+    /// `serve --touch --buttons-from FILE`: the buttons read from a test input.
+    buttons_from: Option<PathBuf>,
     /// `discover-head --lines-from FILE`: the candidates read from a test input.
     lines_from: Option<PathBuf>,
 }
@@ -116,6 +122,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
                 "--touch",
                 "--privacy-from",
                 "--touch-from",
+                "--buttons-from",
             ]
             .contains(&option.as_str()),
             "replay" => [
@@ -176,6 +183,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
             "--replay" => out.replay = Some(value.into()),
             "--privacy-from" => out.privacy_from = Some(value.into()),
             "--touch-from" => out.touch_from = Some(value.into()),
+            "--buttons-from" => out.buttons_from = Some(value.into()),
             "--lines-from" => out.lines_from = Some(value.into()),
             "--clock-id" => out.clock = Some(value),
             "--bus-root" => {
@@ -259,6 +267,9 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Option<Args>, String>
     }
     if out.touch_from.is_some() && !out.touch {
         return Err("--touch-from needs --touch and head pads in --pins".into());
+    }
+    if out.buttons_from.is_some() && !out.touch {
+        return Err(BUTTONS_FROM_NEEDS.into());
     }
     if out.command == "replay" && out.pins.is_some() && !out.touch && !privacy_selected() {
         return Err("replay accepts --pins only with --touch".into());
@@ -717,37 +728,57 @@ fn touch_reader(
     Err("touch hardware requires Linux; replay opens no hardware".into())
 }
 
-/// `--touch-from FILE` (#2602): the GPIO reader with the head pads' lines read
-/// from FILE ([`lamp_controls::pins::FileLines`]); the buttons and reset stay
-/// on their lines. Its reader session says `test-input`, so every TouchEvent
-/// and the touch state name the source.
-fn touch_from_reader(
+/// `--touch-from FILE` (#2602) and `--buttons-from FILE` (#3697): the GPIO
+/// reader with the head pads' lines, the buttons' (primary and reset) or both
+/// read from their FILE ([`lamp_controls::pins::FileLines`]); every other
+/// line stays on the board. Its reader session says `test-input`, so every
+/// TouchEvent and the touch state name the source.
+fn test_input_reader(
     wiring: &lamp_controls::touch_pins::TouchPinsConfig,
     clock: &str,
-    path: &std::path::Path,
+    touch_from: Option<&std::path::Path>,
+    buttons_from: Option<&std::path::Path>,
 ) -> Result<Box<dyn lamp_controls::input::PinReader>, Box<dyn std::error::Error>> {
+    use lamp_controls::pins::{FileLines, Lines};
     let (pins, config) = wiring
         .gpio_config()
-        .ok_or("--touch-from needs --touch and head pads in --pins")?;
+        .ok_or("a test input needs its inputs in --pins")?;
     let mut others = pins.clone();
-    others.head_pads.clear();
-    let others = if others.buttons.is_empty() {
-        None
-    } else {
-        match open_lines(&others) {
-            Ok(lines) => Some(lines),
-            Err(error) => {
-                return Ok(Box::new(lamp_controls::touch_pins::FailedGpio::new(
-                    error.to_string(),
-                )));
+    if touch_from.is_some() {
+        others.head_pads.clear();
+    }
+    if buttons_from.is_some() {
+        others.buttons.clear();
+    }
+    let mut lines: Option<Box<dyn Lines>> =
+        if others.buttons.is_empty() && others.head_pads.is_empty() {
+            None
+        } else {
+            match open_lines(&others) {
+                Ok(lines) => Some(lines),
+                Err(error) => {
+                    return Ok(Box::new(lamp_controls::touch_pins::FailedGpio::new(
+                        error.to_string(),
+                    )));
+                }
             }
+        };
+    let mut file = None;
+    for (path, inputs, what, flag) in [
+        (buttons_from, &pins.buttons, "buttons", "--buttons-from"),
+        (touch_from, &pins.head_pads, "head pads", "--touch-from"),
+    ] {
+        let Some(path) = path else { continue };
+        eprintln!(
+            "lamp-controls: {what} from a test input: {}, not their lines ({flag}, a test flag no product unit passes)",
+            path.display()
+        );
+        if let Some(inner) = file.take() {
+            lines = Some(Box::new(inner));
         }
-    };
-    eprintln!(
-        "lamp-controls: head pads from a test input: {}, not their lines (--touch-from, a test flag no product unit passes)",
-        path.display()
-    );
-    let lines = lamp_controls::pins::FileLines::new(path, pins.head_pads.clone(), others);
+        file = Some(FileLines::new(path, inputs.clone(), lines.take()));
+    }
+    let lines = file.ok_or("no test input was given")?;
     Ok(Box::new(lamp_controls::pins::LinePins::new(
         lines,
         pins,
@@ -797,6 +828,9 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
     };
     if args.touch_from.is_some() && wiring.head_pads.is_empty() {
         return Err("--touch-from needs --touch and head pads in --pins".into());
+    }
+    if args.buttons_from.is_some() && wiring.buttons.is_empty() && wiring.reset.is_none() {
+        return Err(BUTTONS_FROM_NEEDS.into());
     }
     if wiring.privacy.is_some() && !privacy_selected() {
         return Err(unselected_privacy().into());
@@ -865,9 +899,20 @@ fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std:
         None if no_slide_selected() => PrivacyRoute::NoSlide,
         None => PrivacyRoute::None,
     };
-    let (head_lines, gpio) = match &args.touch_from {
-        Some(path) => (None, touch_from_reader(&wiring, clock, path)?),
-        None => (head_lines(&wiring), touch_reader(&wiring, clock)?),
+    // Real head pads are probed before the reader takes their lines.
+    let head_lines = match args.touch_from {
+        Some(_) => None,
+        None => head_lines(&wiring),
+    };
+    let gpio = if args.touch_from.is_some() || args.buttons_from.is_some() {
+        test_input_reader(
+            &wiring,
+            clock,
+            args.touch_from.as_deref(),
+            args.buttons_from.as_deref(),
+        )?
+    } else {
+        touch_reader(&wiring, clock)?
     };
     let bus = if let Some(root) = args.bus_root {
         Bus::new(root)?
