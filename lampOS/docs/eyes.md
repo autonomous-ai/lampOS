@@ -1113,6 +1113,10 @@ hold, which needs the match's id, let them go. With both on:
 - **Said on the bus.** `humans/faces/tracked` gives the new face
   `"follows":"f3"`, the id it follows; the second voice then reads a line
   across the change as one face's ([second-voice.md](second-voice.md)).
+  The link alone never makes a line the known person's: before the eyes'
+  print decides, it is not theirs. A line ending while a follow of the
+  known face is pending waits, at most 1 s, for the known file, and is
+  theirs only once the hold is carried to the new id (#4966).
 
 With either switch off nothing is followed and no `follows` is said.
 

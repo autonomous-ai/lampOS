@@ -4387,8 +4387,18 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   those links the old id's looks count as the new id's for
   `speakers_with_boot` and `no_other_face_in_view`, and a look with two
   faces in it is never one face. The known face is never mapped through a
-  link (`known_with_boot`): only the eyes' file moves it to the new id,
-  once a print of it passes their hold's bar. So a line across a turn away
+  link when read (`known_with_boot`): only the eyes' file moves it to the
+  new id, once a print of it passes their hold's bar. A link is position
+  only, and someone else may sit where they were, so before the eyes'
+  print decides the line is not theirs. When the eyes' last look at the
+  line's end still says a new id follows the known face, `line_sight`
+  waits for that print (`known_once_decided`, #4966, the Reviewer-lead's
+  P2 on #4967): it reads the known file again every 100 ms, at most 1 s
+  past the line's end (`FOLLOW_DECIDED_WITHIN`: the eyes check a new near
+  id at most 0.5 s after their last check, `REFOUND_RETRY`, then a 152 ms
+  print, then the file). The file moved to the new id makes the line
+  theirs; still on the old id at the bound, or gone, the room's. Nothing
+  waits when no follow of the known face is pending. So a line across a turn away
   and back is one face's to `not_theirs` and `no_other_face_in_view`, not
   two; with the eyes' switches off no link is said and nothing changes. Every person scope taken from a line reads the lease this
   narrows (`remember::forget_everything` and `forget_face_memory`, the

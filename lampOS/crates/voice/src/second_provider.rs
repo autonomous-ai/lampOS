@@ -1619,7 +1619,9 @@ fn carried_as(shared: &Shared) -> &'static str {
 /// the eyes' boot, the known face's too ([`SpeakingFaces::known_with_boot`]),
 /// as the held forget's sight is (#3037): after the eyes start again a
 /// reused id is someone else, and a known face with no boot is nobody's.
-/// Without it, the bare ids, as before.
+/// Without it, the bare ids, as before. A follow of the known face the
+/// eyes' last look still says at the line's end waits for their print to
+/// decide (`speaking_faces::known_once_decided`, #4966).
 ///
 /// [`SpeakingFaces::known_with_boot`]: crate::speaking_faces::SpeakingFaces::known_with_boot
 async fn line_sight(
@@ -1633,6 +1635,7 @@ async fn line_sight(
     Option<(String, String)>,
     bool,
 ) {
+    let known_file = known.to_owned();
     let known = known.to_owned();
     if seen_only {
         let speakers = eyes.speakers_with_boot(begun, finishing);
@@ -1641,6 +1644,16 @@ async fn line_sight(
             .await
             .ok()
             .flatten();
+        // A follow of the known face still pending at the line's end: the
+        // eyes' print decides, never the link (#4966).
+        let pair = crate::speaking_faces::known_once_decided(
+            eyes,
+            &known_file,
+            pair,
+            finishing,
+            crate::speaking_faces::FOLLOW_DECIDED_WITHIN,
+        )
+        .await;
         // The known face the only one in view through the line (lamp-3e83).
         let alone = pair
             .as_ref()
