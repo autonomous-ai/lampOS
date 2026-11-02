@@ -36,6 +36,12 @@ pub trait Systemd {
     fn stop(&mut self, unit: &str) -> Result<(), String> {
         Err(format!("{unit} cannot be stopped here"))
     }
+    /// `systemctl start` of a unit enabled but never started by a round
+    /// (`lamp-setup-recover.service`, docs/updates.md), outside any watch.
+    /// Refused unless a world can.
+    fn start_unit(&mut self, unit: &str) -> Result<(), String> {
+        Err(format!("{unit} cannot be started here"))
+    }
     /// `systemctl show` of [`crate::writer_unit::PROPERTIES`] for the
     /// settings writer's one-shot, [`crate::writer_unit::UNIT`], and only
     /// it. A systemd that cannot say refuses: the unit is then never started.
@@ -201,6 +207,10 @@ impl Systemd for Systemctl {
         self.restarted.retain(|(name, _, _)| name != unit);
         self.restarted.push((unit.to_owned(), at, before));
         run(&["restart", unit], self.restart_within)
+    }
+
+    fn start_unit(&mut self, unit: &str) -> Result<(), String> {
+        run(&["start", unit], self.restart_within)
     }
 
     fn stop(&mut self, unit: &str) -> Result<(), String> {

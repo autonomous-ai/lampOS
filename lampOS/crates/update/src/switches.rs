@@ -192,19 +192,10 @@ pub fn merged_off(switches: &[String], sources: &[(String, Assignments)]) -> Vec
     switches
         .iter()
         .filter_map(|name| {
-            // The product unit sets every switch `on`; `None` is cleared.
-            let mut value = Some("on");
-            let mut by: Option<&str> = None;
-            for (what, found) in sources {
-                if let Some(set) = found.get(name) {
-                    value = Some(set);
-                    by = Some(what);
-                } else if found.cleared {
-                    value = None;
-                    by = Some(what);
-                }
-            }
-            let by = by?.to_owned();
+            // The product unit sets every switch `on`: a switch no source
+            // sets or clears stays on.
+            let (value, by) = last(name, sources)?;
+            let by = by.to_owned();
             match value {
                 Some("on") => None,
                 Some(value) => Some((by, format!("turns {name} off ({value:?})"))),
@@ -215,6 +206,29 @@ pub fn merged_off(switches: &[String], sources: &[(String, Assignments)]) -> Vec
             }
         })
         .collect()
+}
+
+/// The last of `sources` that sets `name` or clears every variable: its
+/// value (`None`: cleared) and the source.
+fn last<'a>(
+    name: &str,
+    sources: &'a [(String, Assignments)],
+) -> Option<(Option<&'a str>, &'a str)> {
+    let mut found = None;
+    for (what, assignments) in sources {
+        if let Some(set) = assignments.get(name) {
+            found = Some((Some(set), what.as_str()));
+        } else if assignments.cleared {
+            found = Some((None, what.as_str()));
+        }
+    }
+    found
+}
+
+/// What `name` ends up as once every one of `sources` is read in systemd's
+/// order: none when no source sets it or the last one clears it.
+pub fn effective<'a>(name: &str, sources: &'a [(String, Assignments)]) -> Option<&'a str> {
+    last(name, sources)?.0
 }
 
 /// The line said for `what` (`kept drop-in PATH`) turning a switch off.
