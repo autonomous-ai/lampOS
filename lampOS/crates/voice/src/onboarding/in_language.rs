@@ -869,15 +869,17 @@ impl Lexicon {
 
     fn read(&self, text: &str) -> Reading {
         let mut line = plain(text);
-        // Korean: a casual 어 opening the line is a yes, as 응 is, when the
-        // line is 어 alone or 어 and a bare yes ("어, 해", "어 좋아");
-        // otherwise it is a hesitation and drops ("어… 민수예요" is a name,
-        // "어, 잠깐만" a put-off). A Korean commenter's note on #4473.
+        // Korean: a casual 어 opening the line is a yes, as 응 is, only
+        // when a bare yes follows it ("어, 해", "어 좋아"); otherwise it is
+        // a hesitation and drops ("어… 민수예요" is a name, "어, 잠깐만" a
+        // put-off). A Korean commenter's note on #4473. A lone 어 is the
+        // commonest filler, and "어…" reaches here as "어", so it reads as
+        // nothing (Reviewer-lead's P2 on #4856).
         if self.found == Found::WordStart
             && let Some(rest) = line.strip_prefix(" 어 ")
         {
             let yes = format!(" 응 {rest}");
-            line = if self.bare_yes(&yes) {
+            line = if !rest.trim().is_empty() && self.bare_yes(&yes) {
                 yes
             } else {
                 format!(" {rest}")
@@ -1922,8 +1924,8 @@ mod tests {
             assert!(read.greets && !read.names_someone, "{line}");
         }
         // A Korean commenter's note on #4473: a casual 어 opening the line
-        // is a yes, alone or with a bare yes.
-        for line in ["어", "어.", "어, 해", "어 좋아", "어, 네", "어 응"] {
+        // is a yes when a bare yes follows it.
+        for line in ["어, 해", "어 좋아", "어, 네", "어 응"] {
             let read = ko(line);
             assert!(read.agrees, "{line}");
             assert_eq!(read.yes_or_no, Some(true), "{line}");
@@ -1931,10 +1933,20 @@ mod tests {
         }
         // Before a wait, a "but" or a no, or inside a longer line, it is a
         // hesitation, no yes.
-        for line in ["어, 잠깐만", "어, 근데", "어 잠시만요", "음 어 좋아"] {
+        // Alone it is the commonest filler, and "어…" with a pause is heard
+        // as "어" (Reviewer-lead's P2 on #4856): it reads as nothing.
+        for line in [
+            "어",
+            "어.",
+            "어…",
+            "어, 잠깐만",
+            "어, 근데",
+            "어 잠시만요",
+            "음 어 좋아",
+        ] {
             let read = ko(line);
             assert!(!read.agrees && read.yes_or_no.is_none(), "{line}");
-            assert!(!read.names_someone, "{line}");
+            assert!(!read.hello_yes && !read.names_someone, "{line}");
         }
         assert_eq!(ko("어, 아니").yes_or_no, Some(false));
         assert!(ko("어?").asks && !ko("어?").agrees);
