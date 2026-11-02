@@ -60,6 +60,7 @@ pub mod recall_first;
 pub mod reminders;
 pub mod says_kept;
 pub mod tools;
+pub mod when_asked;
 pub mod wire;
 use crate::second_config::{
     CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, DEEPSEEK_TEXT_ONLY, Key, OPENROUTER_CREDENTIAL,

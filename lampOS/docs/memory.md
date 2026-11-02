@@ -609,7 +609,14 @@ conversation beyond its exchanges, and for how long:
   scope's own turns as background; gone after 10 minutes with no exchange
   of its scope, and at any forget, by voice (`forget`,
   `forget_everything`) or from the app (`memory/forgot`, above): a note
-  being made then is never kept.
+  being made then is never kept. Each fold's job carries today's local day
+  (`"today": "<Weekday> YYYY-MM-DD"`, `conversation_summary::today_here`;
+  none while the lamp's zone cannot be read), and the prompt asks for any
+  day as the day itself ("Friday 6 November"), never a bare weekday,
+  "tomorrow" or "yesterday" (#4753: on lamp-06c1 on 30 October a talk note
+  kept "is hosting a dinner on Friday", wrong when read on another day).
+  Test:
+  `conversation_summary::tests::the_job_carries_today_and_the_prompt_asks_for_whole_days`.
 - **The talk note:** at each conversation's end, that scope's running note
   (the rest of the conversation folded in) is **kept on disk** in the lamp's
   memory as the conversation's talk note, in the same scope: a known
@@ -1069,9 +1076,25 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   300 ms at most, and after that by the writer thread: after each
   `remember` and `forget`, and every five minutes. Opening a session
   never waits for this process, unless someone known is at the lamp (below).
-- **What the model is given from a recall** is how long ago in words
-  ("yesterday", "2 weeks ago"), never a date or a time of day: a person
-  does not say "on 3 October at 14:02".
+- **What the model is given from a recall** is how long ago in words and
+  the day itself, in the lamp's own zone (`remember::when_said`, #4753):
+  "3 days ago, Saturday 31 October", "2 weeks ago, Tuesday 20 October"
+  (past six days too, where "last week" alone could not be placed), with
+  the year only for another year's day; never a time of day. A day after
+  today (a clock put back) is told as today. Recall's description
+  (`remember::RECALL_WHEN`, "without times; the day only if asked when",
+  short to keep recall within its 1,024 bytes under every switch) has the
+  model answer without times and name the day only when the person asks
+  when ("on Saturday, the 31st"), otherwise roughly ("three days ago"): a
+  person does not say "on 3 October at 14:02" unasked. Before, it was told "without dates or times"
+  and given only "3 days ago" or "last week", so "when did I tell you
+  about my tea?" got no day (the bench on #4753 put today's memory at
+  0.10–0.25 on "when" questions). `probe-tools ... --when` measures the
+  wording against the old one on the real model
+  ([second-voice.md](second-voice.md)). Tests:
+  `remember::tests::when_said_is_how_long_ago_and_the_local_day` (the
+  zone's midnight, past six days, another year, the week daylight saving
+  ends) and `remember::tests::recall_names_the_day_only_when_asked_when`.
 - **A forget that names a thing removes only what matches** (#3113, the
   Days client, on every switch: the product's unit has
   `LAMP_MEMORY_FORGET_ABOUT` off).
@@ -1654,8 +1677,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `days_protocol::tests::search_returns_the_day_attached_to_a_dated_fact`
     and `remember::tests::a_dated_search_result_says_whether_its_event_is_still_coming`.
   - **Since and until** (take #4): with the switch, each kept thing recall
-    finds says `"since":"since last week"`, from its `at_unix_ms`, in the
-    words `when` uses (the lamp's local days, never a date). Recall takes
+    finds says `"since":"since last week, Sunday 4 October"`, from its
+    `at_unix_ms`, in the words `when_said` uses (the lamp's local days,
+    never a time). Recall takes
     `history` (a boolean): its description tells the model to give it only
     when the person asks about their own past ("what did I use to like?",
     "what colour did I say before?") or how something kept for everyone
@@ -1669,7 +1693,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     corrections are heard by anyone in it already). Never the room's part
     of a known person's recall; a known person's line narrowed to the room
     is the room's, and gets the room's history only, never the person's. Then a replaced version is found too, with
-    `"until":"until 3 days ago"` from the store's `until_unix_ms`
+    `"until":"until 3 days ago, Saturday 10 October"` from the store's `until_unix_ms`
     ([the rule](memory-days.md#request-contract)). Not asked, a replaced
     version is never told, and the session note and the per-turn hits never
     hold one (they read only active kept things).
@@ -2000,7 +2024,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   promise about an event on a day the cited words make clear also has
   `"on":"YYYY-MM-DD"`, worked out from "today", and is left without it
   when the day isn't clear, never guessed, and only for an event still to
-  come, "today" or later (`remember::observe_prompt`).
+  come, "today" or later (`remember::observe_prompt`). The same sentence
+  asks for a day in the observation's text as the day itself, worked out
+  from "today" ("Friday 6 November"), never a bare weekday or "tomorrow",
+  which read wrong on any other day (#4753).
   A thread's or promise's `on` goes to `tidy_apply`; any other is dropped.
   The memory keeps the day only from the conversation's day to 60 days
   after it; any other `on` (one already past, "my exam was yesterday") is
@@ -2274,7 +2301,7 @@ On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `sea
 - **The room's** are told with a line that they were said in this room and that the lamp can't tell who said them or who is asking, as the session note's room part says.
 - **A person's own** are told with a line that they are the person's own, the one at the lamp now, to be told as theirs ("you told me"), never as something someone here or someone else said (`remember::HITS_OWN_NOTE`, #3504, N9). On lamp-06c1 on 27 Oct, with the line missing, a hit from her own scope was told as "someone in this room once said theirs was hibiscus tea" (journal `(theirs) hits_told=1`). About 150 bytes more on such a turn; no extra round.
 - **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked. On the final words it runs off the worker's runtime (`spawn_blocking`). On the early words of a prepared chat it runs inline, where the chat begins, so a slow memory can hold that line's audio for up to the same 60 ms.
-- **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago it was said in words (`said today`) and, for one with an event day (`on`, in the kept list's answer), that day from today apart from it (`the day: tomorrow, Friday 30 October`, `remember::day_it_is_about`; #3987: "my dental appointment on Friday (today)" read as an appointment today). Tested in `a_hit_line_tells_the_day_a_kept_thing_is_about_apart_from_when_it_was_said`. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
+- **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago it was said in words and the day (`said today, Tuesday 13 October`, #4753) and, for one with an event day (`on`, in the kept list's answer), that day from today apart from it (`the day: tomorrow, Friday 30 October`, `remember::day_it_is_about`; #3987: "my dental appointment on Friday (today)" read as an appointment today). Tested in `a_hit_line_tells_the_day_a_kept_thing_is_about_apart_from_when_it_was_said`. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
 - **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
 - **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's) hits_told=H bytes_told=B`, with no words: `H` kept things told and `B` bytes of their text as told (each cut to 160 characters), both 0 when nothing was told, so a day's disclosure adds up from the journal (#2510 take 1 c, `remember::hits_journal_line`).
 - **Tests:** in `remember::tests`, `a_vietnamese_kept_thing_is_found_with_or_without_its_accents`, `english_hit_words_are_as_before_but_the_memorys_common_words`, `vietnamese_function_words_alone_are_never_a_hit`, `unaccented_function_words_find_no_accented_kept_thing`, `search_common_is_the_memorys_own_list` (the voice's mirror of `search::COMMON` held to the memory's own source), `the_journal_line_counts_what_was_told_and_never_says_it` and `the_hits_switch_is_off_unless_exactly_on`.

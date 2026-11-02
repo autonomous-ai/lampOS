@@ -733,21 +733,25 @@ fn run() -> Result<()> {
                 lamp_voice::second_provider::probe::cache::run(Path::new(provider_config), Path::new(second_config), runs),
             )?;
         }
-        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall]
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when]
         [command, provider_config, second_config, rest @ ..] if command == "probe-tools" => {
-            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall]");
-            let (rest, recall_only) = match rest {
-                [first @ .., last] if last == "--recall" => (first, true),
-                _ => (rest, false),
+            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when]");
+            let (rest, recall_only, when_only) = match rest {
+                [first @ .., last] if last == "--recall" => (first, true, false),
+                [first @ .., last] if last == "--when" => (first, false, true),
+                _ => (rest, false, false),
             };
             let runs = match rest {
                 [] => 3,
                 [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
                 _ => return Err(usage().into()),
             };
-            tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
-                lamp_voice::second_provider::probe::tools::run(Path::new(provider_config), Path::new(second_config), runs, recall_only),
-            )?;
+            let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+            if when_only {
+                runtime.block_on(lamp_voice::second_provider::probe::when_asked::run(Path::new(provider_config), Path::new(second_config), runs))?;
+            } else {
+                runtime.block_on(lamp_voice::second_provider::probe::tools::run(Path::new(provider_config), Path::new(second_config), runs, recall_only))?;
+            }
         }
         // probe-reminders PROVIDER_CONFIG SECOND_CONFIG [RUNS]
         [command, provider_config, second_config, rest @ ..] if command == "probe-reminders" => {
