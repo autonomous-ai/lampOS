@@ -324,10 +324,67 @@ pub(crate) fn asked_at_yes(
     now_unix_ms: u64,
 ) -> std::io::Result<bool> {
     match answered {
-        Some((lamp_said, ago)) if ago <= made_skill::PUT_ON_WITHIN => {
-            made_skill::asked_in_answer(directory, &lamp_said, Duration::ZERO, now_unix_ms)
+        Some((lamp_said, ago))
+            if ago <= made_skill::PUT_ON_WITHIN
+                && lamp_said.contains(made_skill::ASK_TO_PUT_ON) =>
+        {
+            match untold(directory, now_unix_ms).as_slice() {
+                [(_, sha256)] => made_skill::offered(directory, sha256, now_unix_ms).map(|()| true),
+                _ => Ok(false),
+            }
         }
         _ => Ok(false),
+    }
+}
+
+/// How long a skill made here and never asked about is still the one a
+/// yes is to. One whose ask was cut (lamp-9adf, 2 Nov 17:08: a sound right
+/// after it was kept ended the answer before the ask) would otherwise stay
+/// untold for good, and as a second untold skill hold back every later one.
+pub const UNTOLD_WITHIN: Duration = Duration::from_secs(10 * 60);
+
+/// The skills made here never asked about, not on, kept after the newest
+/// ask and within [`UNTOLD_WITHIN`] of `now_unix_ms`: their names and
+/// SHA-256s, oldest first.
+fn untold(directory: &std::path::Path, now_unix_ms: u64) -> Vec<(String, String)> {
+    let entries = made_skill::entries(directory);
+    let asked_at = entries
+        .iter()
+        .filter_map(|entry| entry["offered_at_unix_ms"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let since = now_unix_ms.saturating_sub(UNTOLD_WITHIN.as_millis() as u64);
+    entries
+        .iter()
+        .filter(|entry| entry["offered_at_unix_ms"].as_u64().is_none() && entry["on"] != true)
+        .filter(|entry| {
+            entry["at_unix_ms"].as_u64().is_some_and(|kept_at| {
+                kept_at > asked_at && kept_at >= since && kept_at <= now_unix_ms
+            })
+        })
+        .filter_map(|entry| {
+            Some((
+                entry["name"].as_str()?.to_owned(),
+                entry["sha256"].as_str()?.to_owned(),
+            ))
+        })
+        .collect()
+}
+
+/// The note a request is given while a skill made here was kept and never
+/// asked about (its ask cut, or not said): the model then asks it, so a
+/// yes has something to answer. None while one waits for its yes, or with
+/// none or more than one such skill.
+pub fn untold_note(directory: &std::path::Path, now_unix_ms: u64) -> Option<String> {
+    if made_skill::waiting(directory, now_unix_ms).is_some() {
+        return None;
+    }
+    match untold(directory, now_unix_ms).as_slice() {
+        [(name, _)] => Some(format!(
+            "(For you to know: you made the skill \"{name}\" for the person, but haven't asked them yet whether to put it on. When it fits, say in a few words what it does and ask exactly: \"{}\")",
+            made_skill::ASK_TO_PUT_ON
+        )),
+        _ => None,
     }
 }
 
@@ -629,6 +686,58 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
         assert!(told.get("made").is_none(), "{told}");
         assert_eq!(served.join().unwrap(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 2 Nov 17:08: a skill whose ask was cut stays untold. A
+    /// later one, asked and said yes to, is put on: the cut one, kept more
+    /// than ten minutes before, no longer holds it back. While only one is
+    /// untold, the model is noted to ask about it.
+    #[test]
+    fn a_skill_whose_ask_was_cut_never_holds_back_a_later_one() {
+        let (root, keeping) = keeping("orphan");
+        std::fs::create_dir_all(&keeping.directory).unwrap();
+        let now = 1_800_000_000_000u64;
+        let entry = |name: &str, sha: char, at: u64| {
+            json!({"name": name, "sha256": sha.to_string().repeat(64),
+                   "package": format!("{name}.tar"), "from": format!("local:{at}"),
+                   "at_unix_ms": at, "description": "d"})
+        };
+        let write = |entries: &[Value]| {
+            std::fs::write(
+                keeping.directory.join(made_skill::INDEX),
+                serde_json::to_vec(entries).unwrap(),
+            )
+            .unwrap()
+        };
+        let asked = format!("It glows cyan. {}", made_skill::ASK_TO_PUT_ON);
+        let ago = Duration::from_secs(3);
+        // One untold, kept a minute ago: the model is noted to ask.
+        write(&[entry("cut-ask", 'a', now - 60_000)]);
+        assert!(
+            untold_note(&keeping.directory, now)
+                .unwrap()
+                .contains("\"cut-ask\"")
+        );
+        // Two untold within ten minutes: neither is asked, and no note.
+        write(&[
+            entry("cut-ask", 'a', now - 60_000),
+            entry("water-glow", 'b', now - 5_000),
+        ]);
+        assert_eq!(untold_note(&keeping.directory, now), None);
+        assert!(!asked_at_yes(&keeping.directory, Some((asked.clone(), ago)), now).unwrap());
+        // The cut one kept eleven minutes ago: the later one is asked.
+        write(&[
+            entry("cut-ask", 'a', now - 11 * 60_000),
+            entry("water-glow", 'b', now - 5_000),
+        ]);
+        assert!(asked_at_yes(&keeping.directory, Some((asked, ago)), now).unwrap());
+        assert_eq!(
+            made_skill::waiting(&keeping.directory, now).unwrap().0,
+            "water-glow"
+        );
+        // Waiting for its yes: no untold note on top.
+        assert_eq!(untold_note(&keeping.directory, now), None);
         let _ = std::fs::remove_dir_all(&root);
     }
 
