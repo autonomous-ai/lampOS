@@ -12,7 +12,9 @@
 //! `crate::language`), the lamp's fixed lines in that language are warmed
 //! first ([`TtsCache::warm_lines`]) and played from here by their English
 //! words ([`TtsCache::owners_kept`]); a line not kept yet is said in
-//! English, as before. English warms and plays exactly [`WARM`].
+//! English, as before. English warms and plays exactly [`WARM`]. A full
+//! cache makes room by its oldest files, never the owner's current lines
+//! (#4883, [`MOST_FILES`]).
 use super::SOUND_RATE;
 use crate::language::Language;
 use sha2::{Digest, Sha256};
@@ -26,10 +28,10 @@ use std::{
 
 /// Where the rendered lines are kept: the voice's own state (root's, 0700).
 pub const DIR: &str = "/var/lib/lampOS/voice/tts-cache";
-/// At most this many lines are kept; past it a line is rendered and played
-/// but not stored. Only the lamp's own fixed lines come here: [`WARM`] and
-/// seven lines in each of four other languages (#4473 (c)), with room for a
-/// change of voice.
+/// At most this many lines are kept; past it the oldest go first, never the
+/// owner's current lines (#4883, [`TtsCache::make_room`]). Only the lamp's
+/// own fixed lines come here: [`WARM`] and 18 lines in the owner's language
+/// (#4473 (c)), with room for a change of voice or language.
 pub const MOST_FILES: usize = 48;
 /// The longest line kept: 20 s at the speaker's rate.
 pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
@@ -198,18 +200,7 @@ impl TtsCache {
     /// Written whole or not at all: the lamp is unplugged after a shutdown.
     fn store(&self, path: &Path, samples: &[i16]) -> std::io::Result<()> {
         fs::create_dir_all(&self.dir)?;
-        let kept = fs::read_dir(&self.dir)?
-            .filter(|entry| {
-                entry
-                    .as_ref()
-                    .is_ok_and(|entry| entry.path().extension().is_some_and(|e| e == "wav"))
-            })
-            .count();
-        if kept >= MOST_FILES {
-            return Err(std::io::Error::other(format!(
-                "{MOST_FILES} lines kept already"
-            )));
-        }
+        self.make_room()?;
         let mut bytes = Cursor::new(Vec::new());
         let mut writer =
             hound::WavWriter::new(&mut bytes, spec()).map_err(std::io::Error::other)?;
@@ -225,6 +216,56 @@ impl TtsCache {
         file.sync_all()?;
         fs::rename(&tmp, path)?;
         fs::File::open(&self.dir)?.sync_all()
+    }
+}
+
+impl TtsCache {
+    /// Below [`MOST_FILES`] before a line is written (#4883): past it, the
+    /// oldest files go first, never one of the owner's current lines
+    /// ([`Self::warm_lines`] under this voice, model and language).
+    ///
+    /// A file's voice, model and language cannot be read from its hashed
+    /// name, and a cache left full by an older voice has no index (lamp-52e6,
+    /// 2 Nov), so no index is kept: the protected set is computed from the
+    /// lines this cache warms, and every other file may go. A switch of
+    /// voice or language writes the new lines after the old ones, so oldest
+    /// first drops the other voices' and languages' lines before a line
+    /// asked since. The owner's lines are at most 20, so room is always
+    /// found.
+    fn make_room(&self) -> std::io::Result<()> {
+        let owners: std::collections::HashSet<_> = self
+            .warm_lines()
+            .iter()
+            .map(|line| format!("{}.wav", self.key(line)))
+            .collect();
+        let mut kept = 0;
+        let mut others = Vec::new();
+        for entry in fs::read_dir(&self.dir)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            if !name.to_str().is_some_and(|name| name.ends_with(".wav")) {
+                continue;
+            }
+            kept += 1;
+            if !owners.contains(name.to_str().unwrap_or_default()) {
+                let at = entry.metadata()?.modified()?;
+                others.push((at, entry.path()));
+            }
+        }
+        if kept < MOST_FILES {
+            return Ok(());
+        }
+        others.sort();
+        let over = kept + 1 - MOST_FILES;
+        if others.len() < over {
+            return Err(std::io::Error::other(format!(
+                "{MOST_FILES} lines kept already, all the owner's"
+            )));
+        }
+        for (_, path) in &others[..over] {
+            fs::remove_file(path)?;
+        }
+        Ok(())
     }
 }
 
@@ -504,15 +545,70 @@ mod tests {
         assert!(cache.kept("long").is_none());
     }
 
+    /// #4883: on lamp-52e6 a cache left full by earlier languages (48
+    /// files, no index) never kept Korean's fixed lines, so a Korean lamp
+    /// said the English notices. Each switch here (en, ko, ja, ko, one
+    /// voice, as on that lamp) keeps every one of the owner's lines and the
+    /// cache stays within its cap.
     #[test]
-    fn past_the_most_files_a_line_is_played_but_not_kept() {
+    fn a_language_switch_makes_room_for_the_owners_lines_in_a_full_cache() {
+        let dir = scratch("switch");
+        let (old, _) = counted(&dir, "an older voice");
+        for n in 0..MOST_FILES {
+            old.samples(&format!("an old line {n}")).unwrap();
+        }
+        for owners in [
+            None,
+            Some(Language::Korean),
+            Some(Language::Japanese),
+            Some(Language::Korean),
+        ] {
+            let (cache, _) = counted(&dir, "Rachel");
+            let cache = cache.speaking(owners);
+            let lines = cache.warm_lines();
+            cache.warm(&lines).unwrap();
+            let files = fs::read_dir(&dir).unwrap().count();
+            assert!(files <= MOST_FILES, "{owners:?}: {files} files");
+            for line in &lines {
+                assert!(cache.kept(line).is_some(), "{owners:?}: {line:?} not kept");
+            }
+        }
+    }
+
+    /// The owner's warmed lines are never dropped for another line: when
+    /// only they and lines asked since are left, the oldest asked goes.
+    #[test]
+    fn the_owners_lines_are_never_dropped_to_make_room() {
+        let dir = scratch("never_owners");
+        let (cache, _) = counted(&dir, "Rachel");
+        let cache = cache.speaking(Some(Language::Korean));
+        let lines = cache.warm_lines();
+        cache.warm(&lines).unwrap();
+        for n in 0..MOST_FILES * 2 {
+            cache.samples(&format!("asked {n}")).unwrap();
+        }
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), MOST_FILES);
+        assert!(lines.iter().all(|line| cache.kept(line).is_some()));
+        assert!(
+            cache
+                .kept(&format!("asked {}", MOST_FILES * 2 - 1))
+                .is_some()
+        );
+        assert!(cache.kept("asked 0").is_none());
+    }
+
+    /// Past the most files the oldest line goes and the new one is kept.
+    #[test]
+    fn past_the_most_files_the_oldest_line_makes_room() {
         let dir = scratch("past");
         let (cache, calls) = counted(&dir, "Rachel");
         for n in 0..MOST_FILES {
             cache.samples(&format!("line {n}")).unwrap();
         }
         assert!(cache.samples("one more").is_ok());
-        assert!(!cache.path("one more").exists());
+        assert!(cache.path("one more").exists());
+        assert!(!cache.path("line 0").exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), MOST_FILES);
         assert_eq!(calls.load(Ordering::SeqCst), MOST_FILES + 1);
     }
 }
