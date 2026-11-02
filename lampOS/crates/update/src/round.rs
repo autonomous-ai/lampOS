@@ -1325,6 +1325,26 @@ impl Run<'_, '_> {
                     ));
                 }
             } else {
+                // The Store's switch file is a setting only from updater 10
+                // (`manifest::STORE_ENV_UPDATER`): an older lamp-update-back
+                // refuses the whole manifest for it, and the switch would be
+                // put back. The build waits until this round's refresh made
+                // the writer this lamp-update.
+                if !these.is_empty()
+                    && manifest
+                        .settings
+                        .iter()
+                        .any(|setting| setting.path == manifest::STORE_ENV)
+                    && let Some(running) = &self.config.writer_from
+                    && fs::read(self.config.on(crate::own::BACK))
+                        .is_ok_and(|there| there != running.bytes())
+                {
+                    return Err(Outcome::Refused(format!(
+                        "build {} carries {}, and this lamp's settings writer is older than this lamp-update: waiting for it to be refreshed",
+                        manifest.sequence,
+                        manifest::STORE_ENV
+                    )));
+                }
                 self.say_kept(&steps);
                 writes.extend(these);
             }

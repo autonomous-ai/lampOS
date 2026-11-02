@@ -4889,6 +4889,106 @@ fn a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles() {
     assert_eq!(lamp.state()["settings"][TMPFILES_CONF], sha(&new));
 }
 
+/// The first builder on #4710: a lamp installed before a build turned the
+/// Skills Store on keeps install's `store.env`, off. A round writes the
+/// build's while the lamp's copy is the one install wrote, restarts the part
+/// that reads it (lamp-cloud, by `EnvironmentFile=`), and keeps one changed
+/// on the lamp, said.
+#[test]
+fn a_round_writes_the_builds_store_env_over_installs_and_keeps_the_lamps_own() {
+    let off = lamp_update::install::STORE_SETTINGS
+        .iter()
+        .find(|(path, _)| *path == manifest::STORE_ENV)
+        .unwrap()
+        .1;
+    let on = "LAMP_SKILLS_STORE=on\n";
+    for edited in [false, true] {
+        let (mut lamp, _) = lamp_with_settings();
+        let unit = lamp.root.join("etc/systemd/system/lamp-body.service");
+        let text = fs::read_to_string(&unit).unwrap();
+        fs::write(
+            &unit,
+            text.replace(
+                "[Service]\n",
+                &format!("[Service]\nEnvironmentFile=-{}\n", manifest::STORE_ENV),
+            ),
+        )
+        .unwrap();
+        let at = lamp.root.join(manifest::STORE_ENV.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(
+            &at,
+            if edited {
+                "LAMP_SKILLS_STORE=off # mine\n"
+            } else {
+                off
+            },
+        )
+        .unwrap();
+        let state_at = lamp.root.join("var/lib/lampos-update/state.json");
+        let mut state = lamp.state();
+        state["settings"][manifest::STORE_ENV] = sha(off).into();
+        fs::write(&state_at, state.to_string()).unwrap();
+        publish_settings(&mut lamp, 2, vec![Setting::new(manifest::STORE_ENV, on)]);
+        // A settings writer older than the lamp-update that runs refuses
+        // the whole manifest for the path: a build with it to write waits,
+        // nothing written.
+        if !edited {
+            let back = lamp
+                .root
+                .join(lamp_update::own::BACK.trim_start_matches('/'));
+            fs::create_dir_all(back.parent().unwrap()).unwrap();
+            fs::write(&back, "old writer").unwrap();
+            lamp.config.writer_from = Some(lamp_update::writer_swap::Running::new(
+                b"lamp-update 1".to_vec(),
+            ));
+            let waits = lamp.round();
+            assert!(
+                matches!(&waits, Outcome::Refused(why) if why.contains("settings writer is older")),
+                "{waits:?}"
+            );
+            assert_eq!(lamp.state()["installed"]["sequence"], 1);
+            assert_ne!(lamp.read(manifest::STORE_ENV), on);
+            // Refreshed to it, the round writes.
+            fs::write(&back, "lamp-update 1").unwrap();
+        }
+        // Kept, the build changes nothing on this lamp: it is up to date.
+        let outcome = lamp.round();
+        assert_eq!(
+            outcome,
+            if edited {
+                Outcome::UpToDate(2)
+            } else {
+                Outcome::Switched(2)
+            },
+            "{:?}",
+            lamp.said
+        );
+        let restarted = lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-body.service");
+        if edited {
+            assert_eq!(
+                lamp.read(manifest::STORE_ENV),
+                "LAMP_SKILLS_STORE=off # mine\n"
+            );
+            assert!(
+                lamp.said
+                    .iter()
+                    .any(|line| line.starts_with(&format!("kept {}", manifest::STORE_ENV))),
+                "{:?}",
+                lamp.said
+            );
+            assert_eq!(lamp.state()["settings"][manifest::STORE_ENV], sha(off));
+        } else {
+            assert_eq!(lamp.read(manifest::STORE_ENV), on);
+            assert!(restarted, "{:?}", lamp.calls());
+            assert_eq!(lamp.state()["settings"][manifest::STORE_ENV], sha(on));
+        }
+    }
+}
+
 #[test]
 fn a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start() {
     let (mut lamp, _) = lamp_with_settings();

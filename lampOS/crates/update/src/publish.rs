@@ -205,6 +205,14 @@ pub fn make_with(
                 .max(manifest::ORDER_UPDATER),
         );
     }
+    // The Store's switch file among the settings: an older updater refuses
+    // its path, so it climbs first.
+    if settings
+        .iter()
+        .any(|setting| setting.path == manifest::STORE_ENV)
+    {
+        min_updater = Some(min_updater.unwrap_or(1).max(manifest::STORE_ENV_UPDATER));
+    }
     // A template by its name on the lamp (`manifest::lamp_name`).
     if units
         .iter()
@@ -664,8 +672,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(made.settings, settings);
-        // With setup's reset plan, in its own field (#806).
-        assert_eq!(made.min_updater, Some(manifest::RESET_PLAN_UPDATER));
+        // With setup's reset plan, in its own field (#806), and the Store's
+        // switch file, which only updater 10 takes.
+        assert_eq!(made.min_updater, Some(manifest::STORE_ENV_UPDATER));
         assert_eq!(
             made.reset_plan
                 .as_ref()
@@ -678,6 +687,7 @@ mod tests {
         let paths: Vec<&str> = made.settings.iter().map(|s| s.path.as_str()).collect();
         assert!(paths.contains(&"/etc/lampOS/expression/expression.json"));
         assert!(paths.contains(&"/etc/tmpfiles.d/lampos.conf"));
+        assert!(paths.contains(&manifest::STORE_ENV));
         assert!(
             !paths
                 .iter()
@@ -698,9 +708,12 @@ mod tests {
     /// so a lamp still on 7071's `lamp-update-back` writes it.
     #[test]
     fn the_stores_key_is_carried_only_when_the_repository_has_it() {
-        assert_eq!(
-            manifest::SETTING_FILES,
+        // 7071's two files are still settings; the Store's switch file
+        // came after it (updater 10), and the key never depends on it.
+        assert!(
             ["/etc/lampOS/records.json", "/etc/tmpfiles.d/lampos.conf"]
+                .iter()
+                .all(|path| manifest::SETTING_FILES.contains(path))
         );
         assert_eq!(
             manifest::SETTING_FOLDERS,

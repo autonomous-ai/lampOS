@@ -1463,7 +1463,9 @@ for it.
   (`package::STORE_SWITCH`), off unless set, as `lamp-cloud`'s is.
   `lamp-update install` writes `/etc/lampOS/skills/store.env` with
   `LAMP_SKILLS_STORE=off`; both parts read it with `EnvironmentFile=`.
-  A lamp's edited file is kept on another install. Both require the Store's
+  A lamp's edited file is kept on another install, and by a round, which
+  from updater 10 writes the build's over the one install wrote
+  (docs/updates.md, "The Store's switch file"). Both require the Store's
   separate public key too: missing or invalid, no install is accepted.
   A process that reaches the socket past `lamp-cloud` therefore installs
   nothing while the Store is off: the helper answers `not on this lamp:
