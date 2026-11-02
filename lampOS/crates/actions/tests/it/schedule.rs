@@ -433,6 +433,63 @@ fn new_schemas_use_the_small_provider_vocabulary() {
     );
 }
 
+/// lamp-9adf, 2 Nov 19:13: "stop reminding me to drink water" was taken for
+/// the wellbeing nudges. cancel_reminder names that phrase, and its text, and
+/// says it is never the nudges.
+#[test]
+fn cancel_reminder_names_stop_reminding_me_and_is_never_the_nudges() {
+    let tools = serde_json::to_value(catalog()).unwrap();
+    let cancel = &tools[4];
+    assert_eq!(cancel["name"], "cancel_reminder");
+    let said = cancel["description"].as_str().unwrap();
+    for phrase in [
+        "stop reminding me to drink water",
+        "cancel my water reminder",
+        "never answer this with wellbeing_nudges",
+    ] {
+        assert!(said.contains(phrase), "{phrase}: {said}");
+    }
+    assert!(cancel["parameters"]["properties"]["text"].is_object());
+    assert_eq!(cancel["parameters"]["required"], json!([]));
+}
+
+/// A cancel by text: the one item whose text holds the words is cancelled,
+/// a whole repeating series with it (an `every` series resolves to the same
+/// cancel by id, lamp-schedule's own tests); two that do are named and
+/// nothing is cancelled; none says none.
+#[test]
+fn cancel_by_text_cancels_the_one_match_and_names_several() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    for args in [
+        json!({"text":"Drink water","time":"09:00","every":"daily"}),
+        json!({"text":"Water plants","time":"10:00","every":"daily"}),
+        json!({"text":"Bins","time":"19:00","every":"daily"}),
+    ] {
+        let set = actions.call("repeat_reminder", args.clone());
+        assert_eq!(set["ok"], true, "{args}: {set}");
+    }
+    // Two hold "water": named, nothing cancelled.
+    let two = actions.call("cancel_reminder", json!({"text":"water"}));
+    assert_eq!(two["result"]["cancelled"], false, "{two}");
+    assert_eq!(two["result"]["matches"].as_array().unwrap().len(), 2);
+    assert_eq!(ask(&schedule.socket, json!({"op":"status"}))["items"], 3);
+    // None hold "pasta": none, nothing cancelled.
+    let none = actions.call("cancel_reminder", json!({"text":"pasta"}));
+    assert_eq!(none["result"]["matches"], json!([]), "{none}");
+    // "drink water", any case: the every series alone, whole.
+    let one = actions.call("cancel_reminder", json!({"text":"  DRINK WATER "}));
+    assert_eq!(one["result"]["cancelled"], true, "{one}");
+    let left = actions.call("list_reminders", json!({}));
+    let texts: Vec<&str> = left["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts, ["Water plants", "Bins"]);
+}
+
 #[test]
 fn malformed_arguments_and_unknown_fields_open_no_schedule_connection() {
     let root = root();
@@ -495,6 +552,10 @@ fn malformed_arguments_and_unknown_fields_open_no_schedule_connection() {
         ("list_reminders", Value::Null),
         ("cancel_reminder", json!({"id":0})),
         ("cancel_reminder", json!({"id":1,"delivery":1})),
+        // Neither or both of id and text, or an empty text.
+        ("cancel_reminder", json!({})),
+        ("cancel_reminder", json!({"id":1,"text":"water"})),
+        ("cancel_reminder", json!({"text":"  "})),
         ("snooze_reminder", json!({"id":1,"seconds":0})),
         ("snooze_reminder", json!({"id":1,"seconds":1,"delivery":1})),
     ];
