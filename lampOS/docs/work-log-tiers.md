@@ -1,5 +1,99 @@
 # Tiers work log
 
+## 2026-11-02: restacked memory PRs and folded live-run fixes
+
+The store prerequisite #4750 landed. Rebuilt the remaining stack by cherry-pick
+on `906aa36a2`, without replaying its calendar merge or adding merge commits.
+All three merge cleanly with the latest checked `lamp-voice` head `358e29658`.
+
+| PR | Remote-confirmed head | ARM64 run | Linux clippy run |
+|---|---|---|---|
+| [#4756](https://github.com/autonomous-ai/lampOS/pull/4756) | `1967186ab` | 41379016455 | 41379016466 |
+| [#4777](https://github.com/autonomous-ai/lampOS/pull/4777) | `a555ef2c6` | 41379105426 | 41379105460 |
+| [#4783](https://github.com/autonomous-ai/lampOS/pull/4783) | `ef6e266b8` | 41381115042 | 41381115142 |
+
+CI completion: all six required runs passed on the exact heads in the table;
+all three documentation CI checks passed too.
+
+The recall crate is byte-identical to `38a822541`. Its range-diff contains
+context/test-order changes from the already-landed calendar test. The only
+final document change is the contract anchor from `draft-v2` to `draft-v21`:
+the new base's documentation-link gate exposed that stale link. The diagnostics
+range-diff `38a822541..62e092173` versus `1967186ab..a555ef2c6` is `=`.
+No runtime change is hidden in either rebase. The existing authorized adapter
+entry in the development binary inventory is carried unchanged.
+
+The coordinator corrected the initial placement rule: both live-run fixes stay
+in #4783, as the first builder requested. The initial refreshed head matched
+`e28c8663ab` production sources, including `dbf66399d0`: lowercase json in both
+prompts, the 32-per-kind sleep cap, and validation failures counted as skipped
+nights with no pending cursor. Sleep handling touches code introduced in #4756.
+Database, I/O, broker and stale-state failures retain their terminal behavior.
+No rejected model proposal commits; the records remain eligible on a later pass.
+
+Added adapter regressions cover rollback after an earlier valid fact insertion,
+a rejected incomplete topic partition followed by a valid retry of the same
+records, and model accounting across both retries. Both new tests fail against
+the old prompt wording; with the corrected prompts but old rejection handling,
+both fail because pending is incorrectly true. They pass with the full fixes.
+The supplied over-cap/retry regression is retained. Documentation describes
+skipped-pass behavior and the global counter.
+
+Reviewer-lead found a P2 on that initial head: repeated topic rejection could
+starve later batches. The coordinator ruled, before any candidate score, to
+skip the first rejected attempt and on the second rejection of the same batch
+apply one validated session-only range. The final head implements that fallback
+through existing transaction, exact-source, stale-state and forget validation.
+It resumes later batches and normal consolidation; no rejected model text enters
+memory. Retry identity holds bounded source ids inside probe-restored policy
+state, and forgetting/pausing clears it.
+
+`stats.topic_batches` counts completed main-session topic batches including
+fallbacks; `stats.topic_fallbacks` is that subset. Retries do not enlarge the
+denominator and probe work changes neither. Global model-call/skipped-attempt
+accounting remains intact. Bench `c9d262f9b` implements the matching card and
+registration rule: more than 10% (`fallbacks * 10 > batches`) invalidates the
+score, leaves it null, and retains the ledger. Zero/zero session-only control
+and exactly 10% stay valid. No live integration run is claimed for this pair.
+
+Four more regressions cover repeated rejection then consolidation/later-session
+progress, both directions of probe retry isolation, and forgetting and pause
+resetting retry identity even when the same offered records survive. SQL checks
+prove the fallback assigns one episode without changing owner words. All pass.
+
+Local gates, macOS x86_64 / Rust 1.96.0, all three final source trees:
+- `cargo fmt --all --check`: passed.
+- `CARGO_INCREMENTAL=0 cargo clippy -q -p lamp-memory-tiers --all-targets -- -D warnings`: passed.
+- `CARGO_INCREMENTAL=0 cargo test -q -p lamp-memory-tiers -- --test-threads=1`: passed,
+  respectively 65, 77 and 107 functional tests plus three API compile-fail checks each.
+- `CARGO_INCREMENTAL=0 cargo build -q --workspace`: passed.
+- Documentation check: `npm run check` in `.github/scripts/docs-links`,
+  188 documents, 1,740 local links, zero broken. All three documentation CI runs passed.
+
+Builds used only this worktree's target. Initial gates held the shared slot;
+for the follow-up the coordinator explicitly authorized building alongside Bench
+above a 30 GiB floor (65 GiB remained during testing). Initial cleanup removed
+6.6 GiB, final cleanup 6.1 GiB; no local build remains and no other slot was removed. Superseded CI runs were cancelled where still
+running, after the documentation correction. No device, SSH or live model call
+was used, no spending occurred, and no latency or scoring gain is claimed.
+
+The optional revision-embedding change is deferred to keep this refresh narrow.
+The smallest proposed follow-up is a crate-local build.rs: prefer the explicit
+revision, otherwise embed Git HEAD and track worktree HEAD/ref/packed-ref changes;
+source-only builds still supply their recorded manifest revision. A workflow-only
+fix is insufficient. Unversioned builds remain unsuitable for scored runs.
+
+The stack still lands in order #4756, #4777, #4783 through the first builder/train;
+this builder does not merge it. Reviewer-lead gave exact-head READ-OKs to the first two PRs; their final evidence
+and second-read requests are posted:
+[#4756](https://github.com/autonomous-ai/lampOS/pull/4756#issuecomment-6568014449),
+[#4777](https://github.com/autonomous-ai/lampOS/pull/4777#issuecomment-6568042992).
+Reviewer-lead re-read `ef6e266b8` at 10:08 and marked the P2 fixed with READ-OK.
+Final [#4783 evidence and READ ASK](https://github.com/autonomous-ai/lampOS/pull/4783#issuecomment-6568295745)
+and the combined Queue #4710 request are posted. Remaining independent read
+confirmations and train merges belong to the readers and first builder. Wider live scoring, product integration and
+on-device behavior remain outside this task and unproved here.
+
 ## 2026-10-31: stopped handoff — accepted checkpoint, wider task blocked
 
 The lead accepted `7d6d0a236` with both independent reads and native gates green,
