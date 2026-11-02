@@ -1007,8 +1007,10 @@ fn an_answer_at_once_can_end_without_speaking_its_silence() {
         ),
         (vec!["<no_further_answer>", " It is sunny."], "It is sunny."),
         (vec!["<no_further_answer>It is sunny."], "It is sunny."),
-        (vec!["<no_"], "<no_"),
-        (vec!["<no_", "problem>"], "<no_problem>"),
+        // Not the marker, but markup all the same: never said (29e7 item 5).
+        (vec!["<no_"], ""),
+        (vec!["<no_", "problem>"], ""),
+        (vec!["<no_", "problem> It is sunny."], "It is sunny."),
     ] {
         let reply = chunks
             .into_iter()
@@ -1022,10 +1024,16 @@ fn an_answer_at_once_can_end_without_speaking_its_silence() {
             calling(&["light_cooler"]),
             vec![reply],
         );
-        assert_eq!(went.said, said(&[own, &format!(" {expected}")]), "{went:?}");
+        let want = if expected.is_empty() {
+            said(&[own])
+        } else {
+            said(&[own, &format!(" {expected}")])
+        };
+        assert_eq!(went.said, want, "{went:?}");
         assert_eq!(went.asked, 2, "{went:?}");
     }
-    // The switch off does not give an ordinary reply a new control marker.
+    // The switch off does not give an ordinary reply a new control marker;
+    // as markup it is not said either (29e7 item 5).
     let went = turn_with(
         false,
         false,
@@ -1033,7 +1041,7 @@ fn an_answer_at_once_can_end_without_speaking_its_silence() {
         vec![text(SILENT_AFTER_MARKER), Ok(ChatEvent::Done)],
         vec![],
     );
-    assert_eq!(went.said, said(&[SILENT_AFTER_MARKER]));
+    assert_eq!(went.said, said(&[]));
     assert_eq!(went.asked, 1);
 }
 
