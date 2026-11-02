@@ -1303,9 +1303,10 @@ restore_hal_service_state() {
 # Print why HAL is not serving, so a device that cannot be reached by hand still
 # says why. Kept short: only the tail of the updater output is reported back.
 # HAL logs what users say, and a warning or error can quote it, so journal lines are
-# never matched by keyword. Only structure is kept: traceback locations (file, line,
-# function), exception type names with their message dropped (missing-module errors
-# keep theirs, which names code), and systemd's own "hal.service:" messages.
+# never matched by keyword, and a logged value can span lines, so a line is never matched
+# by a loose prefix either. Only fixed forms are kept, each anchored end to end: systemd's
+# own exit/restart messages for the unit, traceback locations (file, line, function), the
+# name of a missing module, and exception type names with their message dropped.
 hal_failure_diagnostics() {
   {
     echo "[software-update] HAL diagnostics:"
@@ -1314,9 +1315,9 @@ hal_failure_diagnostics() {
     echo "  disk: $(df -h / 2>/dev/null | awk 'NR==2 {print "size=" $2 " used=" $3 " avail=" $4 " use=" $5}')"
     local errors oom
     errors=$(timeout 5 journalctl -u hal -n 300 --no-pager -o cat 2>/dev/null | awk '
-      /^hal\.service: /                                          { print substr($0, 1, 130); next }
+      /^hal\.service: (Main process exited, code=[a-z]+, status=[0-9]+\/[A-Za-z0-9]+|Failed with result .[a-z-]+.\.?|Scheduled restart job, restart counter is at [0-9]+\.?)$/ { print substr($0, 1, 130); next }
       /^ +File "[^"]+", line [0-9]+, in [A-Za-z0-9_<>]+$/        { print substr($0, 1, 130); next }
-      /^(ModuleNotFoundError|ImportError): /                      { print substr($0, 1, 130); next }
+      /^(ModuleNotFoundError|ImportError): No module named .[A-Za-z0-9_.]+.$/ { print substr($0, 1, 130); next }
       /^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)/            { sub(/:.*/, ":"); print substr($0, 1, 130); next }
     ' | tail -n 6)
     [ -z "$errors" ] || { echo "  hal journal:"; printf '%s\n' "$errors" | sed 's/^/    /'; }

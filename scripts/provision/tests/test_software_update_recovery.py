@@ -137,7 +137,10 @@ journalctl() {
     "WARNING heard: please kill the fatal exception" "Traceback (most recent call last):" \
     '  File "/opt/hal/server.py", line 10, in main' "    secret = user_text" \
     "ValueError: bad value from user text" "ModuleNotFoundError: No module named 'torch'" \
-    "hal.service: Main process exited, code=killed, status=9/KILL" "INFO hal started"
+    "hal.service: Main process exited, code=killed, status=9/KILL" "INFO hal started" \
+    "hal.service: I heard call mum and then something private" \
+    "ImportError: cannot import name my_secret from private_thing" \
+    "ModuleNotFoundError: No module named 'x'; the user said hello"
 }
 '''
 
@@ -149,10 +152,13 @@ journalctl() {
                          "ModuleNotFoundError: No module named 'torch'", "ValueError:",
                          "hal.service: Main process exited", "Out of memory"):
             self.assertIn(expected, result.stderr)
+        # A line that only imitates a known prefix is dropped or cut to its type name.
+        self.assertIn("ImportError:", result.stderr)
         # HAL logs what users say; no free-text line may reach the report, even one
         # containing an error-looking word, and exception messages are dropped.
         for leaked in ("failed my exam", "asked about", "kill the fatal", "bad value from user text",
-                       "user_text", "INFO hal started"):
+                       "user_text", "INFO hal started", "call mum", "my_secret",
+                       "the user said hello"):
             self.assertNotIn(leaked, result.stderr)
 
     def test_healthy_hal_prints_no_diagnostics(self):
@@ -162,7 +168,7 @@ journalctl() {
 
     def test_hal_diagnostics_stay_short_for_noisy_journals(self):
         noisy = self.HAL_PROBES + r'''
-journalctl() { for i in $(seq 1 400); do printf 'hal.service: %0500d\n' "$i"; done; }
+journalctl() { for i in $(seq 1 400); do printf '  File "/%0500d", line 1, in f\n' "$i"; printf "hal.service: Failed with result 'exit-code'.\n"; done; }
 if check_hal; then exit 0; else exit 1; fi
 '''
         result = self.run_shell(noisy, BAD_HEALTH="1")
