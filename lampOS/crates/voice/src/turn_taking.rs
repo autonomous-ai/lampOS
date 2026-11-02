@@ -120,7 +120,8 @@ pub fn cut_in_near_asker() -> bool {
 /// answer: only a stop word, a forced yield, the lamp's name, a tap or the
 /// button do; and stillness commits a yield only on the plain blocks of the
 /// run that made it, never on the lamp's own tail after it
-/// ([`Interruption::over_bed`]). Off unless set.
+/// ([`Interruption::over_bed`]). In a quiet room nothing changes. Off
+/// unless set.
 pub const CUT_IN_OVER_BED_ENVIRONMENT: &str = "LAMP_CUT_IN_OVER_BED";
 
 /// Whether the voice's environment says `on` for

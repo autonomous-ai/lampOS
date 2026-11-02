@@ -179,7 +179,8 @@ pub struct Confirmation {
     /// Blocks after which an undecided yield is given up.
     pub deadline_blocks: u16,
     /// Plain blocks, in the run that made the lamp yield and after it (only
-    /// that run with `LAMP_CUT_IN_OVER_BED=on`, [`Interruption::over_bed`]), with
+    /// that run with `LAMP_CUT_IN_OVER_BED=on` in a busy room,
+    /// [`Interruption::over_bed`]), with
     /// which a yield that ends in stillness is an interruption all the same.
     pub plain_blocks: u8,
     /// Consecutive [`Heard::Over`] blocks that make the lamp yield while it
@@ -434,16 +435,18 @@ impl Interruption {
         self.quiet_talk = quiet && self.yielded();
     }
 
-    /// `LAMP_CUT_IN_OVER_BED=on` (#4868), `on`: stillness commits a yield
-    /// only on the plain blocks of the run that made it, not on plain
-    /// blocks after it: once the lamp has yielded, the render is silent and
-    /// its own tail is heard as a person, plainly. With `busy`, the room was
+    /// `LAMP_CUT_IN_OVER_BED=on` (#4868): `on` with `busy`, the room was
     /// busy as the reply began, and sound alone commits nothing: a bed of
     /// talk never stops, so neither speech in the clear nor stillness after
     /// plain blocks ends the reply; a stop word and a forced yield still
-    /// do. Set before each block; off, nothing changes.
+    /// do, and stillness counts only the plain blocks of the run that made
+    /// the yield, not those after it: once the lamp has yielded, the render
+    /// is silent and its own tail is heard as a person, plainly. Without
+    /// `busy`, or off, nothing changes: a late yield's seven onset blocks
+    /// never reach `plain_blocks`, so a quiet room needs the blocks after.
+    /// Set before each block.
     pub fn over_bed(&mut self, on: bool, busy: bool) {
-        self.onset_plain_only = on;
+        self.onset_plain_only = on && busy;
         self.over_bed = on && busy;
     }
 
@@ -979,7 +982,7 @@ mod tests {
     }
 
     #[test]
-    fn with_the_over_bed_switch_the_lamps_own_tail_after_a_yield_commits_nothing() {
+    fn over_a_busy_room_the_lamps_own_tail_after_a_yield_commits_nothing() {
         // Late in a reply, seven plain blocks make the lamp yield; its own
         // tail, plain once the render is silent, follows; then nobody.
         let tail = [
@@ -991,7 +994,7 @@ mod tests {
         let mut on = Interruption::new(Confirmation::EVALUATED);
         let yielded = 130 + LATE - 1;
         assert_eq!(
-            over_bed(&mut on, true, false, &tail),
+            over_bed(&mut on, true, true, &tail),
             [(yielded, Step::Yield), (yielded + 12 + 40, Step::Resume)]
         );
         // Off, the tail's plain blocks add up to an interruption.
@@ -1000,6 +1003,26 @@ mod tests {
             over_bed(&mut off, false, false, &tail),
             [(yielded, Step::Yield), (yielded + 12 + 40, Step::Commit)]
         );
+    }
+
+    #[test]
+    fn with_the_over_bed_switch_a_quiet_room_commits_a_short_word_then_stillness() {
+        // Late in a reply, a short "Wait" over the lamp makes it yield and
+        // goes on a few blocks after; then the person waits in silence. In a
+        // quiet room the switch changes nothing: stillness after ten plain
+        // blocks commits, as off.
+        let wait = [
+            (Heard::Own, false, 130),
+            (Heard::Over, true, LATE),
+            (Heard::Over, true, 5),
+            (Heard::Still, false, 45),
+        ];
+        let yielded = 130 + LATE - 1;
+        let expected = [(yielded, Step::Yield), (yielded + 5 + 40, Step::Commit)];
+        let mut on = Interruption::new(Confirmation::EVALUATED);
+        assert_eq!(over_bed(&mut on, true, false, &wait), expected);
+        let mut off = Interruption::new(Confirmation::EVALUATED);
+        assert_eq!(over_bed(&mut off, false, false, &wait), expected);
     }
 
     #[test]
