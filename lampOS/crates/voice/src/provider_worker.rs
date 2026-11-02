@@ -850,6 +850,9 @@ pub enum ProviderInput {
         text: String,
         late: bool,
         late_by_ms: Option<u64>,
+        /// Others as late, said with it in one line (29e7, 2 Nov).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        also: Vec<String>,
     },
 }
 impl ProviderInput {
@@ -1111,10 +1114,11 @@ pub enum ProviderOutput {
 /// (`LAMP_VOICE_ROUTE=second`) says a reminder as Gemini would.
 pub(crate) fn reminder_note(
     text: &str,
+    also: &[String],
     late: bool,
     late_by_ms: Option<u64>,
 ) -> std::result::Result<String, ReminderDeferral> {
-    reminder_policy::checked_note(text, late, late_by_ms)
+    reminder_policy::checked_note(text, also, late, late_by_ms)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -6083,23 +6087,27 @@ impl InputHandoff {
                 text,
                 late,
                 late_by_ms,
+                also,
                 ..
             } => {
                 if self.submitted.is_some() {
                     return Err(io::Error::other("provider input already started").into());
                 }
                 let expected = SessionId::new(session)?;
-                let note =
-                    match self
-                        .reminders
-                        .prepare(request.get(), session, &text, late, late_by_ms)
-                    {
-                        Ok(note) => note,
-                        Err(reason) => {
-                            self.defer_reminder(request.get(), session, reason, input);
-                            return Ok(());
-                        }
-                    };
+                let note = match self.reminders.prepare(
+                    request.get(),
+                    session,
+                    &text,
+                    &also,
+                    late,
+                    late_by_ms,
+                ) {
+                    Ok(note) => note,
+                    Err(reason) => {
+                        self.defer_reminder(request.get(), session, reason, input);
+                        return Ok(());
+                    }
+                };
                 // Reminder data is not a memory instruction, nor something
                 // to remember automatically merely because it was spoken.
                 crate::remember::keep_out(request.get());

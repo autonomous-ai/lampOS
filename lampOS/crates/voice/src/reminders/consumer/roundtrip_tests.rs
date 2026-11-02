@@ -250,6 +250,8 @@ impl RoundtripFixture {
             failed: false,
             by_skill: false,
             owed_told: None,
+            said_at_us: None,
+            notice_owed: false,
         });
         self.worker = Some(worker);
         self.parent().poll(monotonic_us());
@@ -329,6 +331,32 @@ impl RoundtripFixture {
             .unwrap()
             .advanced
             .fetch_add(ms, Ordering::AcqRel);
+    }
+
+    /// More one-time items with `texts`, set now and due a second later,
+    /// as the person set them before the microphones closed (29e7).
+    pub(crate) fn set_more(&self, texts: &[&str]) {
+        let schedule = self.schedule.as_ref().unwrap();
+        let at = clock_after(schedule.advanced.load(Ordering::Acquire));
+        let mut engine = schedule.engine.lock().unwrap();
+        for (index, text) in texts.iter().enumerate() {
+            let guard = Guard {
+                store_id: STORE_ID.into(),
+                revision: engine.revision(),
+                request_id: format!("roundtrip-more-{index}"),
+            };
+            engine
+                .answer(
+                    Request::Set {
+                        person: None,
+                        guard,
+                        text: (*text).into(),
+                        when: When::After { seconds: 1 },
+                    },
+                    &at,
+                )
+                .unwrap();
+        }
     }
 
     /// The person cancels the due item through Schedule, as the app does.

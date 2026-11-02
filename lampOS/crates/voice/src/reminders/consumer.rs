@@ -1,6 +1,9 @@
 //! Disk and socket work runs here, outside Voice's urgent loop. This module
 //! never grants audio authority and never infers completion from a timeout.
-use super::{FromWorker, LEASE_US, Offer, ToWorker, transport::WorkerTransport};
+use super::{
+    FromWorker, JOINED_TEXT_BYTES, Joined, LEASE_US, MAX_JOINED, Offer, ToWorker, json_bytes,
+    transport::WorkerTransport,
+};
 #[cfg(test)]
 use crate::scenario_clock::monotonic_us;
 use lamp_bus::{Bus, Kind, Message};
@@ -11,8 +14,8 @@ use lamp_schedule::{
     client,
     delivery::{
         AbsentEvidence, AckEvidence, Correlation, DeliveryKey, DeliveryLedger, Evidence,
-        ItemEvidence, PendingEvidence, PreparedToken, QualifiedRetirement, Reconciled,
-        RetirementBasis,
+        ItemEvidence, PendingEvidence, PreparedToken, QualifiedCompletion, QualifiedRetirement,
+        Reconciled, RetirementBasis,
     },
     engine::Persistence,
     protocol::Request,
@@ -31,6 +34,8 @@ const TICK: Duration = Duration::from_millis(200);
 const REQUEST_BUDGET: Duration = Duration::from_millis(250);
 const PACE_US: u64 = 5_000_000;
 const QUEUE: usize = 4;
+/// What of a tick's budget joining late ones leaves the offer (29e7).
+const JOIN_SPARE: Duration = Duration::from_millis(100);
 
 fn invalid(message: impl std::fmt::Display) -> io::Error {
     io::Error::other(message.to_string())
@@ -132,6 +137,12 @@ impl Freshness {
     }
 }
 
+/// Said late enough to join others and wait for a pause in the talk, as
+/// [`Offer::late_line`] says it.
+fn late_line(late: bool, late_by_ms: Option<u64>) -> bool {
+    late_by_ms.is_none_or(|ms| late && ms >= lamp_schedule::engine::SAID_LATE_MS)
+}
+
 /// A due item given up with nothing proven: it may have been heard.
 const HELD: &str = "held: an attempt may have been heard and was never proven said, \
                     so it is not offered again";
@@ -217,6 +228,9 @@ struct Consumer<P: Persistence> {
     cursor: u64,
     recovery: usize,
     outgoing: VecDeque<FromWorker>,
+    /// A line was heard after a reminder: Schedule is told once every
+    /// completed one is acknowledged ([`Self::tell_noticed`]).
+    notice_owed: bool,
 }
 impl<P: Persistence> Consumer<P> {
     fn new(ledger: DeliveryLedger<P>, session: String) -> Self {
@@ -231,6 +245,7 @@ impl<P: Persistence> Consumer<P> {
             cursor: 0,
             recovery: 0,
             outgoing: VecDeque::new(),
+            notice_owed: false,
         }
     }
     fn correlation(&mut self) -> io::Result<Correlation> {
@@ -270,6 +285,10 @@ impl<P: Persistence> Consumer<P> {
             ToWorker::Complete { token, .. }
             | ToWorker::Retire { token, .. }
             | ToWorker::Abandon { token } => token,
+            ToWorker::Noticed {} => {
+                self.notice_owed = true;
+                return Ok(());
+            }
         };
         if self
             .current
@@ -279,6 +298,11 @@ impl<P: Persistence> Consumer<P> {
             return Err(invalid("consumer command has no matching current delivery"));
         }
         let token = token.clone();
+        let joined = self
+            .current
+            .as_ref()
+            .map(|offer| offer.also.clone())
+            .unwrap_or_default();
         match command {
             ToWorker::Complete { proof, .. } => {
                 self.ledger.complete(&token, &proof).map_err(invalid)?;
@@ -286,6 +310,23 @@ impl<P: Persistence> Consumer<P> {
                     &token.key,
                     "said; its completion is kept, to be acknowledged",
                 );
+                // The others said in the same line, on the same proof:
+                // each under its own attempt.
+                for joined in joined {
+                    let proof = QualifiedCompletion {
+                        correlation: joined.token.correlation.clone(),
+                        ..proof.clone()
+                    };
+                    match self.ledger.complete(&joined.token, &proof) {
+                        Ok(_) => self.journal.item(
+                            &joined.token.key,
+                            "said in one line with another late one; its completion is kept, to be acknowledged",
+                        ),
+                        Err(error) => self
+                            .journal
+                            .item(&joined.token.key, format!("{HELD} ({error})")),
+                    }
+                }
             }
             ToWorker::Retire { proof, .. } => {
                 // Validate the exact correlation now; durable retry validates
@@ -295,6 +336,19 @@ impl<P: Persistence> Consumer<P> {
                 {
                     return Err(invalid("consumer retirement correlation differs"));
                 }
+                for joined in joined {
+                    let proof = QualifiedRetirement {
+                        correlation: joined.token.correlation.clone(),
+                        retired_by_session: proof.retired_by_session.clone(),
+                        basis: proof.basis.clone(),
+                    };
+                    self.journal.item(
+                        &joined.token.key,
+                        "not completed: this attempt can no longer speak, to be offered again",
+                    );
+                    self.retry
+                        .insert(joined.token.key.clone(), (joined.token, proof));
+                }
                 self.retry.insert(token.key.clone(), (token.clone(), proof));
                 self.journal.item(
                     &token.key,
@@ -302,8 +356,12 @@ impl<P: Persistence> Consumer<P> {
                 );
             }
             ToWorker::Abandon { .. } => {
+                for joined in joined {
+                    self.journal.item(&joined.token.key, HELD);
+                }
                 self.journal.item(&token.key, HELD);
             }
+            ToWorker::Noticed {} => unreachable!("answered above"),
         }
         self.current = None;
         self.outgoing
@@ -391,29 +449,22 @@ impl<P: Persistence> Consumer<P> {
                     .ok_or_else(|| invalid("Schedule lateness is invalid"))?,
             ),
         };
-        let token = if let Some(current) = &self.current {
+        let (token, also) = if let Some(current) = &self.current {
             if &current.token.key != pending.key() || current.text != text {
                 return Err(invalid("Schedule occurrence changed during speech"));
             }
-            current.token.clone()
-        } else if let Some((previous, proof)) = self.retry.remove(pending.key()) {
-            let correlation = self.correlation()?;
-            match self
-                .ledger
-                .retry_interrupted(&previous, &pending, &proof, correlation)
-            {
-                Ok(token) => token,
-                Err(error) => {
-                    // Kept for the next tick, not held for ever.
-                    self.retry.insert(pending.key().clone(), (previous, proof));
-                    return Err(invalid(error));
-                }
-            }
+            (current.token.clone(), current.also.clone())
         } else {
-            let correlation = self.correlation()?;
-            self.ledger
-                .prepare(&pending, correlation)
-                .map_err(invalid)?
+            let token = self.prepare(&pending)?;
+            // Said late: the others as late are said with it, in one line
+            // (29e7, 2 Nov).
+            let room = JOINED_TEXT_BYTES.saturating_sub(json_bytes(&text));
+            let also = if late_line(late, late_by_ms) && room > 0 {
+                self.join_late(socket, &token.key, room, deadline)
+            } else {
+                Vec::new()
+            };
+            (token, also)
         };
         let expires_at_us = now
             .saturating_add(LEASE_US)
@@ -425,6 +476,7 @@ impl<P: Persistence> Consumer<P> {
             late_by_ms,
             observed_at_us: now,
             expires_at_us,
+            also,
         };
         // Disk latency cannot refresh the observation that preceded it.
         if !offer.fresh(monotonic_us()) {
@@ -438,16 +490,155 @@ impl<P: Persistence> Consumer<P> {
         self.journal.item(
             &offer.token.key,
             format!(
-                "due, offered to the voice (attempt {}{})",
+                "due, offered to the voice (attempt {}{}{})",
                 offer.token.attempt,
-                if offer.late { ", late" } else { "" }
+                if offer.late { ", late" } else { "" },
+                match offer.also.len() {
+                    0 => String::new(),
+                    joined => format!(", {joined} more as late in the same line"),
+                }
             ),
         );
         self.current = Some(offer.clone());
         self.push(FromWorker::Offer { offer })
     }
+    /// A new attempt for `pending`: again, under a new correlation, for one
+    /// retired before, or a first one.
+    fn prepare(&mut self, pending: &PendingEvidence) -> io::Result<PreparedToken> {
+        if let Some((previous, proof)) = self.retry.remove(pending.key()) {
+            let correlation = self.correlation()?;
+            match self
+                .ledger
+                .retry_interrupted(&previous, pending, &proof, correlation)
+            {
+                Ok(token) => Ok(token),
+                Err(error) => {
+                    // Kept for the next tick, not held for ever.
+                    self.retry.insert(pending.key().clone(), (previous, proof));
+                    Err(invalid(error))
+                }
+            }
+        } else {
+            let correlation = self.correlation()?;
+            self.ledger.prepare(pending, correlation).map_err(invalid)
+        }
+    }
+
+    /// The other pending reminders as late as a late line ([`late_line`]),
+    /// oldest first, at most [`MAX_JOINED`] and `room` bytes of text
+    /// ([`JOINED_TEXT_BYTES`]), each with its own attempt prepared, to be
+    /// said in one line with `main` (29e7, 2 Nov). One the
+    /// ledger holds, or that can't be read or prepared now, is left to be
+    /// said on its own, as before.
+    fn join_late(
+        &mut self,
+        socket: &Path,
+        main: &DeliveryKey,
+        mut room: usize,
+        deadline: Instant,
+    ) -> Vec<Joined> {
+        let request = Request::List {
+            after_id: 0,
+            limit: 8,
+            pending_only: true,
+        };
+        let Ok(page) = exchange(socket, &request, deadline) else {
+            return Vec::new();
+        };
+        if page["ok"] != true || page["store_id"].as_str() != Some(main.store_id.as_str()) {
+            return Vec::new();
+        }
+        let mut joined = Vec::new();
+        // Said in the order they were due.
+        let mut items: Vec<&Value> = page["items"].as_array().into_iter().flatten().collect();
+        items.sort_by_key(|item| item["due_unix_ms"].as_i64());
+        for item in items {
+            // Never at the cost of the line itself: joining stops while the
+            // tick's budget still has room for the offer's own freshness.
+            if joined.len() >= MAX_JOINED
+                || deadline.saturating_duration_since(Instant::now()) < JOIN_SPARE
+            {
+                break;
+            }
+            let (Some(id), Some(delivery)) = (item["id"].as_u64(), item["delivery"].as_u64())
+            else {
+                continue;
+            };
+            let late_by_ms = item["late_by_ms"].as_u64();
+            if id == main.id
+                || item["state"] != "pending"
+                || !late_line(item["late"] == true, late_by_ms)
+                || (late_by_ms.is_none() && !item["late_by_ms"].is_null())
+            {
+                continue;
+            }
+            let key = DeliveryKey {
+                store_id: main.store_id.clone(),
+                id,
+                delivery,
+            };
+            let unheld = self.retry.contains_key(&key)
+                || self.ledger.view(&key).is_ok_and(|view| view.is_none());
+            if !unheld {
+                continue;
+            }
+            let request = Request::Get { id };
+            let Ok(value) = exchange(socket, &request, deadline) else {
+                continue;
+            };
+            let Ok(pending) = PendingEvidence::from_get(&request, &value) else {
+                continue;
+            };
+            let Some(text) = value["item"]["text"].as_str().map(str::to_owned) else {
+                continue;
+            };
+            if pending.key() != &key || json_bytes(&text) > room {
+                continue;
+            }
+            match self.prepare(&pending) {
+                Ok(token) => {
+                    room -= json_bytes(&text);
+                    joined.push(Joined { token, text });
+                }
+                Err(error) => self
+                    .journal
+                    .item(&key, format!("not joined to a late line: {error}")),
+            }
+        }
+        joined
+    }
+
+    /// Schedule told a line was heard after a reminder ([`Request::Noticed`]),
+    /// once each one said is acknowledged, so the answer finds it kept.
+    fn tell_noticed(&mut self, socket: &Path, deadline: Instant) -> io::Result<()> {
+        if !self.notice_owed {
+            return Ok(());
+        }
+        let unacknowledged = self
+            .ledger
+            .entries()
+            .map_err(invalid)?
+            .iter()
+            .any(|view| view.completion.is_some() && view.resolution.is_none());
+        if unacknowledged {
+            return Ok(());
+        }
+        if let Ok(reply) = exchange(socket, &Request::Noticed {}, deadline) {
+            // An older Schedule refuses it: it kept none to notice.
+            self.notice_owed = false;
+            if reply["noticed"].as_u64().is_some_and(|n| n > 0) {
+                self.journal.say(format!(
+                    "a line was heard after {} reminder(s) said late: noticed",
+                    reply["noticed"]
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn tick(&mut self, socket: &Path, due: Option<&ScheduleDue>, now: u64) -> io::Result<()> {
         let deadline = request_deadline();
+        self.tell_noticed(socket, deadline)?;
         let Some(due) = due else {
             return self.withdraw();
         };

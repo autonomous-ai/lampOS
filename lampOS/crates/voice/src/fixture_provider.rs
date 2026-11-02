@@ -847,6 +847,7 @@ mod reminder_tests {
                         text: "Tea".into(),
                         late: false,
                         late_by_ms: None,
+                        also: Vec::new(),
                     },
                 )
                 .unwrap();

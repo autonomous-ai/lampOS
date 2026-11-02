@@ -1424,3 +1424,135 @@ fn the_journal_says_what_became_of_each_due_item_once_per_change() {
         ]
     );
 }
+
+/// 29e7, 2 Nov: four one-time reminders 13 to 38 hours late, the
+/// microphones just opened. They are offered once, as one line: the oldest
+/// with the other three joined, each under its own prepared attempt. One
+/// completion settles all four, each is acknowledged and kept by Schedule
+/// as said and waiting for an answer, and a line heard after it notices
+/// them once every one is acknowledged.
+#[test]
+fn late_ones_are_offered_as_one_line_and_noticed_after_their_acks() {
+    const LATE: u64 = 39 * 3_600_000;
+    let mut engine = Engine::open(Disk::default(), "Etc/UTC", &sample(0), STORE_ID).unwrap();
+    for (index, (text, seconds)) in [
+        ("Send the report", 3_600),
+        ("Buy the gift", 6 * 3_600),
+        ("Drink water", 60),
+        ("Water timer", 120),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        engine
+            .answer(
+                Request::Set {
+                    person: None,
+                    guard: guard(&engine, &format!("set-{index}")),
+                    text: text.into(),
+                    when: When::After { seconds },
+                },
+                &sample(0),
+            )
+            .unwrap();
+    }
+    engine.tick(&sample(LATE)).unwrap();
+    let engine = Arc::new(Mutex::new(engine));
+    let shared = engine.clone();
+    let socket = Socket::new(move |request| {
+        Some(
+            shared
+                .lock()
+                .unwrap()
+                .answer(request.clone(), &sample(LATE))
+                .unwrap_or_else(|e| refusal(e.code, e.message)),
+        )
+    });
+    let mut consumer = consumer(Disk::default());
+    let now = monotonic_us();
+    let report = engine
+        .lock()
+        .unwrap()
+        .due(&sample(LATE), stamp(now, 1), true);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    let offer = take_offer(&mut consumer);
+    assert!(offer.late && offer.late_line());
+    // The oldest due is the one said first; the other three with it.
+    assert_eq!(offer.text, "Drink water");
+    assert_eq!(
+        offer.also_texts(),
+        ["Water timer", "Send the report", "Buy the gift"]
+    );
+    assert!(offer.fresh(monotonic_us()));
+    // A line is heard after it: noticed only once all are acknowledged.
+    consumer
+        .command(
+            ToWorker::Complete {
+                token: offer.token.clone(),
+                proof: completion(&offer.token),
+            },
+            now,
+        )
+        .unwrap();
+    consumer.command(ToWorker::Noticed {}, now).unwrap();
+    for joined in &offer.also {
+        let view = consumer.ledger.view(&joined.token.key).unwrap().unwrap();
+        assert!(view.completion.is_some(), "{view:?}");
+    }
+    for step in 0..24 {
+        let now = monotonic_us() + step;
+        let report = engine
+            .lock()
+            .unwrap()
+            .due(&sample(LATE), stamp(now, 1), true);
+        consumer.tick(&socket.path(), Some(&report), now).unwrap();
+        no_offer(&consumer);
+    }
+    assert_eq!(engine.lock().unwrap().counts(&sample(LATE)), (0, 0, 0));
+    let acks = socket
+        .requests()
+        .iter()
+        .filter(|r| matches!(r, Request::Ack { .. }))
+        .count();
+    assert_eq!(acks, 4);
+    let noticed: Vec<_> = socket
+        .requests()
+        .into_iter()
+        .enumerate()
+        .filter(|(_, r)| matches!(r, Request::Noticed {}))
+        .collect();
+    assert_eq!(noticed.len(), 1, "told once");
+    let last_ack = socket
+        .requests()
+        .iter()
+        .rposition(|r| matches!(r, Request::Ack { .. }))
+        .unwrap();
+    assert!(noticed[0].0 > last_ack, "after every ack");
+    let said = engine
+        .lock()
+        .unwrap()
+        .answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+                asker: None,
+            },
+            &sample(LATE),
+        )
+        .unwrap();
+    let said = said["said"].as_array().unwrap();
+    assert_eq!(said.len(), 4);
+    assert!(said.iter().all(|s| s["waiting_for_answer"] == false));
+}
+
+/// One on time is offered alone, and a late one alone when nothing else
+/// is late.
+#[test]
+fn an_on_time_one_joins_nothing() {
+    let (engine, socket) = served(2);
+    let mut consumer = consumer(Disk::default());
+    let offer = begin(&mut consumer, &engine, &socket);
+    assert!(offer.also.is_empty());
+    assert!(!offer.late_line());
+}

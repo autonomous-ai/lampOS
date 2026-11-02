@@ -1987,3 +1987,48 @@ fn user_interruption_cannot_retry_a_failed_provider_with_unretired_audio() {
     assert!(queue.is_empty());
     assert!(test.pending.is_none());
 }
+
+/// 29e7, 2 Nov, replayed: four one-time reminders due while the
+/// microphones were closed, 13 hours late when they open, and the person
+/// already talking. They are one offer, the oldest with the other three
+/// joined; it waits while the person talks and begins at a pause; the
+/// provider is given all four in one note, to be said once, together.
+#[test]
+fn four_overdue_reminders_as_the_microphones_open_mid_talk_are_one_line_at_a_pause() {
+    use crate::reminders::{TALK_PAUSE_US, TalkPause};
+    // The real Stores sync each prepare: on the stepped scenario clock a
+    // busy host's disk cannot spend the 250 ms socket budget (lampOS#935).
+    let _clock = crate::scenario_clock::Scope::enter(std::time::Duration::from_secs(24)).unwrap();
+    let mut fixture = RoundtripFixture::new();
+    fixture.set_more(&["Send the report", "Buy the gift", "Water timer"]);
+    fixture.advance_wall(13 * 3_600_000);
+    let offer = fixture.offer();
+    assert!(offer.late && offer.late_line(), "{offer:?}");
+    assert_eq!(
+        offer.also_texts(),
+        ["Send the report", "Buy the gift", "Water timer"]
+    );
+    // The person is talking: it waits, and begins at a pause.
+    let mut pause = TalkPause::default();
+    let talked = monotonic_us();
+    assert!(!pause.may_begin(&offer, Some(talked), talked + 1_000_000));
+    assert!(pause.may_begin(&offer, Some(talked), talked + TALK_PAUSE_US));
+    let given = commit_owed(&mut fixture, offer.clone());
+    let ProviderInput::Reminder {
+        text,
+        also,
+        late,
+        late_by_ms,
+        ..
+    } = given
+    else {
+        panic!("{given:?}");
+    };
+    assert_eq!(also, offer.also_texts());
+    let note = crate::provider_worker::reminder_note(&text, &also, late, late_by_ms).unwrap();
+    assert_eq!(note.matches("Reminder data:").count(), 1, "{note}");
+    for said in std::iter::once(&offer.text).chain(&also) {
+        assert!(note.contains(said.as_str()), "{said}: {note}");
+    }
+    assert!(note.contains("once, in one short natural line"), "{note}");
+}

@@ -89,10 +89,10 @@ honest failure when called. It does not disable unrelated volume/light calls.
 
 | Tool | Exact model arguments | Private operation |
 |---|---|---|
-| `set_timer` | `text`, whole `seconds` | Set with an elapsed `After` deadline |
+| `set_timer` | `text`, whole `seconds` | Set with an elapsed `After` deadline; for a voice line, the same timer asked for again within 2 min is the one already set (`already_set`), and one with the same words as another still set names it (`same_words_set`; 29e7, [schedule.md](schedule.md)) |
 | `set_reminder` | `text`, exact `time` in `HH:MM`; optional `day`, `zone`, `fold` | Set one civil `At` deadline |
 | `repeat_reminder` | `text`, `time`, `every` (`daily` or `weekly`); `weekday` required only for weekly; optional `zone` | Set a local daily/weekly recurrence |
-| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own and the room's timers; each item says when it was set (`set_day`, `set_clock`), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
+| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own and the room's timers; each item says when it was set (`set_day`, `set_clock`), `said_recently` lists the line's own already said (29e7), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
 | `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series, only the line's own or the room's timer (one set with nobody sure, for 2 h at most; [schedule.md](schedule.md)) |
 | `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own or the room's timer |
 
