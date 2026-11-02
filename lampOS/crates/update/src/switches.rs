@@ -304,6 +304,11 @@ mod tests {
         assert!(found.iter().any(|name| name == "LAMP_CLOUD"), "{found:?}");
         // Off in the product: not a switch install guards.
         assert!(!found.iter().any(|name| name == "LAMP_SKILLS_STORE"));
+        // On in the product: a made skill sent to the Store from the app.
+        assert!(
+            found.iter().any(|name| name == "LAMP_SKILLS_SHARE"),
+            "{found:?}"
+        );
         // A commented example line is no switch.
         let (_, addons) = crate::install::PRODUCT
             .iter()
