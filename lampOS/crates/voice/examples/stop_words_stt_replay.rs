@@ -1011,7 +1011,7 @@ mod tests {
     fn script() -> Vec<(u64, &'static str)> {
         vec![
             (us(5_600), "Stop."),
-            (us(9_000), "and the fox had to wait"),
+            (us(9_000), "had to wait"),
             (us(12_300), "don't stop"),
             (us(12_800), "Lamp, stop."),
             (us(13_200), "stop"),
@@ -1080,10 +1080,7 @@ mod tests {
             words.contains("aec_only\t+0.61 s\tStop.\tstop: catch"),
             "{words}"
         );
-        assert!(
-            words.contains("and the fox had to wait\tstop: false"),
-            "{words}"
-        );
+        assert!(words.contains("had to wait\tstop: false"), "{words}");
         assert!(words.contains("don't stop\n"), "{words}");
         let both = summary(&[heard], 1_000_000);
         assert!(
