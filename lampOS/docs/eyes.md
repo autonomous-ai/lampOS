@@ -1100,12 +1100,16 @@ hold, which needs the match's id, let them go. With both on:
   centre (`bus_out::Ids::followed`). Two such ids, or two new faces near one
   lost one, follow nothing; the old id seen again ends the link; it lasts
   while the new id is kept.
-- **The hold carried.** Within the hold, with one near face whose new id
-  follows the id at the match, that id becomes the match's
-  (`who::Held::follow`), and the known face beside the known file is
-  rewritten to it with the name as it was. The rules above still apply to
-  it: under 0.30 alike lets them go, someone else matched replaces them,
-  and two near faces never follow.
+- **The hold carried, only by a print.** Within the hold, with one near
+  face whose new id follows the id at the match (`who::Held::follow`), a
+  print of that face at least 0.30 alike to the held person makes the new
+  id the match's (`who::Held::carry`), and the known face beside the known
+  file is rewritten to it with the name as it was. Until such a print, the
+  new id is another id: seen but not printed (turned, too small), it lets
+  them go at once and the known file is removed, as before the followed id,
+  so their name never goes on an id no print has shown is theirs (the
+  Reviewer-lead's P2 on #4917). Under 0.30 alike lets them go, someone else
+  matched replaces them, and two near faces never follow.
 - **Said on the bus.** `humans/faces/tracked` gives the new face
   `"follows":"f3"`, the id it follows; the second voice then reads a line
   across the change as one face's ([second-voice.md](second-voice.md)).
