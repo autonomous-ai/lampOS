@@ -145,6 +145,10 @@ Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
+# A line that begins with the lamp's name, said to a face turned to the lamp, is answered in a busy room (#2191): on
+# lamp-52e6 on 20 Oct, under two other voices' talk, a named line was held back with it off and none with it on, and
+# talk without the name went the same way. The face it needs is a second sign above, so every name it answers counts.
+Environment=LAMP_NAMED_ALWAYS=on
 # A hearing of the name inside one line's sound stays with that line: on lamp-4ace on 26 Oct (6919) a hearing in
 # "Can you pass me the charger? The white one." counted for the desk line begun 0.7 s after it, which was answered.
 Environment=LAMP_NAME_STAYS_IN_ITS_LINE=on
