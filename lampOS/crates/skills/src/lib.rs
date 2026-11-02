@@ -7952,6 +7952,8 @@ fn calls(
 /// (`[search]`'s `note`, `walk` and `looked`, and its choice's `default`):
 /// the second voice route's note and walk read them (docs/second-voice.md).
 /// The lists include enabled skills only, even when given the inventory.
+/// Each is in the tools' names' order, whatever order `skills` is in, so
+/// the voice's cut past its bound, the last first, is by name.
 pub fn tools_file(skills: &[Skill]) -> Value {
     tools_file_with(
         skills,
@@ -8086,6 +8088,12 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
         tools.push(unplug::stay_tool());
         moving.push(unplug::STAY_TOOL);
     }
+    // In the tools' names' order, whatever order the skills came in: the
+    // product's install and the program's load gave one file two orders
+    // (#4135). Which skill a name went to is settled above, by `skills`.
+    tools.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    moving.sort_unstable();
+    core.sort_unstable();
     let mut file = json!({ "tools": tools });
     if !moving.is_empty() {
         file["body"] = json!(moving);

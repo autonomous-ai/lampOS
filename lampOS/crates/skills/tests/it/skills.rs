@@ -1024,6 +1024,57 @@ fn a_tool_is_one_skills_a_core_skills_first() {
     assert_eq!(tools_file(&live)["tools"].as_array().unwrap().len(), 1);
 }
 
+/// The tools file is one file whatever order the skills come in: the
+/// product's install lists its skills in its own order, the program loads
+/// them by folder, and with Pose on the two gave dance, prepare_to_unplug,
+/// set_pose and dance, set_pose, prepare_to_unplug (#4135). Its tools and
+/// its `body` and `core` lists are in the tools' names' order.
+#[test]
+fn the_tools_file_is_in_name_order_whatever_order_the_skills_come_in() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    for name in ["dance", "pose", "prepare-unplug"] {
+        copy(&skills_root().join(name), &skills.join(name));
+    }
+    skill_with(
+        &skills,
+        "a-wave",
+        "tool = \"wave\"\n[permissions]\nbody = true\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n",
+    );
+    let (loaded, errors) = load_all(&skills);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(loaded.len(), 4);
+    let mut reversed = loaded.clone();
+    reversed.reverse();
+    let file = tools_file(&loaded);
+    assert_eq!(file, tools_file(&reversed));
+    let names = |key: &str| -> Vec<String> {
+        file[key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| {
+                item.get("name")
+                    .unwrap_or(item)
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect()
+    };
+    let tools = names("tools");
+    let mut sorted = tools.clone();
+    sorted.sort();
+    assert_eq!(tools, sorted, "{file}");
+    assert!(tools.contains(&"set_pose".to_owned()), "{file}");
+    for key in ["body", "core"] {
+        let listed = names(key);
+        let mut sorted = listed.clone();
+        sorted.sort();
+        assert_eq!(listed, sorted, "{key}: {file}");
+    }
+}
+
 /// The gate itself, as the program asks it where each call leaves: the
 /// body, the light, the voice and the look each need their permission, and
 /// the actions part's functions are the light's with `light`, any other only
@@ -3496,8 +3547,8 @@ fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() 
     assert_eq!(code, Some(0), "{error}");
     assert!(said.starts_with("installed desk-tutor 1.0.0"), "{said}");
     clock.skip(RELOAD);
-    // In folder order: Dance's, then Desk tutor's.
-    settled(&["dance", "check_my_work"]);
+    // In name order: Desk tutor's, then Dance's.
+    settled(&["check_my_work", "dance"]);
     let (code, listed, _) = command(&["list".as_ref(), "--dir".as_ref(), skills.as_os_str()]);
     assert_eq!(code, Some(0));
     let mut lines: Vec<&str> = listed.lines().collect();
@@ -3505,7 +3556,7 @@ fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() 
     let functions = lines.pop().unwrap_or_default();
     assert!(
         functions.starts_with(
-            "The skills here give the model 2 functions (dance, check_my_work). A session takes 32"
+            "The skills here give the model 2 functions (check_my_work, dance). A session takes 32"
         ),
         "{listed}"
     );

@@ -96,7 +96,7 @@ pub const MOST_PACKAGE_BYTES: u64 = MOST_BYTES + 2 * 1024 * 1024;
 /// The most parts a file's path in a skill may have (`tests/CASE/FILE`).
 const MOST_DEPTH: usize = 4;
 /// The most functions a session is given, the voice's own and the actions
-/// part's told first, then the skills' in their folders' order
+/// part's told first, then the skills' in their tools' names' order
 /// (`docs/tools.md`): past it, the last are left out.
 pub const SESSION_FUNCTIONS: usize = 32;
 
@@ -1011,6 +1011,8 @@ fn functions_said(skills: &[Skill]) -> String {
     if tools.is_empty() {
         return "The skills here give the model no function.".into();
     }
+    // In name order, as the tools file has them (`tools_file`).
+    tools.sort_unstable();
     format!(
         "The skills here give the model {} function{} ({}). A session takes {SESSION_FUNCTIONS}, \
          the voice's own and the actions part's first (30 on a product lamp), and past \
