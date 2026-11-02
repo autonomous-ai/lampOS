@@ -71,6 +71,16 @@ pub const MOST_EYES_STEP: f32 = 0.05;
 /// and 39 to 66 (a mirror), and left 0 `yes` on all four still sets; one pair
 /// let three single still pairs score above 0.015 (#4585).
 pub const LEAST_HELD_PAIRS: usize = 2;
+/// With [`STEADY_ENVIRONMENT`], the fewest pairs a window with pairs left out
+/// scores `yes` over: its held pairs' squared steps are divided by at least
+/// this many, so one jumpy pair of two held cannot carry the window (a lip
+/// step of 0.022 scores 0.022 / sqrt(4) = 0.011, under [`MESH_SPEAKING_AT`]).
+/// In an offline replay of the lamp-52e6 logs (matching the lamp's calls on
+/// 133 of 133 fully logged looks), the whole window's pair count cost talking
+/// windows (36 to 34 of 37, 38 to 35 of 74, 42 to 37 of 77); 4 kept the
+/// held-pair counts and no still face read `yes` on any set. 3 gave the same
+/// counts with a margin of only 0.0127 on that step (#4585).
+pub const LEAST_HELD_PAIRS_YES: usize = 4;
 /// How far back a face's mouth is read: five to eight looks at the eyes'
 /// pace while they follow a face (250 ms, up to 350 ms on a 10 fps camera,
 /// `main.rs`). With `--steady-rate` a still face is looked at 500 to 600 ms
@@ -479,12 +489,12 @@ impl Mouths {
                 .filter_map(|(a, b)| Some((b.4? - a.4?).powi(2)))
                 .sum::<f32>();
             let score = (squares / held.len().max(1) as f32).sqrt();
-            // With pairs left out, `yes` is scored over the whole window's
-            // pairs, a left-out pair counting as still: one jumpy pair of two
-            // held would otherwise carry half the window (0.022 scores 0.0156
-            // over two, 0.0078 over eight, #4585). `no` stands on the held
-            // pairs; a window between the two is `unknown`.
-            let whole = (squares / pairs.len().max(1) as f32).sqrt();
+            // With pairs left out, `yes` is scored over at least
+            // LEAST_HELD_PAIRS_YES pairs: one jumpy pair of two held would
+            // otherwise carry half the window (0.022 scores 0.0156 over two,
+            // 0.011 over four, #4585). `no` stands on the held pairs; a
+            // window between the two is `unknown`.
+            let whole = (squares / held.len().max(LEAST_HELD_PAIRS_YES) as f32).sqrt();
             let state =
                 if !dropped && score >= MESH_SPEAKING_AT || dropped && whole >= MESH_SPEAKING_AT {
                     SpeakingState::Yes
@@ -1734,6 +1744,18 @@ mod steady_tests {
         let eyes = [20.0, 21.5, 20.0, 21.5, 20.0, 21.5, 20.0, 21.5, 21.5, 21.5];
         let said = moving_each(&eyes, &[], &one_step());
         assert_ne!(said[9], SpeakingState::Yes, "{said:?}");
+    }
+
+    #[test]
+    fn three_held_pairs_of_talking_in_a_moved_window_are_yes() {
+        // The head moves at looks 1 to 5, leaving (6,7), (7,8) and (8,9),
+        // each a lip step of 0.02: sqrt(3 * 0.02^2 / 4) = 0.0173. Over the
+        // window's eight pairs it would be 0.0122, `unknown`.
+        let open: Vec<f32> = (0..10)
+            .map(|look| if look % 2 == 0 { 0.002 } else { 0.022 })
+            .collect();
+        let said = moving_each(&[30.0; 10], &[1, 2, 3, 4, 5], &open);
+        assert_eq!(said[9], SpeakingState::Yes, "{said:?}");
     }
 
     #[test]
