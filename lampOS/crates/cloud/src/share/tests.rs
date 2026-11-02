@@ -413,6 +413,46 @@ fn a_share_sends_only_the_package_its_preview_showed() {
     );
 }
 
+/// Mobile's P2 on #4965: the skill made again while its preview is read.
+/// The files shown and the SHA-256 come from one copy, so they describe the
+/// same bytes, and a send of the skill as it is now is refused.
+#[test]
+fn a_preview_shows_and_hashes_one_copy_even_when_the_skill_changes_meanwhile() {
+    let places = places("share-snapshot");
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    let folder = places.folder.join("water");
+    let toml = fs::read_to_string(folder.join("skill.toml")).unwrap();
+    let before = previewed(&places, "water", "snapshot-before");
+    let (sha256, files) = seen(&folder, &scratch("snapshot-seen"), || {
+        fs::write(folder.join("skill.toml"), format!("{toml}\n# made again\n")).unwrap();
+    })
+    .unwrap();
+    // Both from the copy taken before the change.
+    assert_eq!(sha256, before);
+    let shown = files
+        .iter()
+        .find(|file| file["path"] == "skill.toml")
+        .and_then(|file| file["text"].as_str())
+        .unwrap()
+        .to_owned();
+    assert_eq!(shown, toml);
+    // The skill now is another package: a send of what was seen is refused.
+    let (store, sent) = store(
+        201,
+        r#"{"status":1,"data":{"id":"s1","name":"water","version":"1.0.0","review_status":"pending"}}"#,
+    );
+    assert_eq!(
+        share(
+            &store,
+            &places,
+            &json!({"name": "water", "sha256": sha256}),
+            &scratch("snapshot-send")
+        ),
+        Err(CHANGED.into())
+    );
+    assert!(sent.try_recv().is_err(), "nothing was sent");
+}
+
 #[test]
 fn a_sent_answer_with_no_id_is_unread_not_sent() {
     let places = places("share-unread");
