@@ -550,7 +550,8 @@ pub fn someone_in_view_turned_away(bus: &Bus) -> bool {
 }
 
 /// How many faces the eyes see now (`humans/faces/tracked`), turned to the
-/// lamp or not: in their newest look, nothing when they have said nothing
+/// lamp or not, as people at the lamp (`LAMP_FACES_AT_DESK_ONLY`,
+/// [`crate::known_faces::people_at_lamp`]): in their newest look, nothing when they have said nothing
 /// still fresh, as [`someone_turned_to_lamp`] reads them. Two or more is
 /// people together at the lamp: the room is busy at once
 /// (`LAMP_NAME_OR_FOLLOW_UP`, `room_told::RoomTold::two_people`), and a line
@@ -567,7 +568,9 @@ pub fn faces_in_view(bus: &Bus) -> Option<usize> {
     if message.expired {
         return None;
     }
-    Some(message.parse::<lamp_msgs::Faces>().ok()?.faces.len())
+    Some(crate::known_faces::people_at_lamp(
+        &message.parse::<lamp_msgs::Faces>().ok()?,
+    ))
 }
 
 /// The link to the speech service may be down this long before the voice

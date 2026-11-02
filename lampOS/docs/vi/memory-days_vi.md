@@ -429,6 +429,29 @@ hỏi trước. Việc kiểm tra cùng giọng (`same_voice_releases`, một đ
 chưa bao giờ đúng) là phần làm sau.
 ## Một câu của họ không thấy mặt nói, khi chỉ có mặt họ trong khung hình
 
+**Chỉ mặt của người ngồi tại bàn mới là mặt khác** (`LAMP_FACES_AT_DESK_ONLY=on`,
+bật trong bản sản phẩm; [eyes.md](../eyes.md), "Who counts as someone at the
+lamp"): với «một mặt trong khung hình», «không mặt nào khác» và «một mình trong
+khung hình» bên dưới, một mặt cao chưa tới 0,6 chiều cao của mặt tham chiếu trong
+cùng lần nhìn (mặt cao nhất có độ chắc ít nhất 0,70 và cao không quá 0,6 khung
+hình, nên một khung giả khổng lồ không loại được chủ đèn), hoặc độ chắc chắn dưới
+0,70, không được tính là người ở bên đèn. Một lần nhìn có mặt không bao giờ đếm
+là không có ai.
+Trên lamp-a0ae ngày 2/11, ngay sau cài đặt, tên chủ đèn bị giữ lại ở 51 trên 79
+lượt vì «nhiều hơn một mặt trong khung hình»: bên cạnh mặt chủ đèn (rộng 0,09
+đến 0,19 khung hình, chắc 0,80 đến 0,92), mắt liên tục báo những mặt rộng 0,02
+đến 0,06 với độ chắc 0,61 đến 0,78, gần như mỗi lần nhìn một mã mới. Mặt như vậy
+vẫn được theo dõi và vẫn được đọc là đang nói; danh sách của mắt không bị đổi.
+Một mặt không được tính mà đọc là đang nói trong 10 giây qua vẫn giữ tên chủ đèn
+lại («a face not at the desk seen speaking»): một vị khách đứng xa phía sau, là
+giọng duy nhất, không được nghe tên chủ đèn. Mặt có độ chắc dưới 0,70 bị bỏ dù
+lớn cỡ nào, nên một vị khách tại bàn quay nghiêng (khoảng 0,65) được tính 0: nếu
+họ nói, tên vẫn bị giữ lại; nếu họ im lặng thì không.
+Dòng nhật ký quyết định tên mặc định ghi kích thước và độ chắc của các mặt được
+tính và bị bỏ, không mã, không vị trí, chỉ khi bật công tắc hoặc có mặt bị bỏ. Tắt công tắc thì mọi mặt đều được tính,
+như trước. Các ngưỡng 0,6 và 0,70 lấy từ bản ghi trên lamp-06c1 (3/11); một người thật đứng
+sau chủ đèn 1 m vẫn chưa được thử.
+
 Với `LAMP_PERSON_SCOPE_ONE_FACE=on` (bật trong bản sản phẩm; mục 1 của nhóm
 thử nghiệm ra mắt trên #3997): trên lamp-220c ngày 30/10, mặt chủ đèn có trong
 17 lần nhìn của một câu nhưng không lần nào đọc là đang nói, nên với
