@@ -435,14 +435,14 @@ fn a_reminder_in_a_zone_this_build_does_not_know_is_kept_unread() {
 fn newer_schema_is_retained_whole_and_a_fresh_store_is_usable_after_reopen() {
     let root = tempfile::tempdir().unwrap();
     let dir = root.path().join("store");
-    let future = br#"{"schema":2,"items":[{"future_kind":"unreadable here"}]}"#;
+    let future = br#"{"schema":3,"items":[{"future_kind":"unreadable here"}]}"#;
     let mut store = Store::open(&dir).unwrap();
     store.commit(future).unwrap();
     drop(store);
     let original = fs::read(dir.join("schedule.sqlite3")).unwrap();
     let mut engine = Engine::open(Store::open(&dir).unwrap(), "Etc/UTC", &now(0), FRESH).unwrap();
     let kept = engine.set_aside().unwrap().to_owned();
-    assert_eq!(kept, format!("schedule.sqlite3.newer-2-{}", WALL / 1000));
+    assert_eq!(kept, format!("schedule.sqlite3.newer-3-{}", WALL / 1000));
     assert_eq!(fs::read(dir.join(&kept)).unwrap(), original);
     assert_eq!(engine.store_id(), FRESH);
     assert_eq!(engine.counts(&now(0)), (0, 0, 0));
@@ -461,7 +461,7 @@ fn newer_schema_with_invalid_new_identity_leaves_the_database_in_place() {
     let root = tempfile::tempdir().unwrap();
     let dir = root.path().join("store");
     let mut store = Store::open(&dir).unwrap();
-    store.commit(br#"{"schema":2}"#).unwrap();
+    store.commit(br#"{"schema":3}"#).unwrap();
     drop(store);
     let original = fs::read(dir.join("schedule.sqlite3")).unwrap();
     assert!(Engine::open(Store::open(&dir).unwrap(), "Etc/UTC", &now(0), "bad-id").is_err());
@@ -485,7 +485,7 @@ fn newer_schema_reports_once_and_a_second_start_reports_no_recovery() {
     let dir = root.path().join("state");
     Store::open(&dir)
         .unwrap()
-        .commit(br#"{"schema":2}"#)
+        .commit(br#"{"schema":3}"#)
         .unwrap();
     for expected in [1, 0] {
         let output = Command::new(env!("CARGO_BIN_EXE_lamp-schedule"))
@@ -547,10 +547,10 @@ fn after_a_newer_store_is_set_aside_the_delivery_ledger_prepares_a_new_reminder(
     ledger.prepare(&due, correlation(1)).unwrap();
     let before = engine.revision();
     drop(engine);
-    // A later build writes schema 2 over the same store.
+    // A later build writes schema 3 over the same store.
     let mut store = Store::open(&dir).unwrap();
     let mut later: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
-    later["schema"] = json!(2);
+    later["schema"] = json!(3);
     later["a_field_from_a_later_build"] = json!(true);
     store.commit(&serde_json::to_vec(&later).unwrap()).unwrap();
     drop(store);
@@ -587,7 +587,7 @@ fn a_set_aside_store_without_a_readable_identity_starts_fresh() {
     let dir = root.path().join("store");
     let mut store = Store::open(&dir).unwrap();
     store
-        .commit(br#"{"schema":2,"store_id":"not an id","revision":3,"next_id":4}"#)
+        .commit(br#"{"schema":3,"store_id":"not an id","revision":3,"next_id":4}"#)
         .unwrap();
     drop(store);
     let engine = Engine::open(Store::open(&dir).unwrap(), "Etc/UTC", &now(0), FRESH).unwrap();
@@ -607,12 +607,12 @@ fn an_empty_store_beside_one_set_aside_keeps_its_identity_after_a_crash() {
     let mut store = Store::open(&dir).unwrap();
     store
         .commit(
-            format!(r#"{{"schema":2,"store_id":"{STORE}","revision":7,"next_id":9,"items":[]}}"#)
+            format!(r#"{{"schema":3,"store_id":"{STORE}","revision":7,"next_id":9,"items":[]}}"#)
                 .as_bytes(),
         )
         .unwrap();
     // The rename happened; the carried state was never committed.
-    store.set_aside("newer-2-1791964800").unwrap();
+    store.set_aside("newer-3-1791964800").unwrap();
     assert_eq!(store.load().unwrap(), None);
     drop(store);
     let mut engine = Engine::open(Store::open(&dir).unwrap(), "Etc/UTC", &now(0), FRESH).unwrap();
