@@ -160,6 +160,12 @@ pub struct Installed {
     pub sha256: String,
     /// The package's `lamp-skill.json`.
     pub manifest: Manifest,
+    /// Whether it came from the Skills Store's catalogue: only a skill
+    /// added from the Store may be replaced by a Store install and keep the
+    /// owner's camera yes for its name (the Reviewer-lead's P2 on #4875).
+    /// Absent in a record written before it, read as not from the Store.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub from_store: bool,
 }
 
 /// The most bytes of [`INSTALLED_FROM`] read: a manifest of [`MOST_FILES`]
@@ -2166,6 +2172,7 @@ fn put_in(
             let installed = Installed {
                 sha256: package.sha256.clone(),
                 manifest: package.manifest.clone(),
+                from_store,
             };
             let mut json = serde_json::to_vec_pretty(&installed)
                 .map_err(|error| format!("not installed: {error}"))?;
@@ -2245,6 +2252,16 @@ fn moved_in(
                  and an installable skill can't take its place"
             ));
         }
+        // A Store install replaces only a skill added from the Store:
+        // never one made here, shared, pushed or put in by hand, which
+        // would be deleted with no word and its camera yes handed to new
+        // code (the Reviewer-lead's P2 on #4875).
+        Ok(_) if from_store && !installed_from(&target).is_some_and(|was| was.from_store) => {
+            return Err(format!(
+                "not installed: a skill called {name} is already on this lamp, and it wasn't \
+                 added from the Skills Store: remove it first to add this one"
+            ));
+        }
         Ok(_) => Some(version_of(&target)),
     };
     // A package from the Store never puts an older version over a newer
@@ -2270,8 +2287,8 @@ fn moved_in(
     }
     // The owner's yes to the camera is kept by name (#3504's piece C).
     // From the Store, a package that asks the camera's picture goes on only
-    // once that yes is kept, and an update of the same catalogue entry
-    // keeps it. Any other install that puts a skill in place under that
+    // once that yes is kept, and an update of a skill added from the Store
+    // keeps it (any other skill of that name was refused above). Any other install that puts a skill in place under that
     // name (by hand, or made here) takes the yes away first, under the
     // same lock and before the rename, so its picture waits for a new yes
     // at each call (`Engine::picture_refused`); a record that can't be
