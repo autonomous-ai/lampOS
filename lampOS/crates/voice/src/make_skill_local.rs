@@ -8,8 +8,10 @@
 //! Every gate of a made skill stays: the answer is taken, held to what a
 //! made skill may use, checked and packed by `lamp-skills pack` and kept
 //! ([`made_skill::keep`]); the lamp says what it does and what it uses, and
-//! asks [`made_skill::ASK_TO_PUT_ON`] in the same answer, so the ask is kept
-//! as made then ([`made_skill::offered`]); only the person's spoken yes
+//! asks [`made_skill::ASK_TO_PUT_ON`] in the same answer. The ask is kept
+//! only when a yes comes right after an answer of the lamp's that said it
+//! ([`made_skill::asked_in_answer`], the Reviewer-lead's P2 on #4914), so a
+//! yes after a cut-in or another question puts nothing on; only the person's spoken yes
 //! within [`made_skill::PUT_ON_WITHIN`] puts it on ([`made_skill::put_on`]),
 //! by its SHA-256 alone. An answer that doesn't pass is said as not made,
 //! and nothing is kept. The model only writes: it puts nothing on.
@@ -191,19 +193,16 @@ pub fn make(
         },
         began.elapsed().as_millis()
     );
-    told(keeping, made, now_unix_ms)
+    told(made)
 }
 
-/// What the model is told of a skill made here: kept and asked about now,
-/// or not made, and why, in plain words.
-fn told(keeping: &Keeping, made: Result<Made, Refused>, now_unix_ms: u64) -> Value {
+/// What the model is told of a skill made here: kept, or not made, and
+/// why, in plain words. It is not kept as asked here: only an answer that
+/// said [`made_skill::ASK_TO_PUT_ON`] makes it asked, when the yes comes
+/// ([`answer`], the Reviewer-lead's P2 on #4914).
+fn told(made: Result<Made, Refused>) -> Value {
     match made {
         Ok(made) => {
-            // The model asks in this same answer: the ask is kept now, so
-            // a yes within its 120 s finds it waiting.
-            if let Err(error) = made_skill::offered(&keeping.directory, &made.sha256, now_unix_ms) {
-                eprintln!("lamp-voice: a skill made here: its ask was not kept: {error}");
-            }
             json!({
                 "made": made.name,
                 "description": made.description,
@@ -235,6 +234,20 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
         return crate::tools::unavailable();
     };
     if call.name == made_skill::PUT_ON {
+        // The just-made skill is asked only if the lamp's own last answer
+        // said the ask (`made_skill::asked_in_answer`, as `agent_tasks`
+        // does since #4880): a yes after a cut-in or another question puts
+        // nothing on.
+        if heard
+            && let Some((lamp_said, ago)) = crate::thread::THREAD
+                .lock()
+                .ok()
+                .and_then(|thread| thread.answered_last_but(request, std::time::Instant::now()))
+            && let Err(error) =
+                made_skill::asked_in_answer(&keeping.directory, &lamp_said, ago, now_unix_ms)
+        {
+            eprintln!("lamp-voice: a skill made here: its ask in an answer was not kept: {error}");
+        }
         let said = heard.then(|| {
             crate::thread::THREAD
                 .lock()
@@ -383,8 +396,11 @@ light = { dim = 1 }
         made_skill::waiting(directory, NOW + 1_000)
     }
 
-    /// The model's two files are checked, packed and kept, and asked about
-    /// now: a yes within its 120 s finds it waiting, by its SHA-256.
+    /// The model's two files are checked, packed and kept. Nothing waits
+    /// for a yes until the lamp's own answer has said the ask: an answer
+    /// without it (a cut-in, another question) keeps it unasked, and one
+    /// with it makes it wait, by its SHA-256 (the Reviewer-lead's P2 on
+    /// #4914).
     #[test]
     fn a_good_answer_is_kept_and_asked_about() {
         let (root, keeping) = keeping("good");
@@ -398,6 +414,20 @@ light = { dim = 1 }
                 .contains(made_skill::ASK_TO_PUT_ON)
         );
         assert!(told["uses"].as_str().unwrap().contains("light"), "{told}");
+        assert_eq!(waiting(&keeping.directory), None);
+        let ago = Duration::from_secs(2);
+        assert!(
+            !made_skill::asked_in_answer(
+                &keeping.directory,
+                "It dims the light at ten. Want a reminder too?",
+                ago,
+                NOW
+            )
+            .unwrap()
+        );
+        assert_eq!(waiting(&keeping.directory), None);
+        let said = format!("It dims the light at ten. {}", made_skill::ASK_TO_PUT_ON);
+        assert!(made_skill::asked_in_answer(&keeping.directory, &said, ago, NOW).unwrap());
         assert_eq!(waiting(&keeping.directory).unwrap().0, "evening-dim");
         assert_eq!(served.join().unwrap(), 1);
         let _ = std::fs::remove_dir_all(&root);

@@ -2194,16 +2194,26 @@ Nothing above changes with the switch off.
    …"), with no technical words for the person, and nothing is kept; there
    is no repair round.
 4. Kept, the model is told its name, what it does and what it uses, and to
-   ask "Shall I put it on the lamp?" in the same answer, so the ask is kept
-   as made then (`made_skill::offered`). Only a plain spoken yes within
-   120 s calls `put_on_made_skill`, which puts that SHA-256 on through the
-   manage helper, as above. The second route notes a made skill waiting
-   for its yes with the switch too.
+   ask "Shall I put it on the lamp?" in the same answer. It is not kept as
+   asked then (the Reviewer-lead's P2 on #4914): only when a yes comes right
+   after an answer of the lamp's that said the ask, within 120 s, does
+   `put_on_made_skill` first keep it asked (`made_skill::asked_in_answer`,
+   with the words and age of one exchange, `Thread::answered_last_but`, as
+   `agent_tasks` does since #4880) and then put that SHA-256 on through the
+   manage helper, as above. A yes after a cut-in ("wait, make it 11") or
+   after an answer that asked something else puts nothing on. The second
+   route notes a made skill waiting for its yes with the switch too.
+5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
+   for up to 30 s, or about 60 s with the one more try. The person hears
+   the model's few words that it is making it, said before the call, and
+   then the voice's wait sound if `LAMP_SECOND_WAIT_CUE=on`; nothing else
+   until the answer. Whether "Stop" ends the wait is measured in the played
+   check on lamp-9adf (#4914) and written here with its result.
 
 Not yet with the switch: a skill typed in the app. `skills.make` still
 hands over to a computer, and `can` still waits for one.
 
-Tests: `make_skill_local::tests` (a good answer kept and asked, a refused
+Tests: `make_skill_local::tests` (a good answer kept, asked only after an answer that said the ask, a refused
 one kept nothing, a 404 asked once more, a brief refused asking nothing,
 and the switch alone routing and declaring the two functions).
 
