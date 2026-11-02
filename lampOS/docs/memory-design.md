@@ -191,6 +191,57 @@ Natural behavior is part of acceptance: apply preferences quietly; ask a
 follow-up once when appropriate; accept stillness and silence; never read
 out the owner model, invent a fact, or turn recall into an unasked interview.
 
+## Wiring into lamp-memory
+
+The first builder's rule for any of this reaching a lamp (#4710, 2 November):
+wiring into lamp-memory behind a switch, a played test over days, and two
+reads. The wiring is `LAMP_MEMORY_TIERS` (off unless set; the product sets
+it nowhere), read by lamp-memory at start with `--memory-days`. Its contract
+is in [memory.md](memory.md#the-tiered-store-beside-days-lamp_memory_tiers);
+the shape and what it leaves open:
+
+- **Days stays the answer.** `shadow` mirrors every exchange and kept thing
+  into the tiered store and every removal out of it, runs the nightly sleep,
+  and answers from Days byte for byte. `on` adds the tiers' recall beside a
+  `recall` or `search` answer as `"tiers"`, waited for at most 50 ms. The
+  design's recall belongs in voice, started while speech is in progress and
+  used only if ready at the answer deadline; that voice change, and the
+  session-start owner snapshot, are later work behind their own switch, so
+  `on` serves the field and measures it, and today's voice ignores it.
+- **The record's attribution.** Each known person's scope (and rules scope)
+  is its own tiered store, owned by that scope; heard words are its owner's
+  records, said words the lamp's. The room's scope is never mirrored: Days
+  could not place that voice, so its words are no one's evidence (the
+  attribution rule above). What the room keeps reaches a person's store
+  only through Days' own `adopt`.
+- **Forgetting.** The tiers hold a subset of Days, by construction: Days'
+  connection logs every added, removed or moved entry inside the change's
+  own transaction (temporary triggers, as the health counts use), and every
+  removal of every kind deletes the entry's row. A removal runs the library's
+  forget on the mapped records, which takes their facts, lines and episodes'
+  derived text and fingerprints them; a forget of everything of a scope
+  deletes its store and key ("Reset deletes the key as well as the store"),
+  and a person's removal their rules scope's too; a failing forget deletes
+  the scope's store; a queue overflow, or a worker that stopped, empties all
+  stores; each start removes what Days no longer holds and any record no map
+  names. The days kept running out also removes the tiered copy, through the
+  same fingerprinting forget: the library has no plain retention delete.
+- **Off the reply path.** One worker thread and a 256-job queue own every
+  tiered store; a request only takes Days' in-memory change log and
+  `try_send`s it. The worker's writes share the lamp's disk with Days'
+  synchronous commits, which the played test must measure.
+- **No model on the lamp yet.** lamp-memory runs with `PrivateNetwork=yes`
+  and no adapter, so each night ends episodes, expires and fades, prepares
+  the bounded input and is counted `unconfigured`, never a successful night.
+  The relay adapter (DeepSeek through the relay, as above) is its own
+  reviewed change.
+
+Left open: backfill of earlier Days history; retiring a replaced kept thing
+without a fingerprint; the tiers' `alone` presence condition, which memory
+cannot establish (Days already answers a scope to whoever the voice asks
+for); the weekly reflection; and the bench's diagnostics (#4777) and topic
+segmentation (#4783), which build on the same store.
+
 ## Build order and release ruling
 
 1. Commit the fake month, questions, and scorers before any arm result.
