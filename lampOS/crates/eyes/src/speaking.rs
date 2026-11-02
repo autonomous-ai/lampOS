@@ -59,7 +59,11 @@ pub const LEAST_MESHED_EYES_PX: f32 = 16.0;
 /// box flipping between two fits on a still frame (about 8% of its width at
 /// 17 px between the eyes, #4585) moves the mesh's crop and reads as lips. A
 /// still large face varies about 1.2% look to look, and a face walking closer
-/// less than 2%, so 5% leaves both in.
+/// less than 2%, so 5% leaves both in. A single look that jumps past it from
+/// both neighbours, they agreeing within it, is skipped and its neighbours
+/// paired across it instead: a talking face's landmarks jump that way on
+/// lamp-52e6, and a box that flips for one look then pairs its fit with
+/// itself (#4558).
 pub const MOST_EYES_STEP: f32 = 0.05;
 /// With [`STEADY_ENVIRONMENT`], the steady pairs a window with any pair left
 /// out still needs to be judged; fewer and it is `unknown`. A talking face's
@@ -551,13 +555,32 @@ impl Mouths {
             // mouth as well as a still window does; only too few of them
             // leave nothing to judge (#4585: counting such a pair as a gap
             // read a talking face `unknown` for 2 s after every head move).
-            let held: Vec<_> = pairs
-                .iter()
-                .filter(|(a, b)| {
-                    !(self.steady
-                        && (a.6 || b.6 || (b.5 - a.5).abs() > MOST_EYES_STEP * a.5.min(b.5)))
-                })
-                .collect();
+            // A still look whose eye distance jumps away from both its
+            // neighbours, they agreeing with each other, is a single look
+            // off the face's fit: it is skipped and its neighbours are
+            // paired across it, so a talking face's landmark jitter (eye
+            // steps past 5% on 61 to 71% of steps on lamp-52e6, #4558)
+            // costs one pair, not two; a box flipping between two fits on a
+            // still face then pairs one fit with itself (#4585).
+            let jumped = |a: &Look, b: &Look| (b.5 - a.5).abs() > MOST_EYES_STEP * a.5.min(b.5);
+            let mut held = Vec::new();
+            let mut at = 0;
+            while at + 1 < kept.len() {
+                let next = match kept.get(at..at + 3) {
+                    Some([Some(a), Some(b), Some(c)])
+                        if self.steady && !b.6 && !jumped(a, c) && jumped(a, b) && jumped(b, c) =>
+                    {
+                        at + 2
+                    }
+                    _ => at + 1,
+                };
+                if let (Some(a), Some(b)) = (kept[at], kept[next])
+                    && !(self.steady && (a.6 || b.6 || jumped(&a, &b)))
+                {
+                    held.push((a, b));
+                }
+                at = next;
+            }
             // Only a window with pairs left out is held to that count, so a
             // still one, and every window with the switch off, is judged as
             // before.
@@ -1635,15 +1658,10 @@ mod steady_tests {
     fn a_still_face_whose_box_flips_is_not_speaking() {
         let (eyes, open) = flipping();
         let said = each(true, &eyes, &open);
-        // Its two steady pairs, once the window holds them, read `no`.
+        // Its single-look flips pair one fit with itself, and the other
+        // flips are left out, so the window reads `no` once it is full.
         assert!(
-            said[4..7]
-                .iter()
-                .all(|state| *state == SpeakingState::Unknown),
-            "{said:?}"
-        );
-        assert!(
-            said[7..].iter().all(|state| *state == SpeakingState::No),
+            said[4..].iter().all(|state| *state == SpeakingState::No),
             "{said:?}"
         );
     }
@@ -1695,8 +1713,82 @@ mod steady_tests {
 
     #[test]
     fn a_window_with_one_steady_pair_left_is_unknown() {
-        let said = jittering(&[20.0, 21.5, 20.0, 21.5, 20.0, 20.0, 21.5, 20.0, 21.5, 20.0]);
+        // The eyes step 7.5% a look, never back, except for one pair.
+        let said = jittering(&[20.0, 21.5, 23.1, 24.8, 26.7, 26.7, 28.7, 30.9, 33.2, 35.7]);
         assert_eq!(said[9], SpeakingState::Unknown, "{said:?}");
+    }
+
+    /// Every verdict over meshed looks of one face, the head still and the
+    /// face turned 7 degrees: (ms since the first look, eye distance,
+    /// `mouth_open`).
+    fn timed(looks: &[(u64, f32, f32)]) -> Vec<SpeakingState> {
+        let mut mouths = Mouths {
+            steady: true,
+            ..Mouths::default()
+        };
+        looks
+            .iter()
+            .map(|&(ms, eyes, open)| {
+                mouths
+                    .judge(1, &marks(eyes), Some(7.0), Some(open), ms * 1000)
+                    .state
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_talking_face_whose_eyes_jump_one_look_at_a_time_is_speaking() {
+        // A window of lamp-52e6's `--mouth-diagnostics` (row turntalk, 2 Nov
+        // 23:2x, #4558): 20.02 and 19.49 px each jump past 5% from neighbours
+        // that agree, so their pairs were left out with them and the window
+        // read `unknown` (`few_steady_pairs`).
+        let said = timed(&[
+            (0, 19.02, 0.0328),
+            (264, 20.02, 0.0785),
+            (517, 18.47, 0.1131),
+            (760, 20.31, 0.1073),
+            (1024, 20.95, 0.0904),
+            (1277, 20.71, 0.1076),
+            (1612, 19.49, 0.0017),
+            (1862, 20.75, 0.0844),
+        ]);
+        assert_eq!(said[7], SpeakingState::Yes, "{said:?}");
+    }
+
+    #[test]
+    fn a_still_face_whose_box_flips_for_one_look_is_never_speaking() {
+        // The smaller still face of #4585 (lamp-52e6, 2 Nov 09:15, row both):
+        // its eye distance from its box's width at the looks around the three
+        // it read `yes`, the mouth crop's `mouth_open` 0.020 higher on the
+        // wider fit. A flip for one look pairs the narrow fit with itself.
+        let looks: Vec<(u64, f32, f32)> = [
+            (0, 17.37),
+            (243, 17.39),
+            (675, 17.41),
+            (950, 17.32),
+            (1227, 18.45),
+            (1502, 18.69),
+            (1777, 17.29),
+            (2053, 17.44),
+            (2329, 18.91),
+            (2760, 17.41),
+            (3033, 18.84),
+            (3308, 18.70),
+            (3584, 18.71),
+        ]
+        .iter()
+        .enumerate()
+        .map(|(look, &(ms, eyes))| {
+            let wide = if eyes > 18.0 { 0.020 } else { 0.0 };
+            (
+                ms,
+                eyes,
+                0.040 + wide + 0.0005 * ((look * 7 % 3) as f32 - 1.0),
+            )
+        })
+        .collect();
+        let said = timed(&looks);
+        assert!(!said.contains(&SpeakingState::Yes), "{said:?}");
     }
 
     /// Every verdict over ten meshed looks 250 ms apart of a face 30 px

@@ -2480,7 +2480,19 @@ with the known face's id the eyes keep beside the known file
   still screen face about 17 px between the eyes flipped between two fits
   (about 8% of its width), the crop moved with it and three looks read
   `yes` (scores 0.0151 to 0.0164, #4585); a still large face varies about
-  1.2% look to look and a face walking closer under 2%. The pairs kept are
+  1.2% look to look and a face walking closer under 2%. A single still look
+  whose eye distance jumps past 5% from both its neighbours, they agreeing
+  within 5%, is skipped and its neighbours are paired across it, so it costs
+  one pair, not two: a talking face's own landmarks step past 5% on 61 to
+  71% of steps on lamp-52e6 (2 Nov, 17 to 28 px), and a box that flips for
+  one look pairs its fit with itself. In an offline replay of the diag lines
+  (matching the lamp's calls on every fully logged look of the 2 Nov 23:20
+  run), talking rows read `yes` on 45 of 71 (from 31), 102 of 145 settled
+  turning looks (from 70), 58 of 70 (from 37), 78 of 130 (from 63) and 42 of
+  68 (from 39); every still row stayed at no `yes` (144, 146 and 102
+  looks), and the #4585 small face's box widths with `mouth_open` 0.012 to
+  0.020 higher on the wider fit read none, where a 7% step, the window's
+  median or a 1.5 px floor let it read `yes`. The pairs kept are
   still, so they are judged as a still window's are, `yes` or
   `no`; such a pair is not a gap (counting it as one read a talking face on
   lamp-52e6 `unknown`, `reason` `mesh`, for about 2 s after every head move,
@@ -2519,9 +2531,10 @@ with the known face's id the eyes keep beside the known file
   `yes` either way; a meshed face at 18 px `unknown` off and judged on; a
   corners-only one at 18 px `unknown` either way; a talking window with one
   moving look `yes` either way, and one left with a single still pair
-  `unknown` on; a still 17 px face whose box flips `unknown`, then `no` once
-  two steady pairs remain, on (it read `yes` before `MOST_EYES_STEP`) and
-  `unknown` off; a talking face whose eyes vary 1% `yes` on, a talking 20 px
+  `unknown` on; a still 17 px face whose box flips `no` once its window
+  fills, on (it read `yes` before `MOST_EYES_STEP`) and `unknown` off; the
+  #4585 face's own box sequence never `yes`; a lamp-52e6 talking window
+  whose eyes jump for one look at a time `yes` (it read `unknown`); a talking face whose eyes vary 1% `yes` on, a talking 20 px
   face whose eyes step past 5% on most steps `yes` on with two or three
   steady pairs, and one left with one steady pair `unknown`; a talking face
   turned 35 degrees `yes` on and `unknown` off, and a still one turned 35
