@@ -1889,66 +1889,82 @@ fn save(records: &Records, state: &State) -> Result<(), String> {
 /// said. A file of `defaults` is said as a setting, edited when it is not
 /// the default's bytes. A file that cannot be read is passed over.
 pub fn switches_off(config: &Install, defaults: &[(&str, &str)]) -> Vec<String> {
-    use crate::switches::{environment, environment_file, environment_files, merged_off, said};
+    use crate::switches::{merged_off, said};
     let mut lines = Vec::new();
     for (name, text) in PRODUCT {
         let switches = crate::switches::switches(text);
         if switches.is_empty() {
             continue;
         }
-        let folder = format!("{UNITS}{name}.d/");
-        let mut drop_ins: Vec<String> = fs::read_dir(config.on(&folder))
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
-            .filter(|file| file.ends_with(".conf") && file != "exit-note.conf")
-            .collect();
-        drop_ins.sort();
-        // Read as systemd merges them (the Reviewer-lead's P3 on #3728): the
-        // drop-ins in name order, then the environment files the unit and
-        // those drop-ins name, which win over `Environment=`. Only a switch
-        // still off at the end is said, by the file that left it off.
-        let mut sources = Vec::new();
-        let (_, mut files) = environment_files(text);
-        for file in drop_ins {
-            let path = format!("{folder}{file}");
-            let Ok(kept) = fs::read_to_string(config.on(&path)) else {
-                continue;
-            };
-            sources.push((format!("kept drop-in {path}"), environment(&kept)));
-            let (cleared, named) = environment_files(&kept);
-            if cleared {
-                files.clear();
-            }
-            files.extend(named);
-        }
-        // A file named twice is read twice; its last read is the one that
-        // counts, so it is kept at its last place and said once.
-        let mut once: Vec<String> = Vec::new();
-        for path in files.into_iter().rev() {
-            if !once.contains(&path) {
-                once.insert(0, path);
-            }
-        }
-        for path in once {
-            let Ok(kept) = fs::read_to_string(config.on(&path)) else {
-                continue;
-            };
-            let what = match defaults.iter().find(|(setting, _)| *setting == path) {
-                Some((_, default)) if *default != kept => "edited setting",
-                Some(_) => "setting",
-                None => "environment file",
-            };
-            sources.push((
-                format!("{what} {path}, read by {name},"),
-                environment_file(&kept),
-            ));
-        }
+        // Only a switch still off at the end is said, by the file that
+        // left it off.
+        let sources = kept_sources(&|path| config.on(path), name, text, defaults);
         for (by, how) in merged_off(&switches, &sources) {
             lines.push(said(&by, &how));
         }
     }
     lines
+}
+
+/// A product unit's kept drop-ins (all but the reserved `exit-note.conf`),
+/// then the environment files the unit and those drop-ins name, each read
+/// for what it sets, in the order systemd merges them. `on` maps a lamp's
+/// path to where it is read here.
+pub(crate) fn kept_sources(
+    on: &dyn Fn(&str) -> PathBuf,
+    name: &str,
+    text: &str,
+    defaults: &[(&str, &str)],
+) -> Vec<(String, crate::switches::Assignments)> {
+    use crate::switches::{environment, environment_file, environment_files};
+    let folder = format!("{UNITS}{name}.d/");
+    let mut drop_ins: Vec<String> = fs::read_dir(on(&folder))
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter(|file| file.ends_with(".conf") && file != "exit-note.conf")
+        .collect();
+    drop_ins.sort();
+    // Read as systemd merges them (the Reviewer-lead's P3 on #3728): the
+    // drop-ins in name order, then the environment files the unit and
+    // those drop-ins name, which win over `Environment=`.
+    let mut sources = Vec::new();
+    let (_, mut files) = environment_files(text);
+    for file in drop_ins {
+        let path = format!("{folder}{file}");
+        let Ok(kept) = fs::read_to_string(on(&path)) else {
+            continue;
+        };
+        sources.push((format!("kept drop-in {path}"), environment(&kept)));
+        let (cleared, named) = environment_files(&kept);
+        if cleared {
+            files.clear();
+        }
+        files.extend(named);
+    }
+    // A file named twice is read twice; its last read is the one that
+    // counts, so it is kept at its last place and said once.
+    let mut once: Vec<String> = Vec::new();
+    for path in files.into_iter().rev() {
+        if !once.contains(&path) {
+            once.insert(0, path);
+        }
+    }
+    for path in once {
+        let Ok(kept) = fs::read_to_string(on(&path)) else {
+            continue;
+        };
+        let what = match defaults.iter().find(|(setting, _)| *setting == path) {
+            Some((_, default)) if *default != kept => "edited setting",
+            Some(_) => "setting",
+            None => "environment file",
+        };
+        sources.push((
+            format!("{what} {path}, read by {name},"),
+            environment_file(&kept),
+        ));
+    }
+    sources
 }
 
 /// The product's settings, from `defaults` (path, bytes): each written

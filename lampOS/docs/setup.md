@@ -1049,11 +1049,17 @@ its only way back once its package carries the unit.
   in radio range could set **their own** network (the Reviewer-lead on
   #3024). The first builder signs off before `LAMP_WIFI_RECOVERY` goes on
   anywhere.
-- **The switch takes effect at the next start.** `lamp-setup-recover` is
-  enabled and, as docs/updates.md's "A part added over the air" says of
-  every unit that ends at once with nothing to do, never started by a
-  round: a lamp updated to a build with `recover`, or given the switch,
-  watches from its next start.
+- **The switch takes effect at the next start, or after the next round.**
+  `lamp-setup-recover` is enabled and, as docs/updates.md's "A part added
+  over the air" says of every unit that ends at once with nothing to do,
+  never started or watched inside a round. A round that switches, once its
+  watch has passed and the build is kept, starts it once when it is
+  enabled and `LAMP_WIFI_RECOVERY` reads `on` through its drop-ins
+  (`round::start_recover_if_on`; off, nothing). A failed start is said and
+  the round stays switched. So a lamp updated to a build with `recover`
+  and its switch on watches from that round; one given only the switch
+  watches from its next start or its next switching round. A build's
+  settings can't write a drop-in, so no round turns the switch on.
 - **Said:** the journal (`lamp-setup-recover`) says when it opens and why,
   each retry, and when recovery ends; lamp-cloud's `system.info` says
   `"recovery": true` while it runs with its switch on, so the app names the

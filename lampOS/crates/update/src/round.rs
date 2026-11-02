@@ -59,6 +59,10 @@ use std::{
 pub const OWN_UNIT: &str = "lamp-update.service";
 /// The voice: its restart boundary must still be quiet.
 pub const VOICE_UNIT: &str = "lamp-voice.service";
+/// Recovery: enabled by a round that adds it, never watched, started once
+/// after a round's watch passed when [`RECOVER_SWITCH`] is on.
+pub const RECOVER_UNIT: &str = "lamp-setup-recover.service";
+pub const RECOVER_SWITCH: &str = "LAMP_WIFI_RECOVERY";
 /// The body; its unit declarations determine its restart order.
 pub const BODY_UNIT: &str = "lamp-body.service";
 /// How often the world is looked at while waiting and watching.
@@ -2513,8 +2517,41 @@ impl Run<'_, '_> {
                 "switched, and the state cannot be written: {error}"
             ));
         }
+        self.start_recover_if_on();
         self.prune(state);
         Outcome::Switched(build.sequence)
+    }
+
+    /// Recovery, enabled and with its switch on through its drop-ins, is
+    /// started once here: after the watch passed and the build is kept, so
+    /// its exit can never put a build back. A round only enables a unit it
+    /// adds (docs/updates.md, "A part added over the air"); without this a
+    /// lamp given recovery, or its switch, would watch only from its next
+    /// start. Starting it when it already runs does nothing; a start that
+    /// fails is said and the round stays switched.
+    fn start_recover_if_on(&mut self) {
+        let path = format!("{}{RECOVER_UNIT}", crate::install::UNITS);
+        let Ok(text) = fs::read_to_string(self.config.on(&path)) else {
+            return;
+        };
+        let enabled = crate::added::wants(RECOVER_UNIT, &text).is_ok_and(|links| {
+            !links.is_empty()
+                && links
+                    .iter()
+                    .all(|link| fs::symlink_metadata(self.config.on(link)).is_ok())
+        });
+        let on = |lamp: &str| self.config.on(lamp);
+        let mut sources = vec![(path.clone(), crate::switches::environment(&text))];
+        sources.extend(crate::install::kept_sources(&on, RECOVER_UNIT, &text, &[]));
+        if !enabled || crate::switches::effective(RECOVER_SWITCH, &sources) != Some("on") {
+            return;
+        }
+        match self.world.systemd.start_unit(RECOVER_UNIT) {
+            Ok(()) => self.say(&format!("started {RECOVER_UNIT}, its switch on")),
+            Err(why) => self.say(&format!(
+                "{RECOVER_UNIT} could not be started ({why}); it starts at the next boot"
+            )),
+        }
     }
 
     /// Watches the restarted parts for the configured time. The unit and
