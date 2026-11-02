@@ -456,7 +456,10 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   `/etc/systemd/system/lamp-skills-manage@.service.d/store.conf`, which reads
   that file and prepares IPv4 and IPv6 for fetching packages. These are
   defaults: a lamp's edits are kept on another install. They are install's
-  `STORE_SETTINGS`, not files carried by an update round's settings manifest.
+  `STORE_SETTINGS`. From updater 10 a round's settings carry `store.env`
+  too, with the same rule: the build's is written over the one install
+  wrote, and an edited one is kept (docs/updates.md, "The Store's switch
+  file"). The drop-in is never carried by a round.
   The product cloud unit keeps the Store off; both parts require a valid
   separate Store key before accepting an install, and the helper creates
   no HTTP client while off or without that key. Removing a skill, or turning it off or on, remains
