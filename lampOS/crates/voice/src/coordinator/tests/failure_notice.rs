@@ -1013,11 +1013,25 @@ fn offline_lines_are_said_in_the_owners_language_when_kept_and_english_otherwise
             "{evidence}"
         );
     }
-    // A failed turn (turn_lost) has no words of its own: the release's.
+    // A failed turn (turn_lost, #4883): its own words too, under its kind.
     let (_owner, mut lost) = offline_reply(true);
     lost.as_mut().unwrap().local_only = None;
     select_failure_notice_in(
         &owners,
+        &mut lost,
+        &None,
+        &mut Outage::default(),
+        &mut SessionState::default(),
+    )
+    .unwrap();
+    assert!(selected(&lost, NoticeKind::TurnLost));
+    let words = Language::Japanese.fixed(language::TURN_LOST).unwrap();
+    assert_eq!(first_sample(&lost), words.chars().count() as i16);
+    // An English lamp: the release's file, as before.
+    let (_owner, mut lost) = offline_reply(true);
+    lost.as_mut().unwrap().local_only = None;
+    select_failure_notice_in(
+        &FailureNotices::synthetic_offline(),
         &mut lost,
         &None,
         &mut Outage::default(),

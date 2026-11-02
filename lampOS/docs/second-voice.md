@@ -221,6 +221,7 @@ each line plays exactly as before.
 | A hand's hold's sleep line | `lamp_msgs::SLEEP_LINE` | speech cache, warmed at start (`LAMP_SLEEP_LINE`) | the owner's when kept, else the English kept line, else the breath |
 | `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words; with `LAMP_SLEEP_LINE=on` and the line kept, the hold's cached line in its place | the model told the owner's words (`sleep_asked::told`); the cached line as a hold's, when kept |
 | Offline, service down, back online | `language::PROVIDER_UNAVAILABLE`, `VOICE_SERVICE_UNREACHABLE`, `BACK_ONLINE` | the notices release's English file | the cache's line when kept (`FailureNotices::owners_line`), the English file otherwise |
+| A failed turn | `language::TURN_LOST` ("Sorry, I couldn't answer that. Could you ask me again?", #4883) | the notices release's file (none in the product: the sigh) | the cache's line when kept (`FailureNotices::owners_line`), the release's file or the sigh otherwise |
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 | The second route's own words before a look, and before a search with `LAMP_SECOND_CHECKING_LINE` | `second_provider::LOOKING` ("Let me look."), `CHECKING` ("Let me check.") | said as the turn's text, in English | the owner's words (`language::fixed_in`), and the next round is told those words were said (Thirteen's P2 on #4707) |
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
@@ -231,7 +232,7 @@ each line plays exactly as before.
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, eighteen today (`FIXED_LINES`), then the English two
+lines first, nineteen today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -244,8 +245,8 @@ keeps up to 48 lines. A failure notice said from the cache keeps the
 release's kind in its record, with `wav_sha256` `speech-cache:<key>`: no
 notices kind is added, and the release is untouched, since an older voice
 refuses a whole manifest with a kind it doesn't know
-(failure-notices.md). The failed turn's `turn_lost` has no words of its
-own and stays the release's file or the sigh. Onboarding's fixed lines
+(failure-notices.md). The failed turn's `turn_lost` has its words too
+(#4883); not kept, it stays the release's file or the sigh. Onboarding's fixed lines
 (the skill's words, said as they are when the chat fails, #4263) and the
 language change line (already in its own words) are not in this table.
 Tests: `language::tests::each_fixed_line_has_its_words_in_each_language`,

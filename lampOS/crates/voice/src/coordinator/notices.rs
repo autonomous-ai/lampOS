@@ -110,7 +110,7 @@ impl FailureNotices {
     }
     /// `kind`'s line in the owner's language, read from the speech cache
     /// now, never rendered: none for English, for a kind with no words of
-    /// its own (`turn_lost`), and for a line not kept yet, which leaves the
+    /// its own (`service_refused`), and for a line not kept yet, which leaves the
     /// release's English file (#4473 (c)). Its record names the cache, not
     /// a file of the release.
     fn owners_line(
@@ -194,7 +194,8 @@ fn notice_words(kind: NoticeKind) -> Option<&'static str> {
         NoticeKind::WifiLost => Some(crate::language::WIFI_LOST),
         NoticeKind::WifiRecovering => Some(crate::language::WIFI_RECOVERING),
         NoticeKind::SignedOut => Some(crate::language::SIGNED_OUT),
-        NoticeKind::TurnLost | NoticeKind::ServiceRefused => None,
+        NoticeKind::TurnLost => Some(crate::language::TURN_LOST),
+        NoticeKind::ServiceRefused => None,
     }
 }
 
@@ -774,6 +775,7 @@ mod loading_tests {
             worded,
             [
                 (ProviderUnavailable, crate::language::PROVIDER_UNAVAILABLE),
+                (TurnLost, crate::language::TURN_LOST),
                 (BackOnline, crate::language::BACK_ONLINE),
                 (
                     VoiceServiceUnreachable,
@@ -785,6 +787,29 @@ mod loading_tests {
         );
         // An English lamp's catalog has no cache of the owner's.
         assert!(FailureNotices::synthetic_offline().owners.is_none());
+    }
+
+    /// #4883: the failed turn's line has its words in each language, in
+    /// that language's own script; English keeps the English key.
+    #[test]
+    fn the_failed_turns_line_has_its_words_in_each_language() {
+        use crate::language::{Language, fixed_in};
+        let english = notice_words(NoticeKind::TurnLost).unwrap();
+        assert_eq!(fixed_in(None, english), english);
+        let has = |words: &str, range: std::ops::RangeInclusive<char>| {
+            words.chars().any(|c| range.contains(&c))
+        };
+        for (language, script) in [
+            (Language::Vietnamese, 'À'..='ỹ'),
+            (Language::Japanese, 'ぁ'..='ゖ'),
+            (Language::Chinese, '一'..='鿿'),
+            (Language::Korean, '가'..='힣'),
+        ] {
+            let words = language.fixed(english).unwrap();
+            assert!(has(words, script), "{language:?}: {words}");
+        }
+        let zh = Language::Chinese.fixed(english).unwrap();
+        assert!(!has(zh, 'ぁ'..='ヿ') && !has(zh, '가'..='힣'), "{zh}");
     }
 
     /// #1959: the say service is handed the Wi-Fi line's samples when it
