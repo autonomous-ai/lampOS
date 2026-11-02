@@ -945,8 +945,9 @@ page's two switches and a valid Store public key: listing and removing
 change nothing new on the lamp, and an install puts new code there, so the page can be on while the Store,
 its server and its key are not. Without it, `not on this lamp:
 skills.install`. Install writes `/etc/lampOS/skills/store.env` with the
-switch off, and both parts read it. The product cloud unit also defaults
-the Store to off; placing a key does not turn it on. `lamp-cloud` reads
+switch on (since 2 Nov; `off` before, and an update round leaves a lamp's
+file as it is), and both parts read it. The product cloud unit sets it on
+too; without a valid key an install is still refused. `lamp-cloud` reads
 the key as the helper does (the build's
 `/var/lib/lampOS/skills/store-key.pub`, else the factory's; #3692,
 `lamp_skills::package::store_keys`), but once, at its start: a round that

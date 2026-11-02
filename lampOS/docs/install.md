@@ -451,8 +451,9 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   be below it) and says so. The voice's turn-end model and ONNX
   Runtime library stay beside the voice, where the voice looks for them,
   and lamp-update carries them from build to build as it does now.
-- **The Store, prepared but off.** Install writes
-  `/etc/lampOS/skills/store.env` with `LAMP_SKILLS_STORE=off`, read by both
+- **The Store, prepared but off.** (The heading is kept for links: since
+  2 Nov the product turns it on.) Install writes
+  `/etc/lampOS/skills/store.env` with `LAMP_SKILLS_STORE=on`, read by both
   `lamp-cloud` and the skills manage helper. It also writes the helper's
   `/etc/systemd/system/lamp-skills-manage@.service.d/store.conf`, which reads
   that file and prepares IPv4 and IPv6 for fetching packages. These are
@@ -461,7 +462,7 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   too, with the same rule: the build's is written over the one install
   wrote, and an edited one is kept (docs/updates.md, "The Store's switch
   file"). The drop-in is never carried by a round.
-  The product cloud unit keeps the Store off; both parts require a valid
+  The product cloud unit sets the Store on too; both parts require a valid
   separate Store key before accepting an install, and the helper creates
   no HTTP client while off or without that key. Removing a skill, or turning it off or on, remains
   available. The prepared helper sandbox has network permission even while
