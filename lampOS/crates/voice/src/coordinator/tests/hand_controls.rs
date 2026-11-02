@@ -3936,3 +3936,58 @@ fn the_eyes_camera_follows_the_microphone_and_a_mute_denies_it() {
     assert_eq!(received.camera_permission(), Permission::Denied);
     assert_eq!(received.microphone_permission(), Permission::Denied);
 }
+
+/// A paired computer's mute (`listen.set false`, `crate::control_mute`)
+/// keeps the muted wait closed as the person's mute does, the wait's own
+/// closures run as the privacy wait calls them: no look lets the lamp hear
+/// while it holds, and the look after its lift does. So the ring keeps the
+/// muted wait's look (no session's ring worker, no resting face) for it,
+/// and every say, a computer's turn start among them, is refused "the lamp
+/// is muted" there.
+#[test]
+fn a_computers_mute_keeps_the_muted_wait_closed_until_it_is_lifted() {
+    let _clock =
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+    use crate::privacy::PrivacyState;
+    use crate::ring_asleep::{Asleep, TapFace};
+    use crate::service_privacy::WaitOutcome;
+    use std::os::unix::fs::PermissionsExt;
+    let directory = std::env::temp_dir().join(format!("lv-control-mute-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let controls = HandControls::with_test_guard(
+        "test-hand-clock",
+        monotonic_us(),
+        &directory.join("mute.json"),
+    )
+    .unwrap();
+    let mut hold = Some(controls.control_mutes().hold().unwrap());
+    let controls = RefCell::new(Some(controls));
+    let reminders = RefCell::new(None);
+    let mut trace = SessionState::default();
+    let outcome = muted_wait(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<TapFace<fn() -> Option<Asleep>>>,
+        None,
+        |on_state, gate| {
+            on_state(
+                PrivacyState::Allowed,
+                crate::process::new_boot().unwrap(),
+                1,
+            )?;
+            for _ in 0..3 {
+                assert!(!gate(&mut |_| Ok(()))?, "a computer's mute holds");
+            }
+            hold.take().unwrap().lift(crate::control_mute::Lift::Asked);
+            assert!(gate(&mut |_| Ok(()))?, "lifted, the lamp hears");
+            Ok(WaitOutcome::Allowed)
+        },
+    )
+    .unwrap();
+    assert_eq!(outcome, WaitOutcome::Allowed);
+    assert!(!controls.borrow().as_ref().unwrap().control_held());
+    let _ = fs::remove_dir_all(&directory);
+}

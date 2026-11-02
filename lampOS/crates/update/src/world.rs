@@ -1096,6 +1096,7 @@ mod tests {
             muted: true,
             reason: Some(lamp_msgs::MuteReason::Sleep),
             muted_by: None,
+            control: false,
         };
         mute.publish_json(2, &asleep).unwrap();
         let heard = ears.listen(Duration::from_millis(500));

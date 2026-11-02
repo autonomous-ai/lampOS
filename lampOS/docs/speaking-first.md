@@ -611,6 +611,49 @@ computer's turn`: never the person's own conversation or the lamp's own
 words. The person wins: the privacy switch, the button, sleep and "stop"
 end a computer's turn as any other.
 
+**A computer's mute for lamp-control** ([control.md](control.md), "Turns
+and listening", `listen.set`; `crates/voice/src/control_mute.rs`): the
+skill `control` alone (any other is refused `listen is lamp-control's
+only`), with nothing else in its line, not even an expiry (`listen goes
+alone`). The door does not serve it yet; this is the voice's side.
+
+    {"skill": "control", "listen": false}
+    {"skill": "control", "listen": true}
+
+- **`listen: false` holds the voice's software mute on its connection**,
+  which stays open while it holds: every other ask's connection closes
+  after its answer, this one doesn't. It is answered
+  `{"outcome":"muted"}` once the voice's loop has taken it, at the poll
+  that closes the microphones (within `control_mute::TAKE_WITHIN`, 5 s, or
+  it is given up and `refused`, "the voice did not take the mute in
+  time"). It closes them as the button's mute does: a conversation going
+  on ends, a computer's turn with it, no cycle starts, and every say, a
+  computer's `turn: "start"` too, is refused `the lamp is muted` while it
+  holds. `voice/mute` says it (`control: true`), and the ring shows the
+  muted wait's look, as for the person's mute
+  ([controls.md](controls.md), "A paired computer's mute").
+- **It lasts until** `{"skill":"control","listen":true}` comes on that
+  same connection (answered `{"outcome":"lifted","why":"asked"}`, then the
+  connection closes), or the connection closes (the door closes it when the
+  computer disconnects or is revoked), or the person's hand on the head, a
+  tap or a hand kept a second, lifts it (`{"outcome":"lifted","why":"a hand
+  on the head"}`, then the connection closes). So a computer gone never
+  leaves the lamp deaf. `listen: false` again on it is answered `muted`
+  again; any other line on it is `refused` ("a held mute's connection takes
+  listen only") and the mute stays.
+- **`listen: true` on a connection holding none** is answered
+  `{"outcome":"nothing_held"}` and changes nothing: it never lifts another
+  connection's mute, nor the person's switch, the button's mute, sleep or
+  the restart guard's.
+- **Several at once**: the lamp stays muted until every one is lifted. At
+  most 8 are held (`control_mute::MOST_HELD`); past that, `refused`. Each
+  holds one of the socket's 16 connections. A lamp with no software mute
+  (no mute record) refuses one at once, "the lamp has no software mute to
+  hold".
+- The journal says one line as each starts and as each lifts, with how
+  (asked, its connection closed, a hand on the head), never the computer's
+  name, which the door journals.
+
 **A cached line** (#3697, V1's `_TTS_CACHE_DIR`): `{"skill": "shutdown",
 "text": "…", "cache": true, …}`, from root's helpers only (the peer is
 root by `SO_PEERCRED`; anyone else is refused `cache is asked by root's

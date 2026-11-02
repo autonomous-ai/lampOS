@@ -138,6 +138,7 @@ mod tests {
             muted,
             reason,
             muted_by: None,
+            control: false,
         };
         out.publish_json(1, &said(true, Some(MuteReason::Sleep)))
             .unwrap();
@@ -187,6 +188,7 @@ mod tests {
             muted: true,
             reason: Some(MuteReason::Sleep),
             muted_by: None,
+            control: false,
         };
         out.publish_json(1, &asleep).unwrap();
         sleep.look_now();
@@ -211,6 +213,7 @@ mod tests {
             muted: true,
             reason: Some(MuteReason::Sleep),
             muted_by: None,
+            control: false,
         };
         out.publish_json(1, &asleep).unwrap();
         std::thread::sleep(Duration::from_millis(20 + lamp_bus::EXPIRY_GRACE_MS + 100));

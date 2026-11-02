@@ -1791,6 +1791,7 @@ mod routine_tests {
                 muted: true,
                 reason: None,
                 muted_by: None,
+                control: false,
             },
         );
         assert!(!life.wake_routine(START + SECOND, &resting()));
@@ -1880,6 +1881,7 @@ mod routine_tests {
                     muted: true,
                     reason: Some(MuteReason::Sleep),
                     muted_by: None,
+                    control: false,
                 },
             );
             assert!(!life.routine_owned());
