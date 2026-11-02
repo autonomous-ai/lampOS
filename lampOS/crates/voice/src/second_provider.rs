@@ -4512,15 +4512,6 @@ impl Engine {
                     .filter(|kept| kept.session == session && kept.request < request)
                     .map(|kept| (kept.request, kept.link, kept.began));
                 let carried = self.kept.take().filter(|kept| {
-                    // The name waiting for this line goes to it only when
-                    // one person said both ([`said_by_the_name`]), never
-                    // as the kept sound, which asks nothing of who spoke.
-                    if name_of
-                        .as_ref()
-                        .is_some_and(|name| name.request == kept.request)
-                    {
-                        return false;
-                    }
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
                     // Only the name cut off on its own: a piece that came
                     // back with no words, or with the lamp's name alone. One
@@ -4541,6 +4532,22 @@ impl Engine {
                             || since.is_some_and(|since| since <= CARRY_AFTER_END)
                                 && answered != Some(kept.request))
                 });
+                // The bare call this line is said by: the name waiting for
+                // it goes to it only when one person said both
+                // ([`said_by_the_name`]), never as the kept sound, which
+                // asks nothing of who spoke. Its sound still goes first, so
+                // the line cut after the name is heard whole: alone, the
+                // 0.7 s of "go to sleep" came back with no words (#4886).
+                let (calls_sound, carried) = match carried {
+                    Some(kept)
+                        if name_of
+                            .as_ref()
+                            .is_some_and(|name| name.request == kept.request) =>
+                    {
+                        (Some(kept), None)
+                    }
+                    carried => (None, carried),
+                };
                 // The name's words, when they came back: they begin this
                 // line's, so it is heard and judged whole, and its sound
                 // need not go again.
@@ -4629,6 +4636,14 @@ impl Engine {
                     soft_lead_us: AtomicU64::new(soft_lead_us),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
+                if let Some(call) = calls_sound {
+                    eprintln!(
+                        "lamp-voice second: request {request} goes on from request {}, the bare call it is said by: its {} ms of sound go first",
+                        call.request,
+                        call.samples.len() / 16
+                    );
+                    let _ = audio.try_send(LinePart::Sound(call.samples.into(), false, 0));
+                }
                 self.kept = Some(match carried {
                     Some(kept) => {
                         // The name heard in the piece counts by its time

@@ -1021,3 +1021,33 @@ async fn a_lines_soft_lead_reaches_the_rule_only_from_its_own_first_sound() {
         );
     }
 }
+
+/// #4886: "Lamp, go to sleep." in one breath, cut after "Lamp," by the
+/// coordinator's pause, its words back as the name alone, and the line
+/// after it begun 100 ms after its end: the line's speech to text hears the
+/// call's sound first, as a wordless piece's is (#1712), since its own
+/// 0.7 s alone came back empty on lamp-52e6. The name is still carried by
+/// its rule, and the line is asked with its whole words, never as a call.
+#[tokio::test(start_paused = true)]
+async fn the_line_after_a_bare_call_hears_the_calls_sound_first() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    let played = script(&["Lamp", "Lamp, go to sleep."]);
+    let judged = Judged::default();
+    let (mut engine, now) = lamp(&played, true, &judged);
+    say_the_name(&mut engine, true, true);
+    say_after(&mut engine, &now, Duration::from_millis(100)).await;
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(
+        played.samples_heard.load(Ordering::Relaxed),
+        3 * frame,
+        "the call's own frame, then the line's stream: the call's frame first, then its own"
+    );
+    let asked = asked(&played);
+    assert_eq!(asked.len(), 1, "the call got no answer of its own");
+    assert_eq!(
+        last_words(&asked[0]),
+        Some(&Message::user("Lamp, go to sleep."))
+    );
+    assert!(asked[0].contains(&Message::system(crate::called::NOTE)));
+    assert!(!asked[0].contains(&Message::system(crate::provider_worker::CALLED_NOTE)));
+}

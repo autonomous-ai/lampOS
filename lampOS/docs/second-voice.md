@@ -1593,13 +1593,19 @@ order is kept. A written turn is the same from the chat on.
     the coordinator. The journal says `request N: only the lamp's name: a
     sound begun within 2.5 s of its end takes the turn at once
     (LAMP_CALL_TAKES_NEXT_LINE)`, and `request M: the line after the bare
-    name, taken at once`.
+    name, taken at once`. That line's speech to text hears the call's sound
+    first, as a wordless piece's is (`KeptSound`), while the name is still
+    carried by its rule: on lamp-52e6 "Lamp, go to sleep." cut after
+    "Lamp," left 0.7 s that came back with no words, and was answered as
+    the bare call (#4886). The journal says `request N goes on from request
+    M, the bare call it is said by: its <ms> ms of sound go first`.
   - **Tests:** `second_provider::tests::name_carries` (a line 1.2 s, 2 s
     and 2.4 s after "Lamp." or a misheard name with `Called`; "Lamp. So"
     and the rest 1.0 s later, asked as one line; "So I" held as before; a
     lone call; a short sound that is no name; a line 3 s later; another
     session and a stop; two faces, two voices or no rule; a call's words
-    back 0.6 s and 3 s after its end; "Lamp, stop." and "Lamp, lights
+    back 0.6 s and 3 s after its end; the line 100 ms after a bare call
+    hearing the call's sound first; "Lamp, stop." and "Lamp, lights
     off." at once; a refused name's words never joined; the switch off)
     and
     `worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker`
