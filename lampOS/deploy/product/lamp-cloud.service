@@ -56,6 +56,9 @@ Environment=LAMP_REPORTS=on
 # Store key is required too, and without it an install is still refused. On since the backend listed four approved, signed skills (2 Nov, #4710), shown on lamp-9adf (31 Oct).
 Environment=LAMP_SKILLS_STORE=on
 EnvironmentFile=-/etc/lampOS/skills/store.env
+# A skill made on this lamp sent to the Skills Store (fourteen-P13): only on the owner's Share in the app,
+# packed unsigned from its own files and sent with the lamp's key; a reviewer reads it before it is listed.
+Environment=LAMP_SKILLS_SHARE=on
 Environment=LAMP_APP_UPDATE=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
 Environment=LAMP_SHUTDOWN=on

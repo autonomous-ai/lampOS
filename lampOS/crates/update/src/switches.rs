@@ -318,6 +318,11 @@ mod tests {
             eyes.lines()
                 .any(|line| line == "Environment=LAMP_PRESENCE_VOICE=addressed")
         );
+        // On in the product: a made skill sent to the Store from the app.
+        assert!(
+            found.iter().any(|name| name == "LAMP_SKILLS_SHARE"),
+            "{found:?}"
+        );
         // A commented example line is no switch.
         let (_, addons) = crate::install::PRODUCT
             .iter()
