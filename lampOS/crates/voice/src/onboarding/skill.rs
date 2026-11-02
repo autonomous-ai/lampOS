@@ -33,8 +33,10 @@ pub(crate) const FACE_EXPRESSIONS_YES: &str =
 pub(crate) const FACE_EXPRESSIONS_NO: &str =
     "(Say only this, nothing before or after it: \"Okay, I won't.\")";
 
-/// "Preferences"' done line, the walk's own once the step is done.
-pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time.\")";
+/// "Preferences"' done line, the walk's own once the step is done: the
+/// walk's last words, so they also say where the app's buttons and gestures
+/// guide is (#1711 item 1).
+pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. You'll find what my buttons and touches do in the app, under Lamp, then General, then Buttons and gestures.\")";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

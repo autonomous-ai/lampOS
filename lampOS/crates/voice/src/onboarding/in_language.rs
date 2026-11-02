@@ -1356,11 +1356,11 @@ pub(super) const LINES: &[Line] = &[
         "你坐下的时候，我可以跟你打个招呼吗？",
         "자리에 앉으시면 인사해도 될까요?",
     ]),
-    ("Got it, that's everything. You can ask me to redo the setup any time.", [
-        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại.",
-        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。",
-        "好的，全部完成了。你随时可以让我重新设置。",
-        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요.",
+    ("Got it, that's everything. You can ask me to redo the setup any time. You'll find what my buttons and touches do in the app, under Lamp, then General, then Buttons and gestures.", [
+        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình dùng thế nào, bạn mở app, vào Lamp, rồi General, rồi Buttons and gestures nhé.",
+        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチでできることは、アプリで Lamp、General、Buttons and gestures の順に開くと見られますよ。",
+        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以在 App 里依次打开 Lamp、General、Buttons and gestures。",
+        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 앱에서 Lamp, General, Buttons and gestures 순서로 들어가면 볼 수 있어요.",
     ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
@@ -1490,6 +1490,40 @@ mod tests {
                     "{told}"
                 );
             }
+        }
+    }
+
+    /// The walk's last words say where the app's buttons and gestures guide
+    /// is, in each of the five languages (#1711 item 1).
+    #[test]
+    fn the_walks_done_line_ends_with_where_the_buttons_guide_is() {
+        let done = super::super::skill::PREFERENCES_DONE;
+        let closing = [
+            (
+                None,
+                "You'll find what my buttons and touches do in the app, under Lamp, then General, then Buttons and gestures.",
+            ),
+            (
+                Some(Language::Vietnamese),
+                "Muốn biết các nút và cách chạm vào mình dùng thế nào, bạn mở app, vào Lamp, rồi General, rồi Buttons and gestures nhé.",
+            ),
+            (
+                Some(Language::Japanese),
+                "ボタンやタッチでできることは、アプリで Lamp、General、Buttons and gestures の順に開くと見られますよ。",
+            ),
+            (
+                Some(Language::Chinese),
+                "想知道我的按键和触摸怎么用，可以在 App 里依次打开 Lamp、General、Buttons and gestures。",
+            ),
+            (
+                Some(Language::Korean),
+                "제 버튼이랑 터치 사용법은 앱에서 Lamp, General, Buttons and gestures 순서로 들어가면 볼 수 있어요.",
+            ),
+        ];
+        for (language, line) in closing {
+            let told = said(done.to_owned(), language);
+            let words = super::super::fixed_words(&told).unwrap();
+            assert!(words.ends_with(line), "{language:?}: {words}");
         }
     }
 
