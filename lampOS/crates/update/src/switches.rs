@@ -304,6 +304,20 @@ mod tests {
         assert!(found.iter().any(|name| name == "LAMP_CLOUD"), "{found:?}");
         // On in the product since 2 Nov: a switch install guards.
         assert!(found.iter().any(|name| name == "LAMP_SKILLS_STORE"));
+        // On in the product's eyes: whether anyone is at the lamp, a voice
+        // counted only when said to it.
+        let (_, eyes) = crate::install::PRODUCT
+            .iter()
+            .find(|(name, _)| *name == "lamp-eyes.service")
+            .unwrap();
+        assert!(
+            switches(eyes).iter().any(|found| found == "LAMP_PRESENCE"),
+            "{eyes}"
+        );
+        assert!(
+            eyes.lines()
+                .any(|line| line == "Environment=LAMP_PRESENCE_VOICE=addressed")
+        );
         // A commented example line is no switch.
         let (_, addons) = crate::install::PRODUCT
             .iter()

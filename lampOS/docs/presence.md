@@ -205,7 +205,10 @@ heard, so `someone` comes back and the skill's ask ends with it.
 ## Switching it on
 
 1. `LAMP_PRESENCE=on` in `lamp-eyes`' unit, with `LAMP_BUS=on` (the
-   product's has the bus).
+   product's has the bus). **On in the product since 2 Nov** (the first
+   builder's yes on #4710), with `LAMP_PRESENCE_VOICE=addressed`: a skill
+   made on the lamp on `room/presence` ("when I come back to my desk") ran
+   only with it (lamp-9adf, 18:21). Light out stays off until its own check.
 2. `LAMP_LIGHT_REQUESTS=on` in the voice's and `lamp-skills`' units (the
    product's have both), and `LAMP_LIGHT_KEEP=on` for the person's light
    across a restart.
