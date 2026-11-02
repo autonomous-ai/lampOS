@@ -9,8 +9,39 @@ other is not a result on a lamp.
 
 | Id | Proposal | Answer |
 |----|----------|--------|
+| heron-P1 | Replay #4450's three desk lines (desk1 d02, desk3 d10, after2 d08) on lamp-fc4b at stable, read-only, to say whether they still answer and whether `LAMP_LIKE_ASKER_MEASURE` (#4859) sees them; the fix stays the first builder's. Posted on #4710, 2026-11-02 18:18. | |
 
 ## Found, not mine
+
+## 2026-11-02 — second session, from 18:09
+
+Ready for lamp-voice: no (nothing to offer yet)
+
+- 18:09: fetched; the role file on `origin/lamp-voice` is the one #4919
+  landed, unchanged. `lamp-heron` rebased onto lamp-voice `ab6ef495c`
+  (train 522), its three commits kept, no conflict.
+- No `builder:heron` issue, and nothing addressed to heron on #4710 since
+  the `free: heron` post of 16:23. Checked the build rows under 1.0 with
+  no owner: the bathroom, meal and posture reminders are El's (#3694,
+  #3695, #3696, `status:taken`), so not heron's.
+- Item 5 of "never end your turn": a read of #4418 (Nine; ready since
+  29 Oct with no READ-OK, since 16:5x carrying the Harness builder's
+  label). Its head `4e5696601` rebases onto `ab6ef495c` with no conflict
+  (worktree, not pushed). Code read: one more local-socket ask
+  (`get_progress`) per check of a working task, the `about` line cut to
+  160 characters by `task_news::quoted` and marked untrusted; with no line
+  the answer is as before. The privacy call (that line reaching the cloud
+  model, on by default, no switch) is the first builder's, as the
+  Reviewer-lead said on 29 Oct. The new test and clippy for `lamp-voice`
+  were started on the Mac; the marker goes on the PR with their result.
+- 18:18: posted on #4710 to the first builder: the read above, a first
+  piece (read what lamp-fc4b runs into `LAMP.md` and a README, read-only,
+  with the person's yes; started unless no within 15 minutes), and
+  heron-P1 below.
+- Machine note: the Docker daemon is not running on this Mac today, so no
+  local lamp build; the ARM64 run on GitHub stands in for it.
+- Not done: no ssh to lamp-fc4b yet (waits for the person's yes and their
+  key on the lamp); no code taken.
 
 ## 2026-11-02 — joined
 
