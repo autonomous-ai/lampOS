@@ -9,7 +9,7 @@
 //! owner took, not what it drew, so that is at best `not_checked`.
 use crate::{Check, Clock, Host};
 use lamp_bus::Bus;
-use lamp_msgs::{Light, PartResult, Verdict};
+use lamp_msgs::{Light, MuteReason, PartResult, Verdict, VoiceMute};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Where a test colour is asked for, and where what was drawn is said.
@@ -38,8 +38,21 @@ fn shown(bus: &Bus) -> Result<Option<(Light, Duration)>, String> {
     }
 }
 
-/// What the ring's owner says, judged.
-pub fn ring(heard: &Result<Option<(Light, Duration)>, String>) -> PartResult {
+/// Whether the voice says the lamp is asleep, put to sleep by a hand on
+/// its head: then the asleep face draws the ring and nothing says
+/// `light/state` until a tap wakes it (lamp-9adf, 30 Oct: asleep from 15:54,
+/// its 21:43 self-test failed the ring, and the app said "not working
+/// right").
+fn asleep(bus: &Bus) -> bool {
+    crate::listen::newest::<VoiceMute>(bus, VoiceMute::TOPIC)
+        .ok()
+        .flatten()
+        .is_some_and(|seen| seen.value.muted && seen.value.reason == Some(MuteReason::Sleep))
+}
+
+/// What the ring's owner says, judged; `asleep`, the lamp put to sleep by a
+/// hand, when a state long unsaid is the sleep's, not a stopped ring.
+pub fn ring(heard: &Result<Option<(Light, Duration)>, String>, asleep: bool) -> PartResult {
     let part = "ring";
     match heard {
         Err(why) => PartResult::new(
@@ -53,6 +66,15 @@ pub fn ring(heard: &Result<Option<(Light, Duration)>, String>) -> PartResult {
             &format!(
                 "nothing was ever said on {}: is lamp-voice running?",
                 Light::TOPICS[1]
+            ),
+        ),
+        Ok(Some((_, age))) if *age > STATE_FRESH && asleep => PartResult::new(
+            part,
+            Verdict::NotChecked,
+            &format!(
+                "the lamp is asleep: its newest {} is {:.1} s old, and nothing says it until a tap wakes it",
+                Light::TOPICS[1],
+                age.as_secs_f64()
             ),
         ),
         Ok(Some((_, age))) if *age > STATE_FRESH => PartResult::new(
@@ -229,11 +251,11 @@ impl Check for Ring<'_> {
 impl Ring<'_> {
     fn run_on(&mut self, deadline: Instant, clock: &mut impl Clock) -> PartResult {
         if !self.active {
-            return ring(&shown(self.bus));
+            return ring(&shown(self.bus), asleep(self.bus));
         }
         match shown(self.bus) {
             Ok(Some((_, age))) if age <= STATE_FRESH => {}
-            heard => return ring(&heard),
+            heard => return ring(&heard, asleep(self.bus)),
         }
         match ask_colours_on(self.bus, deadline, clock) {
             Ok(shown) => colours(&shown),
@@ -260,17 +282,46 @@ mod tests {
 
     #[test]
     fn a_ring_that_says_what_it_shows_is_listened_to_never_passed() {
-        let heard = ring(&Ok(Some((light("blue"), Duration::from_millis(400)))));
+        let heard = ring(
+            &Ok(Some((light("blue"), Duration::from_millis(400)))),
+            false,
+        );
         assert_eq!(heard.verdict, Verdict::NotChecked);
         assert!(
             heard.reason.starts_with("listened only"),
             "{}",
             heard.reason
         );
-        assert_eq!(ring(&Ok(None)).verdict, Verdict::NotChecked);
-        let stopped = ring(&Ok(Some((light("blue"), Duration::from_secs(9)))));
+        assert_eq!(ring(&Ok(None), false).verdict, Verdict::NotChecked);
+        let stopped = ring(&Ok(Some((light("blue"), Duration::from_secs(9)))), false);
         assert_eq!(stopped.verdict, Verdict::Fail);
-        assert_eq!(ring(&Err("gone".into())).verdict, Verdict::Fail);
+        assert_eq!(ring(&Err("gone".into()), false).verdict, Verdict::Fail);
+    }
+
+    /// lamp-9adf, 30 Oct: put to sleep by a hand at 15:54, its 21:43 passive
+    /// self-test failed the ring on a `light/state` 5.8 h old, and the app
+    /// said the lamp was "not working right". Asleep, the asleep face draws
+    /// the ring and nothing says its state, so that is not a stopped ring.
+    /// Awake, a state that old still fails; a ring that can't be read still
+    /// fails, asleep or not.
+    #[test]
+    fn a_ring_long_unsaid_while_the_lamp_sleeps_is_not_checked_not_failed() {
+        let old = Ok(Some((light("warm"), Duration::from_secs(20_907))));
+        let asleep = ring(&old, true);
+        assert_eq!(asleep.verdict, Verdict::NotChecked);
+        assert!(
+            asleep.reason.starts_with("the lamp is asleep"),
+            "{}",
+            asleep.reason
+        );
+        assert_eq!(ring(&old, false).verdict, Verdict::Fail);
+        assert_eq!(ring(&Err("gone".into()), true).verdict, Verdict::Fail);
+        let fresh = ring(&Ok(Some((light("warm"), Duration::from_millis(400)))), true);
+        assert!(
+            fresh.reason.starts_with("listened only"),
+            "{}",
+            fresh.reason
+        );
     }
 
     #[test]
