@@ -139,7 +139,8 @@ name (`/etc/lampOS/person/name`), the owner's place from the app
 (`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
 the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
-per-lamp facts, and physical privacy.
+per-lamp facts (the servos' daily load and temperature peaks in
+`/var/lib/lampos-body/peaks`, #4501, among them), and physical privacy.
 
 Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
 checkpoint and transient handoff files share its root-owned 0700 directory.

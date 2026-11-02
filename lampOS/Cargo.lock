@@ -1831,6 +1831,7 @@ dependencies = [
  "lamp-ipc",
  "lamp-keeper",
  "lamp-lean",
+ "lamp-local-time",
  "lamp-msgs",
  "lamp-turn-owner",
  "nix 0.29.0",
