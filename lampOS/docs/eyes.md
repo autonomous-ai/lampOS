@@ -2390,7 +2390,8 @@ with the known face's id the eyes keep beside the known file
   face's last ten looks. `yes` from 0.02 eye distances a look.
 - **`unknown`, never `no`,** while the face has fewer than 5 looks in the
   window, its eyes are under 24 detector pixels apart on average, it is
-  turned more than 30 degrees (40 with `LAMP_EYES_SPEAKING_STEADY=on`) or
+  turned more than 30 degrees (40 for a meshed window with
+  `LAMP_EYES_SPEAKING_STEADY=on`) or
   its turn was not measured (see above), or
   the eye line bends more than 0.1 radians a look.
 - **One misread look (`LAMP_EYES_SPEAKING_DROP_OUTLIER=on`, off unless
@@ -2439,8 +2440,9 @@ with the known face's id the eyes keep beside the known file
   the mesh read on every look is held to 16 px between the eyes
   (`LEAST_MESHED_EYES_PX`, in the pixels the mesh saw) instead of 24; a window
   judged by the corners keeps 24. The 16 is to be confirmed by the 52e6 size
-  ladder on #4558. And a face may be turned up to 40 degrees instead of 30
-  (`STEADY_MOST_TURN_DEG`): the 30 is about one mouth corner hiding the
+  ladder on #4558. And a face in a window the mesh read on every look may be
+  turned up to 40 degrees instead of 30 (`STEADY_MOST_TURN_DEG`; a
+  corners-only window keeps 30): the 30 is about one mouth corner hiding the
   other, and at 30 to 40 degrees the mesh still sees both well enough. In the
   same replay, talking looks turned 32.5 to 38.7 degrees were lost to the 30,
   and five still looks turned 32 to 39 degrees stayed `no` or `unknown`
@@ -2457,7 +2459,7 @@ with the known face's id the eyes keep beside the known file
   face whose eyes step past 5% on most steps `yes` on with two or three
   steady pairs, and one left with one steady pair `unknown`; a talking face
   turned 35 degrees `yes` on and `unknown` off, and a still one turned 35
-  degrees never `yes` on. Off, nothing is read and nothing changes.
+  degrees never `yes` on, and a corners-only one turned 35 degrees `unknown` on. Off, nothing is read and nothing changes.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
