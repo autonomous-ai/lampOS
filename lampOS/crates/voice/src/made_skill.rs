@@ -50,6 +50,12 @@ pub const PROGRAM: &str = "/opt/lampOS/skills/current/lamp-skills";
 pub const TOPICS: [&str; 2] = ["voice/state", "room/presence"];
 /// What the lamp says of a skill it made, word for word.
 pub const ASK_TO_PUT_ON: &str = "Shall I put it on the lamp?";
+/// Whether the lamp's words said [`ASK_TO_PUT_ON`], in any case: the model
+/// runs it into a sentence ("Just to be sure: shall I put it on the
+/// lamp?", lamp-9adf, 2 Nov 22:51), and that ask is the same ask.
+pub fn says_the_ask(said: &str) -> bool {
+    said.to_lowercase().contains(&ASK_TO_PUT_ON.to_lowercase())
+}
 /// The function the model calls on the person's spoken yes to [`ASK_TO_PUT_ON`].
 pub const PUT_ON: &str = "put_on_made_skill";
 /// A yes counts this long after the lamp asked, as a hand-over's does.
@@ -975,7 +981,7 @@ pub fn asked_in_answer(
     ago: Duration,
     now_unix_ms: u64,
 ) -> io::Result<bool> {
-    if !lamp_said.contains(ASK_TO_PUT_ON) || ago > PUT_ON_WITHIN {
+    if !says_the_ask(lamp_said) || ago > PUT_ON_WITHIN {
         return Ok(false);
     }
     let entries = index(directory);
