@@ -518,6 +518,24 @@ pub fn stop_over(heard: &str, lamp: &str) -> bool {
         })
 }
 
+/// The most words a stop heard over the lamp has with `heard-always`.
+const SHORT_STOP_WORDS: usize = 3;
+
+/// Whether what was heard over the lamp, with `heard-always`, is a short
+/// command to stop ([`stop_over`]) of at most [`SHORT_STOP_WORDS`] words,
+/// the stop word or pair first or last: "Stop.", "Stop, stop.", "Stop now",
+/// "Wait, wait", "Hold on", "Lamp, stop.", "Okay stop", "That's enough".
+/// A stop word inside a longer line is none: over a busy room speech to
+/// text hears the room's talk, and a stop word in it stopped an answer
+/// nobody asked to stop (lamp-52e6, #4868).
+fn short_stop_over(heard: &str, lamp: &str) -> bool {
+    let said = words(heard);
+    let edge = |word: Option<&String>| word.is_some_and(|word| stop_word(word));
+    said.len() <= SHORT_STOP_WORDS
+        && (edge(said.first()) || edge(said.last()))
+        && stop_over(heard, lamp)
+}
+
 /// Where a yield's words come from.
 pub trait Ears: Send {
     /// A reply has begun: have a stream ready for a yield in it.
@@ -987,7 +1005,10 @@ impl StopWords {
                 self.yield_backchannel = held;
             }
             let lamp: Vec<&str> = self.lamp.iter().map(|(_, text)| text.as_str()).collect();
-            let mut stops = replying && !self.stop_heard && stop_over(&heard, &lamp.join(" "));
+            // Only a short command stops the lamp over its voice here: this
+            // listener hears the whole room, not a yield (#4868).
+            let mut stops =
+                replying && !self.stop_heard && short_stop_over(&heard, &lamp.join(" "));
             if stops && self.hold {
                 // Decided below, against the lamp's words as they then are.
                 let held = self.held.get_or_insert_with(|| Held {
@@ -2914,7 +2935,7 @@ mod tests {
                 words.heard_speech(true);
                 words.block(true, true, false, None, None, at, &block(1));
             }
-            script.lock().unwrap().words = Some("the fox had to wait".into());
+            script.lock().unwrap().words = Some("had to wait".into());
             words.block(true, true, false, None, None, at + 10_000, &block(1));
             words.spoken_stop()
         };
@@ -3281,6 +3302,64 @@ mod tests {
         assert_eq!(listen_for(None), Listen::Off);
     }
 
+    /// With `heard-always`, a stop over the lamp is a short command, the
+    /// stop word first or last; a stop word inside a room's longer talk, or
+    /// one the lamp said itself, stops nothing (#4868).
+    #[test]
+    fn listening_always_stops_only_on_a_short_command_the_lamp_did_not_say() {
+        let stops = |heard: &str| {
+            let script = Arc::new(Mutex::new(Script::default()));
+            let mut words = StopWords::always(Box::new(Scripted(Arc::clone(&script))));
+            words.block(true, true, false, None, None, 10_000_000, &block(1));
+            words.lamp_said("And so the fox had to wait.", 10_000_000, false);
+            script.lock().unwrap().words = Some(heard.into());
+            words.block(true, true, false, None, None, 10_010_000, &block(2));
+            words.spoken_stop()
+        };
+        for heard in [
+            "Stop, stop.",
+            "Stop now",
+            "Hold on.",
+            "Lamp, stop.",
+            "That's enough.",
+        ] {
+            assert!(stops(heard), "{heard}");
+        }
+        for heard in [
+            "We need them before the review, wait for finance",
+            "Then we stop the build and ship",
+            // The lamp's own words, short as they are.
+            "had to wait",
+            "Don't stop.",
+        ] {
+            assert!(!stops(heard), "{heard}");
+        }
+    }
+
+    /// With `heard`, a yield's longer words with a stop word in them are a
+    /// stop, as before #4868.
+    #[test]
+    fn listening_in_yields_a_long_line_with_a_stop_word_is_still_a_stop() {
+        let script = Arc::new(Mutex::new(Script::default()));
+        let mut words = StopWords::new(Box::new(Scripted(Arc::clone(&script))));
+        words.block(true, true, false, None, None, 0, &block(1));
+        let held = [observed(2)];
+        words.block(true, true, true, Some(0), Some(&held), 0, &block(2));
+        for still in 1..=10 {
+            words.block(true, true, true, Some(still), None, 0, &block(3));
+        }
+        script.lock().unwrap().words =
+            Some("We need them before the review, wait for finance".into());
+        assert_eq!(
+            words.block(true, true, true, Some(11), None, 0, &block(4)),
+            Tell::Words {
+                stop: true,
+                count: 9,
+                backchannel: false
+            }
+        );
+    }
+
     /// With `heard-always`: every block goes to the stream while the lamp
     /// sounds, and none once it has gone quiet; a stop word the lamp said
     /// itself stops nothing; one said over it stops the reply once; the next
@@ -3478,7 +3557,7 @@ mod tests {
     #[test]
     fn the_lamps_own_words_later_than_the_hold_stop_it_at_150_ms() {
         let own = Some(("And the owl said: stop, little fox.", 200));
-        assert_eq!(stop_delay_ms(true, "the owl said stop", own), Some(150));
+        assert_eq!(stop_delay_ms(true, "owl said stop", own), Some(150));
     }
 
     /// The first builder's and the reviewer's P3 on #1353: each held stop,
@@ -3495,7 +3574,7 @@ mod tests {
         let at = |ms: u64| 20_000_000 + ms * 1000;
         for ms in (0..=600).step_by(10) {
             match ms {
-                100 => script.lock().unwrap().words = Some("the owl said stop".into()),
+                100 => script.lock().unwrap().words = Some("owl said stop".into()),
                 180 => words.lamp_said("And the owl said: stop.", at(ms), false),
                 300 => script.lock().unwrap().words = Some("Lamp, wait.".into()),
                 _ => {}
@@ -3522,7 +3601,7 @@ mod tests {
     #[test]
     fn without_the_hold_a_stop_acts_at_once() {
         let own = Some(("And the owl said: stop, little fox.", 80));
-        assert_eq!(stop_delay_ms(false, "the owl said stop", own), Some(0));
+        assert_eq!(stop_delay_ms(false, "owl said stop", own), Some(0));
         assert_eq!(stop_delay_ms(false, "Lamp, stop.", None), Some(0));
         assert!(hold_for(Some("own-words")));
         for value in [None, Some(""), Some("on"), Some("OWN-WORDS")] {

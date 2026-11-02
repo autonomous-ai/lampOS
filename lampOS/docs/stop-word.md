@@ -1206,6 +1206,17 @@ With the switch:
   #1024), so the speaker's discard of the rest of the reply's audio is
   expected and ends nothing, as for a head tap (the first builder's P1 on
   #1047).
+- **Only a short command stops the reply** (#4868, `short_stop_over`): at
+  most three words (`SHORT_STOP_WORDS`), the stop word or pair first or
+  last: "Stop.", "Stop, stop.", "Stop now", "Wait, wait", "Hold on",
+  "Lamp, stop.", "That's enough." A stop word inside a longer line stops
+  nothing, "We need them before the review, wait for finance" among them.
+  On lamp-52e6 on 3 November, over an office-talk bed with no stop word in
+  it, speech to text misheard the bed and a stop word somewhere in a long
+  result stopped an answer nobody asked to stop. A longer stop ("Okay,
+  okay, that is enough.") is missed; the recall cost is not measured. A
+  yield's words, and `heard`, are read as before; the counts' `says_stop`
+  is still any stop phrase.
 - **`LAMP_STOP_WORDS_HOLD=own-words`** (off unless set; #828 section 2):
   a stop heard is acted on only once the lamp's own words cover the block
   its result arrived in, or `HOLD_US` (150 ms, on the blocks' capture
@@ -1434,7 +1445,9 @@ the canceller's output for a recorded reply with "Stop." in it
 whether results come at all, only after `Finalize`, or only at the close.
 
 Tests: `stop_words::tests::a_stop_word_the_lamp_did_not_say_itself_is_heard_over_it`,
-`listening_always_hears_the_lamps_whole_reply_and_stops_on_a_word_it_did_not_say`
+`listening_always_hears_the_lamps_whole_reply_and_stops_on_a_word_it_did_not_say`,
+`listening_always_stops_only_on_a_short_command_the_lamp_did_not_say` and
+`listening_in_yields_a_long_line_with_a_stop_word_is_still_a_stop` (#4868)
 (the driver) and `listening_always_gives_the_words_as_they_come_through_the_thread`
 (the relay's real thread, against a stand-in speech-to-text that gives an
 interim result), `with_the_raw_blocks_the_words_are_asked_for_every_half_second`,
