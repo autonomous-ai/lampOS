@@ -124,9 +124,9 @@ pub fn catalog_with(every: bool) -> Vec<Function> {
         ),
         function(
             NAMES[4],
-            "Cancel the selected timer or whole reminder series only when asked. Use an ID from the current list, read without pending_only. For a timer, cancel only an item whose kind is timer; for a reminder, only one whose kind is reminder.",
-            json!({"id":id}),
-            json!(["id"]),
+            "Cancel a timer or a whole reminder series the person set, only when asked: \"stop reminding me to drink water\", \"cancel my water reminder\", \"no more pasta timer\". Give its id from the current list (read without pending_only), or, with no id, its text: the words of what it reminds them of (\"drink water\"). By text, the one item whose text contains them is cancelled; if several do, or none, you are told which, and nothing is cancelled. For a timer, cancel only an item whose kind is timer; for a reminder, only one whose kind is reminder. A reminder the person set is never one of the lamp's own wellbeing nudges: never answer this with wellbeing_nudges.",
+            json!({"id":id,"text":{"type":"string","description":"What the reminder or timer is for, in the person's words (\"drink water\"), when no id is known."}}),
+            json!([]),
         ),
         function(
             NAMES[5],
@@ -406,6 +406,52 @@ impl Adapter {
             }
             return Ok(listed);
         }
+        // By text: the asker's own list, read as list_reminders reads it,
+        // then the one match cancelled by id, as any cancel is.
+        let call = match call {
+            Call::CancelText { text } => {
+                let mut matches = Vec::new();
+                let mut after_id = 0;
+                for _ in 0..MOST_TEXT_PAGES {
+                    let listed = self.perform(
+                        Call::List {
+                            after_id,
+                            pending_only: false,
+                        },
+                        set_times,
+                        caller,
+                        deadline,
+                    )?;
+                    let items = listed["items"].as_array().cloned().unwrap_or_default();
+                    matches.extend(items.iter().filter(|item| by_text(item, &text)).cloned());
+                    match (
+                        listed["complete"].as_bool(),
+                        listed["next_after_id"].as_u64(),
+                    ) {
+                        (Some(false), Some(next)) if next > after_id => after_id = next,
+                        _ => break,
+                    }
+                }
+                match matches.as_slice() {
+                    [one] => Call::Cancel {
+                        id: one["id"].as_u64().ok_or(Failure::Unavailable)?,
+                    },
+                    _ => {
+                        let found: Vec<Value> = matches
+                            .iter()
+                            .map(|item| json!({"id":item["id"],"kind":item["kind"],"text":item["text"],"repeat":item["repeat"]}))
+                            .collect();
+                        let next = if found.is_empty() {
+                            "Nothing they set matches those words: say so in a few words, and cancel nothing."
+                        } else {
+                            "More than one matches: ask which, naming each in a few words, and cancel by its id once they say."
+                        };
+                        return Ok(json!({"cancelled": false, "matches": found, "next": next}));
+                    }
+                }
+            }
+            call => call,
+        };
         // Snooze obtains guard and delivery from the SAME Get reply. Other
         // mutations use Status. No conflict or uncertain mutation is retried.
         let before = match &call {
@@ -440,7 +486,9 @@ impl Adapter {
                     asker,
                 }
             }
-            Call::List { .. } => unreachable!("list returned before mutation"),
+            Call::List { .. } | Call::CancelText { .. } => {
+                unreachable!("list and a cancel by text resolved before mutation")
+            }
         };
         let response = self.ask(&request, deadline)?;
         committed(&request, &response)
@@ -530,10 +578,25 @@ fn refused(reply: &Value, mutation: bool) -> Failure {
 }
 
 enum Call {
-    Set { text: String, when: When },
-    List { after_id: u64, pending_only: bool },
-    Cancel { id: u64 },
-    Snooze { id: u64, seconds: u64 },
+    Set {
+        text: String,
+        when: When,
+    },
+    List {
+        after_id: u64,
+        pending_only: bool,
+    },
+    Cancel {
+        id: u64,
+    },
+    /// Cancel the one item whose text holds these words ([`by_text`]).
+    CancelText {
+        text: String,
+    },
+    Snooze {
+        id: u64,
+        seconds: u64,
+    },
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -587,7 +650,10 @@ struct Listing {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Cancel {
-    id: u64,
+    #[serde(default)]
+    id: Option<u64>,
+    #[serde(default)]
+    text: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -605,6 +671,19 @@ fn decode<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, Failure> {
     }
     serde_json::from_value(value.clone()).map_err(|_| Failure::BadArguments)
 }
+/// At most this many list pages are read to find a cancel's text.
+const MOST_TEXT_PAGES: usize = 8;
+
+/// Whether a listed item's text holds `words`, case and edge spaces aside:
+/// "stop reminding me to drink water" with `drink water` finds "Drink water".
+fn by_text(item: &Value, words: &str) -> bool {
+    let words = words.trim().to_lowercase();
+    !words.is_empty()
+        && item["text"]
+            .as_str()
+            .is_some_and(|text| text.to_lowercase().contains(&words))
+}
+
 fn valid_text(text: &str) -> bool {
     !text.trim().is_empty() && text.len() <= 300 && !text.chars().any(char::is_control)
 }
@@ -760,10 +839,14 @@ fn parse(name: &str, value: &Value, every: bool) -> Result<Call, Failure> {
         }
         "cancel_reminder" => {
             let a: Cancel = decode(value)?;
-            if a.id == 0 {
-                return Err(Failure::BadArguments);
+            match (a.id, a.text) {
+                (Some(0), _) | (Some(_), Some(_)) | (None, None) => {
+                    return Err(Failure::BadArguments);
+                }
+                (Some(id), None) => Call::Cancel { id },
+                (None, Some(text)) if valid_text(&text) => Call::CancelText { text },
+                (None, Some(_)) => return Err(Failure::BadArguments),
             }
-            Call::Cancel { id: a.id }
         }
         "snooze_reminder" => {
             let a: Snooze = decode(value)?;
