@@ -2200,7 +2200,10 @@ Nothing above changes with the switch off.
    `put_on_made_skill` first keep it asked (`made_skill::asked_in_answer`,
    with the words and age of one exchange, `Thread::answered_last_but`, as
    `agent_tasks` does since #4880) and then put that SHA-256 on through the
-   manage helper, as above. A yes after a cut-in ("wait, make it 11") or
+   manage helper, as above. It is dated at the yes, not at the answer
+   (`make_skill_local::asked_at_yes`, the Reviewer-lead's second P2): the
+   answer's age runs from its first piece ("I'll make it now"), said
+   before the call kept the skill, and the ask comes later in it. A yes after a cut-in ("wait, make it 11") or
    after an answer that asked something else puts nothing on. The second
    route notes a made skill waiting for its yes with the switch too.
 5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
