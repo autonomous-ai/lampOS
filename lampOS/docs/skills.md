@@ -2244,18 +2244,30 @@ started):
   moment within an hour (`app_make::ask_line`, `say_ask`): "I made the
   skill you typed in the app." with what it does, then exactly "Shall I put
   it on the lamp?". That turn is a written turn, so the thread keeps its
-  words as the lamp's answer. Only a yes right after it puts the skill on:
-  `put_on_made_skill` dates the ask at the yes from that answer
-  (`asked_at_yes`), and a yes after anything else puts nothing on. Nothing
-  from the app puts it on.
+  words as the lamp's answer. Only a yes right after it puts the skill on,
+  and nothing from the app puts it on (`app_make::ask_answered`, Mobile's
+  HOLD on #4963):
+  - **Said whole** (the say service's `spoken`): the skill is kept as asked
+    at that moment, however long the ask waited in the queue, so a plain
+    spoken yes within 120 s puts it on, and with silence `skills.made`
+    turns from `asked` to `left_off`.
+  - **Begun but not said whole** (dropped, expired or refused): nothing is
+    kept as asked. It stays untold, its 10 minutes (`UNTOLD_WITHIN`)
+    counted from when the ask was last begun aloud
+    (`ask_begun_at_unix_ms`), not from when it was kept, so an ask queued
+    past 10 minutes is still noted to the model, which asks again. A yes
+    then counts only right after an answer of the lamp's that said the ask
+    (`asked_at_yes`), and a yes after anything else puts nothing on.
 
 Tests: `make_skill_local::tests` (a good answer kept, asked only after an answer that said the ask, a refused
 one kept nothing, a 404 asked once more, a brief refused asking nothing,
 and the switch alone routing and declaring the two functions), and in
 `app_make::tests` the app's: `ready` at once with no tasks part, a typed
 ask kept and its ask given to be said, a yes after that said ask making it
-wait and a yes after anything else not, and one not kept told why with
-nothing said.
+wait and a yes after anything else not, one not kept told why with
+nothing said, and an ask said whole 15 minutes after it was kept made
+`asked` then `left_off` with silence, while a dropped one stays `kept` and
+is noted to the model.
 
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 
