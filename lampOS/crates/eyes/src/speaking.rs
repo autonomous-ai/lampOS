@@ -151,16 +151,36 @@ pub fn head_moved(joints: &lamp_msgs::JointState) -> bool {
 /// a frame up to a few hundred ms old at its look.
 pub const JOINT_HISTORY_MS: u64 = 1_000;
 
+/// How often the loop reads `body/joint_states` for [`JointHistory`]: half
+/// the body's 80 ms period, so every reading is still caught, rather than
+/// on each loop pass (about every 5 ms, 47 to 70% of a core on lamp-52e6).
+pub const JOINT_READ_EVERY_US: u64 = 40_000;
+
 /// The body's recent `body/joint_states` readings, each its bus stamp and
-/// whether the head moved ([`head_moved`]), filled each loop pass, so a look
+/// whether the head moved ([`head_moved`]), filled at most every
+/// [`JOINT_READ_EVERY_US`] ([`JointHistory::read_due`]), so a look
 /// judges motion at its frame's capture from the reading nearest it, not
 /// only the newest one (#4558).
 #[derive(Debug, Default)]
 pub struct JointHistory {
     readings: VecDeque<(u64, bool)>,
+    read_at_us: Option<u64>,
 }
 
 impl JointHistory {
+    /// Whether the loop should read the joints now, at monotonic `now_us`:
+    /// at most once every [`JOINT_READ_EVERY_US`].
+    pub fn read_due(&mut self, now_us: u64) -> bool {
+        if self
+            .read_at_us
+            .is_some_and(|at| now_us.saturating_sub(at) < JOINT_READ_EVERY_US)
+        {
+            return false;
+        }
+        self.read_at_us = Some(now_us);
+        true
+    }
+
     /// Keeps a reading stamped `at_unix_ms` (an expired one says nothing and
     /// is not kept; the same stamp again is the same reading; one older than
     /// the newest means the clock went back, and starts again), and lets go
@@ -1940,6 +1960,18 @@ mod steady_tests {
         };
         mouths.set_head_moved(moved, 200);
         assert!(mouths.head_moved);
+    }
+
+    #[test]
+    fn the_joints_are_read_at_most_every_40_ms_not_each_pass() {
+        // 1000 loop passes in one second, one every millisecond.
+        let mut joints = JointHistory::default();
+        let reads = (0..1_000u64)
+            .filter(|pass| joints.read_due(7_000_000 + pass * 1_000))
+            .count();
+        assert!(reads <= 25, "{reads} reads in a second");
+        // Still often enough to catch each 80 ms reading.
+        assert!(reads >= 20, "{reads} reads in a second");
     }
 
     #[test]
