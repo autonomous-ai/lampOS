@@ -2221,6 +2221,11 @@ Nothing above changes with the switch off.
    asks (`make_skill_local::untold_note`). A yes counts only the untold
    skills kept in those 10 minutes, so an older cut one never holds back a
    later skill (`make_skill_local::asked_at_yes`).
+   Once a skill was asked (its ask said whole, by the voice or the app's
+   spoken ask), a yes puts it on only while the lamp has said nothing since
+   the ask, or its last answer was the ask: a yes to another question the
+   lamp asked meanwhile ("For ten minutes?") puts nothing on
+   (`make_skill_local::yes_is_to_the_ask`, the Reviewer-lead's P2 on #4971).
 5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, and with the one more try after a failure and the
    one repair after a refusal, two asks of two tries each: about 120 s at

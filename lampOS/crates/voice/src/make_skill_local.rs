@@ -336,6 +336,34 @@ fn told(made: Result<Made, Refused>) -> Value {
     }
 }
 
+/// Whether a yes at `now_unix_ms` is to the ask of the made skill waiting
+/// for one: the lamp's last answer (`answered`, its words and how long ago)
+/// came before the skill was asked, or said [`made_skill::ASK_TO_PUT_ON`].
+/// With no skill waiting, true: `put_on` then says so itself.
+fn yes_is_to_the_ask(
+    directory: &std::path::Path,
+    answered: Option<&(String, Duration)>,
+    now_unix_ms: u64,
+) -> bool {
+    let Some((_, sha256)) = made_skill::waiting(directory, now_unix_ms) else {
+        return true;
+    };
+    let Some(asked_at) = made_skill::entries(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256.as_str())
+        .and_then(|entry| entry["offered_at_unix_ms"].as_u64())
+    else {
+        return true;
+    };
+    match answered {
+        None => true,
+        Some((said, ago)) => {
+            said.contains(made_skill::ASK_TO_PUT_ON)
+                || now_unix_ms.saturating_sub(ago.as_millis() as u64) < asked_at
+        }
+    }
+}
+
 /// The just-made skill kept as asked when a yes comes at `now_unix_ms`
 /// right after `answered`, the lamp's last answer and its age: only if
 /// that answer said [`made_skill::ASK_TO_PUT_ON`] within
@@ -433,16 +461,23 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
         // said the ask (`made_skill::asked_in_answer`, as `agent_tasks`
         // does since #4880): a yes after a cut-in or another question puts
         // nothing on.
-        if heard
-            && let Err(error) = asked_at_yes(
-                &keeping.directory,
-                crate::thread::THREAD.lock().ok().and_then(|thread| {
-                    thread.answered_last_but(request, std::time::Instant::now())
-                }),
-                now_unix_ms,
-            )
+        let answered = crate::thread::THREAD
+            .lock()
+            .ok()
+            .and_then(|thread| thread.answered_last_but(request, std::time::Instant::now()));
+        if heard && let Err(error) = asked_at_yes(&keeping.directory, answered.clone(), now_unix_ms)
         {
             eprintln!("lamp-voice: a skill made here: its ask in an answer was not kept: {error}");
+        }
+        // A yes is to the ask only when the lamp has said nothing since it
+        // asked, or its last answer was the ask: a yes to another question
+        // ("For ten minutes?") puts nothing on (the Reviewer-lead's P2 on
+        // #4971, as #4880's rule for the voice path).
+        if !yes_is_to_the_ask(&keeping.directory, answered.as_ref(), now_unix_ms) {
+            return json!({
+                "error": "that yes was to another question, not to putting the skill on",
+                "next": "Don't put it on. If they still want it, ask once more in a few words whether to put it on the lamp."
+            });
         }
         let said = heard.then(|| {
             crate::thread::THREAD
@@ -768,6 +803,46 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         // Waiting for its yes: no untold note on top.
         assert_eq!(untold_note(&keeping.directory, now), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's P2 on #4971: once a skill was asked (its ask
+    /// said whole), a yes counts only while the lamp has said nothing since,
+    /// or its last answer was the ask. A yes to "For ten minutes?" doesn't.
+    #[test]
+    fn a_yes_to_another_question_after_the_ask_puts_nothing_on() {
+        let (root, keeping) = keeping("other-question");
+        std::fs::create_dir_all(&keeping.directory).unwrap();
+        let now = 1_800_000_000_000u64;
+        let asked_at = now - 20_000;
+        std::fs::write(
+            keeping.directory.join(made_skill::INDEX),
+            serde_json::to_vec(&[json!({"name": "glow", "sha256": "a".repeat(64),
+                "package": "glow.tar", "from": "local:app:1:1", "at_unix_ms": now - 60_000,
+                "offered_at_unix_ms": asked_at, "description": "d"})])
+            .unwrap(),
+        )
+        .unwrap();
+        let ask = format!("I made it. {}", made_skill::ASK_TO_PUT_ON);
+        // No answer since the ask, or the last answer the ask itself: yes counts.
+        assert!(yes_is_to_the_ask(&keeping.directory, None, now));
+        assert!(yes_is_to_the_ask(
+            &keeping.directory,
+            Some(&(ask, Duration::from_secs(5))),
+            now
+        ));
+        // An answer from before the ask: still the ask that was said last.
+        assert!(yes_is_to_the_ask(
+            &keeping.directory,
+            Some(&("Sure.".to_owned(), Duration::from_secs(30))),
+            now
+        ));
+        // Another question after the ask: a yes to it puts nothing on.
+        assert!(!yes_is_to_the_ask(
+            &keeping.directory,
+            Some(&("For ten minutes?".to_owned(), Duration::from_secs(3))),
+            now
+        ));
         let _ = std::fs::remove_dir_all(&root);
     }
 
