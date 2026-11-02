@@ -937,8 +937,9 @@ of an arm that did lift is as before: nothing let go, no count.
 
 ### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
 
-Off unless the unit sets `LAMP_BODY_STRAIN_GUARD=on`; off, nothing above
-changes. On (`Limits::strain_guard`):
+On in the product unit (`lampOS/deploy/product/lamp-body.service`, #4899,
+after lamp-52e6's runs on #4501); off unless the unit sets
+`LAMP_BODY_STRAIN_GUARD=on`, and off, nothing above changes. On (`Limits::strain_guard`):
 
 - **A long strain sits it down.** A standing shoulder or elbow over
   `--arm-strain-load` (450) for `--arm-strain-seconds` (30) in a row sends
