@@ -1198,6 +1198,14 @@ evidence (`near.rs`, `sentence_judge`):
 - **its words covering it**: at least one word for each second of the line's
   speech (`MS_A_WORD`, half the pace of ordinary speech; the line's speech is
   its blocks the detector scored as speech, 10 ms each). Fewer is a fragment.
+  Words are `wait_words::words_in`'s; unspaced Japanese and Chinese (Han,
+  Hiragana, Katakana) count one word for each 2 characters
+  (`CJK_CHARS_A_WORD`), since a natural ja/zh sentence came back as one
+  "word" and was refused for coverage however it was said (#4866). Ordinary
+  speech is about 5 to 6 characters a second in Japanese and 4 to 5 in
+  Chinese, so this puts both at the 2 to 3 words a second English is.
+  English, Korean and other spaced text are counted by their spaces as
+  before. Test: `an_unspaced_japanese_or_chinese_sentence_covers_its_speech`.
 
 The try is judged as soon as a line with at least one word is in, or 3 s
 past the window with none. A line whose words came back none ("okay", a hum,

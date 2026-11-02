@@ -1,7 +1,7 @@
 //! The near-call step (#1803), with a scripted bus and Unix clock.
 use super::near::{
     NEAR_DONE, NEAR_FAILED, SENTENCE_AGAIN, SENTENCE_CLOSER, SENTENCE_DONE, SENTENCE_FAILED,
-    SENTENCE_FIRST, SENTENCE_LOUDER, Seen,
+    SENTENCE_FIRST, SENTENCE_LOUDER, Seen, words_cover,
 };
 use super::*;
 use lamp_msgs::{NameHeard, RoomSound};
@@ -2020,4 +2020,26 @@ fn a_refused_call_heard_only_as_text_then_silence_ends_failed() {
     // At the step's end: the sentence's line, then the call's.
     assert_eq!(settle(&mut walk, 140 * S), [SENTENCE_FAILED, NEAR_FAILED]);
     assert_eq!(outcome(&walk), Some(Outcome::Failed));
+}
+
+/// An unspaced Japanese or Chinese sentence is counted by its characters, so
+/// one said at a natural pace covers its speech as a spaced one does (#4866:
+/// a natural Japanese sentence was refused twice for coverage). A bare "yes"
+/// against the same speech is still a fragment, and English and Korean are
+/// counted by their spaces as before.
+#[test]
+fn an_unspaced_japanese_or_chinese_sentence_covers_its_speech() {
+    let covers =
+        |said: &str, speech_ms| words_cover(crate::wait_words::words_in(said) as u64, speech_ms);
+    for said in [
+        "鍵は玄関の青い引き出しに入れてあります。",
+        "钥匙放在门口那个蓝色的抽屉里了。",
+        "열쇠는 현관 파란 서랍에 넣어 뒀어요.",
+        "I left the keys in the blue drawer by the door.",
+    ] {
+        assert!(covers(said, 2_600), "{said:?}");
+    }
+    for said in ["はい。", "好的。", "네.", "Okay, sure."] {
+        assert!(!covers(said, 2_600), "{said:?}");
+    }
 }
