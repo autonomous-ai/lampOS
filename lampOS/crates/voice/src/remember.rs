@@ -1724,7 +1724,7 @@ pub const OBSERVE_PROMPT: &str = "You keep a household lamp's memory tidy. The u
 
 /// What [`OBSERVE_PROMPT`] is told after it with [`EVENTS_ENVIRONMENT`],
 /// when the job carries the conversation's day (`"today"`).
-const OBSERVE_EVENTS: &str = " \"today\" is the day of these exchanges. A thread or promise about an event on a day the cited words make clear (\"on Saturday\", \"tomorrow\", \"on 24 October\") also has \"on\":\"YYYY-MM-DD\", that day worked out from \"today\". \"on\" is only for an event still to come, \"today\" or later: one already past (\"my exam was yesterday\") has none. When the day is not clear, leave \"on\" out, and never guess it.";
+const OBSERVE_EVENTS: &str = " \"today\" is the day of these exchanges. A thread or promise about an event on a day the cited words make clear (\"on Saturday\", \"tomorrow\", \"on 24 October\") also has \"on\":\"YYYY-MM-DD\", that day worked out from \"today\". \"on\" is only for an event still to come, \"today\" or later: one already past (\"my exam was yesterday\") has none. When the day is not clear, leave \"on\" out, and never guess it. In \"text\", write a day the cited words name as that day itself, worked out from \"today\" (\"Friday 6 November\"), never a bare weekday or \"tomorrow\", which read wrong on any other day.";
 
 /// The observation pass's prompt: [`OBSERVE_PROMPT`] and [`OBSERVE_STATED`],
 /// and with `events` (a job carrying `"today"`, [`observe_input`]) the
@@ -1836,6 +1836,13 @@ pub(crate) const RECALL_OWN_PREFERENCE: &str = " For their own life (a preferenc
 /// stays within 1,024 bytes under every switch.
 pub(crate) const RECALL_NOT_FOR: &str = "Not for what you still see of this talk.";
 
+/// How recall's description asks for a day (#4753): each entry's `when`
+/// carries the day ([`when_said`]), named only when the person asks when;
+/// otherwise roughly, as before, never a date or an hour recited unasked.
+/// Short: with the second version, `replaces` and `history` recall is 1,020
+/// of its 1,024 bytes (`recall_is_a_valid_function_under_every_switch`).
+pub const RECALL_WHEN: &str = ", without times; the day only if asked when.";
+
 /// The recall function; with its second version ([`RECALL_V2_ENVIRONMENT`])
 /// it also takes a span of days.
 fn recall_tool(second: bool) -> Tool {
@@ -1849,9 +1856,9 @@ fn recall_tool(second: bool) -> Tool {
     description.push_str(RECALL_NOT_FOR);
     description.push_str(
         " If nothing is found, say only that you do not remember; never make anything up. You \
-         cannot tell who is speaking: never say 'you told me'; give what you remember roughly, \
-         without dates or times.",
+         cannot tell who is speaking: never say 'you told me'; give what you remember roughly",
     );
+    description.push_str(RECALL_WHEN);
     description.push_str(RECALL_OWN_PREFERENCE);
     let mut parameters = json!({
         "type": "object",
@@ -3614,8 +3621,9 @@ pub(crate) fn answer_for(
                     .as_array()?
                     .iter()
                     .filter_map(|entry| {
-                        let when = when(
-                            today - local_day(entry.get("at_unix_ms")?.as_u64()?, zone),
+                        let when = when_said(
+                            today,
+                            local_day(entry.get("at_unix_ms")?.as_u64()?, zone),
                         );
                         let mut item = match entry.get("kind")?.as_str()? {
                             "kept" => json!({"when": when, "asked_to_remember": entry.get("text")?}),
@@ -3689,6 +3697,24 @@ fn when(days_ago: i64) -> String {
         7..=13 => "last week".into(),
         14..=59 => format!("{} weeks ago", days_ago / 7),
         _ => format!("about {} months ago", days_ago / 30),
+    }
+}
+
+/// When something was said, both days since 1970-01-01 in the lamp's own
+/// zone: [`when`], then the day itself, "3 days ago, Saturday 31 October",
+/// with the year when it is not this one (#4753's "when" questions). Told
+/// "3 days ago" alone, the model had to work out the day, and after six
+/// days "last week" could not be placed at all. The model says the day
+/// only when asked when (recall's description); a day after today (a clock
+/// put back) is today.
+pub(crate) fn when_said(today: i64, day: i64) -> String {
+    let day = day.min(today);
+    let said = crate::local_time::day_said(day);
+    let year = crate::local_time::civil(day).0;
+    if year == crate::local_time::civil(today).0 {
+        format!("{}, {said}", when(today - day))
+    } else {
+        format!("{}, {said} {year}", when(today - day))
     }
 }
 
@@ -6636,7 +6662,7 @@ fn hits_told(
             count.bytes += text.len();
             // When it was said, and apart from it the day it is about
             // (#3987).
-            let mut about = vec![format!("said {}", when(today - local_day(at, zone)))];
+            let mut about = vec![format!("said {}", when_said(today, local_day(at, zone)))];
             about.extend(day.map(|day| format!("the day: {day}")));
             if let Some(id) = id.filter(|_| ids) {
                 shown.push(id);
@@ -9629,7 +9655,7 @@ fn days_answer(
             continue;
         }
         sources.push(id);
-        let ago = |at: u64| when(local_day(now, zone) - local_day(at, zone));
+        let ago = |at: u64| when_said(local_day(now, zone), local_day(at, zone));
         let at = entry.get("at_unix_ms")?.as_u64()?;
         let when = ago(at);
         let kind = entry.get("kind")?.as_str()?;
@@ -14603,7 +14629,9 @@ mod tests {
                 && asked.contains(r#""on":"YYYY-MM-DD""#)
                 && asked.contains("\"today\"")
                 && asked.contains("never guess")
-                && asked.contains("still to come"),
+                && asked.contains("still to come")
+                // #4753: a note's day is written as the day itself.
+                && asked.contains("(\"Friday 6 November\"), never a bare weekday"),
             "{asked}"
         );
         assert!(!OBSERVE_PROMPT.contains("today"));
@@ -18247,13 +18275,14 @@ mod tests {
         assert_eq!(
             told,
             format!(
-                "{HITS_NOTE}\n- Names of the cats: Pim and Pom. (said today)\n- Their name is Ossa. (said yesterday)\n{HITS_OWN_NOTE}"
+                "{HITS_NOTE}\n- Names of the cats: Pim and Pom. (said today, Wednesday 14 October)\n- Their name is Ossa. (said yesterday, Tuesday 13 October)\n{HITS_OWN_NOTE}"
             )
         );
         let coffee = hits_note(&socket, None, "how do I take my coffee", NOW, None).unwrap();
         assert!(
-            coffee.contains("- They take their coffee black, no sugar. (said 2 days ago)")
-                && coffee.ends_with(HITS_ROOM_NOTE),
+            coffee.contains(
+                "- They take their coffee black, no sugar. (said 2 days ago, Monday 12 October)"
+            ) && coffee.ends_with(HITS_ROOM_NOTE),
             "{coffee}"
         );
         assert_eq!(
@@ -18393,7 +18422,7 @@ mod tests {
         for heard in ["mau yeu thich", "Màu yêu thích của tôi là gì?"] {
             let told = hits_note(&socket, Some("p-1"), heard, NOW, None).unwrap();
             assert!(
-                told.contains("- Màu yêu thích là xanh. (said today)"),
+                told.contains("- Màu yêu thích là xanh. (said today, Wednesday 14 October)"),
                 "{told}"
             );
             assert!(!told.contains("sister"), "{told}");
@@ -19679,6 +19708,65 @@ mod tests {
         );
     }
 
+    /// #4753: when something was said is how long ago and the day itself,
+    /// in the lamp's own zone, past six days too, and never a clock time.
+    #[test]
+    fn when_said_is_how_long_ago_and_the_local_day() {
+        // NOW is Tuesday 13 October 2026, 22:30 at EAST (UTC+7).
+        let today = local_day(NOW, Some(&EAST));
+        let at = |unix_ms: u64| when_said(today, local_day(unix_ms, Some(&EAST)));
+        assert_eq!(at(NOW), "today, Tuesday 13 October");
+        // Midnight is the zone's: 23:59 there on the 12th is yesterday,
+        // and 00:00 on the 13th is today, though both are the 12th in UTC.
+        assert_eq!(at(1_791_824_340_000), "yesterday, Monday 12 October");
+        assert_eq!(at(1_791_824_400_000), "today, Tuesday 13 October");
+        assert_eq!(at(NOW - 3 * DAY), "3 days ago, Saturday 10 October");
+        // Past six days, the day is told as well as the week.
+        assert_eq!(at(NOW - 9 * DAY), "last week, Sunday 4 October");
+        assert_eq!(at(NOW - 21 * DAY), "3 weeks ago, Tuesday 22 September");
+        // Another year's day says its year.
+        assert_eq!(
+            at(NOW - 400 * DAY),
+            "about 13 months ago, Monday 8 September 2025"
+        );
+        // A day after today (a clock put back) is today.
+        assert_eq!(at(NOW + 2 * DAY), "today, Tuesday 13 October");
+        // The week daylight saving ends: New York on Monday 2 November 2026
+        // at noon; 23:30 on Saturday 31 October there was still summer
+        // time (UTC-4), and is Sunday in UTC.
+        let new_york = LocalTime::zone("America/New_York").unwrap();
+        let now = 1_793_638_800_000;
+        let saturday = 1_793_503_800_000;
+        assert_eq!(
+            when_said(
+                local_day(now, Some(&new_york)),
+                local_day(saturday, Some(&new_york))
+            ),
+            "2 days ago, Saturday 31 October"
+        );
+        assert_eq!(
+            when_said(local_day(now, None), local_day(saturday, None)),
+            "yesterday, Sunday 1 November"
+        );
+    }
+
+    /// #4753: recall's description asks for the day only when they ask
+    /// when, never a time, and the old "without dates" is gone.
+    #[test]
+    fn recall_names_the_day_only_when_asked_when() {
+        for second in [false, true] {
+            let tool = recall_tool(second);
+            assert!(tool.description.contains(RECALL_WHEN), "{second}");
+            assert!(!tool.description.contains("without dates"), "{second}");
+            assert!(
+                tool.description
+                    .contains("roughly, without times; the day only if asked when."),
+                "{}",
+                tool.description
+            );
+        }
+    }
+
     #[test]
     fn what_was_found_is_told_with_how_long_ago_and_never_a_clock_time() {
         let answer = json!({"ok":true,"entries":[
@@ -19689,9 +19777,9 @@ mod tests {
         assert_eq!(
             answer_for(RECALL, &answer, NOW, Some(&EAST), None),
             Some(json!({"found":[
-                {"when":"2 weeks ago","heard":"How do I take my coffee?","you_said":"Black."},
-                {"when":"yesterday","asked_to_remember":"takes coffee black"},
-                {"when":"today","heard":"And tea?","you_said":"No idea."}
+                {"when":"2 weeks ago, Wednesday 23 September","heard":"How do I take my coffee?","you_said":"Black."},
+                {"when":"yesterday, Monday 12 October","asked_to_remember":"takes coffee black"},
+                {"when":"today, Tuesday 13 October","heard":"And tea?","you_said":"No idea."}
             ]}))
         );
         assert_eq!(
@@ -22121,12 +22209,12 @@ mod tests {
         .unwrap();
         assert!(
             told.contains(
-                "- My dental appointment is on Friday. (said today; the day: Friday 16 October, in 3 days)"
+                "- My dental appointment is on Friday. (said today, Tuesday 13 October; the day: Friday 16 October, in 3 days)"
             ),
             "{told}"
         );
         assert!(
-            told.contains("- The dentist is on Main Street. (said yesterday)"),
+            told.contains("- The dentist is on Main Street. (said yesterday, Monday 12 October)"),
             "{told}"
         );
         let today = local_day(NOW, None);
@@ -22186,13 +22274,17 @@ mod tests {
         let (off, none, _) = hits_told(&answer, "my favourite colour", NOW, None, false).unwrap();
         assert_eq!(
             off,
-            format!("{HITS_NOTE}\n- Her favourite colour is violet. (said today)")
+            format!(
+                "{HITS_NOTE}\n- Her favourite colour is violet. (said today, Tuesday 13 October)"
+            )
         );
         assert!(none.is_empty());
         let (on, shown, _) = hits_told(&answer, "my favourite colour", NOW, None, true).unwrap();
         assert_eq!(
             on,
-            format!("{HITS_NOTE}\n- Her favourite colour is violet. (said today; source_id 4)")
+            format!(
+                "{HITS_NOTE}\n- Her favourite colour is violet. (said today, Tuesday 13 October; source_id 4)"
+            )
         );
         assert_eq!(shown, [4]);
         let mut context = DaysContext::default();
@@ -22217,8 +22309,8 @@ mod tests {
         assert_eq!(
             asked["found"],
             json!([
-                {"source_id":9,"when":"3 days ago","asked_to_remember":"Her favourite colour is green.","since":"since 3 days ago"},
-                {"source_id":8,"when":"last week","asked_to_remember":"Her favourite colour is violet.","since":"since last week","until":"until 3 days ago"}
+                {"source_id":9,"when":"3 days ago, Saturday 10 October","asked_to_remember":"Her favourite colour is green.","since":"since 3 days ago, Saturday 10 October"},
+                {"source_id":8,"when":"last week, Monday 5 October","asked_to_remember":"Her favourite colour is violet.","since":"since last week, Monday 5 October","until":"until 3 days ago, Saturday 10 October"}
             ])
         );
         let (unasked, ids) = days_answer(&answer, NOW, Some(&EAST), Some(false)).unwrap();
@@ -22229,7 +22321,7 @@ mod tests {
         let (off, _) = days_answer(&current, NOW, Some(&EAST), None).unwrap();
         assert_eq!(
             off["found"][0],
-            json!({"source_id":9,"when":"3 days ago","asked_to_remember":"Her favourite colour is green."})
+            json!({"source_id":9,"when":"3 days ago, Saturday 10 October","asked_to_remember":"Her favourite colour is green."})
         );
         assert!(off["found"][0].get("since").is_none());
         assert!(off["found"][0].get("until").is_none());
@@ -22273,13 +22365,13 @@ mod tests {
         let room = recall(history.clone(), None);
         let found = room["found"].as_array().unwrap();
         assert_eq!(found.len(), 2, "{room}");
-        assert_eq!(found[0]["since"], "since today");
-        assert_eq!(found[1]["until"], "until today");
+        assert_eq!(found[0]["since"], "since today, Tuesday 13 October");
+        assert_eq!(found[1]["until"], "until today, Tuesday 13 October");
         // Their own: history, only theirs.
         let theirs = recall(history, Some(MAI));
         let found = theirs["found"].as_array().unwrap();
         assert_eq!(found.len(), 3, "{theirs}");
-        assert_eq!(found[1]["until"], "until today");
+        assert_eq!(found[1]["until"], "until today, Tuesday 13 October");
         assert_eq!(found[1]["theirs"], true);
         assert_eq!(found[2]["source_id"], 7);
         assert!(found[2].get("theirs").is_none() && found[2].get("until").is_none());
