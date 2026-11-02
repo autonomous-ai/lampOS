@@ -115,6 +115,20 @@ pub fn cut_in_near_asker() -> bool {
     std::env::var(CUT_IN_NEAR_ASKER_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// `LAMP_CUT_IN_OVER_BED=on` (#4868): over a room busy as the reply began
+/// ([`crate::body_link::Attention::busy_lately`]), sound alone ends no
+/// answer: only a stop word, a forced yield, the lamp's name, a tap or the
+/// button do; and stillness commits a yield only on the plain blocks of the
+/// run that made it, never on the lamp's own tail after it
+/// ([`Interruption::over_bed`]). Off unless set.
+pub const CUT_IN_OVER_BED_ENVIRONMENT: &str = "LAMP_CUT_IN_OVER_BED";
+
+/// Whether the voice's environment says `on` for
+/// [`CUT_IN_OVER_BED_ENVIRONMENT`].
+pub fn cut_in_over_bed() -> bool {
+    std::env::var(CUT_IN_OVER_BED_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
 /// The window is bounded: the consecutive `Over` blocks that made the yield
 /// (its onset run, 7 or 10 blocks) and every block heard while the yield is
@@ -475,6 +489,14 @@ impl PlaybackMask {
     pub fn asker_level_db(&mut self, level: Option<f32>) {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.asker_db = level;
+        }
+    }
+    /// `LAMP_CUT_IN_OVER_BED=on` (#4868), and whether the room was busy as
+    /// the reply in hand began: see `Interruption::over_bed`. Set for every
+    /// block. Only with ears.
+    pub fn over_bed(&mut self, on: bool, busy: bool) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.interruption.over_bed(on, busy);
         }
     }
     /// How far under the asker the talk of the latest yield let go as the
@@ -2253,6 +2275,41 @@ mod tests {
         // No asker's level known, or the switch off: as before.
         assert_eq!(cut_in(true, None).0, [Step::Yield, Step::Commit]);
         assert_eq!(cut_in(false, Some(-12.0)).0, [Step::Yield, Step::Commit]);
+    }
+
+    /// #4868 (`LAMP_CUT_IN_OVER_BED=on`): the mask hands the switch and the
+    /// busy room to its yields: talk in the clear after a yield in a room
+    /// busy as the reply began resumes the answer at the yield's deadline;
+    /// in a quiet room, or without the switch, it commits as before.
+    #[test]
+    fn talk_over_a_room_busy_before_the_answer_resumes_it_with_the_switch() {
+        let cut_in = |on: bool, busy: bool| {
+            let mut mask = PlaybackMask::duplex();
+            mask.assume_matched();
+            mask.over_bed(on, busy);
+            let mut sequence = 1;
+            let mut steps = hear(
+                &mut mask,
+                &mut sequence,
+                ONSET,
+                0.9,
+                &evidence(0, OVER),
+                true,
+            );
+            hear(&mut mask, &mut sequence, 30, 0.1, &evidence(10, None), true);
+            steps.extend(hear(
+                &mut mask,
+                &mut sequence,
+                120,
+                0.9,
+                &evidence(40, None),
+                true,
+            ));
+            steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>()
+        };
+        assert_eq!(cut_in(true, true), [Step::Yield, Step::Resume]);
+        assert_eq!(cut_in(true, false), [Step::Yield, Step::Commit]);
+        assert_eq!(cut_in(false, true), [Step::Yield, Step::Commit]);
     }
 
     #[test]
