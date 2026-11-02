@@ -1575,6 +1575,8 @@ fn name_kept_with_face<'a>(
             .or_else(|| call.args.get("name").and_then(Value::as_str))
     })
     .flatten()
+    // As the eyes keep it: no Korean vocative ("민수야" is 민수).
+    .map(|name| crate::language::without_vocative(name, crate::language::at_start()))
 }
 
 fn run_call_with_scope(

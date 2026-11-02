@@ -3277,7 +3277,7 @@ impl Onboarding {
                 .flatten()
                 .map(str::trim)
                 .filter(|name| !name.is_empty() && name.len() <= 64)
-                .map(str::to_owned);
+                .map(|name| crate::language::without_vocative(name, self.language).to_owned());
             if led && step.reportable(outcome) {
                 self.nudge_record(!by_face, now_us);
                 if by_face {
@@ -5615,6 +5615,15 @@ mod tests {
         early.wait(20 * S, Some(NEAR_MIDDLE));
         assert_eq!(early.outcome(Step::WhoYouAre), Some(Outcome::Done));
         assert_eq!(early.walk.desired.owner.as_deref(), Some("Example Name"));
+        // In Korean the owner is kept without a vocative 야 (a Korean
+        // commenter's note on #4473): "민수야" is 민수, never "민수야 님".
+        let mut korean = Room::new("owner-ko");
+        korean.walk.language = Some(crate::language::Language::Korean);
+        face_saved(&korean.walk.file, Some("민수야"));
+        korean.wait(7 * S, Some(NEAR_MIDDLE));
+        korean.wait(20 * S, Some(NEAR_MIDDLE));
+        assert_eq!(korean.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(korean.walk.desired.owner.as_deref(), Some("민수"));
     }
 
     /// The onboarding forgets report (30 Oct), fix C: a face saved while
