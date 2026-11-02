@@ -1490,6 +1490,23 @@ struct Shared {
     /// A line whose words end before a name waits for it
     /// ([`Engine::waiting_for_a_name`]).
     open_name: bool,
+    /// A line ended by a confident verdict keeps its answer back for the
+    /// grace, and a line begun with the lamp's name is never held as a short
+    /// sound ([`Engine::joining_pauses`], `LAMP_ENDPOINT_PAUSE_JOIN`).
+    pause_join: bool,
+    /// The request whose answer's first sound is kept back, until when, and
+    /// once the grace is over whether it may go on (no newer line began in
+    /// it) ([`ProviderInput::PauseJoin`], [`Shared::kept_for_the_pause`]).
+    /// One slot is enough: only the turn in hand is ever kept, and a newer
+    /// `PauseJoin` comes only for a newer turn, whose `begin` already
+    /// dropped the older one's task (its `Turn`), so nothing still waits on
+    /// the slot it overwrites (Sixth's P3 on #4916).
+    pause_kept: Mutex<Option<(u64, tokio::time::Instant, Option<bool>)>>,
+    /// The request whose words a newer line cut short in its pause's grace
+    /// ([`Engine::cut_short`]): if that line is answered but not joined to
+    /// them (another person's), they are still answered, first, in its
+    /// answer ([`pause_join::EARLIER_LINE`], Sixth's P2 on #4916).
+    pause_cut: Mutex<Option<u64>>,
     /// A line that was only the lamp's name waits for the line after it,
     /// which is then said by it ([`Engine::carrying_the_name`]).
     name_carries: bool,
@@ -2379,6 +2396,12 @@ struct Carried {
     /// from them, never searching again from nothing (#5026, lamp-0529,
     /// 3 Nov: two searches and a page lost to a 0-word line).
     rounds: Vec<Message>,
+    /// Another person's words, cut short in their pause's grace and not
+    /// joined to these (`LAMP_ENDPOINT_PAUSE_JOIN`), oldest first: told
+    /// first, never joined, in the answer of whichever line answers these,
+    /// so a line that cuts these short in turn does not lose them again
+    /// (Seventh's P3 on #4916). Empty for any other words.
+    earlier: Vec<Part>,
 }
 
 /// Which request first tried `remember`, `forget` or `forget_everything`
@@ -2455,6 +2478,7 @@ impl Carried {
             unchecked: Vec::new(),
             memory_write_owner: WriteOwner::default(),
             rounds: Vec::new(),
+            earlier: Vec::new(),
         }
     }
 
@@ -3021,6 +3045,23 @@ fn name_first(text: &str) -> bool {
         && crate::attention::begins_with_the_name(text)
 }
 
+/// Whether a line begins with the lamp's name, set off as a call at its
+/// start ([`crate::attention::begins_with_the_name`]: "Lamp, …", "Hey Lamp
+/// …"), however many words follow: such a line is never held as a short
+/// sound (`LAMP_ENDPOINT_PAUSE_JOIN`, #4449: "Lamp, can you tell me", four
+/// words past the name, was). Never the name later in a line ("Turn the
+/// lamp off", a television's "…the lamp is…"), nor "Lamp is broken", where
+/// it is not set off. Its own check: [`name_first`] and [`NAME_FIRST_MORE`],
+/// the name's carry (`LAMP_SECOND_NAME_CARRIES`), stay as they are, and the
+/// rule still judges the line as before (a repeat of the line before's end
+/// stays no call, `LAMP_NAME_REPEAT_NOT_A_CALL`).
+fn name_at_start(text: &str) -> bool {
+    past_a_greeting(text)
+        .first()
+        .is_some_and(|first| first.eq_ignore_ascii_case(net::key_terms::NAME))
+        && crate::attention::begins_with_the_name(text)
+}
+
 /// Whether a line is whole as it is, so never waits for the line after it
 /// (`LAMP_SECOND_NAME_CARRIES`, El's P2 on the branch: "Lamp, stop."
 /// waited 2.5 s): a stop or "never mind" ([`says_stop`], the stop words'
@@ -3223,6 +3264,9 @@ impl Engine {
                 tools_journal: None,
                 keep_listener: false,
                 open_name: false,
+                pause_join: false,
+                pause_kept: Mutex::new(None),
+                pause_cut: Mutex::new(None),
                 name_carries: false,
                 name_waits: Mutex::new(None),
                 name_refused: Mutex::new(None),
@@ -3800,6 +3844,22 @@ impl Engine {
     pub fn waiting_for_a_name(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.open_name = on;
+        }
+        self
+    }
+
+    /// `LAMP_ENDPOINT_PAUSE_JOIN=on` (#4449): a line the coordinator ended
+    /// on a confident verdict ([`ProviderInput::PauseJoin`]) keeps its
+    /// answer's first sound back for the rest of
+    /// [`crate::pause_join::GRACE`] after its speech ended, its chat and
+    /// speech going on meanwhile, so a line set off in the grace cuts it
+    /// short with none of it heard and is joined to it (with
+    /// [`Self::joining_cut_words`]); and a line begun with the lamp's name
+    /// (set off first, [`name_at_start`]) is never held as a short sound,
+    /// however many words follow it. Before any turn only.
+    pub fn joining_pauses(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.pause_join = on;
         }
         self
     }
@@ -5157,6 +5217,28 @@ impl Engine {
                     }
                 }
             }
+            // Ended by a confident verdict (`LAMP_ENDPOINT_PAUSE_JOIN`): its
+            // answer's first sound waits for the rest of the grace.
+            ProviderInput::PauseJoin {
+                request, kept_ms, ..
+            } => {
+                if self.shared.pause_join
+                    && self
+                        .turn
+                        .as_ref()
+                        .is_some_and(|turn| turn.request == request)
+                    && let Ok(mut kept) = self.shared.pause_kept.lock()
+                {
+                    *kept = Some((
+                        request,
+                        tokio::time::Instant::now() + Duration::from_millis(kept_ms),
+                        None,
+                    ));
+                    eprintln!(
+                        "lamp-voice second: request {request}: ended by a confident verdict: its answer's first sound waits {kept_ms} ms more, for the line to go on (LAMP_ENDPOINT_PAUSE_JOIN)"
+                    );
+                }
+            }
             // The line has gone quiet for a moment: its words so far are
             // asked for, the stream kept open (`LAMP_SECOND_EARLY_FINALIZE`).
             // A pause that can't be queued only loses the time it saves.
@@ -5772,6 +5854,17 @@ impl Engine {
             "lamp-voice second: request {}: ended before its answer: a newer line began; its words wait for that line's verdict",
             carried.request
         );
+        // Cut in its pause's grace, its answer still kept back
+        // (`LAMP_ENDPOINT_PAUSE_JOIN`): never lost to another person's line.
+        let in_the_grace = self.shared.pause_join
+            && self.shared.pause_kept.lock().ok().is_some_and(|kept| {
+                kept.is_some_and(|(of, until, _)| {
+                    of == carried.request && tokio::time::Instant::now() < until
+                })
+            });
+        if let Ok(mut cut) = self.shared.pause_cut.lock() {
+            *cut = in_the_grace.then_some(carried.request);
+        }
         if let Ok(mut cut) = self.shared.cut.lock() {
             *cut = Some(carried);
         }
@@ -5966,6 +6059,38 @@ impl Shared {
     /// False once the engine is gone; the task then just ends.
     async fn emit(&self, event: ProviderOutput) -> bool {
         self.out.send(event).await.is_ok()
+    }
+
+    /// Waits while `request`'s answer is kept back for its pause's grace
+    /// (`LAMP_ENDPOINT_PAUSE_JOIN`, [`ProviderInput::PauseJoin`]), before
+    /// anything of the answer goes out or any of its calls runs, so its
+    /// words stay where a line begun in the grace finds them (`in_flight`)
+    /// and a half request never acts. At once for any other request, past
+    /// the grace, or with the switch off. Whether the request may go on:
+    /// `false` when a newer line began within its grace (that line has its
+    /// words: the half request says and does nothing more), decided once,
+    /// at the grace's end, for all of the request's waits. `true` for any
+    /// request never kept, and once its grace passed with no newer line.
+    async fn kept_for_the_pause(&self, request: u64) -> bool {
+        let until = match self.pause_kept.lock().ok().and_then(|kept| *kept) {
+            Some((of, _, Some(goes_on))) if of == request => return goes_on,
+            Some((of, until, None)) if of == request => until,
+            _ => return true,
+        };
+        tokio::time::sleep_until(until).await;
+        let newer = self
+            .begun
+            .lock()
+            .ok()
+            .and_then(|begun| *begun)
+            .is_some_and(|(latest, _)| latest > request);
+        let Ok(mut kept) = self.pause_kept.lock() else {
+            return !newer;
+        };
+        match kept.as_mut() {
+            Some((of, _, goes_on)) if *of == request => *goes_on.get_or_insert(!newer),
+            _ => !newer,
+        }
     }
 
     /// `then` with the search a push may end ([`Engine::stopping_searches_by_hand`]),
@@ -6920,10 +7045,14 @@ async fn spoken(
     let empty = text.trim().is_empty();
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
     // shows it was said to the lamp, so it is never held as a short sound.
+    // Nor, with `LAMP_ENDPOINT_PAUSE_JOIN`, a line begun with the name set
+    // off at its start, however many words follow it (#4449: "Lamp, can
+    // you tell me" was held so).
     let marked = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
         && !crate::not_speech::short_word(&text)
         && !name_waits
-        && name_of.is_none();
+        && name_of.is_none()
+        && !(shared.pause_join && name_at_start(&text));
     // A sound with a word in it, right after the lamp's own question in a
     // conversation going on, is the person's answer, as on the Live route
     // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as
@@ -7300,14 +7429,20 @@ async fn spoken(
                     unchecked: Vec::new(),
                     memory_write_owner: owner.clone(),
                     rounds,
+                    earlier: carried.earlier.clone(),
                 },
             );
             let lease = scope.clone();
+            // Another person's words the carried ones kept, cut short in
+            // their pause's grace (`LAMP_ENDPOINT_PAUSE_JOIN`): told first,
+            // and the line's keep is the room's (Seventh on #4916).
+            let earlier = told_earlier(&shared, request, lease.as_ref(), &carried.earlier);
             let notes = if refused {
                 vec![worker::NAME_THEN_HELD.to_owned()]
             } else {
                 Vec::new()
             };
+            let notes = earlier.into_iter().chain(notes).collect();
             tokio::join!(
                 though_held,
                 answer(
@@ -7413,6 +7548,12 @@ async fn spoken(
     // Words cut short by this line, the same person's: asked before its
     // own, as one line (`LAMP_JOIN_CUT_WORDS`).
     let own = own_part(request, &text, &marks);
+    // Another person's words the carried ones kept (`LAMP_ENDPOINT_PAUSE_JOIN`),
+    // still told first whether or not this line joins the carried words.
+    let kept_earlier = carried
+        .as_ref()
+        .map(|carried| carried.earlier.clone())
+        .unwrap_or_default();
     let (text, carried, parts) = match carried {
         Some(carried) if name_refused(&shared, request, &carried) => {
             (text, Some(carried), vec![own])
@@ -7437,6 +7578,45 @@ async fn spoken(
         }
         None => (text, None, vec![own]),
     };
+    // Words cut short in their pause's grace and not joined to this line,
+    // another person's: still answered, first, in this answer
+    // (`LAMP_ENDPOINT_PAUSE_JOIN`, Sixth's P2 on #4916), as the asker comes
+    // first without the switch.
+    let cut_in_the_grace = carried.as_ref().filter(|carried| {
+        shared
+            .pause_cut
+            .lock()
+            .ok()
+            .and_then(|mut cut| cut.take())
+            == Some(carried.request)
+            // A bare name is no question: the name's own rules hold it.
+            && !name_alone(&carried.text())
+    });
+    if let Some(carried) = cut_in_the_grace {
+        eprintln!(
+            "lamp-voice second: request {request}: not joined with request {}'s words, cut short in their pause's grace: the model is told to answer them first (LAMP_ENDPOINT_PAUSE_JOIN)",
+            carried.request
+        );
+    }
+    let cut_told = cut_in_the_grace.is_some();
+    let earlier_parts: Vec<Part> = kept_earlier
+        .into_iter()
+        .chain(
+            cut_in_the_grace
+                .into_iter()
+                .flat_map(|carried| carried.parts.clone()),
+        )
+        .collect();
+    // Told under this line's scope narrowed to the room's (Seventh's P2 on
+    // #4916): another person's "remember…" is never kept as this line's
+    // person's. The chat begun early was asked as theirs, so it is dropped.
+    let earlier = told_earlier(&shared, request, scope.as_ref(), &earlier_parts);
+    let earlier_told = earlier.is_some();
+    if earlier_told && prepared.take().is_some() {
+        eprintln!(
+            "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+        );
+    }
     // The first request answered after a misheard cut-in was hummed for,
     // within `NOTE_WITHIN_US`: the model is told it did not catch it, as the
     // Live worker tells it (`LAMP_MISHEARD_HUM`, #828). Once.
@@ -7598,6 +7778,7 @@ async fn spoken(
         .map(str::to_owned);
     let notes = stopped
         .into_iter()
+        .chain(earlier)
         .chain(pushed)
         .chain(misheard)
         .chain(staff)
@@ -7617,7 +7798,7 @@ async fn spoken(
         // (30 Oct, #3997's cut-in proposal).
         .chain(cut_in)
         .collect();
-    if let Some(carried) = carried {
+    if let Some(carried) = carried.filter(|_| !cut_told) {
         eprintln!(
             "lamp-voice second: request {}'s words, cut short, are let go: request {request} is answered",
             carried.request
@@ -7634,6 +7815,14 @@ async fn spoken(
             unchecked: Vec::new(),
             memory_write_owner: memory_write_owner.clone(),
             rounds: Vec::new(),
+            // The earlier words told first stay with these, never joined:
+            // a line that cuts this one short tells them again (Seventh's
+            // P3 on #4916).
+            earlier: if earlier_told {
+                earlier_parts
+            } else {
+                Vec::new()
+            },
         },
     );
     if let Some(heard) = &shared.words_heard {
@@ -7770,6 +7959,41 @@ fn asked_again_last(shared: &Shared, again: &str) -> bool {
         .is_ok_and(|said| said.1.trim() == again.trim())
 }
 
+/// What `request`'s answer is told of `earlier`, another person's words cut
+/// short in their pause's grace and not joined to its own
+/// ([`Carried::earlier`], `LAMP_ENDPOINT_PAUSE_JOIN`): to answer them first
+/// ([`crate::pause_join::earlier_line`]), those older than
+/// [`CHAIN_MOST_FOR`] let go. When it is told, `scope` is narrowed to the
+/// room's for the whole answer (Seventh's P2 on #4916): the line's lease is
+/// its person's, but the words may be a guest's, so a "remember my
+/// birthday is in May" said by them is never kept as that person's, as
+/// another voice in the conversation keeps nothing for them
+/// (`LAMP_PERSON_SCOPE_ONE_FACE`). None, and nothing narrowed, with none.
+fn told_earlier(
+    shared: &Shared,
+    request: u64,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    earlier: &[Part],
+) -> Option<String> {
+    let now = (shared.clock)();
+    let kept: Vec<Part> = earlier
+        .iter()
+        .filter(|part| now.saturating_duration_since(part.at) <= CHAIN_MOST_FOR)
+        .cloned()
+        .collect();
+    let words = words_of(&kept);
+    if words.is_empty() {
+        return None;
+    }
+    if let Some(scope) = scope {
+        scope.narrow_to_room();
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: told to answer first another person's words cut short in their pause's grace, its keep the room's (LAMP_ENDPOINT_PAUSE_JOIN)"
+    );
+    Some(crate::pause_join::earlier_line(&words))
+}
+
 /// `carried` in flight, its request recorded as asked
 /// ([`Shared::asked_last`]).
 /// A finished chat round of `request` (its calls and their results), kept
@@ -7886,7 +8110,10 @@ fn waiting_chain(request: u64, marks: &Marks, carried: &Carried, own: Part) -> C
             .after_end
             .is_some_and(|(of, gap)| of == carried.request && gap <= JOIN_WITHIN);
     if !linked {
-        return Carried::own(request, own.text, own.at, request);
+        return Carried {
+            earlier: carried.earlier.clone(),
+            ..Carried::own(request, own.text, own.at, request)
+        };
     }
     let mut chain = carried.clone();
     chain.unchecked.push((carried.request, request));
@@ -9697,6 +9924,9 @@ enum Stop {
 /// is kept in the thread, and it does not count as an answer for the
 /// announcement's spell.
 async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> {
+    if !shared.kept_for_the_pause(request).await {
+        return Err(Stop::Gone);
+    }
     // Its time counts in what was heard of the answer, with no words.
     shared.said_piece(request, None);
     if let Ok(mut only) = shared.wait_sound_only.lock() {
@@ -10736,6 +10966,18 @@ async fn answer(
                     names.join(", ")
                 );
             }
+            // No call runs while its pause's grace keeps the answer back
+            // (`LAMP_ENDPOINT_PAUSE_JOIN`, Reviewer-two on #4449): a line
+            // begun in it cuts this one short, and a half request never
+            // acts, as a chat begun early runs no tool
+            // (`LAMP_SECOND_PREPARED`).
+            if !calls.is_empty() && !shared.kept_for_the_pause(request).await {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: a line began in its pause's grace: none of its {} call(s) runs (LAMP_ENDPOINT_PAUSE_JOIN)",
+                    calls.len()
+                );
+                return Err(Stop::Gone);
+            }
             // A turn that called anything, a look by its call included, is no
             // holding answer (#1712; the peer read on #1986).
             if !calls.is_empty() {
@@ -11436,6 +11678,15 @@ async fn answer(
         // answer is silently dropped.
         let mut carried: Option<String> = None;
         while let Some((text, packets)) = queued.recv().await {
+            // Nothing of it goes out while its pause's grace keeps it back
+            // (`LAMP_ENDPOINT_PAUSE_JOIN`): a line begun meanwhile cuts it
+            // short unheard, and it says nothing more.
+            if !shared.kept_for_the_pause(request).await {
+                eprintln!(
+                    "lamp-voice second: request {request}: a line began in its pause's grace: none of its answer is said (LAMP_ENDPOINT_PAUSE_JOIN)"
+                );
+                return Err(Stop::Gone);
+            }
             // Its words, kept for a piece said with the next (#4338).
             let own = text.clone();
             // The announcement is heard, not written: the coordinator reads

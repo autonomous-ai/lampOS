@@ -789,6 +789,17 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// The request's line was ended by a confident verdict
+    /// (`LAMP_ENDPOINT_PAUSE_JOIN=on`, [`crate::pause_join`]), sent just
+    /// before its End, only then: the second route keeps its answer's first
+    /// sound back `kept_ms` more, so speech set off in the grace cuts it
+    /// short unheard and is joined to it. The Live worker takes nothing
+    /// from it.
+    PauseJoin {
+        request: u64,
+        privacy_generation: u64,
+        kept_ms: u64,
+    },
     /// The request in hand is onboarding's sentence (#1803), sent just
     /// after its Start: its words are counted by the coordinator and kept
     /// nowhere else, neither in the thread, the memory's journal nor a
@@ -863,6 +874,7 @@ impl ProviderInput {
             | Self::End { request, .. }
             | Self::Called { request, .. }
             | Self::Paused { request, .. }
+            | Self::PauseJoin { request, .. }
             | Self::CountOnly { request, .. }
             | Self::StepCall { request, .. }
             | Self::Onboarding { request, .. }
@@ -885,6 +897,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::Paused {
+                privacy_generation, ..
+            }
+            | Self::PauseJoin {
                 privacy_generation, ..
             }
             | Self::CountOnly {
@@ -6070,7 +6085,9 @@ impl InputHandoff {
         // the session acts on, so it moves no clock (the reviewer on #2102).
         if !matches!(
             command,
-            ProviderInput::Audio { .. } | ProviderInput::Paused { .. }
+            ProviderInput::Audio { .. }
+                | ProviderInput::Paused { .. }
+                | ProviderInput::PauseJoin { .. }
         ) {
             SUBMITTED_AT_US.store(now_us, std::sync::atomic::Ordering::Relaxed);
         }
@@ -6322,6 +6339,8 @@ impl InputHandoff {
             // The second route's (`LAMP_SECOND_EARLY_FINALIZE`): Live's
             // service ends its own turns.
             ProviderInput::Paused { .. } => {}
+            // The second route's (`LAMP_ENDPOINT_PAUSE_JOIN`).
+            ProviderInput::PauseJoin { .. } => {}
             // Onboarding's sentence (#1803): from now its words and the
             // answer to it are kept out of the thread.
             ProviderInput::CountOnly { .. } => {

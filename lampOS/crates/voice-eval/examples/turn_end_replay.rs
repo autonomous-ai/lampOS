@@ -5,7 +5,7 @@
 //! `cargo run --release -p lamp-voice-eval --example turn_end_replay --
 //!  MODEL CLIPS.json [--end-silence-ms 600] [--verdict-ms 130]
 //!  [--speech-level-db DB] [--faint-floor-db DB [--faint-hold-ms MS]]
-//!  [--unfinished-below P] [--unsure-ms MS]
+//!  [--unfinished-below P] [--unsure-ms MS] [--pause-join on]
 //!  --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short][:start] ...`
 //!
 //! `CLIPS.json` is `[{"id": "...", "wav": "/path.wav"}, ...]`, each a 16 kHz
@@ -25,7 +25,18 @@
 //! `unsure_ms`, after trimming), and a value out of their range is refused,
 //! not ignored: with either, every clip and profile is replayed twice, once
 //! as the profile is (`"dials": "before"`) and once with them
-//! (`"dials": "after"`). Prints one JSON
+//! (`"dials": "after"`). With `--pause-join on` a turn begun within the
+//! grace after a turn a confident verdict ended (`LAMP_ENDPOINT_PAUSE_JOIN`,
+//! #4449, by `lamp_voice::pause_join::paused_end` and `within`, set off
+//! when the detector starts the turn) is decided as the coordinator decides
+//! it while an answer waits: by 1 s after it was set off
+//! (`WAIT_KEEPS_FOR_US`) or the grace's decision point
+//! (`pause_join::decide_by`), whichever comes first, it is let go if it
+//! ended or has been quiet for 300 ms (`WAIT_QUIET_BLOCKS`) by then
+//! (`"let_go": true`, a turn of its own that is not answered), else it goes
+//! on from the turn before, one person assumed: the two are one turn, from
+//! the first's start to the second's end, `"joined"` counting the pieces
+//! joined into it. Prints one JSON
 //! line a clip and profile (and dials): each turn's start and end in milliseconds of
 //! the clip's own audio, and the decision that ended it. Nothing is played.
 use lamp_audio::{CAPTURE_SAMPLES, CaptureBlock};
@@ -48,6 +59,11 @@ use std::{
 };
 
 const BLOCK_US: u64 = 10_000;
+/// The coordinator's answer wait, as `--pause-join on` replays it: how long
+/// after it is set off a sound waits (`coordinator::WAIT_KEEPS_FOR_US`), and
+/// the pause that lets it go as quiet (`coordinator::WAIT_QUIET_BLOCKS`).
+const WAIT_KEEPS_FOR_US: u64 = 1_000_000;
+const WAIT_QUIET_BLOCKS: u16 = 30;
 const LEAD_BLOCKS: usize = 60;
 const TAIL_BLOCKS: usize = 250;
 /// -63 dBFS as the RMS of a uniform noise: 32768 * 10^(-63/20) * sqrt(3).
@@ -267,6 +283,7 @@ fn replay(
     end_silence_blocks: u16,
     delay: u64,
     room: Room,
+    pause_join: bool,
 ) -> Result<(Vec<Value>, Vec<Value>), Error> {
     let samples = match room.speech_level_db {
         Some(target) => scaled(samples, target),
@@ -297,8 +314,14 @@ fn replay(
         0,
     );
     let lead_us = (LEAD_BLOCKS as u64) * BLOCK_US;
-    let mut turns = Vec::new();
+    let mut turns: Vec<Value> = Vec::new();
     let mut started = None;
+    // When the last turn's speech ended, if a confident verdict ended it
+    // (`--pause-join on`); and for a turn set off in its grace, by when it
+    // is decided and, once decided, whether it goes on from it (`true`) or
+    // is let go (`false`).
+    let mut paused: Option<u64> = None;
+    let mut grace: Option<(u64, Option<bool>)> = None;
     for (index, chunk) in audio.chunks_exact(CAPTURE_SAMPLES).enumerate() {
         let mut block: CaptureBlock = [0; CAPTURE_SAMPLES];
         for (out, sample) in block.iter_mut().zip(chunk) {
@@ -324,6 +347,13 @@ fn replay(
         };
         match detector.push(frame, probability) {
             Activity::Start(prefix) => {
+                grace = paused
+                    .filter(|ended| lamp_voice::pause_join::within(*ended, at_us))
+                    .map(|ended| {
+                        let by = (at_us + WAIT_KEEPS_FOR_US)
+                            .min(lamp_voice::pause_join::decide_by(ended));
+                        (by, None)
+                    });
                 started = prefix
                     .first()
                     .map(|first| first.captured_at_us)
@@ -331,7 +361,7 @@ fn replay(
             }
             Activity::End(frame) => {
                 let decision = detector.last_endpoint();
-                turns.push(json!({
+                let mut turn = json!({
                     "start_ms": started.map(|start| (start as i64 - lead_us as i64) / 1000),
                     "end_ms": (frame.captured_at_us as i64 - lead_us as i64) / 1000,
                     "basis": decision.map(|decision| decision.basis),
@@ -340,11 +370,45 @@ fn replay(
                     "first_p": decision.and_then(|decision| decision.rechecked_from),
                     "short_asks": decision.map_or(0, |decision| decision.short_asks),
                     "speech_ms": decision.and_then(|decision| decision.speech_ms),
-                }));
+                });
+                // Ended before it was decided: let go, as a cough is.
+                let decided = grace.map(|(_, decided)| decided.unwrap_or(false));
+                match turns.last_mut() {
+                    Some(before) if decided == Some(true) => {
+                        turn["start_ms"] = before["start_ms"].clone();
+                        turn["joined"] = json!(before["joined"].as_u64().unwrap_or(1) + 1);
+                        *before = turn;
+                    }
+                    _ if decided == Some(false) => {
+                        turn["let_go"] = json!(true);
+                        turns.push(turn);
+                    }
+                    _ => {
+                        if pause_join {
+                            turn["joined"] = json!(1);
+                        }
+                        turns.push(turn);
+                    }
+                }
+                // A sound let go leaves the line before it kept as it was.
+                if decided != Some(false) {
+                    paused = lamp_voice::pause_join::paused_end(
+                        pause_join,
+                        decision,
+                        frame.captured_at_us,
+                    );
+                }
+                grace = None;
                 started = None;
             }
             Activity::Fault(why) => return Err(why.into()),
-            Activity::Quiet | Activity::Continue(_) => {}
+            Activity::Quiet | Activity::Continue(_) => {
+                if let Some((by, decided @ None)) = grace.as_mut()
+                    && at_us >= *by
+                {
+                    *decided = Some(detector.pause_blocks() < WAIT_QUIET_BLOCKS);
+                }
+            }
         }
     }
     let asked = asked
@@ -369,6 +433,7 @@ fn main() -> Result<(), Error> {
         faint_hold_ms: 0,
     };
     let mut dials = Dials::default();
+    let mut pause_join = false;
     let mut profiles = Vec::new();
     let mut flags = rest.iter();
     while let Some(flag) = flags.next() {
@@ -382,6 +447,7 @@ fn main() -> Result<(), Error> {
             "--speech-level-db" => room.speech_level_db = Some(value.parse()?),
             "--faint-floor-db" => room.faint_floor_db = Some(value.parse()?),
             "--faint-hold-ms" => room.faint_hold_ms = value.parse()?,
+            "--pause-join" => pause_join = lamp_voice::pause_join::enabled(Some(value.as_str())),
             "--unfinished-below" => {
                 dials.unfinished_below = Some(unfinished_below(value.trim()).ok_or_else(|| {
                     format!(
@@ -431,12 +497,16 @@ fn main() -> Result<(), Error> {
                     end_silence_blocks,
                     verdict_ms / 10,
                     room,
+                    pause_join,
                 )?;
                 let mut line = json!({"clip": id, "profile": profile.name, "audio_ms": samples.len() as u64 / 16, "turns": turns, "verdicts": asked});
                 if let Some(said) = said {
                     line["dials"] = json!(said);
                     line["unfinished_below"] = json!(policy.incomplete_probability);
                     line["unsure_ms"] = json!(u32::from(policy.uncertain_blocks) * 10);
+                }
+                if pause_join {
+                    line["pause_join"] = json!(true);
                 }
                 println!("{line}");
             }

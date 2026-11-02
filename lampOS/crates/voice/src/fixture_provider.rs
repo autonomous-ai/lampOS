@@ -441,6 +441,11 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::PauseJoin {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::CountOnly {
                 request,
                 privacy_generation,
@@ -552,6 +557,7 @@ impl FixtureProvider {
             // A note beside the request: the fixture has no model to tell.
             ProviderInput::Called { .. }
             | ProviderInput::Paused { .. }
+            | ProviderInput::PauseJoin { .. }
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. } => {}

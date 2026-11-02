@@ -176,3 +176,95 @@ fn only_a_call_whose_wait_ran_out_is_told_to_the_model() {
     assert_eq!(queue.len(), 64);
     assert!(note(Some(&waited), false, queue.len()).is_none());
 }
+
+/// `LAMP_ENDPOINT_PAUSE_JOIN` (#4449): only a line a confident verdict
+/// ended, with the switch, is kept back, for the rest of the grace from
+/// when its speech ended (the block that ended it less the 400 ms the
+/// commit waited); off, any other end, an offline turn, or a queue at its
+/// bound (the End's slot) sends nothing.
+#[test]
+fn only_a_confident_end_keeps_its_answer_back_for_the_grace() {
+    let end = |basis| crate::activity::EndpointDecision {
+        basis,
+        silence_ms: 400,
+        probability: Some(0.98),
+        fallback: None,
+        verdict: None,
+        call_wait_ms: None,
+        short_asks: 0,
+        speech_ms: None,
+        rechecked_from: None,
+        unfinished_wait_ms: None,
+    };
+    let (confident, other) = (end("model_complete"), end("silence_fallback"));
+    let note = |on, decision, local_only, queued| {
+        pause_join_note(
+            on,
+            decision,
+            7,
+            local_only,
+            3,
+            (10_000_000, 10_150_000),
+            (queued, 64),
+        )
+    };
+    // Speech ended at 9.6 s; told at 10.15 s: 950 ms of the 1.5 s are left.
+    assert!(matches!(
+        note(true, Some(&confident), false, 63),
+        Some((
+            ProviderInput::PauseJoin {
+                request: 7,
+                privacy_generation: 3,
+                kept_ms: 950,
+            },
+            9_600_000
+        ))
+    ));
+    assert!(note(false, Some(&confident), false, 0).is_none(), "off");
+    assert!(note(true, Some(&other), false, 0).is_none());
+    assert!(note(true, None, false, 0).is_none());
+    assert!(note(true, Some(&confident), true, 0).is_none(), "offline");
+    assert!(
+        note(true, Some(&confident), false, 64).is_none(),
+        "the End's slot"
+    );
+}
+
+/// `LAMP_ENDPOINT_PAUSE_JOIN` (Sixth's P3 on #4916): a sound set off in the
+/// grace is heard as any sound while an answer waits, so a cough that ended
+/// or went quiet is let go and the kept answer goes on; one still waiting
+/// at the grace's decision point (1.4 s after the line's speech ended) is
+/// let go when quiet for 300 ms, else it takes the turn then, while the
+/// answer is still kept back. Any other verdict stands as judged.
+#[test]
+fn a_sound_in_the_grace_is_decided_by_its_end_and_a_cough_let_go() {
+    let speech_end = 10_000_000;
+    let by = crate::pause_join::decide_by(speech_end);
+    assert_eq!(by, 11_400_000);
+    // Before the decision point: as judged.
+    for judged in [
+        WhileAnswerWaits::Wait,
+        WhileAnswerWaits::Decide,
+        WhileAnswerWaits::LetGo("ended"),
+    ] {
+        assert_eq!(in_the_grace(judged, speech_end, 0, by - 1), judged);
+    }
+    // At it: still talking takes the turn; quiet for 300 ms is let go.
+    assert_eq!(
+        in_the_grace(WhileAnswerWaits::Wait, speech_end, 5, by),
+        WhileAnswerWaits::Decide
+    );
+    assert_eq!(
+        in_the_grace(WhileAnswerWaits::Wait, speech_end, WAIT_QUIET_BLOCKS, by),
+        WhileAnswerWaits::LetGo("quiet")
+    );
+    // A cough that ended is let go however late.
+    assert_eq!(
+        in_the_grace(WhileAnswerWaits::LetGo("ended"), speech_end, 0, by + 1),
+        WhileAnswerWaits::LetGo("ended")
+    );
+    assert_eq!(
+        in_the_grace(WhileAnswerWaits::Stop, speech_end, 0, by),
+        WhileAnswerWaits::Stop
+    );
+}

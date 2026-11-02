@@ -90,6 +90,7 @@ pub mod mic_holder;
 pub mod misheard_hum;
 pub mod motion_voice;
 pub mod owner_place;
+pub mod pause_join;
 pub mod person;
 pub mod photo_faces;
 pub mod remember_speaker;
