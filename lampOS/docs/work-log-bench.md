@@ -1,5 +1,51 @@
 # Bench work log
 
+## 2 November 2026: #4753 rebuilt on lamp-voice, malformed-answer fix folded
+
+Ready for lamp-voice: waits on two reads.
+
+The branch `bench/memory-bench` is now `c9d262f9b3ef8b21796c2684c4525e38857a62c0`,
+four commits on `825217332`:
+
+1. The bench's own patch as one commit. Its 32 commits were folded on lamp-voice,
+   and what #4752 already landed was left out. The bench paths match
+   `f17c747a0` byte for byte. Only the bench line was added to `Cargo.toml`, and
+   only the bench entry to `Cargo.lock`.
+2. and 3. The first builder's `b2be65f11` and `15d0ac611`, cherry-picked
+   unchanged. An empty, whitespace, non-JSON or out-of-bounds answer is now a
+   recorded malformed answer, as is one cut off by a non-stop finish. Its
+   question scores 0 with audit, and malformed judge replies do too. Both are
+   counted on the card. The policy's `evaluation_sha256` changes. These came
+   after live run 1 hit a whitespace answer. They change how a broken reply is
+   recorded, not any question or rubric.
+4. The Lead's 2 November ruling, made before any Tiers score exists: a run is
+   invalid for the score when `stats.topic_fallbacks` × 10 >
+   `stats.topic_batches`. Its score is null, its ledger is kept, and it adds to
+   no three-run mean. The card shows both counts. The bench reads them from one
+   inspection at the end of the month. The adapter pair is Tiers `ef6e266b8`
+   (#4783).
+
+Two `live_campaign` fake-service tests failed on the office iMac at `f17c747a0`.
+They do not fail elsewhere: all 9 passed on Mac 1 (twice) and on ARM64 CI run
+41285942021 at `f17c747a0`. That run's red came from other crates' tests. The
+cause on the iMac is not known. The client sets `no_proxy`, so a system proxy
+is not the cause.
+
+`first/bench-launcher` (`36c3579aa`) stays out of #4753. It is a
+`crates/voice` example, which this role may not change. It belongs in its own
+pull request from the voice side.
+
+Gates on Mac 1, rustc 1.97.1, from `lampOS/`:
+- `cargo fmt --all --check`: pass.
+- `cargo clippy -p lamp-memory-bench --all-targets -- -D warnings`: pass.
+- `cargo test -p lamp-memory-bench`: 163 passed, 0 failed.
+- `cargo build --workspace`: pass.
+
+Exact-head CI: Linux clippy 41381146263 passed. ARM64 41381146207 passed.
+
+Not shown: no live call, spending or device action from this session. The
+preliminary numbers on #4753 are the first builder's runs.
+
 ## 1 November 2026: preliminary one-run kind and lamp runbook
 
 Ready for lamp-voice: no
