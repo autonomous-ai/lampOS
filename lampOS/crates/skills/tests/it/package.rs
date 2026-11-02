@@ -777,7 +777,7 @@ fn a_skill_whose_tool_another_skill_has_is_not_installed() {
     let said = package::install(&skills, None, &tutor(&dir.path().join("one"), "1.0.0")).unwrap();
     assert!(
         said.ends_with(
-            "The skills here give the model 2 functions (dance, check_my_work). A session takes 32, \
+            "The skills here give the model 2 functions (check_my_work, dance). A session takes 32, \
              the voice's own and the actions part's first (30 on a product lamp), and past 32 the \
              last are dropped unless the voice runs with LAMP_USE_SKILL=on (every skill through \
              one function, use_skill)."

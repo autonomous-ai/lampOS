@@ -2166,7 +2166,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
     // Not feeling well came with the product after its lamp check (#1681);
-    // the eight of PRODUCT_SKILLS_OFF come installed disabled; the startle
+    // the seven of PRODUCT_SKILLS_OFF come installed disabled; the startle
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
     // Head pat and its wiggle since #4133's design owner's yes (29 Oct).
     assert_eq!(installed.len(), 28);
@@ -2194,11 +2194,11 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The nineteen live skills (with music sway and
+    // contribute functions. The twenty live skills (with music sway and
     // watch you leave since #2834, and Head pat and its wiggle, which declare
     // none) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
-    // wellbeing nudges' one wellbeing_nudges (since 25 Oct).
+    // wellbeing nudges' one wellbeing_nudges (since 25 Oct), and Pose's set_pose (#4135).
     let inventory = lamp_skills::load_each(&root);
     assert_eq!(inventory.len(), 28);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
@@ -2217,16 +2217,16 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
             .last()
             .unwrap()
             .starts_with(
-                "The skills here give the model 3 functions (dance, prepare_to_unplug, wellbeing_nudges)."
+                "The skills here give the model 4 functions (dance, prepare_to_unplug, set_pose, wellbeing_nudges)."
             ),
         "{listed}"
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 19);
+    assert_eq!(live.len(), 20);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
-    // function, its tool or not: the 3 above are all a session is told.
+    // function, its tool or not: the 4 above are all a session is told.
     for (name, _) in install::PRODUCT_SKILLS_OFF {
         let skill = installed.iter().find(|skill| skill.name == *name).unwrap();
         assert!(!skill.enabled, "{name}");

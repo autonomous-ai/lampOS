@@ -39,11 +39,12 @@ const UNPLUG: &str = "unplug: ";
 /// onboarding's two and memory's `forget_everything` since 25 Oct,
 /// reports' `reports_stop` and `reports_state` since #2862, and a made
 /// skill's `make_skill` and `put_on_made_skill` since fourteen-P15), the
-/// actions part's 17 and the skills' 1 (Dance's `dance`), before the search
+/// actions part's 17 and the skills' 2 (Dance's `dance` and, since #4135,
+/// Pose's `set_pose`), before the search
 /// and the look. The test prints this split. A change to it
 /// is a change to what every session is told: say in its pull request what
 /// is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 39;
+const PRODUCT_FUNCTIONS: usize = 40;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
@@ -310,7 +311,7 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
             .any(|name| name == lamp_voice::second_provider::net::search::FETCH),
         "{chat:?}"
     );
-    assert_eq!(skill_tools, ["dance"]);
+    assert_eq!(skill_tools, ["dance", "set_pose"]);
     assert!(chat.iter().any(|name| name == "dance"), "{chat:?}");
     assert!(
         chat.iter()
@@ -352,7 +353,7 @@ fn with_reports_on_dance_stays_at_the_bound() {
         chat,
         ..
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
-    assert_eq!(skill_tools, ["dance"]);
+    assert_eq!(skill_tools, ["dance", "set_pose"]);
     assert!(
         chat.len() > lamp_gemini::MAX_TOOLS && chat.len() <= lamp_voice::second_provider::MAX_TOOLS,
         "{chat:?}"
