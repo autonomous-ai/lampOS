@@ -6613,6 +6613,20 @@ fn conversation_with_gate_inner(
                 "words_asked_after_quiet_blocks":wait_words.is_some().then_some(crate::wait_words::ASK_AFTER_QUIET_BLOCKS)}),
         )?;
     }
+    // Over a room busy as the answer began, sound alone ends no answer
+    // (#4868, `LAMP_CUT_IN_OVER_BED=on`): a stop word, a forced yield, the
+    // lamp's name, a tap or the button do. Off unless set.
+    let cut_in_over_bed = duplex && crate::turn_taking::cut_in_over_bed();
+    if cut_in_over_bed {
+        eprintln!(
+            "lamp-voice: cut-ins over a bed: in a room busy as the answer began, talk alone ends no answer, only a stop word, the lamp's name, a tap or the button{}",
+            if stop_words.is_some() {
+                ""
+            } else {
+                "; LAMP_STOP_WORDS is off, so a spoken stop ends it only through lamp-name's stop"
+            }
+        );
+    }
     // A backchannel held as a yield (#2939, `LAMP_BACKCHANNEL_HOLDS=on`):
     // only with a yield's words heard (`LAMP_STOP_WORDS=heard` or
     // `heard-always`).
@@ -8753,6 +8767,14 @@ fn conversation_with_gate_inner(
                             lamp_began,
                         )
                     }),
+            );
+            // Over a room busy as this reply began, sound alone commits no
+            // cut-in (#4868).
+            playback_mask.over_bed(
+                cut_in_over_bed,
+                reply
+                    .as_ref()
+                    .is_some_and(|current| own_line_busy == Some((current.owner.turn(), true))),
             );
             // The level of the person this reply answers, for cut-ins near
             // them (#3967): `asker_first`'s, of this reply's own turn only.

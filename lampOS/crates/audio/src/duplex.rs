@@ -178,7 +178,8 @@ pub struct Confirmation {
     pub silence_blocks: u8,
     /// Blocks after which an undecided yield is given up.
     pub deadline_blocks: u16,
-    /// Plain blocks, in the run that made the lamp yield and after it, with
+    /// Plain blocks, in the run that made the lamp yield and after it (only
+    /// that run with `LAMP_CUT_IN_OVER_BED=on`, [`Interruption::over_bed`]), with
     /// which a yield that ends in stillness is an interruption all the same.
     pub plain_blocks: u8,
     /// Consecutive [`Heard::Over`] blocks that make the lamp yield while it
@@ -283,6 +284,9 @@ pub struct Interruption {
     /// The speech in the clear of the yield in force is talk well under the
     /// person the lamp is answering ([`Self::quiet_talk`], #3967).
     quiet_talk: bool,
+    /// `LAMP_CUT_IN_OVER_BED=on` (#4868): see [`Self::over_bed`].
+    onset_plain_only: bool,
+    over_bed: bool,
 }
 
 /// How long a yield's commit is held for its words once they have been
@@ -319,6 +323,8 @@ impl Interruption {
             speech_at_ask: None,
             held: 0,
             quiet_talk: false,
+            onset_plain_only: false,
+            over_bed: false,
         }
     }
 
@@ -428,6 +434,19 @@ impl Interruption {
         self.quiet_talk = quiet && self.yielded();
     }
 
+    /// `LAMP_CUT_IN_OVER_BED=on` (#4868), `on`: stillness commits a yield
+    /// only on the plain blocks of the run that made it, not on plain
+    /// blocks after it: once the lamp has yielded, the render is silent and
+    /// its own tail is heard as a person, plainly. With `busy`, the room was
+    /// busy as the reply began, and sound alone commits nothing: a bed of
+    /// talk never stops, so neither speech in the clear nor stillness after
+    /// plain blocks ends the reply; a stop word and a forced yield still
+    /// do. Set before each block; off, nothing changes.
+    pub fn over_bed(&mut self, on: bool, busy: bool) {
+        self.onset_plain_only = on;
+        self.over_bed = on && busy;
+    }
+
     /// Blocks of stillness in a row in the yield in force, while one is.
     pub fn still_blocks(&self) -> Option<u8> {
         match self.state {
@@ -509,7 +528,9 @@ impl Interruption {
                     }
                     Heard::Still => *still = still.saturating_add(1),
                     // The person going on over the lamp's dying sound.
-                    Heard::Over => *seen = seen.saturating_add(u8::from(plain)),
+                    Heard::Over => {
+                        *seen = seen.saturating_add(u8::from(plain && !self.onset_plain_only));
+                    }
                     // The lamp's own sound is still dying away: no evidence.
                     Heard::Under | Heard::Own | Heard::Unknown => {}
                 }
@@ -524,7 +545,9 @@ impl Interruption {
                 let after_words = speech.saturating_sub(self.speech_at_words);
                 // Talk well under the asker commits nothing (#3967): the
                 // room behind them, not someone cutting in.
-                let room_behind = self.quiet_talk && !self.forced_yield;
+                // Nor does sound alone over a room busy before the reply
+                // (#4868).
+                let room_behind = (self.quiet_talk || self.over_bed) && !self.forced_yield;
                 let due = self.stop_heard
                     || (!room_behind
                         && if self.holds_backchannels && self.backchannel == Some(true) {
@@ -910,6 +933,103 @@ mod tests {
         room.quiet_talk(true);
         yielded(&mut room);
         assert_eq!(run(&mut room, &[(Heard::Clear, 6)]), [(5, Step::Commit)]);
+    }
+
+    /// `LAMP_CUT_IN_OVER_BED` (#4868): blocks heard with the switch `on`
+    /// and the room `busy` as the reply began, set before each block as the
+    /// voice does; each block is (heard, plain, count).
+    fn over_bed(
+        interruption: &mut Interruption,
+        on: bool,
+        busy: bool,
+        blocks: &[(Heard, bool, usize)],
+    ) -> Vec<(usize, Step)> {
+        let mut steps = Vec::new();
+        let mut index = 0;
+        for &(heard, plain, count) in blocks {
+            for _ in 0..count {
+                interruption.over_bed(on, busy);
+                match interruption.observe(heard, plain, true) {
+                    Step::Carry => {}
+                    step => steps.push((index, step)),
+                }
+                index += 1;
+            }
+        }
+        steps
+    }
+
+    /// A bed of talk over the lamp: plain over it, its own sound dying
+    /// away, then speech in the clear that never stops.
+    const BED: [(Heard, bool, usize); 4] = [
+        (Heard::Own, false, 40),
+        (Heard::Over, true, 16),
+        (Heard::Under, false, 25),
+        (Heard::Clear, false, 200),
+    ];
+
+    #[test]
+    fn over_a_room_busy_before_the_reply_a_bed_of_talk_commits_nothing() {
+        let mut bed = Interruption::new(Confirmation::EVALUATED);
+        let steps = over_bed(&mut bed, true, true, &BED);
+        // The yield's deadline resumes it, and nothing commits.
+        assert_eq!(steps[0], (39 + ONSET, Step::Yield));
+        assert_eq!(steps[1], (39 + ONSET + 110, Step::Resume));
+        assert!(steps.iter().all(|(_, step)| *step != Step::Commit));
+    }
+
+    #[test]
+    fn with_the_over_bed_switch_the_lamps_own_tail_after_a_yield_commits_nothing() {
+        // Late in a reply, seven plain blocks make the lamp yield; its own
+        // tail, plain once the render is silent, follows; then nobody.
+        let tail = [
+            (Heard::Own, false, 130),
+            (Heard::Over, true, LATE),
+            (Heard::Over, true, 12),
+            (Heard::Still, false, 45),
+        ];
+        let mut on = Interruption::new(Confirmation::EVALUATED);
+        let yielded = 130 + LATE - 1;
+        assert_eq!(
+            over_bed(&mut on, true, false, &tail),
+            [(yielded, Step::Yield), (yielded + 12 + 40, Step::Resume)]
+        );
+        // Off, the tail's plain blocks add up to an interruption.
+        let mut off = Interruption::new(Confirmation::EVALUATED);
+        assert_eq!(
+            over_bed(&mut off, false, false, &tail),
+            [(yielded, Step::Yield), (yielded + 12 + 40, Step::Commit)]
+        );
+    }
+
+    #[test]
+    fn over_a_bed_of_talk_a_stop_word_still_ends_the_reply() {
+        let mut stop = Interruption::new(Confirmation::EVALUATED);
+        let steps = over_bed(&mut stop, true, true, &BED[..3]);
+        assert_eq!(steps, [(39 + ONSET, Step::Yield)]);
+        assert_eq!(
+            over_bed(&mut stop, true, true, &[(Heard::Clear, false, 20)]),
+            []
+        );
+        stop.words(true, false);
+        assert_eq!(
+            over_bed(&mut stop, true, true, &[(Heard::Clear, false, 1)]),
+            [(0, Step::Commit)]
+        );
+    }
+
+    #[test]
+    fn without_the_over_bed_switch_a_bed_of_talk_commits_as_before() {
+        let mut bed = Interruption::new(Confirmation::EVALUATED);
+        let steps = over_bed(&mut bed, false, true, &BED);
+        assert_eq!(steps[..2], [(39 + ONSET, Step::Yield), (86, Step::Commit)]);
+    }
+
+    #[test]
+    fn with_the_over_bed_switch_a_quiet_room_still_commits_to_a_person() {
+        let mut person = Interruption::new(Confirmation::EVALUATED);
+        let steps = over_bed(&mut person, true, false, &BED);
+        assert_eq!(steps[..2], [(39 + ONSET, Step::Yield), (86, Step::Commit)]);
     }
 
     /// #828, step 2: a yield that waits for the words said in it. A short

@@ -458,6 +458,25 @@ lamp-52e6 on 29 Oct (8474) two people talking with office noise 7 dB under
 the asker cut a long answer within about 40 s (`duplex_commit` 343 ms
 after its yield, `hearing_margin_db` 3.9).
 
+**With `LAMP_CUT_IN_OVER_BED=on` (#4868, off unless set), over a room
+busy as the answer began, sound alone ends nothing.** A television or two
+people talking are speech-like all the time, so once the lamp has yielded
+and its render has been quiet 30 blocks, the bed is `Clear` and commits at
+its sixth such block: no count of speech tells a bed from a person. With
+the switch, when the room was busy as the reply began (`busy_lately`,
+the voice's `own_line_busy`, taken once per reply), neither talk in the
+clear nor stillness after plain blocks commits a yield
+(`Interruption::over_bed` in `lamp-audio`): it resumes at stillness or its
+1.1 s deadline, counted as any fruitless yield. A stop word
+(`LAMP_STOP_WORDS=heard`), a forced yield, the lamp's name, a head tap or
+the button still stop the answer; without a word listener a bare "Stop."
+over a bed does not. In any room the switch also counts toward the
+stillness rule only the plain blocks of the run that made the lamp yield:
+after it the render at the alignment is silent, so the lamp's own tail,
+still arriving for up to about 270 ms, is plain by construction, and on
+lamp-4ace that tail and 40 still blocks ended an answer with nobody
+speaking. In a quiet room the speech rule commits as before.
+
 **With `LAMP_CUT_IN_COUNTS_REAL=on` (#2602, off unless set), only the
 lamp's own voice counts as a fruitless yield.** A resume counts toward
 `FRUITLESS_YIELDS` only when its yield's evidence window points at the
@@ -1337,6 +1356,12 @@ functions:
 | `with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in` | With the switch: 3,000 blocks of the lamp's own voice, a 25-block word, and 1,000 blocks of voice unexplained before the lamp's sound is found again after a third aside, none a yield |
 | `with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more` | With the switch: four tries that resume cost two more yields, then none |
 | `talk_well_under_the_asker_is_the_rooms_and_resumes_the_answer` (`turn_taking.rs`) | `LAMP_CUT_IN_NEAR_ASKER=on`: talk 8 dB under the asker resumes the answer, 2 dB under commits; no asker's level, or the switch off, commits |
+| `over_a_room_busy_before_the_reply_a_bed_of_talk_commits_nothing` | `LAMP_CUT_IN_OVER_BED=on`, the room busy: a bed of talk after a yield resumes at the deadline, no commit |
+| `with_the_over_bed_switch_the_lamps_own_tail_after_a_yield_commits_nothing` | With the switch: plain blocks after a seven-block yield, then stillness, resume; off, they commit |
+| `over_a_bed_of_talk_a_stop_word_still_ends_the_reply` | With the switch, the room busy: a stop word commits the yield at its next block |
+| `without_the_over_bed_switch_a_bed_of_talk_commits_as_before` | The switch off: the bed commits at its sixth block in the clear |
+| `with_the_over_bed_switch_a_quiet_room_still_commits_to_a_person` | With the switch, a quiet room: a person commits at the sixth block in the clear |
+| `talk_over_a_room_busy_before_the_answer_resumes_it_with_the_switch` (`turn_taking.rs`) | The mask hands the switch and the busy room to its yields |
 | `with_counts_real_two_plain_asides_leave_a_third_line_heard` | `LAMP_CUT_IN_COUNTS_REAL=on`: two asides heard plainly, then a third line 5 s after, which commits and ends the story; off, not heard |
 | `with_counts_real_the_lamps_own_voice_twice_still_falls_back` | With the switch: two yields whose windows the render mostly explains count, and a third line 5 s after makes no yield |
 | `with_counts_real_unknown_alone_is_not_the_lamps_own_voice` | With the switch: two yields with plain onsets and 60 `Unknown` blocks after don't count as the lamp's own voice, and the third line commits |
