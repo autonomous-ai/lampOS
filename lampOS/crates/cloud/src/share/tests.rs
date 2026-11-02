@@ -56,6 +56,24 @@ fn store(status: u16, body: &'static str) -> (Store, mpsc::Receiver<(String, Vec
     )
 }
 
+/// The SHA-256 a preview of `name` gives, as the app sends it with Send.
+fn previewed(places: &crate::skills::Places, name: &str, at: &str) -> String {
+    let nowhere = Store {
+        base: "http://127.0.0.1:9".into(),
+        key: "k-secret".into(),
+    };
+    share(
+        &nowhere,
+        places,
+        &json!({"name": name, "preview": true}),
+        &scratch(at),
+    )
+    .unwrap()["preview"]["sha256"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
 fn scratch(name: &str) -> PathBuf {
     let dir = PathBuf::from(format!("/tmp/lcsh-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
@@ -186,7 +204,7 @@ fn share_uploads_the_package_with_the_lamps_key_and_reads_back_pending() {
     let sent = share(
         &store,
         &places,
-        &json!({"name": "water", "author": "Lan"}),
+        &json!({"name": "water", "author": "Lan", "sha256": previewed(&places, "water", "up-seen")}),
         &scratch("up"),
     )
     .unwrap();
@@ -243,7 +261,12 @@ fn the_stores_refusals_are_passed_on_in_plain_words_never_the_key() {
         r#"{"status":0,"message":"Request failed","error_code":"skill_name_taken"}"#,
     );
     assert_eq!(
-        share(&taken, &places, &json!({"name": "water"}), &scratch("no")),
+        share(
+            &taken,
+            &places,
+            &json!({"name": "water", "sha256": previewed(&places, "water", "no-seen")}),
+            &scratch("no")
+        ),
         Err("the Skills Store said: skill_name_taken".into())
     );
     // A refusal the Store gives with a 200 and "status": 0 is one too.
@@ -252,7 +275,12 @@ fn the_stores_refusals_are_passed_on_in_plain_words_never_the_key() {
         r#"{"status":0,"message":"Request failed","error_message":"3 are waiting already"}"#,
     );
     assert_eq!(
-        share(&full, &places, &json!({"name": "water"}), &scratch("no2")),
+        share(
+            &full,
+            &places,
+            &json!({"name": "water", "sha256": previewed(&places, "water", "no2-seen")}),
+            &scratch("no2")
+        ),
         Err("the Skills Store said: 3 are waiting already".into())
     );
 }
@@ -332,6 +360,57 @@ fn a_preview_shows_the_text_that_would_leave_and_sends_nothing() {
             .iter()
             .all(|file| !file["path"].as_str().unwrap().starts_with('.'))
     );
+    assert_eq!(answer["preview"]["sha256"].as_str().unwrap().len(), 64);
+}
+
+/// The Reviewer-lead's P2 on #4948: the lamp sends only the bytes the owner
+/// saw. A send with no SHA-256, or with the one of a skill since changed,
+/// sends nothing; the same files give the same SHA-256 again.
+#[test]
+fn a_share_sends_only_the_package_its_preview_showed() {
+    let places = places("share-seen");
+    skill(&places, "water", "Water", "made: here\n", MADE);
+    let first = previewed(&places, "water", "seen-1");
+    assert_eq!(first, previewed(&places, "water", "seen-2"));
+    let (store, sent) = store(
+        201,
+        r#"{"status":1,"data":{"id":"s1","name":"water","version":"1.0.0","review_status":"pending"}}"#,
+    );
+    assert_eq!(
+        share(
+            &store,
+            &places,
+            &json!({"name": "water"}),
+            &scratch("seen-none")
+        ),
+        Err(NOT_SEEN.into())
+    );
+    // Made again between the preview and Send: another package.
+    let folder = places.folder.join("water");
+    let toml = fs::read_to_string(folder.join("skill.toml")).unwrap();
+    fs::write(folder.join("skill.toml"), format!("{toml}\n# changed\n")).unwrap();
+    assert_eq!(
+        share(
+            &store,
+            &places,
+            &json!({"name": "water", "sha256": first}),
+            &scratch("seen-stale")
+        ),
+        Err(CHANGED.into())
+    );
+    assert!(sent.try_recv().is_err(), "nothing was sent");
+    let now = previewed(&places, "water", "seen-3");
+    assert!(
+        share(
+            &store,
+            &places,
+            &json!({"name": "water", "sha256": now}),
+            &scratch("seen-ok")
+        )
+        .unwrap()
+        .get("sent")
+        .is_some()
+    );
 }
 
 #[test]
@@ -343,7 +422,7 @@ fn a_sent_answer_with_no_id_is_unread_not_sent() {
         share(
             &store,
             &places,
-            &json!({"name": "water"}),
+            &json!({"name": "water", "sha256": previewed(&places, "water", "unread-seen")}),
             &scratch("unread")
         ),
         Err(UNREAD.into())
