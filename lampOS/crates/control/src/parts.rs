@@ -118,10 +118,32 @@ pub const MUTE_BEING_TAKEN: &str = "this computer's mute is still being taken by
 /// Where the events of actions that end later go: the client, and the
 /// event (`done`).
 pub type Events = Arc<dyn Fn(&str, Value) + Send + Sync>;
-/// Where a client's binary camera frames go (`crate::camera`'s fast stream):
-/// the client, the turn of the stream that made it (`Camera::streaming`), and
-/// the frame.
-pub type Binary = Arc<dyn Fn(&str, u64, &[u8]) + Send + Sync>;
+/// Where a client's binary frames go (`crate::camera`'s fast stream and
+/// `crate::microphone`'s blocks): whether every connection of the client
+/// had room for it.
+/// A binary frame for a client: its kind, the turn of the stream that made
+/// it (a camera stream's, #5881, or a microphone stream's), and the bytes. A
+/// queued frame goes only while that very stream runs (Second's P1 on #5839).
+pub type Binary = Arc<dyn Fn(&str, Media, Option<u64>, &[u8]) -> bool + Send + Sync>;
+
+/// What a binary frame carries: a camera picture or a microphone block.
+/// Each goes only to a connection whose computer holds its grant, and a
+/// queued one only while that computer's stream of it still runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Media {
+    Camera,
+    Microphone,
+}
+
+impl Media {
+    /// The grant its frames need.
+    pub fn grant(self) -> crate::protocol::Grant {
+        match self {
+            Self::Camera => crate::protocol::Grant::Camera,
+            Self::Microphone => crate::protocol::Grant::Microphone,
+        }
+    }
+}
 
 /// Something a light request can be published on: the bus, or a test's
 /// list.
@@ -181,6 +203,8 @@ pub struct Lamp {
     says: Says,
     /// The number the next say is kept under.
     next_say: u64,
+    /// The microphone, the ears' blocks on the bus; none without the bus.
+    microphone: Option<crate::microphone::Microphone>,
 }
 
 /// What each computer has going on the voice.
@@ -280,6 +304,7 @@ impl Lamp {
             actions: None,
             says: Says::default(),
             next_say: 0,
+            microphone: None,
         }
     }
 
@@ -353,6 +378,43 @@ impl Lamp {
                 "the speaker's volume: an answer it can't read",
             )
         })
+    }
+
+    /// `microphone.stream` from the ears' blocks that `listen` opens, its
+    /// blocks sent through `sink`, only when `switched` on (the owner's
+    /// `--microphone on`), and never while `watch` says the lamp is private,
+    /// more than one person is in view, or the room is unseen (no fresh
+    /// face count): after [`Self::watching`], as [`Self::seeing`]. Without a
+    /// watch the lamp is taken as private and the room as unseen.
+    pub fn hearing(
+        mut self,
+        listen: crate::microphone::Listen,
+        (mark, drawn): (crate::camera::Mark, crate::camera::Drawn),
+        sink: crate::camera::Sink,
+        switched: bool,
+    ) -> Self {
+        let read = |says: fn(&crate::watch::Watch) -> bool| -> crate::camera::Private {
+            let watch = self.watch.clone();
+            Arc::new(move || {
+                watch
+                    .as_ref()
+                    .is_none_or(|watch| watch.lock().map_or(true, |watch| says(&watch)))
+            })
+        };
+        let private = read(|watch| watch.private());
+        let watch = self.watch.clone();
+        let room: crate::microphone::Room = Arc::new(move || {
+            watch
+                .as_ref()
+                .and_then(|watch| watch.lock().ok().and_then(|watch| watch.room()))
+        });
+        self.microphone = Some(
+            crate::microphone::Microphone::new(listen, private, sink)
+                .switched(switched)
+                .room(room)
+                .marking(mark, drawn),
+        );
+        self
     }
 
     /// Another clock for claims, for tests.
@@ -1329,6 +1391,13 @@ impl Parts for Lamp {
                     .ok_or_else(|| not_here("the camera"))?
                     .stream(client, *on, *fps, size.as_deref(), events)
             }
+            Op::MicrophoneStream { on } => {
+                let events = self.events.clone();
+                self.microphone
+                    .as_mut()
+                    .ok_or_else(|| not_here("the microphone"))?
+                    .stream(client, *on, events)
+            }
             Op::Express { feeling, strength } => self.express(client, feeling, *strength),
             Op::Sound { name } => self.sound(client, re, name),
             Op::Play { .. } => Err(waits_for("client packages")),
@@ -1374,25 +1443,52 @@ impl Parts for Lamp {
             .unwrap_or(Value::Null)
     }
 
-    fn camera_streaming(&self, client: &str, turn: u64) -> bool {
-        self.camera
-            .as_ref()
-            .is_some_and(|camera| camera.streaming(client, turn))
+    fn streaming(&self, client: &str, media: Media, turn: Option<u64>) -> bool {
+        match media {
+            // A camera frame always carries its stream's turn (#5881).
+            Media::Camera => turn.is_some_and(|turn| {
+                self.camera
+                    .as_ref()
+                    .is_some_and(|camera| camera.streaming(client, turn))
+            }),
+            Media::Microphone => self
+                .microphone
+                .as_ref()
+                .is_some_and(|microphone| microphone.streaming(client, turn)),
+        }
     }
 
-    fn camera_turn(&self, client: &str) -> Option<u64> {
-        self.camera.as_ref().and_then(|camera| camera.turn(client))
+    fn newest_turn(&self, client: &str, media: Media) -> Option<u64> {
+        match media {
+            Media::Camera => self.camera.as_ref().and_then(|camera| camera.turn(client)),
+            Media::Microphone => self
+                .microphone
+                .as_ref()
+                .and_then(|microphone| microphone.newest_turn(client)),
+        }
     }
 
-    fn camera_end(&mut self, client: &str) {
-        if let Some(camera) = &mut self.camera {
-            camera.end(client);
+    fn media_end(&mut self, client: &str, media: Media) {
+        match media {
+            Media::Camera => {
+                if let Some(camera) = &mut self.camera {
+                    camera.end(client);
+                }
+            }
+            Media::Microphone => {
+                if let Some(microphone) = &mut self.microphone {
+                    microphone.end(client);
+                }
+            }
         }
     }
 
     fn stop(&mut self, client: &str, _: u64) {
         if let Some(camera) = &mut self.camera {
             camera.end(client);
+        }
+        if let Some(microphone) = &mut self.microphone {
+            microphone.end(client);
         }
         if let Some(follow) = &self.follow {
             let mut follower = follow.lock().expect("follower");

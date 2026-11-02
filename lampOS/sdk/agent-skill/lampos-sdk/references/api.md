@@ -130,6 +130,36 @@ Ranges, from lamp-control and the body:
   Gestures `idle` and `scanning` are taken too (keep `scanning` for when a
   person asks).
 
+## The microphone
+
+| what | Python | JavaScript | MCP | grant |
+|---|---|---|---|---|
+| stream the room's sound | `await lamp.microphone_stream(True)` | `lamp.microphoneStream(true)` | — (for a program, not an agent's turn) | microphone |
+| stop it | `await lamp.microphone_stream(False)`, or `stop()` | `lamp.microphoneStream(false)`, or `stop()` | — | none |
+
+The answer is `{"stream": "on", "sample_rate": 16000, "channels": 1,
+"format": "s16le", "block_ms": 20, "source": "mic1"}`. Then, unasked:
+
+| event | fields | fires when |
+|---|---|---|
+| `microphone.audio` (microphone) | `sequence`, `lost`, `sample_rate`, `channels`, `format`, `bytes`, and the samples as `data` (bytes in Python, a Buffer in JS; 640 a block) | each 20 ms block the lamp's ears hear. `lost` counts blocks lost since the last one sent: on the way, or because this program read too slowly (the lamp never queues more than 4) |
+| `microphone.ended` (microphone) | `why` | the lamp turned private, or more than one person came into view ("someone else is here"), both at once; the lamp's eyes stopped saying who is in view for 2 s ("the room isn't seen"); the ring didn't say it drew its mark within 1 s ("the ring is not showing the microphone's mark"); or no sound came for 2 s: "the lamp's microphone isn't shared here", which is what a lamp says whose ears don't publish their sound (`LAMP_BUS_AUDIO` off) |
+
+- **Never while private,** and refused `private` then. **Never with more
+  than one person in view:** the lamp can't tell its owner from anyone else,
+  so it is refused, "someone else is here", and with no fresh word from its
+  eyes on who is in view it is refused too, "the room isn't seen". **Off
+  unless the owner switched
+  it on** (`LAMP_CONTROL_MICROPHONE=on`): refused, "the microphone stream is
+  off on this lamp". **Only on the lamp's own network,** as the camera. The ring shows its mark while it streams,
+  and sound goes only once the ring says it drew it; where it can't, there
+  is no microphone.
+- Listen with `lamp.on("microphone.audio", handler)`: no subscription, it
+  comes with the stream you asked for. On again replaces the stream.
+- The fake lamp streams a quiet 440 Hz tone; `lose_audio(n)` / `loseAudio(n)`
+  makes a gap; `set_private()` / `setPrivate()` and `set_in_view(2)` /
+  `setInView(2)` end it.
+
 ## Skills of your own
 
 | what | Python | JavaScript | command line |

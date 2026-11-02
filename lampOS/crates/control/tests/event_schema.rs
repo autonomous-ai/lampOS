@@ -412,3 +412,23 @@ fn get_body_and_volume_validate_against_the_schema() {
     extra["joints"]["yaw"]["torque"] = json!(true);
     assert!(holds(&root, &state["body"], &extra, "body").is_err());
 }
+
+/// A microphone block's header and its end, as `lamp_control::microphone`
+/// sends them, are the schema's.
+#[test]
+fn a_microphone_blocks_header_and_its_end_are_the_schemas() {
+    let root = schema();
+    let event = &root["$defs"]["event"];
+    let check = |value: Value| holds(&root, event, &value, "event");
+    let header = json!({"ev": "microphone.audio", "sequence": 12, "lost": 0, "sample_rate": 16000,
+                        "channels": 1, "format": "s16le", "bytes": 640});
+    assert_eq!(check(header.clone()), Ok(()));
+    let mut no_lost = header;
+    no_lost.as_object_mut().unwrap().remove("lost");
+    assert!(check(no_lost).is_err());
+    assert_eq!(
+        check(json!({"ev": "microphone.ended", "why": lamp_control::microphone::NOT_SHARED})),
+        Ok(())
+    );
+    assert!(check(json!({"ev": "microphone.ended"})).is_err());
+}

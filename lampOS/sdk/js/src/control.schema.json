@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound, never while the lamp is private (not routed yet).",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private.",
       "enum": [
         "body",
         "light",
@@ -238,6 +238,9 @@
         },
         {
           "$ref": "#/$defs/listen.set"
+        },
+        {
+          "$ref": "#/$defs/microphone.stream"
         }
       ]
     },
@@ -1172,7 +1175,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; turn.end carries turn and started; listen.set carries mute.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
           "type": "object",
           "properties": {
             "re": {
@@ -1288,25 +1291,25 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 1 µm, µg/m³, to a tenth."
+                      "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm2_5": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                      "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm4_0": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 4 µm, µg/m³, to a tenth."
+                      "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm10": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 10 µm, µg/m³, to a tenth."
+                      "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "co2_ppm": {
                       "type": "integer",
@@ -1488,6 +1491,29 @@
                 "lifted",
                 "nothing_held"
               ]
+            },
+            "sample_rate": {
+              "description": "microphone.stream: samples a second, 16000.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "channels": {
+              "description": "microphone.stream: channels interleaved in a block, 1.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "format": {
+              "description": "microphone.stream: how a sample is written: s16le, signed 16 bits, low byte first.",
+              "const": "s16le"
+            },
+            "block_ms": {
+              "description": "microphone.stream: how long one block is, 20 ms.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "source": {
+              "description": "microphone.stream: which of the lamp's microphones: mic1, the room microphone the ears read.",
+              "const": "mic1"
             }
           },
           "required": [
@@ -1899,7 +1925,9 @@
                 "lease",
                 "done",
                 "camera.frame",
-                "camera.ended"
+                "camera.ended",
+                "microphone.audio",
+                "microphone.ended"
               ]
             }
           ]
@@ -2370,31 +2398,31 @@
             }
           },
           "then": {
-            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 µg/m³, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
+            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 \u00b5g/m\u00b3, carbon dioxide 50 ppm, humidity 3, temperature 0.5 \u00b0C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
             "properties": {
               "pm1_0": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 1 µm, µg/m³, to a tenth."
+                "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm2_5": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm4_0": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 4 µm, µg/m³, to a tenth."
+                "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm10": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 10 µm, µg/m³, to a tenth."
+                "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "co2_ppm": {
                 "type": "integer",
@@ -2510,6 +2538,74 @@
               "why"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "microphone.audio"
+              }
+            }
+          },
+          "then": {
+            "description": "One block of a microphone.stream, the header of its binary WebSocket message (the sound itself follows the header, never in JSON).",
+            "properties": {
+              "sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The block's count since the ears started; a step of more than one is sound that was lost."
+              },
+              "lost": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Blocks lost since the last one this stream sent: gaps in sequence, and blocks the connection had no room for."
+              },
+              "sample_rate": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "channels": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "format": {
+                "const": "s16le"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The sound's size in bytes: 640 for a 20 ms block."
+              }
+            },
+            "required": [
+              "sequence",
+              "lost",
+              "sample_rate",
+              "channels",
+              "format",
+              "bytes"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "microphone.ended"
+              }
+            }
+          },
+          "then": {
+            "description": "The microphone.stream ended by itself: the lamp turned private, someone else came into view (more than one person), or no sound came for 2 s (the lamp's microphone isn't shared here).",
+            "properties": {
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "why"
+            ]
+          }
         }
       ]
     },
@@ -2521,25 +2617,25 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 1 µm, µg/m³, to a tenth."
+          "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm2_5": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+          "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm4_0": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 4 µm, µg/m³, to a tenth."
+          "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm10": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 10 µm, µg/m³, to a tenth."
+          "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "co2_ppm": {
           "type": "integer",
@@ -2907,6 +3003,27 @@
         "counts",
         "moving"
       ]
+    },
+    "microphone.stream": {
+      "description": "The microphone's sound, each 20 ms block the ears share on mic1/audio (mono, 16 kHz, S16LE), as a binary WebSocket message: the header's length (4 bytes, big-endian), the header (JSON: ev microphone.audio, sequence, lost, sample_rate, channels, format, bytes), then the samples, 640 bytes. Until on is false, stop, the connection closes, or a microphone.ended event (the lamp turned private, someone else came into view, or no block came for 2 s: the ears share their sound only with LAMP_BUS_AUDIO=on). On again while one runs replaces it. Needs the microphone grant, the lamp's own network and the owner's switch (lamp-control --microphone on, LAMP_CONTROL_MICROPHONE=on; off unless given: refused, the microphone stream is off on this lamp). Refused while the lamp is private, while more than one person is in view (refused: someone else is here; the door can't tell the owner from anyone else), and where the ring can't show its mark; either of the first two also ends a running stream with microphone.ended.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "microphone.stream"
+        },
+        "on": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
+      ],
+      "additionalProperties": false
     }
   }
 }

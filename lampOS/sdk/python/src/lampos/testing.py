@@ -40,6 +40,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.asymmetric.ec import SECP256R1, generate_private_key
 from cryptography.x509.oid import NameOID
 from websockets.asyncio.server import ServerConnection, serve
+from websockets.exceptions import ConnectionClosed
 
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
@@ -47,6 +48,25 @@ from .moves import move_refusal
 
 # The fake's camera picture: the smallest whole JPEG (start and end markers).
 FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
+
+# The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
+# 320 samples, mono, 16 kHz, S16LE.
+AUDIO_RATE = 16_000
+AUDIO_BLOCK = 320
+AUDIO_EVERY_S = 0.02
+# Why lamp-control refuses or ends a microphone stream with more than one
+# person in view (microphone.rs `SOMEONE_ELSE`).
+SOMEONE_ELSE = "someone else is here"
+
+
+def tone_block(sequence: int, hz: float = 440.0, level: int = 1000) -> bytes:
+    """Block `sequence` of a quiet tone, as signed 16-bit little-endian
+    samples: 640 bytes, continuous from one block to the next."""
+    start = sequence * AUDIO_BLOCK
+    return b"".join(
+        int(level * math.sin(2 * math.pi * hz * (start + n) / AUDIO_RATE)).to_bytes(2, "little", signed=True)
+        for n in range(AUDIO_BLOCK)
+    )
 
 try:
     import jsonschema
@@ -432,6 +452,10 @@ class FakeLamp:
         self.mutes: dict[str, tuple[ServerConnection, int]] = {}
         self._client_of: dict[int, str] = {}
         self._connections: set[ServerConnection] = set()
+        # Each connection's microphone stream (`microphone.stream`), and the
+        # made-up ears' next block's `sequence`.
+        self.listening: dict[int, asyncio.Task] = {}
+        self.audio_sequence = 0
         self._next_lease = 1
         self._server = None
         self._validator = (
@@ -545,6 +569,60 @@ class FakeLamp:
         for key, (_ws, held) in list(self.following.items()):
             if held == lease:
                 del self.following[key]
+
+    def lose_audio(self, blocks: int) -> None:
+        """The made-up ears skip `blocks` blocks, as sound lost on the way:
+        the next block's `sequence` jumps, and each stream says it in `lost`."""
+        self.audio_sequence += blocks
+
+    async def set_private(self, private: bool = True) -> None:
+        """The privacy switch: on, every microphone stream ends at once with
+        `microphone.ended`, as lamp-control's do, and a new one is refused."""
+        self.state["lamp"]["private"] = private
+        if private:
+            await self._end_listening("the lamp is private")
+
+    async def set_in_view(self, count: int) -> None:
+        """How many people are in view (`presence`'s `count`): above one,
+        every microphone stream ends at once with `microphone.ended`
+        ("someone else is here"), and a new one is refused, as lamp-control
+        does, since it can't tell the owner from anyone else."""
+        self.state["presence"]["count"] = count
+        if count > 1:
+            await self._end_listening(SOMEONE_ELSE)
+
+    async def _end_listening(self, why: str) -> None:
+        for key, task in list(self.listening.items()):
+            self.listening.pop(key, None)
+            task.cancel()
+            ws = next((ws for ws in self._connections if id(ws) == key), None)
+            if ws is not None:
+                await ws.send(json.dumps({"ev": "microphone.ended", "why": why}))
+
+    def _stop_listening(self, ws: ServerConnection) -> None:
+        task = self.listening.pop(id(ws), None)
+        if task is not None:
+            task.cancel()
+
+    async def _listen(self, ws: ServerConnection) -> None:
+        """One block every 20 ms of a quiet 440 Hz tone, as binary frames:
+        the header's length, the header, then the samples."""
+        last: int | None = None
+        while True:
+            sequence = self.audio_sequence
+            self.audio_sequence += 1
+            lost = 0 if last is None else max(sequence - last - 1, 0)
+            last = sequence
+            samples = tone_block(sequence)
+            header = json.dumps({
+                "ev": "microphone.audio", "sequence": sequence, "lost": lost, "sample_rate": AUDIO_RATE,
+                "channels": 1, "format": "s16le", "bytes": len(samples),
+            }).encode()
+            try:
+                await ws.send(len(header).to_bytes(4, "big") + header + samples)
+            except ConnectionClosed:
+                return
+            await asyncio.sleep(AUDIO_EVERY_S)
 
     async def lease_event(self, lease: str, state: str, why: str | None = None) -> None:
         """Tell a lease's holder its lease is `held`, `suspended` or `lost`
@@ -669,6 +747,7 @@ class FakeLamp:
             gone = self._client_of.pop(id(ws), None)
             if gone is not None and gone not in self._client_of.values():
                 self.mutes.pop(gone, None)
+            self._stop_listening(ws)
             for lease in [l for l, held in self.leases.items() if held["ws"] is ws]:
                 self.leases.pop(lease)
 
@@ -742,6 +821,7 @@ class FakeLamp:
             "turn.end": ["speak"],
             "listen.set": ["hear"],
             "volume": ["speak"],
+            "microphone.stream": ["microphone"],
         }.get(op, [])
 
     async def _upload(self, ws, client: str, request: dict) -> None:
@@ -886,8 +966,10 @@ class FakeLamp:
             await self._ok(ws, id_)
             self._unfollow(request["lease"])
         elif op == "stop":
-            # The holder's stop ends its following, as any of its actions.
+            # The holder's stop ends its following, as any of its actions,
+            # and its microphone stream, with no event.
             self.stop_following(ws)
+            self._stop_listening(ws)
             await self._ok(ws, id_)
         elif op in ("gesture", "move"):
             # As lamp-control routes them: the body takes them, and no
@@ -1060,6 +1142,22 @@ class FakeLamp:
                 await self._ok(ws, id_, mute="held")
             else:
                 await self._ok(ws, id_, mute="lifted" if self.mutes.pop(client, None) else "nothing_held")
+        elif op == "microphone.stream":
+            # As lamp-control's microphone.rs: on again replaces it, off ends
+            # it with no event, and none while the lamp is private.
+            self._stop_listening(ws)
+            if not request["on"]:
+                await self._ok(ws, id_, stream="off")
+            elif self.state["lamp"]["private"]:
+                await self._refuse(ws, id_, "private", "the lamp is private")
+            elif self.state["presence"]["count"] > 1:
+                await self._refuse(ws, id_, "refused", SOMEONE_ELSE)
+            else:
+                await self._ok(
+                    ws, id_, stream="on", sample_rate=AUDIO_RATE, channels=1, format="s16le",
+                    block_ms=int(AUDIO_EVERY_S * 1000), source="mic1",
+                )
+                self.listening[id(ws)] = asyncio.ensure_future(self._listen(ws))
         else:
             await self._ok(ws, id_)
             if op == "play" and self.auto_done:

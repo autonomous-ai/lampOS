@@ -154,7 +154,8 @@ def _check(op: str, fields: dict) -> None:
 
 
 def binary_frame(message: bytes) -> dict:
-    """A fast stream's binary `camera.frame`: its header, with the JPEG as
+    """A binary frame, a fast stream's `camera.frame` or a microphone
+    stream's `microphone.audio`: its header, with the JPEG or the samples as
     `data` (bytes)."""
     length = int.from_bytes(message[:4], "big")
     frame = json.loads(message[4 : 4 + length])
@@ -162,8 +163,10 @@ def binary_frame(message: bytes) -> dict:
     return frame
 
 
-# Events that come with a request, never subscribed to: a camera stream's.
+# Events that come with a request, never subscribed to: a camera stream's,
+# and a microphone stream's.
 CAMERA_EVENTS = ("camera.frame", "camera.ended")
+MICROPHONE_EVENTS = ("microphone.audio", "microphone.ended")
 
 # `keep_connected`'s pauses before connecting again, in seconds: the first
 # after a closed connection, then longer while the lamp can't be reached (a
@@ -617,8 +620,9 @@ class Lamp:
         try:
             async for text in self._ws:
                 if isinstance(text, bytes):
-                    # A fast camera frame: the header's length, the header,
-                    # then the JPEG, given as `data` (bytes).
+                    # A fast camera frame or a microphone block: the
+                    # header's length, the header, then the JPEG or the
+                    # samples, given as `data` (bytes). Never logged.
                     self._event(binary_frame(text))
                     continue
                 frame = json.loads(text)
@@ -659,7 +663,7 @@ class Lamp:
         `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
-        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS):
+        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS):
             raise LampError(f"no event {event!r}", code="bad_request")
         _short_phrase(phrases)
         self._handlers[event].append(handler)
@@ -891,6 +895,20 @@ class Lamp:
             raise LampError("volume: one of to, step or mute", code="bad_request")
         reply = await self._act("volume", False, **given)
         return {"level": reply["level"], "muted": reply["muted"]}
+
+    # The microphone (the `microphone` grant): the ears' own sound, never
+    # while the lamp is private, only on the lamp's own network.
+
+    async def microphone_stream(self, on: bool = True) -> dict:
+        """The room's sound as `microphone.audio` events
+        (`lamp.on("microphone.audio", ...)`), one each 20 ms block: mono,
+        16 kHz, signed 16-bit little-endian samples as `data` (bytes, 640 a
+        block), with `sequence` and `lost` (blocks lost since the last one
+        sent). Until `microphone_stream(False)`, `stop`, or a
+        `microphone.ended` event: the lamp turned private, someone else came
+        into view, the room went unseen, the ring didn't show its mark, or no sound came for 2 s
+        (the lamp doesn't share its microphone, `LAMP_BUS_AUDIO`)."""
+        return await self.request("microphone.stream", on=on)
 
     async def sound(self, name: str) -> dict:
         """Play `hum`, the lamp's own, or one of this computer's clips by

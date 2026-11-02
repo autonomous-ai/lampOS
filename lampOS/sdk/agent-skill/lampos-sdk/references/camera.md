@@ -44,5 +44,5 @@ without it, the calls are refused, or the `camera` grant can't be given.
   a stream ends with `camera.ended` ("the ring is not showing the camera's
   mark") and a snapshot is refused the same way. Handle it; don't retry in a
   loop.
-- **The microphone** has its grant in the same schema change; its calls come
-  with it.
+- **The microphone** comes the same way, with its own grant:
+  [api.md](api.md#the-microphone).

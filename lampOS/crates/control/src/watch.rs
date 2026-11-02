@@ -56,6 +56,12 @@ pub const AIR_EVERY_US: u64 = 5_000_000;
 /// A reading of the air or the board not heard again this long is no longer
 /// known: both come every 5 s, and `board/state` means nothing after 15.
 pub const READING_STALE_US: u64 = 15_000_000;
+/// The room counts as unseen after this long with no `humans/faces/tracked`:
+/// the eyes say their faces several times a second, nobody there included,
+/// so a count this old may be frozen (the eyes stopped, restarted, or the
+/// camera is out), and what it says of the room is unknown (the local
+/// leader's P2 on the microphone).
+pub const FACES_STALE_US: u64 = 2_000_000;
 /// How far each air value moves to be news, in its own unit: particles in
 /// µg/m³, carbon dioxide in ppm, humidity in percent, temperature in °C. A
 /// value that comes or goes (known, then not) is news too, and so is `feel`.
@@ -194,6 +200,11 @@ impl Hand {
 #[derive(Debug, Default)]
 pub struct Watch {
     count: usize,
+    /// When the newest `humans/faces/tracked` came; none before the first.
+    faces_us: Option<u64>,
+    /// Whether `count` is fresh: a faces message within [`FACES_STALE_US`]
+    /// ([`Self::lapse`]). Unseen until the first.
+    seen: bool,
     near: f64,
     facing: bool,
     seen_us: Option<u64>,
@@ -464,6 +475,12 @@ impl Watch {
         if stale(&self.body_joints) {
             self.body_joints = None;
         }
+        if self
+            .faces_us
+            .is_none_or(|heard| now_us.saturating_sub(heard) >= FACES_STALE_US)
+        {
+            self.seen = false;
+        }
         let mut out = self.hand_news(now_us);
         out.extend(self.air_news(now_us));
         let lapsed = self
@@ -530,6 +547,13 @@ impl Watch {
     /// lease that stopped coming ([`Self::lapse`]).
     pub fn private(&self) -> bool {
         self.private
+    }
+
+    /// How many faces are in view now, by the newest `humans/faces/tracked`:
+    /// counts, never who. None while the room is unseen: no faces message
+    /// for [`FACES_STALE_US`] ([`Self::lapse`]), or none yet.
+    pub fn room(&self) -> Option<usize> {
+        self.seen.then_some(self.count)
     }
 
     pub fn state(&self, kind: crate::protocol::StateKind) -> Value {
@@ -600,6 +624,8 @@ impl Watch {
             return Vec::new();
         };
         self.count = faces.len();
+        self.faces_us = Some(now_us);
+        self.seen = true;
         // To two places, as a sound's score is (harness-reviewer's P3 on
         // #3868: 0.39999999999999997).
         self.near = (faces
@@ -720,6 +746,30 @@ mod tests {
             [EventKind::LampChanged]
         );
         assert_eq!(watch.state(StateKind::Lamp)["private"], false);
+    }
+
+    /// The local leader's P2 on the microphone: the face count is only as
+    /// good as its last message. Unseen before the first, its count while
+    /// fresh, and unseen again once none has come for [`FACES_STALE_US`],
+    /// whatever it last said.
+    #[test]
+    fn the_room_is_unseen_once_the_face_count_goes_stale() {
+        let mut watch = Watch::new();
+        assert_eq!(watch.room(), None, "unseen before the first message");
+        watch.lapse(S);
+        assert_eq!(watch.room(), None);
+        let face = json!({"ymin": 0.2, "ymax": 0.5});
+        watch.take("humans/faces/tracked", &json!({"faces": [face]}), 2 * S);
+        assert_eq!(watch.room(), Some(1));
+        watch.lapse(2 * S + FACES_STALE_US - 1);
+        assert_eq!(watch.room(), Some(1), "still fresh");
+        watch.lapse(2 * S + FACES_STALE_US);
+        assert_eq!(watch.room(), None, "a frozen 1 is unknown");
+        let both = json!({"faces": [face, face]});
+        watch.take("humans/faces/tracked", &both, 5 * S);
+        assert_eq!(watch.room(), Some(2));
+        watch.take("humans/faces/tracked", &json!({"faces": []}), 6 * S);
+        assert_eq!(watch.room(), Some(0), "nobody, seen");
     }
 
     /// A hand is told by edge and at most every [`HAND_EVERY_US`], the

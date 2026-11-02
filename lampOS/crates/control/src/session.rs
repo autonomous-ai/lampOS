@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use crate::journal::{self, Journal};
 use crate::lease::{Change, Leases, Refusal};
 use crate::pairing::{self, Clients, Codes, PairRefused};
+use crate::parts::Media;
 use crate::protocol::{
     self, Error, ErrorCode, EventKind, Grant, LeaseWhy, Op, Part, StateKind, VERSION,
 };
@@ -35,20 +36,20 @@ pub trait Parts {
     fn state(&self, kind: StateKind) -> Value;
     /// Ends everything `client` asked for that is still going.
     fn stop(&mut self, client: &str, now_us: u64);
-    /// Ends `client`'s camera stream, and nothing else of it: its pairing
-    /// no longer grants the camera (Thirteen's P2 on #4521).
-    fn camera_end(&mut self, _client: &str) {}
-    /// Whether `client`'s camera stream of `turn` runs now: a frame already
-    /// queued for it goes only then (Thirteen's P3 on #4521), and only while
-    /// the very stream that made it runs, never one that replaced it.
-    fn camera_streaming(&self, _client: &str, _turn: u64) -> bool {
+    /// Ends `client`'s camera or microphone stream, and nothing else of
+    /// it: its pairing no longer grants that one (Thirteen's P2 on #4521).
+    fn media_end(&mut self, _client: &str, _media: Media) {}
+    /// Whether `client`'s camera or microphone stream that made a frame
+    /// still runs: a picture or a block already queued for it goes only then
+    /// (Thirteen's P3 on #4521). With a `turn`, only that very stream: a
+    /// newer one never carries an ended one's blocks (Second's P1 on #5839).
+    fn streaming(&self, _client: &str, _media: Media, _turn: Option<u64>) -> bool {
         false
     }
-    /// The turn of `client`'s newest camera stream ([`Camera::turn`]), for
-    /// the writer to tell an older stream's late `camera.ended` from its own.
-    ///
-    /// [`Camera::turn`]: crate::camera::Camera::turn
-    fn camera_turn(&self, _client: &str) -> Option<u64> {
+    /// The turn of `client`'s newest camera or microphone stream, running or
+    /// ended by itself, until its `off`: the writer tells an older stream's
+    /// late end from that stream's own (`crate::camera::older_end`).
+    fn newest_turn(&self, _client: &str, _media: Media) -> Option<u64> {
         None
     }
     /// Does `op` for `client`, as [`Parts::act`], where the reply may wait
@@ -214,9 +215,9 @@ pub struct Door {
     codes: Codes,
     /// The grants the owner chose with the code out.
     code_grants: BTreeSet<Grant>,
-    /// A computer re-paired without the camera: its stream is ended once
-    /// the pairing is answered.
-    camera_dropped: Option<String>,
+    /// A computer re-paired without the camera or the microphone: that
+    /// stream is ended once the pairing is answered.
+    media_dropped: Vec<(String, Media)>,
     clients: Clients,
     clients_path: Option<PathBuf>,
     leases: Leases,
@@ -336,7 +337,7 @@ impl Door {
             lamp: json!({"id": id, "name": name, "v": VERSION}),
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
-            camera_dropped: None,
+            media_dropped: Vec::new(),
             clients,
             clients_path,
             leases: Leases::new(),
@@ -700,8 +701,8 @@ impl Door {
         match &op {
             Op::Pair { name, key, proof } => {
                 let outcome = self.pair(session, re, name, key, proof, now_us, wall_s);
-                if let Some(client) = self.camera_dropped.take() {
-                    parts.camera_end(&client);
+                for (client, media) in std::mem::take(&mut self.media_dropped) {
+                    parts.media_end(&client, media);
                 }
                 return outcome;
             }
@@ -1091,14 +1092,16 @@ impl Door {
         {
             self.tell_helper_grants(&id, &grants);
         }
-        // Re-paired without the camera: a stream it had going ends now,
-        // not when it next asks (Thirteen's P2 on #4521).
-        if before
-            .as_ref()
-            .is_some_and(|before| before.grants.contains(&Grant::Camera))
-            && !grants.contains(&Grant::Camera)
-        {
-            self.camera_dropped = Some(id.clone());
+        // Re-paired without the camera or the microphone: a stream it had
+        // going ends now, not when it next asks (Thirteen's P2 on #4521).
+        for media in [Media::Camera, Media::Microphone] {
+            if before
+                .as_ref()
+                .is_some_and(|before| before.grants.contains(&media.grant()))
+                && !grants.contains(&media.grant())
+            {
+                self.media_dropped.push((id.clone(), media));
+            }
         }
         ok(re, json!({"client": id, "grants": grants}))
     }
@@ -1350,7 +1353,7 @@ mod tests {
     struct Fake {
         did: Vec<String>,
         stopped: Vec<String>,
-        cameras_ended: Vec<String>,
+        media_ended: Vec<(String, Media)>,
         refuse_with: Option<Error>,
     }
 
@@ -1371,8 +1374,8 @@ mod tests {
         fn stop(&mut self, client: &str, _: u64) {
             self.stopped.push(client.to_owned());
         }
-        fn camera_end(&mut self, client: &str) {
-            self.cameras_ended.push(client.to_owned());
+        fn media_end(&mut self, client: &str, media: Media) {
+            self.media_ended.push((client.to_owned(), media));
         }
     }
 
@@ -1461,15 +1464,47 @@ mod tests {
         };
         pair_again(&mut door, &mut fake, &[Grant::Light, Grant::Camera], 5 * S);
         assert!(
-            fake.cameras_ended.is_empty(),
+            fake.media_ended.is_empty(),
             "the camera kept, the stream goes on"
         );
         pair_again(&mut door, &mut fake, &[Grant::Light], 10 * S);
-        assert_eq!(fake.cameras_ended, [id]);
+        assert_eq!(fake.media_ended, [(id, Media::Camera)]);
         assert!(
             fake.stopped.is_empty(),
             "only the camera, not its light or leases"
         );
+    }
+
+    /// As the camera's: a computer re-paired without the microphone has its
+    /// stream ended at once; one re-paired without both has both ended.
+    #[test]
+    fn a_re_pairing_that_drops_the_microphone_ends_its_stream_at_once() {
+        let computer = Computer::new(42);
+        let all = [Grant::Light, Grant::Camera, Grant::Microphone];
+        let (mut door, _, mut fake) = paired(&computer, &all);
+        let id = pairing::client_id(&computer.key());
+        let pair_again = |door: &mut Door, fake: &mut Fake, grants: &[Grant], at: u64| {
+            let code = door.issue_code(grants.iter().copied().collect(), at);
+            let (mut session, welcome) = door.open();
+            let outcome = door.handle(
+                &mut session,
+                &computer.pair_frame(&code, &welcome),
+                fake,
+                at,
+                1,
+            );
+            assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+        };
+        pair_again(&mut door, &mut fake, &[Grant::Light, Grant::Camera], 5 * S);
+        assert_eq!(fake.media_ended, [(id.clone(), Media::Microphone)]);
+        pair_again(&mut door, &mut fake, &all, 10 * S);
+        assert_eq!(fake.media_ended.len(), 1, "granted again, nothing ends");
+        pair_again(&mut door, &mut fake, &[Grant::Light], 15 * S);
+        assert_eq!(
+            fake.media_ended[1..],
+            [(id.clone(), Media::Camera), (id, Media::Microphone)]
+        );
+        assert!(fake.stopped.is_empty(), "only the streams, not its light");
     }
 
     /// docs/control.md, "The journal": one line a command, naming the
@@ -2270,6 +2305,57 @@ mod tests {
                 .starts_with("LAMP_CONTROL_QUIET ")
         );
         assert!(quiet_window_of(Some("08:00-08:00"), None).is_err());
+    }
+
+    #[test]
+    fn a_microphone_stream_is_journaled_on_and_off_and_never_given_beyond_the_lamps_network() {
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Microphone]);
+        let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let into = lines.clone();
+        let mut door = door.with_journal(Journal::to(move |line| {
+            into.lock().unwrap().push(line.to_owned())
+        }));
+        for (n, frame) in [
+            r#"{"id":3,"op":"microphone.stream","on":true}"#,
+            r#"{"id":4,"op":"microphone.stream","on":false}"#,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let near = door.handle(&mut session, frame, &mut fake, 2 * S + n as u64 * S, 1);
+            assert_eq!(code_of(&near), None, "{near:?}");
+        }
+        let client = pairing::client_id(&computer.key());
+        door.journal_event(&client, "microphone.ended", 4 * S);
+        let lines = lines.lock().unwrap().clone();
+        let who = format!("{client} (a name the door doesn't write)");
+        assert!(
+            lines[0].starts_with(&format!(
+                "lamp-control: {who}: microphone.stream (on): ok, to the ears, by mic1/audio, "
+            )),
+            "{lines:?}"
+        );
+        assert!(
+            lines[1].starts_with(&format!(
+                "lamp-control: {who}: microphone.stream (off): ok, to the ears, by mic1/audio, "
+            )),
+            "{lines:?}"
+        );
+        assert_eq!(
+            lines[2],
+            format!("lamp-control: {who}: event microphone.ended sent")
+        );
+        session.set_remote();
+        let far = door.handle(
+            &mut session,
+            r#"{"id":5,"op":"microphone.stream","on":true}"#,
+            &mut fake,
+            5 * S,
+            1,
+        );
+        assert_eq!(code_of(&far), Some("refused"));
+        assert_eq!(reply(&far)["error"]["why"], LOCAL_ONLY);
     }
 
     #[test]

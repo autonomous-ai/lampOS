@@ -15,7 +15,8 @@ import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js'
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
 import { POSES_STEP_MS, posesToFrames } from './moves.js';
 
-/** A fast stream's binary `camera.frame`: its header, with the JPEG as `data`. */
+/** A binary frame, a fast stream's `camera.frame` or a microphone stream's
+ * `microphone.audio`: its header, with the JPEG or the samples as `data`. */
 export function binaryFrame(message) {
   const length = message.readUInt32BE(0);
   const frame = JSON.parse(message.subarray(4, 4 + length).toString());
@@ -23,8 +24,10 @@ export function binaryFrame(message) {
   return frame;
 }
 
-// Events that come with a request, never subscribed to: a camera stream's.
+// Events that come with a request, never subscribed to: a camera stream's,
+// and a microphone stream's.
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
+const MICROPHONE_EVENTS = ['microphone.audio', 'microphone.ended'];
 
 // `keepConnected`'s pauses before connecting again, in seconds: the first after
 // a closed connection, then longer while the lamp can't be reached (a restart
@@ -295,8 +298,9 @@ export class Lamp {
     ws.removeAllListeners('message');
     for (const frame of frames.splice(0)) this.frame(frame);
     ws.on('message', (data, isBinary) => {
-      // A fast camera frame: the header's length, the header, then the JPEG,
-      // given as `data` (a Buffer).
+      // A fast camera frame or a microphone block: the header's length, the
+      // header, then the JPEG or the samples, given as `data` (a Buffer).
+      // Never logged.
       if (isBinary) return this.frame(binaryFrame(data));
       const frame = JSON.parse(data.toString());
       debug.frame('<-', frame);
@@ -511,7 +515,8 @@ export class Lamp {
 
   // Call `handler(event)` for each `event` the lamp says; subscribes at once.
   on(event, handler, { phrases } = {}) {
-    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)) {
+    if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)
+      && !MICROPHONE_EVENTS.includes(event)) {
       throw new LampError(`no event ${event}`, { code: 'bad_request' });
     }
     const short = shortPhrase(phrases);
@@ -673,6 +678,20 @@ export class Lamp {
     if (fps !== undefined) fields.fps = fps;
     if (size !== undefined) fields.size = size;
     return this.request('camera.stream', fields);
+  }
+
+  // The microphone (the `microphone` grant): the ears' own sound, never while
+  // the lamp is private, only on the lamp's own network.
+
+  /** The room's sound as `microphone.audio` events (`lamp.on('microphone.audio', ...)`),
+   * one each 20 ms block: mono, 16 kHz, signed 16-bit little-endian samples as
+   * `data` (a Buffer, 640 bytes a block), with `sequence` and `lost` (blocks
+   * lost since the last one sent). Until `microphoneStream(false)`, `stop`, or
+   * a `microphone.ended` event: the lamp turned private, someone else came
+   * into view, the room went unseen, the ring didn't show its mark, or no sound came for 2 s (the
+   * lamp doesn't share its microphone, `LAMP_BUS_AUDIO`). */
+  microphoneStream(on = true) {
+    return this.request('microphone.stream', { on });
   }
   // `hum`, the lamp's own, or one of this computer's clips by name (`uploadSound`), once the person isn't talking.
   sound(name) { return this.act('sound', { name }); }
