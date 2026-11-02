@@ -21,13 +21,30 @@ pub struct UnitState {
     pub pid: u32,
     /// `NRestarts`: how often systemd has started it again by itself.
     pub restarts: u32,
+    /// `Result`: how its last run ended: success, exit-code, signal, ...
+    pub result: String,
 }
 
 impl UnitState {
     pub fn running(&self) -> bool {
         self.active == "active" || self.active == "reloading"
     }
+
+    /// Ended by itself with nothing wrong: inactive, its run a success.
+    pub fn ended_cleanly(&self) -> bool {
+        self.active == "inactive" && self.result == "success"
+    }
 }
+
+/// Units made to end by themselves once their job is done. The waking face
+/// (`lamp-waking.service`, `Type=simple`, no `RemainAfterExit`) ends as soon
+/// as the voice takes the ring, so on a lamp that is up it ends inside a
+/// round's watch. Such a unit that ended cleanly is well, not stopped: on
+/// lamp-9adf on 1 Nov builds 9276 and 9424 were put back for it ("the
+/// waking face has ended: Released"), and the put-back's own restart ended
+/// the same way, "the previous build is not well either". One that failed,
+/// crashed or is started again by systemd is still not well.
+pub const ENDS_BY_DESIGN: &[&str] = &["lamp-waking.service"];
 
 /// A part's name in the lamp's health: its binary's without `lamp-`.
 pub fn part_of(binary: &str) -> &str {
@@ -68,6 +85,8 @@ pub struct Watch {
     pub before: Before,
     /// The unit as it was first seen after the restart.
     first: Option<UnitState>,
+    /// A unit made to end ([`ENDS_BY_DESIGN`]) that has ended cleanly.
+    ended: bool,
 }
 
 impl Watch {
@@ -77,12 +96,19 @@ impl Watch {
             part: part.to_owned(),
             before,
             first: None,
+            ended: false,
         }
     }
 
     /// One look during the minute. An error at once is a part that is not
     /// well, whatever the rest of the minute would show.
     pub fn look(&mut self, state: &UnitState) -> Result<(), String> {
+        if ENDS_BY_DESIGN.contains(&self.unit.as_str()) && state.ended_cleanly() {
+            // Its job done: a later start of it is seen afresh.
+            self.ended = true;
+            self.first = None;
+            return Ok(());
+        }
         if state.active == "failed" {
             return Err(format!("{} failed ({})", self.unit, state.sub));
         }
@@ -118,6 +144,9 @@ impl Watch {
     /// The end of the minute: the last look, and the part's own word.
     pub fn finish(&mut self, state: &UnitState, health: Option<&Health>) -> Result<(), String> {
         self.look(state)?;
+        if self.ended && state.ended_cleanly() {
+            return Ok(());
+        }
         if !state.running() {
             return Err(format!(
                 "{} is not running at the end of the watch ({} {})",
@@ -157,6 +186,7 @@ mod tests {
             sub: "running".into(),
             pid,
             restarts,
+            result: "success".into(),
         }
     }
 
@@ -264,5 +294,77 @@ mod tests {
             Before::of("health", Some(&health(&[]))),
         );
         assert!(watch.finish(&running(41, 0), None).is_err());
+    }
+
+    fn waking(active: &str, sub: &str, pid: u32, result: &str) -> UnitState {
+        UnitState {
+            unit: "lamp-waking.service".into(),
+            active: active.into(),
+            sub: sub.into(),
+            pid,
+            restarts: 0,
+            result: result.into(),
+        }
+    }
+
+    #[test]
+    fn the_waking_face_ending_cleanly_inside_the_watch_is_well() {
+        // lamp-9adf, 1 Nov: restarted by the round, then "the waking face has
+        // ended: Released" once the voice took the ring, inside the minute.
+        let mut watch = Watch::new("lamp-waking.service", "setup", Before::default());
+        watch
+            .look(&waking("active", "running", 812, "success"))
+            .unwrap();
+        watch
+            .look(&waking("deactivating", "stop-sigterm", 812, "success"))
+            .unwrap();
+        for _ in 0..30 {
+            watch
+                .look(&waking("inactive", "dead", 0, "success"))
+                .unwrap();
+        }
+        assert_eq!(
+            watch.finish(&waking("inactive", "dead", 0, "success"), None),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn the_waking_face_that_failed_or_is_restarted_is_still_not_well() {
+        let mut watch = Watch::new("lamp-waking.service", "setup", Before::default());
+        watch
+            .look(&waking("active", "running", 812, "success"))
+            .unwrap();
+        assert!(
+            watch
+                .look(&waking("inactive", "dead", 0, "exit-code"))
+                .is_err()
+        );
+        let mut watch = Watch::new("lamp-waking.service", "setup", Before::default());
+        assert!(
+            watch
+                .look(&waking("failed", "failed", 0, "exit-code"))
+                .is_err()
+        );
+        let mut watch = Watch::new("lamp-waking.service", "setup", Before::default());
+        assert!(
+            watch
+                .look(&waking("activating", "auto-restart", 0, "exit-code"))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn only_a_unit_made_to_end_may_end_cleanly() {
+        let mut watch = Watch::new("lamp-voice.service", "voice", Before::default());
+        watch.look(&running(41, 0)).unwrap();
+        let ended = UnitState {
+            active: "inactive".into(),
+            sub: "dead".into(),
+            result: "success".into(),
+            ..running(0, 0)
+        };
+        assert!(watch.look(&ended).is_err());
+        assert!(watch.finish(&ended, None).is_err());
     }
 }
