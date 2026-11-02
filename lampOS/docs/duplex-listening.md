@@ -464,11 +464,23 @@ people talking are speech-like all the time, so once the lamp has yielded
 and its render has been quiet 30 blocks, the bed is `Clear` and commits at
 its sixth such block: no count of speech tells a bed from a person. With
 the switch, when the room was busy as the reply began (`busy_lately`,
-the voice's `own_line_busy`, taken once per reply), neither talk in the
+the voice's `own_line_busy`, taken once per reply, after the turn its
+request displaced is counted), neither talk in the
 clear nor stillness after plain blocks commits a yield
 (`Interruption::over_bed` in `lamp-audio`): it resumes at stillness or its
 1.1 s deadline, counted as any fruitless yield. A stop word, a forced
 yield, the lamp's name, a head tap or the button still stop the answer.
+A sound whose onset blocks held none over the lamp (`Under`, `Unknown`,
+`Clear`, `Still`) never yields, so the yield rules never see it, and the
+mask passes it as a candidate: on lamp-52e6 on the night of 2 Nov three
+such ended answers `user_interrupted` with the switch on. While the answer
+sounds over a busy room, the voice holds it as it holds talk over the
+lamp's own line in a busy room (`while_own_line_waits`, `ForName`): for
+600 ms after its trigger, so a name `lamp-name` says late still counts,
+then lets it go as the room's (`input_let_go_own_line`, `why: over_bed`).
+With the lamp's name or a stop word in it, it is judged as before. Taken
+before the displaced turn was counted, `own_line_busy` left the first
+answer after a restart, its request the third unanswered turn, not busy.
 The switch acts only with `LAMP_STOP_WORDS=heard-always`: its listener
 hears every block the lamp speaks and a stop phrase stops the answer as
 the hand does, whether the lamp has yielded or not. So two bed yields that
@@ -1380,6 +1392,8 @@ functions:
 | `the_over_bed_switch_without_stop_words_is_inert` | The switch on, stop words off or `heard`: a bed after a busy-room yield commits as off; the start line says why |
 | `after_two_busy_bed_resumes_a_stop_over_the_lamp_still_stops_the_answer` (`turn_taking.rs`) | With the switch in effect: two busy-bed yields resume within 20 s and the reply falls back; a "Stop." over the lamp then still stops the answer (with `heard` accepted, it was not heard) |
 | `talk_over_a_room_busy_before_the_answer_resumes_it_with_the_switch` (`turn_taking.rs`) | The mask hands the switch and the busy room to its yields |
+| `over_a_busy_room_a_sound_that_never_yields_waits_for_the_name_then_is_let_go` (`coordinator/tests/duplex.rs`) | With the switch, the room busy: six blocks in the clear over a sounding answer make no yield and the mask passes them; held for the name 600 ms, then let go (`over_bed`); the name or a stop word in it, the switch off, or a room not busy: as before |
+| `the_turn_a_request_displaces_counts_toward_the_room_its_answer_began_in` (`coordinator/tests/turn_taking.rs`) | Two unanswered turns and a third displaced by the request: the answer's room is busy |
 | `with_counts_real_two_plain_asides_leave_a_third_line_heard` | `LAMP_CUT_IN_COUNTS_REAL=on`: two asides heard plainly, then a third line 5 s after, which commits and ends the story; off, not heard |
 | `with_counts_real_the_lamps_own_voice_twice_still_falls_back` | With the switch: two yields whose windows the render mostly explains count, and a third line 5 s after makes no yield |
 | `with_counts_real_unknown_alone_is_not_the_lamps_own_voice` | With the switch: two yields with plain onsets and 60 `Unknown` blocks after don't count as the lamp's own voice, and the third line commits |

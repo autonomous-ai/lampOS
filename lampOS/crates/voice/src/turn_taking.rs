@@ -941,6 +941,19 @@ impl PlaybackMask {
     /// over the lamp waits for its yield to be settled. `None` when not all
     /// of the onset was heard; the conservative rules then decide it.
     fn heard_disposition(duplex: &Duplex, first: u64, trigger: u64) -> Option<Disposition> {
+        if !Self::heard_over(duplex, first, trigger)? {
+            return Some(Disposition::Pass);
+        }
+        Some(match duplex.last_yield {
+            Some((at, Yielded::Undecided)) if at >= first => Disposition::AwaitWriteEvidence,
+            Some((at, Yielded::Resumed)) if at >= first => Disposition::Suppress,
+            // Committed, or a person over a sound that was no reply.
+            _ => Disposition::Pass,
+        })
+    }
+    /// Whether any of a candidate's onset blocks, `first` to `trigger`, was
+    /// heard over the lamp; `None` when not all of them were heard.
+    fn heard_over(duplex: &Duplex, first: u64, trigger: u64) -> Option<bool> {
         let mut over = false;
         let mut found = 0;
         for (_, heard) in duplex
@@ -954,15 +967,27 @@ impl PlaybackMask {
         if trigger < first || found != trigger - first + 1 {
             return None;
         }
-        if !over {
-            return Some(Disposition::Pass);
-        }
-        Some(match duplex.last_yield {
-            Some((at, Yielded::Undecided)) if at >= first => Disposition::AwaitWriteEvidence,
-            Some((at, Yielded::Resumed)) if at >= first => Disposition::Suppress,
-            // Committed, or a person over a sound that was no reply.
-            _ => Disposition::Pass,
-        })
+        Some(over)
+    }
+    /// The first block of `candidate`'s onset.
+    fn onset_first(candidate: &Candidate) -> u64 {
+        candidate
+            .trigger_sequence
+            .saturating_sub(u64::from(START_BLOCKS) - 1)
+            .max(1)
+    }
+    /// Whether every block of `candidate`'s onset was heard and none of them
+    /// over the lamp: a sound that never made the lamp yield, which the
+    /// duplex rules pass as it is (#4868: `LAMP_CUT_IN_OVER_BED` judges it
+    /// in the coordinator).
+    pub(crate) fn plain_onset(&self, candidate: &Candidate) -> bool {
+        self.hearing().and_then(|duplex| {
+            Self::heard_over(
+                duplex,
+                Self::onset_first(candidate),
+                candidate.trigger_sequence,
+            )
+        }) == Some(false)
     }
     /// Whether this capture block was judged with evidence.
     fn was_heard(&self, sequence: u64) -> bool {
@@ -1409,10 +1434,7 @@ impl PlaybackMask {
         if !self.enabled() {
             return Ok(Disposition::Pass);
         }
-        let first_sequence = candidate
-            .trigger_sequence
-            .saturating_sub(u64::from(START_BLOCKS) - 1)
-            .max(1);
+        let first_sequence = Self::onset_first(&candidate);
         if let Some(disposition) = self.hearing().and_then(|duplex| {
             Self::heard_disposition(duplex, first_sequence, candidate.trigger_sequence)
         }) {
