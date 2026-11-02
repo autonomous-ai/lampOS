@@ -2226,6 +2226,10 @@ Nothing above changes with the switch off.
    the ask, or its last answer was the ask: a yes to another question the
    lamp asked meanwhile ("For ten minutes?") puts nothing on
    (`make_skill_local::yes_is_to_the_ask`, the Reviewer-lead's P2 on #4971).
+   The model is then told to ask once more in the ask's own words
+   (`make_skill_local::not_to_the_ask`), so the next yes counts: an ask in
+   other words ("shall I put the red glow on the lamp?") was refused at
+   every yes (lamp-9adf, 2 Nov 22:26).
 5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, and with the one more try after a failure and the
    one repair after a refusal, two asks of two tries each: about 120 s at
