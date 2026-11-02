@@ -684,9 +684,11 @@ pub fn models_from(text: &str) -> Result<Vec<Model>, String> {
         .map_err(|error| error.to_string())
 }
 
-/// Store preparation belongs to install, not a channel's settings manifest:
-/// these paths are outside the updater's setting allowlist. The signing key
-/// is never a default, and changes to these two files are the lamp's own.
+/// Store preparation: install writes both. The switch file, `store.env`,
+/// is also a setting a build carries (`manifest::STORE_ENV`, from updater
+/// 10), so a lamp installed before a build turned the Store on gets it; the
+/// drop-in stays install's alone. The signing key is never a default, and
+/// a change to either file on the lamp is the lamp's own.
 pub const STORE_SETTINGS: &[(&str, &str)] = &[
     // Store preparation only: both readers stay off until the shared switch
     // is explicitly on and the separate factory-provisioned key is valid.
@@ -701,7 +703,8 @@ pub const STORE_SETTINGS: &[(&str, &str)] = &[
 ];
 
 /// The product's settings as a build carries them (#1680, crate::apply):
-/// every one of [`SETTINGS`] and the tmpfiles, 0644. Never setup's, the
+/// every one of [`SETTINGS`], the tmpfiles and the Store's switch file
+/// (`manifest::STORE_ENV`), 0644. Never setup's, the
 /// voice's service, the keys or the zone, which are the lamp's; nor the
 /// product skills' files, which a round places from the build's
 /// `lamp-product-skills` (crate::product_skills) and the skills guard judges.
@@ -711,6 +714,11 @@ pub fn product_settings() -> Vec<manifest::Setting> {
         .iter()
         .filter(|(path, _)| !path.starts_with(&skills))
         .chain([&(TMPFILES_PATH, TMPFILES)])
+        .chain(
+            STORE_SETTINGS
+                .iter()
+                .filter(|(path, _)| *path == manifest::STORE_ENV),
+        )
         .map(|(path, text)| manifest::Setting::new(path, text))
         .collect()
 }

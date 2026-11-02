@@ -550,10 +550,11 @@ that build could never be promoted. Now:
   A newer head refuses as stale, as before.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 9 (2 reads models, 3 settings, 4 image, 5 reset plans,
+`manifest::UPDATER` is 10 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
 product unit the lamp lacks added, 9 the switch in the build's own order,
-which every product build asks for: `ORDER_UPDATER`, #4582). With its product deploy tree, this workflow now
+which every product build asks for: `ORDER_UPDATER`, #4582, 10 the Skills
+Store's switch file among the settings: `STORE_ENV_UPDATER`). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -1686,7 +1687,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 9; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
+before the field climbs first. The current `UPDATER` is 10; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
@@ -1968,9 +1969,10 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 9; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 10; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
 A manifest without settings doesn't write the field. A path must be
-`/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
+`/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`,
+`/etc/lampOS/skills/store.env` (from updater 10), or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
 `/var/lib/lampOS/skills/`; any other refuses the build. So a build never
 writes a secret key, the voice's service, the zone, setup's answers,
@@ -1993,6 +1995,21 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   `lampos.conf` with no record that is one install ever shipped
   (`apply::TMPFILES_SHIPPED`) is the build's before, and any other is the
   lamp's own. The round looks at this at step 4. A build whose only change is its settings is switched too.
+- **The Store's switch file.** `/etc/lampOS/skills/store.env`
+  (`manifest::STORE_ENV`) is install's, recorded as the other settings are,
+  and from updater 10 a build carries it too (`install::product_settings`),
+  so a lamp installed before a build turned the Store on gets the build's:
+  written while the lamp's copy is the one install wrote, kept and said
+  when it was changed on the lamp. lamp-cloud names it in
+  `EnvironmentFile=`, so a round that writes it restarts lamp-cloud. A
+  build carrying it asks for updater 10 (`manifest::STORE_ENV_UPDATER`):
+  an older updater refuses its path, and so does an older
+  `lamp-update-back`, for the whole manifest. So a round that would write
+  settings from such a build, while this lamp's settings writer is not the
+  lamp-update that runs (its refresh, below, failed or was put back),
+  waits and says so: `build N carries /etc/lampOS/skills/store.env, and
+  this lamp's settings writer is older than this lamp-update: waiting for
+  it to be refreshed`. The drop-in `store.conf` stays install's alone.
 - **Root, small.** At the switch, after the journal and normally before any
   unit, link or model moves (the paired head-pins exception is below), the round stages `apply/request.json` and the
   build's envelope in its records and starts `lamp-update-apply.service`
@@ -2127,7 +2144,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 9. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 10. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,

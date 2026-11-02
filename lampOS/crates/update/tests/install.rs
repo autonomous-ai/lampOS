@@ -772,6 +772,11 @@ fn install_prepares_store_off_and_keeps_the_lamps_store_choice() {
         );
     }
     assert!(section(&helper_drop_in, "Service").contains(&"PrivateNetwork=no"));
+    // A round that writes the switch file restarts lamp-cloud, which reads it.
+    assert!(lamp_update::models::reads(
+        &cloud,
+        lamp_update::manifest::STORE_ENV
+    ));
     assert!(lamp.install().unwrap().changed.is_empty());
     // A deliberate switch or sandbox edit survives reinstall; no key is
     // invented even if a lamp enabled the switch before provisioning it.
@@ -787,15 +792,16 @@ fn install_prepares_store_off_and_keeps_the_lamps_store_choice() {
         "[Service]\nPrivateNetwork=yes\n"
     );
     assert!(!lamp.on(lamp_skills::package::STORE_KEY).exists());
-    // Store provision is installer-only: the settings writer takes none of
-    // these paths. The factory's key never enters a build manifest; a
+    // A build carries the switch file (updater 10), never the drop-in, which
+    // stays install's. The factory's key never enters a build manifest; a
     // build ships the Store's key only in the skills folder, where
     // lamp-skills reads it (#3692, `install::store_key_setting`).
     let carried = install::product_settings();
+    assert!(carried.iter().any(|s| s.path == env));
     assert!(
-        carried.iter().all(|s| s.path != env
-            && s.path != drop_in
-            && s.path != lamp_skills::package::STORE_KEY)
+        carried
+            .iter()
+            .all(|s| s.path != drop_in && s.path != lamp_skills::package::STORE_KEY)
     );
     assert_eq!(
         install::STORE_KEY_SETTING,
