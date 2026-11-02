@@ -579,11 +579,19 @@ pub fn by_default_owner(
 /// missed check, a track found again) unnamed the owner and took the name
 /// out of the lamp's own lines (the onboarding forgets report, 30 Oct).
 /// Another voice, two faces, or a known face that isn't theirs still is.
+///
+/// `speaking_not_at_desk` is a face the eyes read speaking lately that is
+/// not counted at the desk (`known_faces::spoke_not_at_desk_lately`,
+/// `LAMP_FACES_AT_DESK_ONLY`): with only the owner's face counted, a guest
+/// far behind them who is the conversation's only voice would otherwise be
+/// told the owner's name (the Reviewer-lead's P2 on #4987). Carried or
+/// not, it holds the name back.
 pub fn someone_else_now(
     owners: &[String],
     faces: Option<usize>,
     known_now: Option<&str>,
     another_voice: bool,
+    speaking_not_at_desk: bool,
     carried: Option<&str>,
 ) -> Option<&'static str> {
     let owner_id = |id: &str| {
@@ -595,6 +603,8 @@ pub fn someone_else_now(
     let carried = carried.is_some_and(owner_id);
     if another_voice {
         Some("another voice in the conversation")
+    } else if speaking_not_at_desk {
+        Some("a face not at the desk seen speaking")
     } else if faces.is_some_and(|faces| faces > 1) {
         Some("more than one face in view")
     } else if theirs == Some(false) {
@@ -831,7 +841,7 @@ mod tests {
         let owner = "Example Name";
         let owners = [owner.to_owned()];
         let at = |faces, known: Option<&str>, voice| {
-            someone_else_now(&owners, faces, known, voice, None)
+            someone_else_now(&owners, faces, known, voice, false, None)
         };
         // Alone, the face turned away or out of view, or no look at all.
         assert_eq!(at(Some(0), None, false), None);
@@ -863,6 +873,21 @@ mod tests {
                 "{faces:?} {known:?}"
             );
         }
+        // A face not at the desk seen speaking, beside the owner alone at
+        // it (the Reviewer-lead's P2 on #4987), carried for them or not.
+        for carried in [None, Some(crate::known_faces::memory_person(owner))] {
+            assert_eq!(
+                someone_else_now(
+                    &owners,
+                    Some(1),
+                    Some(owner),
+                    false,
+                    true,
+                    carried.as_deref()
+                ),
+                Some("a face not at the desk seen speaking")
+            );
+        }
         assert!(by_default(owner).contains("“Example Name”"));
     }
 
@@ -876,7 +901,8 @@ mod tests {
         // Typed differs from the name said at who_you_are.
         let (told, owners) = by_default_owner(Some("Robin Example".to_owned()), kept()).unwrap();
         assert_eq!(told, "Robin Example");
-        let at = |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, None);
+        let at =
+            |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, false, None);
         assert_eq!(at(Some("Robin")), None);
         assert_eq!(at(Some("robin ")), None);
         assert_eq!(at(Some("Robin Example")), None);
@@ -889,18 +915,19 @@ mod tests {
         let (told, owners) = by_default_owner(None, kept()).unwrap();
         assert_eq!(told, "Robin");
         assert_eq!(
-            someone_else_now(&owners, Some(1), Some("Robin"), false, None),
+            someone_else_now(&owners, Some(1), Some("Robin"), false, false, None),
             None
         );
         assert_eq!(
-            someone_else_now(&owners, Some(1), Some("Sam Example"), false, None),
+            someone_else_now(&owners, Some(1), Some("Sam Example"), false, false, None),
             Some("a known face that isn't theirs")
         );
         // Typed only (no face saved at who_you_are), and both the same: as before.
         for kept in [None, Some("Robin Example".to_owned())] {
             let (told, owners) = by_default_owner(Some("Robin Example".to_owned()), kept).unwrap();
             assert_eq!(told, "Robin Example");
-            let at = |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, None);
+            let at =
+                |known: Option<&str>| someone_else_now(&owners, Some(1), known, false, false, None);
             assert_eq!(at(Some("Robin Example")), None);
             assert_eq!(at(Some("Robin")), Some("a known face that isn't theirs"));
             assert_eq!(at(None), Some("an unknown face in view"));
@@ -920,7 +947,7 @@ mod tests {
         let owner = crate::known_faces::memory_person("Robin");
         let guest = crate::known_faces::memory_person("Sam Example");
         let at = |faces, known: Option<&str>, voice, carried: Option<&str>| {
-            someone_else_now(&owners, faces, known, voice, carried)
+            someone_else_now(&owners, faces, known, voice, false, carried)
         };
         // Carried for the owner: an unnamed face is a slip.
         assert_eq!(at(Some(1), None, false, Some(&owner)), None);
