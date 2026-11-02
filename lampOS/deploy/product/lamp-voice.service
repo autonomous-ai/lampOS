@@ -239,7 +239,8 @@ Environment=LAMP_RING_ASLEEP=on
 # a person's try on lamp-52e6: a tap, a hold, and sleep and wake (#1798).
 Environment=LAMP_HEAD_TOUCH=on
 Environment=LAMP_RESTORED_MUTE=on
-# LAMP_SHUTDOWN stays off until the button's check on a product lamp (#3697); the first builder, 31 Oct.
+# On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
+Environment=LAMP_SHUTDOWN=on
 # A run that fails before its capture gave any audio, with no control input in flight, leaves the lamp as its person
 # left it, and a fault after the stop's signal is the stop's (#1567). On for #4332: a busy first boot (a privacy
 # connection refused, a capture message late) ended the voice before it heard anything, and the guard then muted a
