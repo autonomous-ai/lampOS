@@ -995,6 +995,12 @@ Khi đó service inactive/failed làm update thất bại, không được bỏ 
 HAL phải active trước và sau khi `/health` thành công; lỗi sẽ kích hoạt rollback.
 Chỉ HAL trước đó inactive và disabled mới bỏ qua kiểm tra runtime. Rollback trả
 về bản cài trước, không đảm bảo sửa được dependency hoặc cache dùng chung đã hỏng.
+
+Khi health check của HAL thất bại (lúc update hoặc ở bước recovery ngay sau đó), updater in
+một khối "HAL diagnostics" ngắn ra output: trạng thái unit hal, bộ nhớ và swap, mức dùng
+ổ đĩa gốc, vài dòng journal của HAL trông giống lỗi (bỏ các dòng thường vì có thể chứa lời
+người dùng nói) và các lần kernel kill do hết bộ nhớ. Khối này dưới khoảng 1 KB để không bị
+cắt khỏi phần đuôi output mà bootstrap báo lại.
 Sau khi khởi động lại HAL thành công để phục hồi, updater tắt cleanup lúc thoát
 để việc trả mã lỗi không restart service đã phục hồi thêm lần nữa.
 

@@ -231,7 +231,8 @@ class HALHealthTests(unittest.TestCase):
         script = SCRIPT.read_text()
         functions = "\n".join(
             re.search(rf"^{name}\(\) \{{\n.*?^\}}$", script, re.M | re.S).group(0)
-            for name in ("unit_wanted_active", "hal_was_active", "check_hal")
+            for name in ("unit_wanted_active", "hal_was_active", "hal_failure_diagnostics",
+                     "check_hal_runtime", "check_hal")
         )
         # Run in the same conditional context as the updater; set -e alone
         # must not hide a failed health probe or an early service crash.

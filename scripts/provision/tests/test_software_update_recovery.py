@@ -128,6 +128,40 @@ elif name == "curl":
                 self.assertFalse((self.backup / "pending-update.json").exists())
                 self.assertEqual(list(self.root.glob(".hal.new.*")), [])
 
+    HAL_PROBES = r'''
+free() { printf '%s\n' "total used free shared buff/cache available" "Mem: 3900 3700 50 10 150 120" "Swap: 1000 900 100"; }
+df() { printf '%s\n' "Filesystem Size Used Avail Use% Mounted" "/dev/root 29G 28G 200M 99% /"; }
+journalctl() {
+  if [ "$1" = -k ]; then echo "Out of memory: Killed process 42 (python)"; return 0; fi
+  printf '%s\n' "user said turn on the kitchen light" "Traceback (most recent call last):" \
+    "ModuleNotFoundError: No module named 'torch'" "INFO hal started"
+}
+'''
+
+    def test_failed_hal_health_check_reports_why(self):
+        result = self.run_shell(self.HAL_PROBES + 'if check_hal; then exit 0; else exit 1; fi', BAD_HEALTH="1")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        for expected in ("HAL diagnostics", "total=3900M avail=120M swap_used=900M", "use=99%",
+                         "ModuleNotFoundError", "Out of memory"):
+            self.assertIn(expected, result.stderr)
+        # Ordinary journal lines can quote speech and must not be reported.
+        self.assertNotIn("kitchen light", result.stderr)
+        self.assertNotIn("INFO hal started", result.stderr)
+
+    def test_healthy_hal_prints_no_diagnostics(self):
+        result = self.run_shell(self.HAL_PROBES + 'if check_hal; then exit 0; else exit 1; fi')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("HAL diagnostics", result.stderr)
+
+    def test_hal_diagnostics_stay_short_for_noisy_journals(self):
+        noisy = self.HAL_PROBES + r'''
+journalctl() { for i in $(seq 1 400); do printf 'ERROR %0500d\n' "$i"; done; }
+if check_hal; then exit 0; else exit 1; fi
+'''
+        result = self.run_shell(noisy, BAD_HEALTH="1")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertLess(len(result.stderr.encode()), 1500, result.stderr)
+
     def test_device_rejects_failed_hal_even_when_os_server_is_healthy(self):
         result = self.run_shell('DEVICE_DEST="$HAL_DIR"\nif check_device_profile; then exit 0; else exit 1; fi', DEAD_UNIT="hal")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
