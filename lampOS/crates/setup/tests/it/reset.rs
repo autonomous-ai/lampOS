@@ -947,9 +947,13 @@ fn a_reset_takes_harness_sign_in_and_pairings_and_keeps_harness_itself() {
 /// beside #4542: `/var/lib/lampOS/skills-dev` on #4514).
 #[test]
 fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
-    const KEPT: [(&str, &str); 5] = [
+    const KEPT: [(&str, &str); 6] = [
         // The factory's self-test record, kept on purpose (install.md).
         ("/var/lib/lamp-selftest", "the self-test's runs"),
+        // Each servo's highest load and temperature a day (#4501,
+        // `peaks::DIR`): the servos' wear, a fact of this lamp like the
+        // self-test's runs, which goes on with the next owner.
+        ("/var/lib/lampos-body", "the servos' wear"),
         // The product's skills, which install and each round put back. A
         // skill put on from a package there, made by voice or from the
         // Store, is the person's: the reset removes it in its own step
