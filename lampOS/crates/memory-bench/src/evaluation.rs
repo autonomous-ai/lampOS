@@ -286,6 +286,11 @@ pub fn evaluate_with_history(
         return Ok(malformed(MALFORMED_JUDGE, Some(call.request_hash()?)));
     };
     scored_question.evidence_ids = supplied_judge_ids(question, answers);
+    // A reply off the frozen rubric (wrong award count, no explanation, or an
+    // evidence id the question never offered) is a malformed judgment too.
+    if preliminary.needs_judge && !score::judge_fits(&scored_question, &judge) {
+        return Ok(malformed(MALFORMED_JUDGE, Some(call.request_hash()?)));
+    }
     let score = score::judge_score(&scored_question, &aggregate, &judge)?;
     Ok(Evaluation {
         score,

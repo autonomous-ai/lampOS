@@ -224,6 +224,20 @@ pub struct JudgeOutput {
     pub explanation: String,
     pub evidence_ids: Vec<String>,
 }
+/// Whether a judge reply fits the question's frozen rubric: one award per
+/// criterion, an explanation, and only evidence ids the question offered.
+/// A reply that doesn't is a malformed judgment, scored 0 by the evaluator.
+pub fn judge_fits(question: &Question, judge: &JudgeOutput) -> bool {
+    let Rule::Rubric { criteria, .. } = &question.rule else {
+        return false;
+    };
+    judge.awarded.len() == criteria.len()
+        && !judge.explanation.trim().is_empty()
+        && judge
+            .evidence_ids
+            .iter()
+            .all(|id| question.evidence_ids.contains(id))
+}
 pub fn judge_score(question: &Question, answer: &Answer, judge: &JudgeOutput) -> Result<Score> {
     let preliminary = question.score(answer)?;
     if !preliminary.needs_judge {
@@ -232,13 +246,7 @@ pub fn judge_score(question: &Question, answer: &Answer, judge: &JudgeOutput) ->
     let Rule::Rubric { criteria, .. } = &question.rule else {
         return Err(invalid("not a rubric question"));
     };
-    if judge.awarded.len() != criteria.len()
-        || judge.explanation.trim().is_empty()
-        || judge
-            .evidence_ids
-            .iter()
-            .any(|id| !question.evidence_ids.contains(id))
-    {
+    if !judge_fits(question, judge) {
         return Err(invalid("judge response does not match frozen rubric"));
     }
     Ok(Score {
