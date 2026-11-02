@@ -772,10 +772,13 @@ this room" until someone asks to be recognised.
   lamp, so the known file names them within one look, not two seconds
   later (#3108; `who::recognise_due`). With `LAMP_FACE_REFOUND=on` (off
   unless set, #4486) a check is also due at once when the near face's
-  passing id is not the one at the last check that read a print, so a face
-  turned away and back, which comes back with a new id, is known in its
-  first look; while no print is read for it (turned, or too small) it is
-  asked at every look, and once one is, every two seconds again
+  passing id is not among the ids a print was read for (the newest 16), so
+  a face turned away and back, which comes back with a new id, is known in
+  its first look. A face too small to be near has no near id and forces
+  nothing; while its alignment or print fails (turned) the id is asked
+  again at most every half second (`REFOUND_RETRY`), and once one is read,
+  every two seconds again, so two near faces whose largest flips look to
+  look force one check each, not a print every look
   (`who::recognise_due_near`). It needs a passing id, so `LAMP_EYES_SPEAKING`;
   off, the two seconds stand as before. A face from a photo is not: it is
   named only on its person's yes. The camera gives 320 by 240, so a face at the desk is 35 to
@@ -784,7 +787,8 @@ this room" until someone asks to be recognised.
   the face is cut from the frame at its own size instead
   ([below](#held-through-a-miss-lamp_face_full_cropon-3126)).
 - **The score, in the journal.** Each check with a face in view, outside a
-  remembering, says one line, at most every two seconds:
+  remembering, says one line, at most every two seconds (with
+  `LAMP_FACE_REFOUND=on`, also at a forced check above):
   `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363)`, the
   best cosine against anyone's kept prints (`none` with nobody remembered
   or no face near enough), the largest face's height as a share of the
