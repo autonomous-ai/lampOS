@@ -585,10 +585,23 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     (`VOICE_IDS_BY_LANG`) is turned into its id; any other value is taken as
     an id.
 
-  OpenAI and Gemini are given the text without anything in `[...]`;
-  ElevenLabs is given it as written, tags and all, unless
-  `LAMP_SECOND_SPEECH_TAGS=on` filters it (below). A sentence with nothing
-  left to say sends no request. Every sample is doubled (+6 dB) and clipped at full scale:
+  Before anything reads a round of the chat's reply, tool text, markup and
+  stage directions are taken out of it, piece by piece, for every voice
+  (`speech_tags::Stage`, always on; 29e7 item 5, where
+  `\light_dimmer\</antml> The light's already at its dimmest…` and a
+  `[…soft warm white]` opened a piece earlier were spoken and kept as
+  said). A `\word\` pair, a `<tag>` or `</tag>` and a `[...]` span
+  (nested brackets counted) are dropped; a `<` or backslash before
+  anything but a word is a character, so `3 < 5` is said. A stray `]`
+  drops only itself, since what came before it already went on toward the
+  voice. A span still open at the round's end is dropped, but one longer
+  than 200 characters is said as words without its opener, so a stray `[`
+  never swallows an answer. The spaces around a span close to one, none
+  before punctuation. What is said, the lamp's words, `lamp_last_said`,
+  the thread and the chat's own history all get what is left. With
+  `LAMP_SECOND_SPEECH_TAGS` set, a listed tag is left in for the voice to
+  be given (below); without it, ElevenLabs gets no tag either. A sentence
+  with nothing left to say sends no request. Every sample is doubled (+6 dB) and clipped at full scale:
   through the relay `tts-1` `nova` measured peak -7.3 dBFS and RMS -28.8
   dBFS, ElevenLabs Rachel peak -6.4 and RMS -23.5, and the second voice was
   heard much quieter than Gemini's.
@@ -914,7 +927,8 @@ order is kept. A written turn is the same from the chat on.
   before speech or transcript text, even across streamed chunks, with no
   extra chat round. Only its possible prefix waits (at most 19 bytes);
   divergent text is released in the same chunk, and an incomplete marker
-  at the end is kept as text. Ordinary "Nothing." answers and substantive
+  at the end goes on as text, where the stage filter (above) drops it as
+  an unclosed tag. Ordinary "Nothing." answers and substantive
   words after the marker are preserved. The local processing target is
   under 1 ms; the prompt's effect on the model and acoustic latency still
   need a lamp replay.
