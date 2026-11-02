@@ -284,10 +284,23 @@ impl Stream {
         Ok(())
     }
     pub fn reply(&self) -> Result<Reply> {
-        if !self.done || !matches!(self.finish.as_deref(), Some("stop" | "tool_calls")) {
-            return Err(invalid(
-                "chat did not finish normally (truncation/filter/refusal)",
-            ));
+        if !self.done || self.finish.is_none() {
+            return Err(invalid("chat stream ended without a finish reason"));
+        }
+        // A completed stream that ended for another reason (truncation at the
+        // output limit, a content filter, a refusal) is a reply with no usable
+        // text, never a transport failure: its usage is charged as reported,
+        // and the answer loop and the blind judge record it as malformed and
+        // score its question 0 (evaluation policy `invalid_output`); an
+        // adapter's own call sees empty text. Its partial words are left out.
+        if !matches!(self.finish.as_deref(), Some("stop" | "tool_calls")) {
+            return Ok(Reply {
+                content: Some(String::new()),
+                tool_calls: vec![],
+                reasoning_details: None,
+                usage: self.usage.clone(),
+                vectors: vec![],
+            });
         }
         if (self.finish.as_deref() == Some("tool_calls")) == self.tools.is_empty() {
             return Err(invalid("chat finish reason disagrees with tool calls"));
