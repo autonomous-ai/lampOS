@@ -435,7 +435,7 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
             eprintln!("lamp-setup: recover: the radio was left a hotspot: back to the station")
         }
         Some(Err(error)) => eprintln!(
-            "lamp-setup: recover: the radio was left a hotspot and the station could not start: {error}; the next start tries again"
+            "lamp-setup: recover: the radio was left a hotspot and the station could not start: {error}; the next boot tries again if it is still one"
         ),
         None => {}
     }

@@ -199,19 +199,27 @@ pub const INTERFACE_WAIT_MS: u64 = 30_000;
 
 /// Whether the image's `device-ap-mode` left the radio a hotspot (#4863),
 /// read from what it changes that outlives a boot: `wpa_supplicant@wlan0`
-/// masked (its unit a link to `/dev/null`), or `denyinterfaces wlan0` in
-/// dhcpcd's file. Either alone leaves the lamp with no client network at
-/// boot, and only `device-sta-mode` undoes them. `root` is `/` on a lamp.
-/// Read from the lamp's own state, not a note of ours: it holds whoever left
-/// the hotspot (a build before this one too, as lamp-0c89 was left), and
-/// this unit can't write `/var/lib` (`ProtectSystem=strict`). The image's
-/// scripts name `wlan0` only, so this does too.
+/// masked (its unit a link to `/dev/null`) or not enabled (no link in
+/// `multi-user.target.wants`, where `device-sta-mode`'s `systemctl enable`
+/// puts it), or `denyinterfaces wlan0` in dhcpcd's file. Any one leaves the
+/// lamp with no client network at boot, and only `device-sta-mode` undoes
+/// them; not enabled also covers one cut between its `unmask` and its
+/// `enable` (Fifth's P3 on #4931). `root` is `/` on a lamp. Read from the
+/// lamp's own state, not a note of ours: it holds whoever left the hotspot
+/// (a build before this one too, as lamp-0c89 was left), and this unit
+/// can't write `/var/lib` (`ProtectSystem=strict`). The image's scripts name
+/// `wlan0` only, so this does too.
 pub fn left_as_hotspot(root: &std::path::Path) -> bool {
-    let masked = std::fs::read_link(root.join("etc/systemd/system/wpa_supplicant@wlan0.service"))
+    let units = root.join("etc/systemd/system");
+    let masked = std::fs::read_link(units.join("wpa_supplicant@wlan0.service"))
         .is_ok_and(|target| target == std::path::Path::new("/dev/null"));
+    let enabled = std::fs::symlink_metadata(
+        units.join("multi-user.target.wants/wpa_supplicant@wlan0.service"),
+    )
+    .is_ok();
     let denied = std::fs::read_to_string(root.join("etc/dhcpcd.conf"))
         .is_ok_and(|conf| conf.lines().any(|line| line == "denyinterfaces wlan0"));
-    masked || denied
+    masked || !enabled || denied
 }
 
 /// `device-sta-mode`, then a sync whatever it ended with: the root is
@@ -234,13 +242,24 @@ pub fn closed(
     marker.exists().then(|| back_to_station(host))
 }
 
+/// How many times the boot repair runs `device-sta-mode` before it gives
+/// up until the next boot, and the wait between (Fifth's P2 on #4931): the
+/// script disables the hotspot before its first `iw`, which has no
+/// fallback, so a radio not ready yet leaves the lamp neither a hotspot nor
+/// a station. Worst case 30 s for the interface, 3 x 45 s
+/// ([`crate::wifi::RADIO_TIMEOUT`]) and 2 x 20 s: under 4 min, before the
+/// watch begins; the unit is `Type=simple`, so no start timeout applies.
+pub const STATION_TRIES: u32 = 3;
+pub const STATION_RETRY_MS: u64 = 20_000;
+
 /// At `recover`'s start, whatever its switch says (#4863): a set-up lamp
 /// left a hotspot ([`left_as_hotspot`]) by a stop that never closed it, a
 /// power cut above all, goes back to the station. Never before the marker
 /// (a first setup's hotspot is meant), nor while setup runs or a Wi-Fi
 /// change's `.lamp-previous` is there (theirs is the radio). `None`: nothing
-/// was done. A failed return leaves the state as it was, so the next start
-/// tries again.
+/// was done. A failed return still left a hotspot is tried again
+/// [`STATION_TRIES`] times in all, [`STATION_RETRY_MS`] apart (the host's
+/// wait, so tests don't sleep); after the last, the next boot tries again.
 pub fn at_start(
     host: &mut impl crate::wifi::Host,
     root: &std::path::Path,
@@ -256,5 +275,13 @@ pub fn at_start(
     while !interface.exists() && host.now_ms().saturating_sub(since) < INTERFACE_WAIT_MS {
         host.sleep(std::time::Duration::from_secs(1));
     }
-    Some(back_to_station(host))
+    let mut tries = 1;
+    loop {
+        let result = back_to_station(host);
+        if result.is_ok() || tries >= STATION_TRIES || !left_as_hotspot(root) {
+            return Some(result);
+        }
+        tries += 1;
+        host.sleep(std::time::Duration::from_millis(STATION_RETRY_MS));
+    }
 }
