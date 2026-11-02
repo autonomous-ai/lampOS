@@ -364,6 +364,21 @@ fn yes_is_to_the_ask(
     }
 }
 
+/// What the model is told of a yes to another question: ask again, in the
+/// ask's own words. Only an answer that said [`made_skill::ASK_TO_PUT_ON`]
+/// makes the next yes one to it; an ask in other words ("shall I put the
+/// red glow on the lamp?") was refused again at every yes (lamp-9adf,
+/// 2 Nov 22:26).
+fn not_to_the_ask() -> Value {
+    json!({
+        "error": "that yes was to another question, not to putting the skill on",
+        "next": format!(
+            "Don't put it on. If they still want it, ask once more, exactly: \"{}\"",
+            made_skill::ASK_TO_PUT_ON
+        )
+    })
+}
+
 /// The just-made skill kept as asked when a yes comes at `now_unix_ms`
 /// right after `answered`, the lamp's last answer and its age: only if
 /// that answer said [`made_skill::ASK_TO_PUT_ON`] within
@@ -474,10 +489,7 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
         // ("For ten minutes?") puts nothing on (the Reviewer-lead's P2 on
         // #4971, as #4880's rule for the voice path).
         if !yes_is_to_the_ask(&keeping.directory, answered.as_ref(), now_unix_ms) {
-            return json!({
-                "error": "that yes was to another question, not to putting the skill on",
-                "next": "Don't put it on. If they still want it, ask once more in a few words whether to put it on the lamp."
-            });
+            return not_to_the_ask();
         }
         let said = heard.then(|| {
             crate::thread::THREAD
@@ -841,6 +853,17 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(!yes_is_to_the_ask(
             &keeping.directory,
             Some(&("For ten minutes?".to_owned(), Duration::from_secs(3))),
+            now
+        ));
+        // The model is told to ask again in the ask's own words, and a yes
+        // to that ask counts (lamp-9adf, 2 Nov 22:26: an ask in other words
+        // was refused at every yes).
+        let refused = not_to_the_ask();
+        let again = refused["next"].as_str().unwrap();
+        assert!(again.contains(made_skill::ASK_TO_PUT_ON), "{refused}");
+        assert!(yes_is_to_the_ask(
+            &keeping.directory,
+            Some(&(made_skill::ASK_TO_PUT_ON.to_owned(), Duration::from_secs(2))),
             now
         ));
         let _ = std::fs::remove_dir_all(&root);
