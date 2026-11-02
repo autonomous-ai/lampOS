@@ -223,6 +223,26 @@ fn told(made: Result<Made, Refused>) -> Value {
     }
 }
 
+/// The just-made skill kept as asked when a yes comes at `now_unix_ms`
+/// right after `answered`, the lamp's last answer and its age: only if
+/// that answer said [`made_skill::ASK_TO_PUT_ON`] within
+/// [`made_skill::PUT_ON_WITHIN`]. Dated at the yes, not at the answer: its
+/// age runs from its first piece ("I'll make it now"), said before the
+/// call kept the skill, and the ask comes later in the same answer (the
+/// Reviewer-lead's second P2 on #4914). Whether one was kept so.
+fn asked_at_yes(
+    directory: &std::path::Path,
+    answered: Option<(String, Duration)>,
+    now_unix_ms: u64,
+) -> std::io::Result<bool> {
+    match answered {
+        Some((lamp_said, ago)) if ago <= made_skill::PUT_ON_WITHIN => {
+            made_skill::asked_in_answer(directory, &lamp_said, Duration::ZERO, now_unix_ms)
+        }
+        _ => Ok(false),
+    }
+}
+
 /// A call of [`made_skill::MAKE`] or [`made_skill::PUT_ON`] with the
 /// switch, in the product's places: `request`'s words heard (`heard`) for a
 /// yes, which must be said out loud.
@@ -239,12 +259,13 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
         // does since #4880): a yes after a cut-in or another question puts
         // nothing on.
         if heard
-            && let Some((lamp_said, ago)) = crate::thread::THREAD
-                .lock()
-                .ok()
-                .and_then(|thread| thread.answered_last_but(request, std::time::Instant::now()))
-            && let Err(error) =
-                made_skill::asked_in_answer(&keeping.directory, &lamp_said, ago, now_unix_ms)
+            && let Err(error) = asked_at_yes(
+                &keeping.directory,
+                crate::thread::THREAD.lock().ok().and_then(|thread| {
+                    thread.answered_last_but(request, std::time::Instant::now())
+                }),
+                now_unix_ms,
+            )
         {
             eprintln!("lamp-voice: a skill made here: its ask in an answer was not kept: {error}");
         }
@@ -431,6 +452,45 @@ light = { dim = 1 }
         assert_eq!(waiting(&keeping.directory).unwrap().0, "evening-dim");
         assert_eq!(served.join().unwrap(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Reviewer-lead's second P2 on #4914, through the thread as the
+    /// lamp says it: "I'll make it now", then the call keeps the skill, then
+    /// the ask in the same answer, then a yes: the skill waits. An answer
+    /// that asked something else keeps it unasked.
+    #[test]
+    fn the_ask_after_the_make_in_the_same_answer_keeps_the_skill_asked() {
+        use crate::thread::Thread;
+        for (ending, asked) in [
+            (made_skill::ASK_TO_PUT_ON, true),
+            ("Want a reminder too?", false),
+        ] {
+            let (root, keeping) = keeping(if asked { "thread-ask" } else { "thread-other" });
+            let mut thread = Thread::new();
+            let began = std::time::Instant::now();
+            thread.person("Make me a skill that dims the light at 10 pm.", true, began);
+            thread.lamp(1, "I'll make it now.", began);
+            let (url, served) = service(vec![(200, good())]);
+            let told = make(REQUEST, &keeping, chat_at(url), NOW);
+            assert_eq!(told["made"], "evening-dim", "{told}");
+            thread.lamp(1, &format!("It dims the light at ten. {ending}"), began);
+            thread.person("Yes.", true, std::time::Instant::now());
+            let now_unix_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            let answered = thread.answered_last_but(2, std::time::Instant::now());
+            assert_eq!(
+                asked_at_yes(&keeping.directory, answered, now_unix_ms).unwrap(),
+                asked
+            );
+            assert_eq!(
+                made_skill::waiting(&keeping.directory, now_unix_ms).map(|(name, _)| name),
+                asked.then(|| "evening-dim".to_owned())
+            );
+            assert_eq!(served.join().unwrap(), 1);
+            let _ = std::fs::remove_dir_all(&root);
+        }
     }
 
     /// An answer without the two files is said as not made; nothing is
