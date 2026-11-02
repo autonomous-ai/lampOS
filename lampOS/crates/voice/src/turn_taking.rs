@@ -129,6 +129,28 @@ pub fn cut_in_over_bed() -> bool {
     std::env::var(CUT_IN_OVER_BED_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// The effective [`CUT_IN_OVER_BED_ENVIRONMENT`] switch, given whether stop
+/// words are heard (`LAMP_STOP_WORDS=heard` or `heard-always`), and the
+/// voice's one journal line at start about it. Without stop words the switch
+/// is inert: a plain "Stop." over a bed must still stop the lamp.
+pub fn over_bed_switch(on: bool, stop_words: bool) -> (bool, Option<&'static str>) {
+    match (on, stop_words) {
+        (false, _) => (false, None),
+        (true, true) => (
+            true,
+            Some(
+                "lamp-voice: cut-ins over a bed: in a room busy as the answer began, talk alone ends no answer, only a stop word, the lamp's name, a tap or the button",
+            ),
+        ),
+        (true, false) => (
+            false,
+            Some(
+                "lamp-voice: cut-in over a bed: off, it needs LAMP_STOP_WORDS=heard (a plain \"Stop.\" must still stop the lamp)",
+            ),
+        ),
+    }
+}
+
 /// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
 /// The window is bounded: the consecutive `Over` blocks that made the yield
 /// (its onset run, 7 or 10 blocks) and every block heard while the yield is
@@ -2310,6 +2332,44 @@ mod tests {
         assert_eq!(cut_in(true, true), [Step::Yield, Step::Resume]);
         assert_eq!(cut_in(true, false), [Step::Yield, Step::Commit]);
         assert_eq!(cut_in(false, true), [Step::Yield, Step::Commit]);
+    }
+
+    /// #4868: `LAMP_CUT_IN_OVER_BED=on` without stop words is inert: a bed
+    /// after a busy-room yield commits by rule (a) as without the switch,
+    /// and the start line says the switch is off and why.
+    #[test]
+    fn the_over_bed_switch_without_stop_words_is_inert() {
+        let (on, line) = over_bed_switch(true, false);
+        let mut mask = PlaybackMask::duplex();
+        mask.assume_matched();
+        mask.over_bed(on, true);
+        let mut sequence = 1;
+        let mut steps = hear(
+            &mut mask,
+            &mut sequence,
+            ONSET,
+            0.9,
+            &evidence(0, OVER),
+            true,
+        );
+        hear(&mut mask, &mut sequence, 30, 0.1, &evidence(10, None), true);
+        steps.extend(hear(
+            &mut mask,
+            &mut sequence,
+            120,
+            0.9,
+            &evidence(40, None),
+            true,
+        ));
+        let steps = steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>();
+        assert_eq!(steps, [Step::Yield, Step::Commit]);
+        let line = line.expect("one start line");
+        assert!(
+            line.contains("off") && line.contains("LAMP_STOP_WORDS=heard"),
+            "{line}"
+        );
+        assert!(over_bed_switch(true, true).0);
+        assert_eq!(over_bed_switch(false, true), (false, None));
     }
 
     #[test]

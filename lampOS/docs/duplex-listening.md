@@ -469,8 +469,10 @@ clear nor stillness after plain blocks commits a yield
 (`Interruption::over_bed` in `lamp-audio`): it resumes at stillness or its
 1.1 s deadline, counted as any fruitless yield. A stop word
 (`LAMP_STOP_WORDS=heard`), a forced yield, the lamp's name, a head tap or
-the button still stop the answer; without a word listener a bare "Stop."
-over a bed does not. In any room the switch also counts toward the
+the button still stop the answer. The switch acts only with
+`LAMP_STOP_WORDS=heard` (or `heard-always`): without a word listener it is
+inert, exactly as off, so a plain "Stop." still stops the lamp, and the
+journal says so once at start. In any room the switch also counts toward the
 stillness rule only the plain blocks of the run that made the lamp yield:
 after it the render at the alignment is silent, so the lamp's own tail,
 still arriving for up to about 270 ms, is plain by construction, and on
@@ -1361,6 +1363,7 @@ functions:
 | `over_a_bed_of_talk_a_stop_word_still_ends_the_reply` | With the switch, the room busy: a stop word commits the yield at its next block |
 | `without_the_over_bed_switch_a_bed_of_talk_commits_as_before` | The switch off: the bed commits at its sixth block in the clear |
 | `with_the_over_bed_switch_a_quiet_room_still_commits_to_a_person` | With the switch, a quiet room: a person commits at the sixth block in the clear |
+| `the_over_bed_switch_without_stop_words_is_inert` | The switch on, stop words off: a bed after a busy-room yield commits as off; the start line says why |
 | `talk_over_a_room_busy_before_the_answer_resumes_it_with_the_switch` (`turn_taking.rs`) | The mask hands the switch and the busy room to its yields |
 | `with_counts_real_two_plain_asides_leave_a_third_line_heard` | `LAMP_CUT_IN_COUNTS_REAL=on`: two asides heard plainly, then a third line 5 s after, which commits and ends the story; off, not heard |
 | `with_counts_real_the_lamps_own_voice_twice_still_falls_back` | With the switch: two yields whose windows the render mostly explains count, and a third line 5 s after makes no yield |
