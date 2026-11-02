@@ -32,9 +32,58 @@ pub const WRITE_WITHIN: Duration = Duration::from_secs(30);
 const MOST_ANSWER_BYTES: usize = 20 * 1024;
 /// What a made skill's answer is kept from: this, and when it was made.
 pub const FROM: &str = "local:";
-/// What the model is told it is, before the brief.
-const SYSTEM: &str = "You write skills for a lamp. Answer exactly as the request says, with \
-                      the two fenced blocks and nothing else.";
+/// A made skill that `lamp-skills pack` and [`made_skill::capped`] take,
+/// shown to the model whole: the brief alone was written for a computer's
+/// agent with the repository at hand, and the lamp's own model, without it,
+/// wrote fields the check refused (lamp-9adf, 2 Nov 16:10 and 16:12: a
+/// trigger field and a light step it doesn't know).
+const EXAMPLE: &str = "```skill.toml
+kind = \"installable\"
+version = \"1.0.0\"
+needs = [\"light\"]
+
+[permissions]
+topics = [\"room/presence\"]
+light = true
+
+[trigger]
+topic = \"room/presence\"
+field = \"someone\"
+equals = true
+for = \"5s\"
+cooldown = \"1h\"
+rearm = \"ends\"
+
+[ask]
+policy = \"nudge\"
+
+[[do]]
+light = { colour = \"cyan\", level = 3, for = \"20s\" }
+```
+
+```SKILL.md
+---
+name: water-on-return
+description: Glows cyan for twenty seconds when you come back to the desk, a nudge to drink some water.
+---
+
+# Water on return
+
+When someone is back at the lamp, it glows cyan for a moment.
+```";
+
+/// What the model is told it is, before the brief: the format, and a whole
+/// skill the lamp's check takes.
+fn system() -> String {
+    format!(
+        "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
+         blocks and nothing else. Use only the keys and values the request names, written as \
+         in this skill, which the lamp's check takes:\n\n{EXAMPLE}\n\nA skill can't speak \
+         or keep time by itself: a reminder at a time or every so often is the lamp's own \
+         timer, not a skill. Make what the request asks with the light or the head, on the \
+         lamp's resting or someone being there."
+    )
+}
 
 /// Whether the switch is on in this process's environment.
 pub fn from_environment() -> bool {
@@ -100,7 +149,7 @@ pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
 async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
     tokio::time::timeout(WRITE_WITHIN, async {
         let mut stream = chat
-            .send(&[Message::system(SYSTEM), Message::user(brief)])
+            .send(&[Message::system(system()), Message::user(brief)])
             .await?;
         let mut text = String::new();
         while let Some(event) = stream.next().await? {
@@ -146,7 +195,7 @@ pub fn own_chat() -> Result<Chat, String> {
 pub fn make(
     request: &str,
     keeping: &Keeping,
-    chat: impl FnOnce() -> Result<Chat, String> + Send + 'static,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     now_unix_ms: u64,
 ) -> Value {
     let brief = match made_skill::brief(request) {
@@ -159,7 +208,43 @@ pub fn make(
         }
     };
     let began = std::time::Instant::now();
-    let answer = std::thread::Builder::new()
+    let chat = Arc::new(chat);
+    let from = format!("{FROM}{now_unix_ms}");
+    let kept = |answer: Result<String, String>| match answer {
+        Ok(text) => made_skill::keep(&text, false, &from, keeping),
+        Err(why) => {
+            eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
+            Err(Refused("the lamp's model didn't answer".into(), None))
+        }
+    };
+    let mut made = kept(ask(Arc::clone(&chat), brief));
+    // Refused by the lamp's check: its lines go back to the model once, as
+    // a computer's agent's repair does (`made_skill::repair_brief`).
+    if let Err(Refused(_, Some(lines))) = &made
+        && let Ok(repair) = made_skill::repair_brief(request, lines)
+    {
+        eprintln!("lamp-voice: a skill made here: the check's lines go back to the model once");
+        made = kept(ask(chat, repair));
+    }
+    eprintln!(
+        "lamp-voice: a skill made here {} in {} ms",
+        if made.is_ok() {
+            "was kept"
+        } else {
+            "wasn't kept"
+        },
+        began.elapsed().as_millis()
+    );
+    told(made)
+}
+
+/// The model's answer to `brief`, asked on a thread of its own with a
+/// runtime of its own.
+fn ask(
+    chat: Arc<impl Fn() -> Result<Chat, String> + Send + Sync + 'static>,
+    brief: String,
+) -> Result<String, String> {
+    std::thread::Builder::new()
         .name("lamp-voice-make-skill".into())
         .spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
@@ -176,24 +261,7 @@ pub fn make(
             thread
                 .join()
                 .unwrap_or_else(|_| Err("the model's thread failed".into()))
-        });
-    let made = match answer {
-        Ok(text) => made_skill::keep(&text, false, &format!("{FROM}{now_unix_ms}"), keeping),
-        Err(why) => {
-            eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
-            Err(Refused("the lamp's model didn't answer".into(), None))
-        }
-    };
-    eprintln!(
-        "lamp-voice: a skill made here {} in {} ms",
-        if made.is_ok() {
-            "was kept"
-        } else {
-            "wasn't kept"
-        },
-        began.elapsed().as_millis()
-    );
-    told(made)
+        })
 }
 
 /// What the model is told of a skill made here: kept, or not made, and
@@ -404,7 +472,7 @@ light = { dim = 1 }
         (format!("http://{address}/v1/"), served)
     }
 
-    fn chat_at(url: String) -> impl FnOnce() -> Result<Chat, String> + Send + 'static {
+    fn chat_at(url: String) -> impl Fn() -> Result<Chat, String> + Send + Sync + 'static {
         move || {
             Chat::with(&url, "m", "secret", Arc::new(Vec::new)).map_err(|error| error.to_string())
         }
@@ -511,6 +579,45 @@ light = { dim = 1 }
         assert_eq!(waiting(&keeping.directory), None);
         assert!(made_skill::entries(&keeping.directory).is_empty());
         assert_eq!(served.join().unwrap(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Refused by the lamp's check, the check's lines go back to the model
+    /// once, and its corrected answer is kept (lamp-9adf, 2 Nov 16:10: the
+    /// model's first skill had a trigger field the check didn't know).
+    #[test]
+    fn a_skill_the_check_refuses_goes_back_to_the_model_once() {
+        let (root, keeping) = keeping("repair");
+        // The check refuses a skill.toml with a field it doesn't know.
+        std::fs::write(
+            &keeping.program,
+            "#!/bin/sh
+if grep -q every \"$4/skill.toml\"; then echo \"skill.toml: trigger: unknown field every\"; echo \"skill.toml: trigger: unknown field every\" >&2; exit 1; fi
+name=$(basename \"$4\")
+printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
+        )
+        .unwrap();
+        let bad = good().replace("[trigger]\n", "[trigger]\nevery = \"90m\"\n");
+        let (url, served) = service(vec![(200, bad.clone()), (200, good())]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        // Refused twice: said as not made, and asked no third time.
+        let (url, served) = service(vec![(200, bad.clone()), (200, bad)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The skill shown to the model is one a made skill may be: the cap
+    /// and the keeping take it (lamp-skills pack took it too, 2 Nov).
+    #[test]
+    fn the_example_shown_to_the_model_is_a_skill_the_lamp_takes() {
+        let (root, keeping) = keeping("example");
+        let made = made_skill::keep(EXAMPLE, false, "local:1", &keeping).unwrap();
+        assert_eq!(made.name, "water-on-return");
+        assert!(system().contains(EXAMPLE));
         let _ = std::fs::remove_dir_all(&root);
     }
 
