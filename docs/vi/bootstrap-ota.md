@@ -997,9 +997,9 @@ Chỉ HAL trước đó inactive và disabled mới bỏ qua kiểm tra runtime.
 về bản cài trước, không đảm bảo sửa được dependency hoặc cache dùng chung đã hỏng.
 
 Khi health check của HAL thất bại (lúc update hoặc ở bước recovery ngay sau đó), updater in
-một khối "HAL diagnostics" ngắn ra output: trạng thái unit hal, bộ nhớ và swap, mức dùng
+một khối "HAL diagnostics" ngắn ra output: trạng thái unit hal (đã nạp, bật hay tắt, kết quả điều kiện khởi động, lần khởi động và dừng gần nhất), bộ nhớ và swap, mức dùng
 ổ đĩa gốc, các dòng journal của HAL chỉ lấy theo cấu trúc (vị trí traceback, tên module bị thiếu, tên loại
-exception không kèm message, và message thoát/khởi động lại `hal.service:` của systemd ở các dạng cố định;
+exception không kèm message, và message khởi động, dừng, thoát và khởi động lại của unit hal từ systemd ở các dạng cố định;
 không bao giờ khớp dòng văn bản tự do, kể cả theo tiền tố, vì HAL log cả lời người dùng nói) và các lần kernel kill do hết bộ nhớ. Khối này dưới khoảng 1 KB để không bị
 cắt khỏi phần đuôi output mà bootstrap báo lại.
 Sau khi khởi động lại HAL thành công để phục hồi, updater tắt cleanup lúc thoát

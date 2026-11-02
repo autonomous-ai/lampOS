@@ -1032,10 +1032,10 @@ the runtime probe. Rollback restores the previous installation, not a verified
 repair of corrupted dependency files or their shared cache.
 
 When the HAL health check fails (on the update or on the recovery that follows), the
-updater prints a short "HAL diagnostics" block to its output: the hal unit state, memory
+updater prints a short "HAL diagnostics" block to its output: the hal unit state (load and enabled state, start condition result, last start and stop times), memory
 and swap, root-disk use, structure-only lines from HAL's journal (traceback
 locations, the name of a missing module, exception type names without their message, and
-systemd's own `hal.service:` exit and restart messages in fixed forms; free-text lines are
+systemd's own start, stop, exit and restart messages for the unit in fixed forms; free-text lines are
 never matched, not even by prefix, because HAL logs what users say) and any
 kernel out-of-memory kills. It
 stays under about 1 KB so it survives the output tail that bootstrap reports.
