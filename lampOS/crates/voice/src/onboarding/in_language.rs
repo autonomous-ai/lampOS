@@ -679,8 +679,9 @@ const KOREAN: Lexicon = Lexicon {
         "하지 말아",
         "말아",
         "틀려",
-        // "하지 않아도 돼": "you don't have to".
-        "않아도",
+        // "하지 않아도 돼": "you don't have to". Not a bare 않아도: "굳이
+        // 묻지 않아도 돼요" is "no need to ask" (Reviewer-lead's P3 on #4858).
+        "하지 않아도",
     ],
     hello: &["인사", "안녕"],
     greet: &[
@@ -916,17 +917,19 @@ impl Lexicon {
             .filter(|word| word.contains(' '))
             .collect();
         // A strict no after a "but" is a clear no, never put off and at any
-        // length: "고마워, 하지만 안 해도 돼".
+        // length: "고마워, 하지만 안 해도 돼". Another put-off still holds it
+        // ("글쎄, 근데 싫지는 않아요"), and "아니면" ("or else") after the
+        // "but" is no 아니 (Reviewer-lead's P3s on #4858).
+        let put_off_line = self.without(&line, &longer).0;
         let but_no = !asks
+            && !self.any(&self.without(&put_off_line, self.but).0, self.put_off)
             && self.but.iter().any(|word| {
-                line.find(&format!(" {word}"))
-                    .is_some_and(|at| self.any(&line[at + 1..], self.strict_no))
+                line.find(&format!(" {word}")).is_some_and(|at| {
+                    let after = self.without(&line[at..], &["아니면"]).0;
+                    self.any(&after, self.strict_no)
+                })
             });
-        let mut put_off_line = self.without(&line, &longer).0;
-        if but_no {
-            put_off_line = self.without(&put_off_line, self.but).0;
-        }
-        let puts_off = self.any(&put_off_line, self.put_off);
+        let puts_off = !but_no && self.any(&put_off_line, self.put_off);
         let greets = self.any(&line, self.greet);
         let again = self.any(&line, self.again);
         // What is left to hold a yes or a no.
@@ -934,7 +937,9 @@ impl Lexicon {
         let (answer, _) = self.without(&line_no_again, self.ignore);
         let (rest, phrase) = self.without(&answer, self.yes_phrases);
         let (ungreeted, _) = self.without(&rest, self.greet);
-        let refuses = self.any(&rest, self.no);
+        // A no after a "but" refuses even when its word is only a strict no
+        // ("네, 근데 이름이 틀려요", Reviewer-lead's P2 on #4858).
+        let refuses = self.any(&rest, self.no) || but_no;
         // A yes asked back ("可以吗", "いいですか") is no consent either.
         let agrees =
             !asks && !puts_off && (phrase || self.any_yes(&ungreeted, self.yes)) && !refuses;
@@ -2030,15 +2035,29 @@ mod tests {
             assert_eq!(read.yes_or_no, Some(false), "{line}");
             assert!(!read.puts_off && !read.names_someone, "{line}");
         }
-        // A "but" before a yes, or with no no after it, still puts it off.
+        // A "but" before a yes, or with no no after it, still puts it off,
+        // as does another put-off with it or "아니면" ("or else") after it;
+        // "not now, later" too (Reviewer-lead's P3s on #4858).
         for line in [
             "아니, 하지만 해도 돼",
             "네, 근데요",
             "안 돼, 근데 생각해 볼게",
+            "글쎄, 근데 싫지는 않아요",
+            "지금은 안 돼, 이따가",
+            "네, 근데 아니면 나중에",
+            "좋아, 근데 아니면 말고",
         ] {
             let read = ko(line);
             assert!(!read.agrees && read.yes_or_no.is_none(), "{line}");
+            assert!(read.puts_off, "{line}");
         }
+        // "No need to ask" is no strict no (Reviewer-lead's P3 on #4858).
+        assert_eq!(ko("굳이 묻지 않아도 돼요").yes_or_no, None);
+        // "Yes, but the name is wrong", after a misheard name: a no, never
+        // a yes that keeps it (Reviewer-lead's P2 on #4858).
+        let wrong = ko("네, 근데 이름이 틀려요");
+        assert!(wrong.refuses && !wrong.agrees && !wrong.puts_off);
+        assert_eq!(wrong.yes_or_no, Some(false));
         // "됐어" is "I'm ready" or "no thanks": no answer to a consent. "다음"
         // and "패스" are no answer either, and none is a name.
         for line in ["됐어", "됐어요", "다음", "패스"] {
