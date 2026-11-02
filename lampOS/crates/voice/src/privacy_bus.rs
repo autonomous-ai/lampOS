@@ -533,7 +533,7 @@ fn authority(
 /// own bound on a closed microphone, as the speaker's lapse.
 pub(crate) const DENIED_LAPSE_MOST_US: u64 = 1_500_000;
 /// With no authority yet, how long after its start the worker waits for its
-/// first, as it always has.
+/// first before that wait is ridden as a Denied-only lapse (#4332).
 const FIRST_AUTHORITY_US: u64 = 250_000;
 
 /// Whether `snapshot` grants nothing: the microphones and the camera both
@@ -562,8 +562,10 @@ pub(crate) enum Held {
 /// ended on "authority snapshot has expired", and the voice with it, muted
 /// by the restart guard. Such a lease grants nothing, so its lapse only
 /// waits for the next with nothing published, at most
-/// [`DENIED_LAPSE_MOST_US`] from its expiry. A lapse of a lease that grants
-/// anything, no authority ever, or one past that bound still ends the
+/// [`DENIED_LAPSE_MOST_US`] from its expiry. No authority yet is ridden the
+/// same way from [`FIRST_AUTHORITY_US`] after the start (boot 6: the voice
+/// stalled ~0.67 s before the first reached the worker). A lapse of a lease
+/// that grants anything, or one past that bound, still ends the
 /// worker as before; the switch's own reading (`SourceGap`, the publisher's
 /// notices) is checked on every look as before, ride or not.
 #[derive(Debug, Default)]
@@ -604,7 +606,13 @@ impl DeniedLapse {
                 self.riding(now_us).map_err(|()| expired())
             }
             None if self.since_us.is_some() => self.riding(now_us).map_err(|()| expired()),
-            None if now_us.saturating_sub(began_us) >= FIRST_AUTHORITY_US => Err(expired()),
+            // No authority yet grants nothing either (#4332, lamp-06c1 boot
+            // 6): its lapse at FIRST_AUTHORITY_US is ridden as a Denied-only
+            // one, nothing published, under the same bound.
+            None if now_us.saturating_sub(began_us) >= FIRST_AUTHORITY_US => {
+                self.began(began_us.saturating_add(FIRST_AUTHORITY_US));
+                self.riding(now_us).map_err(|()| expired())
+            }
             None => Ok(Held::Waiting),
         }
     }
@@ -625,7 +633,11 @@ fn look(
     began_us: u64,
     now_us: u64,
 ) -> Result<Held, Box<dyn std::error::Error + Send + Sync>> {
+    let first = state.is_none() && lapse.since_us.is_none();
     let held = lapse.look(state, began_us, now_us)?;
+    if first && lapse.since_us.is_some() {
+        eprintln!("{}", first_authority_line());
+    }
     if let Held::Rearmed(lapsed_ms) = held {
         eprintln!("{}", rearmed_line(lapsed_ms));
     }
@@ -649,6 +661,16 @@ fn publishing(
         Held::Waiting => None,
         Held::Current | Held::Rearmed(_) => state,
     })
+}
+
+/// The journal's line when no authority yet, at [`FIRST_AUTHORITY_US`],
+/// starts being ridden (#4332).
+pub(crate) fn first_authority_line() -> String {
+    format!(
+        "lamp-voice: privacy worker has had no authority {} ms after its start, riding it up to {} ms (microphones and camera stay closed)",
+        FIRST_AUTHORITY_US / 1_000,
+        DENIED_LAPSE_MOST_US / 1_000
+    )
 }
 
 /// The journal's line for a ridden lapse, once a fresh authority came.
@@ -1373,8 +1395,8 @@ pub(crate) mod tests {
 
     /// Only a lease that grants nothing is ridden (#4332): a lapse of one
     /// that grants the microphones or the camera, or leaves either unknown,
-    /// ends the worker at its expiry as before, so do no authority within
-    /// 250 ms of the start and a Denied lapse past its bound (a voice gone).
+    /// ends the worker at its expiry as before, so do no authority by the
+    /// end of its own ride and a Denied lapse past its bound (a voice gone).
     #[test]
     fn a_lapse_of_a_lease_that_grants_anything_or_past_its_bound_still_ends_the_worker() {
         let began = 10_000_000;
@@ -1400,7 +1422,15 @@ pub(crate) mod tests {
             lapse.look(None, began, began + 249_999).unwrap(),
             Held::Waiting
         );
-        assert!(lapse.look(None, began, began + 250_000).is_err());
+        assert!(
+            lapse
+                .look(
+                    None,
+                    began,
+                    began + FIRST_AUTHORITY_US + DENIED_LAPSE_MOST_US
+                )
+                .is_err()
+        );
         let (mut controller, _) = controller(began, Permission::Denied, Permission::Denied);
         let state = controller.snapshot(MonoTime::from_micros(began)).unwrap();
         let expired = state.expires_at().as_micros();
@@ -1416,6 +1446,112 @@ pub(crate) mod tests {
                 .look(Some(state), began, expired + DENIED_LAPSE_MOST_US)
                 .is_err()
         );
+    }
+
+    /// lamp-06c1's cold boot, boot 6 (#4332): the voice's main thread
+    /// stalled ~0.67 s before the worker's first authority reached it, the
+    /// worker ended on "privacy controller lease expired" 250 ms after its
+    /// start, and the voice's renewal after the gate found it gone. No
+    /// authority yet grants nothing, so it is ridden as a Denied-only lapse
+    /// from 250 ms after the start, nothing published, up to 1.5 s more.
+    #[test]
+    fn no_authority_yet_is_ridden_from_the_first_lapse_up_to_its_bound() {
+        let began = 10_000_000;
+        let lapsed = began + FIRST_AUTHORITY_US;
+        let mut lapse = DeniedLapse::default();
+        for now in [lapsed - 1, lapsed, lapsed + DENIED_LAPSE_MOST_US - 1] {
+            assert_eq!(lapse.look(None, began, now).unwrap(), Held::Waiting);
+            assert_eq!(publishing(&mut lapse, None, began, now).unwrap(), None);
+        }
+        let error = lapse
+            .look(None, began, lapsed + DENIED_LAPSE_MOST_US)
+            .unwrap_err();
+        assert_eq!(error.to_string(), "privacy controller lease expired");
+        // A late look starts the ride at the lapse, not at the look.
+        let mut lapse = DeniedLapse::default();
+        assert!(
+            lapse
+                .look(None, began, lapsed + DENIED_LAPSE_MOST_US)
+                .is_err()
+        );
+    }
+
+    /// A Denied authority that comes while no authority yet is ridden
+    /// re-arms the worker at once, Denied, and is published as it came; one
+    /// that came already lapsed keeps it closed under the same bound.
+    #[test]
+    fn a_denied_authority_during_the_first_ride_re_arms_it_at_once_as_denied() {
+        let began = 10_000_000;
+        let lapsed = began + FIRST_AUTHORITY_US;
+        let at = lapsed + 420_000;
+        let (mut controller, boot) = controller(began, Permission::Denied, Permission::Denied);
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(began));
+        let mut lapse = DeniedLapse::default();
+        assert_eq!(
+            look(&mut lapse, guard.state(), began, at - 1).unwrap(),
+            Held::Waiting
+        );
+        let stale = controller
+            .snapshot(MonoTime::from_micros(began + 1_000))
+            .unwrap();
+        assert!(stale.expires_at().as_micros() <= at);
+        assert_eq!(
+            publishing(&mut lapse, Some(stale), began, at).unwrap(),
+            None,
+            "a lapsed Denied authority opened the ride"
+        );
+        let fresh = controller.snapshot(MonoTime::from_micros(at)).unwrap();
+        guard.install(MonoTime::from_micros(at), fresh).unwrap();
+        assert_eq!(
+            lapse.look(guard.state(), began, at).unwrap(),
+            Held::Rearmed(420)
+        );
+        assert_eq!(
+            publishing(&mut lapse, guard.state(), began, at + 1).unwrap(),
+            Some(fresh)
+        );
+        let state = guard.state().unwrap();
+        assert_eq!(state.microphone_permission(), Permission::Denied);
+        assert_eq!(state.camera_permission(), Permission::Denied);
+    }
+
+    /// A lapsed lease that grants the microphones or the camera, or leaves
+    /// either unknown, ends the worker at once even while no authority yet
+    /// is ridden (Jarvis on #4992): only a lease that grants nothing joins
+    /// the first ride, and the ride's bound is not reached.
+    #[test]
+    fn a_lapsed_granting_authority_during_the_first_ride_ends_the_worker_at_once() {
+        let began = 10_000_000;
+        let lapsed = began + FIRST_AUTHORITY_US;
+        let at = lapsed + 420_000;
+        for (microphone, camera) in [
+            (Permission::Allowed, Permission::Denied),
+            (Permission::Denied, Permission::Allowed),
+            (Permission::Unknown, Permission::Denied),
+            (Permission::Denied, Permission::Unknown),
+        ] {
+            let (mut controller, _) = controller(began, microphone, camera);
+            let mut lapse = DeniedLapse::default();
+            assert_eq!(
+                look(&mut lapse, None, began, at - 1).unwrap(),
+                Held::Waiting
+            );
+            let stale = controller
+                .snapshot(MonoTime::from_micros(began + 1_000))
+                .unwrap();
+            assert!(!denied_only(stale));
+            assert!(stale.expires_at().as_micros() <= at);
+            assert!(at < lapsed + DENIED_LAPSE_MOST_US);
+            let error = lapse.look(Some(stale), began, at).unwrap_err();
+            assert_eq!(error.to_string(), "privacy controller lease expired");
+            let mut lapse = DeniedLapse::default();
+            assert_eq!(
+                look(&mut lapse, None, began, at - 1).unwrap(),
+                Held::Waiting
+            );
+            let error = publishing(&mut lapse, Some(stale), began, at).unwrap_err();
+            assert_eq!(error.to_string(), "privacy controller lease expired");
+        }
     }
 
     /// The pass's first look comes before its Bus I/O (Reviewer-three on
