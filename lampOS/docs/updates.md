@@ -1280,6 +1280,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `switching to build N` | the parts' switch begins |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
+| `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
+| `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
 | **Putting a build back** | |
 | `putting build N back: …` | before a `put back` end, with why |
 | `the settings need no putting back: lamp-update-apply.service wrote nothing for build N` | the build's settings were never written, so none are put back |
@@ -1908,7 +1910,12 @@ next start and not started now. Some product units end at once when they
 have nothing to do (the waking face without `LAMP_WAKING_FACE=on`, the
 Wi-Fi restore, recovery). Started and watched, one of those would read as
 stopped, and every build would be put back. The waking face would also
-start mid-day.
+start mid-day. The one exception is recovery (`lamp-setup-recover.service`,
+#4863): once a switching round's watch has passed and the build is kept,
+outside the watch, the round starts it once when it is enabled and
+`LAMP_WIFI_RECOVERY` reads `on` through its drop-ins (`crate::switches`,
+as install reads a switch). Off, it is left alone. A start that fails is
+said and the round stays switched; nothing it does can put a build back.
 
 All of it rides the switch's journal (`Switching::added`). A build put
 back, or a switch cut short and recovered at the next start, stops each

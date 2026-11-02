@@ -56,6 +56,8 @@ mod product_adds;
 mod product_carrier;
 #[path = "round/product_companions.rs"]
 mod product_companions;
+#[path = "round/recover_start.rs"]
+mod recover_start;
 #[path = "round/restart_order.rs"]
 mod restart_order;
 #[path = "round/restart_quiet.rs"]
@@ -267,6 +269,8 @@ struct FakeSystemd {
     /// Independent recovery must be explicitly armed by a self-update fixture.
     self_recovery: Result<(), String>,
     self_recovery_queries: usize,
+    /// `systemctl start` of a unit fails with this.
+    start_refused: Option<String>,
 }
 
 impl FakeSystemd {
@@ -383,6 +387,31 @@ impl Systemd for FakeSystemd {
         self.unreachable |= self.unreachable_after_restart;
         self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
+        Ok(())
+    }
+
+    fn start_unit(&mut self, unit: &str) -> Result<(), String> {
+        self.calls.borrow_mut().push(format!("start {unit}"));
+        if let Some(why) = &self.start_refused {
+            return Err(why.clone());
+        }
+        let running = if self.crashing.iter().any(|name| name == unit) {
+            Running {
+                active: "activating".into(),
+                sub: "auto-restart".into(),
+                pid: 0,
+                restarts: 1,
+            }
+        } else {
+            self.next_pid += 1;
+            Running {
+                active: "active".into(),
+                sub: "running".into(),
+                pid: self.next_pid,
+                restarts: 0,
+            }
+        };
+        self.units.insert(unit.to_owned(), running);
         Ok(())
     }
 
@@ -585,6 +614,7 @@ impl Lamp {
             cut_at_reload: false,
             self_recovery: Err("lamp-update-back.timer is not active".into()),
             self_recovery_queries: 0,
+            start_refused: None,
         };
         for unit in [
             "lamp-voice.service",
