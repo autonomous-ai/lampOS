@@ -891,6 +891,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
             questions: false,
             sign_in: false,
         }),
+        make_skill_local: false,
         schedule_tools: true,
         schedule_speak: true,
         who: None,

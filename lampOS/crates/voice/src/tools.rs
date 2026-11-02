@@ -132,6 +132,9 @@ pub struct Settings {
     pub places: bool,
     /// Work handed to an agent elsewhere ([`crate::agent_tasks`]).
     pub tasks: Option<crate::agent_tasks::Place>,
+    /// A skill is made by the lamp's own model, never a computer's agent
+    /// (`LAMP_MAKE_SKILL_LOCAL=on`, [`crate::make_skill_local`]).
+    pub make_skill_local: bool,
     /// Schedule tools may be declared and routed to Actions.
     pub schedule_tools: bool,
     /// A typed due-reminder request may be considered by the provider.
@@ -369,6 +372,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
     }
     let (tasks, mut flags) = crate::agent_tasks::take(flags)?;
     settings.tasks = tasks;
+    settings.make_skill_local = crate::make_skill_local::from_environment();
     if let [flag, rest @ ..] = flags
         && flag == SCHEDULE_TOOLS_FLAG
     {
@@ -782,6 +786,15 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if let Some(place) = &settings.tasks {
         tools.extend(crate::agent_tasks::tools(place));
     }
+    // A skill made by the lamp's own model: its two functions are the
+    // voice's, in place of the tasks part's, with or without it.
+    if settings.make_skill_local {
+        tools.retain(|tool| {
+            tool.name != crate::made_skill::MAKE && tool.name != crate::made_skill::PUT_ON
+        });
+        tools.push(crate::make_skill_local::tool());
+        tools.push(crate::made_skill::put_on_tool());
+    }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
         // A face added from a photo, asked about at the lamp (#1968).
@@ -959,6 +972,9 @@ pub enum Route {
     Clock,
     /// Work for an agent elsewhere, through the tasks part.
     Tasks(crate::agent_tasks::Place),
+    /// A skill made, or put on, by the lamp's own model
+    /// ([`crate::make_skill_local`]).
+    MakeLocal,
     /// Remember or forget a face, or say yes or no to being named, through
     /// the eyes on this socket, as switched; with the onboarding file, if
     /// any, which a face saved tells (#3740).
@@ -1029,6 +1045,11 @@ pub fn route(settings: &Settings, name: &str) -> Route {
                 .then(|| settings.exec.clone())
                 .flatten(),
         );
+    }
+    if settings.make_skill_local
+        && (name == crate::made_skill::MAKE || name == crate::made_skill::PUT_ON)
+    {
+        return Route::MakeLocal;
     }
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
@@ -1743,6 +1764,10 @@ fn run_call_with_scope(
         Route::Tasks(place) => (
             "the tasks part",
             crate::agent_tasks::run(place, call, request, heard, crate::agent_tasks::DEADLINE),
+        ),
+        Route::MakeLocal => (
+            "the lamp's own model",
+            (crate::make_skill_local::answer(call, request, heard), true),
         ),
         Route::Schedule(directory) => (
             "the schedule through the executive",
@@ -2653,6 +2678,7 @@ mod tests {
                 questions: false,
                 sign_in: false,
             }),
+            make_skill_local: false,
             schedule_tools: true,
             schedule_speak: true,
             who: Some("/run/lampos-eyes/request.sock".into()),
@@ -2950,6 +2976,7 @@ mod tests {
                 clock: true,
                 places: false,
                 tasks: Some(place.clone()),
+                make_skill_local: false,
                 schedule_tools: true,
                 schedule_speak: true,
                 who: Some("/run/lampos-eyes/who.sock".into()),

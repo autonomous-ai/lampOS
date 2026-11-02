@@ -72,6 +72,7 @@ pub mod language;
 pub mod listen_gaps;
 pub mod local_time;
 pub mod made_skill;
+pub mod make_skill_local;
 pub mod marked;
 pub mod memory_scope;
 pub mod messages;

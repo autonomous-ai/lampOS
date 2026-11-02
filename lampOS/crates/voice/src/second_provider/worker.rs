@@ -1959,6 +1959,10 @@ pub fn serve(
     for line in lines {
         eprintln!("lamp-voice second: {line}");
     }
+    // A skill made by the lamp's own model asks this worker's chat.
+    if files.tools.make_skill_local {
+        crate::make_skill_local::set_config(config.clone());
+    }
     if own_key_report(own_keys_on, config.hosted.own_deepseek.is_some()).is_some() {
         report_own_key(
             files.bus_root.as_deref(),
@@ -2595,7 +2599,9 @@ pub fn serve(
         .tasks
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
-    let making_skills = tools.tasks.as_ref().is_some_and(|place| place.make_skill);
+    // Made through the tasks part, or by the lamp's own model.
+    let making_skills =
+        tools.tasks.as_ref().is_some_and(|place| place.make_skill) || tools.make_skill_local;
     let declines = tools.decline;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
@@ -3085,8 +3091,9 @@ pub fn serve(
         }));
     }
     // A hand-over waiting for its yes, with the tasks part (#1712).
-    // And a made skill waiting for its yes to be put on (`crate::made_skill`).
-    if has_tasks {
+    // And a made skill waiting for its yes to be put on (`crate::made_skill`),
+    // with the tasks part or made by the lamp's own model.
+    if has_tasks || making_skills {
         engine = engine.noting_a_task_waiting(Arc::new(move |request| {
             crate::agent_tasks::pending_note(request, Instant::now()).or_else(|| {
                 making_skills
