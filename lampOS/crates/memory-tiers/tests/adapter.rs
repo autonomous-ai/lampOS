@@ -1,3 +1,5 @@
+// The adapter binary needs the default-on `bench` feature.
+#![cfg(feature = "bench")]
 use serde_json::{Value, json};
 use std::{
     io::{BufRead, BufReader, Write},

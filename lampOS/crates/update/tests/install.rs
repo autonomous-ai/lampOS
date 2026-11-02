@@ -1654,6 +1654,19 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// The tiered store beside Days stays off in the product (`LAMP_MEMORY_TIERS`,
+/// #4746): until its played test over days and two reads, no product file
+/// sets it, so lamp-memory serves Days alone.
+#[test]
+fn the_product_leaves_the_tiered_memory_off() {
+    for (file, text) in install::PRODUCT {
+        assert!(
+            !text.contains("LAMP_MEMORY_TIERS"),
+            "{file} sets the tiered memory"
+        );
+    }
+}
+
 /// The nightly pass is on in the product, with patterns and feelings (the
 /// memory owner's call on 5 Nov): it needs the memory's socket, Days and
 /// the second route's relay, which the unit sets too, and lamp-memory's

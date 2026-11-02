@@ -293,6 +293,11 @@ before using an existing store.
     <dir>/<person>/journal-YYYY-MM-DD.jsonl   {"id":1,"at_unix_ms":1791892800000,"heard":"...","said":"..."}
     <dir>/<person>/kept.jsonl                 {"id":2,"at_unix_ms":1791892800000,"text":"..."}
 
+With `LAMP_MEMORY_TIERS` set (off unless set), `<dir>/memory-tiers.d/` holds
+the tiered store beside Days ([below](#the-tiered-store-beside-days-lamp_memory_tiers)).
+Its dot keeps it from ever being read as a person's directory. A
+`--memory-days` start with the switch off removes one left there.
+
 Directories are 0700, files 0600. A person id is `[a-z0-9_-]{1,32}`; anything
 else is refused before it is near a path. The day is the local day of
 `at_unix_ms`, `--utc-offset-minutes` east of UTC (default 0; 420 for UTC+7),
@@ -1174,6 +1179,100 @@ about last week") is told at most two of their chapters (`chapters`). Never
 the room's; a forget of anything under it, forget everything and forgetting
 the person take it; it closes 90 days after its week. Rules and limits:
 [memory-days.md](memory-days.md), "Weekly chapters".
+
+## The tiered store beside Days (`LAMP_MEMORY_TIERS`)
+
+Off unless set, and not set by the product's units. With `--memory-days`,
+lamp-memory reads `LAMP_MEMORY_TIERS` at start (#4746/#4747; the design is
+[memory-design.md](memory-design.md), "Wiring into lamp-memory"):
+
+- **unset, empty or `off`:** Days alone, exactly as before. Any other value
+  but `shadow` or `on` is said (`LAMP_MEMORY_TIERS is not off, shadow or on;
+  the tiers stay off`) and the tiers stay off. Set without `--memory-days`,
+  it is said and ignored.
+- **`shadow`:** every exchange and kept thing Days takes is also written to
+  the tiered store (`crates/memory-tiers`), every removal Days makes is
+  applied there too, and the nightly sleep runs. Every answer is Days', byte
+  for byte. The start line is `tiers mode=shadow`.
+- **`on`:** as `shadow`, and a `recall` or `search` that Days answered, for a
+  mirrored scope and with a `query`, also carries `"tiers"`: `{"items":
+  [{"kind","text","strength","ids"}],"timed_out"}`, what the tiered store
+  recalls for the same words, each with the Days ids it came from. It is
+  spliced onto Days' line, whose bytes are otherwise unchanged, and waited
+  for at most 50 ms (`tiers::ANSWER_WAIT`); later, it is left out and
+  counted. Today's voice reads no such field, so `on` changes nothing the
+  person hears until a voice reads it. The wait was measured only on a Mac
+  (median 9 to 21 ms): it must be measured on a lamp's eMMC before `on` is
+  set.
+- **Off:** a `--memory-days` start with the switch off, or set to an unknown
+  value, removes a `memory-tiers.d` an earlier `shadow` or `on` left, since
+  no forget made while off would reach it: `tiers off: a left tiered copy
+  removed stores= files=`, counts only. Days' answers are unchanged.
+
+How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
+
+- **The change log.** With the switch set, Days' connection gets temporary
+  triggers that write each added, removed or moved (`adopt`) exchange and kept
+  thing to an in-memory table, in the same transaction as the change. Every
+  removal deletes the entry's row (a forget by id, selective or not,
+  `forget_last`, `forget_all`, `forget_person`, `forget_said`, the
+  forgotten-source sweep, a kept thing taking the exchange it came up in,
+  the days kept running out), so every one is told. After each request the
+  table is taken and queued for the tiers' thread with one `try_send`: no
+  file is read or written for the tiers on the request's path, and nothing
+  of the request is parsed again (the op and scope come from the answer's
+  log line). Switch off, none of it exists.
+- **Its own thread, a bounded queue.** All tiered-store work (writes,
+  forgets, the night, `on`'s lookups) runs on the `memory-tiers` thread, 256
+  jobs deep. A change that does not fit moves the queue's epoch on: the
+  thread drops everything queued before it and empties the tiered store, so
+  a forget is never lost to a full queue. If the thread stops (a panic),
+  the request side empties `memory-tiers.d` the first time a job can't be
+  sent, so no later forget is lost either. If the tiers can't start after
+  Days' change log did, the log's triggers are dropped, so nothing heard or
+  said piles up in memory untaken. A tiered store that fails is said
+  in the journal (`tiers ... failed: ...`, no words of memory) and counted,
+  and never changes a Days answer.
+- **What is mirrored.** Each known person's scope and rules scope, one
+  SQLite store each under `<dir>/memory-tiers.d/<scope>.sqlite3` with its
+  fingerprint key (`.forget-key`), all 0600 in a 0700 directory, and
+  `mirror.sqlite3`, which maps each tiered record to the Days entry it came
+  from (ids only). The room's scope (`everyone`, `r-everyone`) is never
+  mirrored: an unplaced voice's words are no one's evidence. An exchange's
+  heard words are the scope owner's record, its said words the lamp's; a
+  kept thing is the owner's record kept at once as a fact (the tiers'
+  explicit remember). Talk notes and observations are Days' own model
+  output and are not copied: the tiers keep raw records and derive their
+  own at night.
+- **Forgets reach the tiers.** A removal in Days removes the mapped records
+  with the library's own forget, which takes every fact quoting them, every
+  owner-model or other line citing those facts, and every episode's topic,
+  gist and detail, and fingerprints the words so a later night can't learn
+  them again. It may take more than was named (a record sharing five words
+  with a forgotten one), never less. A forget of everything of a scope
+  (`forget_all`, `forget_person`) deletes that scope's store with its key,
+  fingerprints and map rows; a `forget_person` deletes the person's rules
+  scope's store and key too. A forget that fails deletes the scope's whole
+  store, and so does one whose map can't be read (`tiers map read failed`).
+  Each start
+  removes whatever the tiers hold that Days no longer does (a forget the
+  last process didn't live to apply, a set-aside database) and any record no
+  map row names (a crash between a record and its row).
+- **The night.** Once per local day between 03:00 and 06:00, for each
+  mirrored scope: its open episode ends (also at `session_close` and
+  `conversation_end`), expiry and fading run, and its bounded sleep input is
+  prepared. lamp-memory has no network (`PrivateNetwork=yes`) and no model is
+  configured, so the night is counted `unconfigured` and its records wait;
+  `tiers night person=<scope> model=unconfigured records= facts= lines=
+  episodes=` is said, counts only. A model is a `tiers::Sleeper`; the tests
+  give one.
+
+What is not done yet: no backfill of what Days held before the switch was
+set; a kept thing replaced (`replaces`) stays a fact in the tiers beside its
+replacement (the library has no retire without a fingerprint); the tiers'
+`Access.alone` is taken as given (Days already answers a scope to whoever
+the voice asks for); and the weekly reflection does not run. The played
+test is in [switches.md](switches.md) (`LAMP_MEMORY_TIERS`).
 
 ## Limits, and what happens at each
 
