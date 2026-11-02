@@ -382,13 +382,6 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
     ),
-    // #4135's core skill: the stand a person asks by voice.
-    (
-        "pose",
-        "not yet enabled in the product (#4135): its stand is published and read only with \
-         `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body, which the product sets since \
-         lamp-52e6 moved to it and held it through a conversation",
-    ),
     // #1684's two core skills, merged off (the first builder, #1722): a
     // trial puts them on by hand. Each comes with the product once the four
     // real traces are recorded on a lamp with an air sensor and its
@@ -590,7 +583,7 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("light-show", "shows/calm.toml"),
     skill_file!("light-show", "shows/music.toml"),
     skill_file!("light-show", "shows/party.toml"),
-    skill_file_off!("pose"),
+    skill_file!("pose", "skill.toml"),
     skill_file!("pose", "SKILL.md"),
     skill_file_off!("smoky-air"),
     skill_file!("smoky-air", "SKILL.md"),
