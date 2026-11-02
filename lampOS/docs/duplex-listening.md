@@ -224,8 +224,8 @@ commits it ([stop-word.md](stop-word.md#a-stop-word-heard-in-a-yield-828-step-2-
 Off by default; not on any lamp.
 
 `LAMP_STOP_WORDS=heard-always`, with the same: everything heard while the
-lamp speaks is heard, and a short stop command (at most three words, the
-stop word first or last, #4868) the lamp did not say itself stops the
+lamp speaks is heard, and a short stop command (at most three words, a whole
+stop word or pair first or last, #4868) the lamp did not say itself stops the
 reply as a hand Stop does ([stop-word.md](stop-word.md#a-stop-word-heard-over-the-lamps-voice-828-16-october)).
 Off by default; in no lamp's unit (played on lamp-4ace and lamp-52e6, where
 no person's stop came through yet).

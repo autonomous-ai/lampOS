@@ -504,36 +504,46 @@ pub fn stop_word(word: &str) -> bool {
 /// words, nor right after one that turns it round. "The fox had to wait"
 /// in its story stops nothing, and nor does "Don't stop."
 pub fn stop_over(heard: &str, lamp: &str) -> bool {
-    let (heard, lamp) = (words(heard), words(lamp));
+    !stops_in(&words(heard), &words(lamp)).is_empty()
+}
+
+/// Each stop in `heard` that [`stop_over`] accepts against the lamp's
+/// words `lamp`, as where it begins and how many words it has: a stop
+/// word, or a pair, not the lamp's own nor right after a word that turns
+/// it round.
+fn stops_in(heard: &[String], lamp: &[String]) -> Vec<(usize, usize)> {
     let own = |word: &String| lamp.contains(word);
     let turned = |at: usize| at > 0 && NOT.contains(&heard[at - 1].as_str());
-    heard
-        .iter()
-        .enumerate()
-        .any(|(at, word)| STOP_WORDS.contains(&word.as_str()) && !own(word) && !turned(at))
-        || heard.windows(2).enumerate().any(|(at, pair)| {
-            STOP_PAIRS.contains(&(pair[0].as_str(), pair[1].as_str()))
-                && !(own(&pair[0]) && own(&pair[1]))
-                && !turned(at)
-        })
+    let words = heard.iter().enumerate().filter_map(|(at, word)| {
+        (STOP_WORDS.contains(&word.as_str()) && !own(word) && !turned(at)).then_some((at, 1))
+    });
+    let pairs = heard.windows(2).enumerate().filter_map(|(at, pair)| {
+        (STOP_PAIRS.contains(&(pair[0].as_str(), pair[1].as_str()))
+            && !(own(&pair[0]) && own(&pair[1]))
+            && !turned(at))
+        .then_some((at, 2))
+    });
+    words.chain(pairs).collect()
 }
 
 /// The most words a stop heard over the lamp has with `heard-always`.
 const SHORT_STOP_WORDS: usize = 3;
 
 /// Whether what was heard over the lamp, with `heard-always`, is a short
-/// command to stop ([`stop_over`]) of at most [`SHORT_STOP_WORDS`] words,
-/// the stop word or pair first or last: "Stop.", "Stop, stop.", "Stop now",
-/// "Wait, wait", "Hold on", "Lamp, stop.", "Okay stop", "That's enough".
-/// A stop word inside a longer line is none: over a busy room speech to
-/// text hears the room's talk, and a stop word in it stopped an answer
-/// nobody asked to stop (lamp-52e6, #4868).
+/// command to stop of at most [`SHORT_STOP_WORDS`] words, a whole stop
+/// word or pair [`stop_over`] accepts beginning or ending it: "Stop.",
+/// "Stop, stop.", "Stop now", "Wait, wait", "Hold on please", "Please hold
+/// on", "Lamp, stop.", "Okay stop", "That's enough". "On pause today" is
+/// none: its edge is half a pair, and its stop inside. A stop word inside a
+/// longer line is none either: over a busy room speech to text hears the
+/// room's talk, and a stop word in it stopped an answer nobody asked to
+/// stop (lamp-52e6, #4868).
 fn short_stop_over(heard: &str, lamp: &str) -> bool {
     let said = words(heard);
-    let edge = |word: Option<&String>| word.is_some_and(|word| stop_word(word));
     said.len() <= SHORT_STOP_WORDS
-        && (edge(said.first()) || edge(said.last()))
-        && stop_over(heard, lamp)
+        && stops_in(&said, &words(lamp))
+            .iter()
+            .any(|&(at, len)| at == 0 || at + len == said.len())
 }
 
 /// Where a yield's words come from.
@@ -3319,6 +3329,9 @@ mod tests {
         for heard in [
             "Stop, stop.",
             "Stop now",
+            "Stop.",
+            "Please hold on",
+            "Hold on please",
             "Hold on.",
             "Lamp, stop.",
             "That's enough.",
@@ -3330,6 +3343,10 @@ mod tests {
             "Then we stop the build and ship",
             // The lamp's own words, short as they are.
             "had to wait",
+            // Half a pair at the edge, the stop inside (Thirteen on #5003).
+            "On pause today",
+            "Please stop now",
+            "Don\u{2019}t stop.",
             "Don't stop.",
         ] {
             assert!(!stops(heard), "{heard}");
