@@ -2246,6 +2246,29 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             latest = None;
             let frame_us = latest_us;
             let frame_hold = permit.held();
+            // With LAMP_EYES_SPEAKING_STEADY, whether the head moved at this
+            // frame, read now, before the look's slow work, and measured
+            // against the frame's capture (on the bus's wall clock), not the
+            // judging: no reading, or none fresh at the capture, is unknown.
+            let head_at_frame = steady_bus.as_ref().map(|joints| {
+                let now_us = lamp_ipc::monotonic_us();
+                let captured_us = if frame_us > 0 { frame_us } else { now_us };
+                let frame_unix_ms = lamp_eyes::full_look::unix_ms()
+                    .saturating_sub(now_us.saturating_sub(captured_us) / 1_000);
+                let reading = joints.latest(lamp_msgs::JointState::TOPIC).ok().flatten();
+                let parsed = reading.as_ref().and_then(|message| {
+                    message
+                        .parse::<lamp_msgs::JointState>()
+                        .ok()
+                        .map(|state| (state, message.header.at_unix_ms, message.expired))
+                });
+                lamp_eyes::speaking::head_moved_at(
+                    parsed
+                        .as_ref()
+                        .map(|(state, at, expired)| (state, *at, *expired)),
+                    frame_unix_ms,
+                )
+            });
             looked_at = Instant::now();
             let mut stage_at = looked_at;
             let stage = |at: &mut Instant, into: &mut Duration| {
@@ -2482,21 +2505,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         if let Some(bus) = bus_out.as_mut() {
                             let now = lamp_ipc::monotonic_us();
                             bus.set_mesh_scale(mesh_scale);
-                            if let Some(joints) = steady_bus.as_ref() {
-                                // A reading older than the full look's
-                                // freshness is no word of the head: still.
-                                let moved = joints
-                                    .latest(lamp_msgs::JointState::TOPIC)
-                                    .ok()
-                                    .flatten()
-                                    .filter(|message| {
-                                        !message.expired
-                                            && lamp_eyes::full_look::unix_ms()
-                                                .saturating_sub(message.header.at_unix_ms)
-                                                <= lamp_eyes::full_look::FRESH_MS
-                                    })
-                                    .and_then(|message| message.parse::<lamp_msgs::JointState>().ok())
-                                    .is_some_and(|joints| lamp_eyes::speaking::head_moved(&joints));
+                            if let Some(moved) = head_at_frame {
                                 bus.set_head_moved(moved);
                             }
                             bus.saw(&faces, &opens, picture.filled, now);

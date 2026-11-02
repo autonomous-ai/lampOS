@@ -2429,7 +2429,12 @@ with the known face's id the eyes keep beside the known file
   On, each look reads `body/joint_states` (`speaking::head_moved`: the
   camera's aim, `full_look::aim_speeds`, turning faster than
   `HEAD_MOVED_RADIANS_A_SECOND`, the full look's own still bar, 25 counts a
-  second; a reading older than 160 ms is a still head), and the mesh's score
+  second; read as the look begins, before its slow work, and a reading that
+  is missing, expired or stamped more than 160 ms from the frame's capture
+  either way is a head whose motion is unknown, taken as moving, so a
+  stalled joint stream or a move that ends during a slow mesh leaves those
+  looks out, and without the body's joint stream every window is
+  `unknown`), and the mesh's score
   leaves out every look-to-look pair with a moving look at either end, and
   every pair whose eye distance (in the mesh's pixels) changes by more than
   5% of the smaller (`MOST_EYES_STEP`): on lamp-52e6 the detector's box on a
@@ -2440,14 +2445,22 @@ with the known face's id the eyes keep beside the known file
   still, so they are judged as a still window's are, `yes` or
   `no`; such a pair is not a gap (counting it as one read a talking face on
   lamp-52e6 `unknown`, `reason` `mesh`, for about 2 s after every head move,
-  #4585). Only a window left with fewer than two still pairs
-  (`LEAST_HELD_PAIRS`) is `unknown` (`reason` `mesh`): a talking face's own
+  #4585). A window with pairs left out says `no` on the held pairs' score,
+  but `yes` only on the score over the whole window's pairs, a left-out pair
+  counting as still: over the held pairs alone, two held pairs with one lip
+  step of 0.022 scored 0.0156 and read `yes`, while the same window off
+  scored about 0.008 (#4585 review); between the two it is `unknown`
+  (`reason` `few_steady_pairs`). A window left with fewer than two still
+  pairs (`LEAST_HELD_PAIRS`) is `unknown` (`reason` `few_steady_pairs`): a talking face's own
   landmarks step its eye distance past 5% on about 53% of steps at 20 px
   between the eyes, a still face's on 5%, and in an offline replay of a
   lamp-52e6 run at about 20 px two pairs instead of four raised the talking
   windows read `yes` (3 to 10 of 24, 28 to 31 of 36, 7 to 56, 39 to 66) and
   left none on four still sets; one pair let three single still pairs score
-  above 0.015. And a window
+  above 0.015. That replay scored `yes` over the held pairs; the
+  whole-window score for `yes` has not been replayed yet, and on the host
+  the talking 20 px windows with two or three held pairs still read `yes`.
+  And a window
   the mesh read on every look is held to 16 px between the eyes
   (`LEAST_MESHED_EYES_PX`, in the pixels the mesh saw) instead of 24; a window
   judged by the corners keeps 24. The 16 is to be confirmed by the 52e6 size
@@ -2470,7 +2483,13 @@ with the known face's id the eyes keep beside the known file
   face whose eyes step past 5% on most steps `yes` on with two or three
   steady pairs, and one left with one steady pair `unknown`; a talking face
   turned 35 degrees `yes` on and `unknown` off, and a still one turned 35
-  degrees never `yes` on, and a corners-only one turned 35 degrees `unknown` on. Off, nothing is read and nothing changes.
+  degrees never `yes` on, and a corners-only one turned 35 degrees `unknown` on;
+  two held pairs with one lip step of 0.022, the rest left out by head moves
+  or by the eye step, never `yes` (it read `yes` before the whole-window
+  score); a still face while the head moves in bursts never `yes`; a look
+  with no fresh reading left out as a moving one is; a reading missing,
+  expired or more than 160 ms from the capture unknown; and a window with
+  one held pair `few_steady_pairs`. Off, nothing is read and nothing changes.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
@@ -2648,7 +2667,8 @@ helps interpret framing but does not prove identity or physical distance.
 
 `reason` names the first returning branch: `invalid_eyes`, `turn_unavailable`,
 `turned`, `small`, `outliers` (with `LAMP_EYES_SPEAKING_DROP_OUTLIER=on`
-only), `too_few_looks`, `jitter`, `mesh`, or `corners`. With that switch,
+only), `too_few_looks`, `jitter`, `few_steady_pairs` (with
+`LAMP_EYES_SPEAKING_STEADY=on` only), `mesh`, or `corners`. With that switch,
 `window_looks` and `window_span_us` count the whole window, while
 `window_mean_eyes_px` and `mesh_window_looks` count the looks kept. `mesh` and
 `corners` identify the scoring path, not necessarily speech. Later unevaluated
