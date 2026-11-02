@@ -38,6 +38,7 @@ func TestParseSystemctlShow(t *testing.T) {
 func TestErrorLinesKeepsNewestOldestFirst(t *testing.T) {
 	journal := strings.Join([]string{
 		"hal.service: Main process exited, code=exited, status=1/FAILURE",
+		"hal.service: Failed with result 'exit-code'.",
 		`  File "/opt/hal/server.py", line 40, in main`,
 		"info all good",
 		"Traceback (most recent call last):",
@@ -58,11 +59,19 @@ func TestErrorLinesNeverReturnsUserText(t *testing.T) {
 		"Harness voice mode unavailable: asked about the fatal crash",
 		"ValueError: invalid literal for int() with base 10: 'my secret'",
 		"KeyError",
+		"hal.service: I heard 'call mum' and then something private",
+		"ImportError: cannot import name 'my_secret' from 'private_thing'",
+		"ModuleNotFoundError: No module named 'x'; the user said hello",
 	}, "\n")
 	got := errorLines(journal, 10, 300)
-	want := []string{"ValueError:", "KeyError:"}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+	want := []string{"ValueError:", "KeyError:", "ImportError:", "ModuleNotFoundError:"}
+	if len(got) != len(want) {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %q, want %q", got, want)
+		}
 	}
 	for _, l := range got {
 		for _, bad := range []string{"secret", "lights", "experiment", "heart", "crash"} {
@@ -74,7 +83,7 @@ func TestErrorLinesNeverReturnsUserText(t *testing.T) {
 }
 
 func TestErrorLinesCutsLengthAndHandlesEmpty(t *testing.T) {
-	got := errorLines("hal.service: "+strings.Repeat("x", 500), 5, 50)
+	got := errorLines(`  File "/`+strings.Repeat("x", 500)+`", line 1, in f`, 5, 50)
 	if len(got) != 1 || len(got[0]) != 50 {
 		t.Fatalf("got %q", got)
 	}

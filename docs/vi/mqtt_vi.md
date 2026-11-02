@@ -507,8 +507,8 @@ version HAL. `data` gồm `cpu` (`load1/5/15`, `cores`), `mem` (`total_mb`, `ava
 `used_percent`, swap), `disk` (root filesystem), `temp_c`, và `hal`: `active_state`/`sub_state`/
 `result`/`exec_main_status`/`restarts` của systemd, `health` (`ok`, hoặc lỗi khi probe `/health`
 của HAL) và `recent_errors`. `recent_errors` là các dòng lỗi có cấu trúc của journal HAL, tối đa
-15 dòng, mỗi dòng 300 byte: thông báo `hal.service:` của systemd, vị trí traceback (file, dòng,
-hàm), lỗi thiếu module, và tên loại exception đã bỏ phần thông điệp. Không bao giờ lọc theo từ
+15 dòng, mỗi dòng 300 byte: thông báo thoát/khởi động lại `hal.service:` của systemd (chỉ các dạng cố định), vị trí traceback
+(file, dòng, hàm), tên module bị thiếu, và tên loại exception đã bỏ phần thông điệp. Không bao giờ lọc theo từ
 khóa vì HAL ghi lại lời người dùng nói và một cảnh báo có thể trích dẫn nó. `kernel_oom` liệt kê 3 dòng kernel kill
 do hết bộ nhớ gần nhất. Mỗi probe giới hạn 3 giây, probe lỗi thì field giữ giá trị zero.
 

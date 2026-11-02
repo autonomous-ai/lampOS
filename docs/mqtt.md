@@ -523,8 +523,8 @@ say the HAL version is missing. `data` carries `cpu` (`load1/5/15`, `cores`), `m
 `hal`: the systemd `active_state`/`sub_state`/`result`/`exec_main_status`/`restarts`, `health`
 (`ok`, or the error from probing HAL's `/health`) and `recent_errors`. `recent_errors` are the
 newest structural error lines of HAL's journal, at most 15 lines of 300 bytes: systemd's own
-`hal.service:` messages, traceback locations (file, line, function), missing-module errors, and
-exception type names with their message dropped. Lines are never matched by keyword, because
+`hal.service:` exit and restart messages (fixed forms only), traceback locations (file, line,
+function), the name of a missing module, and exception type names with their message dropped. Lines are never matched by keyword, because
 HAL logs what users say and a warning can quote it. `kernel_oom` lists the last three kernel out-of-memory kill lines. Every probe has a
 3 s limit and a failed one leaves its field at the zero value.
 

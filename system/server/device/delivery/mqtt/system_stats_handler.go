@@ -26,14 +26,17 @@ const (
 	statsMaxOOMLines  = 3
 )
 
-// HAL logs what users say, and a warning or error can quote it, so journal lines are
-// never matched by keyword. Only structure is kept: systemd's own "hal.service:"
-// messages, traceback locations (file, line, function), missing-module errors (their
-// message names code), and exception type names with the message dropped.
+// HAL logs what users say, and a log value can span lines, so a line is never matched
+// by keyword or by a loose prefix. Only fixed forms are returned, each anchored
+// end to end so it cannot carry free text: systemd's own exit/restart messages for the
+// unit, traceback locations (file, line, function), a missing module's name, and
+// exception type names with the message dropped.
 var (
-	reUnitLine   = regexp.MustCompile(`^hal\.service: `)
+	reUnitLine = regexp.MustCompile(`^hal\.service: (Main process exited, code=[a-z]+, status=[0-9]+/[A-Za-z0-9]+` +
+		`|Failed with result '[a-z-]+'\.?` +
+		`|Scheduled restart job, restart counter is at [0-9]+\.?)$`)
 	reTraceFrame = regexp.MustCompile(`^ +File "[^"]+", line [0-9]+, in [A-Za-z0-9_<>]+$`)
-	reImportErr  = regexp.MustCompile(`^(ModuleNotFoundError|ImportError): `)
+	reNoModule   = regexp.MustCompile(`^(ModuleNotFoundError|ImportError): No module named '[A-Za-z0-9_.]+'$`)
 	reExcType    = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:|$)`)
 )
 
@@ -220,7 +223,7 @@ func errorLines(journal string, limit, maxLen int) []string {
 // structuralLine returns the part of a journal line that is safe to report, or false.
 func structuralLine(line string) (string, bool) {
 	switch {
-	case reUnitLine.MatchString(line), reTraceFrame.MatchString(line), reImportErr.MatchString(line):
+	case reUnitLine.MatchString(line), reTraceFrame.MatchString(line), reNoModule.MatchString(line):
 		return line, true
 	}
 	if m := reExcType.FindStringSubmatch(line); m != nil {
