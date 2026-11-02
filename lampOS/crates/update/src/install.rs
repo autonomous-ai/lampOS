@@ -385,9 +385,9 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
     // #4135's core skill: the stand a person asks by voice.
     (
         "pose",
-        "not yet tried on a lamp (#4135): its stand is published and read only with \
-         `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body, off until a lamp has moved to it \
-         and held it through a conversation",
+        "not yet enabled in the product (#4135): its stand is published and read only with \
+         `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body, which the product sets since \
+         lamp-52e6 moved to it and held it through a conversation",
     ),
     // #1684's two core skills, merged off (the first builder, #1722): a
     // trial puts them on by hand. Each comes with the product once the four
