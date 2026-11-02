@@ -1937,9 +1937,9 @@ const SHUTDOWN_READERS: &[(&str, &[&str])] = &[
 /// The switch census for `LAMP_SHUTDOWN` (the first builder, 22:1x on 30
 /// Oct): on in the product, it must be on in every unit whose part reads it,
 /// or one way to turn the lamp off would be silently missing (the app's
-/// Turn off with no amber hold, or a hold that's never acted on). Off until
-/// the button's check on a product lamp (#3697, the first builder on 31
-/// Oct), it is set in none of them. The readers are found in the source at
+/// Turn off with no amber hold, or a hold that's never acted on). On in all
+/// of them since the button's check on a product lamp (#3697, 2 Nov;
+/// #4867). The readers are found in the source at
 /// test time, past comments, so a part that starts reading it fails here
 /// until its unit is listed.
 #[test]
