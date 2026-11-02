@@ -24,5 +24,5 @@ render t02 Karen "Yeah, the review was fine, I just hope finance signs off on th
 while IFS='|' read -r id _ _ _ _ who text _; do
   case $id in ''|'#'*) continue ;; esac
   render "$id" "$who" "$text"
-done < lines.txt
+done < "${SET:-lines.txt}"
 exit $bad

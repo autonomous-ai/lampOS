@@ -1,0 +1,32 @@
+# The device-command set for #4861: id|split|room|class|label|speaker|text|expect
+# Same layout as lines.txt (render.sh reads both). Every line plays in a quiet room.
+# class: clear (a plain device command), vague (a need the lamp can meet with one device call), plain
+# (said to the lamp, no device call wanted), other (said to a person: the lamp should do nothing).
+# expect: the lamp-actions functions that are right (any one of them, comma separated), or none;
+# light_colour:red also needs light/state to read red after the turn.
+# A call on a none line, or a call not in expect, is a wrong action. Every name is made up.
+# English only: LAMP_SECOND_SAY_WITH_CALL says its own words in English only.
+#
+# clear
+c01|held|quiet|clear|lamp|Daniel|Lamp, make the light red.|light_colour:red
+c02|held|quiet|clear|lamp|Samantha|Lamp, turn the light blue.|light_colour:blue
+c03|held|quiet|clear|lamp|Daniel|Lamp, brighter, please.|light_brighter
+c04|held|quiet|clear|lamp|Samantha|Lamp, dim the light a little.|light_dimmer
+c05|held|quiet|clear|lamp|Daniel|Lamp, louder.|volume_up
+c06|held|quiet|clear|lamp|Samantha|Lamp, turn the volume down.|volume_down
+c07|held|quiet|clear|lamp|Daniel|Lamp, make the light warmer.|light_warmer
+c08|held|quiet|clear|lamp|Samantha|Lamp, a cooler light, please.|light_cooler
+# vague
+v01|held|quiet|vague|lamp|Daniel|Lamp, it's too dark in here.|light_brighter,light_on
+v02|held|quiet|vague|lamp|Samantha|Lamp, this light is hurting my eyes.|light_dimmer
+v03|held|quiet|vague|lamp|Daniel|Lamp, I can barely hear you.|volume_up
+v04|held|quiet|vague|lamp|Samantha|Lamp, you're a bit loud.|volume_down
+v05|held|quiet|vague|lamp|Daniel|Lamp, the light feels a bit cold.|light_warmer
+# plain: said to the lamp, no device call
+n01|held|quiet|plain|lamp|Daniel|Lamp, what time is it?|none
+n02|held|quiet|plain|lamp|Samantha|Lamp, what colour is the sky on Mars?|none
+n03|held|quiet|plain|lamp|Daniel|Lamp, do you like the colour red?|none
+# other: said to a person, the lamp should do nothing
+o01|held|quiet|other|not|Daniel|Priya, can you turn the light red for the photo?|none
+o02|held|quiet|other|not|Samantha|Tomas, turn the music down a bit, please.|none
+o03|held|quiet|other|not|Karen|Oskar, it's too dark in here, open the blinds.|none

@@ -10,7 +10,7 @@ judgement and against a label, line by line. The jev-verifier keeps it.
   never used to tune: they are only scored. All names are made up; no line changes the lamp's light,
   volume, timers or memory. q08 ("Lamp?") is short: the voice may drop it as a short sound, which is a
   verdict like any other.
-- `render.sh`: renders each line on the Mac (ElevenLabs, the Mac kit's voices), levelled to -20 LUFS,
+- `render.sh`: renders each line of `lines.txt` (or of `$SET`, e.g. `SET=commands.txt`) on the Mac (ElevenLabs, the Mac kit's voices), levelled to -20 LUFS,
   into `clips/` (not committed). The TV is a colleague's voice through a small speaker's band, 6 dB
   under the rest on purpose: the TV class tests what is said, not a voice the lamp has never heard.
 - `slot.sh DAY START LAST END`: the way to run it in a booked slot (it re-runs itself under
@@ -61,3 +61,22 @@ Jev takes the turn with `answer` or `look_up`; the voice takes it when its answe
 What a yes needs, for each Jev question (attention, hello, progress): Jev beats the voice on the held
 lines, with the margin and the counts stated, and no new false answer to desk talk. Then the same set
 again with that `--act` on, and the scores holding.
+
+## Device commands on today's path (#4861)
+
+The first builder's measure on #4861: are device turns slow enough (p50 over 2.5 s from the end of the line
+to the first sound) to reopen a fast path, and does today's path take wrong actions?
+
+- `commands.txt`: 19 lines in `lines.txt`'s layout plus `expect`: clear and vague device commands, plain
+  questions to the lamp, and lines said to a person. Every name is made up.
+- `cmd.sh preflight|run OUT`: under the lamp lock. It checks the live processes run
+  `LAMP_SECOND_SAY_WITH_CALL=on` (lamp-voice) and `LAMP_SHORT_DONE=on` (lamp-actions), records both
+  units, and reads the start light (light/state) and Speaker. It writes `/run/jev-cmd-restore.py` and arms
+  a dead-man (`systemd-run --on-active=DEADMAN` min, default 75) that runs it with the start state, then
+  sets the Speaker to 50% and runs the restore once: no line plays unless light/state and the Speaker read
+  back right. Per line: the clip, a 0.1 s poll of voice/state from the clip's end (first sound), the
+  verdict and its request, the device calls asked for in that request (lamp-voice's journal), light/state
+  after the answer, then the restore (a failed one stops the run). On exit: the restore to the start state,
+  checked, and only then the dead-man stopped; `lamp-voice turn-times` for the run's session is pulled
+  (numbers and function names only). `cmd-test.sh` tests it.
+- `cmd-score.py OUT`: right, missed and wrong per class, and the timings over right command trials.
