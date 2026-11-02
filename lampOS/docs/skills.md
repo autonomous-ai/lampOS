@@ -1176,7 +1176,7 @@ try to build everything as skills. core skills like core apple apps right
 always installed on the phone and then installable skills like installable
 apps". Earlier: an owner can make a private skill, and choose to publish it
 to a Skills Store for others. That last step is built as fourteen-P13
-(`LAMP_SKILLS_SHARE`, off): the app's Share sends a skill made on the lamp
+(`LAMP_SKILLS_SHARE`, on in the product since 2 Nov, #4948): the app's Share sends a skill made on the lamp
 to the Store's owner upload, where a reviewer reads it before it is listed
 ([cloud.md](cloud.md), "A made skill sent to the Store").
 
