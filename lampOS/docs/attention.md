@@ -246,6 +246,19 @@ Louvre in May" is no call.
 line in a loud office), "Lamp, what did I just ask you?" came back as "Lampy,
 …" and was held as said to someone it calls by name.
 
+"One" joins them with `LAMP_ONE_AS_LAMP=on` only (#4710; off by default,
+[switches.md](switches.md)). On lamp-3e83 on 2 Nov a tester's "Lamp, …"
+came back mostly as "One, …" ("One, how do I make a pour over coffee?",
+"One, what should I eat for lunch?") and each was held as said to someone it
+calls by name (`attention::ONE_STAND_INS`). Set off at a line's start it
+calls the lamp; "One more thing, …" and "Which one?" don't. Deepgram also
+wrote "Wang, …" and "Lung, …" there. They are people's names, so with the
+switch they are the lamp's only with the second sign a set-off name that is
+also a word needs (`NAMES_ALSO_WORDS`, below): a conversation with the lamp
+going on, in a room not known to be busy, with only one person at the lamp
+(`attention::STAND_INS_WITH_A_SIGN`). Nobody else is there to be called.
+Elsewhere they are names as before.
+
 Of the three rounds with no answer heard, the rule held one. In one the
 service sent the words of an answer ("Four. Easy one.") and no sound, the
 only time in the 800 and more answers in the lamp's records. In one it
@@ -1816,6 +1829,20 @@ cases are now that person's, with the switch:
   quiet room.
 The lamp's name still lets the answer out in both. Any timer or reminder
 it would set is held with it, before the Policy's hold (#1054) is asked.
+
+With `LAMP_ONE_AS_LAMP=on` (#4710), a line that mostly repeats the one held
+as said to someone by name is its speaker trying again, not that someone's
+reply, and is judged on its own (`attention::retries`). Each line's words
+are read lower case, split as `called` splits them, without the opening word
+set off as a name ("One,", "Wang,", "Daniel,", "Yes,"; past a greeting) and
+without fillers (`RETRY_FILLERS`: um, uh, oh, hey, hello, okay, so, well, …).
+It is a retry when at least 6 in 10 of the held line's words, and at least
+3, are in it. On lamp-3e83 on 2 Nov, "One, how do I make for over coffee?"
+after "One, how do I make a pour over coffee?" (6 of 8) and "How much is
+100 US dollars in Vietnamese dump?" after "One, how much is, 100 US dollars
+in Vietnamese loan?" (7 of 8) were held as replies. A different reply, "Yes,
+I can." or "Sure, tomorrow." after "Daniel, are you coming to the meeting at
+two?", shares fewer and is held as before. Off, every line is as before.
 
 And one from 06:07 (#918, the first builder at 06:15): in the two-person
 scene, Daniel asked "Hey Lamp, how much is one hundred dollars in euros?"

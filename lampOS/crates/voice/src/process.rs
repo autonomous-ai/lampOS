@@ -1656,6 +1656,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
         // A repeat of the line before's end is no call by its text (#3923).
         crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
+        // "One," as the lamp's name, and a retry no reply (#4710).
+        crate::attention::ONE_AS_LAMP_ENVIRONMENT,
         // The name at a line's start dated from its usual start (#4226).
         crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
         // The conversation's windows measured to a line's start (#4594).
@@ -1843,6 +1845,7 @@ mod tests {
             crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
+            crate::attention::ONE_AS_LAMP_ENVIRONMENT,
             crate::second_provider::NAME_START_USUAL_ENVIRONMENT,
             crate::second_provider::WINDOW_FROM_START_ENVIRONMENT,
             crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -2494,6 +2497,7 @@ mod tests {
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
+                    || name == crate::attention::ONE_AS_LAMP_ENVIRONMENT
                     || name == crate::second_provider::NAME_START_USUAL_ENVIRONMENT
                     || name == crate::second_provider::WINDOW_FROM_START_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
@@ -2675,6 +2679,7 @@ mod tests {
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
+                    "LAMP_ONE_AS_LAMP=on",
                     "LAMP_OWNER_PLACE=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
