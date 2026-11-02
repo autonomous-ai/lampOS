@@ -1750,8 +1750,9 @@ pub fn known_hold_on() -> bool {
 }
 
 /// Off unless `LAMP_FACE_REFOUND=on` on lamp-eyes: a near face whose passing
-/// id is not the one a print was last read for is recognised at once, and
-/// at every look until a print is read for it ([`recognise_due_near`], #4486).
+/// id has no print read for it yet is recognised at once, and again at most
+/// every [`REFOUND_RETRY`] while its alignment or print fails
+/// ([`recognise_due_near`], #4486).
 pub const REFOUND_ENVIRONMENT: &str = "LAMP_FACE_REFOUND";
 
 pub fn refound_on() -> bool {
@@ -1858,20 +1859,44 @@ pub fn recognise_due(looked_for: Option<Instant>, taking: bool, now: Instant) ->
     taking || looked_for.is_none_or(|at| now.saturating_duration_since(at) >= RECOGNISE_EVERY)
 }
 
-/// [`recognise_due`], and with `refound` on also whenever the near face has
-/// a passing id other than `printed_id`, the near id at the last check that
-/// read a print: a re-found face is asked at once, then at every look until
-/// its print is read (turned or too small), then every `RECOGNISE_EVERY`.
+/// With `LAMP_FACE_REFOUND` on, the gap a forced check keeps from the last
+/// check: an id whose alignment or print fails is tried again at most this
+/// often, not every look (a print is 152 ms on a lamp).
+pub const REFOUND_RETRY: Duration = Duration::from_millis(500);
+/// The passing ids a print was read for, newest last, at most this many.
+pub const PRINTED_IDS_KEPT: usize = 16;
+
+/// [`recognise_due`], and with `refound` on also when the near face's
+/// passing id is not among `printed`, the ids a print was read for, and the
+/// last check is [`REFOUND_RETRY`] ago: a re-found face is asked at once,
+/// then, while its alignment or print fails, every half second, and once
+/// its print is read every `RECOGNISE_EVERY`. Remembering every printed id,
+/// not only the last, keeps two near faces whose largest flips look to look
+/// from forcing a print each look (the reviewer-lead on #4577).
 pub fn recognise_due_near(
     looked_for: Option<Instant>,
     taking: bool,
     now: Instant,
     refound: bool,
     near_id: Option<&str>,
-    printed_id: Option<&str>,
+    printed: &std::collections::VecDeque<String>,
 ) -> bool {
     recognise_due(looked_for, taking, now)
-        || (refound && near_id.is_some() && near_id != printed_id)
+        || (refound
+            && near_id.is_some_and(|id| !printed.iter().any(|kept| kept == id))
+            && looked_for.is_none_or(|at| now.saturating_duration_since(at) >= REFOUND_RETRY))
+}
+
+/// Keeps `id` among the printed ids, dropping the oldest past
+/// [`PRINTED_IDS_KEPT`].
+pub fn note_printed(printed: &mut std::collections::VecDeque<String>, id: &str) {
+    if printed.iter().any(|kept| kept == id) {
+        return;
+    }
+    if printed.len() >= PRINTED_IDS_KEPT {
+        printed.pop_front();
+    }
+    printed.push_back(id.to_owned());
 }
 
 /// After a remembering at the lamp: kept, the next look asks at once, so the
@@ -2456,28 +2481,33 @@ mod tests {
         assert!(recognise_due(looked_for, false, next + RECOGNISE_EVERY));
     }
 
+    fn printed_ids(ids: &[&str]) -> std::collections::VecDeque<String> {
+        ids.iter().map(|id| id.to_string()).collect()
+    }
+
     /// #4486: with `LAMP_FACE_REFOUND` on, a new near id is asked at once,
     /// inside the two seconds.
     #[test]
     fn a_refound_near_id_is_recognised_at_once() {
         let start = Instant::now();
-        let soon = start + Duration::from_millis(350);
+        let soon = start + REFOUND_RETRY;
+        let printed = printed_ids(&["f3"]);
         assert!(recognise_due_near(
             Some(start),
             false,
             soon,
             true,
             Some("f8"),
-            Some("f3")
+            &printed
         ));
-        // Nobody near, or the same id: the two seconds stand.
+        // Nobody near, or an id already printed: the two seconds stand.
         assert!(!recognise_due_near(
             Some(start),
             false,
             soon,
             true,
             None,
-            Some("f3")
+            &printed
         ));
         assert!(!recognise_due_near(
             Some(start),
@@ -2485,39 +2515,38 @@ mod tests {
             soon,
             true,
             Some("f3"),
-            Some("f3")
+            &printed
         ));
     }
 
-    /// #4486: until a print is read for the id (the face turned or too
-    /// small), every look asks; once read, the two seconds stand again.
+    /// #4486: while no print is read for the id (its alignment or print
+    /// fails), it is asked again every half second, never every look; once
+    /// read, the two seconds stand again.
     #[test]
-    fn a_refound_id_is_asked_every_look_until_its_print_is_read() {
+    fn a_refound_id_is_asked_every_half_second_until_its_print_is_read() {
         let start = Instant::now();
         let mut looked_for = Some(start);
-        let printed = Some("f3");
-        for look in 1..=4 {
-            let at = start + Duration::from_millis(350 * look);
-            assert!(recognise_due_near(
-                looked_for,
-                false,
-                at,
-                true,
-                Some("f8"),
-                printed
-            ));
-            looked_for = Some(at);
+        let mut printed = printed_ids(&["f3"]);
+        let mut checks = 0;
+        // Eight looks 250 ms apart over two seconds, the print failing.
+        for look in 1..8 {
+            let at = start + Duration::from_millis(250 * look);
+            if recognise_due_near(looked_for, false, at, true, Some("f8"), &printed) {
+                checks += 1;
+                looked_for = Some(at);
+            }
         }
-        // The print is read at the last of those looks.
-        let printed = Some("f8");
+        assert_eq!(checks, 3);
+        // The print is read at the last of those checks.
+        note_printed(&mut printed, "f8");
         let read = looked_for.unwrap();
         assert!(!recognise_due_near(
             looked_for,
             false,
-            read + Duration::from_millis(350),
+            read + REFOUND_RETRY,
             true,
             Some("f8"),
-            printed
+            &printed
         ));
         assert!(recognise_due_near(
             looked_for,
@@ -2525,8 +2554,44 @@ mod tests {
             read + RECOGNISE_EVERY,
             true,
             Some("f8"),
-            printed
+            &printed
         ));
+    }
+
+    /// The reviewer-lead on #4577: two near faces of about one height, the
+    /// largest flipping between their ids look to look, force one check
+    /// each, then the two seconds stand; not a print every look.
+    #[test]
+    fn two_near_ids_alternating_force_one_check_each() {
+        let start = Instant::now();
+        let mut looked_for = Some(start);
+        let mut printed = printed_ids(&["f3"]);
+        let mut forced = 0;
+        // Twenty looks 350 ms apart, f8 and f9 in turn; every check reads.
+        for look in 1..=20u64 {
+            let at = start + Duration::from_millis(350 * look);
+            let id = if look % 2 == 0 { "f9" } else { "f8" };
+            if recognise_due_near(looked_for, false, at, true, Some(id), &printed) {
+                if !recognise_due(looked_for, false, at) {
+                    forced += 1;
+                }
+                looked_for = Some(at);
+                note_printed(&mut printed, id);
+            }
+        }
+        assert_eq!(forced, 2);
+    }
+
+    /// Only the last [`PRINTED_IDS_KEPT`] printed ids are kept.
+    #[test]
+    fn printed_ids_keep_the_newest_sixteen() {
+        let mut printed = printed_ids(&[]);
+        for id in 0..=PRINTED_IDS_KEPT {
+            note_printed(&mut printed, &format!("f{id}"));
+        }
+        note_printed(&mut printed, "f5");
+        assert_eq!(printed.len(), PRINTED_IDS_KEPT);
+        assert_eq!(printed.front().map(String::as_str), Some("f1"));
     }
 
     /// #4486: with `LAMP_FACE_REFOUND` off, a new near id waits the two
@@ -2534,14 +2599,15 @@ mod tests {
     #[test]
     fn with_refound_off_a_new_near_id_waits_the_two_seconds() {
         let start = Instant::now();
-        let soon = start + Duration::from_millis(350);
+        let soon = start + REFOUND_RETRY;
+        let printed = printed_ids(&["f3"]);
         assert!(!recognise_due_near(
             Some(start),
             false,
             soon,
             false,
             Some("f8"),
-            Some("f3")
+            &printed
         ));
         assert!(recognise_due_near(
             Some(start),
@@ -2549,7 +2615,7 @@ mod tests {
             start + RECOGNISE_EVERY,
             false,
             Some("f8"),
-            Some("f3")
+            &printed
         ));
         assert!(recognise_due_near(
             Some(start),
@@ -2557,7 +2623,7 @@ mod tests {
             soon,
             false,
             Some("f8"),
-            Some("f3")
+            &printed
         ));
     }
 
