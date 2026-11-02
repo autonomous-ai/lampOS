@@ -50,7 +50,7 @@ does not match.
 
 **A check promised in the last sentence** (#4711). Earlier sentences may
 be anything, such as a clarifying question. The last sentence must start
-with one of these openers, followed by its end or a space: “let me check”,
+with one of these openers: “let me check”,
 “let me look”, “let me find”, “let me search”, “let me see how / what / if /
 whether”, “I'll check / look / find / search”, “I will check / look / find /
 search”. “I’ll” with a curly apostrophe counts. The lamp-4ace run of 31 Oct
@@ -59,17 +59,29 @@ list: “Hmm — Herman Miller's Aeron, right? Let me look.”, “Let me see ho
 going.” and “Hmm, "Aaron Chan" — do you mean the Aeron chair? Let me check the
 price.” The continuation lets the promised search be made.
 
+After the opener comes nothing, or a short object: at most four words, the
+first of them one of “the”, “that”, “this”, “it”, “them”, “those”, “these”,
+a possessive (“your”, “my”, “his”, “her”, “their”), a question word (“if”,
+“whether”, “what”, “how”, “when”, “where”, “who”, “which”, “why”), or
+“for”, “on”, “into”, “up”, “out”; and no “and”, “but”, “so”, “because” or
+“then”. The “let me see how / what / if / whether” openers already name
+their object, so any rest of up to four words without those joiners may
+follow (“Let me see if it's open.”). So “Sounds fun! I'll look forward to
+it.”, “I'll check in on you tomorrow.”, “Let me check the price and it's 499
+dollars.” and “It's 391. I'll check again if you like.” are not holding.
+
 The promise never qualifies when:
 
-- the answer ends with a question mark (“Let me check the price, shall I?”,
-  or a question alone);
+- the answer ends with a question mark, `?` or full-width `？` (“Let me
+  check the price, shall I?”, or a question alone);
 - the answer follows it, in a later sentence (“Let me check. It's $1,895.”)
   or in the same one, after a colon, semicolon, comma or dash (“Let me check:
   it's $1,895.”);
 - it is quoted, or the opener is only part of a word (“checkmate”).
 
 A sentence ends at `.`, `!`, `?` or `…` followed by a space, so “$1.5” does
-not split one. “Let me know…” and “let me think about it” are not openers.
+not split one, or at a full-width `。`, `！` or `？` with or without a space
+after it. “Let me know…” and “let me think about it” are not openers.
 
 Two choices, read from the code:
 
@@ -82,8 +94,13 @@ Two choices, read from the code:
   model's `LOOK_CALL` or a skill's look step), and every call disqualifies
   the turn. The route's own “Let me check.” (`CHECKING`) is likewise said
   only with a search call. On Live, the check reads Gemini's output
-  transcript, which never holds the lamp's own lines. So a model's “Let me
-  look.” with no call is a promise left unkept.
+  transcript, which never holds the lamp's own lines. A model's “Let me
+  look.” with no call at the start of its answer is itself how it asks for
+  its eyes (`speak_up::asks_to_look`, the coordinator's `look_wanted`): the
+  coordinator offers no continuation for a turn whose look is wanted
+  (`holding::Continuation::observed`), so a nudge never races that look.
+  Anywhere else (“…right? Let me look.”), or with the eyes off, it is a
+  promise left unkept.
 
 The answer is checked in English only. In another language a promise does
 not match and the turn ends as before. On Live, an answer longer than the
