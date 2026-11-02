@@ -130,12 +130,19 @@ pub fn cut_in_over_bed() -> bool {
     std::env::var(CUT_IN_OVER_BED_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// The effective [`CUT_IN_OVER_BED_ENVIRONMENT`] switch, given whether stop
-/// words are heard (`LAMP_STOP_WORDS=heard` or `heard-always`), and the
-/// voice's one journal line at start about it. Without stop words the switch
-/// is inert: a plain "Stop." over a bed must still stop the lamp.
-pub fn over_bed_switch(on: bool, stop_words: bool) -> (bool, Option<&'static str>) {
-    match (on, stop_words) {
+/// The effective [`CUT_IN_OVER_BED_ENVIRONMENT`] switch, given what stop
+/// words are heard (`LAMP_STOP_WORDS`), and the voice's one journal line at
+/// start about it. It takes effect only with `heard-always`, whose stop
+/// listener hears every block the lamp speaks and stops the answer as the
+/// hand does, yielded or not: with `heard` a stop is heard only in a yield,
+/// and a reply fallen back after two bed resumes yields no more, so a
+/// "Stop." would go unheard until the 20 s forgive one (the second reader's
+/// HOLD on #4872). Otherwise the switch is inert, exactly as off.
+pub fn over_bed_switch(
+    on: bool,
+    listen: crate::stop_words::Listen,
+) -> (bool, Option<&'static str>) {
+    match (on, listen == crate::stop_words::Listen::Always) {
         (false, _) => (false, None),
         (true, true) => (
             true,
@@ -146,7 +153,7 @@ pub fn over_bed_switch(on: bool, stop_words: bool) -> (bool, Option<&'static str
         (true, false) => (
             false,
             Some(
-                "lamp-voice: cut-in over a bed: off, it needs LAMP_STOP_WORDS=heard (a plain \"Stop.\" must still stop the lamp)",
+                "lamp-voice: cut-in over a bed: off, it needs LAMP_STOP_WORDS=heard-always (a \"Stop.\" must be heard whether or not the lamp has paused)",
             ),
         ),
     }
@@ -1446,6 +1453,7 @@ fn invalid(message: &'static str) -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::stop_words::Listen;
     /// A tie is not the lamp's own voice, and `Clear` is a person
     /// (the Reviewer-lead's minor on #2779).
     #[test]
@@ -2335,12 +2343,18 @@ mod tests {
         assert_eq!(cut_in(false, true), [Step::Yield, Step::Commit]);
     }
 
-    /// #4868: `LAMP_CUT_IN_OVER_BED=on` without stop words is inert: a bed
-    /// after a busy-room yield commits by rule (a) as without the switch,
-    /// and the start line says the switch is off and why.
+    /// #4868: `LAMP_CUT_IN_OVER_BED=on` without stop words heard always is
+    /// inert: a bed after a busy-room yield commits by rule (a) as without
+    /// the switch, and the start line says the switch is off and why. With
+    /// `heard`, too: its stop is heard only in a yield (the second reader's
+    /// HOLD on #4872).
     #[test]
     fn the_over_bed_switch_without_stop_words_is_inert() {
-        let (on, line) = over_bed_switch(true, false);
+        assert_eq!(
+            over_bed_switch(true, Listen::InYields),
+            over_bed_switch(true, Listen::Off)
+        );
+        let (on, line) = over_bed_switch(true, Listen::Off);
         let mut mask = PlaybackMask::duplex();
         mask.assume_matched();
         mask.over_bed(on, true);
@@ -2366,11 +2380,116 @@ mod tests {
         assert_eq!(steps, [Step::Yield, Step::Commit]);
         let line = line.expect("one start line");
         assert!(
-            line.contains("off") && line.contains("LAMP_STOP_WORDS=heard"),
+            line.contains("off") && line.contains("LAMP_STOP_WORDS=heard-always"),
             "{line}"
         );
-        assert!(over_bed_switch(true, true).0);
-        assert_eq!(over_bed_switch(false, true), (false, None));
+        assert!(over_bed_switch(true, Listen::Always).0);
+        assert_eq!(over_bed_switch(false, Listen::Always), (false, None));
+    }
+
+    /// Scripted words for a stop listener: whatever is set is heard next.
+    struct Said(std::sync::Arc<std::sync::Mutex<Option<String>>>);
+
+    impl crate::stop_words::Ears for Said {
+        fn ready(&mut self) {}
+        fn hear(&mut self, _: u64, _: &[i16]) {}
+        fn finalize(&mut self) {}
+        fn words(&mut self) -> Option<String> {
+            self.0.lock().unwrap().take()
+        }
+        fn forget(&mut self) {}
+        fn rest(&mut self) {}
+    }
+
+    /// #4868, the second reader's HOLD: under every stop-words mode the
+    /// over-bed switch takes effect with, two busy-bed resumes within 20 s
+    /// fall the reply back, and a "Stop." said over the lamp then, long
+    /// before the 20 s forgive one, still stops the answer. The mask and the
+    /// stop listener are driven block by block as the voice drives them
+    /// (`hear_stop_words`).
+    #[test]
+    fn after_two_busy_bed_resumes_a_stop_over_the_lamp_still_stops_the_answer() {
+        use crate::stop_words::{StopWords, Tell};
+        let mut checked = 0;
+        for listen in [Listen::InYields, Listen::Always] {
+            let (on, _) = over_bed_switch(true, listen);
+            if !on {
+                continue;
+            }
+            checked += 1;
+            let said = std::sync::Arc::new(std::sync::Mutex::new(None));
+            let ears = Box::new(Said(std::sync::Arc::clone(&said)));
+            let mut words = if listen == Listen::Always {
+                StopWords::always_counted(ears, None)
+            } else {
+                StopWords::new(ears)
+            };
+            let mut mask = PlaybackMask::duplex();
+            let mut sequence = 1;
+            // One block for both, as the voice hears it; whether the answer
+            // was stopped: by a heard stop or a commit.
+            let mut block = |mask: &mut PlaybackMask, probability: f32, evidence: &EchoEvidence| {
+                mask.over_bed(on, true);
+                let step = mask
+                    .listen(
+                        sequence,
+                        probability,
+                        Some(evidence),
+                        true,
+                        sequence * 10_000,
+                    )
+                    .unwrap()
+                    .step;
+                let tell = words.block(
+                    true,
+                    true,
+                    mask.yield_in_force(),
+                    mask.still_blocks(),
+                    None,
+                    sequence * 10_000,
+                    &[1; 160],
+                );
+                if words.take_asked() {
+                    mask.words_asked();
+                }
+                match tell {
+                    Tell::Await => mask.await_words(),
+                    Tell::Words {
+                        stop, backchannel, ..
+                    } => mask.words(stop, backchannel),
+                    Tell::Nothing | Tell::Unheard => {}
+                }
+                sequence += 1;
+                (step, words.spoken_stop() || step == Step::Commit)
+            };
+            // Two busy-bed yields, each resumed at its deadline: about 1.6 s
+            // each, well within the 20 s.
+            for _ in 0..FRUITLESS_YIELDS {
+                mask.assume_matched();
+                let mut steps = Vec::new();
+                for _ in 0..ONSET {
+                    steps.push(block(&mut mask, 0.9, &evidence(0, OVER)).0);
+                }
+                for _ in 0..30 {
+                    steps.push(block(&mut mask, 0.1, &evidence(10, None)).0);
+                }
+                for _ in 0..120 {
+                    steps.push(block(&mut mask, 0.9, &evidence(40, None)).0);
+                }
+                steps.retain(|step| *step != Step::Carry);
+                assert_eq!(steps, [Step::Yield, Step::Resume], "{listen:?}");
+            }
+            assert!(mask.duplex_summary().unwrap().1, "{listen:?}: fallen back");
+            // A person says "Stop." over the lamp, 2 s later at most.
+            mask.assume_matched();
+            *said.lock().unwrap() = Some("Stop.".into());
+            let stopped = (0..200).any(|_| block(&mut mask, 0.9, &evidence(0, OVER)).1);
+            assert!(
+                stopped,
+                "{listen:?}: a Stop after two bed resumes stops the answer"
+            );
+        }
+        assert!(checked > 0);
     }
 
     #[test]
