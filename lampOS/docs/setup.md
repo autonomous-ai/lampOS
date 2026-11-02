@@ -1181,6 +1181,18 @@ reset's watcher, skills, tasks and voice, and the change, keys and Wi-Fi
 helpers' sockets. `lamp-setup` itself stops being started once the
 marker is there; `lamp-update` and `lamp-records` don't wait for it.
 
+**A new login with the lamp running (#4710, off unless set).** The path
+only starts the target: a part already running keeps what it took at its
+start. `lamp-cloud` takes the link and the key as `LoadCredential=`, the
+Policy the key, and the voice's second route reads the key once as its
+worker starts. With `LAMP_SETUP_RELOAD_LOGIN=on` on `lamp-setup.service`,
+a setup that saved a link or a key unlike the one kept before runs
+`systemctl try-restart` on the units holding it, once the lamp is quiet
+and no update is at work (at most 9 minutes, inside serving's 10): a new
+link `lamp-cloud`, a new key `lamp-cloud`, `lamp-policy` and `lamp-voice`.
+A first setup, with nothing kept before, asks for none, and a unit that
+isn't running is left as it is.
+
 ```sh
 systemctl is-active lampos.target lamp-voice lamp-setup-reset lamp-policy
 systemctl is-active lamp-setup        # active for up to 10 minutes after setup, so the page can follow the lamp; inactive after that

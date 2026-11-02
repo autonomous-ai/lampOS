@@ -6,8 +6,8 @@ use lamp_setup::{
     http::{Shared, router},
     scan,
     serve::{
-        Accepted, Backend, Config, Files, Phase, Save, SetupRequest, Status, backend_link, check,
-        run, start, start_unless_stopped, zone_env, zone_known,
+        Accepted, Backend, Config, Files, Login, Phase, Save, SetupRequest, Status, backend_link,
+        check, run, start, start_unless_stopped, zone_env, zone_known,
     },
     wifi::Host,
 };
@@ -1808,5 +1808,246 @@ fn setup_md_has_a_row_for_every_file_setup_writes() {
     assert!(
         rowless.is_empty(),
         "docs/setup.md's \"What setup writes\" has no row for {rowless:?}"
+    );
+}
+
+/// A lamp's kept login, for #4710: the link and the key setup saves replace
+/// it, as [`Files`] does; `reloaded` is each restart asked for, and `read`
+/// how often the login was read.
+#[derive(Default)]
+struct Relogin {
+    on: bool,
+    kept: Login,
+    read: std::cell::Cell<u32>,
+    reloaded: Vec<Vec<&'static str>>,
+}
+impl Save for Relogin {
+    fn credential(&mut self, key: &str) -> io::Result<()> {
+        self.kept.key = Some(key.as_bytes().to_vec());
+        Ok(())
+    }
+    fn name(&mut self, _: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn timezone(&mut self, _: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn backend(&mut self, link: &Backend) -> io::Result<()> {
+        self.kept.link = Some(serde_json::to_vec(link).unwrap());
+        Ok(())
+    }
+    fn marker(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+    fn reload_login_on(&self) -> bool {
+        self.on
+    }
+    fn login(&self) -> Login {
+        self.read.set(self.read.get() + 1);
+        self.kept.clone()
+    }
+    fn reload_login(&mut self, units: &[&'static str]) {
+        self.reloaded.push(units.to_vec());
+    }
+}
+
+/// What the app's setup keeps: its link and its key.
+fn app_login() -> Login {
+    Login {
+        link: Some(serde_json::to_vec(&app_link()).unwrap()),
+        key: Some(b"AIza-key_1".to_vec()),
+    }
+}
+
+/// The app's setup run on a lamp that kept `kept`, the switch `on` or not;
+/// the restarts asked for and how often the login was read.
+fn relogin(on: bool, kept: Login) -> (Vec<Vec<&'static str>>, u32) {
+    let accepted = check(&request(app_body()), &Root::new().config(false)).unwrap();
+    let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+    let mut save = lamp_setup::light::ReleasingSave {
+        save: Relogin {
+            on,
+            kept,
+            ..Relogin::default()
+        },
+        light: None,
+    };
+    run(
+        &status,
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut save,
+        || Some("192.168.1.23".into()),
+    );
+    assert!(status.lock().unwrap().set_up_completed);
+    (save.save.reloaded, save.save.read.get())
+}
+
+/// #4710: a re-setup that saved a new link asks for `lamp-cloud`, the one
+/// unit holding the link from its start; a new key, every unit holding the
+/// key; both, each unit once. Through the light's wrapper, as the product.
+#[test]
+fn a_new_link_or_key_asks_for_what_holds_it() {
+    let mut old_link = app_login();
+    old_link.link = Some(br#"{"device_id":"dev-41"}"#.to_vec());
+    assert_eq!(
+        relogin(true, old_link).0,
+        [vec!["lamp-cloud.service"]],
+        "a new link"
+    );
+    let mut old_key = app_login();
+    old_key.key = Some(b"AIza-key_0".to_vec());
+    let holders = vec![
+        "lamp-cloud.service",
+        "lamp-policy.service",
+        "lamp-voice.service",
+    ];
+    assert_eq!(
+        relogin(true, old_key).0,
+        std::slice::from_ref(&holders),
+        "a new key"
+    );
+    let both = Login {
+        link: Some(b"{}".to_vec()),
+        key: Some(b"AIza-key_0".to_vec()),
+    };
+    assert_eq!(relogin(true, both).0, [holders], "both, each unit once");
+}
+
+#[test]
+fn the_same_link_and_key_again_ask_for_nothing() {
+    assert_eq!(relogin(true, app_login()), (vec![], 2));
+}
+
+/// Nothing held a login before: a first setup asks for nothing, so it
+/// goes on exactly as without the switch.
+#[test]
+fn a_first_setup_asks_for_nothing() {
+    assert_eq!(relogin(true, Login::default()).0, Vec::<Vec<&str>>::new());
+    // Only one of the two kept before: what is new beside it asks nothing.
+    let link_only = Login {
+        link: Some(serde_json::to_vec(&app_link()).unwrap()),
+        key: None,
+    };
+    assert_eq!(relogin(true, link_only).0, Vec::<Vec<&str>>::new());
+}
+
+/// The switch off: a new link and key ask for nothing, and the login is
+/// never read. A recovery run, which saves the network only, neither.
+#[test]
+fn the_switch_off_or_a_recovery_asks_for_nothing_and_reads_nothing() {
+    let old = Login {
+        link: Some(b"{}".to_vec()),
+        key: Some(b"AIza-key_0".to_vec()),
+    };
+    assert_eq!(relogin(false, old.clone()), (vec![], 0));
+    let accepted = check(&request(app_body()), &Root::new().config(false)).unwrap();
+    let mut save = Relogin {
+        on: true,
+        kept: old,
+        ..Relogin::default()
+    };
+    run(
+        &Arc::new(Mutex::new(Status::new("lamp-4ace".into()))),
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut lamp_setup::serve::NetworkOnly(&mut save),
+        || Some("192.168.1.23".into()),
+    );
+    assert!(save.reloaded.is_empty());
+    assert_eq!(save.read.get(), 0);
+    for (switch, on) in [
+        (Some("on"), true),
+        (Some("ON"), false),
+        (Some("1"), false),
+        (Some(""), false),
+        (None, false),
+    ] {
+        assert_eq!(lamp_setup::serve::reload_login_on(switch), on, "{switch:?}");
+    }
+    assert_eq!(lamp_setup::serve::RELOAD_LOGIN, "LAMP_SETUP_RELOAD_LOGIN");
+}
+
+/// Settings that could not be saved leave no marker: nothing new is held,
+/// so nothing restarts.
+#[test]
+fn a_setup_that_failed_to_save_asks_for_nothing() {
+    struct Failing(Relogin);
+    impl Save for Failing {
+        fn credential(&mut self, key: &str) -> io::Result<()> {
+            self.0.credential(key)
+        }
+        fn name(&mut self, _: &str) -> io::Result<()> {
+            Ok(())
+        }
+        fn timezone(&mut self, _: &str) -> io::Result<()> {
+            Ok(())
+        }
+        fn backend(&mut self, link: &Backend) -> io::Result<()> {
+            self.0.backend(link)
+        }
+        fn marker(&mut self) -> io::Result<()> {
+            Err(io::Error::other("disk full"))
+        }
+        fn reload_login_on(&self) -> bool {
+            true
+        }
+        fn login(&self) -> Login {
+            self.0.login()
+        }
+        fn reload_login(&mut self, units: &[&'static str]) {
+            self.0.reload_login(units)
+        }
+    }
+    let accepted = check(&request(app_body()), &Root::new().config(false)).unwrap();
+    let mut save = Failing(Relogin {
+        kept: Login {
+            link: Some(b"{}".to_vec()),
+            key: Some(b"AIza-key_0".to_vec()),
+        },
+        ..Relogin::default()
+    });
+    run(
+        &Arc::new(Mutex::new(Status::new("lamp-4ace".into()))),
+        &accepted,
+        "VN",
+        &mut Lamp::new(true),
+        &mut save,
+        || None,
+    );
+    assert!(save.0.reloaded.is_empty());
+}
+
+/// The files' own login: the bytes setup's writers leave, so the same link
+/// and key written again read the same, and a new key reads new. Never
+/// printed.
+#[test]
+fn the_files_login_is_what_setups_writers_leave_and_is_never_printed() {
+    let root = Root::new();
+    let config = root.config(false);
+    let mut files = Files(&config);
+    assert_eq!(files.login(), Login::default(), "a fresh lamp keeps none");
+    files.backend(&app_link()).unwrap();
+    files.credential("AIza-key_1").unwrap();
+    let first = files.login();
+    assert!(first.link.is_some() && first.key.is_some());
+    files.backend(&app_link()).unwrap();
+    files.credential("AIza-key_1").unwrap();
+    assert_eq!(files.login(), first, "the same again");
+    files.credential("AIza-key_2").unwrap();
+    assert_eq!(
+        lamp_setup::serve::login_holders(&first, &files.login()),
+        [
+            "lamp-cloud.service",
+            "lamp-policy.service",
+            "lamp-voice.service"
+        ]
+    );
+    let shown = format!("{first:?}");
+    assert!(
+        !shown.contains("s3cret") && !shown.contains("AIza"),
+        "{shown}"
     );
 }

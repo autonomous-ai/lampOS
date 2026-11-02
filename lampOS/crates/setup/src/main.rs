@@ -31,7 +31,9 @@ usage: lamp-setup COMMAND [OPTIONS]
       missing: finish an interrupted reset, bring up the lamp's hotspot and
       answer V1's setup API until the home's Wi-Fi is joined and the
       person's settings are saved; then write the marker, and go on
-      answering for 10 minutes so the page can follow the lamp.
+      answering for 10 minutes so the page can follow the lamp. With
+      LAMP_SETUP_RELOAD_LOGIN=on (#4710), a new backend link or voice key
+      restarts the running units that hold the old one, once it is quiet.
   check --plan FILE
       Check a reset plan and print it. Touches nothing.
   watch-reset --plan FILE [--bus-root PATH] [--clock-id ID] [--seconds N] [--enable]
