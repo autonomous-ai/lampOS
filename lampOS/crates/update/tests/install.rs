@@ -1716,6 +1716,30 @@ fn the_product_sees_who_speaks() {
     }
 }
 
+/// #4710: the memory owner's yes (4 Nov), after Sixth's lamp-52e6 check,
+/// to leaving the head's own moves out of the speaking read (#4558). The
+/// re-found face (#4486) and the known hold (#4493) stay off.
+#[test]
+fn the_product_reads_speaking_on_steady_looks() {
+    let (_, eyes) = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-eyes.service")
+        .expect("no lamp-eyes.service");
+    let service = section(eyes, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_EYES_SPEAKING_STEADY=on"),
+        "lamp-eyes.service lacks LAMP_EYES_SPEAKING_STEADY=on"
+    );
+    for off in ["LAMP_FACE_REFOUND", "LAMP_FACE_KNOWN_HOLD"] {
+        assert!(
+            !service
+                .iter()
+                .any(|line| line.starts_with(&format!("Environment={off}="))),
+            "lamp-eyes.service sets {off}"
+        );
+    }
+}
+
 /// #1176 (Nine and the reviewer): Expression's `--head-touch` only beside
 /// the voice's own head touch and its sleep mute (`LAMP_HEAD_TOUCH=on` and
 /// `--controls-mute`). Without the mute a hand held 3 s puts the face to
