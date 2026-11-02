@@ -101,6 +101,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
+| `light` with `rgb` or `pixels` | `rgb` (`#rrggbb`), or `pixels` (one `#rrggbb` per pixel, hello's `limits.ring.pixels` of them), `brightness` 0–100, `fade_ms`, `for_ms` ≤ 30 s | `light/request` with `pixels`, at the same priority and claim as a named light, and the nearest named colour and level beside them for a ring that draws none ("The ring, pixel by pixel") | `light` | no |
 | `say` | `text`, at most 300 characters; optional `rephrase` | `say.sock` with `exact: true`: the words as sent, rendered straight through the voice's speech service (no model, no tools) and played as the lamp's own line once nobody is talking with the lamp (`say::may_play_exact`: it waits while a conversation with the lamp is going on, its speaker is busy, or an answer or reminder is owed, never for speech in the room that nobody addresses to the lamp; the keeper's pause and the privacy switch refuse it; no quiet gap or rarity). With `rephrase: true`, a written turn for the voice's model, through its quiet after a turn, privacy and busy gates, as before | `speak` | no |
 | `sound` | `name`: `hum`, the voice's built-in short hum (no file, no model), or one of the computer's own clips by name ("Sounds" below); the recorded notices are never a computer's, and no path is ever asked | `hum`: `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates. A clip: `say.sock` `{clip: PATH}`, its path in the clips folder, read by the voice with a skill sound's format and loudness checks and up to 30 s (`say::read_clip`) and played as an exact `say` is (`say::may_play_exact`). Its `done` follows | `speak` | no |
 | `sound.upload`, `sound.list`, `sound.remove` | a clip of the computer's own, kept, listed or deleted ("Sounds" below) | the state folder's `sounds/` | `speak` | no |
@@ -367,6 +368,35 @@ closes the camera and the microphone, not the readings of the room's air or
 the lamp's own computer. An owner who wants none of what the air shows
 doesn't give `air`.
 
+### The ring, pixel by pixel
+
+`light` also takes a computer's own colours, drawn by the ring as given:
+
+- **`rgb`:** one `#rrggbb` for the whole ring.
+- **`pixels`:** one `#rrggbb` per pixel, from pixel 0 around the ring. There are exactly `hello`'s `limits.ring.pixels` of them, 32 on today's ring, so a computer never assumes the count.
+- **`brightness`:** 0–100, scaling the given colours (100 by default). The ring then scales every channel to its own ceiling, which is lower at night, so no computer can go past the eye-safety cap.
+- **`fade_ms`:** how slowly the ring comes into the light.
+
+lamp-control sends them as a `light/request` with `pixels` (`lamp_msgs::LightRequest`), under the same claim and priority as a named light. Beside them goes the nearest named colour and level, which a ring that draws no pixels shows instead and `light/drawn` says.
+
+**What stays on top:**
+
+- **The conversation:** a turn's face draws over the pixels while the lamp listens or talks, and they come back at rest.
+- **The privacy and mute marks,** which the ring draws on their own path.
+- **The camera mark** (#4521, `ring_mark`): drawn over a computer's pixels and frames like over every frame, and kept apart from them (`ring_mark::marked_apart`). While the ring draws a computer's own colours and the mark is on, the mark keeps its own brightness, the two pixels beside it are dark, and every other pixel is at a third of what the computer drew, so the mark is the brightest red on the ring, alone at the top: no computer can hide it among red dots of its own. The mark's pixel, pixel 0, never shows a computer's red (its red is held to its green or blue), so no computer can draw a mark while the camera is off.
+- **The person's own light:** a change to it or a touch ends the computer's light, as for any `light`.
+- **The ring's channel ceiling.**
+
+A computer's pixels can blink or cycle colours. That is the developer's explicit ask, CLAUDE.md rule 8's exception (the local leader, 2 Nov); the lamp's own unprompted patterns keep `lamp_msgs::PatternKind`'s rules.
+
+One physical bound stays, enforced by the ring itself (`ring_face::Face`): **at most 3 flashes a second**, the photosensitive-epilepsy limit.
+- **A flash** is two swings of the ring's light at rest. A swing is its mean brightness turning back by a tenth of the ring's ceiling or more from its last peak or trough, however small each step, or going into or out of a saturated red over a quarter of the ring, however dim.
+- **Every resting frame counts,** whatever drew it: a computer's pixels alternating with a named light, from one computer or two, is held like a blink of pixels alone.
+- **A faster blink** keeps the frame already shown until the window allows the next one, so it comes out at the limit, never faster. The lamp's own light never swings that often, so only a computer's blink is held.
+- **A small change,** one pixel's blink, or a fade that only goes one way, is drawn at once.
+
+**For animations,** each `light` replaces the last under the same claim, so a computer can send a frame at a time. `ring.play` (frames played by the ring's own worker) and `ring.stream` (binary frames under a `light` lease, up to the ring's resting refresh of 40 a second) come next.
+
 ### Leases
 
 A body lease is needed for `look`, `move`, `play` and `joints`. The lease
@@ -471,6 +501,7 @@ which back. An SDK's wait for them returns at the answer.
 | `play` | `name` (a recorded move of the client's package) | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |
 | `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
+| `light` (own colours) | exactly one of `colour`, `rgb` or `pixels`; with `rgb` or `pixels`: optional `brightness` 0–100 (no `level` or `pattern`); optional `fade_ms` 1,000–60,000 | `light` | — |
 | `say` | `text`: words, ≤ 300 chars; optional `rephrase` (boolean) | `speak` | — |
 | `sound` | `name`: `hum`, or a clip's name (a lowercase letter, then lowercase letters, digits, `_` or `-`, ≤ 64) | `speak` | — |
 | `sound.upload` | `name` (a clip's, never `hum`), `sha256` (64 hex), `size` 1–1,444,140, `part` from 0, `parts` 1–64, `data` (base64, ≤ 49,152 chars) | `speak` | — |

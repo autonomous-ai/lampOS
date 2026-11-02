@@ -731,7 +731,7 @@
       "additionalProperties": false
     },
     "light": {
-      "description": "A light for a while, below the person and the conversation, at the ring's default period for its pattern.",
+      "description": "A light for a while, below the person and the conversation: one of the ring's named colours at a level (with an optional pattern), or the computer's own colour (rgb) or each pixel's (pixels, as many as hello's limits.ring.pixels), at a brightness. Exactly one of colour, rgb or pixels.",
       "type": "object",
       "properties": {
         "id": {
@@ -755,16 +755,58 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 30000
+        },
+        "rgb": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "One colour for the whole ring, #rrggbb."
+        },
+        "pixels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "minItems": 1,
+          "description": "Each pixel's colour, #rrggbb, from pixel 0 around the ring: exactly hello's limits.ring.pixels of them."
+        },
+        "brightness": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "With rgb or pixels: 0 to 100 of the given colours, under the ring's own channel ceiling (lower at night). 100 when not given."
+        },
+        "fade_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "description": "How slowly the ring comes into this light."
         }
       },
       "required": [
         "id",
         "op",
-        "colour",
-        "level",
         "for_ms"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "colour",
+            "level"
+          ]
+        },
+        {
+          "required": [
+            "rgb"
+          ]
+        },
+        {
+          "required": [
+            "pixels"
+          ]
+        }
+      ]
     },
     "say": {
       "description": "A line in the lamp's own voice: spoken exactly as sent, straight through the speech service with no model, once the person isn't talking; with rephrase, said by the voice's model in its own words, as before. Through the privacy switch, the keeper's pause and quiet hours.",
@@ -1748,6 +1790,20 @@
               "within_ms"
             ]
           }
+        },
+        "ring": {
+          "type": "object",
+          "description": "The ring as light's pixels see it.",
+          "properties": {
+            "pixels": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How many pixels, from pixel 0 around the ring."
+            }
+          },
+          "required": [
+            "pixels"
+          ]
         }
       }
     },

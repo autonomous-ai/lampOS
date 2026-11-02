@@ -97,6 +97,16 @@ async def _welcome(ws: ClientConnection) -> dict:
     return first
 
 
+def _hex(colour) -> str:
+    """`"#rrggbb"` from `"#rrggbb"` or `(r, g, b)`, each 0-255."""
+    if isinstance(colour, str):
+        return colour
+    red, green, blue = colour
+    if not all(isinstance(c, int) and 0 <= c <= 255 for c in (red, green, blue)):
+        raise LampError(f"a colour's channels are 0 to 255: {colour!r}", code="bad_request")
+    return f"#{red:02x}{green:02x}{blue:02x}"
+
+
 def _check(op: str, fields: dict) -> None:
     """The names the schema enumerates, checked before sending."""
     if op not in schema.ops():
@@ -685,6 +695,38 @@ class Lamp:
 
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)
+
+    @property
+    def ring_pixels(self) -> int | None:
+        """How many pixels the ring has, from hello's limits (none from a lamp
+        before pixel lights)."""
+        return (self.limits.get("ring") or {}).get("pixels")
+
+    async def ring(
+        self,
+        pixels: list,
+        *,
+        for_ms: int,
+        brightness: int | None = None,
+        fade_ms: int | None = None,
+    ) -> dict:
+        """Light the ring pixel by pixel for `for_ms` (30 s at most): one colour
+        per pixel, from pixel 0 around the ring, each `"#rrggbb"` or `(r, g, b)`
+        from 0 to 255, exactly `ring_pixels` of them, at `brightness` 0-100
+        (100 by default). Under the person's own light and the conversation,
+        as `light` is."""
+        if self.ring_pixels is not None and len(pixels) != self.ring_pixels:
+            raise LampError(f"pixels: {self.ring_pixels} of them, one per pixel of the ring", code="bad_request")
+        return await self._act(
+            "light", False, pixels=[_hex(pixel) for pixel in pixels], brightness=brightness, fade_ms=fade_ms, for_ms=for_ms
+        )
+
+    async def light_rgb(
+        self, rgb, *, for_ms: int, brightness: int | None = None, fade_ms: int | None = None
+    ) -> dict:
+        """Light the whole ring in one colour of your own, `"#rrggbb"` or
+        `(r, g, b)`, for `for_ms`, at `brightness` 0-100."""
+        return await self._act("light", False, rgb=_hex(rgb), brightness=brightness, fade_ms=fade_ms, for_ms=for_ms)
 
     async def say(self, text: str, *, rephrase: bool = False) -> dict:
         """Say `text` in the lamp's voice, exactly as written, once the person

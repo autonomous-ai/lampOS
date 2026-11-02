@@ -56,6 +56,7 @@ pub fn light_request(
         light: Light::new(true, &light.colour, light.level).ok()?,
         pattern: light.pattern,
         fade_ms: None,
+        pixels: None,
     };
     request.check().ok().map(|()| request)
 }

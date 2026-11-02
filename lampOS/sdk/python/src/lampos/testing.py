@@ -140,6 +140,7 @@ LIMITS = {
         "clips_max": 64,
         "store_max_bytes": 20_000_000,
     },
+    "ring": {"pixels": 32},
     "quiet_hours": {"from": "22:00", "to": "07:00"},
 }
 
@@ -808,6 +809,16 @@ class FakeLamp:
             # As lamp-control routes them: the body takes them, and no
             # `done` follows.
             await self._ok(ws, id_, to="body")
+        elif op == "light" and ("pixels" in request or "rgb" in request):
+            # A computer's own colours (the ring, pixel by pixel), as
+            # lamp-control's parts.rs: to the ring, each pixel at the brightness.
+            given = request.get("pixels") or [request["rgb"]] * 32
+            if len(given) != 32:
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "bad_request", "pixels: 32 of them, one per pixel of the ring")
+                return
+            self.shown_pixels = given
+            await self._ok(ws, id_, to="ring", pixels=len(given))
         elif op == "light":
             # As lamp-control's parts.rs: the pattern checked first, then to the
             # ring, which keeps its own one-pulse-a-minute (not said back).

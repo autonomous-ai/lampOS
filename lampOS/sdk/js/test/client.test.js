@@ -1225,3 +1225,20 @@ test("a turn's prompt is summarised in the debug log as a say's text", async () 
   assert.deepEqual(debug.redact({ re: 2, ok: true, turn: 'ended', started: 1 }), { re: 2, ok: true, turn: 'ended', started: 1 });
   assert.deepEqual(debug.redact({ re: 3, ok: true, mute: 'held' }), { re: 3, ok: true, mute: 'held' });
 });
+
+test('the ring is lit pixel by pixel and in one colour of its own', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    assert.equal(lamp.ringPixels, 32);
+    const pixels = Array(32).fill('#000000');
+    pixels[0] = [255, 0, 0];
+    assert.deepEqual(await lamp.ring(pixels, { forMs: 3000, brightness: 50 }), { re: 1, ok: true, to: 'ring', pixels: 32 });
+    await lamp.lightRgb([0, 0, 255], { forMs: 1000 });
+    const asked = fake.asked('light');
+    assert.equal(asked[0].pixels[0], '#ff0000');
+    assert.equal(asked[0].brightness, 50);
+    assert.deepEqual(asked[1], { rgb: '#0000ff', for_ms: 1000 });
+    for (const wrong of [Array(31).fill('#000000'), Array(32).fill([256, 0, 0])]) {
+      await assert.rejects(lamp.ring(wrong, { forMs: 1000 }), (error) => error.code === 'bad_request');
+    }
+  });
+});

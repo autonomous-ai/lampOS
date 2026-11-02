@@ -21,7 +21,8 @@ from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
     "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
-    "lamp_light", "lamp_say", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound", "lamp_end_turn",
+    "lamp_light", "lamp_ring", "lamp_say", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound",
+    "lamp_end_turn",
     "lamp_events", "lamp_stop",
 }
 # The schema's ops a tool doesn't send itself: pairing and hello are the
@@ -74,6 +75,7 @@ def test_tools_are_listed_by_the_lamps_grants(tmp_path):
                 "lamp_state",
                 "lamp_wait_for",
                 "lamp_light",
+                "lamp_ring",
                 "lamp_events",
                 "lamp_stop",
             }
@@ -924,6 +926,7 @@ def test_the_readme_lease_column_is_the_servers_own(tmp_path):
         "lamp_move": {"step_ms": 100, "frames": [[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]]},
         "lamp_gesture": {"name": "nod"},
         "lamp_light": {"colour": "warm"},
+        "lamp_ring": {"rgb": "#ff8000"},
         "lamp_express": {"feeling": "glad"},
         "lamp_say": {"text": "Hello."},
         "lamp_state": {},
@@ -1062,5 +1065,22 @@ def test_turns_and_the_mute_send_their_ops_and_say_only_how_they_ended(tmp_path)
         async with connected(tmp_path / "speak", grants=("speak",)) as (_, _, session):
             tools = {tool.name for tool in (await session.list_tools()).tools}
             assert "lamp_end_turn" in tools and not tools & TURN
+
+    run(go())
+
+
+def test_lamp_ring_lights_the_ring_in_a_computers_own_colours(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("light",)) as (fake, _, session):
+            pixels = ["#000000"] * 32
+            pixels[0] = "#ff0000"
+            said = await session.call_tool("lamp_ring", {"pixels": pixels, "brightness": 50, "for_ms": 90_000})
+            assert json.loads(text(said)) == {"lit_ms": 30000, "ring_pixels": 32}
+            assert not (await session.call_tool("lamp_ring", {"rgb": "#0000ff"})).isError
+            asked = fake.asked("light")
+            assert asked[0]["pixels"][0] == "#ff0000" and asked[0]["brightness"] == 50 and asked[0]["for_ms"] == 30000
+            assert asked[1]["rgb"] == "#0000ff"
+            for wrong in ({}, {"rgb": "#0000ff", "pixels": pixels}, {"pixels": pixels[:31]}):
+                assert (await session.call_tool("lamp_ring", wrong)).isError, wrong
 
     run(go())

@@ -301,6 +301,9 @@ pub struct RingLight {
     requested: Option<Light>,
     /// How slowly the shown request asked to be faded into, in ms (#1677).
     fading: Option<u32>,
+    /// The shown request's own pixels, a paired computer's `light` with
+    /// `rgb` or `pixels` (docs/control.md): drawn as given at rest.
+    pixels: Option<Vec<[u8; 3]>>,
     /// The shown request's pattern, its asker and light, and since when it
     /// moves (#940 item 3): from the first resting frame that draws it, and
     /// a renewal keeps that, so a pulse plays once and is seen.
@@ -396,6 +399,7 @@ impl RingLight {
                 requests: None,
                 requested: None,
                 fading: None,
+                pixels: None,
                 moving: None,
                 pulses: Vec::new(),
                 every_pulse: false,
@@ -578,6 +582,7 @@ impl RingLight {
             }
             let shown = requests.shown(now_us);
             self.fading = shown.and_then(|request| request.fade_ms);
+            self.pixels = shown.and_then(|request| request.pixels.clone());
             // Its pattern, started afresh only for a new asker, light or
             // pattern.
             let wanted = shown.and_then(|request| {
@@ -659,6 +664,12 @@ impl RingLight {
     /// request that asks none.
     pub fn fade(&self) -> Option<u32> {
         self.fading.filter(|_| self.testing.is_none())
+    }
+
+    /// The shown request's own pixels, if it draws them itself: none under
+    /// a self-test or for the person's light.
+    pub fn pixels(&self) -> Option<&[[u8; 3]]> {
+        self.pixels.as_deref().filter(|_| self.testing.is_none())
     }
 
     /// A resting frame drew the face at `drawn_at_us`, showing the lamp's
@@ -1167,6 +1178,7 @@ mod tests {
             light: light(true, colour, 4),
             pattern: None,
             fade_ms: None,
+            pixels: None,
         }
     }
 

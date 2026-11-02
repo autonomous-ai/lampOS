@@ -355,12 +355,25 @@ pub enum Op {
         targets: Joints,
         within_ms: u32,
     },
+    /// A light for a while: one of the ring's named colours at a level,
+    /// or the computer's own colour (`rgb`) or each pixel's (`pixels`), at
+    /// a `brightness` (docs/control.md, "The ring, pixel by pixel").
     #[serde(rename = "light")]
     Light {
-        colour: String,
-        level: u8,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        colour: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        level: Option<u8>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rgb: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pixels: Option<Vec<String>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        brightness: Option<u8>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pattern: Option<Pattern>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fade_ms: Option<u32>,
         for_ms: u32,
     },
     /// A line in the lamp's own voice: spoken exactly as sent, straight
@@ -753,17 +766,69 @@ impl Op {
             Self::Light {
                 colour,
                 level,
+                rgb,
+                pixels,
+                brightness,
+                pattern,
+                fade_ms,
                 for_ms,
-                ..
             } => {
-                if !lamp_msgs::Light::COLOURS.contains(&colour.as_str()) {
-                    return Err(format!(
-                        "colour: one of {}",
-                        lamp_msgs::Light::COLOURS.join(", ")
-                    ));
+                let forms = [colour.is_some(), rgb.is_some(), pixels.is_some()];
+                if forms.iter().filter(|given| **given).count() != 1 {
+                    return Err("one of colour, rgb or pixels".to_owned());
                 }
-                if !(1..=lamp_msgs::Light::BRIGHTEST).contains(level) {
-                    return Err(format!("level: from 1 to {}", lamp_msgs::Light::BRIGHTEST));
+                if let Some(colour) = colour {
+                    if !lamp_msgs::Light::COLOURS.contains(&colour.as_str()) {
+                        return Err(format!(
+                            "colour: one of {}",
+                            lamp_msgs::Light::COLOURS.join(", ")
+                        ));
+                    }
+                    if !level
+                        .is_some_and(|level| (1..=lamp_msgs::Light::BRIGHTEST).contains(&level))
+                    {
+                        return Err(format!(
+                            "level: from 1 to {}, with colour",
+                            lamp_msgs::Light::BRIGHTEST
+                        ));
+                    }
+                    if brightness.is_some() {
+                        return Err(
+                            "brightness goes with rgb or pixels; colour has level".to_owned()
+                        );
+                    }
+                } else {
+                    if level.is_some() || pattern.is_some() {
+                        return Err("level and pattern go with colour".to_owned());
+                    }
+                    if brightness.is_some_and(|brightness| brightness > 100) {
+                        return Err("brightness: from 0 to 100".to_owned());
+                    }
+                }
+                if let Some(rgb) = rgb
+                    && hex_rgb(rgb).is_none()
+                {
+                    return Err("rgb: #rrggbb".to_owned());
+                }
+                if let Some(pixels) = pixels {
+                    if pixels.len() != lamp_msgs::LightRequest::PIXELS {
+                        return Err(format!(
+                            "pixels: {} of them, one per pixel of the ring",
+                            lamp_msgs::LightRequest::PIXELS
+                        ));
+                    }
+                    if pixels.iter().any(|pixel| hex_rgb(pixel).is_none()) {
+                        return Err("pixels: each #rrggbb".to_owned());
+                    }
+                }
+                if let Some(fade) = fade_ms
+                    && !lamp_msgs::LightRequest::FADE_MS.contains(fade)
+                {
+                    return Err(format!(
+                        "fade_ms: from {} to {}",
+                        lamp_msgs::LightRequest::FADE_MS.start(),
+                        lamp_msgs::LightRequest::FADE_MS.end()
+                    ));
                 }
                 held_for(*for_ms)?;
             }
@@ -1006,6 +1071,16 @@ fn lease_id(text: &str) -> Result<(), String> {
         })
         .then_some(())
         .ok_or_else(|| "lease: the id lease.take gave, l_ and digits".to_owned())
+}
+
+/// A `#rrggbb` colour's red, green and blue, if it is one.
+pub fn hex_rgb(text: &str) -> Option<[u8; 3]> {
+    let hex = text.strip_prefix('#')?;
+    if hex.len() != 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let channel = |at: usize| u8::from_str_radix(&hex[at..at + 2], 16).ok();
+    Some([channel(0)?, channel(2)?, channel(4)?])
 }
 
 fn held_for(ms: u32) -> Result<(), String> {
@@ -1417,5 +1492,49 @@ mod tests {
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA*=",
             32
         ));
+    }
+
+    /// A light is one of a named colour at a level, a computer's own `rgb`,
+    /// or its `pixels`, one per pixel of the ring, with a brightness.
+    #[test]
+    fn a_light_takes_one_of_colour_rgb_or_pixels() {
+        let checked = |frame: String| parse(&frame).map(|request| request.op.check());
+        let pixels = |n: usize, each: &str| serde_json::to_string(&vec![each; n]).unwrap();
+        for good in [
+            r#"{"id":1,"op":"light","colour":"warm","level":3,"for_ms":1000}"#.to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#ff8000","for_ms":1000}"##.to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#FF8000","brightness":0,"fade_ms":1000,"for_ms":1000}"##.to_owned(),
+            format!(r#"{{"id":1,"op":"light","pixels":{},"brightness":100,"for_ms":1000}}"#, pixels(32, "#010203")),
+        ] {
+            assert_eq!(checked(good.clone()), Ok(Ok(())), "{good}");
+        }
+        for bad in [
+            r#"{"id":1,"op":"light","for_ms":1000}"#.to_owned(),
+            r##"{"id":1,"op":"light","colour":"warm","level":3,"rgb":"#ff0000","for_ms":1000}"##
+                .to_owned(),
+            r#"{"id":1,"op":"light","colour":"warm","for_ms":1000}"#.to_owned(),
+            r#"{"id":1,"op":"light","colour":"warm","level":3,"brightness":50,"for_ms":1000}"#
+                .to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#ff0000","level":3,"for_ms":1000}"##.to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#ff0000","pattern":"breathe","for_ms":1000}"##
+                .to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#ff0000","brightness":101,"for_ms":1000}"##.to_owned(),
+            r#"{"id":1,"op":"light","rgb":"ff0000","for_ms":1000}"#.to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#ff00","for_ms":1000}"##.to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#ff000g","for_ms":1000}"##.to_owned(),
+            format!(
+                r#"{{"id":1,"op":"light","pixels":{},"for_ms":1000}}"#,
+                pixels(31, "#010203")
+            ),
+            format!(
+                r#"{{"id":1,"op":"light","pixels":{},"for_ms":1000}}"#,
+                pixels(32, "red")
+            ),
+            r##"{"id":1,"op":"light","rgb":"#ff0000","fade_ms":999,"for_ms":1000}"##.to_owned(),
+            r##"{"id":1,"op":"light","rgb":"#ff0000","for_ms":30001}"##.to_owned(),
+        ] {
+            assert!(!matches!(checked(bad.clone()), Ok(Ok(()))), "{bad}");
+        }
+        assert_eq!(hex_rgb("#0a0B0c"), Some([10, 11, 12]));
     }
 }
