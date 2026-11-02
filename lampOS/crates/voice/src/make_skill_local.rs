@@ -207,11 +207,31 @@ pub fn make(
             });
         }
     };
+    told(make_kept(
+        request,
+        brief,
+        keeping,
+        chat,
+        &format!("{FROM}{now_unix_ms}"),
+    ))
+}
+
+/// The skill for `request` (its `brief` made already) written by the
+/// model `chat` gives and kept in `keeping` as made from `from`; a
+/// refused one asked once more with the check's lines. Blocking: the model
+/// is asked on a thread of its own. Shared by the voice's `make_skill` and
+/// the app's typed ask (`crate::app_make`).
+pub fn make_kept(
+    request: &str,
+    brief: String,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    from: &str,
+) -> Result<Made, Refused> {
     let began = std::time::Instant::now();
     let chat = Arc::new(chat);
-    let from = format!("{FROM}{now_unix_ms}");
     let kept = |answer: Result<String, String>| match answer {
-        Ok(text) => made_skill::keep(&text, false, &from, keeping),
+        Ok(text) => made_skill::keep(&text, false, from, keeping),
         Err(why) => {
             eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
             Err(Refused("the lamp's model didn't answer".into(), None))
@@ -235,7 +255,7 @@ pub fn make(
         },
         began.elapsed().as_millis()
     );
-    told(made)
+    made
 }
 
 /// The model's answer to `brief`, asked on a thread of its own with a
@@ -298,7 +318,7 @@ fn told(made: Result<Made, Refused>) -> Value {
 /// age runs from its first piece ("I'll make it now"), said before the
 /// call kept the skill, and the ask comes later in the same answer (the
 /// Reviewer-lead's second P2 on #4914). Whether one was kept so.
-fn asked_at_yes(
+pub(crate) fn asked_at_yes(
     directory: &std::path::Path,
     answered: Option<(String, Duration)>,
     now_unix_ms: u64,
@@ -356,7 +376,7 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::os::unix::fs::PermissionsExt;
@@ -386,13 +406,13 @@ light = { dim = 1 }
 
     const CARD: &str = "---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n\n# Evening dim\n\nAt ten it dims.\n";
 
-    fn good() -> String {
+    pub(crate) fn good() -> String {
         format!("```skill.toml\n{TOML}```\n\n```SKILL.md\n{CARD}```\n")
     }
 
     /// A folder of the test's own, with a stand-in for `lamp-skills pack`
     /// that packs whatever it is given.
-    fn keeping(name: &str) -> (PathBuf, Keeping) {
+    pub(crate) fn keeping(name: &str) -> (PathBuf, Keeping) {
         let root = std::env::temp_dir().join(format!("make-local-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
@@ -413,7 +433,7 @@ light = { dim = 1 }
     /// A chat service on a local port: each request in turn gets the next
     /// of `replies`, an HTTP status and, for a 200, the text streamed in
     /// two pieces. How many requests came.
-    fn service(replies: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<usize>) {
+    pub(crate) fn service(replies: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<usize>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let served = std::thread::spawn(move || {
@@ -472,7 +492,9 @@ light = { dim = 1 }
         (format!("http://{address}/v1/"), served)
     }
 
-    fn chat_at(url: String) -> impl Fn() -> Result<Chat, String> + Send + Sync + 'static {
+    pub(crate) fn chat_at(
+        url: String,
+    ) -> impl Fn() -> Result<Chat, String> + Send + Sync + 'static {
         move || {
             Chat::with(&url, "m", "secret", Arc::new(Vec::new)).map_err(|error| error.to_string())
         }
