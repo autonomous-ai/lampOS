@@ -1492,11 +1492,25 @@ impl Engine {
                 state,
             };
         }
-        let Some(voice) = self
-            .voice
-            .clone()
-            .filter(|v| now_us - v.stamp.at_us < self.catalogue.timing.voice_stale_us)
-        else {
+        // Put to sleep, the voice ends its cycle and says no timing until it
+        // opens again, only its mute each second (#3748): while that mute
+        // says sleep, its last timing stands as a resting voice, so the
+        // lamp is held asleep rather than dropped 500 ms in.
+        let voice_asleep = self
+            .life
+            .as_ref()
+            .is_some_and(|life| life.voice_asleep(now_us) == Some(true));
+        let Some(voice) = self.voice.clone().and_then(|mut v| {
+            if now_us - v.stamp.at_us < self.catalogue.timing.voice_stale_us {
+                Some(v)
+            } else if voice_asleep {
+                v.state = Voice::Resting;
+                v.accepting_input = false;
+                Some(v)
+            } else {
+                None
+            }
+        }) else {
             state.missing.push("fresh voice timing".into());
             return Output {
                 body: None,
