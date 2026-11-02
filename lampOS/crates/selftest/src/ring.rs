@@ -354,6 +354,7 @@ mod tests {
                 muted: true,
                 reason: Some(MuteReason::Sleep),
                 muted_by: None,
+                control: false,
             })
         };
         assert!(said_asleep(false, MUTE_PUBLISHER, sleep()));
@@ -364,6 +365,7 @@ mod tests {
             muted: true,
             reason: None,
             muted_by: None,
+            control: false,
         });
         assert!(
             !said_asleep(false, MUTE_PUBLISHER, muted),
@@ -373,6 +375,7 @@ mod tests {
             muted: false,
             reason: None,
             muted_by: None,
+            control: false,
         });
         assert!(!said_asleep(false, MUTE_PUBLISHER, open));
     }

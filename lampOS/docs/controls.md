@@ -1708,6 +1708,29 @@ other mute, the person's. A mute the person chooses over the guard's or an
 unreadable one, or a clear, ends both, where the marker goes. Test:
 `voice_mute_says_who_muted_it`.
 
+**A paired computer's mute** (lamp-control's `listen.set false`, held on a
+say socket connection: [speaking-first.md](speaking-first.md), "A computer's
+mute for lamp-control"; `crates/voice/src/control_mute.rs`). Only where the
+voice has a mute record (`--controls-mute`): without one it is refused, "the
+lamp has no software mute to hold". Each poll of the hand controls takes the
+held mutes after its head events: while any holds, the observation is
+`muted` (and `mute_changed` as it starts or lifts), so a conversation going
+on ends as for the button's mute (`SoftwareMute`, reason `software_muted`),
+a cycle doesn't start, and the quiescent wait stays closed, with the muted
+wait's ring and its refusals ("the lamp is muted", a computer's turn start
+too), as for the person's mute. The record on disk is never written for it:
+it is not the person's, and it ends with its connection. A tap on the head,
+or a hand kept a second, lifts every computer's mute, as it wakes the
+restart guard's (`HandControls::head_event`); it never opens the person's
+own. On `voice/mute` it is its own field, `control: true`, beside any
+`muted_by`; alone, `muted_by` is absent. Not a `muted_by` value: the type is
+closed, and an older reader would refuse the whole message. Tests:
+`a_computers_mute_closes_the_microphones_without_touching_the_record`,
+`a_computers_mute_and_the_persons_are_each_their_own`,
+`a_hand_on_the_head_lifts_a_computers_mute_but_never_the_persons`,
+`a_computers_lift_never_opens_sleep_or_the_restart_guard`,
+`a_computers_mute_keeps_the_muted_wait_closed_until_it_is_lifted`.
+
 **A power cut is not a fault of this run** (#4332). Pulling the plug is how
 most people turn a lamp off, and lamp-220c (29 Oct) came back from one muted
 by the guard, deaf until a head tap, with nothing telling the person to tap.

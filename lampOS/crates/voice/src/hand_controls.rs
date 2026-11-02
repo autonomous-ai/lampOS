@@ -288,22 +288,31 @@ const LATCH_ASLEEP: u8 = 3;
 const LATCH_GUARD: u8 = 4;
 /// Muted because the record could not be trusted ([`HandControls::unreadable`]).
 const LATCH_UNREADABLE: u8 = 5;
+/// Beside any latch above: a paired computer holds a mute
+/// ([`crate::control_mute`]); with [`LATCH_OPEN`], it alone does.
+const LATCH_CONTROL: u8 = 0x80;
 
 /// What the pump says on `voice/mute` for a latch, with who or what muted
 /// it (`muted_by`, #4332): the mute it always said is the person's hold.
+/// A computer's mute is its own field (`control`), never a `muted_by`
+/// an older reader would refuse; alone, it is said as the mute as it
+/// always was, with no `muted_by`.
 fn latch_message(latch: u8) -> Option<VoiceMute> {
+    let control = latch & LATCH_CONTROL != 0;
     let muted = |muted_by| {
         Some(VoiceMute {
             muted: true,
             reason: None,
             muted_by: Some(muted_by),
+            control,
         })
     };
-    match latch {
+    match latch & !LATCH_CONTROL {
         LATCH_OPEN => Some(VoiceMute {
-            muted: false,
+            muted: control,
             reason: None,
             muted_by: None,
+            control,
         }),
         LATCH_MUTED => muted(MutedBy::Button),
         LATCH_GUARD => muted(MutedBy::RestartGuard),
@@ -312,6 +321,7 @@ fn latch_message(latch: u8) -> Option<VoiceMute> {
             muted: true,
             reason: Some(MuteReason::Sleep),
             muted_by: Some(MutedBy::Sleep),
+            control,
         }),
         _ => None,
     }
@@ -517,6 +527,12 @@ pub struct HandControls {
     /// The onboarding walk is under way ([`Self::set_onboarding`]): a hold
     /// on the head asks no sleep.
     onboarding: bool,
+    /// The paired computers' mutes ([`crate::control_mute`]): the voice's
+    /// own once [`Self::restore`]d, a fixture's own in a test.
+    control_mutes: crate::control_mute::ControlMutes,
+    /// A computer's mute held at the last poll: the microphones closed
+    /// for it as for the button's, the record unchanged.
+    control_held: bool,
     /// Inputs a test has queue later, each when the poll's clock reaches
     /// its time, through the sender kept here.
     #[cfg(test)]
@@ -874,6 +890,7 @@ impl HandControls {
         let shared = Arc::new(Shared::default());
         let mut controls =
             Self::with_restored(options, &clock_id, restored, input, shared, now_us)?;
+        controls.use_control_mutes(crate::control_mute::ControlMutes::process());
         controls.start_pump(sender)?;
         Ok(Some(controls))
     }
@@ -1005,14 +1022,38 @@ impl HandControls {
             while_held: None,
             woken: None,
             onboarding: false,
+            control_mutes: crate::control_mute::ControlMutes::default(),
+            control_held: false,
             #[cfg(test)]
             scheduled: Vec::new(),
             #[cfg(test)]
             scheduler: None,
             _pump: None,
         };
+        controls
+            .control_mutes
+            .serve(controls.options.mute_record.is_some());
         controls.share_latch();
         Ok(controls)
+    }
+
+    /// Takes the computers' mutes from `mutes` (the voice's own, which the
+    /// say socket holds them in), served while this lamp has a mute record.
+    pub(crate) fn use_control_mutes(&mut self, mutes: crate::control_mute::ControlMutes) {
+        mutes.serve(self.options.mute_record.is_some());
+        self.control_mutes = mutes;
+    }
+
+    /// The computers' mutes this lamp holds, for a test to hold one.
+    #[cfg(test)]
+    pub(crate) fn control_mutes(&self) -> crate::control_mute::ControlMutes {
+        self.control_mutes.clone()
+    }
+
+    /// A paired computer's mute held at the last poll
+    /// ([`crate::control_mute`]): not the person's, and not in the record.
+    pub fn control_held(&self) -> bool {
+        self.control_held
     }
 
     /// The live latch for the pump to say on `voice/mute`, only where sleep
@@ -1031,6 +1072,11 @@ impl HandControls {
             LATCH_UNREADABLE
         } else {
             LATCH_MUTED
+        };
+        let latch = if self.control_held {
+            latch | LATCH_CONTROL
+        } else {
+            latch
         };
         // Woken only for a latch that changed: the owner shares it on every
         // poll, and the pump says an unchanged one every second by itself
@@ -1393,7 +1439,16 @@ impl HandControls {
         // (the reviewer's P2 on #4478).
         observation.head_lifted = self.sleep_line && self.hold_owed.is_none() && lifted;
         self.land_owed_sleep(now_us, &mut observation);
-        observation.muted = self.muted();
+        // A paired computer's mute (`listen.set false`), after this poll's
+        // head events, so a hand that lifted it is taken first: the
+        // microphones close for it as for the button's, the record as it
+        // was.
+        let control_held = self.control_mutes.take();
+        if control_held != std::mem::replace(&mut self.control_held, control_held) {
+            observation.mute_changed = true;
+            earlier(&mut observation.acquired_at_us, now_us);
+        }
+        observation.muted = self.muted() || self.control_held;
         observation.asleep = self.asleep();
         self.share_latch();
         if observation.stop
@@ -1503,10 +1558,15 @@ impl HandControls {
                     Err(_) => add(&self.shared.rejected, 1),
                 }
             }
+            // A tap, and a hand kept a second below, lift the paired
+            // computers' mutes too (`docs/control.md`, "Turns and
+            // listening"), as they wake the restart guard's: the person
+            // wins over a computer, and never its own mute through them.
             TouchGesture::Tap => {
                 earlier(&mut observation.head_tap_at_us, event.observed_us);
                 earlier(&mut observation.head_tap_began_us, event.began_us);
                 if let Some(released_us) = event.released_us {
+                    self.control_mutes.lift_by_hand();
                     self.head_wake(now_us, event.began_us, released_us);
                 }
             }
@@ -1517,8 +1577,11 @@ impl HandControls {
             // Controls' Stroke keeps the form older readers take (Third's P2
             // on #3767), so the wake is this reader's own rule: the receiver
             // wakes only a lamp asleep when the contact began.
-            TouchGesture::Stroke if self.head_wake(now_us, event.began_us, event.observed_us) => {
-                earlier(&mut observation.acquired_at_us, event.observed_us);
+            TouchGesture::Stroke => {
+                self.control_mutes.lift_by_hand();
+                if self.head_wake(now_us, event.began_us, event.observed_us) {
+                    earlier(&mut observation.acquired_at_us, event.observed_us);
+                }
             }
             _ => {}
         }
@@ -1605,8 +1668,10 @@ impl HandControls {
         let was_asleep = self.asleep();
         let mut observation = self.poll_with_clock(&mut now)?;
         self.persist_muted()?;
-        let allowed = self.after_persistence(now)?;
-        observation.muted = self.muted();
+        // A computer's mute keeps the microphones closed; the person's
+        // clear is still saved under it.
+        let allowed = self.after_persistence(now)? && !self.control_held;
+        observation.muted = self.muted() || self.control_held;
         observation.asleep = self.asleep();
         // Open again after a hand's sleep, by the person's tap or button:
         // the next conversation says its "hm?" (#1362).

@@ -1449,6 +1449,16 @@ pub struct VoiceMute {
     /// before it; a reader that does not know the field skips it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub muted_by: Option<MutedBy>,
+    /// Only while muted: a paired computer holds a mute through
+    /// lamp-control (`listen.set false`, `docs/control.md`), alone or under
+    /// the person's. Its own field, not a [`MutedBy`]: `MutedBy` is closed,
+    /// so a value an older reader does not know would fail its parse of the
+    /// whole message, and a field it does not know is skipped. With only a
+    /// computer's mute, `muted_by` is absent: an older reader takes it as
+    /// the mute as it always was. Written only when true; absent from a
+    /// voice before it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub control: bool,
 }
 
 impl VoiceMute {
@@ -1464,7 +1474,7 @@ impl VoiceMute {
 
     /// A reason belongs only to a mute.
     pub fn check(&self) -> Result<(), Invalid> {
-        if !self.muted && (self.reason.is_some() || self.muted_by.is_some()) {
+        if !self.muted && (self.reason.is_some() || self.muted_by.is_some() || self.control) {
             return Err(Invalid("an unmuted voice has no mute reason".into()));
         }
         if self.muted_by.is_some()
@@ -2682,6 +2692,7 @@ mod tests {
             muted: true,
             reason: Some(MuteReason::Sleep),
             muted_by: None,
+            control: false,
         };
         round_trip(&asleep, "{\"muted\":true,\"reason\":\"sleep\"}");
         assert!(asleep.check().is_ok() && asleep.asleep());
@@ -2690,6 +2701,7 @@ mod tests {
             muted: true,
             reason: None,
             muted_by: None,
+            control: false,
         };
         round_trip(&muted, "{\"muted\":true}");
         assert!(muted.check().is_ok() && !muted.asleep());
@@ -2698,6 +2710,7 @@ mod tests {
             muted: false,
             reason: Some(MuteReason::Sleep),
             muted_by: None,
+            control: false,
         };
         assert!(wrong.check().is_err() && !wrong.asleep());
         assert!(serde_json::from_str::<VoiceMute>("{\"muted\":true,\"reason\":\"nap\"}").is_err());
@@ -2732,6 +2745,7 @@ mod tests {
                 muted: true,
                 reason: None,
                 muted_by: Some(by),
+                control: false,
             };
             round_trip(
                 &said,
@@ -2743,6 +2757,7 @@ mod tests {
             muted: true,
             reason: Some(MuteReason::Sleep),
             muted_by: Some(MutedBy::Sleep),
+            control: false,
         };
         round_trip(
             &asleep,
@@ -2754,16 +2769,19 @@ mod tests {
                 muted: false,
                 reason: None,
                 muted_by: Some(MutedBy::Button),
+                control: false,
             },
             VoiceMute {
                 muted: true,
                 reason: Some(MuteReason::Sleep),
                 muted_by: Some(MutedBy::Button),
+                control: false,
             },
             VoiceMute {
                 muted: true,
                 reason: None,
                 muted_by: Some(MutedBy::Sleep),
+                control: false,
             },
         ] {
             assert!(wrong.check().is_err(), "{wrong:?}");
@@ -2786,6 +2804,74 @@ mod tests {
             assert!(read.muted, "{new}");
             assert_eq!(read.reason.is_some(), new.contains("\"reason\""), "{new}");
         }
+    }
+
+    /// A computer's mute (`control`, lamp-control's `listen.set false`) is
+    /// its own field, said only while muted and only when true. An older
+    /// reader, whose `MutedBy` is closed, still parses the message: it
+    /// skips the field, and with only a computer's mute it reads the mute
+    /// as it always was. A voice before the field still parses here.
+    #[test]
+    fn a_computers_mute_is_its_own_field_that_old_readers_skip() {
+        let alone = VoiceMute {
+            muted: true,
+            reason: None,
+            muted_by: None,
+            control: true,
+        };
+        round_trip(&alone, "{\"muted\":true,\"control\":true}");
+        assert!(alone.check().is_ok() && !alone.asleep());
+        let under_the_persons = VoiceMute {
+            muted: true,
+            reason: None,
+            muted_by: Some(MutedBy::Button),
+            control: true,
+        };
+        round_trip(
+            &under_the_persons,
+            "{\"muted\":true,\"muted_by\":\"button\",\"control\":true}",
+        );
+        assert!(under_the_persons.check().is_ok());
+        let unmuted = VoiceMute {
+            muted: false,
+            reason: None,
+            muted_by: None,
+            control: true,
+        };
+        assert!(unmuted.check().is_err());
+        // A voice before the field.
+        let old: VoiceMute =
+            serde_json::from_str("{\"muted\":true,\"muted_by\":\"button\"}").unwrap();
+        assert!(!old.control && old.check().is_ok());
+        // An older reader: `VoiceMute` as #4332 left it, its `MutedBy` closed.
+        #[derive(Deserialize)]
+        struct Before {
+            muted: bool,
+            reason: Option<MuteReason>,
+            #[serde(default)]
+            muted_by: Option<MutedBy>,
+        }
+        for (new, by) in [
+            ("{\"muted\":true,\"control\":true}", None),
+            (
+                "{\"muted\":true,\"muted_by\":\"button\",\"control\":true}",
+                Some(MutedBy::Button),
+            ),
+            (
+                "{\"muted\":true,\"reason\":\"sleep\",\"muted_by\":\"sleep\",\"control\":true}",
+                Some(MutedBy::Sleep),
+            ),
+        ] {
+            let read: Before = serde_json::from_str(new).unwrap();
+            assert!(read.muted, "{new}");
+            assert_eq!(read.muted_by, by, "{new}");
+            assert_eq!(read.reason.is_some(), new.contains("\"reason\""), "{new}");
+        }
+        // A `muted_by` it does not know would fail the old reader's parse:
+        // why the computer's mute is not one.
+        assert!(
+            serde_json::from_str::<Before>("{\"muted\":true,\"muted_by\":\"control\"}").is_err()
+        );
     }
 
     #[test]
