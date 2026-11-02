@@ -17,7 +17,8 @@
 //! someone looking down at a lamp (about 25 degrees). YuNet has no lip
 //! points, so the opening itself is not seen. On a small face the width's
 //! change is about as much as the marks jitter, so a face whose eyes are
-//! less than [`LEAST_EYES_PX`] apart, turned more than [`MOST_TURN_DEG`],
+//! less than [`LEAST_EYES_PX`] apart, turned more than [`MOST_TURN_DEG`]
+//! ([`STEADY_MOST_TURN_DEG`] with the switch),
 //! too new, or with jittering marks is `unknown`, never `no`.
 use lamp_msgs::{Speaking, SpeakingFrom, SpeakingState};
 use serde::Serialize;
@@ -60,6 +61,16 @@ pub const LEAST_MESHED_EYES_PX: f32 = 16.0;
 /// still large face varies about 1.2% look to look, and a face walking closer
 /// less than 2%, so 5% leaves both in.
 pub const MOST_EYES_STEP: f32 = 0.05;
+/// With [`STEADY_ENVIRONMENT`], the steady pairs a window with any pair left
+/// out still needs to be judged; fewer and it is `unknown`. A talking face's
+/// own landmarks step its eye distance past [`MOST_EYES_STEP`] on about 53% of
+/// steps at 20 px between the eyes (median 1.0 px), a still face's on 5%, so
+/// the earlier four (`LEAST_LOOKS - 1`) read most talking windows `unknown`.
+/// In an offline replay of a lamp-52e6 run at about 20 px, two raised talking
+/// windows read `yes` from 3 to 10 of 24 and 28 to 31 of 36 (one face), 7 to 56
+/// and 39 to 66 (a mirror), and left 0 `yes` on all four still sets; one pair
+/// let three single still pairs score above 0.015 (#4585).
+pub const LEAST_HELD_PAIRS: usize = 2;
 /// How far back a face's mouth is read: five to eight looks at the eyes'
 /// pace while they follow a face (250 ms, up to 350 ms on a 10 fps camera,
 /// `main.rs`). With `--steady-rate` a still face is looked at 500 to 600 ms
@@ -77,6 +88,12 @@ pub const LEAST_LOOKS: usize = 5;
 pub const LEAST_EYES_PX: f32 = 24.0;
 /// A face turned further than this hides one corner behind the other.
 pub const MOST_TURN_DEG: f32 = 30.0;
+/// With [`STEADY_ENVIRONMENT`], the turn a face may have and still be judged,
+/// instead of [`MOST_TURN_DEG`]: at 30 to 40 degrees the mesh still sees both
+/// mouth corners well enough. In an offline replay of a lamp-52e6 run, talking
+/// looks turned 32.5 to 38.7 degrees were lost to the 30, and five still looks
+/// turned 32 to 39 degrees stayed `no` or `unknown` under 40 (#4585).
+pub const STEADY_MOST_TURN_DEG: f32 = 40.0;
 /// The eye line bending by more than this, in radians from one look to the
 /// next (root mean square), is landmarks jittering, not a head.
 pub const MOST_JITTER: f32 = 0.1;
@@ -317,7 +334,12 @@ impl Mouths {
             .collect();
         let looks: Vec<_> = kept.iter().flatten().copied().collect();
         let outliers = mouth.looks.len() - looks.len();
-        let turned = turn_deg.is_none_or(|degrees| degrees > MOST_TURN_DEG);
+        let most_turn = if self.steady {
+            STEADY_MOST_TURN_DEG
+        } else {
+            MOST_TURN_DEG
+        };
+        let turned = turn_deg.is_none_or(|degrees| degrees > most_turn);
         // A window the mesh read on every look is judged by the mesh, so
         // its eyes are counted in the pixels the mesh saw; any other, by the
         // corners, in the detector's.
@@ -420,7 +442,7 @@ impl Mouths {
             // Only a window the head moved in is held to that count, so a
             // still one, and every window with the switch off, is judged as
             // before.
-            if held.len() < pairs.len() && held.len() < LEAST_LOOKS - 1 {
+            if held.len() < pairs.len() && held.len() < LEAST_HELD_PAIRS {
                 return UNKNOWN;
             }
             let score = (held
@@ -1430,10 +1452,10 @@ mod steady_tests {
 
     #[test]
     fn a_window_the_head_moved_through_is_unknown() {
-        // Almost every pair touches a move: too few still pairs to judge.
+        // Every pair but one touches a move: too few still pairs to judge.
         let every: Vec<u64> = (0..10).filter(|look| look % 2 == 1).collect();
         assert_eq!(
-            last(true, 30.0, &[2, 5, 8], &every, false).state,
+            last(true, 30.0, &[1, 3, 6, 8], &every, false).state,
             SpeakingState::Unknown
         );
     }
@@ -1479,10 +1501,15 @@ mod steady_tests {
     fn a_still_face_whose_box_flips_is_not_speaking() {
         let (eyes, open) = flipping();
         let said = each(true, &eyes, &open);
+        // Its two steady pairs, once the window holds them, read `no`.
         assert!(
-            said[4..]
+            said[4..7]
                 .iter()
                 .all(|state| *state == SpeakingState::Unknown),
+            "{said:?}"
+        );
+        assert!(
+            said[7..].iter().all(|state| *state == SpeakingState::No),
             "{said:?}"
         );
     }
@@ -1510,6 +1537,85 @@ mod steady_tests {
             said[4..].iter().all(|state| *state == SpeakingState::Yes),
             "{said:?}"
         );
+    }
+
+    /// A talking face about 20 px between the eyes whose own landmarks move
+    /// its eye distance past MOST_EYES_STEP on most steps (as on lamp-52e6),
+    /// the mouth open on every odd look.
+    fn jittering(eyes: &[f32]) -> Vec<SpeakingState> {
+        let open: Vec<f32> = (0..eyes.len())
+            .map(|look| if look % 2 == 0 { 0.002 } else { 0.06 })
+            .collect();
+        each(true, eyes, &open)
+    }
+
+    #[test]
+    fn a_talking_face_whose_eyes_jitter_past_the_step_is_speaking() {
+        // Windows 0..8 and 1..9 keep two and three steady pairs.
+        let said = jittering(&[20.0, 21.5, 20.0, 20.0, 21.5, 20.0, 20.0, 21.5, 20.0, 20.0]);
+        assert!(
+            said[8..].iter().all(|state| *state == SpeakingState::Yes),
+            "{said:?}"
+        );
+    }
+
+    #[test]
+    fn a_window_with_one_steady_pair_left_is_unknown() {
+        let said = jittering(&[20.0, 21.5, 20.0, 21.5, 20.0, 20.0, 21.5, 20.0, 21.5, 20.0]);
+        assert_eq!(said[9], SpeakingState::Unknown, "{said:?}");
+    }
+
+    /// Every verdict over ten meshed looks 250 ms apart of a face 30 px
+    /// between the eyes turned `degrees`, the mouth's `mouth_open` per look.
+    fn turned(steady: bool, degrees: f32, open: impl Fn(usize) -> f32) -> Vec<SpeakingState> {
+        let mut mouths = Mouths {
+            steady,
+            ..Mouths::default()
+        };
+        (0..10)
+            .map(|look| {
+                mouths
+                    .judge(
+                        1,
+                        &marks(30.0),
+                        Some(degrees),
+                        Some(open(look)),
+                        look as u64 * 250_000,
+                    )
+                    .state
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_talking_face_turned_35_degrees_is_speaking_only_with_the_switch() {
+        let talking = |look: usize| if look.is_multiple_of(2) { 0.002 } else { 0.06 };
+        let on = turned(true, 35.0, talking);
+        assert!(
+            on[4..].iter().all(|state| *state == SpeakingState::Yes),
+            "{on:?}"
+        );
+        let off = turned(false, 35.0, talking);
+        assert!(
+            off.iter().all(|state| *state == SpeakingState::Unknown),
+            "{off:?}"
+        );
+        assert!(
+            turned(true, 41.0, talking)
+                .iter()
+                .all(|state| *state == SpeakingState::Unknown)
+        );
+    }
+
+    #[test]
+    fn a_still_face_turned_35_degrees_is_never_speaking() {
+        let still = |look: usize| 0.002 + 0.0005 * ((look * 7 % 3) as f32 - 1.0);
+        let on = turned(true, 35.0, still);
+        assert!(
+            on.iter().all(|state| *state != SpeakingState::Yes),
+            "{on:?}"
+        );
+        assert!(on[4..].contains(&SpeakingState::No), "{on:?}");
     }
 
     #[test]
