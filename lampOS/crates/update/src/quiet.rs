@@ -15,6 +15,12 @@
 //! microphones are closed and no turn can be cut. Under the same 3 s as the
 //! state, and never while a fresh state says a turn.
 //!
+//! The privacy slide closed is the same (the first builder on #4710): its
+//! mute is not `voice/mute`'s, and a voice muted by it says no state, so a
+//! lamp left on privacy was never quiet and took no update. It is read from
+//! the voice's newest lease (`voice/privacy`, `physical_muted`), by the same
+//! 3 s.
+//!
 //! Pure: it is told what was heard and when, and asked at a time.
 use lamp_msgs::{Voice, VoiceMute};
 use std::time::Duration;
@@ -37,6 +43,9 @@ pub enum Heard {
     State(Voice),
     /// Its mute (`voice/mute`).
     Mute(VoiceMute),
+    /// Its newest privacy lease (`voice/privacy`): whether it says the
+    /// slide is closed.
+    Slide { closed: bool },
 }
 
 #[derive(Clone, Debug)]
@@ -49,6 +58,8 @@ pub struct Quiet {
     state: Option<(Voice, u64)>,
     /// The last mute said, and when.
     mute: Option<(VoiceMute, u64)>,
+    /// The last lease read, whether it said the slide closed, and when.
+    slide: Option<(bool, u64)>,
 }
 
 impl Quiet {
@@ -58,6 +69,7 @@ impl Quiet {
             noise_ms: None,
             state: None,
             mute: None,
+            slide: None,
         }
     }
 
@@ -71,6 +83,7 @@ impl Quiet {
                 self.state = Some((state, at_ms));
             }
             Heard::Mute(mute) => self.mute = Some((mute, at_ms)),
+            Heard::Slide { closed } => self.slide = Some((closed, at_ms)),
         }
     }
 
@@ -90,7 +103,8 @@ impl Quiet {
     /// seconds, and for at least `long` nobody has been heard, nothing has
     /// been said and the voice has been in no other state. Ok at once when
     /// the voice has said within three seconds that it is muted (asleep or
-    /// for privacy), unless a fresh state says it is in a turn. Otherwise
+    /// for privacy), or its newest lease says the privacy slide is closed,
+    /// unless a fresh state says it is in a turn. Otherwise
     /// why not, for a person.
     pub fn for_at_least(&self, long: Duration, now_ms: u64) -> Result<(), String> {
         let long_ms = long.as_millis() as u64;
@@ -98,10 +112,14 @@ impl Quiet {
         let in_turn = self
             .state
             .is_some_and(|(state, said_ms)| fresh(said_ms) && state != Voice::Resting);
+        let slide_closed = self
+            .slide
+            .is_some_and(|(closed, said_ms)| closed && fresh(said_ms));
         if !in_turn
-            && self
-                .mute
-                .is_some_and(|(mute, said_ms)| mute.muted && fresh(said_ms))
+            && (slide_closed
+                || self
+                    .mute
+                    .is_some_and(|(mute, said_ms)| mute.muted && fresh(said_ms)))
         {
             return Ok(());
         }
@@ -236,6 +254,24 @@ mod tests {
             quiet.hear(muted(reason), 2 * S);
             assert_eq!(quiet.for_at_least(QUIET, 2 * S), Ok(()));
         }
+    }
+
+    #[test]
+    fn a_lamp_muted_by_its_own_slide_is_quiet_at_once() {
+        // Muted by the slide, the voice says no state and no mute: only its
+        // lease, which says the slide closed.
+        let mut quiet = Quiet::new(0);
+        quiet.hear(Heard::Speech, S);
+        quiet.hear(Heard::Slide { closed: true }, 2 * S);
+        assert_eq!(quiet.for_at_least(QUIET, 2 * S), Ok(()));
+        // A stale lease says nothing of now; an open one is not quiet.
+        assert!(quiet.for_at_least(QUIET, 6 * S).is_err());
+        quiet.hear(Heard::Slide { closed: false }, 6 * S);
+        assert!(quiet.for_at_least(QUIET, 6 * S).is_err());
+        // A fresh state that says a turn wins over the slide.
+        quiet.hear(Heard::Slide { closed: true }, 7 * S);
+        quiet.hear(Heard::State(Voice::Speaking), 7 * S);
+        assert!(quiet.for_at_least(QUIET, 7 * S).is_err());
     }
 
     #[test]

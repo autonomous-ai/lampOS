@@ -788,7 +788,14 @@ each under the quiet rule. A round
    by that guard after a fault reads on the bus as a mute with no reason
    and counts too: its microphones are closed as well. Without
    `LAMP_HEAD_TOUCH=on` and `--controls-mute` the voice says no
-   `voice/mute`, and a muted voice there still cannot be judged. A
+   `voice/mute`, and a muted voice there still cannot be judged. The
+   privacy slide closed is quiet at once too (the first builder on #4710):
+   its mute isn't `voice/mute`'s, and a voice it muted says no state, so a
+   lamp left on privacy took no update. The round reads the voice's newest
+   lease (`voice/privacy`, renewed every 10 ms) without subscribing, as
+   lamp-control does; a valid one at most 3 s old with `physical_muted`
+   true is quiet, under the same "not while a fresh `voice/state` says a
+   turn" (`quiet.rs`, `world.rs`'s `BusEars::slide`). A
    voice that says nothing on the bus cannot be judged and is not switched;
    a voice whose unit is not running hears nobody and is no reason to wait.
    The wait says "waiting for a quiet moment: <why>" once, after its first
