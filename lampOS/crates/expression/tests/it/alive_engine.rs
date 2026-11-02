@@ -1722,6 +1722,8 @@ mod head {
         lamp.head(TouchGesture::Hold, 9, 3_000_000);
         lamp.mute(true, true);
         lamp.voice_silent = true;
+        let mut asleep = None;
+        let mut breathed = false;
         for second in 0..5 {
             let until = lamp.now + SECOND;
             while lamp.now < until {
@@ -1732,14 +1734,32 @@ mod head {
                     "{second} s: {:?}",
                     output.state
                 );
+                // The sleeping pose and breath keep going out to the body
+                // and the light the whole sleep, not only the first 0.5 s.
+                let body = output.body.as_ref().expect("a sleeping pose");
+                let light = output.light.as_ref().expect("a sleeping breath");
+                if let Some((before, _)) = &asleep {
+                    breathed |= body != before;
+                }
+                asleep = Some((body.clone(), light.face));
             }
             lamp.mute(true, true);
         }
-        // The voice opens and says its timing again: it wakes.
+        assert!(breathed, "the sleeping pose breathes");
+        // The voice opens and says its timing again: it wakes, and what goes
+        // to the body or the light is no longer the sleeping one.
         lamp.voice_silent = false;
         lamp.mute(false, false);
         let woken = lamp.last(100_000);
         assert!(named(&woken, "waking"), "{:?}", woken.state);
+        let (body, face) = asleep.unwrap();
+        assert!(
+            woken.body.as_ref() != Some(&body)
+                || woken.light.as_ref().map(|l| l.face) != Some(face),
+            "{:?} {:?}",
+            woken.body,
+            woken.light
+        );
     }
 
     #[test]
