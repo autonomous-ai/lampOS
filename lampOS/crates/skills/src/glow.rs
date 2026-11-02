@@ -505,6 +505,7 @@ fn ask_ring(
         light: light.clone(),
         pattern: *pattern,
         fade_ms: *fade_ms,
+        pixels: None,
     };
     let published = locked(&glows.out).publish_json(lamp_ipc::monotonic_us(), &request)?;
     if published.delivered == 0 {

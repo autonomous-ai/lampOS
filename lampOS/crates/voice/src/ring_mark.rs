@@ -167,6 +167,27 @@ pub fn marked(mut pixels: [Rgb; PIXEL_COUNT]) -> [Rgb; PIXEL_COUNT] {
     pixels
 }
 
+/// The share of a computer's own colours kept while the mark is drawn
+/// over them ([`marked_apart`]).
+const APART_SHARE: u16 = 3;
+
+/// The mark over a computer's own pixels or frames (docs/control.md, "The
+/// ring, pixel by pixel"): the mark at its own brightness ([`mark_for`] of
+/// the computer's frame), the two pixels beside it dark, and every other
+/// pixel at a third of what the computer drew. No computer can then hide the
+/// mark among dots of its own, however red (Thirteen's P2 on #4943): the
+/// mark is the brightest red on the ring, alone at the top.
+pub fn marked_apart(pixels: [Rgb; PIXEL_COUNT]) -> [Rgb; PIXEL_COUNT] {
+    let mark = mark_for(&pixels);
+    let third = |channel: u8| (u16::from(channel) / APART_SHARE) as u8;
+    let mut pixels =
+        pixels.map(|pixel| Rgb::new(third(pixel.red), third(pixel.green), third(pixel.blue)));
+    pixels[MARK_PIXEL] = mark;
+    pixels[(MARK_PIXEL + 1) % PIXEL_COUNT] = Rgb::BLACK;
+    pixels[(MARK_PIXEL + PIXEL_COUNT - 1) % PIXEL_COUNT] = Rgb::BLACK;
+    pixels
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

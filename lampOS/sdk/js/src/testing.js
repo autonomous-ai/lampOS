@@ -76,6 +76,7 @@ export const LIMITS = Object.freeze({
     clips_max: 64,
     store_max_bytes: 20_000_000,
   },
+  ring: { pixels: 32 },
   quiet_hours: { from: '22:00', to: '07:00' },
 });
 
@@ -663,6 +664,17 @@ export class FakeLamp {
         this.unfollow(request.lease);
         return this.ok(ws, id);
       case 'light': {
+        // A computer's own colours (the ring, pixel by pixel), as lamp-control's
+        // parts.rs: to the ring, each pixel at the brightness.
+        if (request.pixels || request.rgb) {
+          const given = request.pixels ?? Array(32).fill(request.rgb);
+          if (given.length !== 32) {
+            this.requests.pop();
+            return this.refuse(ws, id, 'bad_request', 'pixels: 32 of them, one per pixel of the ring');
+          }
+          this.shownPixels = given;
+          return this.ok(ws, id, { to: 'ring', pixels: given.length });
+        }
         // As lamp-control's parts.rs: the pattern checked first, then to the
         // ring, which keeps its own one-pulse-a-minute (not said back).
         const [least, why] = PATTERN_LEAST_LEVEL[request.pattern] ?? [1, ''];

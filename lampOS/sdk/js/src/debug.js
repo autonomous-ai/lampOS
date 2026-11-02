@@ -33,6 +33,8 @@ export const SHOWN = new Set([
   // and lengths, never the bytes; a pushed skill's whole hash and each part's number (`skill.push`).
   'sound', 'sounds', 'removed', 'ms', 'sha256', 'part', 'rate_hz', 'clip_max_ms', 'clip_max_bytes',
   'part_max_chars', 'parts_max', 'clips_max', 'store_max_bytes',
+  // `light`'s own colours (the ring, pixel by pixel) and hello's ring.
+  'brightness', 'fade_ms', 'pixels', 'rgb', 'ring',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',
