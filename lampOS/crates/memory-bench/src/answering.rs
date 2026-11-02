@@ -132,7 +132,7 @@ fn result_bytes(value: &Value) -> Result<usize> {
     }
 }
 const INVALIDATED_RESULT: &str =
-    "Earlier memory tool result invalidated by a subsequent memory operation.";
+    "Earlier memory tool result invalidated by a subsequent memory change.";
 fn assistant(reply: &Reply) -> Value {
     let mut message =
         json!({"role":"assistant","content":reply.content,"tool_calls":reply.tool_calls});
@@ -258,8 +258,8 @@ impl Answerer<'_> {
             if round + 1 == evaluation::TOOL_ROUNDS {
                 return Err(invalid("answer exhausted registered tool rounds"));
             }
-            transcript.clear();
-            fresh_tool_bytes = 0;
+            // Earlier rounds stay: their read-only results remain usable until a
+            // call changes memory, and every retained result counts in the cap.
             transcript.push(assistant(&reply));
             for (index, tool) in calls.into_iter().enumerate() {
                 let request = Request::new(
@@ -302,12 +302,24 @@ impl Answerer<'_> {
                     )?;
                     break;
                 }
-                for prior in &mut transcript {
-                    if prior["role"] == "tool" {
-                        prior["content"] = json!(INVALIDATED_RESULT);
+                // Only a call that changed memory (remember, edit, forget) makes
+                // earlier results stale; read-only results stay and count together.
+                let changed = outcome.data["memory_changed"]
+                    .as_bool()
+                    .ok_or_else(|| invalid("tool omitted memory_changed"))?;
+                let bytes = result_bytes(&outcome.data["result"])?;
+                if changed {
+                    for prior in &mut transcript {
+                        if prior["role"] == "tool" {
+                            prior["content"] = json!(INVALIDATED_RESULT);
+                        }
                     }
+                    fresh_tool_bytes = bytes;
+                } else {
+                    fresh_tool_bytes = fresh_tool_bytes
+                        .checked_add(bytes)
+                        .ok_or_else(|| invalid("tool result byte overflow"))?;
                 }
-                fresh_tool_bytes = result_bytes(&outcome.data["result"])?;
                 if fresh_tool_bytes > turn_cap {
                     return Err(invalid("fresh memory tool result exceeds prompt cap"));
                 }

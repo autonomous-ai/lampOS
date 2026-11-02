@@ -290,6 +290,21 @@ impl Trial<'_> {
                 probes += 1;
             }
         }
+        // Topic batches and their session-only fallbacks, as the adapter
+        // reports them at the month's end (main-session work only); null for
+        // a setup that reports neither, and a missing count stays null so the
+        // card can refuse it. The card applies the registered 10% rule.
+        let last = ops.run(Op::Inspect, json!({"person_id":self.corpus.persona.id}))?;
+        let stats = &last.data["stats"];
+        let (batches, fallbacks) = (
+            stats["topic_batches"].as_u64(),
+            stats["topic_fallbacks"].as_u64(),
+        );
+        let topic = if batches.is_none() && fallbacks.is_none() {
+            Value::Null
+        } else {
+            json!({"topic_batches":batches,"topic_fallbacks":fallbacks})
+        };
         let total = categories.values().map(Vec::len).sum::<usize>();
         let scored = categories.values().flatten().flatten().count();
         let overall = (total > 0 && scored == total)
@@ -300,7 +315,7 @@ impl Trial<'_> {
             (kind,json!({"questions":values.len(),"mean":mean,"scored":values.iter().flatten().count()}))
         }).collect();
         Ok(
-            json!({"label":if self.mode==Mode::Live {"live; provisional pending human audit"}else{"plumbing check"},"arm":self.arm,"events":self.observed.len(),"questions":probes,"answer_turns":turns,"malformed_answers":malformed_answers,"malformed_judgments":malformed_judgments,"nights":nights,"weekly_passes":nights/7,"by_kind":by_kind,"overall":overall,"human_audit":audit,"tier_usage":coverage,"fixture_profile":self.corpus.profile,"coverage_gaps":["no second identified person","no delivered-recall acknowledgement",if matches!(self.corpus.profile,Profile::Month){"fading not exercised by this month"}else{"fading requires live metadata audit"},"current-product in-turn forgetting is weaker than the uniform bench restart"],"score_status":if self.mode==Mode::Live{"provisional"}else{"no scores"}}),
+            json!({"label":if self.mode==Mode::Live {"live; provisional pending human audit"}else{"plumbing check"},"arm":self.arm,"events":self.observed.len(),"questions":probes,"answer_turns":turns,"malformed_answers":malformed_answers,"malformed_judgments":malformed_judgments,"nights":nights,"weekly_passes":nights/7,"by_kind":by_kind,"overall":overall,"human_audit":audit,"tier_usage":coverage,"topic":topic,"fixture_profile":self.corpus.profile,"coverage_gaps":["no second identified person","no delivered-recall acknowledgement",if matches!(self.corpus.profile,Profile::Month){"fading not exercised by this month"}else{"fading requires live metadata audit"},"current-product in-turn forgetting is weaker than the uniform bench restart"],"score_status":if self.mode==Mode::Live{"provisional"}else{"no scores"}}),
         )
     }
 }

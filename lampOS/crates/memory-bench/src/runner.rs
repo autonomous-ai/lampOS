@@ -440,6 +440,9 @@ fn validate_response(request: &Request, data: &Value) -> Result<()> {
             if data.get("result").is_none() {
                 return Err(invalid("tool omitted result"));
             }
+            if request.v >= 2 {
+                boolean(data, "memory_changed")?;
+            }
             array(data, "source_ids")?;
         }
         Op::Inspect => {

@@ -222,7 +222,7 @@ fn exact_product_settings_fragmented_stream_and_durable_wire_provenance() {
     let body: Value = serde_json::from_slice(&request[split + 4..]).unwrap();
     assert_eq!(
         body,
-        json!({"model":"deepseek-flash","messages":[{"role":"user","content":"Fictional owner question."}],"stream":true,"stream_options":{"include_usage":true},"thinking":{"type":"disabled"},"max_tokens":512})
+        json!({"model":"deepseek-flash","messages":[{"role":"user","content":"Fictional owner question."}],"stream":true,"stream_options":{"include_usage":true},"thinking":{"type":"disabled"},"max_tokens":512,"temperature":0})
     );
     let p = client.receipts()[0].provenance.as_ref().unwrap();
     assert_eq!(p.reported_model.as_deref(), Some("fixture-pinned-model"));

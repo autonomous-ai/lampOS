@@ -302,19 +302,50 @@ fn attempt(
     if coverage.probes != corpus.questions.len() as u64 {
         return Err(invalid("diagnostic coverage differs from probes"));
     }
-    row["scores"] = if mode == Mode::Live {
-        json!(means)
-    } else {
-        Value::Null
-    };
+    // Registered 2 November 2026: a run whose session-only topic fallbacks
+    // exceed 10% of its topic batches is invalid for the score; its ledger
+    // is kept and its counts are shown. A Tiers run missing either count is
+    // invalid the same way; setups without topics are not applicable.
+    let topic_invalid = topic_rule(arm, &result["topic"])?;
+    row["topic"] = result["topic"].clone();
+    if let Some(reason) = topic_invalid {
+        row["score_invalid"] = json!(reason);
+    }
+    let topic_invalid = topic_invalid.is_some();
+    let means = (mode == Mode::Live && !topic_invalid).then_some(means);
+    row["scores"] = json!(means);
     row["tier_usage"] = json!(coverage);
     row["human_audit"] = result["human_audit"].clone();
     row["coverage_gaps"] = result["coverage_gaps"].clone();
     Ok(Attempt {
         row,
-        means: (mode == Mode::Live).then_some(means),
+        means,
         coverage: Some(coverage),
     })
+}
+/// Why a completed run has no score under the topic-fallback rule.
+pub const TOPIC_FALLBACKS_INVALID: &str =
+    "topic_fallbacks x 10 > topic_batches: invalid for the score, ledger kept";
+/// Why a Tiers run, or any run reporting only one count, has no score.
+pub const TOPIC_COUNTS_MISSING: &str =
+    "topic_batches or topic_fallbacks not reported: invalid for the score, ledger kept";
+/// The topic-fallback rule for one run: None when it may be scored. Every
+/// Tiers setup must report both counts; a setup reporting neither is not
+/// applicable; a partial report is invalid for any setup.
+pub fn topic_rule(arm: &str, topic: &Value) -> Result<Option<&'static str>> {
+    if topic.is_null() {
+        return Ok(arm.starts_with("tiers").then_some(TOPIC_COUNTS_MISSING));
+    }
+    let (Some(batches), Some(fallbacks)) = (
+        topic["topic_batches"].as_u64(),
+        topic["topic_fallbacks"].as_u64(),
+    ) else {
+        return Ok(Some(TOPIC_COUNTS_MISSING));
+    };
+    if fallbacks > batches {
+        return Err(invalid("more topic fallbacks than topic batches"));
+    }
+    Ok((fallbacks.saturating_mul(10) > batches).then_some(TOPIC_FALLBACKS_INVALID))
 }
 fn aggregate(attempts: &[Attempt]) -> Option<BTreeMap<String, Value>> {
     if attempts.len() != 3 {
@@ -674,6 +705,40 @@ mod tests {
             row: json!({}),
             means: value.map(|v| BTreeMap::from([("overall".into(), v), ("exact".into(), v)])),
             coverage: None,
+        }
+    }
+    #[test]
+    fn topic_fallbacks_over_a_tenth_of_batches_invalidate_the_score() {
+        let topic = |b: u64, f: u64| json!({"topic_batches":b,"topic_fallbacks":f});
+        let rule = |t: &Value| topic_rule("tiers", t).unwrap();
+        // Exactly 10% stays valid; one more fallback makes it invalid.
+        assert_eq!(rule(&topic(30, 3)), None);
+        assert_eq!(rule(&topic(30, 4)), Some(TOPIC_FALLBACKS_INVALID));
+        assert_eq!(rule(&topic(0, 0)), None);
+        assert_eq!(rule(&topic(9, 1)), Some(TOPIC_FALLBACKS_INVALID));
+        // Impossible counts are refused, never read as valid.
+        assert!(topic_rule("tiers", &topic(3, 4)).is_err());
+    }
+    #[test]
+    fn a_tiers_run_missing_a_topic_count_is_invalid_and_no_topic_setups_are_not_applicable() {
+        for arm in ["tiers", "tiers_minus_fading"] {
+            for missing in [
+                Value::Null,
+                json!({"topic_batches":3,"topic_fallbacks":null}),
+                json!({"topic_batches":null,"topic_fallbacks":0}),
+            ] {
+                assert_eq!(
+                    topic_rule(arm, &missing).unwrap(),
+                    Some(TOPIC_COUNTS_MISSING)
+                );
+            }
+        }
+        for arm in ["none", "full_history", "lampos_today_partial"] {
+            assert_eq!(topic_rule(arm, &Value::Null).unwrap(), None);
+            assert_eq!(
+                topic_rule(arm, &json!({"topic_batches":3,"topic_fallbacks":null})).unwrap(),
+                Some(TOPIC_COUNTS_MISSING)
+            );
         }
     }
     #[test]

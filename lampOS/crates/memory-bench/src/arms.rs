@@ -117,6 +117,23 @@ impl Basic {
             && id == Some(self.owner.as_str())
             && presence == Presence::OwnerAlone
     }
+    /// Durable state is `history.json` plus the events appended after it in
+    /// `history.log`, one JSON line each. An ingest appends and syncs one line;
+    /// only `persist` (open and forget) rewrites the snapshot and empties the
+    /// log, so deleted words leave both files and writes stay linear.
+    fn append(&self, event: &Event) -> Result<()> {
+        if self.main.is_some() {
+            return Ok(());
+        }
+        let mut line = serde_json::to_vec(event)?;
+        line.push(b'\n');
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(self.path.join("history.log"))?;
+        file.write_all(&line)?;
+        file.sync_data()?;
+        Ok(())
+    }
     fn persist(&self) -> Result<()> {
         if self.main.is_some() {
             return Ok(());
@@ -131,6 +148,13 @@ impl Basic {
         file.write_all(&bytes)?;
         file.sync_all()?;
         std::fs::rename(temporary, self.path.join("history.json"))?;
+        let log = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(self.path.join("history.log"))?;
+        log.sync_all()?;
         File::open(&self.path)?.sync_all()?;
         Ok(())
     }
@@ -180,8 +204,8 @@ impl MemoryArm for Basic {
                     ));
                 }
                 sources.push(event.record_id.clone());
+                self.append(&event)?;
                 self.state.events.push(event);
-                self.persist()?;
             }
         }
         Ok(json!({"accepted":admitted,"source_ids":sources,"forget_effect":effect}))

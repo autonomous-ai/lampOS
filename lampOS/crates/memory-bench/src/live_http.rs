@@ -4,7 +4,7 @@ mod stream;
 
 use crate::{
     Result, hash, invalid,
-    model::{Call, Provenance, Provider, Reply},
+    model::{Call, Provenance, Provider, Purpose, Reply},
 };
 use reqwest::{
     Url,
@@ -171,6 +171,7 @@ impl Http {
     fn request(&self, call: &Call) -> Result<Vec<u8>> {
         call.validate()?;
         let Call::Chat {
+            purpose,
             messages,
             max_output_tokens,
             response_format,
@@ -184,6 +185,9 @@ impl Http {
         let mut body = json!({"model":self.config.requested_model, "messages":messages,
             "stream":true, "stream_options":{"include_usage":true},
             "thinking":{"type":"disabled"}, "max_tokens":max_output_tokens});
+        if matches!(purpose, Purpose::Answer | Purpose::Judge) {
+            body["temperature"] = json!(crate::evaluation::TEMPERATURE);
+        }
         if let Some(format) = response_format {
             body["response_format"] = format.clone();
         }
