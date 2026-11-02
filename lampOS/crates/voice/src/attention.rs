@@ -638,10 +638,8 @@ const STAND_INS: &[&str] = &[
 /// (6999, 14:1x) "Lamp, what did I just ask you?" came back as "Lampy, …"
 /// and was held as said to someone it calls by name.
 ///
-/// "One" too, with `LAMP_ONE_AS_LAMP=on` only ([`ONE_STAND_INS`]): on
-/// lamp-3e83 on 2 Nov a tester's "Lamp, …" came back mostly as "One, …"
-/// ("One, how do I make a pour over coffee?", "One, what should I eat for
-/// lunch?") and each was held as said to someone it calls by name (#4710).
+/// "One" is not among them: with `LAMP_ONE_AS_LAMP=on` only, and read
+/// more narrowly, as [`opens_with_one`] reads it (#4710).
 const STAND_ALONE_INS: &[&str] = &[
     "lynn", "len", "lin", "lump", "land", "line", "palin", "palan", "louvre", "lampy",
 ];
@@ -652,11 +650,104 @@ const STAND_ALONE_INS: &[&str] = &[
 /// nothing else; [`Attention::count_one_as_the_lamp`], #4710).
 pub const ONE_AS_LAMP_ENVIRONMENT: &str = "LAMP_ONE_AS_LAMP";
 
-/// With `LAMP_ONE_AS_LAMP=on`, one of [`STAND_ALONE_INS`] on its own
-/// switch: Deepgram's most frequent word for "Lamp," on lamp-3e83 on 2 Nov
-/// (#4710). Nobody's name; set off at a line's start, never "One more
-/// thing" or "Which one?".
+/// With `LAMP_ONE_AS_LAMP=on`, Deepgram's most frequent word for "Lamp," on
+/// lamp-3e83 on 2 Nov: a tester's "Lamp, …" came back mostly as "One, …"
+/// ("One, how do I make a pour over coffee?", "One, what should I eat for
+/// lunch?") and each was held as said to someone it calls by name (#4710).
+/// Nobody's name, so with the switch never someone else's. But "one" is an
+/// everyday reply word, so it calls the lamp only as [`opens_with_one`]
+/// reads it, opening a request of at least three words ("One, what time
+/// is it?"; never "Yes, one.", "One.", "One, please.", "One, I think.",
+/// "One, two, three." or "One more thing"), and never in a busy
+/// room, as a stand-in never shows a call there ([`called_by_real_name`];
+/// Seventh's P2 on #4953). Not in [`written_for_the_name`] or
+/// [`only_the_name`] either: a bare "One," cut at a pause is not carried
+/// as a call the way "Lynn," is, since a bare "One." is as often the answer
+/// to "How many?" and the call needs its words after the comma.
 const ONE_STAND_INS: &[&str] = &["one"];
+
+/// Number words: "One," followed by one is counting or an amount ("One,
+/// two, three, go!", "One, maybe two."), not a call ([`opens_with_one`]).
+const NUMBER_WORDS: &[&str] = &[
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+    "twelve", "twenty", "hundred", "thousand", "half",
+];
+
+/// Words that, alone after "One,", make it a reply, not a call ("One,
+/// please.", "One, thanks.").
+const ONE_REPLY_WORDS: &[&str] = &["please", "thanks", "thank", "you"];
+
+/// Words that, first after "One,", open a reply to "How many?", not a
+/// request, however long the rest ("One, maybe a bit later.", "One, yeah
+/// that sounds good.", "One, no sugar please.", "One, if that's okay.";
+/// [`opens_with_one`]; Seventh's P2-1 on #4968). Not "I": "One, I need a
+/// timer." is a request. Not "just", "okay", "ok" or "actually" either:
+/// they open ordinary calls ("One, just turn the light off.", "One, okay,
+/// what time is it?"), and the replies they open are held by the number or
+/// three-word rule ("One, just one please.", "One, okay."; Seventh's P2-1
+/// on #4968, 01:46). Known residual: a request opening with one of these
+/// ("One, no wait, turn it off.", "One, sure set it for ten.") is missed.
+const ONE_REPLY_OPENERS: &[&str] = &[
+    "maybe", "yeah", "yes", "yep", "no", "nope", "if", "or", "sure", "probably", "perhaps",
+];
+
+/// Fewest words after "One," for it to call the lamp: a short answer to
+/// "How many?" ("One, I think.", "One, maybe.", "One, no sugar.") has
+/// fewer, every "One," line from lamp-3e83 has more ("One, what time is
+/// it?"; Seventh's P2-1 on #4968). Known residual: a longer ordinary reply
+/// opening with another word ("One, I think so too.", "One, I'm not sure.")
+/// still calls the lamp in a room not known to be busy; and a request
+/// opening with one of [`ONE_REPLY_OPENERS`] ("One, no wait, turn it
+/// off.", "One, yes go ahead and play it.") is missed.
+const ONE_CALL_LEAST_WORDS: usize = 3;
+
+/// With `LAMP_ONE_AS_LAMP=on`, whether `heard` calls the lamp as "One,"
+/// ([`ONE_STAND_INS`]): the line's first word past any greeting, set off by
+/// a comma, with at least [`ONE_CALL_LEAST_WORDS`] words after it ("One,
+/// what time is it?", "Hey, one, dim the light."), none of the first three
+/// and not the last a number word or a figure ([`NUMBER_WORDS`]: "One, or
+/// maybe two."), the first not one of [`ONE_REPLY_OPENERS`] ("One, maybe a
+/// bit later."), and not only [`ONE_REPLY_WORDS`]. A number further in is
+/// the request's ("One, set a timer for two minutes.", "One, how much is
+/// 100 US dollars in Vietnamese dong?"). "Yes, one.", "I want one,
+/// please.", a bare "One." or "One,", "One, please.", "One, I think.",
+/// "One, no sugar.", "One, two, three." and "Okay, one more?" are no calls
+/// (Seventh's P2 on #4953 and P2-1 on #4968). Known residual: a longer
+/// ordinary reply opening with another word ("One, I think so too.", "One,
+/// I'm not sure.") still calls the lamp in a room not known to be busy;
+/// and a request opening with one of [`ONE_REPLY_OPENERS`] ("maybe",
+/// "yeah", "yes", "yep", "no", "nope", "if", "or", "sure", "probably",
+/// "perhaps": "One, sure set it for ten.") is missed.
+pub(crate) fn opens_with_one(heard: &str) -> bool {
+    let bare = |word: &str| word.trim_matches(|c: char| !c.is_alphanumeric()).to_owned();
+    let words: Vec<&str> = heard.split_whitespace().collect();
+    let Some(at) = words.iter().position(|word| !is_greeting(&bare(word))) else {
+        return false;
+    };
+    let opens = words[at].strip_suffix(',').is_some_and(|word| {
+        ONE_STAND_INS
+            .iter()
+            .any(|one| word.eq_ignore_ascii_case(one))
+    });
+    let after: Vec<String> = words[at + 1..]
+        .iter()
+        .map(|word| bare(word).to_lowercase())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let number = |word: &String| {
+        NUMBER_WORDS.contains(&word.as_str()) || word.starts_with(|c: char| c.is_ascii_digit())
+    };
+    opens
+        && after.len() >= ONE_CALL_LEAST_WORDS
+        && !after[..ONE_CALL_LEAST_WORDS].iter().any(number)
+        && !after.last().is_some_and(number)
+        && !after
+            .first()
+            .is_some_and(|word| ONE_REPLY_OPENERS.contains(&word.as_str()))
+        && !after
+            .iter()
+            .all(|word| ONE_REPLY_WORDS.contains(&word.as_str()))
+}
 
 /// With `LAMP_ONE_AS_LAMP=on`, what Deepgram also wrote for "Lamp," on
 /// lamp-3e83 on 2 Nov ("Wang, what did I ask you a minute ago?", "Lung,
@@ -715,8 +806,24 @@ fn retry_words(line: &str) -> std::collections::BTreeSet<String> {
 /// Whether `line` mostly repeats `held`: at least [`RETRY_SHARE_TENTHS`]
 /// of `held`'s words ([`retry_words`]) are in it, and at least
 /// [`RETRY_LEAST_WORDS`]. "Yes, I can." after "Daniel, can you come at
-/// two?" shares one word of five, and is no retry.
+/// two?" shares one word of five, and is no retry. Only when `held` opens
+/// with a word Deepgram writes for the lamp's name, set off ("One,",
+/// "Wang,", "Lung,"; [`ONE_STAND_INS`], [`STAND_INS_WITH_A_SIGN`]): after a
+/// real name ("Daniel, can you send me the file?") a reply echoes the
+/// question ("I can send you the file.") and stays that person's (Seventh's
+/// P2 on #4953). A line in unspaced Japanese, Chinese or Korean is one
+/// "word" here, so it is never a retry, and is judged as before.
 pub(crate) fn retries(held: &str, line: &str) -> bool {
+    let for_the_lamp =
+        crate::second_provider::first_word_set_off(held).is_some_and(|(start, end)| {
+            ONE_STAND_INS
+                .iter()
+                .chain(STAND_INS_WITH_A_SIGN)
+                .any(|word| held[start..end].eq_ignore_ascii_case(word))
+        });
+    if !for_the_lamp {
+        return false;
+    }
     let held = retry_words(held);
     let line = retry_words(line);
     let shared = held.intersection(&line).count();
@@ -1467,6 +1574,9 @@ pub struct Attention {
     /// hand has that sign ([`STAND_INS_WITH_A_SIGN`]), judged with it.
     one_as_lamp: bool,
     names_with_a_sign: bool,
+    /// With `one_as_lamp`, whether "One," calls the lamp for the request in
+    /// hand ([`opens_with_one`]): judged in a room not known to be busy.
+    one_counts: bool,
     /// With `one_as_lamp`, the words of the line the request in hand
     /// follows as a reply ([`ANOTHER_REPLY_US`]): a retry of it is judged
     /// on its own ([`retries`]).
@@ -2435,6 +2545,7 @@ impl Attention {
         self.cut_in = false;
         self.one_person = false;
         self.names_with_a_sign = false;
+        self.one_counts = false;
         self.name_taken_as_a_word = false;
     }
 
@@ -2476,29 +2587,32 @@ impl Attention {
 
     /// The words taken as the lamp's name standing alone for the request
     /// in hand: [`STAND_ALONE_INS`] on the second route, and with
-    /// [`Self::count_one_as_the_lamp`], [`ONE_STAND_INS`], and
-    /// [`STAND_INS_WITH_A_SIGN`] with its sign.
+    /// [`Self::count_one_as_the_lamp`], [`STAND_INS_WITH_A_SIGN`] with its
+    /// sign. "One" is read apart ([`opens_with_one`]).
     fn alone_ins(&self) -> Vec<&'static str> {
         let mut words = stand_alone(self.stand_alone_ins).to_vec();
-        if self.one_as_lamp {
-            words.extend(ONE_STAND_INS);
-            if self.names_with_a_sign {
-                words.extend(STAND_INS_WITH_A_SIGN);
-            }
+        if self.one_as_lamp && self.names_with_a_sign {
+            words.extend(STAND_INS_WITH_A_SIGN);
         }
         words
     }
 
     /// [`addresses_someone_else_on`] as the request in hand reads it
-    /// ([`Self::alone_ins`]).
+    /// ([`Self::alone_ins`]); with [`Self::count_one_as_the_lamp`], "One" is
+    /// nobody's name ([`ONE_STAND_INS`]).
     fn addresses_another(&self, heard: &str) -> bool {
-        addresses_someone_else_among(heard, &self.alone_ins())
+        let mut words = self.alone_ins();
+        if self.one_as_lamp {
+            words.extend(ONE_STAND_INS);
+        }
+        addresses_someone_else_among(heard, &words)
     }
 
     /// [`called_by_name_on`] as the request in hand reads it
-    /// ([`Self::alone_ins`]).
+    /// ([`Self::alone_ins`]), and "One," as [`opens_with_one`] reads it
+    /// outside a busy room.
     fn called_by_name_here(&self, heard: &str) -> bool {
-        name_said_to(heard, &self.alone_ins(), true)
+        name_said_to(heard, &self.alone_ins(), true) || self.one_counts && opens_with_one(heard)
     }
 
     /// With [`Self::count_one_as_the_lamp`], whether the request in hand
@@ -2627,9 +2741,11 @@ impl Attention {
         let fresh = self.begun <= FRESH_REQUESTS;
         self.name_taken_as_a_word = false;
         // `LAMP_ONE_AS_LAMP`: "Wang," and "Lung," are the lamp's name only
-        // with the sign a name that is also a word needs (#4710).
+        // with the sign a name that is also a word needs (#4710), and "One,"
+        // only in a room not known to be busy (Seventh's P2 on #4953).
         self.names_with_a_sign =
-            self.one_as_lamp && going_on && room != Room::Busy && self.one_person;
+            self.one_as_lamp && self.one_person_in_conversation(room, going_on);
+        self.one_counts = self.one_as_lamp && room != Room::Busy;
         let another = self.another(room, going_on, own);
         self.name_taken_as_a_word =
             self.spoken_to && !own && another.is_none() && self.name_as_a_word(room, going_on);
@@ -3039,10 +3155,17 @@ impl Attention {
     /// do?" (#3945, the first builder's call); with no conversation, in a
     /// busy room, or with a second voice or face, it is held as before.
     fn name_as_a_word(&self, room: Room, going_on: bool) -> bool {
-        going_on
-            && room != Room::Busy
-            && self.one_person
+        self.one_person_in_conversation(room, going_on)
             && opens_with_a_name_also_a_word(&self.heard)
+    }
+
+    /// The second sign a set-off name that is also a word needs, and
+    /// "Wang," or "Lung," with `LAMP_ONE_AS_LAMP` ([`NAMES_ALSO_WORDS`],
+    /// [`STAND_INS_WITH_A_SIGN`]): a conversation going on, in a room not
+    /// known to be busy, with only one person at the lamp
+    /// ([`Self::one_person_present`]).
+    fn one_person_in_conversation(&self, room: Room, going_on: bool) -> bool {
+        going_on && room != Room::Busy && self.one_person
     }
 
     /// Whether the request in hand asks about the lamp's own work, done
@@ -5156,27 +5279,35 @@ mod tests {
     /// #4710: on lamp-3e83 on 2 Nov a tester's "Lamp, …" was written
     /// "One, …" (and "Wang, …"), held as said to someone it calls by name,
     /// and her retries and a bare "Hello?" held as that someone's replies.
-    /// With `LAMP_ONE_AS_LAMP=on` every one of them is answered.
+    /// With `LAMP_ONE_AS_LAMP=on` every one of them is answered in a room
+    /// not known to be busy; in a busy room "One," shows no call, as a
+    /// stand-in never does there (Seventh's P2 on #4953).
     #[test]
     fn with_one_as_lamp_the_lamp_3e83_lines_are_answered() {
         let alone = |heard| (heard, false);
-        for room in [Room::Quiet, Room::Busy] {
-            for heard in [
-                "One, how do I make a pour over coffee?",
-                "One, how much is, 100 US dollars in Vietnamese loan?",
-                "One, what should I eat for lunch?",
-                "One, recommend a book for the weekend.",
-                "One, what did I ask you a minute about?",
-            ] {
-                assert!(!addresses_someone_else_among(heard, ONE_STAND_INS));
-                assert!(
-                    matches!(
-                        judged_run(true, room, &[alone(heard)])[..],
-                        [Verdict::Play(_)]
-                    ),
-                    "{heard} {room:?}"
-                );
-            }
+        for heard in [
+            "One, how do I make a pour over coffee?",
+            "One, how much is, 100 US dollars in Vietnamese loan?",
+            "One, what should I eat for lunch?",
+            "One, recommend a book for the weekend.",
+            "One, what did I ask you a minute about?",
+        ] {
+            assert!(!addresses_someone_else_among(heard, ONE_STAND_INS));
+            assert!(opens_with_one(heard), "{heard}");
+            assert!(
+                matches!(
+                    judged_run(true, Room::Quiet, &[alone(heard)])[..],
+                    [Verdict::Play(_)]
+                ),
+                "{heard}"
+            );
+            assert!(
+                matches!(
+                    judged_run(true, Room::Busy, &[alone(heard)])[..],
+                    [Verdict::Hold(_)]
+                ),
+                "{heard}"
+            );
         }
         for run in [
             [
@@ -5255,8 +5386,146 @@ mod tests {
             "Which one, the red one?",
             "Just one, please.",
         ] {
-            assert!(!name_said_to(heard, ONE_STAND_INS, false), "{heard}");
+            assert!(!opens_with_one(heard), "{heard}");
         }
+    }
+
+    /// Seventh's P2 on #4953: "One" is an everyday reply word, so with
+    /// `LAMP_ONE_AS_LAMP=on` it calls the lamp only as the line's first word
+    /// past greetings, set off by a comma, with at least three words after
+    /// it, none of the first three nor the last a number, the first not a
+    /// reply opener ("maybe", "if", ...; Seventh's P2-1 on #4968), and not
+    /// only "please"; and never shows a call in a busy room.
+    /// Each line no call is judged as with the switch off.
+    #[test]
+    fn with_one_as_lamp_one_calls_only_opening_a_request() {
+        for heard in [
+            "One, what time is it?",
+            "one, dim the light.",
+            "ONE, dim the light.",
+            "Hey, one, dim the light.",
+            "One, please dim the light.",
+            "One, set a timer for two minutes.",
+            "One, are you there?",
+            "One, what's the weather today?",
+            "One, turn the light down please.",
+            "One, how do I make a pour over coffee?",
+            "One, what should I eat for lunch?",
+            "One, I need a timer.",
+            // "just", "okay", "ok" and "actually" open calls, not only
+            // replies (Seventh's P2-1 on #4968, 01:46).
+            "One, just turn the light off.",
+            "One, okay, what time is it?",
+            "One, ok what time is it?",
+            "One, actually can you dim it?",
+            // Known residual (Seventh's P2-1 on #4968): a longer ordinary
+            // reply opening with a word not in ONE_REPLY_OPENERS still calls
+            // the lamp in a room not known to be busy.
+            "One, I think so too.",
+            "One, I'm not sure.",
+        ] {
+            assert!(opens_with_one(heard), "{heard}");
+        }
+        for heard in [
+            "Yes, one.",
+            "One, please.",
+            "One.",
+            "One,",
+            "One, two, three, go!",
+            "One, 2, 3.",
+            "I want one, please.",
+            "Okay, one more?",
+            "One of them is broken.",
+            "Won't you come?",
+            "Two, maybe one.",
+            "One. What time is it?",
+            // Short answers to "How many?" (Seventh's P2-1 on #4968).
+            "One, I think.",
+            "One, maybe.",
+            "One, yeah.",
+            "One, I guess.",
+            "One, or two.",
+            "One, no sugar.",
+            "One, if possible.",
+            "One, actually.",
+            "One, okay.",
+            "One, or maybe two.",
+            "One, I think two.",
+            // Longer replies opening with a reply word (ONE_REPLY_OPENERS).
+            "One, maybe a bit later.",
+            "One, yeah that sounds good.",
+            "One, no sugar please.",
+            "One, if that's okay.",
+            "One, just one please.",
+            "One, sure that works fine.",
+            // Second known residual (Seventh's P2-1 on #4968, 01:46): a
+            // request opening with a reply opener is missed.
+            "One, no wait, turn it off.",
+            "One, yes go ahead and play it.",
+            "One, sure set it for ten.",
+            "One, maybe turn the music down.",
+        ] {
+            assert!(!opens_with_one(heard), "{heard}");
+            for room in [Room::Quiet, Room::Busy] {
+                let on = judged_run(true, room, &[(heard, false)]);
+                assert!(
+                    matches!(on[..], [Verdict::Hold(_)]),
+                    "{heard} {room:?}: {on:?}"
+                );
+                assert_ne!(on[0], Verdict::Play(CALLED_IN_TEXT), "{heard}");
+            }
+        }
+        // In a busy room no "One," line shows the call by its text.
+        for heard in ["One, what time is it?", "one, dim the light."] {
+            assert!(
+                matches!(
+                    judged_run(true, Room::Busy, &[(heard, false)])[..],
+                    [Verdict::Hold(_)]
+                ),
+                "{heard}"
+            );
+        }
+    }
+
+    /// Seventh's P2 on #4953: after a line held as said to someone by a
+    /// real name, a reply that echoes a short question is still that
+    /// person's; only a line held for its "One,", "Wang," or "Lung," is
+    /// retried.
+    #[test]
+    fn with_one_as_lamp_a_reply_echoing_a_real_name_question_is_still_a_reply() {
+        for (held, reply) in [
+            (
+                "Daniel, can you send me the file?",
+                "I can send you the file.",
+            ),
+            (
+                "Daniel, are you coming to the meeting?",
+                "Yes, I'm coming to the meeting.",
+            ),
+        ] {
+            assert!(!retries(held, reply), "{held} / {reply}");
+            let verdicts = judged_run(
+                true,
+                Room::Quiet,
+                &[
+                    ("One, what should I eat for lunch?", false),
+                    (held, false),
+                    (reply, false),
+                ],
+            );
+            assert_eq!(
+                verdicts[1..],
+                [Verdict::Hold(TO_ANOTHER), Verdict::Hold(ANSWERING_ANOTHER)],
+                "{held} / {reply}"
+            );
+        }
+        // The same words after a held "Wang," are its speaker trying again.
+        assert!(retries(
+            "Wang, can you send me the file?",
+            "Can you send me the file?"
+        ));
+        // An unspaced line is one word: never a retry, as before.
+        assert!(!retries("Wang、今何時ですか。", "今何時ですか。"));
     }
 
     /// #4710, the first builder's second change: with `LAMP_ONE_AS_LAMP=on`
