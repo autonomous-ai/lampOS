@@ -302,8 +302,8 @@ mod tests {
             .unwrap();
         let found = switches(cloud);
         assert!(found.iter().any(|name| name == "LAMP_CLOUD"), "{found:?}");
-        // Off in the product: not a switch install guards.
-        assert!(!found.iter().any(|name| name == "LAMP_SKILLS_STORE"));
+        // On in the product since 2 Nov: a switch install guards.
+        assert!(found.iter().any(|name| name == "LAMP_SKILLS_STORE"));
         // On in the product: a made skill sent to the Store from the app.
         assert!(
             found.iter().any(|name| name == "LAMP_SKILLS_SHARE"),

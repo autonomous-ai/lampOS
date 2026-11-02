@@ -128,14 +128,26 @@ pub fn again(error: &net::Error) -> bool {
     match error {
         net::Error::Status(status) => *status == 404 || (500..600).contains(status),
         net::Error::Timeout(_) | net::Error::Transport(_) => true,
-        net::Error::Url | net::Error::Protocol(_) => false,
+        // The relay's stream cut before its end (lamp-9adf, 2 Nov 17:49):
+        // a broken connection by another name.
+        net::Error::Protocol(what) => *what == CUT,
+        net::Error::Url => false,
     }
 }
 
 /// The model's answer to `brief`, its text whole, asked once more when
 /// [`again`] says so.
 pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
-    match write_once(chat, brief).await {
+    // An answer whose last fence never closed was cut short too (17:48:
+    // "its answer was cut off"): asked once more, as a broken stream.
+    let once = write_once(chat, brief).await.and_then(|text| {
+        if fences_closed(&text) {
+            Ok(text)
+        } else {
+            Err(net::Error::Protocol(CUT))
+        }
+    });
+    match once {
         Err(error) if again(&error) => {
             eprintln!(
                 "lamp-voice: a skill made here: the model's answer failed ({error}); asked once more"
@@ -144,6 +156,19 @@ pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
         }
         answer => answer,
     }
+}
+
+/// The chat client's word for a stream that ended before its end.
+const CUT: &str = "chat stream cut";
+
+/// Whether every fenced block the answer opened is closed: an even,
+/// non-zero count of fences.
+fn fences_closed(text: &str) -> bool {
+    let fences = text
+        .lines()
+        .filter(|line| line.trim_start().starts_with("```"))
+        .count();
+    fences > 0 && fences % 2 == 0
 }
 
 async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
@@ -207,11 +232,31 @@ pub fn make(
             });
         }
     };
+    told(make_kept(
+        request,
+        brief,
+        keeping,
+        chat,
+        &format!("{FROM}{now_unix_ms}"),
+    ))
+}
+
+/// The skill for `request` (its `brief` made already) written by the
+/// model `chat` gives and kept in `keeping` as made from `from`; a
+/// refused one asked once more with the check's lines. Blocking: the model
+/// is asked on a thread of its own. Shared by the voice's `make_skill` and
+/// the app's typed ask (`crate::app_make`).
+pub fn make_kept(
+    request: &str,
+    brief: String,
+    keeping: &Keeping,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
+    from: &str,
+) -> Result<Made, Refused> {
     let began = std::time::Instant::now();
     let chat = Arc::new(chat);
-    let from = format!("{FROM}{now_unix_ms}");
     let kept = |answer: Result<String, String>| match answer {
-        Ok(text) => made_skill::keep(&text, false, &from, keeping),
+        Ok(text) => made_skill::keep(&text, false, from, keeping),
         Err(why) => {
             eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
             Err(Refused("the lamp's model didn't answer".into(), None))
@@ -235,7 +280,7 @@ pub fn make(
         },
         began.elapsed().as_millis()
     );
-    told(made)
+    made
 }
 
 /// The model's answer to `brief`, asked on a thread of its own with a
@@ -298,16 +343,73 @@ fn told(made: Result<Made, Refused>) -> Value {
 /// age runs from its first piece ("I'll make it now"), said before the
 /// call kept the skill, and the ask comes later in the same answer (the
 /// Reviewer-lead's second P2 on #4914). Whether one was kept so.
-fn asked_at_yes(
+pub(crate) fn asked_at_yes(
     directory: &std::path::Path,
     answered: Option<(String, Duration)>,
     now_unix_ms: u64,
 ) -> std::io::Result<bool> {
     match answered {
-        Some((lamp_said, ago)) if ago <= made_skill::PUT_ON_WITHIN => {
-            made_skill::asked_in_answer(directory, &lamp_said, Duration::ZERO, now_unix_ms)
+        Some((lamp_said, ago))
+            if ago <= made_skill::PUT_ON_WITHIN
+                && lamp_said.contains(made_skill::ASK_TO_PUT_ON) =>
+        {
+            match untold(directory, now_unix_ms).as_slice() {
+                [(_, sha256)] => made_skill::offered(directory, sha256, now_unix_ms).map(|()| true),
+                _ => Ok(false),
+            }
         }
         _ => Ok(false),
+    }
+}
+
+/// How long a skill made here and never asked about is still the one a
+/// yes is to. One whose ask was cut (lamp-9adf, 2 Nov 17:08: a sound right
+/// after it was kept ended the answer before the ask) would otherwise stay
+/// untold for good, and as a second untold skill hold back every later one.
+pub const UNTOLD_WITHIN: Duration = Duration::from_secs(10 * 60);
+
+/// The skills made here never asked about, not on, kept after the newest
+/// ask and within [`UNTOLD_WITHIN`] of `now_unix_ms`: their names and
+/// SHA-256s, oldest first.
+fn untold(directory: &std::path::Path, now_unix_ms: u64) -> Vec<(String, String)> {
+    let entries = made_skill::entries(directory);
+    let asked_at = entries
+        .iter()
+        .filter_map(|entry| entry["offered_at_unix_ms"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let since = now_unix_ms.saturating_sub(UNTOLD_WITHIN.as_millis() as u64);
+    entries
+        .iter()
+        .filter(|entry| entry["offered_at_unix_ms"].as_u64().is_none() && entry["on"] != true)
+        .filter(|entry| {
+            entry["at_unix_ms"].as_u64().is_some_and(|kept_at| {
+                kept_at > asked_at && kept_at >= since && kept_at <= now_unix_ms
+            })
+        })
+        .filter_map(|entry| {
+            Some((
+                entry["name"].as_str()?.to_owned(),
+                entry["sha256"].as_str()?.to_owned(),
+            ))
+        })
+        .collect()
+}
+
+/// The note a request is given while a skill made here was kept and never
+/// asked about (its ask cut, or not said): the model then asks it, so a
+/// yes has something to answer. None while one waits for its yes, or with
+/// none or more than one such skill.
+pub fn untold_note(directory: &std::path::Path, now_unix_ms: u64) -> Option<String> {
+    if made_skill::waiting(directory, now_unix_ms).is_some() {
+        return None;
+    }
+    match untold(directory, now_unix_ms).as_slice() {
+        [(name, _)] => Some(format!(
+            "(For you to know: you made the skill \"{name}\" for the person, but haven't asked them yet whether to put it on. When it fits, say in a few words what it does and ask exactly: \"{}\")",
+            made_skill::ASK_TO_PUT_ON
+        )),
+        _ => None,
     }
 }
 
@@ -356,7 +458,7 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::os::unix::fs::PermissionsExt;
@@ -386,13 +488,13 @@ light = { dim = 1 }
 
     const CARD: &str = "---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n\n# Evening dim\n\nAt ten it dims.\n";
 
-    fn good() -> String {
+    pub(crate) fn good() -> String {
         format!("```skill.toml\n{TOML}```\n\n```SKILL.md\n{CARD}```\n")
     }
 
     /// A folder of the test's own, with a stand-in for `lamp-skills pack`
     /// that packs whatever it is given.
-    fn keeping(name: &str) -> (PathBuf, Keeping) {
+    pub(crate) fn keeping(name: &str) -> (PathBuf, Keeping) {
         let root = std::env::temp_dir().join(format!("make-local-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
@@ -413,7 +515,7 @@ light = { dim = 1 }
     /// A chat service on a local port: each request in turn gets the next
     /// of `replies`, an HTTP status and, for a 200, the text streamed in
     /// two pieces. How many requests came.
-    fn service(replies: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<usize>) {
+    pub(crate) fn service(replies: Vec<(u16, String)>) -> (String, std::thread::JoinHandle<usize>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let served = std::thread::spawn(move || {
@@ -472,7 +574,9 @@ light = { dim = 1 }
         (format!("http://{address}/v1/"), served)
     }
 
-    fn chat_at(url: String) -> impl Fn() -> Result<Chat, String> + Send + Sync + 'static {
+    pub(crate) fn chat_at(
+        url: String,
+    ) -> impl Fn() -> Result<Chat, String> + Send + Sync + 'static {
         move || {
             Chat::with(&url, "m", "secret", Arc::new(Vec::new)).map_err(|error| error.to_string())
         }
@@ -610,6 +714,58 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// lamp-9adf, 2 Nov 17:08: a skill whose ask was cut stays untold. A
+    /// later one, asked and said yes to, is put on: the cut one, kept more
+    /// than ten minutes before, no longer holds it back. While only one is
+    /// untold, the model is noted to ask about it.
+    #[test]
+    fn a_skill_whose_ask_was_cut_never_holds_back_a_later_one() {
+        let (root, keeping) = keeping("orphan");
+        std::fs::create_dir_all(&keeping.directory).unwrap();
+        let now = 1_800_000_000_000u64;
+        let entry = |name: &str, sha: char, at: u64| {
+            json!({"name": name, "sha256": sha.to_string().repeat(64),
+                   "package": format!("{name}.tar"), "from": format!("local:{at}"),
+                   "at_unix_ms": at, "description": "d"})
+        };
+        let write = |entries: &[Value]| {
+            std::fs::write(
+                keeping.directory.join(made_skill::INDEX),
+                serde_json::to_vec(entries).unwrap(),
+            )
+            .unwrap()
+        };
+        let asked = format!("It glows cyan. {}", made_skill::ASK_TO_PUT_ON);
+        let ago = Duration::from_secs(3);
+        // One untold, kept a minute ago: the model is noted to ask.
+        write(&[entry("cut-ask", 'a', now - 60_000)]);
+        assert!(
+            untold_note(&keeping.directory, now)
+                .unwrap()
+                .contains("\"cut-ask\"")
+        );
+        // Two untold within ten minutes: neither is asked, and no note.
+        write(&[
+            entry("cut-ask", 'a', now - 60_000),
+            entry("water-glow", 'b', now - 5_000),
+        ]);
+        assert_eq!(untold_note(&keeping.directory, now), None);
+        assert!(!asked_at_yes(&keeping.directory, Some((asked.clone(), ago)), now).unwrap());
+        // The cut one kept eleven minutes ago: the later one is asked.
+        write(&[
+            entry("cut-ask", 'a', now - 11 * 60_000),
+            entry("water-glow", 'b', now - 5_000),
+        ]);
+        assert!(asked_at_yes(&keeping.directory, Some((asked, ago)), now).unwrap());
+        assert_eq!(
+            made_skill::waiting(&keeping.directory, now).unwrap().0,
+            "water-glow"
+        );
+        // Waiting for its yes: no untold note on top.
+        assert_eq!(untold_note(&keeping.directory, now), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The skill shown to the model is one a made skill may be: the cap
     /// and the keeping take it (lamp-skills pack took it too, 2 Nov).
     #[test]
@@ -618,6 +774,22 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let made = made_skill::keep(EXAMPLE, false, "local:1", &keeping).unwrap();
         assert_eq!(made.name, "water-on-return");
         assert!(system().contains(EXAMPLE));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 2 Nov 17:48: an answer cut before its last fence closed
+    /// is asked once more, as a cut stream is; the whole one is kept.
+    #[test]
+    fn an_answer_cut_before_its_last_fence_is_asked_once_more() {
+        let (root, keeping) = keeping("cut");
+        let whole = good();
+        let cut = whole[..whole.rfind("```").unwrap()].to_owned();
+        assert!(!fences_closed(&cut) && fences_closed(&whole));
+        assert!(again(&net::Error::Protocol(CUT)));
+        let (url, served) = service(vec![(200, cut), (200, whole)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
         let _ = std::fs::remove_dir_all(&root);
     }
 

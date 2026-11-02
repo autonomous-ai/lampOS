@@ -3,7 +3,7 @@
 //! Elapsed timers prefer the same boot's elapsed clock. Calendar reminders use
 //! trusted Unix time. This module never reads a clock, environment, or file.
 
-use jiff::civil::{Date, Time};
+use jiff::civil::{Date, DateTime, Time};
 use jiff::tz::{AmbiguousOffset, TimeZone, TimeZoneDatabase};
 use jiff::{Timestamp, ToSpan, Zoned};
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,10 @@ pub const MAX_UNIX_MS: i64 = 253_402_207_200_999;
 const MAX_ID_BYTES: usize = 128;
 const MAX_ZONE_BYTES: usize = 128;
 const MAX_LOCAL_BYTES: usize = 192;
+/// The shortest and longest `every` (first builder, 2 Nov 17:4x on #4710: a
+/// lamp reminding someone every few minutes is a nag, not a companion).
+pub const MIN_EVERY_MINUTES: u32 = 15;
+pub const MAX_EVERY_MINUTES: u32 = 1440;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -59,6 +63,24 @@ pub enum When {
     Weekly {
         weekday: Weekday,
         time: String,
+        #[serde(default)]
+        zone: Option<String>,
+    },
+    /// Every so many minutes or hours, never both, 15 minutes to 24 hours
+    /// in all (`LAMP_SCHEDULE_EVERY`). With a window, `from` to `to` (local
+    /// `HH:MM`, either order: one across midnight is fine, and equal ones are
+    /// the whole day), the occurrences are the window's start and every step
+    /// after it inside it; the first after it closes is its next start.
+    /// Without one, the first is a step from now, to the whole minute.
+    Every {
+        #[serde(default)]
+        minutes: Option<u32>,
+        #[serde(default)]
+        hours: Option<u32>,
+        #[serde(default)]
+        from: Option<String>,
+        #[serde(default)]
+        to: Option<String>,
         #[serde(default)]
         zone: Option<String>,
     },
@@ -131,6 +153,18 @@ pub enum Repeat {
         zone: String,
         date: String,
     },
+    /// This occurrence's civil `date` and `time`, a step of `minutes`, and
+    /// the window's `from` and `to`, both or neither.
+    Every {
+        minutes: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<String>,
+        time: String,
+        zone: String,
+        date: String,
+    },
 }
 
 impl Deadline {
@@ -162,7 +196,22 @@ impl Deadline {
             if weekday.is_some_and(|day| day.index() != date.weekday().to_monday_zero_offset()) {
                 return Err(TimeError::InvalidDeadline);
             }
-            let actual = compatible(date, parse_time(time)?, &named_zone(zone)?)?;
+            let time = parse_time(time)?;
+            if let Repeat::Every {
+                minutes, from, to, ..
+            } = repeat
+            {
+                if !(MIN_EVERY_MINUTES..=MAX_EVERY_MINUTES).contains(minutes) {
+                    return Err(TimeError::InvalidDeadline);
+                }
+                if let Some(window) = window(from.as_deref(), to.as_deref())
+                    .map_err(|_| TimeError::InvalidDeadline)?
+                    && !window.holds(time)
+                {
+                    return Err(TimeError::InvalidDeadline);
+                }
+            }
+            let actual = compatible(date, time, &named_zone(zone)?)?;
             if actual.timestamp().as_millisecond() != self.unix_ms
                 || actual.to_string() != self.local
             {
@@ -183,8 +232,182 @@ impl Repeat {
                 zone,
                 date,
             } => (time, zone, date, Some(*weekday)),
+            Self::Every {
+                time, zone, date, ..
+            } => (time, zone, date, None),
         }
     }
+}
+
+/// An `every` window: its start, as a time and as minutes into the day, and
+/// how many minutes it lasts, 1 to 1439.
+#[derive(Clone, Copy, Debug)]
+struct Window {
+    start: Time,
+    from: i32,
+    length: i32,
+}
+
+impl Window {
+    /// How far `time` is into the window, if it is in it.
+    fn offset(self, time: Time) -> Option<i32> {
+        let offset = (minute_of_day(time) - self.from).rem_euclid(1440);
+        (offset < self.length).then_some(offset)
+    }
+
+    fn holds(self, time: Time) -> bool {
+        self.offset(time).is_some()
+    }
+}
+
+fn minute_of_day(time: Time) -> i32 {
+    i32::from(time.hour()) * 60 + i32::from(time.minute())
+}
+
+/// The window `from`..`to`: none for neither, or for equal ones (the whole
+/// day); one alone is refused.
+fn window(from: Option<&str>, to: Option<&str>) -> Result<Option<Window>, TimeError> {
+    match (from, to) {
+        (None, None) => Ok(None),
+        (Some(from), Some(to)) => {
+            let (start, end) = (parse_time(from)?, parse_time(to)?);
+            let length = (minute_of_day(end) - minute_of_day(start)).rem_euclid(1440);
+            Ok((length > 0).then_some(Window {
+                start,
+                from: minute_of_day(start),
+                length,
+            }))
+        }
+        _ => Err(TimeError::InvalidWindow),
+    }
+}
+
+/// The step after the occurrence at `at`, in civil time: `minutes` on, or,
+/// past the window's end, the window's next start.
+fn every_step(at: DateTime, minutes: u32, window: Option<Window>) -> Result<DateTime, TimeError> {
+    let on = at
+        .checked_add(i64::from(minutes).minutes())
+        .map_err(|_| TimeError::OutOfRange)?;
+    let Some(window) = window else {
+        return Ok(on);
+    };
+    let offset = window.offset(at.time()).ok_or(TimeError::InvalidDeadline)?;
+    if offset + i32::try_from(minutes).map_err(|_| TimeError::OutOfRange)? < window.length {
+        return Ok(on);
+    }
+    // The window began `offset` minutes before `at`: its next start is a day on.
+    let began = at
+        .checked_sub(i64::from(offset).minutes())
+        .map_err(|_| TimeError::OutOfRange)?;
+    Ok(add_days(began.date(), 1)?.to_datetime(window.start))
+}
+
+/// Most steps one `every` takes to find its next occurrence: a gap in the
+/// zone's clock can map a few steps to the same or an earlier instant, and
+/// a first one walks from yesterday's window start.
+const MOST_EVERY_STEPS: usize = 400;
+
+fn every_deadline(
+    at: DateTime,
+    zone: &TimeZone,
+    minutes: u32,
+    window: Option<(&str, &str)>,
+) -> Result<Deadline, TimeError> {
+    let actual = compatible(at.date(), at.time(), zone)?;
+    let repeat = Repeat::Every {
+        minutes,
+        from: window.map(|(from, _)| from.to_owned()),
+        to: window.map(|(_, to)| to.to_owned()),
+        time: format!("{:02}:{:02}", at.hour(), at.minute()),
+        zone: zone.iana_name().ok_or(TimeError::InvalidZone)?.to_owned(),
+        date: at.date().to_string(),
+    };
+    deadline(actual, Some(repeat))
+}
+
+/// The step in minutes `every` asks for, 15 to 1440, in minutes or hours,
+/// never both.
+fn every_minutes(minutes: Option<u32>, hours: Option<u32>) -> Result<u32, TimeError> {
+    let total = match (minutes, hours) {
+        (Some(minutes), None) => minutes,
+        (None, Some(hours)) => hours.checked_mul(60).ok_or(TimeError::InvalidInterval)?,
+        _ => return Err(TimeError::InvalidInterval),
+    };
+    if !(MIN_EVERY_MINUTES..=MAX_EVERY_MINUTES).contains(&total) {
+        return Err(TimeError::InvalidInterval);
+    }
+    Ok(total)
+}
+
+fn first_every(
+    step: u32,
+    from: Option<&str>,
+    to: Option<&str>,
+    zone_name: &str,
+    now: &ClockSample,
+) -> Result<Deadline, TimeError> {
+    let zone = named_zone(zone_name)?;
+    let window = window(from, to)?;
+    // Equal ones are the whole day: kept as no window.
+    let kept = window.and(from.zip(to));
+    let here = timestamp(now.unix_ms)?.to_zoned(zone.clone());
+    let mut at = match window {
+        // A step from now, up to the next whole minute.
+        None => {
+            let on = here
+                .datetime()
+                .checked_add(i64::from(step).minutes())
+                .map_err(|_| TimeError::OutOfRange)?;
+            let whole = on.date().to_datetime(
+                Time::new(on.hour(), on.minute(), 0, 0).map_err(|_| TimeError::OutOfRange)?,
+            );
+            if whole < on {
+                whole
+                    .checked_add(1.minute())
+                    .map_err(|_| TimeError::OutOfRange)?
+            } else {
+                whole
+            }
+        }
+        // Yesterday's window start, then its steps, to the first ahead.
+        Some(window) => add_days(here.date(), -1)?.to_datetime(window.start),
+    };
+    for _ in 0..MOST_EVERY_STEPS {
+        let candidate = every_deadline(at, &zone, step, kept)?;
+        if candidate.unix_ms > now.unix_ms {
+            return Ok(candidate);
+        }
+        at = every_step(at, step, window)?;
+    }
+    Err(TimeError::NonIncreasing)
+}
+
+fn next_every(previous: &Deadline, repeat: &Repeat) -> Result<Deadline, TimeError> {
+    let Repeat::Every {
+        minutes,
+        from,
+        to,
+        time,
+        zone,
+        date,
+    } = repeat
+    else {
+        return Err(TimeError::InvalidDeadline);
+    };
+    let zone = named_zone(zone)?;
+    let window = window(from.as_deref(), to.as_deref())?;
+    let kept = window.and(from.as_deref().zip(to.as_deref()));
+    let mut at = parse_date(date)?.to_datetime(parse_time(time)?);
+    for _ in 0..MOST_EVERY_STEPS {
+        at = every_step(at, *minutes, window)?;
+        // A gap in the zone's clock can put a step on the same instant as
+        // the one before, or an earlier one: stepped over, never said twice.
+        let next = every_deadline(at, &zone, *minutes, kept)?;
+        if next.unix_ms > previous.unix_ms {
+            return Ok(next);
+        }
+    }
+    Err(TimeError::NonIncreasing)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -200,6 +423,8 @@ pub enum TimeError {
     InvalidDeadline,
     OutOfRange,
     NonIncreasing,
+    InvalidInterval,
+    InvalidWindow,
 }
 
 impl fmt::Display for TimeError {
@@ -216,6 +441,10 @@ impl fmt::Display for TimeError {
             Self::InvalidDeadline => "invalid persisted deadline",
             Self::OutOfRange => "time is outside the supported range",
             Self::NonIncreasing => "calendar occurrence resolves to an earlier instant",
+            Self::InvalidInterval => {
+                "repeat every 15 minutes to 24 hours, in minutes or in hours, not both"
+            }
+            Self::InvalidWindow => "a window needs both from and to, each HH:MM",
         })
     }
 }
@@ -332,6 +561,19 @@ pub fn resolve(when: &When, now: &ClockSample, default_zone: &str) -> Result<Dea
             Some(*weekday),
             now,
         ),
+        When::Every {
+            minutes,
+            hours,
+            from,
+            to,
+            zone,
+        } => first_every(
+            every_minutes(*minutes, *hours)?,
+            from.as_deref(),
+            to.as_deref(),
+            zone.as_deref().unwrap_or(default_zone),
+            now,
+        ),
     }
 }
 
@@ -384,6 +626,9 @@ pub fn advance(previous: &Deadline) -> Result<Option<Deadline>, TimeError> {
     let Some(repeat) = &previous.repeat else {
         return Ok(None);
     };
+    if matches!(repeat, Repeat::Every { .. }) {
+        return next_every(previous, repeat).map(Some);
+    }
     let (time, zone_name, date, weekday) = repeat.parts();
     let date = add_days(parse_date(date)?, if weekday.is_some() { 7 } else { 1 })?;
     let zone = named_zone(zone_name)?;

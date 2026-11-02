@@ -16,7 +16,27 @@ mod stored;
 /// Optional stored metadata may be added without a bump. New enum values,
 /// required fields, larger bounds, or fields whose omission could schedule
 /// or deliver different work require a newer schema instead.
-const SCHEMA: u32 = 1;
+/// 2: a reminder every so many minutes or hours (`Repeat::Every`). A store is
+/// written as 2 only while it holds one ([`written_schema`]); otherwise as 1,
+/// which a build from before reads as it always did.
+const SCHEMA: u32 = 2;
+
+/// The oldest schema whose builds read every item in `state`: 2 with an
+/// `every` among its deadlines or snoozes, else 1.
+fn written_schema(state: &State) -> u32 {
+    let every = |deadline: &crate::time::Deadline| {
+        matches!(deadline.repeat, Some(crate::time::Repeat::Every { .. }))
+    };
+    if state
+        .items
+        .iter()
+        .any(|item| every(&item.deadline) || item.snooze.as_ref().is_some_and(every))
+    {
+        2
+    } else {
+        1
+    }
+}
 
 pub const MAX_ITEMS: usize = 128;
 pub const MAX_TEXT_BYTES: usize = 300;
@@ -191,8 +211,19 @@ struct Unread {
 }
 
 /// The state as stored: its items, read or not, in `id` order, each unread
-/// one as its own text, byte for byte.
+/// one as its own text, byte for byte, under the oldest schema that reads
+/// them all ([`written_schema`]).
 fn encode(state: &State) -> Result<Vec<u8>, Error> {
+    let schema = written_schema(state);
+    if state.schema != schema {
+        let mut written = state.clone();
+        written.schema = schema;
+        return encode_as_is(&written);
+    }
+    encode_as_is(state)
+}
+
+fn encode_as_is(state: &State) -> Result<Vec<u8>, Error> {
     if state.unread.is_empty() {
         return serde_json::to_vec(state).map_err(storage);
     }
@@ -270,7 +301,7 @@ impl State {
                 "Schedule state has an unsupported or invalid shape.",
             )
         };
-        if self.schema != SCHEMA
+        if !(1..=SCHEMA).contains(&self.schema)
             || !valid_id(&self.store_id)
             || self.next_id == 0
             || self.items.len() + self.unread.len() > MAX_ITEMS
@@ -405,6 +436,10 @@ pub struct Engine<P: Persistence> {
     /// zone: a new reminder at a clock time with no zone of its own is
     /// refused, as it would ring hours off (#1680).
     no_wall_clock: bool,
+    /// `LAMP_SCHEDULE_EVERY=on` ([`Self::allow_every`]): a new reminder may
+    /// repeat every so many minutes or hours. Off, one is refused as a kind
+    /// this build doesn't take, as an older build refuses it.
+    every: bool,
     last_clock: ClockSample,
     recovered: BTreeSet<u64>,
     failed: bool,
@@ -639,11 +674,18 @@ impl<P: Persistence> Engine<P> {
             zone: zone.into(),
             zone_asked,
             no_wall_clock: false,
+            every: false,
             system,
             last_clock: now.clone(),
             recovered,
             failed: false,
         })
+    }
+
+    /// Lets a new reminder repeat every so many minutes or hours
+    /// (`LAMP_SCHEDULE_EVERY=on`). One already kept is served either way.
+    pub fn allow_every(&mut self, on: bool) {
+        self.every = on;
     }
 
     /// Stored reminders and timers this build can't read, kept as they are
@@ -1000,12 +1042,19 @@ impl<P: Persistence> Engine<P> {
                         "There are already 128 active reminders and timers; cancel or acknowledge one.",
                     ));
                 }
+                if matches!(when, When::Every { .. }) && !self.every {
+                    return Err(err(
+                        "bad_request",
+                        "This lamp doesn't take a reminder every so many minutes or hours.",
+                    ));
+                }
                 if self.no_wall_clock
                     && matches!(
                         when,
                         When::At { zone: None, .. }
                             | When::Daily { zone: None, .. }
                             | When::Weekly { zone: None, .. }
+                            | When::Every { zone: None, .. }
                     )
                 {
                     return Err(err(

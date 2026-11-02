@@ -1481,7 +1481,8 @@ for it.
   and key checks prevent a fetch. systemd cannot change that permission by
   request within one template, so a remove uses the same sandbox.
   Provision the key and turn on the shared switch as [install.md](install.md),
-  "The Store, prepared but off", describes; nothing enables it automatically.
+  "The Store, prepared but off", describes. Since 2 Nov the product's
+  defaults set the switch on; a lamp installed before keeps its own file.
 - **Only two parts may ask** (the reviewer's P3 on #2429): before reading
   the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
   `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
@@ -2213,6 +2214,13 @@ Nothing above changes with the switch off.
    before the call kept the skill, and the ask comes later in it. A yes after a cut-in ("wait, make it 11") or
    after an answer that asked something else puts nothing on. The second
    route notes a made skill waiting for its yes with the switch too.
+   A skill made here whose ask was cut (lamp-9adf, 2 Nov 17:08: a sound
+   right after it was kept ended the answer before the ask) is "untold".
+   While it is the only one, kept within `UNTOLD_WITHIN` (10 minutes), the
+   second route notes it to the model, which then says what it does and
+   asks (`make_skill_local::untold_note`). A yes counts only the untold
+   skills kept in those 10 minutes, so an older cut one never holds back a
+   later skill (`make_skill_local::asked_at_yes`).
 5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, and with the one more try after a failure and the
    one repair after a refusal, two asks of two tries each: about 120 s at
@@ -2222,12 +2230,32 @@ Nothing above changes with the switch off.
    until the answer. Whether "Stop" ends the wait is measured in the played
    check on lamp-9adf (#4914) and written here with its result.
 
-Not yet with the switch: a skill typed in the app. `skills.make` still
-hands over to a computer, and `can` still waits for one.
+A skill typed in the app, with the switch (`crate::app_make`, needing the
+say service, `LAMP_SAY=on`, to ask aloud; without it the app socket isn't
+started):
+
+- `{"ready": {}}` is yes at once, with no tasks part asked, so `lamp-cloud`
+  names `skills.make` in `can` on the switch alone.
+- A `make` is made by the lamp's own model as above, the same example,
+  check and one repair (`make_skill_local::make_kept`, `app_make::make_here`),
+  kept as made from `local:app:<ms>:1` (the ask's task `local:app:<ms>`, so
+  `skills.made` finds it): `making`, then `kept`, or `not_kept` with why.
+- Kept, the lamp says aloud, through the say service's own asks at a good
+  moment within an hour (`app_make::ask_line`, `say_ask`): "I made the
+  skill you typed in the app." with what it does, then exactly "Shall I put
+  it on the lamp?". That turn is a written turn, so the thread keeps its
+  words as the lamp's answer. Only a yes right after it puts the skill on:
+  `put_on_made_skill` dates the ask at the yes from that answer
+  (`asked_at_yes`), and a yes after anything else puts nothing on. Nothing
+  from the app puts it on.
 
 Tests: `make_skill_local::tests` (a good answer kept, asked only after an answer that said the ask, a refused
 one kept nothing, a 404 asked once more, a brief refused asking nothing,
-and the switch alone routing and declaring the two functions).
+and the switch alone routing and declaring the two functions), and in
+`app_make::tests` the app's: `ready` at once with no tasks part, a typed
+ask kept and its ask given to be said, a yes after that said ask making it
+wait and a yes after anything else not, and one not kept told why with
+nothing said.
 
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 

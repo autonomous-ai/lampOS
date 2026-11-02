@@ -753,12 +753,12 @@ fn install_prepares_store_off_and_keeps_the_lamps_store_choice() {
         fs::read_to_string(lamp.on(env))
             .unwrap()
             .lines()
-            .any(|l| l == "LAMP_SKILLS_STORE=off")
+            .any(|l| l == "LAMP_SKILLS_STORE=on")
     );
     assert!(!lamp.on(lamp_skills::package::STORE_KEY).exists());
     for unit in ["lamp-cloud.service", "lamp-skills-manage@.service"] {
         let text = fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{unit}"))).unwrap();
-        assert!(section(&text, "Service").contains(&"Environment=LAMP_SKILLS_STORE=off"));
+        assert!(section(&text, "Service").contains(&"Environment=LAMP_SKILLS_STORE=on"));
     }
     let helper =
         fs::read_to_string(lamp.on("/etc/systemd/system/lamp-skills-manage@.service")).unwrap();
@@ -778,14 +778,14 @@ fn install_prepares_store_off_and_keeps_the_lamps_store_choice() {
         lamp_update::manifest::STORE_ENV
     ));
     assert!(lamp.install().unwrap().changed.is_empty());
-    // A deliberate switch or sandbox edit survives reinstall; no key is
-    // invented even if a lamp enabled the switch before provisioning it.
-    fs::write(lamp.on(env), "LAMP_SKILLS_STORE=on\n").unwrap();
+    // A deliberate switch or sandbox edit survives reinstall (a lamp that
+    // turned the Store off keeps it off), and no key is ever invented.
+    fs::write(lamp.on(env), "LAMP_SKILLS_STORE=off\n").unwrap();
     fs::write(lamp.on(drop_in), "[Service]\nPrivateNetwork=yes\n").unwrap();
     assert!(lamp.install().unwrap().changed.is_empty());
     assert_eq!(
         fs::read_to_string(lamp.on(env)).unwrap(),
-        "LAMP_SKILLS_STORE=on\n"
+        "LAMP_SKILLS_STORE=off\n"
     );
     assert_eq!(
         fs::read_to_string(lamp.on(drop_in)).unwrap(),
@@ -1019,8 +1019,8 @@ fn a_clean_install_names_no_switch_off() {
 /// An edited setting that turns a switch off: `store.env`, kept as the
 /// lamp's own Store choice, is lamp-cloud's `EnvironmentFile=`, which
 /// systemd reads over the unit's `Environment=`. An environment file a kept
-/// drop-in names is read too. The Store's own switch, off in the product, is
-/// no switch of install's to guard.
+/// drop-in names is read too. The Store's own switch is on in the product
+/// since 2 Nov, so a lamp's store.env that turns it off is named too.
 #[test]
 fn an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named() {
     let mut lamp = Lamp::new(188, &[]);
@@ -1052,6 +1052,12 @@ fn an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named() {
             ),
             format!(
                 "environment file {file}, read by lamp-cloud.service, turns LAMP_SKILLS_PAGE off (\"\"); the product sets it on"
+            ),
+            format!(
+                "edited setting {env}, read by lamp-cloud.service, turns LAMP_SKILLS_STORE off (\"off\"); the product sets it on"
+            ),
+            format!(
+                "edited setting {env}, read by lamp-skills-manage@.service, turns LAMP_SKILLS_STORE off (\"off\"); the product sets it on"
             ),
         ],
         "{:?}",
