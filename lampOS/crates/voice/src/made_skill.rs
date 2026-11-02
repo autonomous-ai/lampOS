@@ -936,6 +936,44 @@ pub fn offered(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<(
     Ok(())
 }
 
+/// The lamp's own answer said [`ASK_TO_PUT_ON`] `ago` before now, with
+/// `lamp_said` its words: the model, asked whether the skill is ready, may
+/// say it before the news is told (lamp-9adf, 31 Oct 09:32: "Is the skill I
+/// asked for ready yet?" was answered "… Shall I put it on the lamp?", and
+/// the plain yes after it found nothing waiting). Then the newest made
+/// skill never asked about, not on and kept after the newest ask, is kept as
+/// asked when that answer was said, so [`waiting`] holds the yes to the
+/// usual [`PUT_ON_WITHIN`] (the first builder, 2 Nov 10:1x; the
+/// Reviewer-lead's P2 on #4880: only the turn right after the lamp itself
+/// asked, never a yes to another question). Whether one was kept so.
+pub fn asked_in_answer(
+    directory: &Path,
+    lamp_said: &str,
+    ago: Duration,
+    now_unix_ms: u64,
+) -> io::Result<bool> {
+    if !lamp_said.contains(ASK_TO_PUT_ON) || ago > PUT_ON_WITHIN {
+        return Ok(false);
+    }
+    let entries = index(directory);
+    let asked_at = entries
+        .iter()
+        .filter_map(|entry| entry["offered_at_unix_ms"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let said_at = now_unix_ms.saturating_sub(ago.as_millis() as u64);
+    let untold = entries
+        .iter()
+        .filter(|entry| entry["offered_at_unix_ms"].as_u64().is_none() && entry["on"] != true)
+        .filter_map(|entry| Some((entry["at_unix_ms"].as_u64()?, entry)))
+        .filter(|(kept_at, _)| *kept_at > asked_at && *kept_at <= said_at)
+        .max_by_key(|(kept_at, _)| *kept_at);
+    match untold.and_then(|(_, entry)| entry["sha256"].as_str()) {
+        Some(sha256) => offered(directory, sha256, said_at).map(|()| true),
+        None => Ok(false),
+    }
+}
+
 /// The lamp has just asked [`ASK_TO_PUT_ON`] about the made skill from the
 /// news `key` (a task's answer, kept by [`keep`] with it as `from`): heard
 /// whole at the lamp, or given in a text. Kept as asked at `now_unix_ms`,
@@ -1597,6 +1635,60 @@ light = { dim = 1 }
         drop_unfinished(&dir);
         assert!(fresh.exists(), "another keep's package, moving in now");
         assert!(!left.exists(), "a crash's, long ago");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// lamp-9adf, 31 Oct 09:32: the news of `posture-glow` untold, asked "Is
+    /// the skill I asked for ready yet?", the model said the ask in its own
+    /// answer, and the yes after it found nothing waiting. Now that answer
+    /// keeps the newest untold skill as asked when it was said, so the yes
+    /// is held to the usual two minutes; another question's yes, an answer
+    /// too long ago, or an older skill than the newest ask, keeps nothing
+    /// (the Reviewer-lead's P2 on #4880).
+    #[test]
+    fn the_lamps_own_answer_saying_the_ask_keeps_the_untold_skill_asked() {
+        let dir = scratch("mk-in-answer");
+        let made = dir.join("made");
+        fs::create_dir_all(&made).unwrap();
+        let kept = |name: &str, sha: char, at: u64| {
+            json!({"name": name, "sha256": sha.to_string().repeat(64),
+                   "package": format!("{name}.tar"), "from": format!("s1:{at}:1"),
+                   "at_unix_ms": at})
+        };
+        write_index(
+            &made,
+            &[
+                kept("evening-dim", 'a', 1_000),
+                kept("posture-glow", 'b', 2_000),
+            ],
+        )
+        .unwrap();
+        let answer = format!("It glows warm once an hour. {ASK_TO_PUT_ON}");
+        let now = 300_000;
+        // Another question's yes keeps nothing.
+        assert!(
+            !asked_in_answer(
+                &made,
+                "Shall I set that reminder?",
+                Duration::from_secs(5),
+                now
+            )
+            .unwrap()
+        );
+        assert_eq!(waiting(&made, now), None);
+        // Said too long ago keeps nothing.
+        assert!(
+            !asked_in_answer(&made, &answer, PUT_ON_WITHIN + Duration::from_secs(1), now).unwrap()
+        );
+        assert_eq!(waiting(&made, now), None);
+        // Said 5 s ago: the newest untold one is asked then, and waits.
+        assert!(asked_in_answer(&made, &answer, Duration::from_secs(5), now).unwrap());
+        let newest = Some(("posture-glow".to_owned(), "b".repeat(64)));
+        assert_eq!(waiting(&made, now), newest);
+        assert_eq!(index(&made)[1]["offered_at_unix_ms"], json!(now - 5_000));
+        // Asked now, the older untold one never takes its place.
+        assert!(!asked_in_answer(&made, &answer, Duration::from_secs(1), now + 1_000).unwrap());
+        assert_eq!(waiting(&made, now + 1_000), newest);
         let _ = fs::remove_dir_all(&dir);
     }
 
