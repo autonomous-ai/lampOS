@@ -2213,6 +2213,13 @@ Nothing above changes with the switch off.
    before the call kept the skill, and the ask comes later in it. A yes after a cut-in ("wait, make it 11") or
    after an answer that asked something else puts nothing on. The second
    route notes a made skill waiting for its yes with the switch too.
+   A skill made here whose ask was cut (lamp-9adf, 2 Nov 17:08: a sound
+   right after it was kept ended the answer before the ask) is "untold".
+   While it is the only one, kept within `UNTOLD_WITHIN` (10 minutes), the
+   second route notes it to the model, which then says what it does and
+   asks (`make_skill_local::untold_note`). A yes counts only the untold
+   skills kept in those 10 minutes, so an older cut one never holds back a
+   later skill (`make_skill_local::asked_at_yes`).
 5. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, and with the one more try after a failure and the
    one repair after a refusal, two asks of two tries each: about 120 s at
