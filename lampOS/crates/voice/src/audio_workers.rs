@@ -7,6 +7,7 @@ use crate::{
     options::{
         AudioWorkerOptions, NoiseSuppression, ReferenceClock, ReferenceRecovery, SoftwareProcessing,
     },
+    peer_stop,
     playback::SpeechPlayback,
     reference::{
         PRIME_FRAMES, PrimeBarrier, RecoveryPolicy, ReferenceAssembly, accepted_write_survived,
@@ -35,6 +36,7 @@ use lamp_turn_owner::{
     BootId, Error as InteractionError, MonoTime, Permission, Snapshot, TurnOwner,
 };
 use std::{
+    collections::VecDeque,
     io,
     path::Path,
     time::{Duration, Instant},
@@ -399,6 +401,7 @@ pub fn capture_on<D: CaptureDevice>(
         &mut channels,
     )?;
     let mut microphone = MicrophoneOn::<D>::new(device, controller, CaptureConfig::default())?;
+    let mut held = VecDeque::new();
     let result = capture_loop(
         &mut channels,
         &mut microphone,
@@ -413,7 +416,31 @@ pub fn capture_on<D: CaptureDevice>(
         stop_words,
         device,
         capture_wait,
+        &mut held,
     );
+    // #4332: the speaker took the coordinator's Stop first and closed the
+    // reference link; this worker's own Stop is queued behind. That is the
+    // Stop's clean end, as the loop's own would have been, never a fault
+    // that fails the voice's cleanup. A refused link with no Stop queued
+    // still is one.
+    let result = match result {
+        Err(error) if peer_stop::stopped_with_peer(&mut channels, &mut held, error.as_ref()) => {
+            eprintln!(
+                "lamp-voice: capture: the speaker had gone at the voice's stop ({error}); capture ends stopped"
+            );
+            microphone
+                .revoke()
+                .map_err(Into::into)
+                .and_then(|()| {
+                    channels
+                        .control
+                        .send(WorkerEvent::CaptureStopped)
+                        .map_err(Into::into)
+                })
+                .map(|()| EndReason::Stopped)
+        }
+        result => result,
+    };
     // Invalidate input authority and close hardware before any filesystem acknowledgement wait.
     let close = microphone.control_lost();
     drop(microphone);
@@ -453,6 +480,9 @@ fn capture_loop<D: CaptureDevice>(
     // The ALSA name opened: whose it is when busy at start (#1567).
     device: &str,
     wait: bool,
+    // What the coordinator sent while `prepare()` ran, read to look for a
+    // Stop (#4332): the next tick takes it first, in order.
+    held: &mut VecDeque<Control>,
 ) -> Result<EndReason> {
     // A frame waits this many capture blocks before it is cancelled, so that
     // the canceller has its render first. Whatever still waits when this
@@ -550,8 +580,12 @@ fn capture_loop<D: CaptureDevice>(
         };
         last_tick = tick;
         for index in 0..=bound {
-            let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
-                break;
+            let control = match held.pop_front() {
+                Some(control) => control,
+                None => match channels.control.receive_renewed(Control::is_renewal)? {
+                    Some(control) => control,
+                    None => break,
+                },
             };
             if index == bound {
                 return Err(io::Error::other("capture control tick bound").into());
@@ -669,16 +703,23 @@ fn capture_loop<D: CaptureDevice>(
                         eprintln!("lamp-voice: capture: {}", waited.plain());
                     }
                     privacy = report.microphone_generation;
-                    capture_prepared = true;
-                    channels.control.send(WorkerEvent::CapturePrepared {
-                        epoch: report.epoch,
-                        privacy_generation: privacy,
-                        prepared_at_us: report.prepared_at_us,
-                        waited,
-                    })?;
-                    link.control.send(ReferenceControl::CapturePrepared {
-                        privacy_generation: privacy,
-                    })?;
+                    // #4332: the coordinator's Stop reached every worker
+                    // while the microphone opened, and the speaker may have
+                    // taken its own and gone. Nothing is said to either:
+                    // the next tick reads the Stop, after what came before
+                    // it, and ends.
+                    if !peer_stop::stop_queued(channels, held, HELD_UP_CONTROL)? {
+                        capture_prepared = true;
+                        channels.control.send(WorkerEvent::CapturePrepared {
+                            epoch: report.epoch,
+                            privacy_generation: privacy,
+                            prepared_at_us: report.prepared_at_us,
+                            waited,
+                        })?;
+                        link.control.send(ReferenceControl::CapturePrepared {
+                            privacy_generation: privacy,
+                        })?;
+                    }
                 }
             }
             let mut control_count = 0;
@@ -1122,12 +1163,24 @@ pub fn speaker(
         &mut channels,
     )?;
     let mut speaker = open_speaker(&mut channels, device, controller)?;
+    let mut speech = SpeechPlayback::default();
+    let mut output = ReferenceOutput::default();
     let result = speaker_loop(
         &mut channels,
         &mut speaker,
         worker,
         directory,
         &mut recording,
+        &mut speech,
+        &mut output,
+    );
+    let result = ended_at_peer_stop(
+        &mut channels,
+        &mut speaker,
+        &mut recording,
+        &mut speech,
+        &output,
+        result,
     );
     // Physical drop and permanent authority invalidation precede diagnostic finalization.
     let stop = speaker.fault();
@@ -1145,6 +1198,44 @@ pub fn speaker(
     };
     let finish = recording.map_or(Ok(()), |r| r.finish(&mut channels, reason));
     result.map(|_| ()).and(stop).and(finish)
+}
+/// #4332, the other way round: capture took the coordinator's Stop first and
+/// closed the reference link while the speaker was in a tick; the speaker's
+/// own Stop is queued behind. A clean end, ended as the loop's own Stop ends
+/// it: the device stopped, a speech gap reported, the reset recorded (Fifth
+/// on #4951). A refused link with no Stop queued, and any other error, are
+/// returned as they were.
+fn ended_at_peer_stop(
+    channels: &mut WorkerChannels,
+    speaker: &mut Speaker,
+    recording: &mut Option<Recording>,
+    speech: &mut SpeechPlayback,
+    output: &ReferenceOutput,
+    result: Result<EndReason>,
+) -> Result<EndReason> {
+    let error = match result {
+        Err(error)
+            if peer_stop::stopped_with_peer(channels, &mut VecDeque::new(), error.as_ref()) =>
+        {
+            error
+        }
+        result => return result,
+    };
+    eprintln!(
+        "lamp-voice: speaker: capture had gone at the voice's stop ({error}); the speaker ends stopped"
+    );
+    speaker.stop()?;
+    report_speech_reset(channels, speech)?;
+    diagnostic_reset(
+        recording,
+        ResetReason::Stop,
+        0,
+        0,
+        speaker.queued_range().epoch,
+        output.privacy.unwrap_or(0),
+        speaker.last_discard(),
+    );
+    Ok(EndReason::Stopped)
 }
 /// The speaker's clock opened, a busy device waited out first as the
 /// microphone's is (#4332): the coordinator is told at the first busy answer,
@@ -1315,17 +1406,20 @@ impl ReferenceOutput {
     }
 }
 
+// `speech` and `output` are the caller's, so that an end at the voice's
+// Stop found through a refused reference link (#4332) reports and records
+// its reset as the loop's own Stop does.
 fn speaker_loop(
     channels: &mut WorkerChannels,
     speaker: &mut Speaker,
     worker: BootId,
     directory: &Path,
     recording: &mut Option<Recording>,
+    speech: &mut SpeechPlayback,
+    output: &mut ReferenceOutput,
 ) -> Result<EndReason> {
     let mut link: Option<ReferenceChannels> = None;
-    let mut output = ReferenceOutput::default();
     let mut pending: Option<PendingChunk> = None;
-    let mut speech = SpeechPlayback::default();
     let mut last_sequence = 0;
     let mut flush_count = speaker.flush_count();
     // Since when the authority has been lapsed, the speaker silent (#1178).
@@ -1352,10 +1446,10 @@ fn speaker_loop(
                             underrun(
                                 channels,
                                 speaker,
-                                &mut output,
+                                output,
                                 &mut flush_count,
                                 speech.unfinished_owner(),
-                                &mut speech,
+                                speech,
                                 &mut pending,
                                 recording,
                             )?;
@@ -1383,7 +1477,7 @@ fn speaker_loop(
                         if speaker.flush_count() == flush_count {
                             speaker.stop()?;
                         }
-                        report_speech_reset(channels, &mut speech)?;
+                        report_speech_reset(channels, speech)?;
                         diagnostic_reset(
                             recording,
                             ResetReason::PrivacyChange,
@@ -1401,7 +1495,7 @@ fn speaker_loop(
                     supersede_speech(
                         channels,
                         speaker,
-                        &mut speech,
+                        speech,
                         snapshot,
                         output.privacy,
                         flush_count,
@@ -1415,7 +1509,7 @@ fn speaker_loop(
                 }
                 Control::Stop => {
                     speaker.stop()?;
-                    report_speech_reset(channels, &mut speech)?;
+                    report_speech_reset(channels, speech)?;
                     diagnostic_reset(
                         recording,
                         ResetReason::Stop,
@@ -1446,9 +1540,9 @@ fn speaker_loop(
             lapse(
                 channels,
                 speaker,
-                &mut output,
+                output,
                 &mut flush_count,
-                &mut speech,
+                speech,
                 &mut pending,
                 recording,
                 &mut lapsed_since,
@@ -1470,10 +1564,10 @@ fn speaker_loop(
                 underrun(
                     channels,
                     speaker,
-                    &mut output,
+                    output,
                     &mut flush_count,
                     speech.unfinished_owner(),
-                    &mut speech,
+                    speech,
                     &mut pending,
                     recording,
                 )?;
@@ -1485,9 +1579,9 @@ fn speaker_loop(
                 lapse(
                     channels,
                     speaker,
-                    &mut output,
+                    output,
                     &mut flush_count,
-                    &mut speech,
+                    speech,
                     &mut pending,
                     recording,
                     &mut lapsed_since,
@@ -1498,8 +1592,8 @@ fn speaker_loop(
             }
             Err(error) => return Err(error),
         }
-        if report_discard(channels, speaker, &mut output, &mut flush_count, recording)? {
-            report_speech_reset(channels, &mut speech)?;
+        if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+            report_speech_reset(channels, speech)?;
         }
         if let Some(tail) = speaker.take_retired_tail()? {
             channels.control.send(WorkerEvent::CancelledTailRetired {
@@ -1519,8 +1613,8 @@ fn speaker_loop(
             })?;
         }
         // A hard deadline can expire while collecting the retirement receipt.
-        if report_discard(channels, speaker, &mut output, &mut flush_count, recording)? {
-            report_speech_reset(channels, &mut speech)?;
+        if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+            report_speech_reset(channels, speech)?;
         }
         let Some(link) = link.as_mut() else {
             stall_pass.done();
@@ -1563,9 +1657,9 @@ fn speaker_loop(
                             lapse(
                                 channels,
                                 speaker,
-                                &mut output,
+                                output,
                                 &mut flush_count,
-                                &mut speech,
+                                speech,
                                 &mut pending,
                                 recording,
                                 &mut lapsed_since,
@@ -1594,9 +1688,9 @@ fn speaker_loop(
                             lapse(
                                 channels,
                                 speaker,
-                                &mut output,
+                                output,
                                 &mut flush_count,
-                                &mut speech,
+                                speech,
                                 &mut pending,
                                 recording,
                                 &mut lapsed_since,
@@ -1636,10 +1730,10 @@ fn speaker_loop(
                     underrun(
                         channels,
                         speaker,
-                        &mut output,
+                        output,
                         &mut flush_count,
                         speech.unfinished_owner(),
-                        &mut speech,
+                        speech,
                         &mut pending,
                         recording,
                     )?;
@@ -1651,9 +1745,9 @@ fn speaker_loop(
                     lapse(
                         channels,
                         speaker,
-                        &mut output,
+                        output,
                         &mut flush_count,
-                        &mut speech,
+                        speech,
                         &mut pending,
                         recording,
                         &mut lapsed_since,
@@ -1670,7 +1764,7 @@ fn speaker_loop(
             finish_tick(tick);
             continue;
         }
-        report_speech_drained(channels, speaker, &mut speech)?;
+        report_speech_drained(channels, speaker, speech)?;
         if let Some(final_write) = speech.take_retired(speaker.queued_range()) {
             channels.control.send(WorkerEvent::SpeechRetired {
                 owner: final_write.owner,
@@ -1698,7 +1792,7 @@ fn speaker_loop(
                 Ok(()) => supersede_speech(
                     channels,
                     speaker,
-                    &mut speech,
+                    speech,
                     chunk.snapshot,
                     output.privacy,
                     flush_count,
@@ -1708,17 +1802,17 @@ fn speaker_loop(
                 Err(error) if underran(error.as_ref()) => underrun(
                     channels,
                     speaker,
-                    &mut output,
+                    output,
                     &mut flush_count,
                     speech.unfinished_owner(),
-                    &mut speech,
+                    speech,
                     &mut pending,
                     recording,
                 )?,
                 Err(error) => return Err(error),
             }
-            if report_discard(channels, speaker, &mut output, &mut flush_count, recording)? {
-                report_speech_reset(channels, &mut speech)?;
+            if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+                report_speech_reset(channels, speech)?;
             }
             pending = Some(PendingChunk { chunk, offset: 0 });
         }
@@ -1762,8 +1856,8 @@ fn speaker_loop(
                         .recorder
                         .try_render(meta, &partial.chunk.samples[partial.offset..end]);
                 }
-                if report_discard(channels, speaker, &mut output, &mut flush_count, recording)? {
-                    report_speech_reset(channels, &mut speech)?;
+                if report_discard(channels, speaker, output, &mut flush_count, recording)? {
+                    report_speech_reset(channels, speech)?;
                 }
                 match result {
                     Ok(written) => {
@@ -1838,10 +1932,10 @@ fn speaker_loop(
                         underrun(
                             channels,
                             speaker,
-                            &mut output,
+                            output,
                             &mut flush_count,
                             speaking,
-                            &mut speech,
+                            speech,
                             &mut pending,
                             recording,
                         )?;
@@ -1868,10 +1962,10 @@ fn speaker_loop(
                         underrun(
                             channels,
                             speaker,
-                            &mut output,
+                            output,
                             &mut flush_count,
                             speech.unfinished_owner(),
-                            &mut speech,
+                            speech,
                             &mut pending,
                             recording,
                         )?;
@@ -1883,9 +1977,9 @@ fn speaker_loop(
                         lapse(
                             channels,
                             speaker,
-                            &mut output,
+                            output,
                             &mut flush_count,
-                            &mut speech,
+                            speech,
                             &mut pending,
                             recording,
                             &mut lapsed_since,
@@ -2488,5 +2582,156 @@ mod capture_wait_tests {
         for other in [None, Some(""), Some("off"), Some("1"), Some("ON")] {
             assert!(!wait_switched_on(other), "{other:?}");
         }
+    }
+}
+
+/// The speaker's end at a refused reference link (#4332, Fifth on #4951),
+/// on the real `null` device, the real channels and a send refused by a
+/// capture side that has closed its socket. `null` never starts the
+/// speaker's clock, so its loop cannot reach a send to capture; the end it
+/// returns through is driven here directly.
+#[cfg(test)]
+mod peer_stop_speaker_tests {
+    use super::*;
+    use crate::process::{SessionDirectory, new_boot};
+    use crate::wire::PlaybackGapPhase;
+    use lamp_audio::ownership::PlaybackCursor;
+
+    struct Ends {
+        _directory: SessionDirectory,
+        parent: WorkerChannels,
+        channels: WorkerChannels,
+        speaker: Speaker,
+        speech: SpeechPlayback,
+        refused: Box<dyn std::error::Error + Send + Sync>,
+    }
+
+    /// A speaker with speech paused mid-answer (a gap of accepted zeros),
+    /// and the error its send to a gone capture side returned.
+    fn ends() -> Ends {
+        // A private (0700) session directory, as the transport requires.
+        let directory = SessionDirectory::create().unwrap();
+        let (parent_boot, worker_boot, capture_boot) = (
+            new_boot().unwrap(),
+            new_boot().unwrap(),
+            new_boot().unwrap(),
+        );
+        let mut parent =
+            WorkerChannels::bind(&directory.path, "speaker", parent_boot, worker_boot, false)
+                .unwrap();
+        let mut channels =
+            WorkerChannels::bind(&directory.path, "speaker", parent_boot, worker_boot, true)
+                .unwrap();
+        parent.connect(&directory.path, "speaker", false).unwrap();
+        channels.connect(&directory.path, "speaker", true).unwrap();
+        let capture =
+            ReferenceChannels::bind(&directory.path, "capture", capture_boot, worker_boot).unwrap();
+        let mut link =
+            ReferenceChannels::bind(&directory.path, "speaker", worker_boot, capture_boot).unwrap();
+        assert!(link.connect_step().unwrap());
+        drop(capture);
+        let refused = link
+            .control
+            .send(ReferenceControl::Stopped {
+                playback_epoch: 1,
+                observed_at_us: monotonic_us(),
+            })
+            .expect_err("a send to a closed capture side is refused");
+        assert_eq!(
+            refused.kind(),
+            io::ErrorKind::ConnectionRefused,
+            "{refused}"
+        );
+        let speaker = Speaker::open_clock("null", parent_boot).unwrap();
+        let owner: TurnOwner = serde_json::from_value(serde_json::json!({
+            "boot": serde_json::to_value(parent_boot).unwrap(),
+            "turn": 1,
+            "generation": 1,
+        }))
+        .unwrap();
+        let at = |frame| PlaybackCursor { epoch: 1, frame };
+        let mut speech = SpeechPlayback::default();
+        speech
+            .speech_accepted(owner, 1, at(0), at(100), monotonic_us(), false)
+            .unwrap();
+        assert!(
+            speech
+                .zeros_accepted(at(100), at(200), monotonic_us())
+                .unwrap()
+                .is_some()
+        );
+        Ends {
+            _directory: directory,
+            parent,
+            channels,
+            speaker,
+            speech,
+            refused: refused.into(),
+        }
+    }
+
+    fn gaps_cancelled(parent: &mut WorkerChannels) -> usize {
+        let mut cancelled = 0;
+        while let Some(event) = parent.control.receive::<WorkerEvent>().unwrap() {
+            if matches!(
+                event,
+                WorkerEvent::PlaybackGap {
+                    phase: PlaybackGapPhase::Cancelled,
+                    ..
+                }
+            ) {
+                cancelled += 1;
+            }
+        }
+        cancelled
+    }
+
+    /// Capture gone at the voice's Stop, the speaker's own Stop queued: it
+    /// ends stopped, as the loop's Stop ends it, the device stopped and the
+    /// paused answer's gap reported cancelled.
+    #[test]
+    fn a_refused_capture_link_with_the_stop_queued_ends_the_speaker_as_its_stop_does() {
+        let mut ends = ends();
+        ends.parent.control.send(Control::Stop).unwrap();
+        let flushes = ends.speaker.flush_count();
+        let ended = ended_at_peer_stop(
+            &mut ends.channels,
+            &mut ends.speaker,
+            &mut None,
+            &mut ends.speech,
+            &ReferenceOutput::default(),
+            Err(ends.refused),
+        );
+        assert!(matches!(ended, Ok(EndReason::Stopped)), "{ended:?}");
+        assert_eq!(
+            ends.speaker.flush_count(),
+            flushes + 1,
+            "the device was not stopped"
+        );
+        assert_eq!(
+            gaps_cancelled(&mut ends.parent),
+            1,
+            "the gap was not reported"
+        );
+    }
+
+    /// The same refused link with no Stop queued, as a capture worker that
+    /// crashed leaves it: the fault it was, nothing stopped or reported here.
+    #[test]
+    fn a_refused_capture_link_without_a_stop_is_still_the_speakers_fault() {
+        let mut ends = ends();
+        let flushes = ends.speaker.flush_count();
+        let ended = ended_at_peer_stop(
+            &mut ends.channels,
+            &mut ends.speaker,
+            &mut None,
+            &mut ends.speech,
+            &ReferenceOutput::default(),
+            Err(ends.refused),
+        );
+        let error = ended.expect_err("still a fault");
+        assert!(error.to_string().starts_with("ref.c.speaker: "), "{error}");
+        assert_eq!(ends.speaker.flush_count(), flushes);
+        assert_eq!(gaps_cancelled(&mut ends.parent), 0);
     }
 }
