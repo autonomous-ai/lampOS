@@ -52,9 +52,9 @@ Environment=LAMP_APP_MAKE_SKILL=on
 # the person's yes at setup (share_reports) or from the app (reports.set). With no recorded yes, nothing
 # is sent; a reset wipes the choice.
 Environment=LAMP_REPORTS=on
-# Install writes this shared, default-off switch; a separately provisioned Store key is
-# required too. Changing store.env and restarting cloud enables the next helper connection.
-Environment=LAMP_SKILLS_STORE=off
+# Install writes this shared switch in store.env, read after this line; a separately provisioned
+# Store key is required too, and without it an install is still refused. On since the backend listed four approved, signed skills (2 Nov, #4710), shown on lamp-9adf (31 Oct).
+Environment=LAMP_SKILLS_STORE=on
 EnvironmentFile=-/etc/lampOS/skills/store.env
 Environment=LAMP_APP_UPDATE=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
