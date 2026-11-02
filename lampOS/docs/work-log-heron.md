@@ -15,7 +15,7 @@ other is not a result on a lamp.
 
 ## 2026-11-02 — lamp-fc4b read, #4954
 
-Ready for lamp-voice: yes (#4954, `94cc64e58`, another lamp's own folder)
+Ready for lamp-voice: landed (#4954, train 525, lamp-voice `a924050ff`, as `4c7517719`)
 
 - Taken 18:32 as heron's first piece under "Moving labelled work" rule 4,
   proposed on #4710 at 18:17 with no "no" in 15 minutes. No issue yet; the
@@ -36,6 +36,9 @@ Ready for lamp-voice: yes (#4954, `94cc64e58`, another lamp's own folder)
   Reviewer-lead on #4710 at 18:33.
 - 18:41: the Reviewer-lead's READ-OK on `94cc64e58`, no findings; clippy run
   41437723564 green. `NEXT TRAIN: #4954` posted on #4710 at 18:44.
+- 19:42: landed in train 525 (#4960) as lamp-voice `a924050ff`; ARM64 run
+  41437723561 green too (17 m 32 s). Still no `builder:heron` label or
+  issue, and no answer on heron-P1.
 - 18:49: a second read of #4859 (the first builder's, ready, one HOLD and no
   READ-OK) posted on the PR as HOLD `98bb20b2c`: the Reviewer-lead's P2
   stands by reading (`hears` from the measuring printer feeds the past-silent
