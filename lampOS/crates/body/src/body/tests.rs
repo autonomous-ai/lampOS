@@ -3079,6 +3079,7 @@ fn gesture_run(
                 still: false,
                 paused: false,
                 stand_share: None,
+                pose: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -3157,6 +3158,7 @@ fn expression_run_with(
             still: false,
             paused: false,
             stand_share: None,
+            pose: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -3325,6 +3327,7 @@ fn speaking_run_with(
             still: false,
             paused: false,
             stand_share: None,
+            pose: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -4036,6 +4039,7 @@ fn rest_glances_watched(
             still: false,
             paused: false,
             stand_share: None,
+            pose: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -4458,6 +4462,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             still: false,
             paused: false,
             stand_share: None,
+            pose: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -4527,6 +4532,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             still: false,
             paused: false,
             stand_share: None,
+            pose: None,
             unplug: false,
             held_by_test: false,
             held: false,
@@ -4614,6 +4620,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 still: false,
                 paused: false,
                 stand_share: None,
+                pose: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -5040,6 +5047,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     still: false,
                     paused: false,
                     stand_share: None,
+                    pose: None,
                     unplug: false,
                     held_by_test: false,
                     held: false,
@@ -5122,6 +5130,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 still: false,
                 paused: false,
                 stand_share: None,
+                pose: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -5209,6 +5218,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 still: false,
                 paused: false,
                 stand_share: None,
+                pose: None,
                 asleep: false,
                 woken: false,
                 unplug: false,
@@ -8050,6 +8060,7 @@ fn called_run(
                 still: false,
                 paused: false,
                 stand_share: None,
+                pose: None,
                 unplug: false,
                 held_by_test: false,
                 held: false,
@@ -14372,6 +14383,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                     aim: None,
                     paused: paused && at >= Duration::from_secs(16),
                     stand_share: None,
+                    pose: None,
                     ..Asked::default()
                 }
             },
@@ -15944,4 +15956,155 @@ fn a_stand_asked_never_goes_above_the_lamps_own_share() {
     let capped = at(9);
     assert!(capped[0] > 2_100 && capped[0] < 2_300, "{capped:?}");
     assert_eq!(at(23), capped, "asked 60 %, held at its own 30 %");
+}
+
+/// One step of a pose run: when, the arm's goals, the head's goals, the pose said.
+type PoseStep = (Duration, [u16; 2], [u16; 3], Option<[f32; 3]>);
+
+/// A holder's pose (`Asked::pose`, the lease's `pose`): held and standing
+/// still at full height, the arm goes where it asks, cut into its window
+/// between the fold and the stand, and the roll with it; and back to the
+/// stand once the pose is gone. Never held, a pose moves nothing.
+#[test]
+fn a_held_standing_lamp_takes_its_holders_pose_inside_the_arms_window() {
+    let run = |pose: [f32; 3], held: bool| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let time = clock.time.clone();
+        let seen_at = clock.time.clone();
+        let mut seen = Vec::new();
+        run_alive(
+            &mut lamp,
+            &mut clock,
+            gesture_limits(),
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Speaking, 60)),
+            move || {
+                let at = time.get();
+                Asked {
+                    held,
+                    pose: (at >= Duration::from_secs(12) && at < Duration::from_secs(20))
+                        .then_some(pose),
+                    ..Asked::default()
+                }
+            },
+            |glimpse| {
+                seen.push((
+                    seen_at.get(),
+                    glimpse.arm_goals,
+                    glimpse.goals,
+                    glimpse.posed,
+                ))
+            },
+        );
+        seen
+    };
+    let at = |seen: &[PoseStep], secs: u64| {
+        *seen
+            .iter()
+            .rfind(|step| step.0 < Duration::from_secs(secs))
+            .unwrap()
+    };
+    let degrees = |counts: f32| counts * 360.0 / 4_096.0;
+    // Inside the window: 30 and 20 degrees from the fold ([2_050, 2_047]).
+    let inside = run([0.0, 30.0, 20.0], true);
+    let stood = at(&inside, 11);
+    // Stood first (speaking, it leans a little in from its pose).
+    assert!(stood.1[0] > 2_550 && stood.1[1] > 2_500, "{:?}", stood.1);
+    let posed = at(&inside, 19);
+    assert!(posed.1[0].abs_diff(2_391) <= 2, "{:?}", posed.1);
+    assert!(posed.1[1].abs_diff(2_275) <= 2, "{:?}", posed.1);
+    let said = posed.3.expect("standing, held: a pose is said");
+    assert!(
+        (said[1] - 30.0).abs() < 0.3 && (said[2] - 20.0).abs() < 0.3,
+        "{said:?}"
+    );
+    // The pose gone: back where it stands as it speaks.
+    assert_eq!(at(&inside, 29).1, stood.1);
+    // Past the window: the shoulder kept at the stand's 2_650 and the elbow
+    // at the fold's 2_047. The roll asked (10 degrees) stays inside the
+    // body's own roll reach (`--reach`'s 1 count here, as on the product),
+    // and the pose said is the one kept, so the door says it `clamped`.
+    let past = run([10.0, 90.0, -40.0], true);
+    let cut = at(&past, 19);
+    assert_eq!(cut.1, [2_650, 2_047], "{:?}", cut.1);
+    let rolled = f32::from(cut.2[1]) - f32::from(HOME[1]);
+    assert!(rolled.abs() <= 1.0, "{rolled}");
+    let kept = cut.3.expect("standing, held: a pose is said");
+    assert!(
+        degrees(rolled).abs() < 0.1 && kept[0].abs() < 0.1,
+        "{kept:?}"
+    );
+    // Never held: the pose moves nothing.
+    let never = run([0.0, 30.0, 20.0], false);
+    assert_eq!(at(&never, 19).1, stood.1);
+}
+
+/// A pose's roll stays inside the body's own roll reach even where the
+/// stand's roll is a count over it (the Reviewer-lead's P2 on #4959):
+/// `stand_roll = roll + 1`, 10 degrees asked, the head tilts at most that
+/// reach, never `POSE_REACH`'s 220 counts.
+#[test]
+fn a_poses_roll_keeps_inside_the_roll_reach_when_the_stand_roll_is_a_count_over() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let mut limits = gesture_limits();
+    limits.stand_roll = limits.roll + 1.0;
+    let reach = limits.stand_roll;
+    let time = clock.time.clone();
+    let mut rolled: f32 = 0.0;
+    run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || {
+            let at = time.get();
+            Asked {
+                held: true,
+                pose: (at >= Duration::from_secs(12) && at < Duration::from_secs(20))
+                    .then_some([10.0, 30.0, 20.0]),
+                ..Asked::default()
+            }
+        },
+        |glimpse| {
+            rolled = rolled.max((f32::from(glimpse.goals[1]) - f32::from(HOME[1])).abs());
+        },
+    );
+    assert!(
+        rolled <= reach + 1.0,
+        "tilted {rolled} counts, reach {reach}"
+    );
+}
+
+/// Folded, or with no stand pose, a lamp says why it takes no pose.
+#[test]
+fn a_lamp_not_standing_says_why_it_takes_no_pose() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(3));
+    let mut unposed = Vec::new();
+    run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        || Asked {
+            held: true,
+            pose: Some([0.0, 30.0, 20.0]),
+            ..Asked::default()
+        },
+        |glimpse| unposed.push((glimpse.posed, glimpse.unposed)),
+    );
+    let (posed, why) = unposed.last().copied().unwrap();
+    assert_eq!(posed, None);
+    assert_eq!(why, Some(POSE_NO_ARM));
 }

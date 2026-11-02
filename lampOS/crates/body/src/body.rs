@@ -37,6 +37,7 @@ use crate::{
     gesture::{Gestures, Mood, Pose},
     idle,
     inspection::{Interest, PortIo, Runtime},
+    lease,
     protocol::{ReadOnlyRequest, ReadWindow, StatusFlags, StatusParser},
     units::ENCODER_MAX,
 };
@@ -290,6 +291,14 @@ const GESTURE_WAIT: Duration = Duration::from_secs(3);
 const GESTURE_STEP: [f32; 5] = [24.0, 34.0, 26.0, 21.0, 21.0];
 /// The farthest a gesture takes each of those from where the lamp has it.
 const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 170.0, 360.0, 360.0];
+/// The farthest a holder's pose (`Asked::pose`) takes the head's roll from
+/// the pose; the arm goes anywhere inside its window instead (the pose's
+/// own clamp), and pitch and yaw stay with the holder's look.
+const POSE_REACH: [f32; 5] = [0.0, 220.0, 0.0, 4_095.0, 4_095.0];
+/// Why a lamp takes no holder's pose now (`Glimpse::posed`).
+const POSE_NOT_STANDING: &str = "the lamp is not standing still at its full height";
+const POSE_NO_ARM: &str = "this lamp's arm has no stand pose (--stand)";
+const POSE_GESTURE: &str = "a gesture plays";
 /// While it speaks, a lamp standing at its full height leans toward the
 /// person: the shoulder and the elbow this many counts from the pose it
 /// stands in (about four and five degrees), eased in as the answer starts
@@ -636,6 +645,13 @@ pub struct Asked {
     /// direction, as the gaze's own look is, already inside the reach the
     /// holder was given. Taken only while `held`, in place of the gaze's.
     pub aim: Option<[f32; 2]>,
+    /// The holder's pose of the head's roll and the arm (`lease::Posing`,
+    /// `{"pose":…}`): roll from the found home, shoulder and elbow from the
+    /// folded arm, in degrees, as `get('body')` counts them. Taken only
+    /// while `held` and standing still at full height, playing nothing: the
+    /// arm inside its window between the fold and the stand, laid on the
+    /// pose as a gesture is, so V1's anti-tip rule cuts any step of it.
+    pub pose: Option<[f32; 3]>,
     /// Under `Limits::strain_guard` (#4501): a person held the head or a
     /// button a second, or a health check started, since the lamp was
     /// seated. It may stand again.
@@ -666,6 +682,7 @@ impl Asked {
         still: true,
         paused: true,
         stand_share: None,
+        pose: None,
         asleep: false,
         woken: false,
         toward: None,
@@ -691,6 +708,7 @@ impl Asked {
         still: true,
         paused: false,
         stand_share: None,
+        pose: None,
         asleep: true,
         woken: false,
         toward: None,
@@ -1215,6 +1233,18 @@ pub struct Glimpse {
     /// pitch, in counts from the pose's own direction. None otherwise. What
     /// the door says the head reached (`lease::Looking`, `there`).
     pub look_aimed: Option<[f32; 2]>,
+    /// The roll, shoulder and elbow as the holder's pose counts them
+    /// (`Asked::pose`, degrees), or why the body takes no pose now
+    /// (`Glimpse::posed`): what the door says the pose reached
+    /// (`lease::Posing`, `there`). Not on the bus.
+    #[serde(skip)]
+    pub posed: Option<[f32; 3]>,
+    #[serde(skip)]
+    pub unposed: Option<&'static str>,
+    /// The same three as their positions say (degrees), sag and all: what
+    /// the door's `there` reports. Not on the bus.
+    #[serde(skip)]
+    pub reached: Option<[f32; 3]>,
     /// A face the eyes reported on this step: across, down and size.
     pub face: Option<[f32; 3]>,
     /// The gesture it is making.
@@ -3049,6 +3079,9 @@ fn glimpse_of(template: Glimpse, step: u64, now: &[Sample; 5], goals: [u16; 3]) 
         arm_temperatures: ARM.map(|joint| now[joint.index()].temperature),
         look: [0.0; 2],
         look_aimed: None,
+        posed: None,
+        unposed: Some(POSE_NOT_STANDING),
+        reached: None,
         face: None,
         gesture: None,
         gesture_fates: Fates::default(),
@@ -3905,6 +3938,7 @@ pub(crate) fn run_looking(
         still: false,
         paused: false,
         stand_share: None,
+        pose: None,
         asleep: false,
         woken: false,
         toward: None,
@@ -6116,6 +6150,33 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 _ => playing = None,
             }
         }
+        // A holder's pose (`Asked::pose`): the head's roll and the arm where
+        // it asks, laid on the stand as a gesture's offsets are, while held
+        // and standing still at full height with nothing playing. The arm's
+        // goal is cut into its window between the fold and the stand first.
+        // The head's tilt has the reach of a lamp that has stood up, as far
+        // as it has: a pose's roll and a glance keep inside it.
+        let roll_reach =
+            limits.roll + (limits.stand_roll - limits.roll).max(0.0) * head_share(stand).powi(2);
+        let posing = playing.is_none()
+            && easing_out.is_none()
+            && asked_now.held
+            && upright
+            && asked_now.pose.is_some();
+        if posing && let (Some(pose), Some(up)) = (asked_now.pose, standing) {
+            // Inside the body's own roll reach, as a glance is (the
+            // Reviewer-lead's P2 on #4959): `POSE_REACH`'s 220 counts alone
+            // would tilt a lamp whose stand roll is a count over its reach.
+            gesture_wanted[1] = (f32::from(home[1]) + pose[0] * lease::COUNTS_PER_DEGREE
+                - home_now[1])
+                .clamp(-roll_reach, roll_reach);
+            for index in 0..2 {
+                let (folded, stood) = (f32::from(up.folded[index]), f32::from(up.pose[3 + index]));
+                let target = (folded + pose[1 + index] * lease::COUNTS_PER_DEGREE)
+                    .clamp(folded.min(stood), folded.max(stood));
+                gesture_wanted[3 + index] = target - f32::from(arm_goals[index]);
+            }
+        }
         let before = gesture_now;
         match easing_out.as_mut().filter(|_| playing.is_none()) {
             Some((steps, from, speed)) => {
@@ -6138,9 +6199,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             None => {
                 easing_out = None;
+                let reach = if posing { POSE_REACH } else { GESTURE_REACH };
                 for (index, now_at) in gesture_now.iter_mut().enumerate() {
-                    let wanted =
-                        gesture_wanted[index].clamp(-GESTURE_REACH[index], GESTURE_REACH[index]);
+                    let wanted = gesture_wanted[index].clamp(-reach[index], reach[index]);
                     *now_at += (wanted - *now_at).clamp(-GESTURE_STEP[index], GESTURE_STEP[index]);
                 }
             }
@@ -6290,10 +6351,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // cut of it comes off below.
         let mut aimed = aim.map(|_| look);
         // Each axis of a pose is a share of its reach, and where the eyes
-        // have it look is added to that, inside the same reach. The head's
-        // tilt has the reach of a lamp that has stood up, as far as it has.
-        let roll_reach =
-            limits.roll + (limits.stand_roll - limits.roll).max(0.0) * head_share(stand).powi(2);
+        // have it look is added to that, inside the same reach; the head's
+        // tilt inside `roll_reach`, above.
         // What Expression asks is added to the pose the mood wants, and so
         // goes through everything that pose goes through: the reach of
         // each joint, the speed and the acceleration the pose follows at,
@@ -6856,6 +6915,30 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             arm_temperatures: ARM.map(|joint| samples[joint.index()].temperature),
             look,
             look_aimed: aimed,
+            posed: standing.filter(|_| upright && playing.is_none()).map(|up| {
+                [
+                    (f32::from(written[1]) - f32::from(home[1])) / lease::COUNTS_PER_DEGREE,
+                    (f32::from(arm_written[0]) - f32::from(up.folded[0]))
+                        / lease::COUNTS_PER_DEGREE,
+                    (f32::from(arm_written[1]) - f32::from(up.folded[1]))
+                        / lease::COUNTS_PER_DEGREE,
+                ]
+            }),
+            reached: standing.filter(|_| upright && playing.is_none()).map(|up| {
+                let roll = samples[COMMANDED[1].index()].position;
+                let arm = ARM.map(|joint| samples[joint.index()].position);
+                [
+                    (f32::from(roll) - f32::from(home[1])) / lease::COUNTS_PER_DEGREE,
+                    (f32::from(arm[0]) - f32::from(up.folded[0])) / lease::COUNTS_PER_DEGREE,
+                    (f32::from(arm[1]) - f32::from(up.folded[1])) / lease::COUNTS_PER_DEGREE,
+                ]
+            }),
+            unposed: match standing {
+                None => Some(POSE_NO_ARM),
+                Some(_) if !upright => Some(POSE_NOT_STANDING),
+                Some(_) if playing.is_some() => Some(POSE_GESTURE),
+                Some(_) => None,
+            },
             face,
             gesture: playing.map(|(clip, _)| clip.name),
             kept_where_put: report.kept_where_put,
