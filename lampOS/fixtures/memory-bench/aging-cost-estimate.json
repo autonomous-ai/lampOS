@@ -1,0 +1,119 @@
+{
+  "label": "separate aging planning estimate; recorded plumbing only; no accuracy or fading result",
+  "scores": null,
+  "source": "independently supplied full-engine ledger, verified by bench",
+  "runner_revision": "6420a2f490263df664a12c8f8848c95421c30abd",
+  "adapter_revision": "7d6d0a2364bc2052c323327334633a97450b12b3",
+  "registration_sha256": "b63ebe7f390451c43fc299b31c97b32b7b012163013286710f87064aa7fa4f50",
+  "manifest_sha256": "6dac5e79eb712a94d0213279347364d382d39ec0f3f336db7cbd114d761cd784",
+  "ledger_sha256": "dbc549b53619bbce1947f99baed1a59d82e7ff3d34340b550b9e80d31852ca24",
+  "ledger_verification": {
+    "entries": 5332,
+    "terminal": "completed",
+    "final_hash": "ebcc58a1cf37299d1cedad736a7c5fc592501612f59dd38cae18b60757db6e28"
+  },
+  "model_shapes": {
+    "empty_consolidation": {
+      "calls": 146,
+      "input_characters": 1520650,
+      "input_tokens_estimate": 456195,
+      "output_tokens_allowance": 598016,
+      "cost": {
+        "flash": 0.8544777,
+        "pro": 2.97032076
+      }
+    },
+    "fixed_answer": {
+      "calls": 42,
+      "input_characters": 120628,
+      "input_tokens_estimate": 36189,
+      "output_tokens_allowance": 21504,
+      "cost": {
+        "flash": 0.0366615,
+        "pro": 0.13292532
+      }
+    },
+    "topic_segmentation": {
+      "calls": 346,
+      "input_characters": 697972,
+      "input_tokens_estimate": 209392,
+      "output_tokens_allowance": 104815,
+      "cost": {
+        "flash": 0.1885956,
+        "pro": 0.6914648400000001
+      }
+    }
+  },
+  "model_input_tokens_estimate": 701775,
+  "model_output_tokens_allowance": 724335,
+  "model_cost": {
+    "flash": 1.0797345,
+    "pro": 3.7947096
+  },
+  "judge": {
+    "rubric_questions": 32,
+    "criteria": 32,
+    "answer_turns": 32,
+    "input_tokens_estimate_and_allowance": 1966639,
+    "output_tokens_allowance": 16384,
+    "cost": {
+      "flash": 0.6096525,
+      "pro": 2.66084412
+    }
+  },
+  "speech_once": {
+    "records": 1712,
+    "unique_audio": 226,
+    "all_record_minutes": 70.19858333333333,
+    "unique_audio_minutes": 20.7138,
+    "all_record_cost": 0.6317872499999999,
+    "rate_per_minute": 0.009,
+    "tts_cloud_cost": 0,
+    "live_calls": 0,
+    "measurement": {
+      "label": "file-only speech sizing for cost; not a qualified STT cache",
+      "event_hash": "768297eba1df1c254f397d0f08c84b17acdc4e3e762fad522d850f98b77859b2",
+      "audio_manifest_hash": "90fe40614e7de297451cc049a3ba1943ce692ee087ebbd8c43aa2066b81e9b04",
+      "records": 1712,
+      "unique_audio": 226,
+      "max_duration_ms": 66804,
+      "live_calls": 0,
+      "runner_limit": "Existing pinned runner rejects audio over 60 seconds. This measurement permits up to 120 seconds, pending bounded runner support and tests. No script or registration changed.",
+      "tts_executable_sha256": "a0c75425dfcaaf5316fe255f9d7be0748a1a24041dccaf50cfc73dbe02e18016"
+    }
+  },
+  "scope": {
+    "setups": [
+      "tiers",
+      "tiers_minus_fading"
+    ],
+    "runs_each": 3,
+    "total_runs": 6,
+    "no_fading_shape": "not independently measured here; equal workload to full engine is a planning assumption",
+    "campaign": "excluded from the proposed month campaign cap; separate authorization required"
+  },
+  "rates": {
+    "flash": {
+      "input_per_million": 0.3,
+      "output_per_million": 1.2
+    },
+    "pro": {
+      "input_per_million": 1.32,
+      "output_per_million": 3.96
+    }
+  },
+  "sources": {
+    "model_prices": "https://api-docs.deepseek.com/quick_start/pricing/",
+    "token_heuristic": "https://api-docs.deepseek.com/quick_start/token_usage/",
+    "speech_prices": "https://deepgram.com/pricing"
+  },
+  "per_run_model_and_judge": {
+    "flash": 1.689387,
+    "pro": 6.45555372
+  },
+  "six_runs_with_learned_state_and_contingency": {
+    "flash": 29.6561540625,
+    "pro": 106.1270309625
+  },
+  "assumptions": "Same input heuristic, maximum output allowances, three-times model-only learned-state sensitivity and 25% contingency as month. Empty consolidation cannot show fading; no-fading actual state may change later requests. Speech counted once at full-record duration."
+}

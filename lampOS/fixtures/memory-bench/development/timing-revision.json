@@ -1,0 +1,16 @@
+{
+  "version": 3,
+  "before_any_scored_run": true,
+  "previous_registration_revision": "48462ca66",
+  "previous_events_sha256": "ae4b6eaa8878af4dd81eda74550fd4628c6cd17980ae7a75f0202171b65e6180",
+  "events_sha256": "638f418a71453a64f56eb840f91435ce1a45bd032dea12f21bebd21dd2f86248",
+  "questions_sha256": "78056903d8fe6afd5af29c36cc22ebf62f672dcf246ef81a3ec9c1766ad2a6fd",
+  "answer_key_sha256": "2bf2c2a3c72093e43bb569639ee154d304602f2307d07bc62fe0bfbfef8bdf14",
+  "checks": {
+    "identical_owner_utterances_and_observed_identity": 1500,
+    "identical_question_content_scoring_and_times": 200,
+    "identical_persona_and_answer_key_bytes": true,
+    "audio_script_hash_matches": 1500
+  },
+  "scores_seen": false
+}
