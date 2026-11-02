@@ -2828,7 +2828,8 @@ fn day_of(scratch: &Scratch, person: &str, id: u64) -> Option<String> {
 
 /// Reviewer-lead P3 on #2680: a weekly "dentist on Friday" said again with
 /// `once` for a later Friday takes that day and is followed up once after
-/// it, as after the first; an earlier or the same day changes nothing.
+/// it, as after the first; the same day changes nothing (an earlier one
+/// moves it, #4753: [`an_event_day_moves_earlier_or_later_when_restated_and_a_mention_keeps_it`]).
 #[test]
 fn a_weekly_kept_thing_said_again_for_a_later_day_is_followed_up_again() {
     let scratch = Scratch::new("kept-weekly");
@@ -2851,15 +2852,15 @@ fn a_weekly_kept_thing_said_again_for_a_later_day_is_followed_up_again() {
         day_of(&scratch, "p-minh", id).as_deref(),
         Some("2026-10-30")
     );
-    // Monday 26: the same day, then an earlier one, change nothing.
-    for on in ["2026-10-30", "2026-10-28"] {
-        assert_eq!(kept_once_on(&mut store, MONDAY + 7 * DAY, DENTIST, on), id);
-        assert_eq!(
-            day_of(&scratch, "p-minh", id).as_deref(),
-            Some("2026-10-30"),
-            "{on}"
-        );
-    }
+    // Monday 26: the same day changes nothing.
+    assert_eq!(
+        kept_once_on(&mut store, MONDAY + 7 * DAY, DENTIST, "2026-10-30"),
+        id
+    );
+    assert_eq!(
+        day_of(&scratch, "p-minh", id).as_deref(),
+        Some("2026-10-30")
+    );
     for at in [MONDAY + 7 * DAY, MONDAY + 10 * DAY, MONDAY + 11 * DAY] {
         store.maintain(at).unwrap();
         assert_eq!(store.follow_up_with(&minh, true).unwrap(), None, "{at}");
@@ -3679,4 +3680,438 @@ fn an_observation_replacing_a_kept_thing_retires_it() {
             .is_err()
     );
     assert!(store.record(&olivia, tea).unwrap().unwrap().active);
+}
+
+/// #4753: a kept thing's day restated moves either way, as said last ("Lily
+/// comes Saturday", "now Sunday", "back to Saturday"), and is followed up
+/// after the day it is now; said again with no day (a mere mention), it
+/// keeps its day.
+#[test]
+fn an_event_day_moves_earlier_or_later_when_restated_and_a_mention_keeps_it() {
+    let scratch = Scratch::new("event-moves-both-ways");
+    let mut store = scratch.open(30, MONDAY);
+    let minh = person("p-minh");
+    const LILY: &str = "Lily comes to visit.";
+    // Monday 19 October: Saturday 24.
+    let id = kept_once_on(&mut store, MONDAY, LILY, "2026-10-24");
+    // Later: Sunday 25.
+    assert_eq!(
+        kept_once_on(&mut store, MONDAY + 3_600_000, LILY, "2026-10-25"),
+        id
+    );
+    assert_eq!(
+        day_of(&scratch, "p-minh", id).as_deref(),
+        Some("2026-10-25")
+    );
+    // Earlier: back to Saturday.
+    assert_eq!(
+        kept_once_on(&mut store, MONDAY + 2 * 3_600_000, LILY, "2026-10-24"),
+        id
+    );
+    assert_eq!(
+        day_of(&scratch, "p-minh", id).as_deref(),
+        Some("2026-10-24")
+    );
+    // A mention with no day keeps it.
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"remember","person":"p-minh","at_unix_ms":MONDAY + 3 * 3_600_000,"text":LILY,"once":true}),
+        MONDAY + 3 * 3_600_000,
+    );
+    assert_eq!(
+        (answer["id"].as_u64(), &answer["existing"]),
+        (Some(id), &json!(true))
+    );
+    assert_eq!(
+        day_of(&scratch, "p-minh", id).as_deref(),
+        Some("2026-10-24")
+    );
+    assert_eq!(event_rows(&scratch), 1);
+    // Followed up after Saturday, its day now, once.
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_with(&minh, true).unwrap(),
+        Some(json!({"id":id,"category":"kept","text":LILY,"on":"2026-10-24"}))
+    );
+}
+
+/// The times `person`'s kept thing `id` was said again (#4753).
+fn said_again_rows(scratch: &Scratch, person: &str, id: u64) -> u64 {
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row(
+            "SELECT count(DISTINCT a.at_unix_ms) FROM said_again a JOIN entries e ON e.rid=a.rid WHERE e.person=?1 AND e.id=?2",
+            rusqlite::params![person, id],
+            |r| r.get(0),
+        )
+        .unwrap()
+}
+
+/// `person`'s kept thing `id` as the kept list, a recall and a search
+/// (#4753) tell when it was last said: `last_said_unix_ms`, or none.
+fn last_said_told(store: &mut Days, person: &str, id: u64, now: u64) -> [Option<u64>; 3] {
+    let last = |answer: Value| {
+        answer["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["id"] == id)
+            .unwrap_or_else(|| panic!("{id} not in {answer}"))
+            .get("last_said_unix_ms")
+            .and_then(Value::as_u64)
+    };
+    let (kept, _) = request(store, json!({"op":"kept","person":person}), now);
+    let (recalled, _) = request(
+        store,
+        json!({"op":"recall","person":person,"query":"coffee"}),
+        now,
+    );
+    let (searched, _) = request(
+        store,
+        json!({"op":"search","person":person,"query":"coffee"}),
+        now,
+    );
+    [last(kept), last(recalled), last(searched)]
+}
+
+/// The voice's order (#4753, Reviewer-lead's P2): `remember` during the
+/// turn, with the conversation's lines already written (`from`), then the
+/// turn's own line, linked to what the turn kept (`append_linked`). The
+/// kept thing's id and the line's.
+fn said_in_a_turn(
+    store: &mut Days,
+    who: &Person,
+    at: u64,
+    text: &str,
+    from: &[u64],
+    heard: &str,
+    also: &[u64],
+) -> (u64, u64) {
+    let (id, _) = store.remember_once_from(who, at, text, from, true).unwrap();
+    let mut sources = vec![id];
+    sources.extend_from_slice(also);
+    let line = store.append(who, at, heard, "Sure.", &sources).unwrap();
+    (id, line)
+}
+
+/// The rows of `said_again` with no line as origin: none ever.
+fn said_with_no_line(scratch: &Scratch) -> u64 {
+    Connection::open(scratch.0.join(DATABASE))
+        .unwrap()
+        .query_row("SELECT count(*) FROM said_again WHERE origin<=0", [], |r| {
+            r.get(0)
+        })
+        .unwrap()
+}
+
+/// #4753: a kept thing said again (`once`) records when, once the line
+/// that said it is written, and the kept list, recall and search tell it
+/// as `last_said_unix_ms` beside the first `at_unix_ms`; a time no later
+/// than the newest changes nothing. It outlives its line's expiry, and goes
+/// with a forget of that line or of the kept thing.
+#[test]
+fn a_kept_thing_said_again_tells_when_it_was_last_said() {
+    let scratch = Scratch::new("last-said");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    const COFFEE: &str = "Takes coffee black.";
+    let keep = |store: &mut Days, at: u64, heard: &str| {
+        store.maintain(at).unwrap();
+        let before = store
+            .append(&minh, at, "Morning.", "Morning!", &[])
+            .unwrap();
+        said_in_a_turn(store, &minh, at, COFFEE, &[before], heard, &[])
+    };
+    let (id, _) = keep(&mut store, NOW, "Remember I take my coffee black.");
+    assert_eq!(last_said_told(&mut store, "p-minh", id, NOW), [None; 3]);
+    let again = NOW + 10 * DAY;
+    // Said again: nothing yet, until its line is written.
+    store.maintain(again).unwrap();
+    store
+        .remember_once_from(&minh, again, COFFEE, &[], true)
+        .unwrap();
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 0);
+    let line = store
+        .append(&minh, again, "Coffee black, as I said.", "Sure.", &[id])
+        .unwrap();
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 1);
+    assert_eq!(said_with_no_line(&scratch), 0);
+    assert_eq!(
+        last_said_told(&mut store, "p-minh", id, again),
+        [Some(again); 3]
+    );
+    // `at_unix_ms` stays when it was kept.
+    let (searched, _) = request(
+        &mut store,
+        json!({"op":"search","person":"p-minh","query":"coffee"}),
+        again,
+    );
+    let entry = searched["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["id"] == id)
+        .unwrap();
+    assert_eq!(entry["at_unix_ms"], NOW);
+    // An older time adds nothing, its line written or not.
+    said_in_a_turn(
+        &mut store,
+        &minh,
+        NOW + DAY,
+        COFFEE,
+        &[],
+        "Black, yes.",
+        &[],
+    );
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 1);
+    // A later line linked to it, with no remember, adds nothing either.
+    store
+        .append(&minh, again + DAY, "Coffee time.", "Enjoy.", &[id])
+        .unwrap();
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 1);
+    // The line it was said again in expires; the time stays.
+    store.maintain(again + 31 * DAY).unwrap();
+    assert!(store.record(&minh, line).unwrap().is_none());
+    assert_eq!(
+        last_said_told(&mut store, "p-minh", id, again + 31 * DAY),
+        [Some(again); 3]
+    );
+    // Forgetting the kept thing takes its times.
+    store.forget(&minh, id).unwrap();
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 0);
+}
+
+/// #4753, the forget guards, in the voice's order (Reviewer-lead's P2): a
+/// forget of the line a kept thing was said again in (by id, "forget what I
+/// just said" as `forget_last`, a forget-all) leaves no time of it; a
+/// forget of an earlier line of the conversation leaves it. The kept thing
+/// and the first time stay.
+#[test]
+fn forgetting_the_line_it_was_said_again_in_leaves_no_time() {
+    let minh = person("p-minh");
+    const COFFEE: &str = "Takes coffee black.";
+    for how in ["id", "last", "all", "earlier"] {
+        let scratch = Scratch::new("last-said-forget");
+        let mut store = scratch.open(30, NOW);
+        let (id, _) = said_in_a_turn(
+            &mut store,
+            &minh,
+            NOW,
+            COFFEE,
+            &[],
+            "Remember I take my coffee black.",
+            &[],
+        );
+        let again = NOW + 2 * DAY;
+        store.maintain(again).unwrap();
+        let earlier = store
+            .append(&minh, again, "And no sugar.", "Noted.", &[])
+            .unwrap();
+        let (_, line) = said_in_a_turn(
+            &mut store,
+            &minh,
+            again,
+            COFFEE,
+            &[earlier],
+            "My coffee is black, remember.",
+            &[],
+        );
+        assert_eq!(said_again_rows(&scratch, "p-minh", id), 1, "{how}");
+        assert_eq!(said_with_no_line(&scratch), 0, "{how}");
+        match how {
+            "id" => {
+                store.forget(&minh, line).unwrap();
+            }
+            "last" => {
+                let removed = store.forget_last(&minh, Some(Kind::Exchange)).unwrap();
+                assert_eq!(removed.map(|removed| removed.id), Some(line));
+            }
+            "earlier" => {
+                store.forget(&minh, earlier).unwrap();
+                assert_eq!(said_again_rows(&scratch, "p-minh", id), 1);
+                assert_eq!(
+                    last_said_told(&mut store, "p-minh", id, again),
+                    [Some(again); 3]
+                );
+                continue;
+            }
+            _ => {
+                store.forget_all(Some(&minh)).unwrap();
+                assert_eq!(said_again_rows(&scratch, "p-minh", id), 0);
+                continue;
+            }
+        }
+        assert_eq!(said_again_rows(&scratch, "p-minh", id), 0, "{how}");
+        assert_eq!(
+            last_said_told(&mut store, "p-minh", id, again),
+            [None; 3],
+            "{how}"
+        );
+        assert!(store.record(&minh, id).unwrap().is_some(), "{how}");
+    }
+}
+
+/// #4753, Reviewer-lead's P2: said again in a conversation's first turn
+/// (no line of it written yet, so `from` is empty), the time is still the
+/// line's, and "forget what I just said" takes it. No row is left with no
+/// line.
+#[test]
+fn said_again_in_a_conversations_first_turn_goes_with_forget_last() {
+    let scratch = Scratch::new("last-said-first-turn");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    const COFFEE: &str = "Takes coffee black.";
+    let (id, _) = said_in_a_turn(
+        &mut store,
+        &minh,
+        NOW,
+        COFFEE,
+        &[],
+        "Remember I take my coffee black.",
+        &[],
+    );
+    let again = NOW + DAY;
+    store.maintain(again).unwrap();
+    let (_, line) = said_in_a_turn(
+        &mut store,
+        &minh,
+        again,
+        COFFEE,
+        &[],
+        "Coffee black, remember.",
+        &[],
+    );
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 1);
+    assert_eq!(said_with_no_line(&scratch), 0);
+    let removed = store.forget_last(&minh, None).unwrap();
+    assert_eq!(removed.map(|removed| removed.id), Some(line));
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 0);
+    assert_eq!(last_said_told(&mut store, "p-minh", id, again), [None; 3]);
+    assert!(store.record(&minh, id).unwrap().is_some());
+}
+
+/// #4753, Reviewer-lead's P3: the line a kept thing was said again in may
+/// be linked to another kept thing or an observation, and speak of it;
+/// forgetting that source takes the line, and the time goes with it. A
+/// time's origin is only ever its line, so no source of another kind
+/// keeps one.
+#[test]
+fn a_time_goes_with_the_forget_of_a_kept_thing_or_observation_its_line_came_from() {
+    let minh = person("p-minh");
+    const COFFEE: &str = "Takes coffee black.";
+    for source in ["kept", "observation"] {
+        let scratch = Scratch::new("last-said-source");
+        let mut store = scratch.open(30, NOW);
+        let (id, _) = said_in_a_turn(
+            &mut store,
+            &minh,
+            NOW,
+            COFFEE,
+            &[],
+            "Remember I take my coffee black.",
+            &[],
+        );
+        let other = match source {
+            "kept" => store.remember(&minh, NOW, "Has a dog named Rex.").unwrap(),
+            _ => {
+                let walk = store
+                    .append(&minh, NOW, "I walk Rex at seven.", "Lovely.", &[])
+                    .unwrap();
+                observe(
+                    &mut store,
+                    &minh,
+                    "c-1",
+                    &[walk],
+                    "Walks the dog at seven.",
+                    None,
+                )
+            }
+        };
+        let again = NOW + DAY;
+        store.maintain(again).unwrap();
+        let (_, line) = said_in_a_turn(
+            &mut store,
+            &minh,
+            again,
+            COFFEE,
+            &[],
+            "Coffee black, remember, before I walk Rex the dog at seven.",
+            &[other],
+        );
+        assert_eq!(said_again_rows(&scratch, "p-minh", id), 1, "{source}");
+        store.forget(&minh, other).unwrap();
+        assert!(store.record(&minh, line).unwrap().is_none(), "{source}");
+        assert_eq!(said_again_rows(&scratch, "p-minh", id), 0, "{source}");
+        assert!(store.record(&minh, id).unwrap().is_some(), "{source}");
+    }
+}
+
+/// #4753: the room's kept thing said again in a line someone known then
+/// adopts loses that time: the line is theirs now.
+#[test]
+fn a_room_kept_things_time_goes_with_a_line_adopted_from_it() {
+    let scratch = Scratch::new("last-said-adopt");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    const COFFEE: &str = "The office takes coffee black.";
+    let (id, _) = said_in_a_turn(
+        &mut store,
+        &room,
+        NOW,
+        COFFEE,
+        &[],
+        "The office takes its coffee black.",
+        &[],
+    );
+    let again = NOW + DAY;
+    store.maintain(again).unwrap();
+    let (_, line) = said_in_a_turn(
+        &mut store,
+        &room,
+        again,
+        COFFEE,
+        &[],
+        "Black coffee for the office.",
+        &[],
+    );
+    assert_eq!(said_again_rows(&scratch, "everyone", id), 1);
+    let moved = store.adopt(&room, &person("p-minh"), &[line]).unwrap();
+    assert_eq!(moved.len(), 1);
+    assert!(store.record(&room, id).unwrap().is_some());
+    assert_eq!(said_again_rows(&scratch, "everyone", id), 0);
+}
+
+/// A store made before `said_again` gets it on open: its kept things were
+/// last said when they were kept, and a kept thing said again then records
+/// it.
+#[test]
+fn a_store_without_said_again_opens_and_records_it() {
+    let scratch = Scratch::new("last-said-old");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    const COFFEE: &str = "Takes coffee black.";
+    let (id, _) = store
+        .remember_once_from(&minh, NOW, COFFEE, &[], true)
+        .unwrap();
+    drop(store);
+    scratch.sql("DROP TABLE said_again;");
+    let mut store = scratch.open(30, NOW + DAY);
+    assert_eq!(said_again_rows(&scratch, "p-minh", id), 0);
+    assert_eq!(
+        last_said_told(&mut store, "p-minh", id, NOW + DAY),
+        [None; 3]
+    );
+    said_in_a_turn(
+        &mut store,
+        &minh,
+        NOW + DAY,
+        COFFEE,
+        &[],
+        "Coffee black.",
+        &[],
+    );
+    assert_eq!(
+        last_said_told(&mut store, "p-minh", id, NOW + DAY),
+        [Some(NOW + DAY); 3]
+    );
 }

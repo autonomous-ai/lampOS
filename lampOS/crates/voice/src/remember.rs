@@ -3621,10 +3621,7 @@ pub(crate) fn answer_for(
                     .as_array()?
                     .iter()
                     .filter_map(|entry| {
-                        let when = when_said(
-                            today,
-                            local_day(entry.get("at_unix_ms")?.as_u64()?, zone),
-                        );
+                        let when = when_said(today, local_day(said_last(entry)?, zone));
                         let mut item = match entry.get("kind")?.as_str()? {
                             "kept" => json!({"when": when, "asked_to_remember": entry.get("text")?}),
                             _ => json!({"when": when, "heard": entry.get("heard")?, "you_said": entry.get("said")?}),
@@ -3685,6 +3682,19 @@ fn day_it_is_about(on: &str, today: i64) -> Option<String> {
         ahead @ 2.. => format!("{said}, in {ahead} days"),
         ago => format!("{said}, {} days ago", -ago),
     })
+}
+
+/// When a found entry was last said: a kept thing said again since it was
+/// kept carries `last_said_unix_ms` (#4753, the memory's `said_again`),
+/// else, as every entry of an older memory, its `at_unix_ms`.
+fn said_last(entry: &Value) -> Option<u64> {
+    let at = entry.get("at_unix_ms")?.as_u64()?;
+    Some(
+        entry
+            .get("last_said_unix_ms")
+            .and_then(Value::as_u64)
+            .map_or(at, |last| last.max(at)),
+    )
 }
 
 /// How long ago, the way a person would say it. A date and an hour read
@@ -6639,7 +6649,7 @@ fn hits_told(
         .iter()
         .filter_map(|entry| {
             let text = entry.get("text")?.as_str()?.trim();
-            let at = entry.get("at_unix_ms")?.as_u64()?;
+            let at = said_last(entry)?;
             let id = entry.get("id").and_then(Value::as_u64);
             let day = entry["on"]
                 .as_str()
@@ -9657,11 +9667,12 @@ fn days_answer(
         sources.push(id);
         let ago = |at: u64| when_said(local_day(now, zone), local_day(at, zone));
         let at = entry.get("at_unix_ms")?.as_u64()?;
-        let when = ago(at);
+        // When it was last said (#4753); `since` stays when it was kept.
+        let when = ago(said_last(entry)?);
         let kind = entry.get("kind")?.as_str()?;
         let mut item = match kind {
             "kept" if dated.is_some() => {
-                let mut item = json!({"source_id":id,"when":when,"asked_to_remember":entry.get("text")?.as_str()?,"since":format!("since {when}")});
+                let mut item = json!({"source_id":id,"when":when,"asked_to_remember":entry.get("text")?.as_str()?,"since":format!("since {}", ago(at))});
                 if let Some(until) = entry.get("until_unix_ms").and_then(Value::as_u64) {
                     item["until"] = json!(format!("until {}", ago(until)));
                 }
@@ -19765,6 +19776,46 @@ mod tests {
                 tool.description
             );
         }
+    }
+
+    /// #4753: a kept thing said again since it was kept carries the
+    /// memory's `last_said_unix_ms`; recall, a hit and a dated recall tell
+    /// `when` from it, a dated recall's `since` still from when it was
+    /// kept. Without it (an older memory, or never said again), as before.
+    #[test]
+    fn a_kept_thing_said_again_is_told_when_it_was_last_said() {
+        let kept = json!({"kind":"kept","id":2,"at_unix_ms":NOW - 20 * DAY,"last_said_unix_ms":NOW - DAY,"text":"takes coffee black"});
+        assert_eq!(said_last(&kept), Some(NOW - DAY));
+        let answer = json!({"ok":true,"entries":[kept]});
+        assert_eq!(
+            answer_for(RECALL, &answer, NOW, Some(&EAST), None).unwrap()["found"][0]["when"],
+            "yesterday, Monday 12 October"
+        );
+        let (dated, _) = days_answer(&answer, NOW, Some(&EAST), Some(true)).unwrap();
+        assert_eq!(dated["found"][0]["when"], "yesterday, Monday 12 October");
+        assert_eq!(
+            dated["found"][0]["since"],
+            "since 2 weeks ago, Wednesday 23 September"
+        );
+        let (told, _, _) =
+            hits_told(&answer, "how do I take my coffee", NOW, Some(&EAST), false).unwrap();
+        assert!(
+            told.contains("(said yesterday, Monday 12 October)"),
+            "{told}"
+        );
+        // An older memory's, or one never said again: when it was kept.
+        let mut older = answer.clone();
+        older["entries"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("last_said_unix_ms");
+        assert_eq!(
+            answer_for(RECALL, &older, NOW, Some(&EAST), None).unwrap()["found"][0]["when"],
+            "2 weeks ago, Wednesday 23 September"
+        );
+        // A time before it was kept is never told.
+        older["entries"][0]["last_said_unix_ms"] = json!(NOW - 30 * DAY);
+        assert_eq!(said_last(&older["entries"][0]), Some(NOW - 20 * DAY));
     }
 
     #[test]

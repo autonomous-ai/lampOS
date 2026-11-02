@@ -121,6 +121,28 @@ tắc này từ 28/10: trên lamp-06c1, khi không có nó, một câu nói lạ
 lần thứ hai (lượt chạy của Friday, #3504). Vẫn còn nợ một lần kiểm tra trên
 lamp: cùng một câu nói hai lần chỉ giữ một điều.
 
+Từ #4753, bộ nhớ còn ghi lại lúc điều đó được nói lại (bảng `said_again`, tạo
+`IF NOT EXISTS`, `user_version` không đổi), khi lúc ấy muộn hơn lúc giữ và lần nói lại gần nhất. `kept`,
+`recall` và `search` khi đó trả thêm `last_said_unix_ms`, lần nói gần nhất,
+bên cạnh `at_unix_ms` vẫn là lúc giữ; voice nói «khi nào» theo lần muộn hơn.
+Trước đây, «lần cuối tôi nói với bạn về cà phê là khi nào?» chỉ nhận được ngày
+giữ đầu tiên, dù hôm qua vừa nói lại. Thời điểm được giữ tạm trong bộ nhớ của
+store (`said_pending`, tối đa 64) và chỉ được ghi khi chính dòng của lượt đó
+được ghi (`append_linked`, sau lượt, có liên kết tới điều đã giữ), với dòng đó
+là `origin` duy nhất; không bao giờ có hàng `origin` 0, và `source_ids` của
+`remember` (các dòng ghi trước nó) không bao giờ là origin. Quên dòng có câu
+nói lại («quên điều tôi vừa nói», `forget_last`, kể cả ở lượt đầu của cuộc trò
+chuyện), hoặc quên điều đã giữ hay lượt quan sát mà dòng đó liên kết tới, thì
+mất luôn thời điểm đó; quên một dòng trước đó của cuộc trò chuyện thì không.
+Lượt ấy hết hạn sau 30 ngày thì thời điểm vẫn còn. Kho
+tạo trước bảng này mở ra vẫn chạy, và mọi điều đã giữ của nó được coi là nói
+lần cuối lúc được giữ.
+
+Một điều đã giữ có ngày sự kiện, nói lại với một ngày khác, nhận ngày mới dù
+sớm hơn hay muộn hơn («Lily đến thứ Bảy», «giờ là Chủ nhật», «lại thứ Bảy»), và
+được hỏi thăm lại một lần sau ngày đó; nói lại mà không kèm ngày thì giữ ngày
+cũ. Trước đây ngày chỉ đổi khi muộn hơn.
+
 ## Ngày được nói, chỉ khi được hỏi «khi nào» (#4753)
 
 Mỗi kết quả của `recall` (và mỗi dòng «said …» của gợi ý trong lượt) nay mang
