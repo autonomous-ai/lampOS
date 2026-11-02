@@ -144,6 +144,7 @@ fn face(facing: Option<bool>, height: f32) -> Face {
         confidence: 1.0,
         yaw: None,
         facing,
+        follows: None,
     }
 }
 

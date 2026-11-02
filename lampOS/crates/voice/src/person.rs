@@ -1186,6 +1186,7 @@ mod tests {
             yaw: None,
             facing: None,
             speaking: None,
+            follows: None,
         };
         let mut look = |faces: usize| {
             let now = crate::scenario_clock::monotonic_us();

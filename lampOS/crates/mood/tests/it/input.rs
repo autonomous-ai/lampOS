@@ -108,6 +108,7 @@ fn face(id: &str) -> Face {
         confidence: 0.9,
         yaw: None,
         facing: None,
+        follows: None,
     }
 }
 

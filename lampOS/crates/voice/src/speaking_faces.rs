@@ -213,6 +213,27 @@ struct Looks {
     /// ([`SpeakingFaces::known_with_boot`]). Instance names only, so kept
     /// past [`KEPT`] and [`SpeakingFaces::forget`].
     boots: VecDeque<(String, SystemTime)>,
+    /// The followed ids taken as one face (`boot/f1` is `boot/f2`, the eyes'
+    /// `follows`, #4885), newest last, for a known face read from a file
+    /// written before the eyes moved it ([`SpeakingFaces::known_with_boot`]).
+    followed: VecDeque<(String, String)>,
+}
+
+/// Followed ids remembered for the known face, far more than turn at once.
+const MOST_FOLLOWED: usize = 16;
+
+impl Look {
+    /// Every id list of the look, to take one id as another.
+    fn ids_mut(&mut self) -> [&mut Vec<String>; 6] {
+        [
+            &mut self.speaking,
+            &mut self.tracked,
+            &mut self.still,
+            &mut self.turned,
+            &mut self.turned_silent,
+            &mut self.turned_unread,
+        ]
+    }
 }
 
 /// Boots of the eyes remembered with their first frame's time.
@@ -229,7 +250,10 @@ impl SpeakingFaces {
     /// One read of the eyes' `humans/faces/tracked`: their frame, by its
     /// publisher's boot and sequence, counted only if it is new; `None` when
     /// they said nothing fresh, counted as no face speaking at most once each
-    /// [`EYES_EVERY`].
+    /// [`EYES_EVERY`]. A face the eyes say `follows` an old id (#4885) takes
+    /// that id's earlier looks under the boot as its own, so every reading of
+    /// a line across the flip, [`Self::no_other_face_in_view`] and the
+    /// speakers [`not_theirs`] judges among them, sees one face.
     pub fn look(&self, at: Instant, frame: Option<((&str, u64), &Faces)>) {
         let Ok(mut looks) = self.looks.lock() else {
             return;
@@ -322,6 +346,38 @@ impl SpeakingFaces {
             looks.boots.push_back((boot.clone(), first));
             while looks.boots.len() > MOST_BOOTS {
                 looks.boots.pop_front();
+            }
+        }
+        // A new id the eyes say follows an old one (#4885, only with their
+        // hold and re-found check on): the old id's earlier looks under this
+        // boot are taken as the new id's, so a line across the flip is one
+        // face's to every reading of it. A look that has both is two faces
+        // and stays as it was.
+        let follows = frame
+            .map(|(_, faces)| {
+                faces
+                    .faces
+                    .iter()
+                    .filter_map(|face| Some((face.follows.clone()?, face.id.clone())))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for (old, new) in follows.iter().filter(|_| !boot.is_empty()) {
+            for look in looks.kept.iter_mut().filter(|look| {
+                look.boot == boot && !look.tracked.contains(new) && look.tracked.contains(old)
+            }) {
+                for ids in look.ids_mut() {
+                    ids.iter_mut()
+                        .filter(|id| *id == old)
+                        .for_each(|id| id.clone_from(new));
+                }
+            }
+            let pair = (format!("{boot}/{old}"), format!("{boot}/{new}"));
+            if !looks.followed.contains(&pair) {
+                looks.followed.push_back(pair);
+                while looks.followed.len() > MOST_FOLLOWED {
+                    looks.followed.pop_front();
+                }
             }
         }
         let kept = &mut looks.kept;
@@ -421,7 +477,8 @@ impl SpeakingFaces {
     /// P2 on #3038). In doubt it is refused: a new boot's file written just
     /// before the voice read its first frame waits for the eyes' next
     /// renewal. `None` with no boot read before it. The eyes' own
-    /// `known-speaker` file (Fourth's) is to replace this.
+    /// `known-speaker` file (Fourth's) is to replace this. A face the eyes
+    /// have since followed to a new id (`follows`, #4885) is read as that id.
     /// When boot `boot`'s first frame was read, for the boundary tests.
     #[cfg(test)]
     fn first_frame_of(&self, boot: &str) -> Option<SystemTime> {
@@ -441,7 +498,15 @@ impl SpeakingFaces {
             .iter()
             .filter(|(_, first)| *first < written)
             .max_by_key(|(_, first)| *first)?;
-        Some((name, format!("{boot}/{face}")))
+        let mut face = format!("{boot}/{face}");
+        // Written before the eyes moved it to the id that follows it.
+        for _ in 0..MOST_FOLLOWED {
+            match looks.followed.iter().find(|(old, _)| *old == face) {
+                Some((_, new)) => face.clone_from(new),
+                None => break,
+            }
+        }
+        Some((name, face))
     }
 
     /// Whether the face `face` (`boot/f3`, as [`Self::known_with_boot`]
@@ -531,7 +596,8 @@ impl SpeakingFaces {
     /// all) in any look of it: at least one of their own looks fell in it,
     /// and each tracked nobody or `face` alone (#4339). A line with no look
     /// in it, the eyes stalled or the camera covered, is not: nothing then
-    /// shows nobody else was there.
+    /// shows nobody else was there. An old id a new one follows is the new
+    /// one's face here (#4885, [`Self::look`]).
     pub fn no_other_face_in_view(&self, face: Option<&str>, from: Instant, to: Instant) -> bool {
         let Ok(looks) = self.looks.lock() else {
             return false;
@@ -931,6 +997,7 @@ mod tests {
             yaw: None,
             facing: None,
             speaking: None,
+            follows: None,
         };
         let start = Instant::now();
         let eyes = SpeakingFaces::default();
@@ -974,6 +1041,7 @@ mod tests {
                 score: 0.9,
                 from: None,
             }),
+            follows: None,
         };
         let eyes = SpeakingFaces::default();
         let from = Instant::now();
@@ -1047,6 +1115,7 @@ mod tests {
                 score: 0.9,
                 from: None,
             }),
+            follows: None,
         };
         let looks = |frames: &[&[&str]]| {
             let eyes = SpeakingFaces::default();
@@ -1174,6 +1243,7 @@ mod tests {
                         score: 0.9,
                         from: None,
                     }),
+                    follows: None,
                 })
                 .collect(),
         }
@@ -1192,6 +1262,49 @@ mod tests {
     }
 
     use SpeakingState::{No, Unknown, Yes};
+
+    /// #4885: a line spanning a new passing id the eyes say follows the old
+    /// (`f2` follows `f1`, with their hold and re-found check on) is one
+    /// face's: no other face in view, and their face alone seen speaking it.
+    /// Without the link it is two faces, narrowed to the room as before; and
+    /// a look with both ids in it is never one face.
+    #[test]
+    fn a_line_across_a_followed_id_is_one_faces() {
+        let lan = crate::known_faces::memory_person("A");
+        let known = Some(("A".to_owned(), "b/f2".to_owned()));
+        let line = |link: bool| {
+            let eyes = SpeakingFaces::default();
+            let from = Instant::now();
+            for index in 0..4u32 {
+                let mut look = faces(&[(if index < 2 { "f1" } else { "f2" }, Yes)]);
+                if link && index >= 2 {
+                    look.faces[0].follows = Some("f1".to_owned());
+                }
+                eyes.look(from + EVERY * index, Some((("b", u64::from(index)), &look)));
+            }
+            let to = from + EVERY * 4;
+            (
+                eyes.no_other_face_in_view(Some("b/f2"), from, to),
+                eyes.speakers_with_boot(from, to),
+            )
+        };
+        let (alone, speakers) = line(true);
+        assert!(alone);
+        assert_eq!(speakers, ["b/f2"]);
+        assert!(!not_theirs(&speakers, &lan, known.clone(), true));
+        let (alone, speakers) = line(false);
+        assert!(!alone);
+        assert_eq!(speakers, ["b/f1", "b/f2"]);
+        assert!(not_theirs(&speakers, &lan, known.clone(), true));
+        // The old id in the same look as the new: two faces.
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        eyes.look(from, Some((("b", 0), &faces(&[("f1", Yes)]))));
+        let mut both = faces(&[("f1", Yes), ("f2", Yes)]);
+        both.faces[1].follows = Some("f1".to_owned());
+        eyes.look(from + EVERY, Some((("b", 1), &both)));
+        assert!(!eyes.no_other_face_in_view(Some("b/f2"), from, from + EVERY * 2));
+    }
 
     /// lamp-3e83 (stable 8163, 28 Oct 16:30): the known person alone at the
     /// lamp, their mouth not read speaking often enough, had about half
@@ -1583,6 +1696,35 @@ mod tests {
             std::fs::write(known_face_of(&known), wrong).unwrap();
             assert_eq!(known_with_face(&known), None, "{wrong}");
         }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #4885: a known face file the eyes wrote before they followed its face
+    /// to a new id names the new id once the link is seen.
+    #[test]
+    fn a_known_face_written_before_it_was_followed_is_read_as_the_new_id() {
+        let dir =
+            std::env::temp_dir().join(format!("speaking-faces-follow-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let now = Instant::now();
+        let eyes = SpeakingFaces::default();
+        eyes.look(
+            now - Duration::from_secs(1),
+            Some((("b", 0), &faces(&[("f1", Yes)]))),
+        );
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        let read = || eyes.known_with_boot(&known).map(|(_, face)| face);
+        assert_eq!(read().as_deref(), Some("b/f1"));
+        let mut back = faces(&[("f2", Yes)]);
+        back.faces[0].follows = Some("f1".to_owned());
+        eyes.look(now, Some((("b", 1), &back)));
+        assert_eq!(read().as_deref(), Some("b/f2"));
+        // The camera closed: the link goes with the looks.
+        eyes.forget();
+        assert_eq!(read().as_deref(), Some("b/f1"));
         std::fs::remove_dir_all(dir).unwrap();
     }
 

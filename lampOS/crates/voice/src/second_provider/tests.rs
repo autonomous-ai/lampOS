@@ -11255,6 +11255,7 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
                                     score: 0.9,
                                     from: None,
                                 }),
+                                follows: None,
                             })
                             .into(),
                     };
@@ -11366,6 +11367,7 @@ async fn without_the_switch_a_line_another_face_spoke_stays_the_known_persons() 
                 score: 0.9,
                 from: None,
             }),
+            follows: None,
         }],
     };
     engine.submit(start(1));
@@ -15796,6 +15798,7 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
                                     score: 0.9,
                                     from: None,
                                 }),
+                                follows: None,
                             })
                             .collect(),
                     };

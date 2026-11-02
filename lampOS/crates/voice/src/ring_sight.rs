@@ -150,6 +150,7 @@ mod tests {
             confidence: 1.0,
             yaw: None,
             facing: None,
+            follows: None,
         }
     }
 

@@ -210,6 +210,7 @@ fn face(id: &str, xmin: f32, facing: bool) -> Face {
         yaw: None,
         facing: Some(facing),
         speaking: None,
+        follows: None,
     }
 }
 

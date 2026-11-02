@@ -47,6 +47,7 @@ fn show_speaker(eyes: &SpeakingFaces, speaker: &str) {
                     score: 0.9,
                     from: None,
                 }),
+                follows: None,
             })
             .into(),
     };

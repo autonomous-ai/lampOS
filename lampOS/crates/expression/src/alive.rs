@@ -1647,6 +1647,7 @@ mod routine_tests {
                     yaw: None,
                     facing: None,
                     speaking: None,
+                    follows: None,
                 }]
             } else {
                 vec![]
