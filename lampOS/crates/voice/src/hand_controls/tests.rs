@@ -713,6 +713,7 @@ fn voice_mute_says_who_muted_it() {
             muted: false,
             reason: None,
             muted_by: None,
+            control: false,
         }
     );
     drop(open);
@@ -735,6 +736,7 @@ fn voice_mute_says_who_muted_it() {
             muted: true,
             reason: Some(MuteReason::Sleep),
             muted_by: Some(MutedBy::Sleep),
+            control: false,
         }
     );
     assert!(said(&asleep).check().is_ok());
@@ -1368,6 +1370,7 @@ fn a_hold_while_onboarding_is_under_way_asks_no_sleep() {
             muted: false,
             reason: None,
             muted_by: None,
+            control: false,
         }),
         "said open"
     );
@@ -1930,6 +1933,7 @@ fn the_pump_says_the_latch_on_voice_mute_when_it_changes_and_every_second() {
             muted: false,
             reason: None,
             muted_by: None,
+            control: false,
         }
     );
     shared.latch.store(LATCH_ASLEEP, Ordering::Release);
@@ -3644,4 +3648,175 @@ fn the_late_window_returns_only_a_sleep_hold() {
         late(START + 650_000).is_empty(),
         "a tap and its touch: none"
     );
+}
+
+/// A paired computer's mute (`listen.set false`, `crate::control_mute`)
+/// closes the microphones as the button's mute does: the poll says muted
+/// and changed, the quiescent wait stays closed, `voice/mute` says it in
+/// its own field (no `muted_by`, which an older reader would refuse), and
+/// the record on disk is never written. Lifted, all opens again.
+#[test]
+fn a_computers_mute_closes_the_microphones_without_touching_the_record() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    let said = |owner: &HandControls| {
+        latch_message(owner.shared.latch.load(Ordering::Acquire)).expect("a latch")
+    };
+    let mutes = owner.control_mutes();
+    let hold = mutes.hold().unwrap();
+    let seen = owner.poll_at(START + 10).unwrap();
+    assert!(seen.muted && seen.mute_changed && !seen.asleep);
+    assert_eq!(seen.observed_at_us, Some(START + 10));
+    assert!(owner.control_held() && !owner.muted());
+    assert_eq!(
+        said(&owner),
+        VoiceMute {
+            muted: true,
+            reason: None,
+            muted_by: None,
+            control: true,
+        }
+    );
+    assert!(said(&owner).check().is_ok());
+    assert_eq!(hold.told(), Some(crate::control_mute::Told::Taken));
+    let (allowed, seen) = owner
+        .quiescent_observation_with_clock(|| START + 20)
+        .unwrap();
+    assert!(!allowed && seen.muted && !seen.mute_changed);
+    // Nothing was saved for it: no record, no guard.
+    assert!(!directory.file().exists());
+    // Lifted by its connection: open again, said so.
+    hold.lift(crate::control_mute::Lift::Asked);
+    let (allowed, seen) = owner
+        .quiescent_observation_with_clock(|| START + 30)
+        .unwrap();
+    assert!(allowed && !seen.muted && seen.mute_changed);
+    assert_eq!(said(&owner), latch_message(LATCH_OPEN).unwrap());
+}
+
+/// Under the person's own mute, a computer's is said beside it; lifting
+/// the computer's never lifts the person's, and the person's clear never
+/// lifts the computer's: the lamp listens only when both are gone.
+#[test]
+fn a_computers_mute_and_the_persons_are_each_their_own() {
+    let directory = Directory::new();
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    assert!(record.request_mute(START));
+    let (mut owner, _sender) = from_record(head_options(Some(&directory)), record, START);
+    let mutes = owner.control_mutes();
+    let hold = mutes.hold().unwrap();
+    let (allowed, seen) = owner
+        .quiescent_observation_with_clock(|| START + 10)
+        .unwrap();
+    assert!(!allowed && seen.muted);
+    let said = latch_message(owner.shared.latch.load(Ordering::Acquire)).unwrap();
+    assert_eq!((said.muted_by, said.control), (Some(MutedBy::Button), true));
+    assert!(said.check().is_ok());
+    drop(hold);
+    let (allowed, seen) = owner
+        .quiescent_observation_with_clock(|| START + 20)
+        .unwrap();
+    assert!(!allowed && seen.muted, "the person's mute stays");
+    let said = latch_message(owner.shared.latch.load(Ordering::Acquire)).unwrap();
+    assert_eq!(
+        (said.muted_by, said.control),
+        (Some(MutedBy::Button), false)
+    );
+    // Two computers': muted until both lift.
+    let (mut open, _sender) = fixture(head_options(Some(&directory)));
+    let mutes = open.control_mutes();
+    let (one, two) = (mutes.hold().unwrap(), mutes.hold().unwrap());
+    assert!(open.poll_at(START + 10).unwrap().muted);
+    one.lift(crate::control_mute::Lift::Asked);
+    assert!(open.poll_at(START + 20).unwrap().muted, "the second holds");
+    drop(two);
+    assert!(!open.poll_at(START + 30).unwrap().muted);
+}
+
+/// The person's hand on the head, a tap or a hand kept a second, lifts
+/// every computer's mute (the hold told so), as it wakes the restart
+/// guard's; a person's own mute under it stays, as it always did.
+#[test]
+fn a_hand_on_the_head_lifts_a_computers_mute_but_never_the_persons() {
+    for (persons, lifted_us) in [
+        (false, START + 700_000),
+        (false, START + 2_000_000),
+        (true, START + 700_000),
+        (true, START + 2_000_000),
+    ] {
+        let directory = Directory::new();
+        let mut record = MuteRecord::new(CLOCK).unwrap();
+        if persons {
+            assert!(record.request_mute(START / 2));
+        }
+        record.save(&directory.file()).unwrap();
+        let (mut owner, sender) = from_record(head_options(Some(&directory)), record, START);
+        let mutes = owner.control_mutes();
+        let hold = mutes.hold().unwrap();
+        let mut head = TestHead::new(CLOCK, START);
+        let quiet = feed(&mut owner, &sender, head.run(START + 500_000, false), true);
+        assert!(
+            quiet
+                .iter()
+                .all(|(_, seen, allowed)| seen.muted && !allowed)
+        );
+        assert!(owner.control_held());
+        let mut ticks = head.run(lifted_us, true);
+        ticks.extend(head.run(lifted_us + 500_000, false));
+        let seen = feed(&mut owner, &sender, ticks, true);
+        assert!(!owner.control_held(), "{persons} {lifted_us}");
+        assert_eq!(hold.told(), Some(crate::control_mute::Told::Taken));
+        assert_eq!(
+            hold.told(),
+            Some(crate::control_mute::Told::Lifted(
+                crate::control_mute::Lift::Hand
+            ))
+        );
+        let opened = seen.iter().any(|(_, _, allowed)| *allowed);
+        assert_eq!(opened, !persons, "{persons} {lifted_us}");
+    }
+}
+
+/// A computer's mute never lifts the button's, sleep's or the restart
+/// guard's: they stay in the record, as `voice/mute` says them, when its
+/// connection ends.
+#[test]
+fn a_computers_lift_never_opens_sleep_or_the_restart_guard() {
+    let directory = Directory::new();
+    let mut asleep = MuteRecord::new(CLOCK).unwrap();
+    assert!(asleep.request_sleep(START));
+    let (mut owner, _sender) = from_record(head_options(Some(&directory)), asleep, START);
+    let hold = owner.control_mutes().hold().unwrap();
+    assert!(owner.poll_at(START + 10).unwrap().asleep);
+    let said = latch_message(owner.shared.latch.load(Ordering::Acquire)).unwrap();
+    assert_eq!((said.reason, said.control), (Some(MuteReason::Sleep), true));
+    hold.lift(crate::control_mute::Lift::Asked);
+    let (allowed, seen) = owner
+        .quiescent_observation_with_clock(|| START + 20)
+        .unwrap();
+    assert!(!allowed && seen.asleep);
+
+    let directory = Directory::new();
+    let (mut guarded, _sender) = fixture(head_options(Some(&directory)));
+    guarded.mark_guard = true;
+    guarded.arm_active().unwrap();
+    drop(guarded);
+    let record = MuteRecord::load(&directory.file(), CLOCK, START).unwrap();
+    let (mut guarded, _sender) = from_record(head_options(Some(&directory)), record, START);
+    guarded.mark_guard = true;
+    guarded.restore_guard_marker(stored_identity(&directory.file()));
+    let hold = guarded.control_mutes().hold().unwrap();
+    assert!(guarded.poll_at(START + 10).unwrap().muted);
+    drop(hold);
+    let (allowed, _) = guarded
+        .quiescent_observation_with_clock(|| START + 20)
+        .unwrap();
+    assert!(!allowed && guarded.restored_after_fault());
+}
+
+/// A lamp with no mute record has no software mute to hold: refused.
+#[test]
+fn without_a_mute_record_a_computers_mute_is_refused() {
+    let (owner, _sender) = fixture(options(true, None));
+    assert!(owner.control_mutes().hold().is_err());
 }

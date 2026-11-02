@@ -999,6 +999,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
             muted: true,
             reason,
             muted_by: Some(by),
+            control: false,
         };
         let data = mic(&mut real, &serde_json::to_value(said).unwrap());
         assert_eq!(data["muted"], true, "{data}");

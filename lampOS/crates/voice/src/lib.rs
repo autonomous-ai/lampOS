@@ -60,6 +60,7 @@ pub mod camera_worker;
 pub mod capture_cores;
 pub mod choreography;
 pub mod config;
+pub mod control_mute;
 pub mod control_turn;
 pub mod conversation_summary;
 pub mod cut_in_told;

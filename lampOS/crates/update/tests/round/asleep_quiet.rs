@@ -64,6 +64,7 @@ fn a_lamp_asleep_or_muted_for_privacy_is_switched_without_waiting() {
                 muted: true,
                 reason,
                 muted_by: None,
+                control: false,
             }),
         );
         assert_eq!(outcome, Outcome::Switched(2), "{reason:?}: {:?}", lamp.said);
@@ -110,6 +111,7 @@ fn a_voice_that_says_nothing_is_still_waited_for() {
             muted: false,
             reason: None,
             muted_by: None,
+            control: false,
         }),
     );
     assert!(

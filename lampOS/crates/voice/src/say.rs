@@ -96,6 +96,15 @@
 //!   [`TURN_SKILL`] may ask either. A start is answered `begun` with the
 //!   turn's `id` when its window opens; the coordinator decides the rest
 //!   ([`crate::control_turn`]).
+//! - **A computer's mute for lamp-control** (the same section):
+//!   `listen: false` holds the voice's software mute on its connection,
+//!   which stays open while it holds, answered `muted` once the voice has
+//!   taken it; `listen: true` on that connection lifts it, answered
+//!   `lifted`, and the connection closes. Closing the connection lifts it
+//!   too, and so does the person's hand on the head (`lifted` with why).
+//!   `listen: true` on a connection holding none is answered
+//!   `nothing_held`. Only [`TURN_SKILL`], with nothing else in the line
+//!   ([`crate::control_mute`]).
 //!
 //! Onboarding is also a source-owned request: only `skill: onboarding` with
 //! `from: onboarding` and a nonzero `invitation` can ask for it. The coordinator
@@ -247,6 +256,14 @@ pub enum Outcome {
     Refused(String),
     /// A `turn: "end"` ended the conversation of its turn.
     Ended,
+    /// `listen: false`: the voice has taken this connection's mute, which
+    /// holds until it is lifted ([`crate::control_mute`]).
+    Muted,
+    /// This connection's mute was lifted, with how: asked, or a hand on
+    /// the head.
+    Lifted(String),
+    /// `listen: true` on a connection that held no mute: nothing changed.
+    NothingHeld,
 }
 
 impl Outcome {
@@ -258,6 +275,9 @@ impl Outcome {
             Self::Expired => json!({"outcome": "expired"}),
             Self::Refused(why) => json!({"outcome": "refused", "why": why}),
             Self::Ended => json!({"outcome": "ended"}),
+            Self::Muted => json!({"outcome": "muted"}),
+            Self::Lifted(why) => json!({"outcome": "lifted", "why": why}),
+            Self::NothingHeld => json!({"outcome": "nothing_held"}),
         }
         .to_string()
     }
@@ -301,6 +321,10 @@ pub enum Words {
     /// lamp-control asks for the turn it opened as `id` to be ended
     /// (`turn: "end"`).
     TurnEnd(u64),
+    /// lamp-control sets a computer's mute: `false` holds one on the
+    /// connection, `true` lifts it (`listen`, [`crate::control_mute`]).
+    /// Taken on the client's thread, never queued for the voice.
+    Listen(bool),
 }
 
 impl Words {
@@ -320,7 +344,8 @@ impl Words {
             | Self::ExactSound(_)
             | Self::ClipAt(_)
             | Self::TurnStart(_)
-            | Self::TurnEnd(_) => None,
+            | Self::TurnEnd(_)
+            | Self::Listen(_) => None,
         }
     }
 }
@@ -453,6 +478,10 @@ struct Wire {
     /// The turn a `turn: "end"` ends, as its start's `begun` named it.
     #[serde(default)]
     id: Option<u64>,
+    /// A computer's mute: `false` holds one, `true` lifts it
+    /// ([`TURN_SKILL`] only, alone).
+    #[serde(default)]
+    listen: Option<bool>,
     /// A note to be told who is at the lamp (#2825): only with `note`.
     #[serde(default)]
     who: bool,
@@ -516,6 +545,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     }
     if skill == SHUTDOWN_SKILL && caller != Caller::WifiHelper {
         return Err("skill shutdown is asked by root only".into());
+    }
+    if let Some(on) = wire.listen.take() {
+        return parse_listen(skill, on, &wire);
     }
     if let Some(turn) = wire.turn.take() {
         return parse_turn(skill, turn, wire);
@@ -757,6 +789,47 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         priority: NORMAL_PRIORITY,
         expires_in_ms,
         start_before_us: wire.start_before_us,
+        task: None,
+        invitation: None,
+        unplug_request: None,
+        who: false,
+    })
+}
+
+/// A `listen` ask, checked: lamp-control's alone, with nothing else in its
+/// line, not even an expiry: it is taken on the client's thread at once.
+fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String> {
+    if skill != TURN_SKILL {
+        return Err("listen is lamp-control's only".into());
+    }
+    if wire.note.is_some()
+        || wire.text.is_some()
+        || wire.quoted.is_some()
+        || wire.from.is_some()
+        || wire.task.is_some()
+        || wire.invitation.is_some()
+        || wire.sound.is_some()
+        || wire.clip.is_some()
+        || wire.recording.is_some()
+        || wire.cue.is_some()
+        || wire.cache
+        || wire.unplug_request.is_some()
+        || wire.priority.is_some()
+        || wire.expires_in_ms.is_some()
+        || wire.start_before_us.is_some()
+        || wire.turn.is_some()
+        || wire.id.is_some()
+        || wire.exact
+        || wire.who
+    {
+        return Err("listen goes alone".into());
+    }
+    Ok(Request {
+        skill,
+        words: Words::Listen(on),
+        priority: NORMAL_PRIORITY,
+        expires_in_ms: TURN_END_EXPIRY_MS,
+        start_before_us: None,
         task: None,
         invitation: None,
         unplug_request: None,
@@ -1134,6 +1207,27 @@ impl Says {
         clips: &Path,
         recordings: Recordings,
     ) -> io::Result<Self> {
+        Self::serve_holding(
+            path,
+            group,
+            sounds,
+            clips,
+            recordings,
+            crate::control_mute::ControlMutes::process(),
+        )
+    }
+
+    /// [`Self::serve_with_clips`], a computer's mute held in `mutes`: the
+    /// voice's own ([`crate::control_mute::ControlMutes::process`]), a
+    /// test's own.
+    pub(crate) fn serve_holding(
+        path: &Path,
+        group: Option<u32>,
+        sounds: &Path,
+        clips: &Path,
+        recordings: Recordings,
+        mutes: crate::control_mute::ControlMutes,
+    ) -> io::Result<Self> {
         let (listener, bound) = bind(path, group)?;
         let (ask, incoming) = mpsc::channel();
         let open = Arc::new(AtomicUsize::new(0));
@@ -1145,7 +1239,7 @@ impl Says {
         let own = ask.clone();
         thread::Builder::new()
             .name("lamp-voice-say".into())
-            .spawn(move || accept(&listener, &ask, &open, &sounds, &recordings))?;
+            .spawn(move || accept(&listener, &ask, &open, &sounds, &recordings, &mutes))?;
         Ok(Self {
             own,
             incoming,
@@ -1405,6 +1499,7 @@ impl Says {
                     | Words::ClipAt(_)
                     | Words::TurnStart(_)
                     | Words::TurnEnd(_)
+                    | Words::Listen(_)
             )
         })
     }
@@ -1719,13 +1814,15 @@ pub(crate) fn bind(path: &Path, group: Option<u32>) -> io::Result<(UnixListener,
 }
 
 /// Take each client on a thread of its own, at most [`MOST_WAITING`] at
-/// once. Ends when the voice has gone.
+/// once, a connection holding a computer's mute among them. Ends when the
+/// voice has gone.
 fn accept(
     listener: &UnixListener,
     ask: &mpsc::Sender<Asked>,
     open: &Arc<AtomicUsize>,
     sounds: &Arc<Folders>,
     recordings: &Arc<Recordings>,
+    mutes: &crate::control_mute::ControlMutes,
 ) {
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else { continue };
@@ -1740,10 +1837,11 @@ fn accept(
         }
         let (ask, held, sounds) = (ask.clone(), Arc::clone(open), Arc::clone(sounds));
         let recordings = Arc::clone(recordings);
+        let mutes = mutes.clone();
         let spawned = thread::Builder::new()
             .name("lamp-voice-say-client".into())
             .spawn(move || {
-                serve_client(stream, &ask, &sounds, &recordings);
+                serve_client(stream, &ask, &sounds, &recordings, &mutes);
                 held.fetch_sub(1, Ordering::AcqRel);
             });
         if spawned.is_err() {
@@ -1768,45 +1866,50 @@ fn serve_client(
     ask: &mpsc::Sender<Asked>,
     folders: &Folders,
     recordings: &Recordings,
+    mutes: &crate::control_mute::ControlMutes,
 ) {
-    let outcome = match read_line_within(&stream, READ_WITHIN) {
+    let caller = caller_of(&stream, recordings.helper_uid);
+    let mut kept = Vec::new();
+    let outcome = match read_line_kept(&stream, READ_WITHIN, &mut kept) {
         Err(why) => Outcome::Refused(why.into()),
-        Ok(line) => match parse_from(&line, caller_of(&stream, recordings.helper_uid)).and_then(
-            |mut request| {
-                match &request.words {
-                    Words::SoundAt(path) => {
-                        request.words = Words::Sound(read_skill_sound(path, &folders.sounds)?);
-                    }
-                    Words::ClipAt(path) => {
-                        request.words = Words::ExactSound(read_clip(path, &folders.clips)?);
-                    }
-                    Words::Recording(name) => {
-                        request.words = Words::Sound(recordings.samples(name)?);
-                    }
-                    Words::Cached(text) => {
-                        request.words = Words::Sound(recordings.cached(text)?);
-                    }
-                    Words::Exact(text) => {
-                        request.words = Words::ExactSound(recordings.rendered(text)?);
-                    }
-                    // A fixed line asked as text, the first stand's (#4710),
-                    // in the owner's words (#4473 (c)).
-                    Words::Text(text) => {
-                        if let Some(owners) =
-                            crate::language::at_start().and_then(|language| language.fixed(text))
-                        {
-                            request.words = Words::Text(owners.to_owned());
-                        }
-                    }
-                    Words::Quoted(_) if !ADDON_SAY.load(std::sync::atomic::Ordering::Relaxed) => {
-                        return Err(format!("add-on says are off ({ADDON_SAY_ENVIRONMENT})"));
-                    }
-                    _ => {}
+        Ok(line) => match parse_from(&line, caller).and_then(|mut request| {
+            match &request.words {
+                Words::SoundAt(path) => {
+                    request.words = Words::Sound(read_skill_sound(path, &folders.sounds)?);
                 }
-                Ok(request)
-            },
-        ) {
+                Words::ClipAt(path) => {
+                    request.words = Words::ExactSound(read_clip(path, &folders.clips)?);
+                }
+                Words::Recording(name) => {
+                    request.words = Words::Sound(recordings.samples(name)?);
+                }
+                Words::Cached(text) => {
+                    request.words = Words::Sound(recordings.cached(text)?);
+                }
+                Words::Exact(text) => {
+                    request.words = Words::ExactSound(recordings.rendered(text)?);
+                }
+                // A fixed line asked as text, the first stand's (#4710),
+                // in the owner's words (#4473 (c)).
+                Words::Text(text) => {
+                    if let Some(owners) =
+                        crate::language::at_start().and_then(|language| language.fixed(text))
+                    {
+                        request.words = Words::Text(owners.to_owned());
+                    }
+                }
+                Words::Quoted(_) if !ADDON_SAY.load(std::sync::atomic::Ordering::Relaxed) => {
+                    return Err(format!("add-on says are off ({ADDON_SAY_ENVIRONMENT})"));
+                }
+                _ => {}
+            }
+            Ok(request)
+        }) {
             Err(why) => Outcome::Refused(why),
+            Ok(Request {
+                words: Words::Listen(on),
+                ..
+            }) => return serve_listen(stream, on, caller, kept, mutes),
             Ok(request) => {
                 let read_at_us = lamp_ipc::monotonic_us();
                 let expires_at_us = request.expires_at_us(read_at_us);
@@ -1870,34 +1973,151 @@ fn serve_client(
 
 /// The client's one line, read until its newline within `within` of now,
 /// at most [`MOST_LINE_BYTES`]; or why not.
+#[cfg(test)]
 fn read_line_within(stream: &UnixStream, within: Duration) -> Result<String, &'static str> {
+    read_line_kept(stream, within, &mut Vec::new())
+}
+
+/// [`read_line_within`], from what `kept` holds first; what came after the
+/// line is left in `kept`, for a held mute's next line.
+fn read_line_kept(
+    stream: &UnixStream,
+    within: Duration,
+    kept: &mut Vec<u8>,
+) -> Result<String, &'static str> {
     let started = Instant::now();
-    let mut line = Vec::new();
-    let mut piece = [0u8; 512];
     loop {
+        if let Some(line) = line_in(kept)? {
+            return Ok(line);
+        }
         let left = within
             .checked_sub(started.elapsed())
             .filter(|left| !left.is_zero())
             .ok_or("no request line in time")?;
-        stream
-            .set_read_timeout(Some(left))
-            .map_err(|_| "no request line in time")?;
-        let read = match (&*stream).read(&mut piece) {
-            Ok(0) => return Err("no request line in time"),
-            Ok(read) => read,
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-            Err(_) => return Err("no request line in time"),
-        };
-        line.extend_from_slice(&piece[..read]);
-        let end = line.iter().position(|&byte| byte == b'\n');
-        // The line with its newline, or what has come of it, is at most
-        // the limit (the reviewer on #954).
-        if end.map_or(line.len(), |end| end + 1) as u64 > MOST_LINE_BYTES {
-            return Err("one line, ended by a newline, at most 4096 bytes");
+        match read_some(stream, left, kept) {
+            Ok(true) => {}
+            Ok(false) | Err(()) => return Err("no request line in time"),
         }
-        if let Some(end) = end {
-            line.truncate(end + 1);
-            return String::from_utf8(line).map_err(|_| "not a say request");
+    }
+}
+
+/// The first whole line in `kept`, taken out of it, if there is one; or
+/// why it can't be one: the line with its newline, or what has come of it,
+/// is at most the limit (the reviewer on #954).
+fn line_in(kept: &mut Vec<u8>) -> Result<Option<String>, &'static str> {
+    let end = kept.iter().position(|&byte| byte == b'\n');
+    if end.map_or(kept.len(), |end| end + 1) as u64 > MOST_LINE_BYTES {
+        return Err("one line, ended by a newline, at most 4096 bytes");
+    }
+    let Some(end) = end else {
+        return Ok(None);
+    };
+    let line: Vec<u8> = kept.drain(..=end).collect();
+    String::from_utf8(line)
+        .map(Some)
+        .map_err(|_| "not a say request")
+}
+
+/// Reads what comes within `within` into `kept`: whether anything came
+/// (false when nothing did in time), or `Err` when the client has gone.
+fn read_some(stream: &UnixStream, within: Duration, kept: &mut Vec<u8>) -> Result<bool, ()> {
+    let mut piece = [0u8; 512];
+    stream.set_read_timeout(Some(within)).map_err(|_| ())?;
+    loop {
+        return match (&*stream).read(&mut piece) {
+            Ok(0) => Err(()),
+            Ok(read) => {
+                kept.extend_from_slice(&piece[..read]);
+                Ok(true)
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                ) =>
+            {
+                Ok(false)
+            }
+            Err(_) => Err(()),
+        };
+    }
+}
+
+/// How often a held mute's connection looks for its next line and for what
+/// the voice told it.
+const HELD_LOOK: Duration = Duration::from_millis(50);
+
+/// A `listen` ask on its connection ([`crate::control_mute`]). `false`
+/// holds a mute there, answered `muted` once the voice has taken it, and
+/// keeps the connection: `listen: true` on it lifts the mute and the
+/// connection closes; its closing lifts it; a hand on the head lifts it,
+/// said `lifted` with why. Any other line on it is refused and the mute
+/// stays. `true` alone held nothing.
+fn serve_listen(
+    mut stream: UnixStream,
+    on: bool,
+    caller: Caller,
+    mut kept: Vec<u8>,
+    mutes: &crate::control_mute::ControlMutes,
+) {
+    use crate::control_mute::{Lift, TAKE_WITHIN, Told};
+    let answer = |stream: &mut UnixStream, outcome: Outcome| {
+        let _ = writeln!(stream, "{}", outcome.line());
+    };
+    if on {
+        return answer(&mut stream, Outcome::NothingHeld);
+    }
+    let hold = match mutes.hold() {
+        Ok(hold) => hold,
+        Err(why) => return answer(&mut stream, Outcome::Refused(why)),
+    };
+    // A computer that stops reading never holds this thread in a write.
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(200)));
+    let asked = Instant::now();
+    let mut taken = false;
+    loop {
+        match hold.told() {
+            Some(Told::Taken) => {
+                taken = true;
+                answer(&mut stream, Outcome::Muted);
+            }
+            Some(Told::Lifted(how)) => {
+                return answer(&mut stream, Outcome::Lifted(how.why().into()));
+            }
+            None => {}
+        }
+        if !taken && asked.elapsed() >= TAKE_WITHIN && hold.give_up() {
+            return answer(
+                &mut stream,
+                Outcome::Refused("the voice did not take the mute in time".into()),
+            );
+        }
+        let line = match line_in(&mut kept) {
+            Ok(Some(line)) => line,
+            Ok(None) => match read_some(&stream, HELD_LOOK, &mut kept) {
+                Ok(_) => continue,
+                // Gone: the mute goes with it, as its hold drops.
+                Err(()) => return,
+            },
+            Err(why) => return answer(&mut stream, Outcome::Refused(why.into())),
+        };
+        match parse_from(&line, caller).map(|request| request.words) {
+            Ok(Words::Listen(true)) => {
+                hold.lift(Lift::Asked);
+                return answer(&mut stream, Outcome::Lifted(Lift::Asked.why().into()));
+            }
+            // Held already: said again once taken.
+            Ok(Words::Listen(false)) => {
+                if taken {
+                    answer(&mut stream, Outcome::Muted);
+                }
+            }
+            Ok(_) => answer(
+                &mut stream,
+                Outcome::Refused("a held mute's connection takes listen only".into()),
+            ),
+            Err(why) => answer(&mut stream, Outcome::Refused(why)),
         }
     }
 }
@@ -3313,6 +3533,7 @@ mod tests {
                     clips: "/unused".into(),
                 },
                 &Recordings::none(),
+                &crate::control_mute::ControlMutes::default(),
             )
         });
         let one = received.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -4344,5 +4565,208 @@ mod tests {
         );
         assert_eq!(Outcome::Ended.line(), r#"{"outcome":"ended"}"#);
         ticket.answer(Outcome::Refused("the lamp is muted".into()));
+    }
+
+    #[test]
+    fn listen_is_lamp_controls_alone_with_nothing_else() {
+        let words = |line: &str| parse(line).map(|request| request.words);
+        assert_eq!(
+            words(r#"{"skill":"control","listen":false}"#),
+            Ok(Words::Listen(false))
+        );
+        assert_eq!(
+            words(r#"{"skill":"control","listen":true}"#),
+            Ok(Words::Listen(true))
+        );
+        for caller in [Caller::Other, Caller::WifiHelper] {
+            assert_eq!(
+                parse_from(r#"{"skill":"pomodoro","listen":false}"#, caller),
+                Err("listen is lamp-control's only".into())
+            );
+        }
+        for line in [
+            r#"{"skill":"control","listen":false,"expires_in_ms":5000}"#,
+            r#"{"skill":"control","listen":false,"text":"Hi."}"#,
+            r#"{"skill":"control","listen":true,"turn":"end","id":3}"#,
+            r#"{"skill":"control","listen":false,"turn":"start","expires_in_ms":5}"#,
+            r#"{"skill":"control","listen":true,"cue":"hum"}"#,
+            r#"{"skill":"control","listen":true,"priority":3}"#,
+            r#"{"skill":"control","listen":false,"start_before_us":9}"#,
+        ] {
+            assert_eq!(parse(line), Err("listen goes alone".into()), "{line}");
+        }
+        // Not a boolean, and an unknown field, are no say request.
+        for line in [
+            r#"{"skill":"control","listen":"off"}"#,
+            r#"{"skill":"control","listen":false,"mood":"x"}"#,
+        ] {
+            assert!(parse(line).is_err(), "{line}");
+        }
+        assert_eq!(Outcome::Muted.line(), r#"{"outcome":"muted"}"#);
+        assert_eq!(
+            Outcome::Lifted("asked".into()).line(),
+            r#"{"outcome":"lifted","why":"asked"}"#
+        );
+        assert_eq!(Outcome::NothingHeld.line(), r#"{"outcome":"nothing_held"}"#);
+    }
+
+    /// A say service whose computers' mutes are this test's own, served as
+    /// a lamp with a mute record serves them.
+    fn listening(tag: &str) -> (PathBuf, Says, crate::control_mute::ControlMutes) {
+        let dir = socket_dir(tag);
+        let path = dir.join("say.sock");
+        let mutes = crate::control_mute::ControlMutes::default();
+        mutes.serve(true);
+        let says = Says::serve_holding(&path, None, &dir, &dir, Recordings::none(), mutes.clone())
+            .unwrap();
+        (path, says, mutes)
+    }
+
+    /// A connection that asked `listen`, and its answers line by line.
+    struct Held {
+        stream: UnixStream,
+        answers: BufReader<UnixStream>,
+    }
+
+    impl Held {
+        fn ask(path: &Path, on: bool) -> Self {
+            let stream = UnixStream::connect(path).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let answers = BufReader::new(stream.try_clone().unwrap());
+            let mut held = Self { stream, answers };
+            held.send(on);
+            held
+        }
+
+        fn send(&mut self, on: bool) {
+            writeln!(self.stream, r#"{{"skill":"control","listen":{on}}}"#).unwrap();
+        }
+
+        fn next(&mut self) -> String {
+            let mut line = String::new();
+            std::io::BufRead::read_line(&mut self.answers, &mut line).unwrap();
+            line.trim_end().to_owned()
+        }
+    }
+
+    /// Waits for the say service's threads to reach `count` held mutes.
+    fn until_held(mutes: &crate::control_mute::ControlMutes, count: usize) {
+        let started = Instant::now();
+        while mutes.count() != count {
+            assert!(started.elapsed() < Duration::from_secs(3), "{count} held");
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn a_computers_mute_holds_on_its_connection_until_it_asks_or_closes() {
+        let (path, _says, mutes) = listening("hold");
+        let mut first = Held::ask(&path, false);
+        until_held(&mutes, 1);
+        // Answered once the voice has taken it, at its poll.
+        assert!(mutes.take());
+        assert_eq!(first.next(), r#"{"outcome":"muted"}"#);
+        // Asked again on its own connection: still the one.
+        first.send(false);
+        assert_eq!(first.next(), r#"{"outcome":"muted"}"#);
+        assert_eq!(mutes.count(), 1);
+        // Another ask on a held connection is refused, the mute kept.
+        writeln!(
+            first.stream,
+            r#"{{"skill":"control","text":"Hi.","expires_in_ms":5000}}"#
+        )
+        .unwrap();
+        assert_eq!(
+            first.next(),
+            r#"{"outcome":"refused","why":"a held mute's connection takes listen only"}"#
+        );
+        // A second connection's `true` held nothing, and lifts nothing.
+        let mut other = Held::ask(&path, true);
+        assert_eq!(other.next(), r#"{"outcome":"nothing_held"}"#);
+        assert_eq!(other.next(), "", "closed");
+        assert!(mutes.take() && mutes.count() == 1);
+        // A second computer's mute: muted until both lift.
+        let mut second = Held::ask(&path, false);
+        until_held(&mutes, 2);
+        assert!(mutes.take());
+        assert_eq!(second.next(), r#"{"outcome":"muted"}"#);
+        first.send(true);
+        assert_eq!(first.next(), r#"{"outcome":"lifted","why":"asked"}"#);
+        assert_eq!(first.next(), "", "closed");
+        until_held(&mutes, 1);
+        assert!(mutes.take(), "the second still holds");
+        // The second's connection closes: lifted.
+        drop(second);
+        until_held(&mutes, 0);
+        assert!(!mutes.take());
+    }
+
+    #[test]
+    fn a_hand_on_the_head_lifts_every_held_mute_and_tells_each() {
+        let (path, _says, mutes) = listening("hand");
+        let mut held: Vec<_> = (0..2).map(|_| Held::ask(&path, false)).collect();
+        until_held(&mutes, 2);
+        assert!(mutes.take());
+        for one in &mut held {
+            assert_eq!(one.next(), r#"{"outcome":"muted"}"#);
+        }
+        assert_eq!(mutes.lift_by_hand(), 2);
+        for one in &mut held {
+            assert_eq!(
+                one.next(),
+                r#"{"outcome":"lifted","why":"a hand on the head"}"#
+            );
+            assert_eq!(one.next(), "", "closed");
+        }
+        assert!(!mutes.take());
+    }
+
+    #[test]
+    fn a_computers_mute_is_refused_without_a_software_mute_and_past_eight() {
+        let dir = socket_dir("nomute");
+        let path = dir.join("say.sock");
+        let unserved = crate::control_mute::ControlMutes::default();
+        let _says =
+            Says::serve_holding(&path, None, &dir, &dir, Recordings::none(), unserved).unwrap();
+        assert_eq!(
+            exchange(&path, "{\"skill\":\"control\",\"listen\":false}\n"),
+            "{\"outcome\":\"refused\",\"why\":\"the lamp has no software mute to hold\"}\n"
+        );
+        let (path, _says, mutes) = listening("eight");
+        let held: Vec<_> = (0..crate::control_mute::MOST_HELD)
+            .map(|_| Held::ask(&path, false))
+            .collect();
+        until_held(&mutes, crate::control_mute::MOST_HELD);
+        assert_eq!(
+            exchange(&path, "{\"skill\":\"control\",\"listen\":false}\n"),
+            format!(
+                "{{\"outcome\":\"refused\",\"why\":\"{} computers' mutes are held already\"}}\n",
+                crate::control_mute::MOST_HELD
+            )
+        );
+        drop(held);
+        until_held(&mutes, 0);
+    }
+
+    /// A line sent with the `listen` in one write is kept for the held
+    /// connection, not lost with the first line's read.
+    #[test]
+    fn a_lift_sent_with_its_mute_in_one_write_is_still_read() {
+        let (path, _says, mutes) = listening("onewrite");
+        let mut stream = UnixStream::connect(&path).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        stream
+            .write_all(
+                b"{\"skill\":\"control\",\"listen\":false}\n{\"skill\":\"control\",\"listen\":true}\n",
+            )
+            .unwrap();
+        let mut answer = String::new();
+        BufReader::new(stream).read_to_string(&mut answer).unwrap();
+        assert_eq!(answer, "{\"outcome\":\"lifted\",\"why\":\"asked\"}\n");
+        assert_eq!(mutes.count(), 0);
     }
 }

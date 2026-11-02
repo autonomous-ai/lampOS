@@ -1598,6 +1598,7 @@ mod head {
                 muted,
                 reason: asleep.then_some(MuteReason::Sleep),
                 muted_by: None,
+                control: false,
             };
             self.send(Input::VoiceMute { stamp, value });
         }
