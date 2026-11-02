@@ -34,6 +34,8 @@ Ready for lamp-voice: yes (#4954, `94cc64e58`, another lamp's own folder)
   `crates/`, `tools/` or the workflows reading `deploy/lamp-fc4b/`. The
   PR's ARM64 run starts on its own; docs-only by rule 6. READ ASK to the
   Reviewer-lead on #4710 at 18:33.
+- 18:41: the Reviewer-lead's READ-OK on `94cc64e58`, no findings; clippy run
+  41437723564 green. `NEXT TRAIN: #4954` posted on #4710 at 18:44.
 - #4418's read posted on the PR as READ-OK `4e5696601`: rebases clean onto
   `ab6ef495c`; on the Mac, `cargo fmt -p lamp-voice --check` clean,
   `cargo test -p lamp-voice --lib agent_tasks::tests` 65 passed 0 failed,
