@@ -369,8 +369,10 @@ pub(crate) fn asked_at_yes(
 pub const UNTOLD_WITHIN: Duration = Duration::from_secs(10 * 60);
 
 /// The skills made here never asked about, not on, kept after the newest
-/// ask and within [`UNTOLD_WITHIN`] of `now_unix_ms`: their names and
-/// SHA-256s, oldest first.
+/// ask, and kept, or their ask last begun aloud (`ask_begun_at_unix_ms`,
+/// an app's ask queued for a good moment: Mobile's HOLD on #4963), within
+/// [`UNTOLD_WITHIN`] of `now_unix_ms`: their names and SHA-256s, oldest
+/// first.
 fn untold(directory: &std::path::Path, now_unix_ms: u64) -> Vec<(String, String)> {
     let entries = made_skill::entries(directory);
     let asked_at = entries
@@ -384,7 +386,10 @@ fn untold(directory: &std::path::Path, now_unix_ms: u64) -> Vec<(String, String)
         .filter(|entry| entry["offered_at_unix_ms"].as_u64().is_none() && entry["on"] != true)
         .filter(|entry| {
             entry["at_unix_ms"].as_u64().is_some_and(|kept_at| {
-                kept_at > asked_at && kept_at >= since && kept_at <= now_unix_ms
+                let last = entry["ask_begun_at_unix_ms"]
+                    .as_u64()
+                    .map_or(kept_at, |begun| begun.max(kept_at));
+                kept_at > asked_at && last >= since && kept_at <= now_unix_ms
             })
         })
         .filter_map(|entry| {

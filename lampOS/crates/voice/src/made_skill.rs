@@ -936,6 +936,26 @@ pub fn offered(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<(
     Ok(())
 }
 
+/// The made skill `sha256`'s ask was begun aloud at `now_unix_ms` (a say
+/// turn of the lamp's own, crate::app_make): kept as `ask_begun_at_unix_ms`,
+/// from which an untold skill's window is counted
+/// (`make_skill_local::UNTOLD_WITHIN`), so an ask queued long is still
+/// answerable once said.
+pub fn ask_begun(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<()> {
+    let mut entries = index(directory);
+    let mut found = false;
+    for entry in &mut entries {
+        if entry["sha256"] == sha256 {
+            entry["ask_begun_at_unix_ms"] = json!(now_unix_ms);
+            found = true;
+        }
+    }
+    if found {
+        write_index(directory, &entries)?;
+    }
+    Ok(())
+}
+
 /// The lamp's own answer said [`ASK_TO_PUT_ON`] `ago` before now, with
 /// `lamp_said` its words: the model, asked whether the skill is ready, may
 /// say it before the news is told (lamp-9adf, 31 Oct 09:32: "Is the skill I

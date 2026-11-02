@@ -584,8 +584,10 @@ answers `ready` with yes at once (no tasks part asked), so `can` names
 `skills.make` and `skills.made` on that switch alone, with no change here.
 `skills.made` goes through the same states: `making` while the model
 writes, `kept` once the check took it, `asked` once the lamp has said its
-ask aloud and the person's yes came right after it, then `on` or
-`left_off`; `not_kept` with why. Nothing from the app puts it on, as
+ask aloud whole (dated then, however long it waited for a good moment),
+then `on` at a plain spoken yes within 120 s, or `left_off` with none;
+`not_kept` with why. An ask begun but not said whole leaves it `kept`
+until the lamp asks again ([skills.md](skills.md)). Nothing from the app puts it on, as
 before ([skills.md](skills.md), "Asked for in the app").
 
 - **`skills.make`** (`{"words", "request_id"}`): the words, trimmed, 1 to
