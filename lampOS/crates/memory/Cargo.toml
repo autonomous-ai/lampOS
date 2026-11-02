@@ -25,6 +25,8 @@ lamp-msgs = { path = "../msgs" }
 lamp-ipc = { path = "../ipc" }
 # The day's boundary across daylight saving (#820).
 lamp-local-time = { path = "../local-time" }
+# The tiered store, mirrored only with LAMP_MEMORY_TIERS (#4746, docs/memory-design.md).
+lamp-memory-tiers = { path = "../memory-tiers", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

@@ -5,7 +5,11 @@ uses it, no service starts it, and it changes nothing on a lamp. The library con
 registered ablations. Its benchmark adapter is an ordinary binary target, listed
 as development-only in the release inventory and never packaged for a lamp.
 Only that binary can create disposable probe copies; the library has no copy or
-restore API. The approved design is in
+restore API. Its own dependencies (`tempfile`, rusqlite `backup`, tokio
+`io-std`/`io-util`) sit behind the `bench` feature it requires. The feature is
+on by default, so ordinary workspace and CI targets build and test the adapter,
+and lamp-memory takes the library with `default-features = false`, so its
+graph does not widen. The approved design is in
 [memory-design.md](memory-design.md); the benchmark boundary is
 [memory-bench.md](memory-bench.md).
 

@@ -1569,6 +1569,35 @@ impl Days {
         Ok(())
     }
 
+    /// Tell each added, removed or moved exchange and kept thing to the
+    /// tiered store's mirror (`LAMP_MEMORY_TIERS`, [`crate::tiers`]). Its
+    /// table and triggers are temporary, like the health counts'; the
+    /// durable schema and records are unchanged, and a store never enabled
+    /// has neither.
+    pub fn enable_tiers_log(&mut self) -> Result<()> {
+        crate::tiers_log::enable(&mut self.db)?;
+        Ok(())
+    }
+
+    /// Undo [`Self::enable_tiers_log`]: its triggers and table go, with
+    /// whatever was not taken, so nothing grows on a connection whose
+    /// tiers could not start. Done once it is off.
+    pub fn disable_tiers_log(&mut self) -> Result<()> {
+        crate::tiers_log::disable(&self.db)?;
+        Ok(())
+    }
+
+    /// The changes since the last take, after [`Self::enable_tiers_log`].
+    /// Call between requests, so each change told is committed.
+    pub fn take_tiers_log(&mut self) -> Result<Vec<crate::tiers_log::Change>> {
+        Ok(crate::tiers_log::take(&self.db)?)
+    }
+
+    /// Every exchange and kept thing held, by scope and id.
+    pub fn tiers_known(&self) -> Result<Vec<(String, u64)>> {
+        Ok(crate::tiers_log::known(&self.db)?)
+    }
+
     /// Constant-time counts on this connection, after `enable_health_counts`.
     /// Call between requests so the snapshot describes committed records.
     pub fn health_counts(&self) -> Result<crate::health_counts::Counts> {
