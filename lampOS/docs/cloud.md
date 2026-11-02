@@ -130,7 +130,7 @@ lamp says so.
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
-| `skills.share` (`{"name", "author"?, "preview"?}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave. Without them, "not on this lamp" |
+| `skills.share` (`{"name", "author"?, "sha256"}`, or `{"name", "preview": true}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave and the package's `sha256`, both from one copy of the skill taken once, so a skill made again meanwhile can't pair one text with another package (Mobile's P2 on #4965). A send must give that `sha256`: without it, "show what would be sent first, then send that"; with another, as when the skill was made again since, "the skill changed since you looked: look again before sending", and nothing sent (the Reviewer-lead's P2 on #4948). Without them, "not on this lamp" |
 | `skills.shared` (`{}`) | as `skills.share`: this lamp's sent skills, the Store's newest 100, `{"shares": [...]}` |
 | `skills.unshare` (`{"id"}`) | as `skills.share`: a sent skill taken back from the Store, `{"unshared": ID}` |
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
@@ -1036,8 +1036,15 @@ first builder gave it to Fourteen on Queue #3997 (30 Oct 15:5x); the
 Store's side is Backend3's (Queue comment 6516962994), live in production
 since 30 Oct.
 
-- **`skills.share`** (`{"name", "author"?}`): the owner's act from the app
-  only, never by voice. `name` must be a skill made on this lamp (`made:
+- **`skills.share`** (`{"name", "author"?, "sha256"}`): the owner's act from
+  the app only, never by voice, and only of what they were shown: the
+  app asks first with `"preview": true` (nothing sent; the files' text and
+  the package's `sha256`), shows it, and sends that `sha256` with Send. The
+  lamp packs again and sends only if the package's SHA-256 is the one
+  given, so the bytes that leave are the bytes shown; none given or another
+  is refused and nothing goes (the first builder's condition, the
+  Reviewer-lead's P2 on #4948). The package carries no time, so the same
+  files pack to the same bytes. `name` must be a skill made on this lamp (`made:
   here`, the page's `made_here` group) that is on; else "only a skill made
   on this lamp can be shared" or "turn the skill on before sharing it".
   `author`, when given, is a first name: trimmed, at most 32 characters, on

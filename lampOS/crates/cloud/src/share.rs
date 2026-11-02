@@ -226,43 +226,68 @@ fn prepared(folder: &Path, work: &Path) -> Result<PathBuf, String> {
 pub fn preview(folder: &Path, scratch: &Path) -> Result<Vec<Value>, String> {
     let work = scratch.join(format!("lamp-preview-{}", std::process::id()));
     let _ = fs::remove_dir_all(&work);
-    let read = (|| {
-        let copy = prepared(folder, &work)?;
-        let mut files = Vec::new();
-        let mut left = PREVIEW_MOST;
-        let mut folders = vec![copy.clone()];
-        while let Some(dir) = folders.pop() {
-            let mut entries: Vec<_> = fs::read_dir(&dir)
-                .map_err(|error| format!("the skill could not be read: {error}"))?
-                .filter_map(Result::ok)
-                .collect();
-            entries.sort_by_key(|entry| entry.file_name());
-            for entry in entries {
-                let path = entry.path();
-                if path.is_dir() {
-                    folders.push(path);
-                    continue;
+    let read = prepared(folder, &work).and_then(|copy| shown(&copy));
+    let _ = fs::remove_dir_all(&work);
+    read
+}
+
+/// The files of the prepared `copy`, as [`preview`] shows them.
+fn shown(copy: &Path) -> Result<Vec<Value>, String> {
+    let mut files = Vec::new();
+    let mut left = PREVIEW_MOST;
+    let mut folders = vec![copy.to_path_buf()];
+    while let Some(dir) = folders.pop() {
+        let mut entries: Vec<_> = fs::read_dir(&dir)
+            .map_err(|error| format!("the skill could not be read: {error}"))?
+            .filter_map(Result::ok)
+            .collect();
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            let path = entry.path();
+            if path.is_dir() {
+                folders.push(path);
+                continue;
+            }
+            let shown = path
+                .strip_prefix(copy)
+                .map(|rest| rest.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let bytes =
+                fs::read(&path).map_err(|error| format!("the skill could not be read: {error}"))?;
+            match String::from_utf8(bytes) {
+                Ok(text) => {
+                    let kept: String = text.chars().take(left).collect();
+                    left -= kept.chars().count();
+                    files.push(json!({"path": shown, "text": kept}));
                 }
-                let shown = path
-                    .strip_prefix(&copy)
-                    .map(|rest| rest.to_string_lossy().into_owned())
-                    .unwrap_or_default();
-                let bytes = fs::read(&path)
-                    .map_err(|error| format!("the skill could not be read: {error}"))?;
-                match String::from_utf8(bytes) {
-                    Ok(text) => {
-                        let kept: String = text.chars().take(left).collect();
-                        left -= kept.chars().count();
-                        files.push(json!({"path": shown, "text": kept}));
-                    }
-                    Err(not_text) => {
-                        files.push(json!({"path": shown, "bytes": not_text.as_bytes().len()}))
-                    }
+                Err(not_text) => {
+                    files.push(json!({"path": shown, "bytes": not_text.as_bytes().len()}))
                 }
             }
         }
-        files.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
-        Ok(files)
+    }
+    files.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+    Ok(files)
+}
+
+/// [`preview`]'s files and the SHA-256 of the package they make, both from
+/// one copy of `folder` taken once: a skill made again while they are read
+/// can't pair one skill's text with another's package (Mobile's P2 on
+/// #4965). `copied` runs right after the copy is taken (a test's seam).
+pub(crate) fn seen(
+    folder: &Path,
+    scratch: &Path,
+    copied: impl FnOnce(),
+) -> Result<(String, Vec<Value>), String> {
+    let work = scratch.join(format!("lamp-seen-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&work);
+    let read = (|| {
+        let copy = prepared(folder, &work)?;
+        copied();
+        let files = shown(&copy)?;
+        let tar = lamp_skills::package::pack(&copy, &work.join("out"))?;
+        let bytes = fs::read(&tar).map_err(|error| format!("the package: {error}"))?;
+        Ok((lamp_skills::package::sha256_hex(&bytes), files))
     })();
     let _ = fs::remove_dir_all(&work);
     read
@@ -453,10 +478,22 @@ fn answered(status: u16, body: &[u8]) -> Result<Value, String> {
     })
 }
 
-/// `skills.share {"name", "author"?}`: `{"sent": {"id", "name", "version",
-/// "review_status"}}`, or why not. With `"preview": true`, nothing is sent:
-/// `{"preview": {"name", "files": [{"path", "text"}]}}`, the text exactly as
-/// it would leave, for the app to show before Send.
+/// What a share is told when no `sha256` names the package the owner saw.
+pub const NOT_SEEN: &str = "show what would be sent first, then send that";
+/// What a share is told when the skill changed after the owner saw it.
+pub const CHANGED: &str = "the skill changed since you looked: look again before sending";
+
+/// `skills.share {"name", "author"?, "sha256"}`: `{"sent": {"id", "name",
+/// "version", "review_status"}}`, or why not. With `"preview": true`,
+/// nothing is sent: `{"preview": {"name", "sha256", "files": [{"path",
+/// "text"}]}}`, the text exactly as it would leave and the SHA-256 of the
+/// package it would be, both from one copy of the skill, for the app to
+/// show before Send. A send must name
+/// that same SHA-256, so the lamp sends only the bytes the owner saw: none,
+/// [`NOT_SEEN`]; another, as when the skill was made again since,
+/// [`CHANGED`] (the Reviewer-lead's P2 on #4948). The package carries no
+/// time (`lamp_skills::package`), so packing the same files again gives the
+/// same bytes.
 pub fn share(
     store: &Store,
     places: &crate::skills::Places,
@@ -467,10 +504,17 @@ pub fn share(
     let author = author(data)?;
     let folder = made_here_and_on(places, &name)?;
     if data.get("preview").and_then(Value::as_bool) == Some(true) {
-        let files = preview(&folder, scratch)?;
-        return Ok(json!({ "preview": {"name": name, "files": files} }));
+        let (sha256, files) = seen(&folder, scratch, || {})?;
+        return Ok(json!({ "preview": {"name": name, "sha256": sha256, "files": files} }));
     }
+    let seen = data
+        .get("sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| NOT_SEEN.to_owned())?;
     let (file_name, tar) = pack(&folder, scratch)?;
+    if lamp_skills::package::sha256_hex(&tar) != seen {
+        return Err(CHANGED.to_owned());
+    }
     let (boundary, body) = multipart(&file_name, &tar, author.as_deref());
     let (status, reply) = exchange(
         store,
