@@ -412,6 +412,33 @@ impl Recovering {
 fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error::Error>> {
     use lamp_setup::recover::{Act, Recovery, SWITCH, Seen, on};
     use lamp_setup::wifi::{Host, ImageHost};
+    let setup_active = || {
+        System
+            .run(&[
+                "/usr/bin/systemctl".into(),
+                "is-active".into(),
+                "--quiet".into(),
+                "lamp-setup.service".into(),
+            ])
+            .is_ok()
+    };
+    // Before the switch is read (#4863): a lamp left a hotspot, by a power
+    // cut above all, has no client network whether recovery is on or off.
+    match lamp_setup::recover::at_start(
+        &mut ImageHost::new(),
+        std::path::Path::new("/"),
+        &config.marker,
+        &lamp_setup::wifi_change::ImageRejoin::new().previous,
+        setup_active,
+    ) {
+        Some(Ok(())) => {
+            eprintln!("lamp-setup: recover: the radio was left a hotspot: back to the station")
+        }
+        Some(Err(error)) => eprintln!(
+            "lamp-setup: recover: the radio was left a hotspot and the station could not start: {error}; the next start tries again"
+        ),
+        None => {}
+    }
     if !on(std::env::var(SWITCH).ok().as_deref()) {
         eprintln!("lamp-setup: recover: off ({SWITCH} is not on)");
         return Ok(true);
@@ -444,6 +471,17 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
         }) {
             if let Some(open) = open.take() {
                 open.close();
+                // Stopped, a shutdown too (#4863): device-ap-mode's changes
+                // outlive a boot, so the station comes back now.
+                match lamp_setup::recover::closed(&mut ImageHost::new(), &config.marker) {
+                    Some(Ok(())) => {
+                        eprintln!("lamp-setup: recover: the hotspot closed: back to the station")
+                    }
+                    Some(Err(error)) => eprintln!(
+                        "lamp-setup: recover: the hotspot closed and the station could not start: {error}"
+                    ),
+                    None => {}
+                }
             }
             return Ok(true);
         }
@@ -451,6 +489,7 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
         // P3 on #3024): setup's own then serves, not this.
         if !config.marker.exists() {
             eprintln!("lamp-setup: recover: the marker is gone (a reset): setup itself serves");
+            // Left a hotspot, never the station: setup's own takes it over.
             if let Some(open) = open.take() {
                 open.close();
             }
@@ -463,14 +502,7 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
             online,
             associated: !online && host.wpa_state() == "COMPLETED",
             busy: open.as_ref().is_some_and(Recovering::running)
-                || System
-                    .run(&[
-                        "/usr/bin/systemctl".into(),
-                        "is-active".into(),
-                        "--quiet".into(),
-                        "lamp-setup.service".into(),
-                    ])
-                    .is_ok()
+                || setup_active()
                 || lamp_setup::wifi_change::ImageRejoin::new()
                     .previous
                     .exists(),

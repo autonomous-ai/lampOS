@@ -191,3 +191,70 @@ impl Recovery {
         act
     }
 }
+
+/// How long the boot repair waits for the Wi-Fi's interface to appear: the
+/// unit starts after `network-pre.target`, which a driver's late firmware
+/// load may beat, and `device-sta-mode` stops at its first `iw` without it.
+pub const INTERFACE_WAIT_MS: u64 = 30_000;
+
+/// Whether the image's `device-ap-mode` left the radio a hotspot (#4863),
+/// read from what it changes that outlives a boot: `wpa_supplicant@wlan0`
+/// masked (its unit a link to `/dev/null`), or `denyinterfaces wlan0` in
+/// dhcpcd's file. Either alone leaves the lamp with no client network at
+/// boot, and only `device-sta-mode` undoes them. `root` is `/` on a lamp.
+/// Read from the lamp's own state, not a note of ours: it holds whoever left
+/// the hotspot (a build before this one too, as lamp-0c89 was left), and
+/// this unit can't write `/var/lib` (`ProtectSystem=strict`). The image's
+/// scripts name `wlan0` only, so this does too.
+pub fn left_as_hotspot(root: &std::path::Path) -> bool {
+    let masked = std::fs::read_link(root.join("etc/systemd/system/wpa_supplicant@wlan0.service"))
+        .is_ok_and(|target| target == std::path::Path::new("/dev/null"));
+    let denied = std::fs::read_to_string(root.join("etc/dhcpcd.conf"))
+        .is_ok_and(|conf| conf.lines().any(|line| line == "denyinterfaces wlan0"));
+    masked || denied
+}
+
+/// `device-sta-mode`, then a sync whatever it ended with: the root is
+/// mounted `commit=600`, and its lasting steps (dhcpcd's file, the units
+/// enabled, disabled and unmasked) come before its first restart, which
+/// systemd refuses during a shutdown.
+pub fn back_to_station(host: &mut impl crate::wifi::Host) -> std::io::Result<()> {
+    let result = host.station();
+    rustix::fs::sync();
+    result
+}
+
+/// As `recover` closes its hotspot on a stop (#4863): the radio goes back to
+/// the station, unless the marker is gone, a reset, where setup's own
+/// hotspot takes over. `None`: nothing was done.
+pub fn closed(
+    host: &mut impl crate::wifi::Host,
+    marker: &std::path::Path,
+) -> Option<std::io::Result<()>> {
+    marker.exists().then(|| back_to_station(host))
+}
+
+/// At `recover`'s start, whatever its switch says (#4863): a set-up lamp
+/// left a hotspot ([`left_as_hotspot`]) by a stop that never closed it, a
+/// power cut above all, goes back to the station. Never before the marker
+/// (a first setup's hotspot is meant), nor while setup runs or a Wi-Fi
+/// change's `.lamp-previous` is there (theirs is the radio). `None`: nothing
+/// was done. A failed return leaves the state as it was, so the next start
+/// tries again.
+pub fn at_start(
+    host: &mut impl crate::wifi::Host,
+    root: &std::path::Path,
+    marker: &std::path::Path,
+    previous: &std::path::Path,
+    setup_active: impl FnOnce() -> bool,
+) -> Option<std::io::Result<()>> {
+    if !marker.exists() || !left_as_hotspot(root) || previous.exists() || setup_active() {
+        return None;
+    }
+    let interface = root.join("sys/class/net/wlan0");
+    let since = host.now_ms();
+    while !interface.exists() && host.now_ms().saturating_sub(since) < INTERFACE_WAIT_MS {
+        host.sleep(std::time::Duration::from_secs(1));
+    }
+    Some(back_to_station(host))
+}
