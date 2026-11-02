@@ -1,5 +1,34 @@
 # Bench work log
 
+## 2 November 2026: the Reviewer-lead HOLD on #4753 answered
+
+Ready for lamp-voice: waits on two reads again.
+
+The HOLD on `c9d262f9b` named one P2 and three P3s. All four are fixed in `0fae7547ba891b713d1530805bb2c23c9bb778e4`, in the
+last commit, which also carries the 10% topic rule:
+
+- **P2, tool results.** Every tool result used to replace all earlier ones with
+  an invalidation note, read-only recalls too, and a new tool round dropped the
+  earlier rounds. Now each version 2 `tool` reply reports `memory_changed`.
+  Earlier results are replaced only after a call that changed memory.
+  Read-only results stay, in the same round and across rounds, and count
+  together against the context bound. A reply without the flag invalidates the
+  run. Tests: two recalls in one batch, recalls across rounds then a remember,
+  the shared cap, and the missing flag.
+- **P3, topic counts.** A Tiers run missing either count is now invalid for the
+  score ("not reported"). A setup that reports only one count is invalid too.
+  Setups with no topics stay not applicable.
+- **P3, temperature.** Answer and judge calls send temperature 0. Calls a setup
+  makes for itself run at the provider default. Both are in the policy.
+- **P3, eMMC writes.** Full history appends one synced line per ingest to
+  `history.log` and rewrites `history.json` only on a forget, which also
+  empties the log.
+
+The policy's `evaluation_sha256` changes. No setup run so far advertises a
+memory tool (none, full history, lampOS today, and the Tiers adapter all send
+an empty tool list), so the rows already run on lamp-4ace are unaffected. The
+Tiers row should run on the new head.
+
 ## 2 November 2026: #4753 rebuilt on lamp-voice, malformed-answer fix folded
 
 Ready for lamp-voice: waits on two reads.
