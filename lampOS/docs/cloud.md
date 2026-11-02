@@ -578,6 +578,16 @@ taken on the switch alone, so an app that asks anyway gets the voice's own
 reason. The journal says each change ("making a skill is ready" or "not
 ready"), never more.
 
+With `LAMP_MAKE_SKILL_LOCAL=on` in `lamp-voice`'s unit (#4914, off unless
+set), the lamp's own model makes it and no computer is needed: the voice
+answers `ready` with yes at once (no tasks part asked), so `can` names
+`skills.make` and `skills.made` on that switch alone, with no change here.
+`skills.made` goes through the same states: `making` while the model
+writes, `kept` once the check took it, `asked` once the lamp has said its
+ask aloud and the person's yes came right after it, then `on` or
+`left_off`; `not_kept` with why. Nothing from the app puts it on, as
+before ([skills.md](skills.md), "Asked for in the app").
+
 - **`skills.make`** (`{"words", "request_id"}`): the words, trimmed, 1 to
   180 bytes, and a request id, are sent to `lamp-voice`'s app-make socket
   (`/run/lampos-app-make/make.sock`, in `ReadWritePaths` as

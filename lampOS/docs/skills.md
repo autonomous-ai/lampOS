@@ -2223,12 +2223,32 @@ Nothing above changes with the switch off.
    until the answer. Whether "Stop" ends the wait is measured in the played
    check on lamp-9adf (#4914) and written here with its result.
 
-Not yet with the switch: a skill typed in the app. `skills.make` still
-hands over to a computer, and `can` still waits for one.
+A skill typed in the app, with the switch (`crate::app_make`, needing the
+say service, `LAMP_SAY=on`, to ask aloud; without it the app socket isn't
+started):
+
+- `{"ready": {}}` is yes at once, with no tasks part asked, so `lamp-cloud`
+  names `skills.make` in `can` on the switch alone.
+- A `make` is made by the lamp's own model as above, the same example,
+  check and one repair (`make_skill_local::make_kept`, `app_make::make_here`),
+  kept as made from `local:app:<ms>:1` (the ask's task `local:app:<ms>`, so
+  `skills.made` finds it): `making`, then `kept`, or `not_kept` with why.
+- Kept, the lamp says aloud, through the say service's own asks at a good
+  moment within an hour (`app_make::ask_line`, `say_ask`): "I made the
+  skill you typed in the app." with what it does, then exactly "Shall I put
+  it on the lamp?". That turn is a written turn, so the thread keeps its
+  words as the lamp's answer. Only a yes right after it puts the skill on:
+  `put_on_made_skill` dates the ask at the yes from that answer
+  (`asked_at_yes`), and a yes after anything else puts nothing on. Nothing
+  from the app puts it on.
 
 Tests: `make_skill_local::tests` (a good answer kept, asked only after an answer that said the ask, a refused
 one kept nothing, a 404 asked once more, a brief refused asking nothing,
-and the switch alone routing and declaring the two functions).
+and the switch alone routing and declaring the two functions), and in
+`app_make::tests` the app's: `ready` at once with no tasks part, a typed
+ask kept and its ask given to be said, a yes after that said ask making it
+wait and a yes after anything else not, and one not kept told why with
+nothing said.
 
 #### Asked for in the app (#2813, `LAMP_APP_MAKE_SKILL=on`, on in the product)
 

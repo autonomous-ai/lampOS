@@ -6131,10 +6131,12 @@ fn conversation_with_gate_inner(
         crate::language::announce(says.own_asks());
     }
     // A skill typed in the app, handed over and told aloud as the voice's
-    // own (#2813, `LAMP_APP_MAKE_SKILL=on`): a socket for lamp-cloud.
+    // own (#2813, `LAMP_APP_MAKE_SKILL=on`): a socket for lamp-cloud. Made
+    // by the lamp's own model (#4914), its ask is said through the say
+    // service's own asks.
     #[cfg(not(test))]
     if lifetime.continuous() {
-        crate::app_make::start_from_environment();
+        crate::app_make::start_from_environment(says.as_ref().map(|says| says.own_asks()));
     }
     // The level under which sound is not speech, which may follow the room;
     // the speech blocks of the turn in hand and of the moment before it,
