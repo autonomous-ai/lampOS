@@ -88,6 +88,24 @@ pub struct Ids {
     last: Vec<u32>,
     /// The last look's ids whose mouth read speaking.
     talking: Vec<u32>,
+    /// Whether a new id follows the face it replaced ([`Ids::followed`]):
+    /// only with `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`
+    /// ([`follows_from_environment`], #4885).
+    pub follows: bool,
+    /// Each new id and the id it follows, while both are kept.
+    followed: Vec<(u32, u32)>,
+}
+
+/// Whether passing ids are followed across a new track: both the hold and
+/// the re-found check on (#4885), else never.
+pub fn follows_from_environment() -> bool {
+    follows_on(crate::who::known_hold_on(), crate::who::refound_on())
+}
+
+/// [`follows_from_environment`]'s rule: `LAMP_FACE_KNOWN_HOLD` and
+/// `LAMP_FACE_REFOUND` both on.
+pub fn follows_on(known_hold: bool, refound: bool) -> bool {
+    known_hold && refound
 }
 
 fn overlap(a: &[f32; 4], b: &[f32; 4]) -> f32 {
@@ -103,7 +121,8 @@ impl Ids {
     pub fn of(&mut self, boxes: &[[f32; 4]], now_us: u64) -> Vec<u32> {
         self.seen
             .retain(|(_, _, at)| now_us.saturating_sub(*at) <= SAME_WITHIN_US);
-        let mut taken = vec![false; self.seen.len()];
+        let kept = self.seen.len();
+        let mut taken = vec![false; kept];
         let mut ids = Vec::with_capacity(boxes.len());
         for found in boxes {
             let best = self
@@ -131,7 +150,68 @@ impl Ids {
             ids.push(id);
         }
         self.last.clone_from(&ids);
+        if self.follows {
+            self.follow(kept, &taken, boxes, &ids);
+        }
         ids
+    }
+
+    /// Notes what each id made this look follows ([`Ids::followed`]): the
+    /// first `kept` of `seen` were kept from before it, `taken` those seen
+    /// in it again.
+    fn follow(&mut self, kept: usize, taken: &[bool], boxes: &[[f32; 4]], ids: &[u32]) {
+        let seen_again = |old: &u32| {
+            self.seen[..kept]
+                .iter()
+                .zip(taken)
+                .any(|((id, ..), taken)| id == old && *taken)
+        };
+        // A link lasts while the new id is kept, and ends if the old is seen.
+        let ids_kept = |id: &u32| self.seen.iter().any(|(seen, ..)| seen == id);
+        let mut followed = std::mem::take(&mut self.followed);
+        followed.retain(|(new, old)| ids_kept(new) && !seen_again(old));
+        let centre = |r: &[f32; 4]| ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0);
+        let mut made = Vec::new();
+        for (found, id) in boxes.iter().zip(ids) {
+            if self.seen[..kept].iter().any(|(seen, ..)| seen == id) {
+                continue;
+            }
+            let (x, y) = centre(found);
+            let width = found[2] - found[0];
+            let mut near = self.seen[..kept]
+                .iter()
+                .zip(taken)
+                .filter(|((old, was, _), taken)| {
+                    let (across, down) = centre(was);
+                    !**taken
+                        && !followed.iter().any(|(_, followed)| followed == old)
+                        && (across - x).hypot(down - y) <= width
+                })
+                .map(|((old, ..), _)| *old);
+            if let (Some(old), None) = (near.next(), near.next()) {
+                made.push((*id, old));
+            }
+        }
+        // Two new faces near one lost one: neither is it.
+        for (new, old) in &made {
+            if made.iter().filter(|(_, other)| other == old).count() == 1 {
+                followed.push((*new, *old));
+            }
+        }
+        self.followed = followed;
+    }
+
+    /// The id the face with passing id `new` is taken to be (#4885): when it
+    /// came, the one id kept (seen within 1.5 s) but not seen in that look,
+    /// and not followed already, whose box's centre was within the new box's
+    /// width of the new box's centre. Two such ids, or two new faces near
+    /// one, follow nothing. It lasts while `new` is kept, and the old id seen
+    /// again ends it. Always none with [`Ids::follows`] off.
+    pub fn followed(&self, new: u32) -> Option<u32> {
+        self.followed
+            .iter()
+            .find(|(id, _)| *id == new)
+            .map(|(_, old)| *old)
     }
 
     /// Where the face with this passing id is in the last look, in the
@@ -242,6 +322,7 @@ fn message_observed(
             }
             Face {
                 speaking,
+                follows: ids.followed(id).map(|old| format!("f{old}")),
                 id: format!("f{id}"),
                 xmin: edges[0],
                 ymin: edges[1],
@@ -433,6 +514,7 @@ impl BusOut {
             closed,
             ids: Ids {
                 mouths: speaking::from_environment(),
+                follows: follows_from_environment(),
                 ..Ids::default()
             },
             alive_at_us: 0,
@@ -686,6 +768,14 @@ impl BusOut {
         self.ids.index_of(id)
     }
 
+    /// The passing id the face `id` (`f3`) follows ([`Ids::followed`]), only
+    /// while speaking is judged, as [`Self::speaking_id`].
+    pub fn followed_id(&self, id: &str) -> Option<String> {
+        self.ids.mouths.as_ref()?;
+        let number = id.strip_prefix('f')?.parse().ok()?;
+        self.ids.followed(number).map(|old| format!("f{old}"))
+    }
+
     /// Call from the loop whether or not the camera is open: with it closed
     /// nothing is published, and this is what says the eyes are still there.
     /// With `LAMP_PRESENCE=on`, whether anyone is at the lamp is said from
@@ -886,6 +976,103 @@ mod tests {
         assert_eq!(ids.of(&[at(0.15)], 3_000_000), [3]);
         // Two boxes on one old face: only one of them is that face.
         assert_eq!(ids.of(&[at(0.15), at(0.16)], 3_100_000), [3, 4]);
+    }
+
+    /// #4885: a face lost for one look and back with too little overlap to
+    /// keep its id gets a new one that follows the old, only with the switch.
+    #[test]
+    fn a_face_back_on_a_new_id_follows_the_one_lost_beside_it() {
+        let at = |x: f32| [x, 0.2, x + 0.2, 0.6];
+        let mut ids = Ids {
+            follows: true,
+            ..Ids::default()
+        };
+        assert_eq!(ids.of(&[at(0.1)], 0), [1]);
+        assert_eq!(ids.of(&[], 100_000), Vec::<u32>::new());
+        // Back 0.15 across: overlap 0.14 of the union, under 0.2.
+        assert_eq!(ids.of(&[at(0.25)], 200_000), [2]);
+        assert_eq!(ids.followed(2), Some(1));
+        assert_eq!(ids.followed(1), None);
+        // It stays followed while it is in view.
+        assert_eq!(ids.of(&[at(0.26)], 300_000), [2]);
+        assert_eq!(ids.followed(2), Some(1));
+        // With the switch off, the same looks follow nothing.
+        let mut off = Ids::default();
+        off.of(&[at(0.1)], 0);
+        off.of(&[], 100_000);
+        assert_eq!(off.of(&[at(0.25)], 200_000), [2]);
+        assert_eq!(off.followed(2), None);
+    }
+
+    /// #4885: two lost faces near the new one, a gap past the 1.5 s an id
+    /// is kept, two new faces near one lost one, or a lost one far off,
+    /// follow nothing.
+    #[test]
+    fn two_lost_faces_near_or_a_long_gap_follow_nothing() {
+        let at = |x: f32| [x, 0.2, x + 0.2, 0.6];
+        let on = || Ids {
+            follows: true,
+            ..Ids::default()
+        };
+        let mut two = on();
+        assert_eq!(two.of(&[at(0.1), at(0.4)], 0), [1, 2]);
+        assert_eq!(two.of(&[at(0.25)], 200_000), [3]);
+        assert_eq!(two.followed(3), None);
+        let mut late = on();
+        late.of(&[at(0.1)], 0);
+        assert_eq!(late.of(&[at(0.25)], 1_600_000), [2]);
+        assert_eq!(late.followed(2), None);
+        let mut both = on();
+        both.of(&[at(0.4)], 0);
+        assert_eq!(both.of(&[at(0.25), at(0.55)], 200_000), [2, 3]);
+        assert_eq!((both.followed(2), both.followed(3)), (None, None));
+        let mut far = on();
+        far.of(&[at(0.1)], 0);
+        assert_eq!(far.of(&[at(0.5)], 200_000), [2]);
+        assert_eq!(far.followed(2), None);
+        // The old face seen again: the new one no longer follows it.
+        let mut again = on();
+        again.of(&[at(0.1)], 0);
+        again.of(&[at(0.25)], 200_000);
+        assert_eq!(again.followed(2), Some(1));
+        again.of(&[at(0.6), at(0.1)], 300_000);
+        assert_eq!(again.followed(2), None);
+    }
+
+    /// #4885: the faces topic says what a face follows only with both the
+    /// hold and the re-found check on; older readers ignore the field.
+    #[test]
+    fn the_topic_says_what_a_face_follows_only_with_both_switches() {
+        assert!(follows_on(true, true));
+        assert!(!follows_on(true, false));
+        assert!(!follows_on(false, true));
+        assert!(!follows_on(false, false));
+        let first = [face(64.0, 96.0, 128.0, 192.0, 0.0)];
+        let back = [face(160.0, 96.0, 128.0, 192.0, 0.0)];
+        let said = |follows: bool| {
+            let mut ids = Ids {
+                follows,
+                ..Ids::default()
+            };
+            message(&first, &[], PICTURE, &mut ids, 0);
+            message(&[], &[], PICTURE, &mut ids, 100_000);
+            serde_json::to_string(&message(&back, &[], PICTURE, &mut ids, 200_000)).unwrap()
+        };
+        let on = said(true);
+        assert!(on.contains("\"follows\":\"f1\""), "{on}");
+        let off = said(false);
+        assert!(!off.contains("follows"), "{off}");
+        // A reader that does not know the field reads the face as before.
+        #[derive(serde::Deserialize)]
+        struct Older {
+            faces: Vec<OlderFace>,
+        }
+        #[derive(serde::Deserialize)]
+        struct OlderFace {
+            id: String,
+        }
+        let older: Older = serde_json::from_str(&on).unwrap();
+        assert_eq!(older.faces[0].id, "f2");
     }
 
     #[test]

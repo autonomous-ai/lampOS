@@ -257,6 +257,7 @@ fn hold_shows_listening_and_fresh_gaze_on_the_next_tick() {
                 confidence: 0.9,
                 yaw: None,
                 facing: None,
+                follows: None,
             }],
         },
     });

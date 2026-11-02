@@ -72,6 +72,7 @@ fn face(xmin: f32, ymin: f32, side: f32) -> Face {
         confidence: 0.9,
         yaw: None,
         facing: None,
+        follows: None,
     }
 }
 

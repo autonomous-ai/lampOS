@@ -1452,6 +1452,7 @@ fn how_the_room_is_and_who_the_eyes_see_are_taken_from_the_bus() {
         confidence: 0.9,
         yaw: None,
         facing: Some(facing),
+        follows: None,
     };
     eyes.publish_json(
         0,

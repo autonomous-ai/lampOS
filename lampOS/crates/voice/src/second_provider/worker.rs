@@ -11393,6 +11393,7 @@ mod tests {
                         yaw: None,
                         facing: None,
                         speaking: None,
+                        follows: None,
                     }],
                 },
             )
@@ -11490,6 +11491,7 @@ mod tests {
                             yaw: None,
                             facing: None,
                             speaking: None,
+                            follows: None,
                         })
                         .collect(),
                 },
@@ -12038,6 +12040,7 @@ mod tests {
                         yaw: None,
                         facing: Some(false),
                         speaking: None,
+                        follows: None,
                     }]
                 } else {
                     Vec::new()
@@ -12283,6 +12286,7 @@ mod tests {
                     yaw: None,
                     facing: Some(turned),
                     speaking: None,
+                    follows: None,
                 }],
             };
             eyes.publish_json(lamp_ipc::monotonic_us(), &faces).unwrap();
@@ -12376,6 +12380,7 @@ mod tests {
                 yaw: None,
                 facing: Some(true),
                 speaking: None,
+                follows: None,
             }],
         };
         eyes.publish_json(lamp_ipc::monotonic_us(), &faces).unwrap();
@@ -12450,6 +12455,7 @@ mod tests {
             yaw: None,
             facing: Some(facing),
             speaking: None,
+            follows: None,
         };
         let mut judged = |on: bool, faces: Vec<lamp_msgs::Face>| {
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
@@ -12665,6 +12671,7 @@ mod tests {
                     yaw: None,
                     facing: Some(facing),
                     speaking: None,
+                    follows: None,
                 })
                 .collect(),
         }
@@ -13845,6 +13852,7 @@ mod tests {
                             score: 0.9,
                             from: None,
                         }),
+                        follows: None,
                     }],
                 };
                 self.eyes.look(
@@ -13918,6 +13926,7 @@ mod tests {
             yaw: None,
             facing: Some(true),
             speaking: None,
+            follows: None,
         };
         let verdict = |looked: Option<Vec<lamp_msgs::Face>>, words: &str| {
             let _ = std::fs::remove_dir_all(&root);
@@ -15988,6 +15997,7 @@ mod tests {
                         score: 0.9,
                         from: None,
                     }),
+                    follows: None,
                 }],
             };
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
@@ -16842,6 +16852,7 @@ mod tests {
                     score: 0.9,
                     from: None,
                 }),
+                follows: None,
             }],
         };
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
@@ -16943,6 +16954,7 @@ mod tests {
                     score: 0.9,
                     from: None,
                 }),
+                follows: None,
             }],
         };
         let signs = |going_on| Signs {
@@ -17031,6 +17043,7 @@ mod tests {
                     score: 0.9,
                     from: None,
                 }),
+                follows: None,
             }],
         };
         let signs = |going_on| Signs {
@@ -17118,6 +17131,7 @@ mod tests {
                     score: 0.9,
                     from: None,
                 }),
+                follows: None,
             }],
         };
         let signs = |going_on| Signs {
@@ -19292,6 +19306,7 @@ mod tests {
                 yaw: None,
                 facing: Some(facing),
                 speaking: None,
+                follows: None,
             }],
         };
         let busy = || super::Signs {
@@ -21908,6 +21923,7 @@ mod tests {
                             score: 0.0,
                             from: None,
                         }),
+                        follows: None,
                     }],
                 };
                 eyes.look(
@@ -21993,6 +22009,7 @@ mod tests {
                         score: 0.0,
                         from: None,
                     }),
+                    follows: None,
                 }],
             };
             eyes.look(
@@ -22477,6 +22494,7 @@ mod tests {
             confidence: 1.0,
             yaw: Some(0.1),
             facing: Some(true),
+            follows: None,
         };
         let mut heeding = Heeding::new(true, true, Some(&root), None);
         heeding.seeing_speaking_faces(
@@ -22736,6 +22754,7 @@ mod tests {
                     score: 0.0,
                     from: None,
                 }),
+                follows: None,
             };
             for look in 0..5u64 {
                 let faces = Faces {
@@ -22815,6 +22834,7 @@ mod tests {
                             yaw: Some(0.1),
                             facing: Some(true),
                             speaking: None,
+                            follows: None,
                         }],
                     },
                 )
@@ -22896,6 +22916,7 @@ mod tests {
                                     score: 0.0,
                                     from: None,
                                 }),
+                                follows: None,
                             }],
                         };
                         speaking.look(
@@ -22920,6 +22941,7 @@ mod tests {
                             yaw: Some(0.1),
                             facing: Some(*facing),
                             speaking: None,
+                            follows: None,
                         })
                         .collect(),
                 };
@@ -23132,6 +23154,7 @@ mod tests {
                                 confidence: 1.0,
                                 yaw: Some(0.1),
                                 facing: Some(true),
+                                follows: None,
                             })
                             .collect(),
                     },
@@ -23336,6 +23359,7 @@ mod tests {
                                 confidence: 1.0,
                                 yaw: Some(0.1),
                                 facing: Some(true),
+                                follows: None,
                             })
                             .collect(),
                     },
@@ -24251,6 +24275,7 @@ mod tests {
                         score: 0.9,
                         from: None,
                     }),
+                    follows: None,
                 })
                 .collect(),
         };

@@ -1789,6 +1789,10 @@ pub struct Held {
     matched_at: Option<Instant>,
     /// The near face's passing id at that match, while speaking is judged.
     matched_id: Option<String>,
+    /// A new passing id that follows the matched one carries the hold
+    /// ([`Held::follow`]): with `LAMP_FACE_KNOWN_HOLD=on` and
+    /// `LAMP_FACE_REFOUND=on` only (#4885).
+    follows: bool,
 }
 
 impl Held {
@@ -1797,7 +1801,40 @@ impl Held {
             on,
             matched_at: None,
             matched_id: None,
+            follows: false,
         }
+    }
+
+    /// With `follows` (`bus_out::follows_from_environment`), a followed id
+    /// carries the hold ([`Held::follow`]).
+    pub fn following(mut self, follows: bool) -> Self {
+        self.follows = follows;
+        self
+    }
+
+    /// The near face `near` is a new passing id that follows `followed`, the
+    /// id the held match had (`bus_out::Ids::followed`): within the hold, and
+    /// with `near_faces` one, the match's id becomes `near`, so the checks
+    /// that need the same id ([`Held::keeps_print`], [`Held::keeps_unprinted`])
+    /// keep the one known on it, and the known face is to be rewritten to it.
+    /// Two near faces never follow (#4885). Whether it did.
+    pub fn follow(
+        &mut self,
+        now: Instant,
+        near: Option<&str>,
+        followed: Option<&str>,
+        near_faces: usize,
+    ) -> bool {
+        let follows = self.follows
+            && self.keeps(now)
+            && near_faces == 1
+            && followed.is_some()
+            && self.matched_id.as_deref() == followed;
+        if let Some(near) = near.filter(|_| follows) {
+            self.matched_id = Some(near.to_owned());
+            return true;
+        }
+        false
     }
 
     pub fn on(&self) -> bool {
@@ -2825,6 +2862,38 @@ mod tests {
         held.matched(start, None);
         assert!(!held.keeps_unprinted(then, true, None));
         assert!(held.keeps_unprinted(then, false, None));
+    }
+
+    /// #4885: with both switches, a near face on a new passing id that
+    /// follows the held match's carries the hold at 0.32 likeness and lets
+    /// go at 0.25; without them, or with two near faces, a new id lets go.
+    #[test]
+    fn a_followed_id_carries_the_hold_only_while_it_still_looks_like_them() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut held = Held::new(true).following(true);
+        held.matched(start, Some("f3".to_owned()));
+        // Two near faces never follow, nor an id that follows another.
+        assert!(!held.follow(then, Some("f4"), Some("f3"), 2));
+        assert!(!held.follow(then, Some("f4"), Some("f2"), 1));
+        assert!(!held.follow(then, Some("f4"), None, 1));
+        assert!(!held.keeps_print(then, Some(0.32), Some("f4")));
+        assert!(held.follow(then, Some("f4"), Some("f3"), 1));
+        assert!(held.keeps_print(then, Some(0.32), Some("f4")));
+        assert!(!held.keeps_print(then, Some(0.25), Some("f4")));
+        assert!(held.keeps_unprinted(then, true, Some("f4")));
+        // The old id is no longer theirs.
+        assert!(!held.keeps_print(then, Some(0.32), Some("f3")));
+        // Past the hold, nothing follows.
+        let mut late = Held::new(true).following(true);
+        late.matched(start, Some("f3".to_owned()));
+        assert!(!late.follow(start + KNOWN_HOLD, Some("f4"), Some("f3"), 1));
+        // Without the switches, a followed id lets go as any new id does.
+        for mut off in [Held::new(true), Held::new(false).following(true)] {
+            off.matched(start, Some("f3".to_owned()));
+            assert!(!off.follow(then, Some("f4"), Some("f3"), 1));
+            assert!(!off.keeps_print(then, Some(0.32), Some("f4")));
+        }
     }
 
     #[test]

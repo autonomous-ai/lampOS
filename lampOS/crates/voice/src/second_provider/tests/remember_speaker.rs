@@ -88,6 +88,7 @@ async fn run(
                     score: 0.9,
                     from: None,
                 }),
+                follows: None,
             }],
         };
         eyes.look(

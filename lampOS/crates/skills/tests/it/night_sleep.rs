@@ -437,6 +437,7 @@ fn face() -> Face {
         yaw: None,
         facing: None,
         speaking: None,
+        follows: None,
     }
 }
 

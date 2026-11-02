@@ -709,6 +709,7 @@ fn largest_fresh_face_is_a_normalized_target_without_invented_geometry() {
         confidence: 0.9,
         yaw: None,
         facing: None,
+        follows: None,
     };
     send(
         &mut engine,

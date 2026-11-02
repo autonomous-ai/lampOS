@@ -1930,6 +1930,7 @@ mod tests {
             confidence: 1.0,
             yaw: facing.map(|_| 0.1),
             facing,
+            follows: None,
         };
         let say = |eyes: &mut lamp_bus::Publisher, faces: Vec<Face>| {
             eyes.publish_json(lamp_ipc::monotonic_us(), &Faces { faces })
@@ -1969,6 +1970,7 @@ mod tests {
             confidence: 1.0,
             yaw: facing.map(|_| 0.1),
             facing,
+            follows: None,
         };
         let say = |eyes: &mut lamp_bus::Publisher, faces: Vec<Face>| {
             eyes.publish_json(lamp_ipc::monotonic_us(), &Faces { faces })

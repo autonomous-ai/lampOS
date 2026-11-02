@@ -1163,6 +1163,7 @@ async fn with_name_or_follow_up_two_faces_make_the_room_busy_and_a_face_alone_is
         yaw: None,
         facing: Some(facing),
         speaking: None,
+        follows: None,
     };
     let mut eyes = lamp_bus::Bus::new(&root.0)
         .unwrap()
@@ -1268,6 +1269,7 @@ async fn with_name_or_follow_up_another_voice_makes_the_room_busy_before_its_own
                     yaw: None,
                     facing: Some(true),
                     speaking: None,
+                    follows: None,
                 }],
             },
         )
