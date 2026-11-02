@@ -38,16 +38,36 @@ fn shown(bus: &Bus) -> Result<Option<(Light, Duration)>, String> {
     }
 }
 
-/// Whether the voice says the lamp is asleep, put to sleep by a hand on
-/// its head: then the asleep face draws the ring and nothing says
+/// Who says `voice/mute`: only the voice's own word counts.
+pub const MUTE_PUBLISHER: &str = "voice";
+
+/// Whether the voice says now that the lamp is asleep, put to sleep by a
+/// hand on its head: then the asleep face draws the ring and nothing says
 /// `light/state` until a tap wakes it (lamp-9adf, 30 Oct: asleep from 15:54,
 /// its 21:43 self-test failed the ring, and the app said "not working
 /// right").
 fn asleep(bus: &Bus) -> bool {
-    crate::listen::newest::<VoiceMute>(bus, VoiceMute::TOPIC)
+    bus.latest(VoiceMute::TOPIC)
         .ok()
         .flatten()
-        .is_some_and(|seen| seen.value.muted && seen.value.reason == Some(MuteReason::Sleep))
+        .is_some_and(|message| {
+            said_asleep(
+                message.expired,
+                &message.header.source,
+                message.parse::<VoiceMute>().ok(),
+            )
+        })
+}
+
+/// The voice's `voice/mute` says asleep: still within its life (renewed
+/// every second, kept 3 s), from the voice itself, muted for sleep. A
+/// lapsed one, kept on the bus after the voice stopped, or one another part
+/// wrote, says nothing (the Reviewer-lead's P2 on #4881), as the body's
+/// `sleep_in` reads it.
+pub fn said_asleep(expired: bool, source: &str, mute: Option<VoiceMute>) -> bool {
+    !expired
+        && source == MUTE_PUBLISHER
+        && mute.is_some_and(|mute| mute.muted && mute.reason == Some(MuteReason::Sleep))
 }
 
 /// What the ring's owner says, judged; `asleep`, the lamp put to sleep by a
@@ -322,6 +342,39 @@ mod tests {
             "{}",
             fresh.reason
         );
+    }
+
+    /// Only the voice's own, unlapsed word that the lamp sleeps counts: a
+    /// sleep kept on the bus after the voice crashed, or one a skill wrote,
+    /// leaves a stale ring failed (the Reviewer-lead's P2 on #4881).
+    #[test]
+    fn only_the_voices_fresh_sleep_counts_as_asleep() {
+        let sleep = || {
+            Some(VoiceMute {
+                muted: true,
+                reason: Some(MuteReason::Sleep),
+                muted_by: None,
+            })
+        };
+        assert!(said_asleep(false, MUTE_PUBLISHER, sleep()));
+        assert!(!said_asleep(true, MUTE_PUBLISHER, sleep()), "lapsed");
+        assert!(!said_asleep(false, "skills", sleep()), "not the voice's");
+        assert!(!said_asleep(false, MUTE_PUBLISHER, None), "unreadable");
+        let muted = Some(VoiceMute {
+            muted: true,
+            reason: None,
+            muted_by: None,
+        });
+        assert!(
+            !said_asleep(false, MUTE_PUBLISHER, muted),
+            "muted, not asleep"
+        );
+        let open = Some(VoiceMute {
+            muted: false,
+            reason: None,
+            muted_by: None,
+        });
+        assert!(!said_asleep(false, MUTE_PUBLISHER, open));
     }
 
     #[test]
