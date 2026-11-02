@@ -60,6 +60,12 @@ pub mod heard;
 pub mod needs_face;
 pub mod noted;
 pub mod on;
+/// The memory benchmark's probe: a test clock, a bounded drain, and a
+/// checkpoint and restore. Only in a test build or one made with
+/// `--cfg lamp_memory_probe`; never in a product build.
+#[cfg(any(test, lamp_memory_probe))]
+#[path = "memory_probe.rs"]
+pub mod probe;
 
 /// Where the coordinator reads the memory's socket: an absolute path.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_SOCKET";
@@ -3134,6 +3140,32 @@ fn unix_ms() -> u64 {
         .map_or(0, |since| since.as_millis() as u64)
 }
 
+/// The wall clock the Days memory's calls are made at: [`unix_ms`] in a
+/// product build. A build with the memory probe uses the probe's clock
+/// once one is installed ([`probe::Clock::install`]).
+#[cfg(not(any(test, lamp_memory_probe)))]
+fn wall_ms() -> u64 {
+    unix_ms()
+}
+
+#[cfg(any(test, lamp_memory_probe))]
+fn wall_ms() -> u64 {
+    probe::installed().map_or_else(unix_ms, probe::Clock::now_ms)
+}
+
+/// The zone those calls are made in: the system's in a product build
+/// ([`crate::local_time::system`]); the probe's clock's once one is
+/// installed in a build with it.
+#[cfg(not(any(test, lamp_memory_probe)))]
+fn wall_zone() -> Option<&'static LocalTime> {
+    crate::local_time::system()
+}
+
+#[cfg(any(test, lamp_memory_probe))]
+fn wall_zone() -> Option<&'static LocalTime> {
+    probe::installed().map_or_else(crate::local_time::system, probe::Clock::zone)
+}
+
 /// Run one of the memory's functions and say what to tell the model; the
 /// second value says whether the memory answered. Blocking for at most
 /// `deadline`: for a thread of its own. For whoever the eyes know is at the
@@ -3877,7 +3909,7 @@ pub fn finished(request: u64) {
             Ok(mut thread) => thread.finished(request, Instant::now()),
             Err(_) => return,
         };
-        hand_on_days(done, unix_ms(), client);
+        hand_on_days(done, wall_ms(), client);
         // What its calls gave and no exchange took (one kept out) is
         // dropped (#2176 finding 14).
         client.drop_fetched(request);
@@ -5222,6 +5254,7 @@ type Current = (Option<String>, Vec<u64>);
 type Source = (Option<String>, u64);
 
 #[derive(Default)]
+#[cfg_attr(any(test, lamp_memory_probe), derive(Clone))]
 struct DaysContext {
     session: Option<String>,
     /// Whose snapshot the session also opened, beside the room's.
@@ -6711,6 +6744,11 @@ enum DaysJob {
         person: String,
         id: u64,
     },
+    /// The memory probe's barrier ([`probe::drain`]): answered once every
+    /// job queued before it is done, its store reply included. Absent from
+    /// product builds.
+    #[cfg(any(test, lamp_memory_probe))]
+    Barrier(SyncSender<()>),
 }
 
 impl DaysClient {
@@ -7210,7 +7248,7 @@ impl DaysClient {
         until: Instant,
     ) -> Result<(Value, Vec<u64>), NoteCause> {
         let (snapshot, ids) = self.open_one(name, None, until)?;
-        let Some(them) = self.forgot_today(person, unix_ms(), crate::local_time::system()) else {
+        let Some(them) = self.forgot_today(person, wall_ms(), wall_zone()) else {
             return Ok((snapshot, ids));
         };
         let (room, left_out) = room_without_someone(snapshot, ids, them.as_deref());
@@ -7314,15 +7352,27 @@ impl DaysClient {
         call: &ToolCall,
         deadline: Duration,
         person: Option<&str>,
+        turn: Turn<'_>,
+    ) -> (Value, bool) {
+        self.run_for_request_at(call, deadline, person, turn, || (wall_ms(), wall_zone()))
+    }
+
+    /// [`Self::run_for_request`] at the moment and in the zone `time` gives,
+    /// read where the clock was always read: after the scope's check.
+    fn run_for_request_at<'z>(
+        &self,
+        call: &ToolCall,
+        deadline: Duration,
+        person: Option<&str>,
         (lease, request): Turn<'_>,
+        time: impl FnOnce() -> (u64, Option<&'z LocalTime>),
     ) -> (Value, bool) {
         if !scope_current(lease) {
             return (gone(), false);
         }
         let started = Instant::now();
         let deadline = deadline.min(crate::tools::ASK_DEADLINE);
-        let now = unix_ms();
-        let zone = crate::local_time::system();
+        let (now, zone) = time();
         let Some(left) = deadline.checked_sub(started.elapsed()) else {
             return (gone(), false);
         };
@@ -7369,6 +7419,8 @@ impl DaysClient {
         // toward closing a job unsent.
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
             OBSERVE_FORGETS.fetch_add(1, Ordering::AcqRel);
+            #[cfg(any(test, lamp_memory_probe))]
+            probe::forget_asked();
             // And the conversation's running summary goes, with any of it
             // being made (`LAMP_CONVERSATION_SUMMARY`).
             crate::conversation_summary::forget_all();
@@ -8877,8 +8929,10 @@ impl DaysClient {
         if !scope_current(lease) {
             return (gone(), false);
         }
+        #[cfg(any(test, lamp_memory_probe))]
+        probe::rule_asked(call);
         let until = Instant::now() + deadline.min(crate::tools::ASK_DEADLINE);
-        let now = unix_ms();
+        let now = wall_ms();
         if crate::rules::forgets_light(call) {
             return self.forget_light(person, until);
         }
@@ -8927,7 +8981,7 @@ impl DaysClient {
         } else {
             None
         };
-        let zone = crate::local_time::system();
+        let zone = wall_zone();
         // A write whose acknowledgement is lost may still have committed: a
         // rule kept without its ID here would let what is said under it be
         // journalled unlinked. As for `remember` and `forget`, journalling
@@ -9780,10 +9834,14 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
     let forgotten = |forgets: u64| OBSERVE_FORGETS.load(Ordering::Acquire) != forgets;
     let replaces = replaces_on();
     for (person, input, forgets, shown) in jobs {
+        #[cfg(any(test, lamp_memory_probe))]
+        if probe::observe_barrier_reached(&input) {
+            continue;
+        }
         let Some(job) = input["job"].as_str().map(str::to_owned) else {
             continue;
         };
-        let input = observe_input(&input, events, unix_ms(), crate::local_time::system());
+        let input = observe_input(&input, events, wall_ms(), wall_zone());
         let started = Instant::now();
         if forgotten(forgets) {
             let closed = close_job(socket, person.as_deref(), &job);
@@ -10746,6 +10804,10 @@ fn days_writer(
                 if let Some(Ok(mut lines)) = lines_heard.map(Mutex::lock) {
                     lines.prune(Instant::now());
                 }
+            }
+            #[cfg(any(test, lamp_memory_probe))]
+            Ok(DaysJob::Barrier(done)) => {
+                let _ = done.send(());
             }
             Ok(DaysJob::End) | Err(RecvTimeoutError::Timeout) => {
                 if let Some(early) = &early {

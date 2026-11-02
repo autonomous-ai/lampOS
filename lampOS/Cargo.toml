@@ -23,6 +23,9 @@ rtrb = "0.4.0"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+# The memory benchmark's probe in `lamp-voice` (#4748): set only by the
+# benchmark's own builds, never by a product build.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(lamp_memory_probe)"] }
 
 [workspace.lints.clippy]
 all = "warn"

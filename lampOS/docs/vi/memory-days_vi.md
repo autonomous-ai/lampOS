@@ -439,3 +439,37 @@ một giọng ngoài khung hình khi họ ngồi một mình trong khung, không
 để phân biệt, có thể được lưu vào ký ức của họ (không bao giờ được đọc lại cho
 giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
 hình có thể chứa lời người khác nói ngoài khung hình.
+
+## Đầu dò của bộ đo (#4748)
+
+Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của
+Voice và kho thật. `lamp_voice::remember::probe` cho nó những gì cần. Nó chỉ có
+trong bản dựng kiểm thử hoặc bản dựng với `RUSTFLAGS="--cfg lamp_memory_probe"`;
+không bản dựng sản phẩm nào đặt cờ đó, không feature nào bật nó, và `lamp-voice`
+từ chối dựng nó ở chế độ tối ưu (`compile_error!` trong `lib.rs`). Không có nó,
+mọi dòng đã đổi biên dịch như cũ: phần điều phối đọc `unix_ms()` và
+`local_time::system()`, và không hàng đợi nào có biến thể rào chắn. Nó không có
+socket, cờ hay công tắc riêng.
+
+- **Đồng hồ.** `Clock::install(start_ms, zone)`, một lần mỗi tiến trình, chỉ đi
+  tới (`set`). Khi đã cài, phần điều phối công cụ (`run_for_request`), ngày sau
+  lệnh quên của phòng, các lệnh quy tắc, giờ của lượt chuyển, `today` của lượt
+  quan sát và tuổi của ghi chú đang chạy đều đọc nó.
+  `DaysClient::run_probe_at(call, deadline, person, request, now_ms, zone)` nhận
+  thời điểm cho từng lệnh, giữ kiểm tra phạm vi, định danh yêu cầu và câu trả
+  lời của lệnh quên ngoài luồng, như `run_in`.
+- **Xả hàng đợi.** `drain(client, within, cancel)` đặt rào chắn vào hàng đợi của
+  bộ ghi, rồi của lượt quan sát, rồi của luồng tóm tắt, mỗi cái sau khi cái
+  trước đã trả lời. Rào chắn chỉ được trả lời khi mọi việc trước nó xong, kể cả
+  câu trả lời của kho. Hết giờ, bị huỷ, một câu trả lời đang giữ hay một lượt bị
+  mất thì không có `Drained`.
+- **Điểm lưu và khôi phục.** `checkpoint` nhận một `Drained` (không sao chép
+  được), chép các tệp của kho đã dừng và trạng thái của client cùng các ghi chú
+  đang chạy. Nó từ chối khi cuộc trò chuyện còn mở, khi tệp đổi trong lúc chép,
+  hay khi có lệnh quên hoặc lượt mới sau lần xả, và không để lại gì trừ khi mọi
+  bước xong. `restore` đặt lại trên cùng client và kho; `copy_store` cho một
+  tiến trình con dùng một lần.
+
+Giới hạn (reviewer-three): khôi phục bị từ chối sau bất kỳ lệnh quên nào kể từ
+điểm lưu, nên không gì đã quên quay lại; hết giờ hay huỷ không bao giờ cho một
+điểm lưu. Một đầu dò là một góc nhìn cho mỗi tiến trình.
