@@ -36,7 +36,7 @@ pub(crate) const FACE_EXPRESSIONS_NO: &str =
 /// "Preferences"' done line, the walk's own once the step is done: the
 /// walk's last words, so they also say where the app's buttons and gestures
 /// guide is (#1711 item 1).
-pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. You'll find what my buttons and touches do in the app, under Lamp, then General, then Buttons and gestures.\")";
+pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures.\")";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
