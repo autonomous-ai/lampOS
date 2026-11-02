@@ -60,7 +60,8 @@ owner for the grants your program needs, by what it does:
 | hears music, laughter, the door, footsteps | `sound` |
 | puts skills of its own on the lamp | `skills` |
 | reads the room's air, the lamp's own computer | `air`, `device` |
-| sees pictures, hears audio (arriving) | `camera`, `microphone` |
+| sees pictures | `camera` |
+| hears the room's sound (20 ms blocks of samples) | `microphone` |
 
 **A grant added later needs a new pairing code:** the owner can't widen a pairing. Then, on the computer:
 
@@ -103,7 +104,8 @@ elsewhere:
 - **Grants:** the owner ticks what this computer may do: `body` (move),
   `light`, `speak`, `look` (presence, hands, face/hand targets), `hear`
   (phrases, the name), `sound` (sound classes), `skills` (push skills),
-  `air` (the air sensor), `device` (the lamp's own computer).
+  `air` (the air sensor), `device` (the lamp's own computer), `camera`
+  (pictures), `microphone` (the room's sound).
   A call without its grant is refused `no_grant`. Grants are read at hello.
 - **Leases:** moving the body (`look`, `move`, `play`, `joints`) needs a
   `body` lease. Hold one with `async with lamp.lease("body"):` (JS
@@ -171,12 +173,21 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
   body's joints, bounds and caps with `lamp.body_info()` (JS
   `lamp.bodyInfo()`, the `body` grant).
 - What each carries, and its grant: [references/api.md](references/api.md#events-and-state).
-- Never readable, by any grant: pictures, audio, transcripts, face prints,
-  names. A hand's or face's place is a share of the picture.
+- Never readable, by any grant but `camera` and `microphone`: pictures,
+  audio. By any grant: transcripts, face prints, names. A hand's or face's
+  place is a share of the picture.
 - **The camera** (the `camera` grant): a snapshot, or a stream of
   frames; never while private, never off the lamp's own network:
-  [references/camera.md](references/camera.md). The microphone and `body.state`
-  come next; this skill gains them as they land.
+  [references/camera.md](references/camera.md).
+- **The microphone** (the `microphone` grant): Python
+  `await lamp.microphone_stream(True)`, JS `lamp.microphoneStream(true)`,
+  sends `microphone.audio` events, each a 20 ms block (16 kHz mono S16LE,
+  640 bytes in `data`), until `microphone_stream(False)` /
+  `microphoneStream(false)`, `stop`, or `microphone.ended`; off unless the
+  owner switched it on, never while private or with someone else in view,
+  never off the lamp's own network:
+  [references/api.md](references/api.md#the-microphone). `body.state` and
+  routed `joints` come next; this skill gains them as they land.
 
 ## Patterns
 

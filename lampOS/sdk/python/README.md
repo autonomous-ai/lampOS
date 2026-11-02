@@ -183,7 +183,11 @@ asyncio.run(main())
   `received` for what it took. Its `light` keeps lamp-control's pattern levels
   (a `breathe` at level 1 is refused) and answers `{"to": "ring"}`.
   `pulses_dropped` lists a second pulse within a minute, which the ring shows
-  steady, without its pulse (and says nothing).
+  steady, without its pulse (and says nothing). A `microphone_stream` on it
+  sends a quiet 440 Hz tone, one block every 20 ms (`tone_block`);
+  `lose_audio(n)` skips `n` blocks, said in the next one's `lost`, and
+  `await set_private()` or `await set_in_view(2)` ends each stream with
+  `microphone.ended`.
   A `move` it takes is one lamp-control takes: steps of 40 to 1,000 ms, 1.5 to
   10 s in all, from home and back, each joint within the body's reach and speed
   (`lampos.moves.move_refusal`, its words).
@@ -379,8 +383,8 @@ about its `axis` by `sign * (deg - zero_deg)` after its `rest_quat`.
 Through this door, by any grant: transcripts or the words around a phrase,
 face prints, and anyone's name. The camera's pictures come only with the
 `camera` grant, on the lamp's own network and never while it is private
-(`examples/camera.py`); the `microphone` grant is not routed yet, so no audio
-leaves. With `look` alone, a hand's or a face's place in the picture is a
+(`examples/camera.py`); the room's sound comes only
+with the `microphone` grant, on the same terms (`microphone_stream`). With `look` alone, a hand's or a face's place in the picture is a
 share of it, never the picture.
 
 ## Reference
@@ -459,6 +463,7 @@ its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 | `await lamp.say(text, *, rephrase=False)` | `text`: words, at most 900 UTF-8 bytes (about 900 Latin letters, 300 in a three-byte script), the voice's own cap, checked here before sending as the lamp checks it, never stricter; spoken **exactly as written** through the lamp's speech service (no model, no tools) once the person isn't talking. `rephrase=True`: the lamp's model says it in its own words instead, as before. Since #4958 `say` is exact by default; before it, every say was the model's version, which `rephrase=True` keeps | `speak` | no | 6 a minute, 60 an hour with the rates on; refused in quiet hours where the lamp sets them |
 | `await lamp.camera_snapshot()` | none; returns the camera's newest picture, JPEG bytes about 320 across. Refused while the lamp is private, or with the camera closed | `camera` | no |
 | `await lamp.camera_stream(on=True, fps=None, size=None)` | `fps`: 1 to 30 a second at most (2); `size`: `640x480` (the default) or `1280x720`. Where the eyes serve every frame (the answer's `fast: true`; not on customer lamps, stable 10824), each `camera.frame` comes as the camera made it, with the JPEG as `data` (bytes); otherwise the eyes' newest frame, about 1 to 2 a second, with `jpeg` in base64. `fps_now` is the rate lately; each new frame once, until `camera_stream(False)`, `stop` or a `camera.ended` event. Ends with `camera.ended` when the lamp turns private, or after 10 s with the camera closed | `camera` | no |
+| `await lamp.microphone_stream(on=True)` | none but `on`. The room's sound as `microphone.audio` events, one each 20 ms block as the lamp's ears hear it: mono, 16 kHz, signed 16-bit little-endian samples as `data` (bytes, 640 a block), with `sequence`, `lost` (blocks lost since the last one sent: on the way, or because this computer read too slowly), `sample_rate`, `channels`, `format` (`s16le`) and `bytes`. The answer says the same shape and `source` (`mic1`). On again replaces it; until `microphone_stream(False)`, `stop` or a `microphone.ended` event: at once when the lamp turns private, at once when more than one person is in view ("someone else is here": the lamp can't tell its owner from anyone else), within 2 s when the lamp's eyes stop saying who is in view ("the room isn't seen"), within 1 s when the ring doesn't say it drew its mark ("the ring is not showing the microphone's mark"), or within 2 s when no sound comes (a lamp that doesn't share its microphone, `LAMP_BUS_AUDIO` off). A re-pairing without `microphone` ends it. Refused while private, with more than one person in view or the room unseen, from beyond the lamp's own network, where the ring can't show its mark, and unless the owner switched it on (`LAMP_CONTROL_MICROPHONE=on`, off by default) | `microphone` | no |
 | `await lamp.sound(name)` | `name`: `hum`, the lamp's own short hum, or one of your clips (`upload_sound`), a clip plays once the person isn't talking, as an exact `say` does; the hum is rarer: its `done` says `dropped` within 15 s of the lamp's last turn ("the lamp spoke a moment ago"), or with another sound in the last 30 s | `speak` | no |
 | `await lamp.upload_sound(name, wav)` | `name`: a lowercase letter, then lowercase letters, digits, `_` or `-`, up to 64, never `hum`. `wav`: bytes or a path, a WAV of 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS (the lamp's speaker cap). Sent in 36 KiB parts and checked whole on the lamp, over a clip of the same name. Returns `{name, bytes, ms}`. Each computer keeps up to 64 clips and 20 MB (`limits["sounds"]`); revoking it deletes them | `speak` | no |
 | `await lamp.sounds()` | your clips on the lamp, each `{name, bytes, ms}` | `speak` | no |

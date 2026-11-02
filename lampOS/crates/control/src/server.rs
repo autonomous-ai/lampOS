@@ -32,13 +32,15 @@ use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, 
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::cert::Identity;
+use crate::parts::Media;
 use crate::protocol::{EventKind, Grant, Op};
 use crate::session::{Door, Parts, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
-/// Camera frames queued for one connection at most; past that one is dropped.
+/// Binary frames (camera frames, microphone blocks) queued for one
+/// connection at most; past that one is dropped.
 pub const FRAMES_QUEUED: usize = 4;
 /// How long a new connection has to say `hello` (or `pair`).
 pub const HELLO_WITHIN: Duration = Duration::from_secs(30);
@@ -150,9 +152,10 @@ pub const LEASE_TICK: Duration = Duration::from_millis(250);
 struct Open {
     client: Option<String>,
     outbox: mpsc::UnboundedSender<Value>,
-    /// Its camera frames, binary, [`FRAMES_QUEUED`] at most: past that a
-    /// frame is dropped, never queued, so a slow link never grows memory.
-    frames: mpsc::Sender<(u64, Vec<u8>)>,
+    /// Its binary frames, camera pictures and microphone blocks, each with
+    /// its kind, [`FRAMES_QUEUED`] at most: past that a frame is dropped,
+    /// never queued, so a slow link never grows memory.
+    frames: mpsc::Sender<(Media, Option<u64>, Vec<u8>)>,
     /// What it subscribed to, and its phrases, as its session says.
     events: BTreeSet<EventKind>,
     phrases: Vec<String>,
@@ -369,27 +372,31 @@ impl Shared {
         })
     }
 
-    /// Sends `event` to every connection of `client`.
-    /// Sends a binary camera frame to every connection of `client` on the
-    /// lamp's own network: dropped for one whose queue is full.
-    fn send_binary_to(&self, client: &str, turn: u64, frame: &[u8]) {
+    /// Sends a binary frame of `media` to every connection of `client` that
+    /// holds its grant: dropped for one whose queue is full, never waited
+    /// for. Whether every one, and at least one, took it.
+    fn send_binary_to(&self, client: &str, media: Media, turn: Option<u64>, frame: &[u8]) -> bool {
+        let mut taken = None;
         for open in self.open.lock().expect("open").values() {
-            if open.client.as_deref() == Some(client)
-                && open.grants.contains(&crate::protocol::Grant::Camera)
-            {
-                let _ = open.frames.try_send((turn, frame.to_vec()));
+            if open.client.as_deref() == Some(client) && open.grants.contains(&media.grant()) {
+                let took = open.frames.try_send((media, turn, frame.to_vec())).is_ok();
+                taken = Some(taken.unwrap_or(true) && took);
             }
         }
+        taken.unwrap_or(false)
     }
 
-    /// Binary camera frames for a client (`crate::camera`'s fast stream).
+    /// Binary frames for a client (`crate::camera`'s fast stream,
+    /// `crate::microphone`'s blocks).
     pub fn binary(self: &Arc<Self>) -> crate::parts::Binary {
         let shared = Arc::downgrade(self);
-        Arc::new(move |client: &str, turn: u64, frame: &[u8]| {
-            if let Some(shared) = shared.upgrade() {
-                shared.send_binary_to(client, turn, frame);
-            }
-        })
+        Arc::new(
+            move |client: &str, media: Media, turn: Option<u64>, frame: &[u8]| {
+                shared
+                    .upgrade()
+                    .is_some_and(|shared| shared.send_binary_to(client, media, turn, frame))
+            },
+        )
     }
 
     fn send_to(&self, client: &str, event: Value) {
@@ -399,15 +406,14 @@ impl Shared {
             }
         }
         // A stream's end is in the journal with its why, as its start was
-        // (Thirteen's P3 on #4521).
-        if event["ev"] == "camera.ended" {
+        // (Thirteen's P3 on #4521): the camera's and the microphone's.
+        if let Some(ev @ ("camera.ended" | "microphone.ended")) = event["ev"].as_str() {
             let why = event["why"].as_str().unwrap_or("ended");
             let now = self.now_us();
-            self.door.lock().expect("door").journal_event(
-                client,
-                &format!("camera.ended ({why})"),
-                now,
-            );
+            self.door
+                .lock()
+                .expect("door")
+                .journal_event(client, &format!("{ev} ({why})"), now);
         }
     }
 
@@ -894,7 +900,10 @@ async fn connection<S>(
 {
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
-    let (frames, mut framed) = mpsc::channel::<(u64, Vec<u8>)>(FRAMES_QUEUED);
+    let (frames, mut framed) = mpsc::channel::<(Media, Option<u64>, Vec<u8>)>(FRAMES_QUEUED);
+    // The writer's own way back into its queue: an end drains only its own
+    // kind and puts the others back.
+    let requeue = frames.clone();
     let (body_state, mut newest_body) = watch::channel::<Option<Value>>(None);
     // Until its sender goes with the connection's entry.
     let mut body_open = true;
@@ -999,23 +1008,19 @@ async fn connection<S>(
                     }
                 }
                 frame = framed.recv() => {
-                    let Some((turn, frame)) = frame else { continue };
+                    let Some((media, turn, frame)) = frame else { continue };
                     // Never beyond the lamp's own network (control.md, "The
-                    // camera").
+                    // camera", "The microphone").
                     if remote {
                         continue;
                     }
-                    // Only while the stream that made it still runs: a frame
-                    // queued before an `off`, a `stop`, a re-pairing or an
-                    // end never goes (Thirteen's P3 on #4521), nor through a
-                    // stream started after it, before that one's mark is
-                    // drawn (banana, 9 Nov).
+                    // Only while its own stream still runs: a picture or a
+                    // block queued before an `off`, a `stop`, a re-pairing
+                    // or an end never goes (Thirteen's P3 on #4521), and a
+                    // block of an ended stream never goes through the stream
+                    // that replaced it (Second's P1 on #5839).
                     let streaming = session.client().is_some_and(|client| {
-                        shared
-                            .parts
-                            .lock()
-                            .expect("parts")
-                            .camera_streaming(client, turn)
+                        shared.parts.lock().expect("parts").streaming(client, media, turn)
                     });
                     if !streaming {
                         continue;
@@ -1036,25 +1041,36 @@ async fn connection<S>(
                     {
                         continue;
                     }
+                    // Ended: the pictures or blocks still queued for it never
+                    // go (Thirteen's P3 on #4521); the other kind's stay.
+                    let ended = match event["ev"].as_str() {
+                        Some("camera.ended") => Some(Media::Camera),
+                        Some("microphone.ended") => Some(Media::Microphone),
+                        _ => None,
+                    };
                     let mut event = event;
-                    // Ended: the frames still queued for it never go
-                    // (Thirteen's P3 on #4521). An older stream's end that
-                    // comes after a newer stream started is not this one's:
-                    // it neither empties the newer stream's frames nor tells
-                    // the computer (banana's P3 on #5881). Its turn is the
-                    // door's own, taken off before it goes.
-                    if event["ev"] == "camera.ended" {
+                    if let Some(ended) = ended {
+                        // An older stream's end, late after a newer stream of
+                        // this computer started, is not the newer one's: it
+                        // neither empties its queue nor reaches the computer
+                        // (Second's P2 on #5839). Its turn is the door's own,
+                        // taken off before it goes.
                         let turn = event
                             .as_object_mut()
                             .and_then(|fields| fields.remove(crate::camera::TURN_FIELD))
                             .and_then(|turn| turn.as_u64());
                         let newest = session.client().and_then(|client| {
-                            shared.parts.lock().expect("parts").camera_turn(client)
+                            shared.parts.lock().expect("parts").newest_turn(client, ended)
                         });
                         if crate::camera::older_end(turn, newest) {
                             continue;
                         }
-                        while framed.try_recv().is_ok() {}
+                        let others: Vec<(Media, Option<u64>, Vec<u8>)> = std::iter::from_fn(|| framed.try_recv().ok())
+                            .filter(|(media, _, _)| *media != ended)
+                            .collect();
+                        for other in others {
+                            let _ = requeue.try_send(other);
+                        }
                     }
                     // A picture goes only while the stream that made it runs,
                     // never through one started after it (banana, 9 Nov), and
@@ -1070,7 +1086,7 @@ async fn connection<S>(
                                     .parts
                                     .lock()
                                     .expect("parts")
-                                    .camera_streaming(client, turn)
+                                    .streaming(client, Media::Camera, Some(turn))
                             })
                         });
                         if !streaming {

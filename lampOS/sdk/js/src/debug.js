@@ -42,6 +42,9 @@ export const SHOWN = new Set([
   'load_limit', 'max_counts', 'max_deg', 'min_counts', 'min_deg', 'speed_deg_s', 'stand_counts', 'stands',
   // Each joint of a `body.state` beyond `get` `body`'s.
   'goal_deg', 'load', 'moving', 'temp_c',
+  // A microphone stream's shape and a block's count (never the sound, which
+  // comes binary and is never logged).
+  'block_ms', 'channels', 'format', 'lost', 'sample_rate', 'sequence', 'source',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id', 'lease_max_ms', 'say_max_bytes',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',

@@ -2293,6 +2293,54 @@ def test_the_volume_is_set_stepped_muted_and_told_when_the_person_changes_it(tmp
     run(go())
 
 
+def test_the_microphone_streams_20_ms_blocks_with_the_microphone_grant_only_and_ends_when_private(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light", "microphone")) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                blocks, ended = asyncio.Queue(), asyncio.Queue()
+                lamp.on("microphone.audio", blocks.put_nowait)
+                lamp.on("microphone.ended", ended.put_nowait)
+                started = await lamp.microphone_stream()
+                assert {k: started[k] for k in ("stream", "sample_rate", "channels", "format", "block_ms", "source")} == {
+                    "stream": "on", "sample_rate": 16000, "channels": 1, "format": "s16le", "block_ms": 20, "source": "mic1",
+                }
+                first = await asyncio.wait_for(blocks.get(), 5)
+                assert (first["ev"], first["lost"], first["format"], first["bytes"]) == ("microphone.audio", 0, "s16le", 640)
+                assert isinstance(first["data"], bytes) and len(first["data"]) == 640
+                # Blocks lost on the way are said in the next one.
+                fake.lose_audio(4)
+                while (await asyncio.wait_for(blocks.get(), 5))["lost"] != 4:
+                    pass
+                # Off: no more blocks, and no event.
+                assert (await lamp.microphone_stream(False))["stream"] == "off"
+                await asyncio.sleep(0.05)
+                while not blocks.empty():
+                    blocks.get_nowait()
+                await asyncio.sleep(0.08)
+                assert blocks.empty() and ended.empty()
+                # Private: a stream ends at once, and a new one is refused.
+                await lamp.microphone_stream(True)
+                await fake.set_private()
+                assert await asyncio.wait_for(ended.get(), 5) == {"ev": "microphone.ended", "why": "the lamp is private"}
+                with pytest.raises(errors.BY_CODE["private"]):
+                    await lamp.microphone_stream(True)
+                # Someone else in view: the same, with its own why.
+                await fake.set_private(False)
+                await lamp.microphone_stream(True)
+                await fake.set_in_view(2)
+                assert await asyncio.wait_for(ended.get(), 5) == {"ev": "microphone.ended", "why": "someone else is here"}
+                with pytest.raises(errors.BY_CODE["refused"], match="someone else"):
+                    await lamp.microphone_stream(True)
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path / "plain")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.microphone_stream(True)
+
+    run(go())
+
+
 def test_the_volume_needs_the_speak_grant(tmp_path):
     async def go():
         async with FakeLamp(grants=("body",)) as fake:
@@ -2443,3 +2491,15 @@ def test_the_pose_degrees_are_lamp_controls_own():
     assert COUNTS_PER_DEGREE == 4_096 / 360
     grows = dict(re.findall(r'\("[a-z_]+", "([a-z]+)", (true|false)\)', info.read_text()))
     assert {name: (1 if grows[name] == "true" else -1) for name in POSE_JOINTS} == dict(zip(POSE_JOINTS, _POSE_SIGN))
+
+
+def test_a_microphone_block_is_its_header_and_the_samples_as_data():
+    from lampos.client import binary_frame
+    from lampos.testing import tone_block
+
+    samples = tone_block(7)
+    header = json.dumps({"ev": "microphone.audio", "sequence": 7, "lost": 2, "sample_rate": 16000, "channels": 1,
+                         "format": "s16le", "bytes": len(samples)}).encode()
+    block = binary_frame(len(header).to_bytes(4, "big") + header + samples)
+    assert (block["ev"], block["sequence"], block["lost"]) == ("microphone.audio", 7, 2)
+    assert block["data"] == samples and len(samples) == 640
