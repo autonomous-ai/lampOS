@@ -259,10 +259,14 @@ fn recalled_with_days(store: &Days, person: &Person, entries: &[Entry]) -> Resul
         entries: entries.to_vec(),
     });
     let days = store.event_days(person)?;
+    let said = store.last_said(person)?;
     if let Some(told) = answer["entries"].as_array_mut() {
         for (told, entry) in told.iter_mut().zip(entries) {
             if let (Entry::Kept(_), Some(day)) = (entry, days.get(&entry.id())) {
                 told["on"] = json!(day);
+            }
+            if let (Entry::Kept(_), Some(at)) = (entry, said.get(&entry.id())) {
+                told["last_said_unix_ms"] = json!(at);
             }
         }
     }
@@ -375,11 +379,17 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             });
             // As search: the day a kept thing is about, so the voice tells it
             // apart from the day it was said (#3987). Older readers ignore it.
+            // And when it was last said, when said again since it was kept
+            // (#4753); older readers ignore it.
             let days = store.event_days(&person)?;
+            let said = store.last_said(&person)?;
             if let Some(entries) = answer["entries"].as_array_mut() {
                 for (entry, kept) in entries.iter_mut().zip(&kept) {
                     if let Some(day) = days.get(&kept.id) {
                         entry["on"] = json!(day);
+                    }
+                    if let Some(at) = said.get(&kept.id) {
+                        entry["last_said_unix_ms"] = json!(at);
                     }
                 }
             }
@@ -474,10 +484,18 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 wider,
             )?;
             let mut entries = serde_json::to_value(&records).expect("records are JSON values only");
+            // A kept thing said again since it was kept says when it was
+            // last said (#4753); `at_unix_ms` stays when it was kept.
+            let said = store.last_said(&person)?;
             if let Some(entries) = entries.as_array_mut() {
                 for (entry, record) in entries.iter_mut().zip(&records) {
                     if let Some(day) = store.event_day(&person, record.id)? {
                         entry["on"] = json!(day);
+                    }
+                    if record.kind == "kept"
+                        && let Some(at) = said.get(&record.id)
+                    {
+                        entry["last_said_unix_ms"] = json!(at);
                     }
                 }
             }

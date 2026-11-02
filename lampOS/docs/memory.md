@@ -1516,6 +1516,25 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `{"remembered":true}`, as for a first keep: a visitor is never told the
   lamp knew it, nor that someone here said it (#2995's P2). Off, the
   request is as before.
+  The store also records when it was said again (#4753, `said_again`,
+  memory-days.md): the kept list, `recall` and `search` give such a kept
+  thing `last_said_unix_ms` beside its first `at_unix_ms`, and the voice
+  tells its `when` (and a hit's "said …") from the later of the two
+  (`remember::said_last`); a recall's `since` stays when it was kept.
+  Before, "when did I last tell you about my coffee?" got the day it was
+  first kept, even when it was said again yesterday, and after the 30-day
+  expiry of the later exchange nothing held the later day. The time is
+  recorded when the turn's own line is written (`append_linked`, after the
+  turn, linked to the kept thing), with that line as its one origin, so
+  "forget what I just said" (`forget_last`) or any forget of that line
+  takes it, in a conversation's first turn too; forgetting an earlier line
+  of the conversation leaves it. An older memory gives no
+  `last_said_unix_ms`, so the kept thing's own time is told, as before.
+  Tests: `remember::tests::a_kept_thing_said_again_is_told_when_it_was_last_said`,
+  `days::a_kept_thing_said_again_tells_when_it_was_last_said`,
+  `days::forgetting_the_line_it_was_said_again_in_leaves_no_time`,
+  `days::said_again_in_a_conversations_first_turn_goes_with_forget_last`,
+  `days::a_time_goes_with_the_forget_of_a_kept_thing_or_observation_its_line_came_from`.
   Measured on the relay's DeepSeek (deepseek-flash, thinking off), re-run
   on 22 Oct for #3030, 20 runs of each line, a reply counted when it says
   the lamp knew or had it already. A new session, the person's own scope:
@@ -2237,9 +2256,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   byte for byte as before. With `LAMP_MEMORY_KEEP_HEARD`, a heard line
   kept in place of the model's sentence keeps `on`: by then `on` is left
   only when those same heard words name it (`remember::heard::call_with`).
-  Said again with `LAMP_MEMORY_REMEMBER_ONCE` for a later day (a weekly
-  "dentist on Friday"), the kept fact takes the new day and is followed
-  up once after it (memory-days.md, `remember {…, on}`). Tests:
+  Said again with `LAMP_MEMORY_REMEMBER_ONCE` for another day, later (a
+  weekly "dentist on Friday") or earlier (#4753: "Lily comes Saturday",
+  "now Sunday", "back to Saturday"), the kept fact takes the new day and is
+  followed up once after it; said again with no day, it keeps its own
+  (memory-days.md, `remember {…, on}`). Tests:
+  `days::an_event_day_moves_earlier_or_later_when_restated_and_a_mention_keeps_it`,
   `remember::on::tests::a_day_is_kept_only_from_words_that_name_that_day`,
   `remember::on::tests::on_is_dropped_unless_the_heard_line_names_that_day`,
   `remember::heard::tests::the_call_is_held_against_the_words_heard_in_its_own_line`,

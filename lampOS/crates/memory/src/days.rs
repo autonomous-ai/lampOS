@@ -58,6 +58,9 @@ pub const TALK_NOTES_BYTES: usize = 12_800;
 /// A talk note as `talk_notes` gives it: its id, its day and its text.
 pub type TalkNote = (u64, String, String);
 const DAY_MS: u64 = 86_400_000;
+/// Times a kept thing was said again (#4753) waiting for the line that said
+/// them, at most this many ([`Days::said_pending`]).
+const SAID_PENDING: usize = 64;
 const MAX_IMPORT_FILE: u64 = 64 * 1024 * 1024;
 
 /// Typed, content-free failures. SQL and model output never become log text.
@@ -178,6 +181,14 @@ pub struct Days {
     local: LocalTime,
     now: u64,
     set_aside: Option<String>,
+    /// When a kept thing was said again (#4753), by its rid, until the
+    /// exchange that said it is written: the voice's `remember` comes
+    /// during the turn and its line after it (`append_linked`), linked to
+    /// the kept thing as a source. That line is the time's one origin
+    /// ([`Self::add`]), so forgetting it takes the time. Never on disk: a
+    /// time whose line is never written (lost, or the memory restarted in
+    /// between) is never told. The oldest goes past [`SAID_PENDING`].
+    said_pending: std::collections::VecDeque<(i64, u64)>,
     _held: File,
 }
 
@@ -246,6 +257,7 @@ impl Days {
             local: options.local,
             now,
             set_aside,
+            said_pending: std::collections::VecDeque::new(),
             _held: held,
         };
         this.import()?;
@@ -510,10 +522,15 @@ impl Days {
     /// day of `at` to [`EVENT_WITHIN_DAYS`] after it ([`kept_day`]); any
     /// other `on` is dropped and the fact kept undated. A kept thing that
     /// is found already (`once`) gains the day when it has none, and takes
-    /// it when it is later than the one it has (a weekly "dentist on
-    /// Friday" said again for next Friday); then its follow-up row goes, so
-    /// the new day is followed up once in turn. An earlier or the same day
-    /// changes nothing. The sources and the day commit together.
+    /// it when it differs from the one it has, later (a weekly "dentist on
+    /// Friday" said again for next Friday) or earlier (#4753: "Lily comes
+    /// Sunday now" back to Saturday; the day is a real one still to come,
+    /// [`kept_day`]); then its follow-up row goes, so the new day is
+    /// followed up once in turn. The same day, or none (a mere mention),
+    /// changes nothing. When `at` is after it was kept and last said, it
+    /// is a time it was said again (`said_again`, [`Self::last_said`]),
+    /// held until the line that said it is written ([`Self::said_pending`]).
+    /// The sources and the day commit together.
     pub fn remember_on(
         &mut self,
         person: &Person,
@@ -547,15 +564,16 @@ impl Days {
         if once && let Some(id) = self.kept_already(person, &text)? {
             let tx = self.db.transaction()?;
             link_sources(&tx, person, id, from)?;
+            let rid: i64 = tx.query_row(
+                "SELECT rid FROM entries WHERE person=?1 AND id=?2",
+                params![person.as_str(), id],
+                |r| r.get(0),
+            )?;
+            let said = said_after(&tx, rid, at)?;
             if let Some(on) = on {
-                let rid: i64 = tx.query_row(
-                    "SELECT rid FROM entries WHERE person=?1 AND id=?2",
-                    params![person.as_str(), id],
-                    |r| r.get(0),
-                )?;
-                // Days are `YYYY-MM-DD`, so text order is day order.
+                // Either way (#4753): a restated day is the day now.
                 let moved = tx.execute(
-                    "UPDATE event_days SET day=?2 WHERE rid=?1 AND day<?2",
+                    "UPDATE event_days SET day=?2 WHERE rid=?1 AND day!=?2",
                     params![rid, on.to_string()],
                 )?;
                 if moved > 0 {
@@ -570,6 +588,13 @@ impl Days {
                 }
             }
             tx.commit()?;
+            if said {
+                self.said_pending.retain(|(pending, _)| *pending != rid);
+                if self.said_pending.len() == SAID_PENDING {
+                    self.said_pending.pop_front();
+                }
+                self.said_pending.push_back((rid, at));
+            }
             return Ok((id, true));
         }
         self.kept_room(person)?;
@@ -809,6 +834,27 @@ impl Days {
             )?;
         }
         insert_record(&tx, &record, &self.local, self.now)?;
+        // An exchange linked to a kept thing said again (#4753) is the line
+        // that said it: the time is recorded now, with this line its origin.
+        let mut said = Vec::new();
+        if text.is_empty() && !self.said_pending.is_empty() {
+            for source in sources {
+                let rid: i64 = tx.query_row(
+                    "SELECT rid FROM entries WHERE person=?1 AND id=?2",
+                    params![person.as_str(), source],
+                    |r| r.get(0),
+                )?;
+                if let Some(&(_, at)) = self.said_pending.iter().find(|(r, _)| *r == rid) {
+                    if said_after(&tx, rid, at)? {
+                        tx.execute(
+                            "INSERT OR IGNORE INTO said_again(rid,at_unix_ms,origin) VALUES(?1,?2,?3)",
+                            params![rid, at, id],
+                        )?;
+                    }
+                    said.push(rid);
+                }
+            }
+        }
         if let Some(on) = on {
             tx.execute(
                 "INSERT INTO event_days(rid,day) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
@@ -836,6 +882,7 @@ impl Days {
             }
         }
         tx.commit()?;
+        self.said_pending.retain(|(rid, _)| !said.contains(rid));
         Ok(id)
     }
 
@@ -967,6 +1014,19 @@ impl Days {
         )?;
         let rows = statement.query_map(params![person.as_str()], |row| {
             Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?))
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+    /// When each of this person's kept things was last said, by id, for
+    /// those said again since they were kept (#4753, `said_again`); one not
+    /// here was last said at its own `at_unix_ms`. In one query, as
+    /// [`Self::event_days`].
+    pub fn last_said(&self, person: &Person) -> Result<std::collections::HashMap<u64, u64>> {
+        let mut statement = self.db.prepare(
+            "SELECT e.id,max(a.at_unix_ms) FROM said_again a JOIN entries e ON e.rid=a.rid WHERE e.person=?1 GROUP BY e.id",
+        )?;
+        let rows = statement.query_map(params![person.as_str()], |row| {
+            Ok((row.get::<_, u64>(0)?, row.get::<_, u64>(1)?))
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
@@ -1142,6 +1202,7 @@ impl Days {
             tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
         }
         talk_with_doomed(&tx)?;
+        said_again_with_doomed(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
         Ok(count)
@@ -1188,6 +1249,7 @@ impl Days {
             tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
         }
         talk_with_doomed(&tx)?;
+        said_again_with_doomed(&tx)?;
         let count = erase(&tx)?;
         tx.commit()?;
         self.forget_set_aside()?;
@@ -2340,6 +2402,28 @@ impl Days {
             "UPDATE origins SET origin=-origin WHERE rid IN (SELECT rid FROM adopting)",
             [],
         )?;
+        // When a kept thing was said again (#4753): a room's kept thing
+        // that stays loses a time said in a line that is now someone's own;
+        // one that moves keeps the times said in lines that moved with it,
+        // in `to`'s numbering, and no other.
+        for (old, new) in &moved {
+            tx.execute(
+                "DELETE FROM said_again WHERE (rid,at_unix_ms) IN (SELECT a.rid,a.at_unix_ms FROM said_again a JOIN entries k ON k.rid=a.rid WHERE k.person=?1 AND a.origin=?2)",
+                params![from.as_str(), old],
+            )?;
+            tx.execute(
+                "UPDATE said_again SET origin=-?2 WHERE origin=?1 AND rid IN (SELECT rid FROM adopting)",
+                params![old, new],
+            )?;
+        }
+        tx.execute(
+            "DELETE FROM said_again WHERE origin>0 AND rid IN (SELECT rid FROM adopting)",
+            [],
+        )?;
+        tx.execute(
+            "UPDATE said_again SET origin=-origin WHERE rid IN (SELECT rid FROM adopting)",
+            [],
+        )?;
         // A moved observation asked about once is still asked about once,
         // now as `to`'s: their pacing counts it. Its event day, by rid, is
         // still its own.
@@ -2596,6 +2680,32 @@ fn generation(db: &Connection, person: &Person) -> Result<u64> {
         |r| r.get(0),
     )?)
 }
+/// Whether `at` is after the kept thing `rid` was kept and after it was
+/// last said (#4753): a time it was said again. An older or the same time
+/// is none. Inside the caller's transaction.
+fn said_after(tx: &Transaction<'_>, rid: i64, at: u64) -> Result<bool> {
+    let newest: u64 = tx.query_row(
+        "SELECT max(e.at_unix_ms,coalesce((SELECT max(a.at_unix_ms) FROM said_again a WHERE a.rid=e.rid),0)) FROM entries e WHERE e.rid=?",
+        [rid],
+        |r| r.get(0),
+    )?;
+    Ok(at > newest)
+}
+
+/// A time a kept thing was said again goes with its origin, the line that
+/// said it, when a forget takes that line (#4753, as [`talk_with_doomed`]
+/// for talk notes): a forgotten line leaves no time behind. Any entry of
+/// the scope as origin, not only an exchange (Reviewer-lead's P3). In the
+/// caller's transaction, before [`erase`]; never on expiry, so an exchange
+/// that ages out at `keep_days` leaves the time it was said again.
+fn said_again_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+    tx.execute(
+        "DELETE FROM said_again WHERE (rid,at_unix_ms) IN (SELECT a.rid,a.at_unix_ms FROM said_again a JOIN entries k ON k.rid=a.rid JOIN entries x ON x.person=k.person AND x.id=a.origin WHERE x.rid IN (SELECT rid FROM doomed))",
+        [],
+    )?;
+    Ok(())
+}
+
 /// Links `from`, validated as a new remember's are, to the kept thing `id`
 /// that `once` found (#2176): forgetting it then removes this
 /// conversation's exchanges too. Links it already has stay one. Inside the
