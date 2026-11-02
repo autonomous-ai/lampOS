@@ -2428,8 +2428,14 @@ with the known face's id the eyes keep beside the known file
   camera's aim, `full_look::aim_speeds`, turning faster than
   `HEAD_MOVED_RADIANS_A_SECOND`, the full look's own still bar, 25 counts a
   second; a reading older than 160 ms is a still head), and the mesh's score
-  leaves out every look-to-look pair with a moving look at either end. The
-  pairs kept are still, so they are judged as a still window's are, `yes` or
+  leaves out every look-to-look pair with a moving look at either end, and
+  every pair whose eye distance (in the mesh's pixels) changes by more than
+  5% of the smaller (`MOST_EYES_STEP`): on lamp-52e6 the detector's box on a
+  still screen face about 17 px between the eyes flipped between two fits
+  (about 8% of its width), the crop moved with it and three looks read
+  `yes` (scores 0.0151 to 0.0164, #4585); a still large face varies about
+  1.2% look to look and a face walking closer under 2%. The pairs kept are
+  still, so they are judged as a still window's are, `yes` or
   `no`; such a pair is not a gap (counting it as one read a talking face on
   lamp-52e6 `unknown`, `reason` `mesh`, for about 2 s after every head move,
   #4585). Only a window left with fewer than four still pairs
@@ -2442,7 +2448,9 @@ with the known face's id the eyes keep beside the known file
   `yes` either way; a meshed face at 18 px `unknown` off and judged on; a
   corners-only one at 18 px `unknown` either way; a talking window with one
   moving look `yes` either way, and one with a move every third look
-  `unknown` on. Off, nothing is read and nothing changes.
+  `unknown` on; a still 17 px face whose box flips `unknown` on (it read
+  `yes` before `MOST_EYES_STEP`) and off, and a talking face whose eyes vary
+  1% `yes` on. Off, nothing is read and nothing changes.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
