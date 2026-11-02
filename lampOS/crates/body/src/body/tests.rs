@@ -2086,25 +2086,29 @@ fn spare_report() -> BodyReport {
     run(&mut lamp, &mut clock, Limits::FOLDED, None, || None, |_| {})
 }
 
-/// A folded arm let go whose shoulder falls past where a goal may be
-/// written from its last one: the refused goal write still puts torque
-/// back on both arm joints, and the refusal is returned after.
+/// A folded arm let go whose shoulder sags 120 counts, over a goal's step
+/// from the goal it had: its goal is rewritten where it now lies, so torque
+/// comes back there with no jolt back up, and no stop is left behind.
 #[test]
-fn a_refused_goal_write_while_the_arm_is_let_go_still_puts_torque_back_on() {
+fn a_sag_over_50_while_let_go_leaves_no_jolt_and_no_stop() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(5));
-    // The shoulder sags 120 counts while let go: under a bad read's jump,
-    // over a goal's step from the goal it had.
+    // Under a bad read's jump, over a goal's step from the goal it had.
     lamp.event = Some((Duration::from_millis(20), 1, Event::Push(120.0)));
     let mut report = spare_report();
-    let result = {
+    let (result, refused, goal) = {
         let mut bus = Bus::new(&mut lamp, &mut clock, Some(lamp_4ace_standing()));
         bus.samples().unwrap();
         bus.write_goal(Joint::BasePitch, 2_050, false).unwrap();
-        release_arm(&mut bus, &mut report)
+        let result = release_arm(&mut bus, &mut report);
+        (result, bus.refused.clone(), bus.goals[1])
     };
-    assert!(result.is_err(), "{result:?}");
-    assert_eq!(report.arm_releases, 0);
+    let now = result.expect("the release ends well");
+    assert!(refused.is_none(), "{refused:?}");
+    assert_eq!(report.arm_releases, 1);
     assert_eq!((lamp.servos[1].torque, lamp.servos[2].torque), (1, 1));
+    let sagged = now[1].position;
+    assert!(sagged.abs_diff(2_050) > 50, "{sagged}");
+    assert_eq!((goal, lamp.servos[1].goal), (Some(sagged), sagged));
 }
 
 /// A torque-off to the folded arm that the shoulder takes and the elbow

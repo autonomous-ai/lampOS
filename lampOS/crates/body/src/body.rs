@@ -3318,11 +3318,17 @@ fn release_arm<P: PortIo, R: Runtime>(
     let mut failed = None;
     for joint in ARM {
         // Torque comes back on whatever the read or the goal write did:
-        // where it was told to go before, if either failed.
-        if let Ok(now) = &now
-            && let Err(detail) = bus.write_goal(joint, now[joint.index()].position, true)
-        {
-            failed.get_or_insert(detail);
+        // where it was told to go before, if either failed. The goal is
+        // where the joint now lies, measured from there, not from the goal
+        // it had: one that sagged over `ARM_GOAL_STEP` let go is not
+        // refused, so torque never pulls it back to that goal (the
+        // Reviewer-lead's P2 on #4519).
+        if let Ok(now) = &now {
+            let before = bus.goals[joint.index()].take();
+            if let Err(detail) = bus.write_goal(joint, now[joint.index()].position, true) {
+                bus.goals[joint.index()] = before;
+                failed.get_or_insert(detail);
+            }
         }
         report.torque_writes = report.torque_writes.saturating_add(1);
         if let Err(detail) = bus.write_patiently(joint, &torque_write(joint, 1)) {
