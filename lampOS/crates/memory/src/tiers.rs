@@ -26,6 +26,14 @@
 //! no longer does, or that no mapping names. The room's scope
 //! (`everyone`, `r-everyone`) is never mirrored: an unplaced voice's words
 //! are not evidence of anyone's (the design's attribution rule).
+//!
+//! The night's model is the voice's (the memory owner's choice, 3 Nov):
+//! lamp-memory stays offline, so with no [`Sleeper`] each scope's night is
+//! a job in a bounded queue ([`NIGHT_JOBS`]) that the voice takes on the
+//! main socket (`tiers_sleep_take`) while the lamp is quiet at night, asks
+//! its relay's model, and gives back (`tiers_sleep_give`). The reply is
+//! checked by the tiered store's own validator; a job a forget touched
+//! since it was taken, or that morning reached, is never applied.
 use crate::{
     days::Days,
     protocol::{self, Forgot},
@@ -39,13 +47,14 @@ use lamp_memory_tiers::{
 };
 use rusqlite::{Connection, params};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     fs, io,
     os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     sync::{
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc::{self, RecvTimeoutError, SyncSender, TrySendError},
     },
@@ -75,6 +84,43 @@ const STOPPING: Duration = Duration::from_millis(200);
 const OPEN_STORES: usize = 16;
 const NIGHT_PASSES: usize = 4;
 const RECALL_BYTES: usize = 2048;
+/// The night's jobs waiting for the voice, all scopes together. A night
+/// that finds the queue full is not queued: its job is counted expired and
+/// its night failed (`nights_failed`), and its records wait for the next
+/// night. A later pass that finds it full is counted expired only.
+pub const NIGHT_JOBS: usize = 16;
+/// A job taken and not given back this long is dropped (counted expired):
+/// the voice let it go (someone spoke, the privacy slide) or stopped. A job
+/// is given out once, never again: nothing is retried in a loop, and its
+/// records wait for the next night. Above the voice's own call timeout.
+pub const JOB_LEASE: Duration = Duration::from_secs(120);
+/// How long a `tiers_sleep_take` or `tiers_sleep_give` waits for the
+/// tiers' thread before answering `busy`.
+///
+/// The memory server answers one connection at a time, so this wait holds
+/// the socket for every other caller: a turn's first read
+/// (`remember::FIRST_READ`, 300 ms) or a spoken forget at 04:00 waits
+/// behind it. 100 ms keeps a night op well under that, so the night stays
+/// off the turn's path, socket included. (Answering night ops off the
+/// server's thread would need the server's one-at-a-time loop changed for
+/// every op; a short bound is the smaller, safer change.) The worker can be
+/// slower than that (another scope's `apply_sleep` and `prepare_sleep`
+/// with full fsyncs), and nothing is lost when it is:
+///
+/// - a take it answers after the wait gave up puts its job back
+///   ([`Handoff`]), so the next take gets it;
+/// - a give it reaches after the wait is still applied, once, and its
+///   outcome kept ([`GIVEN_KEPT`]): the voice gives it again later and is
+///   told that outcome, never applied twice. A give that could not even be
+///   queued is applied by that retry.
+pub const NIGHT_OP_WAIT: Duration = Duration::from_millis(100);
+/// The outcomes of the latest gives, by job id, answered to a give of the
+/// same job again: the most a night can give out, every scope's passes.
+pub const GIVEN_KEPT: usize = NIGHT_JOBS * NIGHT_PASSES;
+/// The two socket ops the voice does the night with; known only with the
+/// switch set (Days alone refuses them as any unknown op).
+pub const TAKE_OP: &str = "tiers_sleep_take";
+pub const GIVE_OP: &str = "tiers_sleep_give";
 
 /// A switch value other than off, `shadow` or `on`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -107,10 +153,11 @@ impl Mode {
     }
 }
 
-/// The nightly sleep's model: the tiered store's bounded input in, its
-/// proposal JSON out ([`lamp_memory_tiers::SleepProposal`]). The product
-/// runs none (lamp-memory has no network), so each night is counted
-/// `unconfigured`; tests and the bench give one.
+/// The nightly sleep's model in this process: the tiered store's bounded
+/// input in, its proposal JSON out ([`lamp_memory_tiers::SleepProposal`]).
+/// The product runs none (lamp-memory has no network): without one each
+/// night is a job for the voice ([`TAKE_OP`], [`GIVE_OP`]). Tests and the
+/// bench give one.
 pub trait Sleeper: Send {
     fn propose(&mut self, scope: &str, input: &SleepInput) -> Result<String, String>;
 }
@@ -167,12 +214,26 @@ pub struct Tally {
     /// Times the tiers were emptied after a dropped change.
     pub wipes: u64,
     pub nights: u64,
+    /// Nights whose first job morning reached untaken: no voice did them.
     pub nights_unconfigured: u64,
     pub nights_applied: u64,
     pub nights_failed: u64,
     /// `on`: tiers answers given beside Days', and those left out as late.
     pub recalls: u64,
     pub recalls_late: u64,
+    /// The voice's night: jobs queued, taken, and how each ended. A job is
+    /// applied, invalid (the reply failed the validator), stale (a forget
+    /// or another change reached its scope after it was made) or expired
+    /// (morning came, or the queue was full).
+    pub jobs_queued: u64,
+    pub jobs_taken: u64,
+    pub jobs_applied: u64,
+    pub jobs_invalid: u64,
+    pub jobs_stale: u64,
+    pub jobs_expired: u64,
+    /// Takes the worker answered after the socket side stopped waiting:
+    /// each job put back, untaken (and not counted taken).
+    pub jobs_put_back: u64,
 }
 
 /// What one scope's tiered store holds, for tests and diagnostics.
@@ -250,6 +311,66 @@ enum Job {
         scope: String,
         reply: SyncSender<Option<View>>,
     },
+    /// The voice's `tiers_sleep_take`: the next job, or none. Judged on the
+    /// worker's clock, as the night is.
+    Take {
+        reply: Handoff<Option<Value>>,
+    },
+    /// The voice's `tiers_sleep_give`: the model's reply for a job.
+    Give {
+        id: String,
+        json: String,
+        reply: Handoff<&'static str>,
+    },
+}
+
+/// A night op's answer, handed from the worker to the socket side that may
+/// stop waiting for it. Under one lock either the answer is handed or the
+/// socket side has given up, never both: an answer handed back to the
+/// worker ([`Handoff::hand`]'s `Err`) is one the voice never saw.
+struct Handoff<T>(Arc<(Mutex<Slot<T>>, Condvar)>);
+
+enum Slot<T> {
+    Waiting,
+    Ready(T),
+    Gone,
+}
+
+impl<T> Handoff<T> {
+    fn new() -> Self {
+        Self(Arc::new((Mutex::new(Slot::Waiting), Condvar::new())))
+    }
+
+    fn other(&self) -> Self {
+        Self(self.0.clone())
+    }
+
+    /// The worker's side: `Err` with the answer when the socket side gave
+    /// up (or the request was dropped unasked).
+    fn hand(&self, answer: T) -> Result<(), T> {
+        let (slot, ready) = &*self.0;
+        let mut slot = slot.lock().unwrap_or_else(|e| e.into_inner());
+        if !matches!(*slot, Slot::Waiting) {
+            return Err(answer);
+        }
+        *slot = Slot::Ready(answer);
+        ready.notify_all();
+        Ok(())
+    }
+
+    /// The socket side: the answer within `wait`, else `None`, after which
+    /// the worker's [`Handoff::hand`] fails.
+    fn wait(&self, wait: Duration) -> Option<T> {
+        let (slot, ready) = &*self.0;
+        let slot = slot.lock().unwrap_or_else(|e| e.into_inner());
+        let (mut slot, _) = ready
+            .wait_timeout_while(slot, wait, |s| matches!(s, Slot::Waiting))
+            .unwrap_or_else(|e| e.into_inner());
+        match std::mem::replace(&mut *slot, Slot::Gone) {
+            Slot::Ready(answer) => Some(answer),
+            Slot::Waiting | Slot::Gone => None,
+        }
+    }
 }
 
 impl Job {
@@ -415,11 +536,11 @@ impl Tiered {
         let epoch = link.epoch.load(Ordering::SeqCst);
         match jobs.try_send(Queued { epoch, job }) {
             Ok(()) => true,
-            Err(TrySendError::Full(_)) => {
+            Err(TrySendError::Full(queued)) => {
                 if writes {
                     link.epoch.fetch_add(1, Ordering::SeqCst);
                     add(&self.tally, |t| t.dropped += 1);
-                } else {
+                } else if matches!(queued.job, Job::Recall { .. }) {
                     add(&self.tally, |t| t.recalls_late += 1);
                 }
                 false
@@ -456,6 +577,84 @@ impl Tiered {
                 add(&self.tally, |t| t.recalls_late += 1);
                 None
             }
+        }
+    }
+}
+
+/// A night op's answer: its line and its log, nothing of the job's words.
+fn night_answer(line: Value, log: String) -> protocol::Answer {
+    protocol::Answer {
+        line: line.to_string(),
+        log,
+        storage_fault: false,
+        wrote: false,
+        forgot: None,
+    }
+}
+
+impl Tiered {
+    /// `tiers_sleep_take` and `tiers_sleep_give`, if `line` is one; `None`
+    /// for anything else, which Days answers. Only lines naming the ops are
+    /// parsed here.
+    fn night_op(&self, line: &[u8]) -> Option<protocol::Answer> {
+        const MARK: &[u8] = b"tiers_sleep_";
+        if !line.windows(MARK.len()).any(|w| w == MARK) {
+            return None;
+        }
+        let request: Value = serde_json::from_slice(line).ok()?;
+        let op = request.get("op").and_then(Value::as_str)?;
+        let refused = |message: &str| {
+            night_answer(
+                json!({"ok":false,"error":"bad_request","message":message}),
+                format!("{op} person=- refused"),
+            )
+        };
+        match op {
+            TAKE_OP => {
+                let answer = Handoff::new();
+                let reply = answer.other();
+                // A take the worker answers after this gave up is put back.
+                let answered = self
+                    .offer(Job::Take { reply })
+                    .then(|| answer.wait(NIGHT_OP_WAIT))
+                    .flatten();
+                let (line, outcome) = match answered {
+                    Some(Some(job)) => (json!({"ok":true,"job":job}), "job"),
+                    Some(None) => (json!({"ok":true,"job":null}), "none"),
+                    // Not waited for: the voice looks again later.
+                    None => (json!({"ok":true,"job":null,"busy":true}), "busy"),
+                };
+                Some(night_answer(line, format!("{op} person=- {outcome}")))
+            }
+            GIVE_OP => {
+                let Some(id) = request.get("job").and_then(Value::as_str) else {
+                    return Some(refused("tiers_sleep_give takes the job's id"));
+                };
+                // A reply that is no JSON object (the voice gives `null` for a
+                // model answer it could not read) drops the job as invalid.
+                let Some(reply) = request.get("reply") else {
+                    return Some(refused("tiers_sleep_give takes the model's reply"));
+                };
+                let answer = Handoff::new();
+                let job = Job::Give {
+                    id: id.to_owned(),
+                    json: reply.to_string(),
+                    reply: answer.other(),
+                };
+                // `busy`: queued, the worker still applies the reply once when
+                // it reaches it; not queued, nothing is applied. Either way
+                // the voice gives it again and is told the outcome.
+                let outcome = if self.offer(job) {
+                    answer.wait(NIGHT_OP_WAIT).unwrap_or("busy")
+                } else {
+                    "busy"
+                };
+                Some(night_answer(
+                    json!({"ok":true,"outcome":outcome}),
+                    format!("{op} person=- {outcome}"),
+                ))
+            }
+            _ => None,
         }
     }
 }
@@ -550,6 +749,11 @@ fn asked(log: &str) -> (&str, &str, bool) {
 
 impl Memory for Tiered {
     fn answer(&mut self, line: &[u8], now_unix_ms: u64) -> protocol::Answer {
+        if self.link.is_some()
+            && let Some(answer) = self.night_op(line)
+        {
+            return answer;
+        }
         let mut answer = crate::days_protocol::answer(&mut self.days, line, now_unix_ms);
         if self.link.is_none() {
             if self.discard {
@@ -632,6 +836,29 @@ struct Worker {
     log: Arc<dyn Fn(&str) + Send + Sync>,
     epoch: Arc<AtomicU64>,
     wiped: u64,
+    /// The night's jobs for the voice, oldest first, at most [`NIGHT_JOBS`].
+    jobs: VecDeque<NightJob>,
+    /// For the jobs' ids: a count, hashed with this process's start.
+    job_seq: u64,
+    job_salt: [u8; 32],
+    /// The latest gives' outcomes by job id ([`GIVEN_KEPT`]).
+    given: VecDeque<(String, &'static str)>,
+}
+
+/// One scope's night pass, waiting for the voice's model. Its input stays
+/// here; the voice is given its words without the scope's name.
+struct NightJob {
+    id: String,
+    scope: String,
+    /// The local day it is for; morning, or another day, expires it.
+    day: i64,
+    input: SleepInput,
+    /// The input as the voice is given it: the store's own bounded JSON
+    /// less its owner.
+    json: Value,
+    pass: usize,
+    taken: bool,
+    lease_until: u64,
 }
 
 fn open_mirror(path: &Path) -> rusqlite::Result<Connection> {
@@ -667,6 +894,15 @@ impl Worker {
             log: options.log,
             epoch,
             wiped: 0,
+            jobs: VecDeque::new(),
+            job_seq: 0,
+            given: VecDeque::new(),
+            job_salt: Sha256::digest(format!(
+                "{}-{:?}",
+                std::process::id(),
+                SystemTime::now().duration_since(UNIX_EPOCH)
+            ))
+            .into(),
         };
         worker.open();
         worker
@@ -734,6 +970,7 @@ impl Worker {
     }
 
     fn wipe(&mut self) {
+        self.drop_jobs(None);
         self.stores.clear();
         self.mirror = None;
         if let Ok(entries) = fs::read_dir(&self.root) {
@@ -816,6 +1053,21 @@ impl Worker {
             Job::View { scope, reply } => {
                 let view = self.view(&scope);
                 let _ = reply.try_send(view);
+            }
+            Job::Take { reply } => {
+                let job = self.take((self.clock)());
+                if let Err(Some(job)) = reply.hand(job)
+                    && let Some(id) = job["id"].as_str()
+                {
+                    // Nobody got it: given out again on the next take.
+                    self.untake(id);
+                }
+            }
+            Job::Give { id, json, reply } => {
+                let outcome = self.give((self.clock)(), &id, &json);
+                if reply.hand(outcome).is_err() {
+                    (self.log)(&format!("tiers night give answered busy: {outcome}"));
+                }
             }
         }
     }
@@ -993,6 +1245,8 @@ impl Worker {
         match result {
             Ok((count, left)) => {
                 add(&self.tally, |t| t.removed += count as u64);
+                // A night's job made before this forget is never applied.
+                self.drop_jobs(Some(scope));
                 // The library may take more than was named (a record whose
                 // words a forgotten one shares): its map rows go too.
                 if let Some(db) = &self.mirror {
@@ -1015,6 +1269,7 @@ impl Worker {
 
     /// The scope's store, its fingerprint key and its map rows, gone.
     fn reset(&mut self, scope: &str) {
+        self.drop_jobs(Some(scope));
         self.stores.remove(scope);
         if Person::new(scope).is_none() {
             return;
@@ -1194,13 +1449,15 @@ impl Worker {
     }
 
     /// Once per local day, in the night's hours, each mirrored scope
-    /// sleeps: its open episode ends, expiry and fading run, and with a
-    /// model its bounded input is proposed on and applied. Without one the
-    /// night is counted `unconfigured`, never a successful night.
+    /// sleeps: its open episode ends, expiry and fading run, and its
+    /// bounded input is proposed on and applied: by this process's model
+    /// when it has one, else as a job the voice takes ([`TAKE_OP`]). A
+    /// night whose job morning reaches untaken is counted `unconfigured`,
+    /// never a successful night.
     fn night(&mut self) {
         let now = (self.clock)();
-        let hour = self.local.hour_of_day(now);
-        if !(NIGHT_FROM_HOUR..NIGHT_UNTIL_HOUR).contains(&hour) || self.mirror.is_none() {
+        self.expire_jobs(now);
+        if !self.in_night(now) || self.mirror.is_none() {
             return;
         }
         let day = self.local.day(now);
@@ -1230,13 +1487,14 @@ impl Worker {
 
     fn sleep(&mut self, scope: &str, now: u64) {
         add(&self.tally, |t| t.nights += 1);
-        let now = now as i64;
+        let at = now as i64;
         let mut sleeper = self.sleeper.take();
         let mut outcome = "nothing";
+        let mut for_voice = None;
         if let Some(store) = self.store(scope) {
             let prepared = store
-                .owner_left(now)
-                .and_then(|()| store.maintain(now, Arm::Tiers).map(|_| ()));
+                .owner_left(at)
+                .and_then(|()| store.maintain(at, Arm::Tiers).map(|_| ()));
             if let Err(error) = prepared {
                 outcome = "failed";
                 let line = format!("tiers night failed: {error}");
@@ -1244,7 +1502,7 @@ impl Worker {
                 (self.log)(&line);
             } else {
                 for _ in 0..NIGHT_PASSES {
-                    let input = match store.prepare_sleep(now, PassKind::Nightly) {
+                    let input = match store.prepare_sleep(at, PassKind::Nightly) {
                         Ok(Some(input)) => input,
                         Ok(None) => break,
                         Err(_) => {
@@ -1253,7 +1511,9 @@ impl Worker {
                         }
                     };
                     let Some(model) = sleeper.as_mut() else {
-                        outcome = "unconfigured";
+                        // The voice does it: one job a pass, the next
+                        // queued when this one is given back.
+                        for_voice = Some(input);
                         break;
                     };
                     let applied = model
@@ -1276,12 +1536,24 @@ impl Worker {
             }
         }
         self.sleeper = sleeper;
+        if let Some(input) = for_voice {
+            outcome = if self.queue_job(scope, input, 0, now) {
+                "queued"
+            } else {
+                "failed"
+            };
+        }
         add(&self.tally, |t| match outcome {
             "applied" => t.nights_applied += 1,
-            "unconfigured" => t.nights_unconfigured += 1,
             "failed" => t.nights_failed += 1,
             _ => {}
         });
+        self.said_night(scope, outcome);
+    }
+
+    /// `tiers night person=<scope> model=<outcome>` with the store's
+    /// counts: no words of it.
+    fn said_night(&mut self, scope: &str, outcome: &str) {
         let counts = self.view(scope).map_or((0, 0, 0, 0), |v| {
             (
                 v.records.len(),
@@ -1294,5 +1566,207 @@ impl Worker {
             "tiers night person={scope} model={outcome} records={} facts={} lines={} episodes={}",
             counts.0, counts.1, counts.2, counts.3
         ));
+    }
+
+    fn in_night(&self, now: u64) -> bool {
+        (NIGHT_FROM_HOUR..NIGHT_UNTIL_HOUR).contains(&self.local.hour_of_day(now))
+    }
+
+    /// A pass's input queued for the voice; false when the queue is full
+    /// (counted expired, and for a night's first pass its night failed:
+    /// its records wait for the next night) or the input can no longer be
+    /// given.
+    fn queue_job(&mut self, scope: &str, input: SleepInput, pass: usize, now: u64) -> bool {
+        if self.jobs.len() >= NIGHT_JOBS {
+            add(&self.tally, |t| t.jobs_expired += 1);
+            return false;
+        }
+        let Some(mut json) = input
+            .json()
+            .ok()
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        else {
+            add(&self.tally, |t| t.jobs_stale += 1);
+            return false;
+        };
+        // The scope's name is not the model's business: the voice is given
+        // the words, never whose store they are.
+        if let Some(object) = json.as_object_mut() {
+            object.remove("owner");
+        }
+        self.job_seq += 1;
+        let mut hash = Sha256::new();
+        hash.update(self.job_salt);
+        hash.update(self.job_seq.to_le_bytes());
+        let id: String = hash.finalize()[..8]
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        self.jobs.push_back(NightJob {
+            id,
+            scope: scope.to_owned(),
+            day: self.local.day(now),
+            input,
+            json,
+            pass,
+            taken: false,
+            lease_until: 0,
+        });
+        add(&self.tally, |t| t.jobs_queued += 1);
+        true
+    }
+
+    /// Jobs morning reached, or of another day: dropped, counted expired; a
+    /// night whose first pass was never taken is counted `unconfigured`.
+    fn expire_jobs(&mut self, now: u64) {
+        let (night, day) = (self.in_night(now), self.local.day(now));
+        let before = self.jobs.len();
+        let mut untaken = 0;
+        self.jobs.retain(|job| {
+            let keep = night && job.day == day && !(job.taken && job.lease_until <= now);
+            if !keep && !job.taken && job.pass == 0 {
+                untaken += 1;
+            }
+            keep
+        });
+        let expired = (before - self.jobs.len()) as u64;
+        if expired > 0 {
+            add(&self.tally, |t| {
+                t.jobs_expired += expired;
+                t.nights_unconfigured += untaken;
+            });
+            (self.log)(&format!(
+                "tiers night jobs expired={expired} untaken={untaken}"
+            ));
+        }
+    }
+
+    /// A scope's jobs (or every one), dropped as stale: a forget or a reset
+    /// reached the store they were made from.
+    fn drop_jobs(&mut self, scope: Option<&str>) {
+        let before = self.jobs.len();
+        self.jobs
+            .retain(|job| scope.is_some_and(|scope| job.scope != scope));
+        let dropped = (before - self.jobs.len()) as u64;
+        if dropped > 0 {
+            add(&self.tally, |t| t.jobs_stale += dropped);
+        }
+    }
+
+    /// The voice's take: the oldest job never given out, its id, the
+    /// model's instructions and the input.
+    fn take(&mut self, now: u64) -> Option<Value> {
+        self.expire_jobs(now);
+        let job = self.jobs.iter_mut().find(|job| !job.taken)?;
+        job.taken = true;
+        job.lease_until = now.saturating_add(JOB_LEASE.as_millis() as u64);
+        let given = json!({
+            "id": job.id,
+            "system": lamp_memory_tiers::model::PROMPT,
+            "input": job.json,
+        });
+        add(&self.tally, |t| t.jobs_taken += 1);
+        Some(given)
+    }
+
+    /// A take whose answer reached nobody (the socket side stopped waiting):
+    /// the job is untaken, the next take's again.
+    fn untake(&mut self, id: &str) {
+        if let Some(job) = self.jobs.iter_mut().find(|job| job.id == id && job.taken) {
+            job.taken = false;
+            job.lease_until = 0;
+            add(&self.tally, |t| {
+                t.jobs_taken = t.jobs_taken.saturating_sub(1);
+                t.jobs_put_back += 1;
+            });
+            (self.log)("tiers night take answered late: the job put back");
+        }
+    }
+
+    /// The voice's give: the model's reply for job `id`, applied through
+    /// the tiered store's own validator, or why not. A job whose sources a
+    /// forget took (the store's records, or Days' entries they were
+    /// written from) since it was made is stale and never applied.
+    fn give(&mut self, now: u64, id: &str, reply: &str) -> &'static str {
+        self.expire_jobs(now);
+        // Given before (its answer was `busy`): the same outcome, nothing
+        // applied again.
+        if let Some((_, outcome)) = self.given.iter().find(|(given, _)| given == id) {
+            return outcome;
+        }
+        let Some(at) = self.jobs.iter().position(|job| job.id == id) else {
+            return "unknown";
+        };
+        let Some(job) = self.jobs.remove(at) else {
+            return "unknown";
+        };
+        let outcome = self.give_job(now, job, reply);
+        if self.given.len() >= GIVEN_KEPT {
+            self.given.pop_front();
+        }
+        self.given.push_back((id.to_owned(), outcome));
+        outcome
+    }
+
+    fn give_job(&mut self, now: u64, job: NightJob, reply: &str) -> &'static str {
+        // Dropped whatever happens next: a reply that fails the checks is
+        // never asked again.
+        if !reply.starts_with('{') {
+            add(&self.tally, |t| t.jobs_invalid += 1);
+            self.said_night(&job.scope, "invalid");
+            return "invalid";
+        }
+        let mapped: HashSet<i64> = self
+            .map_of(&job.scope)
+            .into_iter()
+            .map(|(_, r)| r)
+            .collect();
+        let mut next = None;
+        let outcome = match self.store(&job.scope) {
+            None => "stale",
+            Some(store) => {
+                let present: Option<HashSet<i64>> = store
+                    .records(Access::OWNER_ALONE)
+                    .ok()
+                    .map(|records| records.iter().map(|r| r.id).collect());
+                let sources_held = present.is_some_and(|present| {
+                    job.input
+                        .records()
+                        .iter()
+                        .all(|r| present.contains(&r.id) && mapped.contains(&r.id))
+                });
+                if !sources_held {
+                    "stale"
+                } else {
+                    match store.apply_sleep(&job.input, reply) {
+                        Ok(report) if report.pending && job.pass + 1 < NIGHT_PASSES => {
+                            next = store
+                                .prepare_sleep(now as i64, PassKind::Nightly)
+                                .ok()
+                                .flatten();
+                            "applied"
+                        }
+                        Ok(_) => "applied",
+                        Err(lamp_memory_tiers::Error::Stale) => "stale",
+                        Err(_) => "invalid",
+                    }
+                }
+            }
+        };
+        add(&self.tally, |t| match outcome {
+            "applied" => {
+                t.jobs_applied += 1;
+                if job.pass == 0 {
+                    t.nights_applied += 1;
+                }
+            }
+            "invalid" => t.jobs_invalid += 1,
+            _ => t.jobs_stale += 1,
+        });
+        if let Some(next) = next {
+            self.queue_job(&job.scope, next, job.pass + 1, now);
+        }
+        self.said_night(&job.scope, outcome);
+        outcome
     }
 }

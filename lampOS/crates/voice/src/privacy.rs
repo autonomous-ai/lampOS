@@ -101,6 +101,9 @@ impl PrivacyGate {
         // The memory's nightly pass works only with the slide open and
         // stops the moment it closes (`LAMP_MEMORY_NIGHTLY`).
         crate::nightly::privacy(allowed);
+        // The memory's night works only with the slide open and stops the
+        // moment it closes (`LAMP_MEMORY_TIERS`).
+        crate::tiers_night::privacy(allowed);
         allowed
     }
 
@@ -136,6 +139,7 @@ impl PrivacyGate {
         self.allowed_since = None;
         self.last_muted = None;
         crate::nightly::privacy(false);
+        crate::tiers_night::privacy(false);
     }
 }
 

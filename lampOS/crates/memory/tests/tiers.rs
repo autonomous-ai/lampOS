@@ -90,6 +90,20 @@ impl Sleeper for Model {
     }
 }
 
+/// The fake model's proposal from the input as the voice is given it.
+fn propose(input: &Value) -> Value {
+    let records = input["records"].as_array().unwrap();
+    let mut facts = vec![];
+    let mut lines = vec![];
+    for r in records.iter().filter(|r| r["speaker"] == "owner") {
+        let (id, text) = (r["id"].as_i64().unwrap(), r["text"].as_str().unwrap());
+        let key = format!("k{id}");
+        facts.push(json!({"key":key,"claim":format!("They said {text}"),"record_ids":[id],"strength":"said","kind":"preference","true_since_ms":r["at_ms"],"true_until_ms":null,"supersedes":null}));
+        lines.push(json!({"replaces":null,"kind":"owner_model","text":format!("Cares about {text}"),"fact_ids":[],"fact_keys":[key]}));
+    }
+    json!({"facts":facts,"lines":lines,"episodes":[]})
+}
+
 /// A model that holds the worker until told to go on.
 struct Held(Arc<Mutex<mpsc::Receiver<()>>>);
 impl Sleeper for Held {
@@ -136,6 +150,17 @@ fn lamp_with(
     }
 }
 
+/// Every job queued so far done. `settle` gives up after its own 30 s;
+/// on a loaded host (the whole file's tests at once, each store's key and
+/// fsyncs) one night can take longer, so it is asked again, up to four
+/// times, before the test fails.
+fn settled(tiered: &Tiered) {
+    assert!(
+        (0..4).any(|_| tiered.settle()),
+        "the tiers' thread never settled"
+    );
+}
+
 fn ask(memory: &mut impl Memory, request: Value) -> Value {
     let answer = memory.answer(request.to_string().as_bytes(), NOON);
     serde_json::from_str(&answer.line).unwrap()
@@ -156,18 +181,60 @@ impl Lamp {
         answer["id"].as_u64().unwrap()
     }
     fn view(&self, scope: &str) -> tiers::View {
-        assert!(self.tiered.settle());
+        settled(&self.tiered);
         self.tiered.view(scope).unwrap_or_default()
     }
     fn tally(&self) -> Tally {
-        assert!(self.tiered.settle());
+        settled(&self.tiered);
         self.tiered.tally()
+    }
+    /// 07:00 the same morning, past the night's hours, and the worker's
+    /// look at it.
+    fn morning(&self) {
+        self.clock
+            .store(NIGHT + 3 * HOUR + HOUR / 2, Ordering::SeqCst);
+        settled(&self.tiered);
+        settled(&self.tiered);
+    }
+    /// The voice's take: its line, and its job if it has one.
+    fn take_line(&mut self) -> (String, Option<Value>) {
+        let line = self
+            .tiered
+            .answer(
+                json!({"op":"tiers_sleep_take"}).to_string().as_bytes(),
+                NOON,
+            )
+            .line;
+        let answer: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(answer["ok"], true, "{line}");
+        if answer["busy"] == true {
+            // The tiers' thread was slow (a loaded host): as the voice
+            // does, look again once it is done.
+            settled(&self.tiered);
+            return self.take_line();
+        }
+        let job = Some(answer["job"].clone()).filter(|j| !j.is_null());
+        (line, job)
+    }
+    fn take(&mut self) -> Option<Value> {
+        self.take_line().1
+    }
+    fn give(&mut self, id: &Value, reply: Value) -> String {
+        let answer = self.ask(json!({"op":"tiers_sleep_give","job":id,"reply":reply}));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let outcome = answer["outcome"].as_str().unwrap().to_owned();
+        if outcome == "busy" {
+            // As the voice does: given again, told the one outcome.
+            settled(&self.tiered);
+            return self.give(id, reply);
+        }
+        outcome
     }
     /// The clock at 03:30, and the worker's night run.
     fn sleep(&self) {
         self.clock.store(NIGHT, Ordering::SeqCst);
-        assert!(self.tiered.settle());
-        assert!(self.tiered.settle());
+        settled(&self.tiered);
+        settled(&self.tiered);
     }
 }
 
@@ -398,7 +465,7 @@ fn the_night_runs_once_and_what_it_made_from_forgotten_words_goes() {
         "{view:?}"
     );
     // Once a night.
-    assert!(lamp.tiered.settle());
+    settled(&lamp.tiered);
     assert_eq!(lamp.tally().nights, 1);
     lamp.ask(json!({"op":"forget","person":P1,"id":a,"selective":true}));
     let view = lamp.view(P1);
@@ -413,24 +480,381 @@ fn the_night_runs_once_and_what_it_made_from_forgotten_words_goes() {
     );
 }
 
-/// Without a model (the product's lamp-memory has no network) the night
-/// still ends episodes and expires, and is counted unconfigured.
+/// Without a model in lamp-memory (it has no network) the night is a job
+/// for the voice; one morning reaches untaken is counted unconfigured.
 #[test]
-fn a_night_without_a_model_is_counted_unconfigured() {
+fn a_night_without_a_model_is_a_job_for_the_voice_and_morning_expires_it() {
     let scratch = Scratch::new("unconfigured");
     let mut lamp = lamp(&scratch, Mode::Shadow, None);
     lamp.exchange(P1, "I like green tea", "Me too");
     lamp.sleep();
     let tally = lamp.tally();
     assert_eq!(
-        (
-            tally.nights,
-            tally.nights_unconfigured,
-            tally.nights_applied
-        ),
-        (1, 1, 0)
+        (tally.nights, tally.jobs_queued, tally.nights_applied),
+        (1, 1, 0),
+        "{tally:?}"
     );
     assert!(lamp.view(P1).facts.is_empty());
+    lamp.morning();
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_expired, tally.nights_unconfigured),
+        (1, 1),
+        "{tally:?}"
+    );
+    lamp.clock.store(NIGHT, Ordering::SeqCst);
+    assert!(lamp.take().is_none());
+}
+
+/// The voice's night: its take gives the input without the scope's name;
+/// its give of the model's reply applies it; the next take finds none.
+#[test]
+fn a_job_taken_and_given_back_makes_the_nights_tiers() {
+    let scratch = Scratch::new("voice-night");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.sleep();
+    let (line, job) = lamp.take_line();
+    assert!(!line.contains(P1), "the scope is named: {line}");
+    let job = job.expect("a job");
+    assert_eq!(job["system"], lamp_memory_tiers::model::PROMPT);
+    let reply = propose(&job["input"]);
+    assert_eq!(lamp.give(&job["id"], reply), "applied");
+    let view = lamp.view(P1);
+    assert!(view.facts.iter().any(|f| f.contains("peanuts")), "{view:?}");
+    assert!(view.lines.iter().any(|l| l.contains("peanuts")), "{view:?}");
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_taken, tally.jobs_applied, tally.nights_applied),
+        (1, 1, 1)
+    );
+    assert!(lamp.take().is_none());
+    // A forget takes what the voice's night made of it.
+    lamp.ask(json!({"op":"forget_last","person":P1}));
+    assert!(!lamp.view(P1).holds("peanuts"));
+}
+
+/// A reply that fails the store's checks is dropped and never offered
+/// again; so is one the voice could not read (`null`). A give of it again
+/// is told its first outcome, and applies nothing.
+#[test]
+fn an_invalid_reply_is_dropped_never_retried() {
+    let scratch = Scratch::new("voice-invalid");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I play chess on Fridays", "Fun");
+    lamp.exchange(P2, "I play the cello", "Lovely");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    // A fact citing a record outside the batch.
+    let bad = json!({"facts":[{"key":"k","claim":"They said x","record_ids":[999],"strength":"said","kind":"preference","true_since_ms":NOON,"true_until_ms":null,"supersedes":null}],"lines":[],"episodes":[]});
+    assert_eq!(lamp.give(&job["id"], bad), "invalid");
+    let other = lamp.take().unwrap();
+    assert_ne!(other["id"], job["id"]);
+    assert_eq!(lamp.give(&other["id"], Value::Null), "invalid");
+    assert!(lamp.take().is_none());
+    assert_eq!(lamp.give(&job["id"], propose(&job["input"])), "invalid");
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_invalid, tally.jobs_applied),
+        (2, 0),
+        "{tally:?}"
+    );
+    assert!(lamp.view(P1).facts.is_empty() && lamp.view(P2).facts.is_empty());
+}
+
+/// A forget between the take and the give: the job is stale and nothing
+/// of it is applied.
+#[test]
+fn a_forget_between_take_and_give_makes_the_job_stale() {
+    let scratch = Scratch::new("voice-forgot");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.exchange(P1, "I love hiking in Sapa", "Sounds fun");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    let reply = propose(&job["input"]);
+    lamp.ask(json!({"op":"forget_last","person":P1}));
+    assert_eq!(lamp.give(&job["id"], reply), "unknown");
+    let view = lamp.view(P1);
+    assert!(view.facts.is_empty() && !view.holds("Sapa"), "{view:?}");
+    assert!(lamp.tally().jobs_stale >= 1);
+    // A forget of everything of the scope, likewise.
+    let scratch = Scratch::new("voice-forgot-all");
+    let mut lamp = self::lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    lamp.ask(json!({"op":"forget_all","person":P1}));
+    assert_eq!(lamp.give(&job["id"], propose(&job["input"])), "unknown");
+    assert!(lamp.tiered.view(P1).is_none_or(|v| v.facts.is_empty()));
+}
+
+/// A take the tiers' thread answers only after the socket side stopped
+/// waiting (a slow disk): the voice is told none, and the job is put back,
+/// the next take's, rather than held by no one until its lease ends.
+#[test]
+fn a_take_answered_too_late_puts_its_job_back_for_the_next_take() {
+    use std::sync::atomic::AtomicBool;
+    let scratch = Scratch::new("voice-slow-take");
+    let clock = Arc::new(AtomicU64::new(NOON));
+    let slow = Arc::new(AtomicBool::new(false));
+    let mut options = tiers::Options::new(scratch.0.clone(), Mode::Shadow, LocalTime::Offset(0));
+    let (read, stall) = (clock.clone(), slow.clone());
+    // The worker reads its clock first thing in a take: a slow worker.
+    options.clock = Box::new(move || {
+        if stall.swap(false, Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(400));
+        }
+        read.load(Ordering::SeqCst)
+    });
+    let logged = Arc::new(Mutex::new(vec![]));
+    let into = logged.clone();
+    options.log = Arc::new(move |line| into.lock().unwrap().push(line.to_owned()));
+    let mut lamp = Lamp {
+        tiered: Tiered::start(scratch.days(), options),
+        clock,
+        logged,
+    };
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.sleep();
+    // Only this take waits briefly; every other op keeps the real wait.
+    slow.store(true, Ordering::SeqCst);
+    let started = std::time::Instant::now();
+    let answer = lamp.ask(json!({"op":"tiers_sleep_take"}));
+    assert!(started.elapsed() < FIRST_READ, "{:?}", started.elapsed());
+    assert_eq!(
+        (answer["job"].is_null(), answer["busy"] == true),
+        (true, true),
+        "{answer}"
+    );
+    // Once the worker is done with it, the job is there again.
+    settled(&lamp.tiered);
+    let job = lamp.take().expect("the job put back");
+    assert_eq!(lamp.give(&job["id"], propose(&job["input"])), "applied");
+    let tally = lamp.tally();
+    assert_eq!(
+        (
+            tally.jobs_put_back,
+            tally.jobs_taken,
+            tally.jobs_applied,
+            tally.jobs_expired
+        ),
+        (1, 1, 1, 0),
+        "{tally:?}"
+    );
+    assert!(lamp.view(P1).facts.iter().any(|f| f.contains("peanuts")));
+    assert!(
+        lamp.logged
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|l| l == "tiers night take answered late: the job put back")
+    );
+}
+
+/// A turn's first memory read waits at most this (`remember::FIRST_READ`).
+const FIRST_READ: Duration = Duration::from_millis(300);
+
+/// The memory server answers one connection at a time: a give the tiers'
+/// thread is slow on answers `busy` at once, so a `recall` sent right after
+/// it (a person speaking at 04:00) is answered within a turn's first read.
+/// The reply is still applied, once: the voice's give again is told
+/// `applied`, and a third give the same.
+#[test]
+fn a_recall_during_a_slow_give_is_answered_within_a_turns_first_read() {
+    use std::sync::atomic::AtomicBool;
+    let scratch = Scratch::new("voice-slow-give");
+    let clock = Arc::new(AtomicU64::new(NOON));
+    let slow = Arc::new(AtomicBool::new(false));
+    let mut options = tiers::Options::new(scratch.0.clone(), Mode::Shadow, LocalTime::Offset(0));
+    let (read, stall) = (clock.clone(), slow.clone());
+    // The worker reads its clock first thing in a give: a slow worker.
+    options.clock = Box::new(move || {
+        if stall.swap(false, Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(1500));
+        }
+        read.load(Ordering::SeqCst)
+    });
+    let logged = Arc::new(Mutex::new(vec![]));
+    let into = logged.clone();
+    options.log = Arc::new(move |line| into.lock().unwrap().push(line.to_owned()));
+    let mut lamp = Lamp {
+        tiered: Tiered::start(scratch.days(), options),
+        clock,
+        logged,
+    };
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    let reply = propose(&job["input"]);
+    slow.store(true, Ordering::SeqCst);
+    let started = std::time::Instant::now();
+    let given = lamp.ask(json!({"op":"tiers_sleep_give","job":job["id"],"reply":reply}));
+    let recalled = lamp.ask(json!({"op":"recall","person":P1,"query":"peanuts"}));
+    let took = started.elapsed();
+    assert_eq!(given["outcome"], "busy", "{given}");
+    assert_eq!(recalled["ok"], true, "{recalled}");
+    assert!(took < FIRST_READ, "the give and the recall took {took:?}");
+    // The voice gives it again: applied once, whatever the tries.
+    assert_eq!(lamp.give(&job["id"], reply.clone()), "applied");
+    assert_eq!(lamp.give(&job["id"], reply), "applied");
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_applied, tally.nights_applied),
+        (1, 1),
+        "{tally:?}"
+    );
+    assert!(lamp.view(P1).facts.iter().any(|f| f.contains("peanuts")));
+}
+
+/// A job whose sources the tiers no longer hold, with no forget to drop
+/// it (a mapping lost from under the worker): the give's own recheck makes
+/// it stale, and nothing of it is applied.
+#[test]
+fn a_give_whose_sources_are_gone_without_a_forget_is_stale() {
+    let scratch = Scratch::new("voice-unheld");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.sleep();
+    let job = lamp.take().unwrap();
+    settled(&lamp.tiered);
+    // The worker is idle: the mirror's map rows go behind its back, so no
+    // forget runs and the job stays queued.
+    let mirror = scratch.0.join(tiers::DIR).join("mirror.sqlite3");
+    let db = rusqlite::Connection::open(&mirror).unwrap();
+    db.busy_timeout(Duration::from_secs(5)).unwrap();
+    let gone = db.execute("DELETE FROM map WHERE scope=?1", [P1]).unwrap();
+    assert!(gone > 0);
+    drop(db);
+    assert_eq!(lamp.give(&job["id"], propose(&job["input"])), "stale");
+    let tally = lamp.tally();
+    assert_eq!((tally.jobs_stale, tally.jobs_applied), (1, 0), "{tally:?}");
+    assert!(lamp.view(P1).facts.is_empty());
+}
+
+/// Morning: a job taken but not given back, or never taken, expires; a
+/// give after it finds nothing. A taken job not given within its lease
+/// is dropped, not offered again.
+#[test]
+fn jobs_expire_by_morning_and_after_their_lease() {
+    let scratch = Scratch::new("voice-expire");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.exchange(P2, "I play the cello", "Lovely");
+    lamp.sleep();
+    let first = lamp.take().unwrap();
+    lamp.clock.store(
+        NIGHT + tiers::JOB_LEASE.as_millis() as u64 + 1,
+        Ordering::SeqCst,
+    );
+    let second = lamp.take().unwrap();
+    assert_ne!(first["id"], second["id"]);
+    assert_eq!(lamp.give(&first["id"], propose(&first["input"])), "unknown");
+    lamp.morning();
+    assert_eq!(
+        lamp.give(&second["id"], propose(&second["input"])),
+        "unknown"
+    );
+    let tally = lamp.tally();
+    assert_eq!(
+        (tally.jobs_expired, tally.jobs_applied),
+        (2, 0),
+        "{tally:?}"
+    );
+    assert!(lamp.view(P1).facts.is_empty());
+}
+
+/// End to end with the voice's own night (`lamp_voice::tiers_night`) and a
+/// fake model: quiet at night, a night makes the tiers' summaries.
+#[test]
+fn the_voices_night_with_a_fake_model_makes_the_tiers() {
+    use lamp_voice::tiers_night::{self as night, Job, Lamp as _};
+    let scratch = Scratch::new("voice-e2e");
+    let mut lamp = lamp(&scratch, Mode::Shadow, None);
+    lamp.exchange(P1, "I am allergic to peanuts", "I will remember");
+    lamp.exchange(P2, "I play the cello", "Lovely");
+    lamp.sleep();
+    struct Direct<'a>(&'a mut Tiered);
+    impl night::Memory for Direct<'_> {
+        fn take(&mut self) -> Option<Job> {
+            // The tiers' thread idle first, so no op answers `busy` on a
+            // loaded host.
+            settled(self.0);
+            let line = json!({"op":"tiers_sleep_take"}).to_string();
+            let answer: Value =
+                serde_json::from_str(&self.0.answer(line.as_bytes(), NIGHT).line).ok()?;
+            night::job_of(&answer)
+        }
+        fn give(&mut self, id: &str, reply: Value) -> Option<String> {
+            settled(self.0);
+            let line = json!({"op":"tiers_sleep_give","job":id,"reply":reply}).to_string();
+            let answer: Value =
+                serde_json::from_str(&self.0.answer(line.as_bytes(), NIGHT).line).ok()?;
+            answer["outcome"].as_str().map(str::to_owned)
+        }
+    }
+    struct Quiet;
+    impl night::Lamp for Quiet {
+        fn stirs(&self) -> u64 {
+            0
+        }
+        fn quiet_for(&self) -> Duration {
+            night::QUIET_FOR
+        }
+        fn open(&self) -> bool {
+            true
+        }
+    }
+    struct Fake;
+    impl night::Model for Fake {
+        fn ask<'a>(&'a self, system: &'a str, input: &'a str) -> night::Asked<'a> {
+            assert_eq!(system, lamp_memory_tiers::model::PROMPT);
+            let reply = propose(&serde_json::from_str(input).unwrap()).to_string();
+            Box::pin(async move {
+                Some(night::Reply {
+                    text: reply,
+                    tokens: Some(100),
+                })
+            })
+        }
+    }
+    assert!(Quiet.open());
+    {
+        let mut voice =
+            night::Night::new(Direct(&mut lamp.tiered), Quiet, Fake, LocalTime::Offset(0)).unwrap();
+        voice.clock = Box::new(|| NIGHT);
+        voice.log = Arc::new(|_| {});
+        // A give the tiers' thread is slow on (a loaded host) is `busy`
+        // and given again by the next step, as the voice's run does.
+        let mut step = || loop {
+            let step = voice.step();
+            if step != night::Step::Busy {
+                break step;
+            }
+        };
+        assert_eq!(step(), night::Step::Given("applied".into()));
+        assert_eq!(step(), night::Step::Given("applied".into()));
+        assert_eq!(step(), night::Step::NoJob);
+    }
+    assert!(lamp.view(P1).facts.iter().any(|f| f.contains("peanuts")));
+    assert!(lamp.view(P2).facts.iter().any(|f| f.contains("cello")));
+    assert!(!lamp.view(P1).holds("cello") && !lamp.view(P2).holds("peanuts"));
+}
+
+/// Switch off, Days alone refuses the night's ops as any unknown op, and
+/// nothing is written beside it.
+#[test]
+fn switch_off_the_nights_ops_are_refused_and_nothing_changes() {
+    let scratch = Scratch::new("voice-off");
+    let mut days = scratch.days();
+    let take = ask(&mut days, json!({"op":"tiers_sleep_take"}));
+    assert_eq!(take["ok"], false, "{take}");
+    let give = ask(
+        &mut days,
+        json!({"op":"tiers_sleep_give","job":"x","reply":{}}),
+    );
+    assert_eq!(give["ok"], false, "{give}");
+    assert!(!scratch.0.join(tiers::DIR).exists());
 }
 
 #[test]
@@ -463,7 +887,7 @@ fn on_adds_the_tiers_beside_days_answer_and_shadow_never_does() {
     let mut on = lamp(&o, Mode::On, None);
     for lamp in [&mut shadow, &mut on] {
         lamp.keep(P1, "the wifi password is on the fridge", &[]);
-        assert!(lamp.tiered.settle());
+        settled(&lamp.tiered);
     }
     let request = json!({"op":"recall","person":P1,"query":"wifi password"});
     let quiet = shadow.ask(request.clone());
@@ -507,7 +931,7 @@ fn a_full_queue_empties_the_tiers_rather_than_lose_a_forget() {
     let held = Held(Arc::new(Mutex::new(wait)));
     let mut lamp = lamp_with(&scratch, Mode::Shadow, Some(Box::new(held)), 2);
     let secret = lamp.exchange(P1, "the safe opens with 1984", "Noted");
-    assert!(lamp.tiered.settle());
+    settled(&lamp.tiered);
     // The night holds the worker in the model.
     lamp.clock.store(NIGHT, Ordering::SeqCst);
     lamp.exchange(P1, "wake the worker", "Awake");

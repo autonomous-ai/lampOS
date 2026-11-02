@@ -213,6 +213,8 @@ impl CloudRequest {
         // A line handed on stops the memory's nightly pass
         // (`LAMP_MEMORY_NIGHTLY`); off, one load.
         crate::nightly::stir();
+        // A line handed on stops the memory's night (`LAMP_MEMORY_TIERS`).
+        crate::tiers_night::stir();
         match command {
             ProviderInput::Start { .. } => self.start_submitted = true,
             ProviderInput::End { .. } => self.input_end_submitted = true,
