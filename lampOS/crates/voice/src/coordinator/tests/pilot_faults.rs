@@ -1041,6 +1041,7 @@ impl Peers {
                     | ProviderInput::Written { .. }
                     | ProviderInput::Called { .. }
                     | ProviderInput::Paused { .. }
+                    | ProviderInput::PauseJoin { .. }
                     | ProviderInput::CountOnly { .. }
                     | ProviderInput::StepCall { .. }
                     | ProviderInput::Onboarding { .. },

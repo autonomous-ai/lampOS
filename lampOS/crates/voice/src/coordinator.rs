@@ -766,6 +766,37 @@ fn motion_voice_heard(
     (crate::motion_voice::decide(mode, levels.as_ref()), levels)
 }
 
+/// `LAMP_ENDPOINT_PAUSE_JOIN` (#4449, Sixth's P3 on #4916): `waits`, as
+/// [`while_answer_waits`] judged a sound set off in the grace after a line
+/// whose speech ended at `speech_end_us`, decided by the grace's end
+/// ([`crate::pause_join::decide_by`]) while that line's answer is still
+/// kept back: a sound still waiting then is let go when it has gone quiet
+/// for 300 ms (a cough), else it takes the turn and the second route joins
+/// it to the line. Before then, and any other verdict, as judged: a sound
+/// that ended is let go and the answer goes on.
+///
+/// A sound set off after about 1.1 s in the grace cannot show 300 ms of
+/// quiet by `decide_by`, so a late cough takes the turn and the line is
+/// answered in the empty line's place, by a new chat. Accepted and counted
+/// in the lamp check (Seventh's P3 on #4916): deciding later, at the
+/// trigger plus 300 ms, would pass the second worker's hold (`kept_ms`,
+/// the grace's end), which nothing here can lengthen, so the Start would
+/// reach it after the answer went on.
+fn in_the_grace(
+    waits: WhileAnswerWaits,
+    speech_end_us: u64,
+    pause_blocks: u16,
+    at_us: u64,
+) -> WhileAnswerWaits {
+    if waits != WhileAnswerWaits::Wait || at_us < crate::pause_join::decide_by(speech_end_us) {
+        waits
+    } else if pause_blocks >= WAIT_QUIET_BLOCKS {
+        WhileAnswerWaits::LetGo("quiet")
+    } else {
+        WhileAnswerWaits::Decide
+    }
+}
+
 /// [`WhileAnswerWaits`] for `candidate` at `at_us`: `ended` if its sound is
 /// over, and the detector's pause in blocks.
 fn while_answer_waits(
@@ -3940,6 +3971,7 @@ fn flush_provider_input_with(
             | ProviderInput::End { request, .. }
             | ProviderInput::Called { request, .. }
             | ProviderInput::Paused { request, .. }
+            | ProviderInput::PauseJoin { request, .. }
             | ProviderInput::CountOnly { request, .. }
             | ProviderInput::StepCall { request, .. }
             | ProviderInput::Onboarding { request, .. }
@@ -5992,6 +6024,12 @@ fn conversation_with_gate_inner(
     // The turn in hand that was only the lamp's name, and when its speech
     // ended (`LAMP_CALL_TAKES_NEXT_LINE`).
     let mut call_turn: Option<(u64, u64)> = None;
+    // The turn in hand a confident verdict ended, and when its speech ended,
+    // for speech that goes on from it in the grace
+    // (`LAMP_ENDPOINT_PAUSE_JOIN`, [`crate::pause_join`]): the second route's
+    // only, never kept with the switch off.
+    let pause_join = crate::pause_join::from_environment() && rig.provider.role == "second";
+    let mut pause_turn: Option<(u64, u64)> = None;
     // The turn that was asked while the room was busy, and when the lamp
     // began to be heard answering it.
     let mut asked_in_busy_room: Option<u64> = None;
@@ -9366,6 +9404,22 @@ fn conversation_with_gate_inner(
                             .map(|current| (current.owner.turn(), answer_unheard(current))),
                         candidate.first_read_at_us,
                     );
+                    // Speech set off in the grace after a line a confident
+                    // verdict ended, none of its answer heard
+                    // (`LAMP_ENDPOINT_PAUSE_JOIN`): heard as any sound while
+                    // an answer waits, the body's motors and a cough let go
+                    // as before (Sixth's P3 on #4916), but decided by the
+                    // grace's end, while the answer is still kept back, so
+                    // the second route joins the two ([`in_the_grace`]).
+                    let after_the_pause = crate::pause_join::goes_on(
+                        pause_turn,
+                        reply
+                            .as_ref()
+                            .map(|current| (current.owner.turn(), answer_unheard(current))),
+                        candidate.trigger_read_at_us,
+                    )
+                    .then(|| pause_turn.map(|(_, speech_end_us)| speech_end_us))
+                    .flatten();
                     if paused {
                         // Paused by the keeper: a new sound takes no turn,
                         // whether or not one is under way; that one goes on.
@@ -9701,14 +9755,20 @@ fn conversation_with_gate_inner(
                     let mut waits = if goes_on_from_name || after_the_call {
                         WhileAnswerWaits::Decide
                     } else {
-                        while_answer_waits(
+                        let waits = while_answer_waits(
                             wait,
                             reply.as_ref(),
                             &candidate,
                             admission.pending_ended(),
                             detector.pause_blocks(),
                             at_us,
-                        )
+                        );
+                        match after_the_pause {
+                            Some(speech_end_us) => {
+                                in_the_grace(waits, speech_end_us, detector.pause_blocks(), at_us)
+                            }
+                            None => waits,
+                        }
                     };
                     // With `words`, its words too (step 2).
                     if let Some(words) = wait_words
@@ -10079,7 +10139,17 @@ fn conversation_with_gate_inner(
                             reply.as_ref().map_or(0, |current| current.owner.turn())
                         );
                     }
-                    if after_the_call {
+                    if after_the_pause.is_some() {
+                        pause_turn = None;
+                        eprintln!(
+                            "lamp-voice: request {}: set off in the grace after a line a confident verdict ended, taken at once (LAMP_ENDPOINT_PAUSE_JOIN)",
+                            reply.as_ref().map_or(0, |current| current.owner.turn())
+                        );
+                        record(
+                            trace,
+                            json!({"kind":"pause_join_taken","turn":reply.as_ref().map(|current| current.owner.turn()),"at_us":monotonic_us()}),
+                        )?;
+                    } else if after_the_call {
                         call_turn = None;
                         eprintln!(
                             "lamp-voice: request {}: the line after the bare name, taken at once (LAMP_CALL_TAKES_NEXT_LINE)",
@@ -10524,6 +10594,26 @@ fn conversation_with_gate_inner(
                             provider_queue_bound,
                         ) {
                             provider_queue.push_back(called);
+                        }
+                        // Ended by a confident verdict: its answer is kept
+                        // back for the grace (`LAMP_ENDPOINT_PAUSE_JOIN`).
+                        pause_turn = None;
+                        if let Some((kept, speech_end_us)) = pause_join_note(
+                            pause_join,
+                            detector.last_endpoint(),
+                            current.owner.turn(),
+                            current.local_only.is_some(),
+                            snapshot.microphone_generation(),
+                            (input_end_us, monotonic_us()),
+                            (provider_queue.len(), provider_queue_bound),
+                        ) {
+                            provider_queue.push_back(kept);
+                            pause_turn = Some((current.owner.turn(), speech_end_us));
+                            record(
+                                trace,
+                                json!({"kind":"pause_join","turn":current.owner.turn(),"speech_ended_at_us":speech_end_us,"at_us":monotonic_us(),
+                                    "grace_ms":crate::pause_join::GRACE.as_millis() as u64}),
+                            )?;
                         }
                         queue_input_end(
                             &mut provider_queue,
@@ -15308,6 +15398,34 @@ fn call_note(
             request,
             privacy_generation,
         })
+}
+
+/// With `LAMP_ENDPOINT_PAUSE_JOIN` (`on`) on the second route: the note that
+/// keeps a confidently ended line's answer back for the rest of its grace
+/// ([`ProviderInput::PauseJoin`]), and when its speech ended, for the turn
+/// whose speech ended at the block read at `ended_us`, the note sent at
+/// `now_us`. None for any other end, an offline turn (its request never went
+/// out), or a queue at its bound, whose last slot is the End's.
+fn pause_join_note(
+    on: bool,
+    decision: Option<&EndpointDecision>,
+    request: u64,
+    local_only: bool,
+    privacy_generation: u64,
+    (ended_us, now_us): (u64, u64),
+    (queued, pcm_bound): (usize, usize),
+) -> Option<(ProviderInput, u64)> {
+    let speech_end_us = crate::pause_join::paused_end(on, decision, ended_us)
+        .filter(|_| !local_only && queued < pcm_bound)?;
+    let kept_ms = crate::pause_join::kept_for(speech_end_us, now_us).as_millis() as u64;
+    Some((
+        ProviderInput::PauseJoin {
+            request,
+            privacy_generation,
+            kept_ms,
+        },
+        speech_end_us,
+    ))
 }
 
 /// The endpoint has one explicit slot after the PCM threshold. It cannot

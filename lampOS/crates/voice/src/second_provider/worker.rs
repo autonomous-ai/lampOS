@@ -182,6 +182,11 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::PauseJoin {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::CountOnly {
                 request,
                 privacy_generation,
@@ -3061,6 +3066,15 @@ pub fn serve(
             "lamp-voice second: speech to text's socket for the next line is kept open, the first line's opened before it (LAMP_SECOND_STT_WARM)"
         );
         engine = engine.keeping_a_listener_ready(true);
+    }
+    // A line cut at a thinking pause keeps its answer back for the grace,
+    // and a line begun with the lamp's name is never held as a short sound
+    // (#4449).
+    if crate::pause_join::from_environment() {
+        eprintln!(
+            "lamp-voice second: a line ended by a confident verdict keeps its answer back until 1.5 s after its speech ended, and a line begun with the lamp's name is never held as a short sound (LAMP_ENDPOINT_PAUSE_JOIN)"
+        );
+        engine = engine.joining_pauses(true);
     }
     // A line whose words end before a name waits for it (#2135).
     if std::env::var(crate::second_provider::OPEN_NAME_ENVIRONMENT)
