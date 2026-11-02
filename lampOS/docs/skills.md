@@ -2196,7 +2196,13 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    (`task_news::keep_typed`), so its news ("… Shall I put it on the
    lamp?") is told by the spoken task news at a good moment, with someone
    there, and the ask is dated only when heard whole or played through with
-   a gap (`made_skill::asked`, step 6 of "Made by voice" above).
+   a gap (`made_skill::asked`, step 6 of "Made by voice" above), or when the
+   lamp's own answer said "Shall I put it on the lamp?" just before a
+   spoken yes, its news still untold: the newest skill never asked about,
+   kept after the newest ask, is dated as asked when that answer was said,
+   within 120 s (`made_skill::asked_in_answer`; lamp-9adf, 31 Oct: "Is the
+   skill I asked for ready yet?"). A yes to any other question dates
+   nothing.
    A spoken yes within 120 s puts it on (`put_on_made_skill`, and the
    manage helper's own check, #2874); a no, a typed yes or silence leaves
    it off. What the tasks part settles is settled here too, by the task's
