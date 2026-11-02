@@ -63,7 +63,14 @@ impl Continuation {
         session: u64,
         worker: BootId,
         current: Option<&Reply>,
+        look_wanted: Option<(u64, u64)>,
     ) {
+        // The model's own "Let me look." already asked for a look on this
+        // turn (`speak_up::asks_to_look`): that look keeps the promise, so
+        // no continuation races it.
+        if look_wanted.is_some_and(|(turn, _)| turn == request) {
+            return;
+        }
         if current.is_some_and(|current| {
             current.owner.turn() == request
                 && current.cloud.session == session

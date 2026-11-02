@@ -161,7 +161,9 @@ impl Tracker {
 /// caller has already required that nothing was called in the turn.
 pub(crate) fn holding_only(text: &str) -> bool {
     let normalized = text
-        .trim_matches(|c: char| c.is_whitespace() || matches!(c, '.' | '!' | '?' | '…'))
+        .trim_matches(|c: char| {
+            c.is_whitespace() || matches!(c, '.' | '!' | '?' | '…') || full_width_terminator(c)
+        })
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
@@ -187,17 +189,15 @@ pub(crate) fn holding_only(text: &str) -> bool {
 /// Promise openers for an answer's last sentence (#4711). "let me see" only
 /// with what it will see: bare "Let me see." is a filler or asks to be
 /// shown something. "let me look" counts: the lamp's own `LOOKING` line is
-/// only said in a turn that called a look, so a model's "Let me look." with
-/// no call is a promise left unkept.
+/// only said in a turn that called a look. A model's own "Let me look."
+/// that asks for the eyes (`speak_up::asks_to_look`) is no promise left
+/// unkept: the coordinator offers no continuation for a turn whose look is
+/// wanted (`holding::Continuation::observed`).
 const PROMISES: &[&str] = &[
     "let me check",
     "let me look",
     "let me find",
     "let me search",
-    "let me see how",
-    "let me see what",
-    "let me see if",
-    "let me see whether",
     "i'll check",
     "i'll look",
     "i'll find",
@@ -208,25 +208,58 @@ const PROMISES: &[&str] = &[
     "i will search",
 ];
 
+/// Openers that already name what they will find out, so any short rest
+/// may follow ("Let me see if it's open.").
+const PROMISES_WITH_THEIR_OBJECT: &[&str] = &[
+    "let me see how",
+    "let me see what",
+    "let me see if",
+    "let me see whether",
+];
+
+/// The first word a short object after a promise may begin with: "Let me
+/// check the price", "I'll look it up", "Let me find out". Anything else
+/// after the opener is something other than a check ("I'll look forward to
+/// it.", "I'll check in on you tomorrow.").
+const OBJECT_WORDS: &[&str] = &[
+    "the", "that", "this", "it", "them", "those", "these", "your", "my", "his", "her", "their",
+    "if", "whether", "what", "how", "when", "where", "who", "which", "why", "for", "on", "into",
+    "up", "out",
+];
+
+/// At most this many words may follow an opener: a longer rest is more
+/// than an object, often the answer itself.
+const MAX_OBJECT_WORDS: usize = 4;
+
+/// Words that join a second clause, which is no object: "Let me check the
+/// price and it's 499 dollars."
+const JOINERS: &[&str] = &["and", "but", "so", "because", "then"];
+
+/// Full-width terminators close a sentence with no space after them.
+fn full_width_terminator(c: char) -> bool {
+    matches!(c, '。' | '！' | '？')
+}
+
 /// The answer's last sentence promises to check, look, see or find out, and
-/// says nothing after it: any earlier sentence may be anything (the lamp-4ace
-/// run of 31 Oct: "…do you mean the Aeron chair? Let me check the price.").
-/// A question at the end, or the answer given in the same sentence ("Let me
-/// check: it's $1,895.") or after it, never qualifies.
+/// says nothing after it but a short object: any earlier sentence may be
+/// anything (the lamp-4ace run of 31 Oct: "…do you mean the Aeron chair? Let
+/// me check the price."). A question at the end, or the answer given in the
+/// same sentence ("Let me check: it's $1,895.") or after it, never qualifies.
 fn promises_a_check(text: &str) -> bool {
     let text = text.trim();
-    if text.ends_with('?') {
+    if text.ends_with(['?', '？']) {
         return false;
     }
-    let body = text.trim_end_matches(['.', '!', '…']);
+    let body = text.trim_end_matches(['.', '!', '…', '。', '！']);
     // A sentence ends at a terminator followed by a space, so "$1.5" or
-    // "4.5 s" never splits one.
+    // "4.5 s" never splits one, or at a full-width one with or without.
     let last = body
         .char_indices()
         .rev()
         .find(|&(at, c)| {
-            matches!(c, '.' | '!' | '?' | '…')
-                && body[at + c.len_utf8()..].starts_with(char::is_whitespace)
+            full_width_terminator(c)
+                || (matches!(c, '.' | '!' | '?' | '…')
+                    && body[at + c.len_utf8()..].starts_with(char::is_whitespace))
         })
         .map_or(body, |(at, c)| &body[at + c.len_utf8()..]);
     let last = last
@@ -235,11 +268,25 @@ fn promises_a_check(text: &str) -> bool {
         .join(" ")
         .to_ascii_lowercase()
         .replace('’', "'");
-    !last.contains([':', ';', ',', '—', '–', '"', '“'])
-        && PROMISES.iter().any(|opener| {
+    if last.contains([':', ';', ',', '—', '–', '"', '“']) {
+        return false;
+    }
+    let rest_of = |openers: &[&str]| {
+        openers.iter().find_map(|opener| {
             last.strip_prefix(opener)
-                .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+                .filter(|rest| rest.is_empty() || rest.starts_with(' '))
+                .map(|rest| rest.split_whitespace().collect::<Vec<_>>())
         })
+    };
+    let short = |rest: &[&str]| {
+        rest.len() <= MAX_OBJECT_WORDS && !rest.iter().any(|word| JOINERS.contains(word))
+    };
+    if let Some(rest) = rest_of(PROMISES_WITH_THEIR_OBJECT) {
+        return short(&rest);
+    }
+    rest_of(PROMISES).is_some_and(|rest| {
+        short(&rest) && rest.first().is_none_or(|word| OBJECT_WORDS.contains(word))
+    })
 }
 
 #[cfg(test)]
@@ -376,6 +423,30 @@ mod tests {
             "Let me know if you need anything.",
             "\"Let me check\"",
             "Let me checkmate you.",
+            // An opener followed by more than a short object is no promise.
+            "Sounds fun! I'll look forward to it.",
+            "I'll check in on you tomorrow.",
+            "Let me check the price and it's 499 dollars.",
+            "It's 391. I'll check again if you like.",
+            "Let me see if it's open and tell you what I think.",
+        ] {
+            assert!(!holding_only(phrase), "{phrase}");
+        }
+    }
+
+    #[test]
+    fn full_width_terminators_end_a_sentence_and_a_question() {
+        for phrase in [
+            "Let me check the price。",
+            "It's a chair。Let me check the price。",
+            "Do you mean the Aeron chair？Let me check！",
+        ] {
+            assert!(holding_only(phrase), "{phrase}");
+        }
+        for phrase in [
+            "Let me check the price？",
+            "Let me check。It's 499。",
+            "Let me check！It's 499.",
         ] {
             assert!(!holding_only(phrase), "{phrase}");
         }

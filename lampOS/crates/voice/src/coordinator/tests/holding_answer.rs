@@ -303,7 +303,7 @@ fn holding_classification_cannot_extend_a_turn_the_lamp_started_itself() {
     let request = reply.owner.turn();
     let mut state = holding::Continuation::new(true);
     reply.input_sequence = 0;
-    state.observed(request, 1, provider_boot(), Some(&reply));
+    state.observed(request, 1, provider_boot(), Some(&reply), None);
     state.settled(request, true, monotonic_us());
     assert!(
         state
@@ -311,11 +311,34 @@ fn holding_classification_cannot_extend_a_turn_the_lamp_started_itself() {
             .is_none()
     );
     reply.input_sequence = 1;
-    state.observed(request, 1, provider_boot(), Some(&reply));
+    state.observed(request, 1, provider_boot(), Some(&reply), None);
     state.settled(request, true, monotonic_us());
     assert!(
         state
             .take(monotonic_us(), None, Some(1), provider_boot(), true)
             .is_some()
     );
+}
+
+#[test]
+fn holding_classification_yields_to_a_look_its_own_words_asked_for() {
+    let _clock = clock();
+    let (_, reply, _) = active_reply();
+    let request = reply.owner.turn();
+    for (look_wanted, offered) in [
+        (Some((request, 0)), false),
+        (Some((request + 1, 0)), true),
+        (None, true),
+    ] {
+        let mut state = holding::Continuation::new(true);
+        state.observed(request, 1, provider_boot(), Some(&reply), look_wanted);
+        state.settled(request, true, monotonic_us());
+        assert_eq!(
+            state
+                .take(monotonic_us(), None, Some(1), provider_boot(), true)
+                .is_some(),
+            offered,
+            "{look_wanted:?}"
+        );
+    }
 }
