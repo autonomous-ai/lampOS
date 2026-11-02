@@ -495,10 +495,10 @@ impl RoomTold {
     /// `LAMP_NAME_OR_FOLLOW_UP` `BUSY_TURNED_ALONE`) is the same: two people
     /// talking on keep the room busy, and its minute runs from their last
     /// line (the reviewer's P2 on #2372, the first builder at 04:36). So is
-    /// a line `LAMP_GOING_ON_SAME_ONE` held as not the one the lamp answered
-    /// (#4933: held as nothing, it let the room end a minute after a call,
-    /// and the next colleagues' lines were played as the conversation going
-    /// on). With [`Self::count_held_talk`], in a room not known to be busy, a line held
+    /// a line `LAMP_GOING_ON_SAME_ONE` held as not the one the lamp answered,
+    /// or `LAMP_TURNED_AWAY` held as turned to someone else (#4933: held as
+    /// nothing, it let the room end a minute after a call, and the next
+    /// colleagues' lines were played as the conversation going on). With [`Self::count_held_talk`], in a room not known to be busy, a line held
     /// as said to someone else (`attention::said_to_another`), or as said to
     /// nobody with someone in view and not turned to the lamp
     /// ([`Self::seen_talking`]), is talk, and one in another voice makes the
@@ -526,6 +526,7 @@ impl RoomTold {
             Some(crate::attention::Verdict::Hold(why))
                 if why == crate::going_on_asks::NOT_THE_LAMPS
                     || why == crate::going_on_same_one::HELD
+                    || why == crate::turned_away::HELD
                     || self.ends_sooner
                         && (why == crate::attention::BUSY_UNCALLED
                             || why == crate::attention::BUSY_NAMED_UNTURNED
@@ -2125,6 +2126,41 @@ mod tests {
             "Did you book the meeting room"
         );
         assert_eq!(room.at(164 * S), Room::Busy, "Not yet, after lunch");
+        assert!(
+            !room.talked_past_the_lamp(),
+            "a held line ends no conversation"
+        );
+    }
+
+    /// #4933, as above, with `LAMP_TURNED_AWAY`: a line held as turned to
+    /// someone else ("Can you pass me the charger?") is talk between people
+    /// too, so the room stays busy after the next call.
+    #[test]
+    fn a_line_held_as_turned_to_someone_else_keeps_the_room_busy() {
+        const S: u64 = 1_000_000;
+        let held = crate::attention::Verdict::Hold(crate::turned_away::HELD);
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.end_busy_sooner(true);
+        room.end_busy_once_answered(true);
+        for (request, at) in [(41, 8), (42, 12), (44, 16), (46, 24)] {
+            room.heard(request, (at - 6) * S);
+            room.ended(request, (at - 1) * S);
+            room.left_unanswered(request, at * S);
+            room.at(at * S);
+        }
+        assert_eq!(room.at(25 * S), Room::Busy);
+        room.heard(48, 74 * S);
+        room.ended(48, 77 * S);
+        room.spoke(48, 79 * S);
+        room.heard(49, 96 * S);
+        room.ended(49, 105 * S);
+        room.judged(49, Some(held), false);
+        room.left_unanswered(49, 109 * S);
+        room.heard(50, 131 * S);
+        room.ended(50, 136 * S);
+        room.spoke(50, 137 * S);
+        assert_eq!(room.at(152 * S), Room::Busy, "the next colleagues' line");
         assert!(
             !room.talked_past_the_lamp(),
             "a held line ends no conversation"
