@@ -37,8 +37,8 @@ pub const OUTLIER_SHARE: f32 = 0.3;
 /// The outliers a window may drop; one more and it is `unknown`.
 pub const MOST_OUTLIERS: usize = 1;
 /// With `LAMP_EYES_SPEAKING=on` too, `on` leaves out of the mesh's score every
-/// look-to-look pair across which the lamp's head moved ([`Mouths::set_head_moved`]),
-/// and holds a window meshed on every look to [`LEAST_MESHED_EYES_PX`]
+/// look-to-look pair across which the lamp's head moved ([`Mouths::set_head_moved`])
+/// or the eye distance jumped ([`MOST_EYES_STEP`]), and holds a window meshed on every look to [`LEAST_MESHED_EYES_PX`]
 /// instead of [`LEAST_EYES_PX`] (#4558). Off: as before.
 pub const STEADY_ENVIRONMENT: &str = "LAMP_EYES_SPEAKING_STEADY";
 /// The camera's aim turning faster than this, in radians a second
@@ -52,6 +52,14 @@ pub const HEAD_MOVED_RADIANS_A_SECOND: f64 = crate::full_look::STILL_RADIANS_A_S
 /// jitter, not the mesh's inner lips. To be confirmed by the 52e6 size
 /// ladder on #4558.
 pub const LEAST_MESHED_EYES_PX: f32 = 16.0;
+/// With [`STEADY_ENVIRONMENT`], a look-to-look pair whose eye distance (in
+/// the mesh's pixels) changes by more than this share of the smaller one is
+/// left out of the mesh's score like a pair the head moved in: the detector's
+/// box flipping between two fits on a still frame (about 8% of its width at
+/// 17 px between the eyes, #4585) moves the mesh's crop and reads as lips. A
+/// still large face varies about 1.2% look to look, and a face walking closer
+/// less than 2%, so 5% leaves both in.
+pub const MOST_EYES_STEP: f32 = 0.05;
 /// How far back a face's mouth is read: five to eight looks at the eyes'
 /// pace while they follow a face (250 ms, up to 350 ms on a 10 fps camera,
 /// `main.rs`). With `--steady-rate` a still face is looked at 500 to 600 ms
@@ -395,15 +403,19 @@ impl Mouths {
             if let Some(detail) = diagnostic {
                 detail.reason = Reason::Mesh;
             }
-            // With the switch, a pair across which the head moved is left
-            // out: the head's own motion moves the crop and reads as lips
-            // moving (#4558). The pairs kept are still, so they score the
+            // With the switch, a pair across which the head moved, or the
+            // eye distance jumped by more than MOST_EYES_STEP, is left out:
+            // the head's own motion, or the box flipping on a still frame,
+            // moves the crop and reads as lips moving (#4558, #4585). The pairs kept are still, so they score the
             // mouth as well as a still window does; only too few of them
             // leave nothing to judge (#4585: counting such a pair as a gap
             // read a talking face `unknown` for 2 s after every head move).
             let held: Vec<_> = pairs
                 .iter()
-                .filter(|(a, b)| !(self.steady && (a.6 || b.6)))
+                .filter(|(a, b)| {
+                    !(self.steady
+                        && (a.6 || b.6 || (b.5 - a.5).abs() > MOST_EYES_STEP * a.5.min(b.5)))
+                })
                 .collect();
             // Only a window the head moved in is held to that count, so a
             // still one, and every window with the switch off, is judged as
@@ -1423,6 +1435,80 @@ mod steady_tests {
         assert_eq!(
             last(true, 30.0, &[2, 5, 8], &every, false).state,
             SpeakingState::Unknown
+        );
+    }
+
+    /// Every verdict over ten meshed looks 250 ms apart, the head still,
+    /// with each look's eye distance and `mouth_open`.
+    fn each(steady: bool, eyes: &[f32], open: &[f32]) -> Vec<SpeakingState> {
+        let mut mouths = Mouths {
+            steady,
+            ..Mouths::default()
+        };
+        (0..eyes.len())
+            .map(|look| {
+                mouths
+                    .judge(
+                        1,
+                        &marks(eyes[look]),
+                        Some(0.0),
+                        Some(open[look]),
+                        look as u64 * 250_000,
+                    )
+                    .state
+            })
+            .collect()
+    }
+
+    /// A still screen face about 17 px between the eyes whose detector box
+    /// flips between two fits (#4585), the mouth crop's `mouth_open` jumping
+    /// with it.
+    fn flipping() -> (Vec<f32>, Vec<f32>) {
+        let eyes = vec![18.2, 16.8, 18.2, 18.2, 16.8, 18.2, 16.8, 16.8, 18.2, 16.8];
+        let open = eyes
+            .iter()
+            .enumerate()
+            .map(|(look, &e)| {
+                0.040 + if e > 17.5 { 0.020 } else { 0.0 } + 0.0005 * ((look * 7 % 3) as f32 - 1.0)
+            })
+            .collect();
+        (eyes, open)
+    }
+
+    #[test]
+    fn a_still_face_whose_box_flips_is_not_speaking() {
+        let (eyes, open) = flipping();
+        let said = each(true, &eyes, &open);
+        assert!(
+            said[4..]
+                .iter()
+                .all(|state| *state == SpeakingState::Unknown),
+            "{said:?}"
+        );
+    }
+
+    #[test]
+    fn a_still_face_whose_box_flips_stays_unknown_without_the_switch() {
+        let (eyes, open) = flipping();
+        let said = each(false, &eyes, &open);
+        assert!(
+            said.iter().all(|state| *state == SpeakingState::Unknown),
+            "{said:?}"
+        );
+    }
+
+    #[test]
+    fn a_talking_face_with_steady_eyes_is_speaking() {
+        let eyes: Vec<f32> = (0..10)
+            .map(|look| 18.0 * if look % 2 == 0 { 1.01 } else { 0.99 })
+            .collect();
+        let open: Vec<f32> = (0..10)
+            .map(|look| if look % 2 == 0 { 0.002 } else { 0.06 })
+            .collect();
+        let said = each(true, &eyes, &open);
+        assert!(
+            said[4..].iter().all(|state| *state == SpeakingState::Yes),
+            "{said:?}"
         );
     }
 
