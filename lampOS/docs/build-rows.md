@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-31 11:13 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-11-02 16:11 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 92.1% over 76 rows. Quality 67.8% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 92.3% over 76 rows. Quality 67.8% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -27,7 +27,7 @@ Written by the first builder from the team's review page at 2026-10-31 11:13 (+0
 | Sleep, and waking on its name | 1.00 | #749 #714 | fourth, second |  |
 | Reminders, timers, memory across days | 1.00 | #748 #743 | — |  |
 | Setup for a home, 5 s reset | 0.95 | #806 #1209 #2861 #3579 | first, el | 26 Oct 20:3x, up from 0.85: shown on lamp-52e6 with build 7071 (the lead’s agent, 20:10–20:28). |
-| A safe shutdown from the app and a long press | 0.85 | #3697 #3698 #3713 #3735 | fifth, mobile | 30 Oct 22:0x, up from 0.7: the app’s Turn off button meets its done-when on product lamp-0c89 (three taps, each a clean off and a boot that listens; |
+| A safe shutdown from the app and a long press | 1.00 | #3697 #3698 #3713 #3735 | fifth, mobile | 2 Nov 16:0x, up from 0.85, built: on in the product since #4909, stable in 9528 (16:0x). |
 | Touch strip and head pads | 0.95 | #711 #1362 #2445 #2460 #2857 | first, fifth | 27 Oct 15:1x: found on the tester’s 7071 lamps: a hand kept 3 s put the lamp to sleep unsaid, in onboarding’s touch and giving-way steps, and they reset it (#3747, #3749). |
 | Two people at the lamp | 1.00 | #829 #1158 #1278 | fourth | All merged: day and night bars (#1158, 11:49) and a follow-up within 20 s told it may follow on (#1278, 13:57). |
 | “Stop” over its own voice | 1.00 | #828 #1047 #1264 | fourth | Built: stop words heard over its voice (#1047, 09:11) and listening gaps in its pauses (#1264, 11:52), both off until measured. |
@@ -98,7 +98,7 @@ Written by the first builder from the team's review page at 2026-10-31 11:13 (+0
 |---|---|---|---|
 | Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
 | Knows when you have finished | 0.70 | 0.85 | 27 Oct 01:3x, unchanged: a bare “Lamp.”, a pause, then the request, right after a voice start, still splits and is held in a room not yet known to be quiet. |
-| Cutting in | 0.55 | 0.75 | 25 Oct 19:0x, up from 0.5: on lamp-52e6 with the ship candidate’s own product switches (Seventh, played ElevenLabs lines, an empty room), every real cut-in stopped the story, 4 of 4, with no false stop; |
+| Cutting in | 0.55 | 0.75 | 31 Oct 16:1x, unchanged: on lamp-4ace’s product unit (c08b4c08f6), “Wait, hold on.” about 6 s into a story was handled 4 of 6 times. |
 | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
 | Not spoken to | 0.60 | 0.90 | 30 Oct 23:0x, down from 0.7: tonight’s five busy rounds on lamp-4ace (8999, the product unit checked switch by switch) left desk talk alone 16 of 26 times (5/6, 2/6, 4/6, 2/4, 3/4), not the 6 of 6 of 26 Oct. |
