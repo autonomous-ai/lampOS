@@ -3,7 +3,7 @@
 //! health), the disk's free room and the clock. The real ones are here.
 use crate::{judge::UnitState, quiet::Heard};
 use lamp_bus::{Bus, Subscriber};
-use lamp_msgs::{Health, Speech, VoiceMute, VoiceState};
+use lamp_msgs::{Health, MicrophonePrivacy, Speech, VoiceMute, VoiceState};
 use std::{
     collections::BTreeMap,
     io,
@@ -565,6 +565,23 @@ impl BusEars {
     }
 }
 
+impl BusEars {
+    /// The voice's newest privacy lease, when it is fresh and valid: whether
+    /// it says the slide is closed. None from a lamp whose voice says none.
+    fn slide(&self) -> Option<Heard> {
+        let message = self.bus.as_ref()?.latest(MicrophonePrivacy::TOPIC).ok()??;
+        let age = unix_ms().saturating_sub(message.header.at_unix_ms);
+        if age > crate::quiet::STATE_LASTS.as_millis() as u64 {
+            return None;
+        }
+        let lease: MicrophonePrivacy = message.parse().ok()?;
+        lease.check().ok()?;
+        Some(Heard::Slide {
+            closed: lease.physical_muted == Some(true),
+        })
+    }
+}
+
 fn unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -611,6 +628,12 @@ impl Ears for BusEars {
                 while let Ok(Some(_)) = speech.recv(Duration::ZERO) {
                     heard.push(Heard::Speech);
                 }
+            }
+            // The privacy slide (#4710): a voice it muted says no state and
+            // no mute, only its lease, renewed every 10 ms. Read without
+            // subscribing, as lamp-control reads it, by the state's 3 s.
+            if let Some(slide) = self.slide() {
+                heard.push(slide);
             }
             if Instant::now() >= until {
                 return heard;
@@ -978,6 +1001,66 @@ mod tests {
         );
         assert!(heard.contains(&Heard::Speech), "{heard:?}");
         assert_eq!(ears.health(), None);
+    }
+
+    /// The privacy slide (#4710): the voice's newest lease is read without
+    /// subscribing. A valid one says whether the slide is closed; one that
+    /// is not valid, or none, is heard as nothing.
+    #[test]
+    fn the_bus_reads_the_slide_from_the_voices_newest_lease() {
+        let root = tempfile::Builder::new()
+            .prefix("lu-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(root.path()).unwrap();
+        let mut said = |_: &str| {};
+        let mut ears = BusEars::new(root.path(), &mut said);
+        let slides = |heard: &[Heard]| {
+            heard
+                .iter()
+                .filter(|heard| matches!(heard, Heard::Slide { .. }))
+                .copied()
+                .collect::<Vec<_>>()
+        };
+        assert!(slides(&ears.listen(Duration::from_millis(300))).is_empty());
+        let mut publisher = bus
+            .publisher_declared(
+                MicrophonePrivacy::TOPIC,
+                &MicrophonePrivacy::declaration(),
+                "voice",
+            )
+            .unwrap();
+        let lease = |sequence: u64, closed: bool| MicrophonePrivacy {
+            stamp: lamp_msgs::ClockStamp {
+                clock_id: "host".into(),
+                at_us: 2_000,
+                sequence,
+            },
+            session_id: "0123456789abcdef".into(),
+            controller_boot: "0123456789abcdef0123456789abcdef".into(),
+            microphone_generation: 1,
+            observed_us: 1_000,
+            expires_at_us: 40_000,
+            permitted: !closed,
+            physical_muted: Some(closed),
+            no_slide: false,
+        };
+        for (sequence, closed) in [(1, true), (2, false)] {
+            publisher
+                .publish_json(sequence, &lease(sequence, closed))
+                .unwrap();
+            let heard = ears.listen(Duration::from_millis(300));
+            assert_eq!(
+                slides(&heard).last(),
+                Some(&Heard::Slide { closed }),
+                "{heard:?}"
+            );
+        }
+        // Not a valid lease (a permit with the slide closed): nothing.
+        let mut wrong = lease(3, true);
+        wrong.permitted = true;
+        publisher.publish_json(3, &wrong).unwrap();
+        assert!(slides(&ears.listen(Duration::from_millis(300))).is_empty());
     }
 
     #[test]
