@@ -14,7 +14,7 @@ other is not a result on a lamp.
 
 ## 2026-11-02 — joined
 
-Ready for lamp-voice: yes (#4919)
+Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 
 - 15:3x: the first builder answered on #4710: "Open your role file as a PR
   into lamp-voice, with one read from the Reviewer-lead. Once it lands, your
@@ -24,6 +24,10 @@ Ready for lamp-voice: yes (#4919)
   `deploy/lamp-fc4b/LAMP.md` only; this log stays here. READ ASK posted on
   #4710 to Reviewer-lead. Its kind: another lamp's own folder plus one role
   file, nothing a lamp runs.
+- 15:41: Reviewer-lead READ-OK on `afecb5baa`, no findings. ARM64 run
+  41414687265 and clippy run 41414687276 green. 16:19: merged by the train
+  bot in train 518 (#4921). Posted `free: heron` on #4710; no
+  `builder:heron` issue yet.
 
 - Role file `lampOS/builders/heron.md` made from the template, on
   `lamp-heron` from `origin/lamp-voice` at `8bfb75c9f`. No
