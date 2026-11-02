@@ -553,6 +553,21 @@ pub enum Outcome {
     Failed,
 }
 
+/// `value` as JSON at `path`, whole or not at all: written beside it, synced,
+/// renamed over it and the folder synced.
+pub fn write_json(path: &Path, value: &impl Serialize) -> io::Result<()> {
+    use std::io::Write;
+    let new = path.with_extension("json.new");
+    let mut file = fs::File::create(&new)?;
+    file.write_all(&serde_json::to_vec_pretty(value)?)?;
+    file.sync_all()?;
+    fs::rename(&new, path)?;
+    if let Some(parent) = path.parent() {
+        fs::File::open(parent)?.sync_all()?;
+    }
+    Ok(())
+}
+
 /// The record in the body's state folder.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Record {
@@ -581,16 +596,7 @@ impl Record {
     }
 
     pub fn write(&self, path: &Path) -> io::Result<()> {
-        use std::io::Write;
-        let new = path.with_extension("json.new");
-        let mut file = fs::File::create(&new)?;
-        file.write_all(&serde_json::to_vec_pretty(self)?)?;
-        file.sync_all()?;
-        fs::rename(&new, path)?;
-        if let Some(parent) = path.parent() {
-            fs::File::open(parent)?.sync_all()?;
-        }
-        Ok(())
+        write_json(path, self)
     }
 
     /// Whether the lamp may ask now, `now_unix_ms`: never once it has

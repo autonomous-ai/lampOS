@@ -26,6 +26,10 @@ Slice=lampos-parts.slice
 WorkingDirectory=/
 RuntimeDirectory=lampos-body
 RuntimeDirectoryMode=0755
+# Its own state: under LAMP_BODY_STRAIN_GUARD=on, each joint's peaks of the day in peaks/ (#4501).
+# Shared with lamp-body-measure's measured.env and the first stand's record, at the same mode.
+StateDirectory=lampos-body
+StateDirectoryMode=0755
 Environment=LAMP_BUS=on
 Environment=LAMP_EXPRESSION_BODY=on
 # A hand held on the head puts the lamp to sleep (#711): while the voice says so (voice/mute), the
