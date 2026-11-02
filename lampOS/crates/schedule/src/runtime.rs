@@ -39,6 +39,8 @@ pub const STALE_AFTER: Duration = Duration::from_millis(1500);
 /// `schedule/due` declares (`ScheduleDue::declaration`), which a longer one
 /// would make late.
 pub const REPORT_EVERY: Duration = Duration::from_secs(1);
+/// The switch for a reminder every so many minutes or hours: `on` only.
+pub const EVERY_SWITCH: &str = "LAMP_SCHEDULE_EVERY";
 
 pub trait Clock: Send + 'static {
     fn sample(&self) -> io::Result<ClockSample>;
@@ -502,6 +504,8 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
     let mut engine =
         Engine::open_with_offset(store, &config.zone, config.utc_offset_minutes, &sample, &id)
             .map_err(io::Error::other)?;
+    // A reminder every so many minutes or hours, only with its own switch.
+    engine.allow_every(std::env::var(EVERY_SWITCH).ok().as_deref() == Some("on"));
     engine.tick(&sample).map_err(io::Error::other)?;
     let current = Arc::new(Mutex::new(report(&engine, sample, 0)?));
     let (listener, _binding) = bind(&config.socket)?;

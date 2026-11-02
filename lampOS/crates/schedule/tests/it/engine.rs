@@ -1601,3 +1601,75 @@ fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_se
         .unwrap_err();
     assert_eq!(refused.code, "bad_request");
 }
+
+/// `LAMP_SCHEDULE_EVERY` (the first builder's yes on #4710, 2 Nov 17:4x):
+/// off, a reminder every so many minutes is refused as a kind this build
+/// doesn't take; on, it is kept, its occurrences come one step apart, and
+/// "stop reminding me" (a cancel) ends the whole series.
+#[test]
+fn every_is_refused_with_its_switch_off_and_cancelled_whole_with_it_on() {
+    let hourly = When::Every {
+        minutes: None,
+        hours: Some(1),
+        from: None,
+        to: None,
+        zone: None,
+    };
+    let disk = Disk::default();
+    let schema = |disk: &Disk| {
+        let bytes = disk.0.lock().unwrap().bytes.clone().unwrap();
+        serde_json::from_slice::<Value>(&bytes).unwrap()["schema"].clone()
+    };
+    let mut e = open(disk.clone(), &now(0));
+    e.tick(&now(0)).unwrap();
+    let refused = e
+        .answer(
+            Request::Set {
+                person: None,
+                guard: guard(&e),
+                text: "Drink some water".into(),
+                when: hourly.clone(),
+            },
+            &now(0),
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, "bad_request");
+    // With no `every` kept, the store is one a build from before reads.
+    set(&mut e, &now(0), 60);
+    assert_eq!(schema(&disk), 1);
+    let r = Request::Cancel {
+        asker: None,
+        guard: guard(&e),
+        id: 1,
+    };
+    e.answer(r, &now(0)).unwrap();
+    e.allow_every(true);
+    create(&mut e, &now(0), hourly);
+    assert_eq!(schema(&disk), 2);
+    // This build reads its own schema 2 store back.
+    drop(e);
+    let mut e = open(disk.clone(), &now(0));
+    e.allow_every(true);
+    let first = get(&mut e, &now(0), 2)["due_unix_ms"].as_i64().unwrap();
+    assert_eq!(first - WALL, 3_600_000);
+    // Due, said, acknowledged: the next one is an hour on.
+    let mut at = now(1000);
+    at.unix_ms = first;
+    e.tick(&at).unwrap();
+    assert_eq!(due(&e, &at).oldest.unwrap().id, 2);
+    ack(&mut e, &at, 2, 1);
+    let second = get(&mut e, &at, 2)["due_unix_ms"].as_i64().unwrap();
+    assert_eq!(second - first, 3_600_000);
+    // "Stop reminding me": the series is cancelled, nothing more is due.
+    e.tick(&at).unwrap();
+    let r = Request::Cancel {
+        asker: None,
+        guard: guard(&e),
+        id: 2,
+    };
+    assert_eq!(e.answer(r, &at).unwrap()["cancelled"], true);
+    at.unix_ms = second + 7_200_000;
+    at.boot_ms += 10_000;
+    e.tick(&at).unwrap();
+    assert!(due(&e, &at).oldest.is_none());
+}
