@@ -406,15 +406,31 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   its own stale readings already end that wait as unreadable, read again
   after 1 s with a fresh worker, which the worker's clean stop now allows.
   A lapse of a lease that grants anything, a Denied lapse past 1.5 s from
-  its expiry, no authority within 250 ms of the start, the publisher gone
-  and a worker that ended abnormally all end as before. Unit tests: a
+  its expiry, no authority within 250 ms of the start (now ridden, below),
+  the publisher gone and a worker that ended abnormally all end as before. Unit tests: a
   Denied lease lapsed by a 900 ms stall is ridden with nothing granted and
   re-armed with one line; the 06c1 queue (an expired Denied authority) is
   skipped and an expired granting one still ends with "authority snapshot
   has expired"; granting, Unknown, past-the-bound and no-authority lapses
   still end; a worker dead in the wait still ends the voice. Two Linux
   tests of the real worker (a 900 ms Denied lapse ridden, a granting lapse
-  ends) run on the ARM64 gate only. Not yet tried on a lamp.
+  ends) run on the ARM64 gate only. Not yet tried on a lamp. Then cold boot
+  6 of lamp-06c1 still ended: the voice's main thread stalled from 16.341 s
+  to 17.013 s, the privacy worker had had no authority 250 ms after its
+  start and ended on `privacy controller lease expired`, exit 1, the
+  voice's renewal after the gate got ECONNREFUSED, and the cleanup came back
+  `CleanupFailed`, so the voice exited. No authority yet grants nothing, so
+  the worker now rides it like a Denied-only lapse from 250 ms after its
+  start, publishing nothing, for at most 1.5 s more, said once as
+  `lamp-voice: privacy worker has had no authority 250 ms after its start,
+  riding it up to 1500 ms (microphones and camera stay closed)`. A Denied
+  authority during that ride re-arms it at once; none by 1.75 s still ends
+  it as before. Retrying a worker that ended with status 1 on the voice side
+  was rejected: the exit is how every other worker failure ends the wait,
+  and a retry would hide those too. Unit tests: no authority is waiting at
+  250 ms and just before 1.75 s and ends at 1.75 s; a Denied authority
+  during the ride re-arms it at once as Denied, and a lapsed one keeps it
+  closed. Not yet tried on a lamp.
 - **A killed privacy worker's sockets left in the muted wait.** On
   lamp-06c1 on a cold boot of stock 9528 (`on4`), the wait found no switch
   reading within 50 ms of Ready, its privacy worker did not stop within the
