@@ -496,12 +496,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     if allowed("speak"):
 
         @server.tool()
-        async def lamp_say(text: str) -> str:
-            """Say a short line in the lamp's own voice (300 characters at most). It isn't said while the
-            lamp is in quiet hours, private, or talking with someone."""
+        async def lamp_say(text: str, rephrase: bool = False) -> str:
+            """Say a short line in the lamp's own voice (300 characters at most), exactly as written, once
+            the person isn't talking; `rephrase` lets the lamp say it in its own words instead. It isn't said
+            while the lamp is in quiet hours or private."""
             if len(text) > 300:
                 raise ToolError("bad_request: at most 300 characters")
-            await act("say", text=text)
+            await act("say", text=text, rephrase=True if rephrase else None)
             return "said"
 
         @server.tool()

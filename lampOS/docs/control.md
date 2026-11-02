@@ -96,7 +96,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
-| `say` | `text`, at most 300 characters | `say.sock`, with its quiet after a turn, privacy and busy gates | `speak` | no |
+| `say` | `text`, at most 300 characters; optional `rephrase` | `say.sock` with `exact: true`: the words as sent, rendered straight through the voice's speech service (no model, no tools) and played as the lamp's own line once nobody is talking with the lamp (`say::may_play_exact`: it waits while a conversation with the lamp is going on, its speaker is busy, or an answer or reminder is owed, never for speech in the room that nobody addresses to the lamp; the keeper's pause and the privacy switch refuse it; no quiet gap or rarity). With `rephrase: true`, a written turn for the voice's model, through its quiet after a turn, privacy and busy gates, as before | `speak` | no |
 | `sound` | `name`: `hum` only in this release, the voice's built-in short hum (no file, no model); the recorded notices are never a computer's | `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates; its `done` follows | `speak` | no |
 | `stop` | | ends the client's own actions now | none | no |
 
@@ -448,7 +448,7 @@ which back. An SDK's wait for them returns at the answer.
 | `play` | `name` (a recorded move of the client's package) | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |
 | `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
-| `say` | `text`: words, ≤ 300 chars | `speak` | — |
+| `say` | `text`: words, ≤ 300 chars; optional `rephrase` (boolean) | `speak` | — |
 | `sound` | `name`: `hum` (the only one in this release) | `speak` | — |
 | `stop` | — | — | — |
 | `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |

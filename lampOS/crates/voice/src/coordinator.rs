@@ -12048,7 +12048,21 @@ fn conversation_with_gate_inner(
                 },
                 says,
             );
-            if let Some(now_state) = play_skill_sound(
+            // A paired computer's exact line first: it waits while the
+            // person talks, where a skill's sound is refused.
+            if let Some(now_state) = play_exact_line(
+                says,
+                &now_is,
+                at_us,
+                owner,
+                reply,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )? {
+                snapshot = now_state;
+                last_publish = monotonic_us();
+            } else if let Some(now_state) = play_skill_sound(
                 says,
                 &now_is,
                 at_us,
@@ -13289,6 +13303,12 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
         since_sound_us: says
             .last_sound_us()
             .map(|played| gates.at_us.saturating_sub(played)),
+        playing: gates.reply.is_some()
+            || gates.speaker_pending.is_some()
+            || !gates.playback_mask.available(gates.at_us),
+        conversing: crate::thread::THREAD
+            .lock()
+            .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
     }
 }
 
@@ -13320,6 +13340,68 @@ fn tell_voice_of_turn(
             .filter(|_| !origin.is_some_and(SpeechOrigin::unshown)),
         at_us,
     );
+}
+
+/// A paired computer's exact line, if one waits (`exact`, docs/control.md,
+/// "say"): its words as sent, rendered through the speech service on the
+/// asker's thread, with no model and no tools, played now as a turn of the
+/// lamp's own on the head cue's speaker path once [`crate::say::may_play_exact`]
+/// says so. While the person talks or a turn is under way it stays waiting
+/// (until its expiry); the keeper's pause or the privacy switch refuses it.
+/// The authority's new snapshot when it plays.
+#[allow(clippy::too_many_arguments)]
+fn play_exact_line(
+    says: &mut crate::say::Says,
+    now_is: &crate::say::SoundNow,
+    at_us: u64,
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    playout_start: PlayoutStart,
+    trace: &mut SessionState,
+    publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<Option<Snapshot>> {
+    if !says.exact_waiting(at_us) {
+        return Ok(None);
+    }
+    let decided = crate::say::may_play_exact(now_is);
+    match decided {
+        crate::say::ExactNow::Wait(_) => return Ok(None),
+        crate::say::ExactNow::Refuse(why) => {
+            if let Some((_, ticket)) = says.take_exact(at_us) {
+                record(
+                    trace,
+                    json!({"kind":"exact_line","at_us":at_us,"skill":ticket.skill(),"plays":false,"why":why}),
+                )?;
+                ticket.answer(crate::say::Outcome::Refused(why.into()));
+            }
+            return Ok(None);
+        }
+        crate::say::ExactNow::Play => {}
+    }
+    let Some((samples, ticket)) = says.take_exact(at_us) else {
+        return Ok(None);
+    };
+    let frames = samples.len();
+    record(
+        trace,
+        json!({"kind":"exact_line","at_us":at_us,"skill":ticket.skill(),"plays":true,"frames":frames}),
+    )?;
+    let (snapshot, _) = speaker_tone::commit_sound_turn(
+        owner,
+        reply,
+        NoticeDelivery::sound(SpeechOrigin::SkillSound, samples),
+        "exact_line",
+        "a computer's exact words: nothing heard, nothing sent to the provider",
+        0,
+        playout_start,
+        trace,
+        publish,
+    )?;
+    ticket.begun(monotonic_us());
+    if let Some(current) = reply.as_mut() {
+        current.say = Some(ticket);
+    }
+    Ok(Some(snapshot))
 }
 
 /// A skill's sound asked for, if one waits: played now as a turn of the

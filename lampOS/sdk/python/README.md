@@ -320,7 +320,7 @@ its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 | `await lamp.play(name, *, wait=False)` | `name`: a move of your installed package | `body` | `body` |
 | `await lamp.joints(lease, within_ms, **targets)` | `lease`: your held `body` lease. `within_ms`: up to 5,000. `targets`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow` in degrees, −180 to 180, at least one | `body` | `body` (named) |
 | `await lamp.light(colour, level, for_ms, pattern=None)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `for_ms`: 1–30,000. `pattern`: none (steady), `breathe` (level 2 or up), `candle` (3 or up) or `pulse` (2 or up). Under its level a pattern is `refused`. The ring plays one `pulse` a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no |
-| `await lamp.say(text)` | `text`: words, up to 300 characters | `speak` | no |
+| `await lamp.say(text, *, rephrase=False)` | `text`: words, up to 300 characters, spoken **exactly as written** through the lamp's speech service (no model, no tools) once the person isn't talking. `rephrase=True`: the lamp's model says it in its own words instead, as before | `speak` | no | 6 a minute, 60 an hour; refused in quiet hours |
 | `await lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no |
 | `await lamp.stop()` | | none | no |
 | `await lamp.request(op, *, on_id=None, **fields)` | any op of the schema, checked against it first. `on_id(id)`: told the request's id before it is sent, to match a `done` that may come before the reply is read | the op's | |

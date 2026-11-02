@@ -727,7 +727,7 @@
       "additionalProperties": false
     },
     "say": {
-      "description": "A line in the lamp's own voice, through its quiet, privacy and busy gates.",
+      "description": "A line in the lamp's own voice: spoken exactly as sent, straight through the speech service with no model, once the person isn't talking; with rephrase, said by the voice's model in its own words, as before. Through the privacy switch, the keeper's pause and quiet hours.",
       "type": "object",
       "properties": {
         "id": {
@@ -741,6 +741,10 @@
           "minLength": 1,
           "maxLength": 300,
           "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f]+$"
+        },
+        "rephrase": {
+          "type": "boolean",
+          "description": "true: the voice's model says it in its own words (a written turn), as before. Default false: exactly as sent."
         }
       },
       "required": [

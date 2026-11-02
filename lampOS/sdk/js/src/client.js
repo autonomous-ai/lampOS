@@ -477,7 +477,9 @@ export class Lamp {
   play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
   joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
-  say(text) { return this.act('say', { text }); }
+  // Say `text` in the lamp's voice, exactly as written, once the person isn't talking; `{ rephrase: true }` lets the
+  // lamp's model say it in its own words instead, as before.
+  say(text, { rephrase } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }); }
   sound(name) { return this.act('sound', { name }); }
   async stop() {
     const reply = await this.act('stop', {});

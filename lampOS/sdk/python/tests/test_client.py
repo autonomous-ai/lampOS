@@ -1378,3 +1378,18 @@ def test_a_look_at_the_hand_needs_the_bodys_lease_socket_as_other_looks_do(tmp_p
                 assert not fake.leases
 
     run(go())
+
+
+def test_a_say_is_exact_unless_rephrase_is_asked(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                await lamp.say("Build passed, 3 tests.")
+                await lamp.say("Tell them the build passed.", rephrase=True)
+                assert fake.asked("say") == [
+                    {"text": "Build passed, 3 tests."},
+                    {"text": "Tell them the build passed.", "rephrase": True},
+                ]
+
+    run(go())

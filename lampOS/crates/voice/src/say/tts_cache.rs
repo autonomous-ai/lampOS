@@ -167,6 +167,22 @@ impl TtsCache {
         Ok(samples)
     }
 
+    /// `text` rendered now through the speech service, never kept: a paired
+    /// computer's exact words (`exact`, lamp-control's `say`), which are
+    /// not the lamp's own fixed lines and must not fill [`MOST_FILES`]. Or
+    /// why not: the service's refusal, or a line empty or past
+    /// [`MOST_FRAMES`].
+    pub fn render_once(&self, text: &str) -> Result<Vec<i16>, String> {
+        let samples = (self.render)(text).map_err(|why| format!("not rendered: {why}"))?;
+        if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
+            return Err(format!(
+                "rendered empty or past {} s",
+                MOST_FRAMES / SOUND_RATE
+            ));
+        }
+        Ok(samples)
+    }
+
     /// `text`'s samples if kept already, never rendered here: for a caller
     /// that must not wait on the speech service (#3748).
     pub fn kept(&self, text: &str) -> Option<Vec<i16>> {

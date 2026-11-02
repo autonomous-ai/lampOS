@@ -50,7 +50,8 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `level` | integer | 1 to 5 | 3 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
-| `lamp_say` | `text` | string, required | 300 characters at most | — | speak | no |
+| `lamp_say` | `text` | string, required | 300 characters at most, said exactly as written once the person isn't talking | — | speak | no |
+| | `rephrase` | boolean | `true`: the lamp says it in its own words instead | `false` | | |
 | `lamp_sound` | `name` | string, required | a sound's name: lowercase letters, digits, `-` and `_`, 40 at most; `hum`, the lamp's own short hum, is the only one in this release; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
 | `lamp_events` | `since` | integer | a `seq` from an earlier answer; 0 for every event kept (the last 200) | 0 | the event's (`person.*` and `hand` look, `name.heard` hear, `sound.heard` sound; `touch`, `button`, `lamp.changed` none) | no |
 | | `wait_s` | number | 0 to 120: with nothing after `since`, how long to wait for the next | 0 | | |
