@@ -4001,6 +4001,7 @@ fn flush_provider_input_with(
             | ProviderInput::CountOnly { request, .. }
             | ProviderInput::StepCall { request, .. }
             | ProviderInput::Onboarding { request, .. }
+            | ProviderInput::TurnOpened { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -6318,6 +6319,11 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // A turn a computer opened through lamp-control (`crate::control_turn`),
+    // and the person's newest line: its turn and when it was admitted, so
+    // that a computer's turn is refused while they talk with the lamp.
+    let mut control_turns = crate::control_turn::ControlTurns::default();
+    let mut person_line: Option<(u64, u64)> = None;
     // The body's ask when it lets go for its pose, said through the say
     // service from a thread of its own (#2938, `LAMP_BODY_ASK=on`).
     #[cfg(not(test))]
@@ -7186,6 +7192,8 @@ fn conversation_with_gate_inner(
                                     observed_at_us,
                                     eyes_link.as_mut(),
                                 )?;
+                                // The person's mute ends a computer's turn.
+                                control_turns.cancelled(crate::control_turn::MUTED);
                                 return Err(Box::new(PhysicalMute {
                                     observed_at_us,
                                     onboarding,
@@ -7231,6 +7239,7 @@ fn conversation_with_gate_inner(
                         at_us,
                         eyes_link.as_mut(),
                     )?;
+                    control_turns.cancelled(crate::control_turn::MUTED);
                     return Err(Box::new(PhysicalMute {
                         observed_at_us: at_us,
                         onboarding,
@@ -7494,8 +7503,27 @@ fn conversation_with_gate_inner(
                 }
             );
         }
+        // A computer ends the turn it opened (`turn: "end"`): only that
+        // turn's own window or the conversation that grew from it, cut as
+        // the button's stop cuts. Any other is refused.
+        let mut control_end: Option<crate::say::Ticket> = None;
+        if let Some(says) = says.as_mut() {
+            let now_us = monotonic_us();
+            says.poll(now_us);
+            while let Some((id, ticket)) = says.take_turn_end(now_us) {
+                if control_end.is_none() && control_turns.ends(id) {
+                    control_end = Some(ticket);
+                } else {
+                    ticket.answer(crate::say::Outcome::Refused(
+                        crate::control_turn::NOT_THIS_TURN.into(),
+                    ));
+                }
+            }
+        }
+        let control_ended = control_end.is_some();
         {
-            if stop || muted || gap_cut || head_stop || spoken_stop || body_pushed {
+            if stop || muted || gap_cut || head_stop || spoken_stop || body_pushed || control_ended
+            {
                 let observed_at_us = monotonic_us();
                 let cancellation = hand::cancel(
                     owner,
@@ -7559,7 +7587,14 @@ fn conversation_with_gate_inner(
                 if let Some(words) = wait_words.as_mut() {
                     words.close();
                 }
-                if gap_cut && !stop && !head_stop && !spoken_stop && !body_pushed && !muted {
+                if gap_cut
+                    && !stop
+                    && !head_stop
+                    && !spoken_stop
+                    && !body_pushed
+                    && !control_ended
+                    && !muted
+                {
                     // Admission keeps nothing of it: its capture lineage
                     // ends with the gap. After the gap, what is still said
                     // of it is dropped until a pause, not a new question.
@@ -7602,8 +7637,8 @@ fn conversation_with_gate_inner(
                 asked_in_busy_room = None;
                 busy_answer_since = None;
                 use crate::receipt_history::{
-                    BODY_PUSHED, CAPTURE_GAP, HAND_STOP, HEAD_SLEEP, HEAD_STOP, SOFTWARE_MUTED,
-                    SPOKEN_STOP,
+                    BODY_PUSHED, CAPTURE_GAP, CONTROL_ENDED, HAND_STOP, HEAD_SLEEP, HEAD_STOP,
+                    SOFTWARE_MUTED, SPOKEN_STOP,
                 };
                 // Only a Stop that cut the lamp's speech: after an idle
                 // Stop, "Lamp?" or "Hi." is taken as always (Second on
@@ -7636,6 +7671,8 @@ fn conversation_with_gate_inner(
                     SPOKEN_STOP
                 } else if body_pushed {
                     BODY_PUSHED
+                } else if control_ended {
+                    CONTROL_ENDED
                 } else {
                     CAPTURE_GAP
                 };
@@ -7655,6 +7692,18 @@ fn conversation_with_gate_inner(
                         reason,
                         cancellation.speaker_told_at_us,
                     )?;
+                }
+                // A computer's turn ends with whatever ended the
+                // conversation: the person wins over it.
+                control_turns.cancelled(if muted {
+                    crate::control_turn::MUTED
+                } else if reason == CONTROL_ENDED {
+                    crate::control_turn::ENDED_BY_COMPUTER
+                } else {
+                    reason
+                });
+                if let Some(ended) = control_end.take() {
+                    ended.answer(crate::say::Outcome::Ended);
                 }
                 publish?;
                 if muted {
@@ -10172,6 +10221,18 @@ fn conversation_with_gate_inner(
                     if not_now {
                         onboarding_marked = reply.as_ref().map(|current| current.owner.turn());
                     }
+                    // A line begun in a computer's turn is a call, as a tap
+                    // is: told to the worker's rule right after its Start.
+                    if let Some(current) = reply.as_ref() {
+                        let (request, at_us) = (current.owner.turn(), monotonic_us());
+                        person_line = Some((request, at_us));
+                        if control_turns.admitted(request, at_us) {
+                            provider_queue.push_back(ProviderInput::TurnOpened {
+                                request,
+                                privacy_generation: snapshot.microphone_generation(),
+                            });
+                        }
+                    }
                     line_began = reply
                         .as_ref()
                         .map(|current| (current.owner.turn(), trigger_us));
@@ -12148,6 +12209,119 @@ fn conversation_with_gate_inner(
                 if let Some(current) = reply.as_mut() {
                     current.say = Some(ticket);
                 }
+            }
+        }
+        // A turn a computer opens through lamp-control (`turn: "start"`,
+        // `crate::control_turn`): refused at once while the lamp is muted
+        // or paused, while someone talks with it and while it speaks;
+        // otherwise it waits for a say's gates, and then the listening cue
+        // plays as a tap's does, or its prompt is said first.
+        let control_now_us = monotonic_us();
+        if let Some(current) = reply.as_ref()
+            && let Some((turn, at_us)) = person_line.as_mut()
+            && current.owner.turn() == *turn
+        {
+            *at_us = control_now_us;
+        }
+        control_turns.tick(
+            control_now_us,
+            reply
+                .as_ref()
+                .map(|current| (current.owner.turn(), current.sounded)),
+            reply.is_none()
+                && admission.idle_for_reminder()
+                && clock.saturating_sub(last_turn_us) >= crate::say::QUIET_US,
+        );
+        if let Some(says) = says.as_mut()
+            && says.turn_start_waits(control_now_us)
+        {
+            let persons = |turn: u64| person_line.is_some_and(|(line, _)| line == turn);
+            let refusal = crate::control_turn::refused(&crate::control_turn::StartNow {
+                muted: snapshot.microphone_permission() != Permission::Allowed,
+                paused,
+                conversation: control_turns.going_on()
+                    || admission.owns_stream()
+                    || look_wanted.is_some()
+                    || reply
+                        .as_ref()
+                        .is_some_and(|current| persons(current.owner.turn()))
+                    || person_line.is_some_and(|(_, at_us)| {
+                        control_now_us.saturating_sub(at_us) < crate::say::QUIET_US
+                    }),
+                speaking: reply.is_some()
+                    || speaker_pending.is_some()
+                    || !provider_queue.is_empty()
+                    || submission_draining,
+            });
+            if let Some(why) = refusal {
+                if let Some((_, ticket)) = says.take_turn_start(control_now_us) {
+                    eprintln!(
+                        "lamp-voice: the skill {}'s turn is refused: {why}",
+                        ticket.skill()
+                    );
+                    ticket.answer(crate::say::Outcome::Refused(why.into()));
+                }
+            } else if !reminder_waiting
+                && admission.idle_for_reminder()
+                && clock.saturating_sub(last_turn_us) >= crate::say::QUIET_US
+                && snapshot.listening_ready(MonoTime::from_micros(control_now_us))
+                && reminder_quiet(
+                    control_now_us,
+                    reminder_cycle_started_us,
+                    last_speech_us,
+                    last_capture,
+                )
+                && playback_mask.available(control_now_us)
+                && !(refused_hold && model_refusing.holds(control_now_us))
+                && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+                && let Some((prompt, ticket)) = says.take_turn_start(control_now_us)
+            {
+                match prompt {
+                    Some(prompt) => {
+                        let said = control_turns.prompt(ticket);
+                        snapshot = commit_written_turn(
+                            owner,
+                            reply,
+                            &mut provider_queue,
+                            &crate::say::Words::Text(prompt).turn().unwrap_or_default(),
+                            false,
+                            "control_turn_prompt",
+                            provider_session,
+                            rig.playout_start_now(),
+                            trace,
+                            |state| rig.publish(state),
+                        )?;
+                        said.begun(monotonic_us());
+                        if let Some(current) = reply.as_mut() {
+                            current.say = Some(said);
+                        }
+                    }
+                    None => {
+                        // The tap's listening face and "hm?", whatever the
+                        // tap's own rarity: the computer asked for this one.
+                        if let Some(choreography) = choreography.as_mut() {
+                            choreography.set_unshown(false);
+                            choreography.set_listening(true);
+                        }
+                        let hum = head_cue
+                            .clone()
+                            .unwrap_or_else(|| crate::head_cue::hum(crate::head_cue::DBFS));
+                        let (now_state, _) = speaker_tone::commit_sound_turn(
+                            owner,
+                            reply,
+                            NoticeDelivery::sound(SpeechOrigin::HeadCue, hum),
+                            "control_turn_cue",
+                            "a computer opened a turn: nothing heard, nothing sent to the provider",
+                            0,
+                            rig.playout_start_now(),
+                            trace,
+                            |state| rig.publish(state),
+                        )?;
+                        snapshot = now_state;
+                        control_turns.open(ticket, monotonic_us());
+                    }
+                }
+                last_publish = monotonic_us();
             }
         }
         // A skill's own sound (#938): played now, as a turn of the lamp's

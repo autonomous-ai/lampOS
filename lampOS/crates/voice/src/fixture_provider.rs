@@ -458,6 +458,10 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::TurnOpened {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -560,7 +564,8 @@ impl FixtureProvider {
             | ProviderInput::PauseJoin { .. }
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
-            | ProviderInput::Onboarding { .. } => {}
+            | ProviderInput::Onboarding { .. }
+            | ProviderInput::TurnOpened { .. } => {}
             ProviderInput::End { .. } => {
                 let input = self
                     .input

@@ -47,11 +47,14 @@ pub(crate) const SPOKEN_STOP: &str = "spoken_stop";
 /// A push on the body while a skill's search goes on (`body/hand`, #2904):
 /// the search's turn in hand is cut as a spoken stop cuts it.
 pub(crate) const BODY_PUSHED: &str = "body_pushed";
+/// A computer ended the turn it opened through lamp-control
+/// (`crate::control_turn`, `turn: "end"`): cut as the button's stop cuts.
+pub(crate) const CONTROL_ENDED: &str = "control_ended";
 /// The shutdown's last words or a sleep asked aloud cut the lamp's reply for
 /// a sound of its own (`cut_for_last_words`, #3697, #3748), revoking the
 /// speaker first as a hand's Stop does.
 pub(crate) const LAST_WORDS: &str = "last_words";
-pub(crate) const LOCAL_CANCELS: [&str; 8] = [
+pub(crate) const LOCAL_CANCELS: [&str; 9] = [
     LAST_WORDS,
     HEAD_SLEEP,
     SOFTWARE_MUTED,
@@ -60,6 +63,7 @@ pub(crate) const LOCAL_CANCELS: [&str; 8] = [
     CAPTURE_GAP,
     SPOKEN_STOP,
     BODY_PUSHED,
+    CONTROL_ENDED,
 ];
 
 impl ReceiptHistory {

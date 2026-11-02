@@ -89,6 +89,14 @@
 //!   shorten the relative expiry, including time spent reaching or reading
 //!   the socket. The caller keeps responsibility for its generation checks.
 //!
+//! - **A turn for lamp-control** (`docs/control.md`, "Turns and
+//!   listening"): `turn: "start"` asks the voice to open a conversation
+//!   turn, as a tap on the head does, optionally with `text`, the prompt it
+//!   says first; `turn: "end"` with `id` ends one it opened. Only the skill
+//!   [`TURN_SKILL`] may ask either. A start is answered `begun` with the
+//!   turn's `id` when its window opens; the coordinator decides the rest
+//!   ([`crate::control_turn`]).
+//!
 //! Onboarding is also a source-owned request: only `skill: onboarding` with
 //! `from: onboarding` and a nonzero `invitation` can ask for it. The coordinator
 //! takes the exact invitation through [`Says::take_onboarding`]; no ID is a
@@ -188,6 +196,11 @@ pub const URGENT_QUIET_US: u64 = 1_000_000;
 const READ_WITHIN: Duration = Duration::from_secs(1);
 /// The most a request line may be.
 const MOST_LINE_BYTES: u64 = 4_096;
+/// The one skill that may ask for a turn: lamp-control's door
+/// (`docs/control.md`, "Turns and listening").
+pub const TURN_SKILL: &str = "control";
+/// How long a `turn: "end"`, which names no expiry, may wait to be taken.
+pub const TURN_END_EXPIRY_MS: u64 = 10_000;
 /// Told the model before a text, so that it says the words as they are.
 pub const AS_WRITTEN: &str = "Say exactly these words, in your own voice, and nothing else:";
 
@@ -198,6 +211,12 @@ pub enum Answer {
     /// clock (`lamp_ipc::monotonic_us`), in microseconds: its first sound
     /// follows when the model's comes, about a second later.
     Begun(u64),
+    /// A turn asked with `turn: "start"` opened its window at `at_us`, as
+    /// the turn `id`, which a `turn: "end"` names.
+    BegunTurn {
+        at_us: u64,
+        id: u64,
+    },
     Done(Outcome),
 }
 
@@ -207,6 +226,9 @@ impl Answer {
         match self {
             // The event's name first, as a reader looks for it.
             Self::Begun(at_us) => format!(r#"{{"event":"begun","at_us":{at_us}}}"#),
+            Self::BegunTurn { at_us, id } => {
+                format!(r#"{{"event":"begun","at_us":{at_us},"id":{id}}}"#)
+            }
             Self::Done(outcome) => outcome.line(),
         }
     }
@@ -223,6 +245,8 @@ pub enum Outcome {
     Expired,
     /// Not taken, with why.
     Refused(String),
+    /// A `turn: "end"` ended the conversation of its turn.
+    Ended,
 }
 
 impl Outcome {
@@ -233,6 +257,7 @@ impl Outcome {
             Self::Dropped(why) => json!({"outcome": "dropped", "why": why}),
             Self::Expired => json!({"outcome": "expired"}),
             Self::Refused(why) => json!({"outcome": "refused", "why": why}),
+            Self::Ended => json!({"outcome": "ended"}),
         }
         .to_string()
     }
@@ -270,6 +295,12 @@ pub enum Words {
     /// until the client's thread reads it ([`read_clip`]) into an
     /// [`Self::ExactSound`]: played as an exact line is.
     ClipAt(PathBuf),
+    /// lamp-control asks for a turn to be opened, with the words said
+    /// first if any (`turn: "start"`, [`TURN_SKILL`] only).
+    TurnStart(Option<String>),
+    /// lamp-control asks for the turn it opened as `id` to be ended
+    /// (`turn: "end"`).
+    TurnEnd(u64),
 }
 
 impl Words {
@@ -287,7 +318,9 @@ impl Words {
             | Self::Sound(_)
             | Self::Exact(_)
             | Self::ExactSound(_)
-            | Self::ClipAt(_) => None,
+            | Self::ClipAt(_)
+            | Self::TurnStart(_)
+            | Self::TurnEnd(_) => None,
         }
     }
 }
@@ -366,6 +399,13 @@ enum Cue {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum TurnWire {
+    Start,
+    End,
+}
+
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Wire {
     skill: String,
@@ -402,9 +442,17 @@ struct Wire {
     unplug_request: Option<String>,
     #[serde(default)]
     priority: Option<u8>,
-    expires_in_ms: u64,
+    /// Needed by every ask but a `turn: "end"`.
+    #[serde(default)]
+    expires_in_ms: Option<u64>,
     #[serde(default)]
     start_before_us: Option<u64>,
+    /// A turn for lamp-control: `start` or `end` ([`TURN_SKILL`] only).
+    #[serde(default)]
+    turn: Option<TurnWire>,
+    /// The turn a `turn: "end"` ends, as its start's `begun` named it.
+    #[serde(default)]
+    id: Option<u64>,
     /// A note to be told who is at the lamp (#2825): only with `note`.
     #[serde(default)]
     who: bool,
@@ -455,9 +503,9 @@ const ONE_OF: &str = "exactly one of note, text, from, sound, clip, recording an
 /// Read and check one request line from `caller`. The reason, if refused,
 /// names the field and never repeats what was asked.
 pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
-    let wire: Wire = serde_json::from_str(line.trim_end_matches(['\n', '\r']))
+    let mut wire: Wire = serde_json::from_str(line.trim_end_matches(['\n', '\r']))
         .map_err(|_| "not a say request".to_owned())?;
-    let skill = wire.skill;
+    let skill = std::mem::take(&mut wire.skill);
     if skill.is_empty()
         || skill.len() > 64
         || !skill
@@ -469,6 +517,15 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     if skill == SHUTDOWN_SKILL && caller != Caller::WifiHelper {
         return Err("skill shutdown is asked by root only".into());
     }
+    if let Some(turn) = wire.turn.take() {
+        return parse_turn(skill, turn, wire);
+    }
+    if wire.id.is_some() {
+        return Err("id goes only with turn end".into());
+    }
+    let Some(expires_in_ms) = wire.expires_in_ms else {
+        return Err("not a say request".into());
+    };
     if let Some(line) = wire.quoted {
         if wire.note.is_some()
             || wire.text.is_some()
@@ -507,7 +564,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
                 .priority
                 .unwrap_or(NORMAL_PRIORITY)
                 .min(URGENT_FROM - 1),
-            expires_in_ms: wire.expires_in_ms,
+            expires_in_ms,
             start_before_us: wire.start_before_us,
             task: None,
             invitation: None,
@@ -622,19 +679,88 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     if priority > 9 {
         return Err("priority is 0 to 9".into());
     }
-    if !(1..=LONGEST_EXPIRY_MS).contains(&wire.expires_in_ms) {
+    if !(1..=LONGEST_EXPIRY_MS).contains(&expires_in_ms) {
         return Err(format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"));
     }
     Ok(Request {
         skill,
         words,
         priority,
-        expires_in_ms: wire.expires_in_ms,
+        expires_in_ms,
         start_before_us: wire.start_before_us,
         task: wire.task,
         invitation: wire.invitation,
         unplug_request: wire.unplug_request,
         who: wire.who,
+    })
+}
+
+/// A `turn` ask, checked: lamp-control's alone, a start with at most its
+/// prompt (`text`, under a text's rules) and an expiry, an end with only
+/// its `id`. Nothing else goes with either.
+fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, String> {
+    if skill != TURN_SKILL {
+        return Err("turn is lamp-control's only".into());
+    }
+    if wire.note.is_some()
+        || wire.quoted.is_some()
+        || wire.from.is_some()
+        || wire.sound.is_some()
+        || wire.clip.is_some()
+        || wire.recording.is_some()
+        || wire.cue.is_some()
+        || wire.task.is_some()
+        || wire.invitation.is_some()
+        || wire.unplug_request.is_some()
+        || wire.cache
+        || wire.exact
+        || wire.who
+        || wire.priority.is_some()
+    {
+        return Err("turn goes with text, expires_in_ms or id only".into());
+    }
+    let (words, expires_in_ms) = match turn {
+        TurnWire::Start => {
+            if wire.id.is_some() {
+                return Err("id goes only with turn end".into());
+            }
+            if let Some(text) = &wire.text
+                && (text.trim().is_empty()
+                    || text.len() > MOST_WORDS_BYTES
+                    || text.chars().any(char::is_control))
+            {
+                return Err(format!(
+                    "note or text is 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
+                ));
+            }
+            let expires_in_ms = wire
+                .expires_in_ms
+                .filter(|expires| (1..=LONGEST_EXPIRY_MS).contains(expires))
+                .ok_or_else(|| format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"))?;
+            (Words::TurnStart(wire.text), expires_in_ms)
+        }
+        TurnWire::End => {
+            if wire.text.is_some() || wire.expires_in_ms.is_some() || wire.start_before_us.is_some()
+            {
+                return Err("turn end goes with its id only".into());
+            }
+            let id = wire
+                .id
+                .filter(|id| *id > 0)
+                .ok_or_else(|| "turn end needs the turn's id".to_owned())?;
+            (Words::TurnEnd(id), TURN_END_EXPIRY_MS)
+        }
+    };
+    Ok(Request {
+        skill,
+        words,
+        priority: NORMAL_PRIORITY,
+        expires_in_ms,
+        start_before_us: wire.start_before_us,
+        task: None,
+        invitation: None,
+        unplug_request: None,
+        who: false,
     })
 }
 
@@ -738,6 +864,30 @@ impl Ticket {
         self.who
     }
 
+    /// A ticket the voice holds for itself: a say it makes of its own,
+    /// answered to the voice, as lamp-control's turn's prompt is
+    /// ([`crate::control_turn`]).
+    pub(crate) fn own(skill: &str) -> (Self, mpsc::Receiver<Answer>) {
+        let (answer, answered) = mpsc::channel();
+        (
+            Self {
+                skill: skill.to_owned(),
+                answer: Some(answer),
+                guard: None,
+                who: false,
+            },
+            answered,
+        )
+    }
+
+    /// A turn asked with `turn: "start"` opened its window at `at_us`, as
+    /// the turn `id`.
+    pub fn begun_turn(&self, at_us: u64, id: u64) {
+        if let Some(answer) = self.answer.as_ref() {
+            let _ = answer.send(Answer::BegunTurn { at_us, id });
+        }
+    }
+
     /// The voice began the turn at `at_us`. A client that has gone is
     /// nothing to the voice.
     pub fn begun(&self, at_us: u64) {
@@ -765,16 +915,7 @@ impl Drop for Ticket {
 /// A ticket for a test of the voice's turn, and where its answer goes.
 #[cfg(test)]
 pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
-    let (answer, answered) = mpsc::channel();
-    (
-        Ticket {
-            skill: skill.to_owned(),
-            answer: Some(answer),
-            guard: None,
-            who: false,
-        },
-        answered,
-    )
+    Ticket::own(skill)
 }
 
 /// A parsed wire request a stepped coordinator fixture delivers at its clock.
@@ -788,6 +929,19 @@ pub(crate) struct LineForTest {
 
 #[cfg(test)]
 impl LineForTest {
+    /// Another line to the same say service, and where its answer goes.
+    pub(crate) fn another(&self, line: &str) -> (Self, mpsc::Receiver<Answer>) {
+        let (answer, answered) = mpsc::channel();
+        (
+            Self {
+                request: parse(line).unwrap(),
+                incoming: self.incoming.clone(),
+                answer,
+            },
+            answered,
+        )
+    }
+
     pub(crate) fn read_at(self, read_at_us: u64) {
         self.incoming
             .send(Asked {
@@ -1249,8 +1403,59 @@ impl Says {
                     | Words::Exact(_)
                     | Words::ExactSound(_)
                     | Words::ClipAt(_)
+                    | Words::TurnStart(_)
+                    | Words::TurnEnd(_)
             )
         })
+    }
+
+    /// Whether a turn start waits, not yet expired at `now_us`.
+    pub fn turn_start_waits(&self, now_us: u64) -> bool {
+        self.waiting.iter().any(|waiting| {
+            matches!(waiting.request.words, Words::TurnStart(_)) && now_us < waiting.expires_at_us
+        })
+    }
+
+    /// Take the oldest turn start, as the voice opens or refuses it at
+    /// `now_us`: its prompt, if any, and its ticket. Those whose time ran
+    /// out are answered `expired` first.
+    pub fn take_turn_start(&mut self, now_us: u64) -> Option<(Option<String>, Ticket)> {
+        self.take_turn_of(now_us, |words| matches!(words, Words::TurnStart(_)))
+            .map(|(words, ticket)| match words {
+                Words::TurnStart(prompt) => (prompt, ticket),
+                _ => unreachable!("only a turn start was chosen"),
+            })
+    }
+
+    /// Take the oldest turn end: the id it names and its ticket. An end
+    /// never waits for the lamp to be at rest.
+    pub fn take_turn_end(&mut self, now_us: u64) -> Option<(u64, Ticket)> {
+        self.take_turn_of(now_us, |words| matches!(words, Words::TurnEnd(_)))
+            .map(|(words, ticket)| match words {
+                Words::TurnEnd(id) => (id, ticket),
+                _ => unreachable!("only a turn end was chosen"),
+            })
+    }
+
+    fn take_turn_of(
+        &mut self,
+        now_us: u64,
+        of: impl Fn(&Words) -> bool,
+    ) -> Option<(Words, Ticket)> {
+        self.expire(now_us);
+        let index = (0..self.waiting.len())
+            .filter(|&index| of(&self.waiting[index].request.words))
+            .min_by_key(|&index| self.waiting[index].order)?;
+        let waiting = self.waiting.remove(index);
+        Some((
+            waiting.request.words,
+            Ticket {
+                skill: waiting.request.skill,
+                answer: Some(waiting.answer),
+                guard: waiting.guard,
+                who: false,
+            },
+        ))
     }
 
     /// Take the next sound asked for, to play it now or refuse it now: a
@@ -1646,8 +1851,8 @@ fn serve_client(
                                 .map_err(|_| mpsc::RecvTimeoutError::Disconnected)
                         };
                         match answer {
-                            Ok(Answer::Begun(at_us)) => {
-                                let _ = writeln!(stream, "{}", Answer::Begun(at_us).line());
+                            Ok(begun @ (Answer::Begun(_) | Answer::BegunTurn { .. })) => {
+                                let _ = writeln!(stream, "{}", begun.line());
                             }
                             Ok(Answer::Done(outcome)) => break outcome,
                             Err(mpsc::RecvTimeoutError::Timeout) => continue,
@@ -3994,5 +4199,150 @@ mod tests {
             }),
             ExactNow::Refuse("the lamp is muted")
         );
+    }
+
+    #[test]
+    fn a_turn_is_lamp_controls_alone_with_its_prompt_or_its_id_only() {
+        let words = |line: &str| parse(line).map(|request| request.words);
+        assert_eq!(
+            words(r#"{"skill":"control","turn":"start","expires_in_ms":5000}"#),
+            Ok(Words::TurnStart(None))
+        );
+        assert_eq!(
+            words(r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":5000}"#),
+            Ok(Words::TurnStart(Some("Ready?".into())))
+        );
+        let end = parse(r#"{"skill":"control","turn":"end","id":7}"#).unwrap();
+        assert_eq!(end.words, Words::TurnEnd(7));
+        assert_eq!(end.expires_in_ms, TURN_END_EXPIRY_MS);
+        // Another skill, root's helpers too, may not ask for one.
+        for caller in [Caller::Other, Caller::WifiHelper] {
+            assert_eq!(
+                parse_from(
+                    r#"{"skill":"pomodoro","turn":"start","expires_in_ms":5000}"#,
+                    caller
+                ),
+                Err("turn is lamp-control's only".into())
+            );
+        }
+        let long = "a".repeat(MOST_WORDS_BYTES + 1);
+        for (line, why) in [
+            (
+                r#"{"skill":"control","turn":"start"}"#.to_owned(),
+                format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"),
+            ),
+            (
+                r#"{"skill":"control","turn":"start","expires_in_ms":0}"#.to_owned(),
+                format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"),
+            ),
+            (
+                format!(
+                    r#"{{"skill":"control","turn":"start","text":"{long}","expires_in_ms":5}}"#
+                ),
+                format!(
+                    "note or text is 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
+                ),
+            ),
+            (
+                r#"{"skill":"control","turn":"start","text":" ","expires_in_ms":5}"#.to_owned(),
+                format!(
+                    "note or text is 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
+                ),
+            ),
+            (
+                r#"{"skill":"control","turn":"start","note":"Ask.","expires_in_ms":5}"#.to_owned(),
+                "turn goes with text, expires_in_ms or id only".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"start","cue":"hum","expires_in_ms":5}"#.to_owned(),
+                "turn goes with text, expires_in_ms or id only".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"start","quoted":"Hi.","expires_in_ms":5}"#.to_owned(),
+                "turn goes with text, expires_in_ms or id only".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"start","id":3,"expires_in_ms":5}"#.to_owned(),
+                "id goes only with turn end".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"end"}"#.to_owned(),
+                "turn end needs the turn's id".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"end","id":0}"#.to_owned(),
+                "turn end needs the turn's id".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"end","id":3,"text":"Bye."}"#.to_owned(),
+                "turn end goes with its id only".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"end","id":3,"expires_in_ms":5}"#.to_owned(),
+                "turn end goes with its id only".into(),
+            ),
+            (
+                r#"{"skill":"control","text":"Hi.","id":3,"expires_in_ms":5}"#.to_owned(),
+                "id goes only with turn end".into(),
+            ),
+            // An unknown field is still refused: an older voice refusing
+            // `turn` is the door's way to know it can't take turns.
+            (
+                r#"{"skill":"control","turn":"start","expires_in_ms":5,"mood":"x"}"#.to_owned(),
+                "not a say request".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"later","expires_in_ms":5}"#.to_owned(),
+                "not a say request".into(),
+            ),
+        ] {
+            assert_eq!(parse(&line).map(|_| ()), Err(why), "{line}");
+        }
+        // A say of lamp-control's is still a say.
+        assert_eq!(
+            words(r#"{"skill":"control","text":"Hello.","expires_in_ms":5000}"#),
+            Ok(Words::Text("Hello.".into()))
+        );
+    }
+
+    #[test]
+    fn a_turn_ask_is_never_taken_as_a_say_and_its_begun_names_its_id() {
+        let (mut says, ask) = Says::by_hand();
+        for (line, order) in [
+            (
+                r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":5000}"#,
+                0,
+            ),
+            (r#"{"skill":"control","turn":"end","id":4}"#, 1),
+        ] {
+            let request = parse(line).unwrap();
+            let (answer, _answered) = mpsc::channel();
+            ask.send(Asked {
+                expires_at_us: request.expires_at_us(order),
+                request,
+                answer,
+                read_at_us: order,
+                guard: None,
+            })
+            .unwrap();
+        }
+        says.poll(10);
+        assert!(says.take(10).is_none());
+        assert!(says.take_sound(10).is_none());
+        assert_eq!(says.quiet_needed_us(), None);
+        assert!(says.turn_start_waits(10));
+        let (id, _) = says.take_turn_end(10).unwrap();
+        assert_eq!(id, 4);
+        let (prompt, ticket) = says.take_turn_start(10).unwrap();
+        assert_eq!(prompt.as_deref(), Some("Ready?"));
+        assert!(!says.turn_start_waits(10));
+        let (asker, answered) = Ticket::own("control");
+        asker.begun_turn(42, 9);
+        assert_eq!(
+            answered.try_recv().unwrap().line(),
+            r#"{"event":"begun","at_us":42,"id":9}"#
+        );
+        assert_eq!(Outcome::Ended.line(), r#"{"outcome":"ended"}"#);
+        ticket.answer(Outcome::Refused("the lamp is muted".into()));
     }
 }
