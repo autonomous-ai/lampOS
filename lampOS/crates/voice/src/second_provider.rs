@@ -1311,11 +1311,18 @@ struct Shared {
     /// The owner's language, read at start (`None`: English): every fixed
     /// line this route says itself is said in it ([`Shared::fixed`], #4473).
     language: Option<crate::language::Language>,
-    /// A stop said over the lamp's answer is answered with
-    /// [`crate::spoken_stop::LINE`], not asked of the model, its clip kept
-    /// once rendered (`LAMP_SPOKEN_STOP_ENDS`, #3985).
+    /// A stop said over the lamp's answer, or just after it, is answered
+    /// with [`crate::spoken_stop::LINE`], not asked of the model
+    /// (`LAMP_SPOKEN_STOP_ENDS`, #3985).
     spoken_stop_ends: bool,
-    stop_line: Mutex<Option<Vec<i16>>>,
+    /// A cut-in that ended the lamp's answer with no words is answered
+    /// [`crate::cut_in_wordless::LINE`] (`LAMP_CUT_IN_WORDLESS_ASKS`).
+    wordless_asks: bool,
+    /// When [`crate::cut_in_wordless::LINE`] was said last, by the engine's
+    /// clock: not again within [`crate::cut_in_wordless::AGAIN_AFTER`].
+    wordless_asked_at: Mutex<Option<Instant>>,
+    /// The fixed answers' clips, rendered ahead ([`FixedClips`]).
+    fixed_clips: Arc<FixedClips>,
     /// A turn after a quiet spell opens with [`ANNOUNCEMENT`]: not when
     /// this route is the lamp's only voice (`LAMP_VOICE_ROUTE=second`).
     announce: bool,
@@ -2561,11 +2568,189 @@ impl DownLine {
     }
 }
 
+/// The route's fixed answers ([`crate::spoken_stop::LINE`],
+/// [`crate::cut_in_wordless::LINE`]), each rendered once in the owner's
+/// language as the worker starts and kept in memory, so one is played at
+/// once, never rendered after the cut it answers ([`render_fixed`] then).
+#[derive(Default)]
+struct FixedClips {
+    clips: Mutex<Vec<(&'static str, Vec<i16>)>>,
+    rendering: AtomicBool,
+}
+
+impl FixedClips {
+    /// Each of `lines` (English) not kept yet, rendered in `language`; one
+    /// that fails is tried again at the next line's start.
+    fn render(
+        self: &Arc<Self>,
+        services: &Arc<dyn Services>,
+        language: Option<crate::language::Language>,
+        lines: Vec<&'static str>,
+    ) {
+        if lines.iter().all(|line| self.kept(line).is_some())
+            || self.rendering.swap(true, Ordering::AcqRel)
+        {
+            return;
+        }
+        let kept = self.clone();
+        let services = services.clone();
+        tokio::spawn(async move {
+            for english in lines {
+                if kept.kept(english).is_some() {
+                    continue;
+                }
+                let clip =
+                    render_line(&services, crate::language::fixed_in(language, english)).await;
+                if clip.is_empty() {
+                    eprintln!(
+                        "lamp-voice second: the fixed line \"{english}\" could not be said ahead; trying again at the next line"
+                    );
+                } else {
+                    kept.keep(english, clip);
+                }
+            }
+            kept.rendering.store(false, Ordering::Release);
+        });
+    }
+
+    /// `english`'s clip, if rendered.
+    fn kept(&self, english: &str) -> Option<Vec<i16>> {
+        let clips = self.clips.lock().ok()?;
+        clips
+            .iter()
+            .find(|(line, _)| *line == english)
+            .map(|(_, clip)| clip.clone())
+    }
+
+    fn keep(&self, english: &'static str, clip: Vec<i16>) {
+        if let Ok(mut clips) = self.clips.lock()
+            && !clips.iter().any(|(line, _)| *line == english)
+        {
+            clips.push((english, clip));
+        }
+    }
+}
+
+/// One of the route's fixed answers to `request` (`english`, said in the
+/// owner's language), the model not asked: told as the lamp's words, kept
+/// in the thread as theirs, and played as the lamp's words, never as a wait
+/// sound, so the journal says its first answer audio (`why`) or that it
+/// could not be said, and a line begun over it is begun over the lamp's
+/// voice. From its clip rendered ahead ([`FixedClips`]) at once; if none
+/// is kept, streamed from the voice as it comes, as the turn's piece (so a
+/// piece that fails to start is asked again on a connection of its own),
+/// and asked once more if it came with no sound. Before, it was rendered
+/// whole after the cut and only then played: on lamp-06c1 on 30 Oct at
+/// 15:53:43 the stop line, its voice slow, was still unplayed when a
+/// wordless line replaced its turn 5 s later, and the person heard nothing.
+async fn say_fixed(shared: &Shared, request: u64, english: &'static str, why: &str) {
+    let heard_at = Instant::now();
+    let line = shared.fixed(english);
+    if !shared
+        .emit(ProviderOutput::Transcript {
+            request: Some(request),
+            text: line.to_owned(),
+            finished: false,
+        })
+        .await
+    {
+        return;
+    }
+    shared.said_piece(request, Some(line));
+    let kept = shared.fixed_clips.kept(english);
+    let ahead = kept.is_some();
+    let mut first = true;
+    let mut play = |samples: Vec<i16>| {
+        if std::mem::replace(&mut first, false) {
+            eprintln!(
+                "lamp-voice second: request {request} first answer audio {} ms after the words were heard: its fixed line, {} ({why})",
+                heard_at.elapsed().as_millis(),
+                if ahead { "rendered ahead" } else { "said now" }
+            );
+        }
+        ProviderOutput::Audio {
+            request,
+            sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
+            provider_event_at_us: monotonic_us(),
+            source_frames: samples.len(),
+            source_offset: 0,
+            samples,
+        }
+    };
+    let mut played = 0;
+    if let Some(clip) = kept {
+        for part in clip.chunks(PACKET_SAMPLES) {
+            let audio = play(part.to_vec());
+            if !shared.emit(audio).await {
+                return;
+            }
+            shared.said_samples(request, part.len());
+            played += part.len();
+        }
+    } else {
+        let mut clip = Vec::new();
+        for _ in 0..2 {
+            let mut speech = shared
+                .services
+                .speak_for(line.to_owned(), net::Turn { request, heard_at });
+            let mut failed = false;
+            while let Some(packet) = speech.next().await {
+                let Ok(packet) = packet else {
+                    failed = true;
+                    break;
+                };
+                for part in packet.chunks(PACKET_SAMPLES) {
+                    let audio = play(part.to_vec());
+                    if !shared.emit(audio).await {
+                        return;
+                    }
+                    shared.said_samples(request, part.len());
+                    played += part.len();
+                }
+                clip.extend(packet);
+                if clip.len() >= DOWN_LINE_MOST_SAMPLES {
+                    break;
+                }
+            }
+            if played > 0 {
+                // Kept for the next time only when said whole.
+                if !failed {
+                    shared.fixed_clips.keep(english, clip);
+                }
+                break;
+            }
+        }
+    }
+    if played == 0 {
+        eprintln!(
+            "lamp-voice second: request {request}: its fixed line could not be said: the voice gave no sound for it twice ({why})"
+        );
+    }
+    if shared
+        .emit(ProviderOutput::GenerationComplete { request })
+        .await
+    {
+        shared
+            .emit(ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            })
+            .await;
+    }
+}
+
 /// `text` said by the route's voice into one clip, at most
 /// `DOWN_LINE_MOST_SAMPLES`; empty if the voice failed.
 async fn render_line(services: &Arc<dyn Services>, text: &str) -> Vec<i16> {
+    clip_of(services.speak(text.to_owned())).await
+}
+
+/// A voice's packets in one clip, at most `DOWN_LINE_MOST_SAMPLES`; empty
+/// if the voice failed.
+async fn clip_of(
+    mut speech: futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>>,
+) -> Vec<i16> {
     let mut clip = Vec::new();
-    let mut speech = services.speak(text.to_owned());
     while let Some(packet) = speech.next().await {
         match packet {
             Ok(packet) => clip.extend(packet),
@@ -2907,7 +3092,9 @@ impl Engine {
                 down: None,
                 language: crate::language::at_start(),
                 spoken_stop_ends: false,
-                stop_line: Mutex::new(None),
+                wordless_asks: false,
+                wordless_asked_at: Mutex::new(None),
+                fixed_clips: Arc::default(),
                 announce: true,
                 heard_last: Mutex::new(None),
                 lamp_said: Mutex::new((0, String::new())),
@@ -3851,6 +4038,16 @@ impl Engine {
         self
     }
 
+    /// A cut-in that ended the lamp's answer and came back with no words is
+    /// answered [`crate::cut_in_wordless::LINE`], in a quiet room only, the
+    /// model not asked (`LAMP_CUT_IN_WORDLESS_ASKS`). Before any turn only.
+    pub fn asking_after_wordless_cut_ins(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.wordless_asks = on;
+        }
+        self
+    }
+
     pub fn asking_again(mut self, cut_in: CutIn, ask: AskAgain) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.ask_again = Some((cut_in, ask));
@@ -4348,6 +4545,23 @@ impl Engine {
         if let Some(down) = &self.shared.down {
             down.render(&self.shared.services, self.shared.language);
         }
+        self.render_fixed_answers();
+    }
+
+    /// The fixed answers switched on, rendered ahead in the owner's
+    /// language, so none waits on the voice after a cut ([`FixedClips`]).
+    fn render_fixed_answers(&self) {
+        let shared = &self.shared;
+        let lines: Vec<&'static str> = [
+            (shared.spoken_stop_ends, crate::spoken_stop::LINE),
+            (shared.wordless_asks, crate::cut_in_wordless::LINE),
+        ]
+        .into_iter()
+        .filter_map(|(on, line)| on.then_some(line))
+        .collect();
+        shared
+            .fixed_clips
+            .render(&shared.services, shared.language, lines);
     }
 
     pub fn submit(&mut self, input: ProviderInput) {
@@ -4449,6 +4663,8 @@ impl Engine {
                 if let Some(down) = &self.shared.down {
                     down.render(&self.shared.services, self.shared.language);
                 }
+                // And the fixed answers, one failed at the start tried again.
+                self.render_fixed_answers();
                 // The wait sounds too, as the line begins, not only once its
                 // words are heard: one rendered by the time the chat is due
                 // makes its "hmm" (#3755).
@@ -5777,21 +5993,34 @@ async fn spoken(
     let mut prepared: Option<Prepared> = None;
     // Whether the words so far end unfinished, told to the coordinator as
     // it changes, while the line is heard (`LAMP_SECOND_UNFINISHED_WAIT`).
-    let mut words_said = if shared.unfinished_words {
+    // Also taken for a cut-in's words on the way (`interim`), with
+    // `LAMP_CUT_IN_WORDLESS_ASKS` or `LAMP_SPOKEN_STOP_ENDS`.
+    let mut words_said = if shared.unfinished_words
+        || (marks.over_the_lamps_voice && (shared.wordless_asks || shared.spoken_stop_ends))
+    {
         listener.said()
     } else {
         None
     };
     let mut told_unfinished = None;
+    // The last words speech to text had for this line, interim or final,
+    // none empty: a cut-in whose final words come back empty may still have
+    // had some on the way ([`words_on_the_way`]).
+    let mut interim: Option<String> = None;
     let mut enrollment_audio = None;
     let mut enrollment_audio_valid = true;
     loop {
         tokio::select! {
             Some(words) = next_said(&mut words_said) => {
-                let unfinished = crate::unfinished_words::trailing(&words);
-                if unfinished != told_unfinished {
-                    told_unfinished = unfinished;
-                    shared.emit(ProviderOutput::WordsEnd { request, unfinished }).await;
+                if !words.trim().is_empty() {
+                    interim = Some(words.clone());
+                }
+                if shared.unfinished_words {
+                    let unfinished = crate::unfinished_words::trailing(&words);
+                    if unfinished != told_unfinished {
+                        told_unfinished = unfinished;
+                        shared.emit(ProviderOutput::WordsEnd { request, unfinished }).await;
+                    }
                 }
             }
             part = heard.recv() => match part {
@@ -5890,6 +6119,15 @@ async fn spoken(
             (&cut_in, &marks),
         );
     }
+    // And the words that came while the final ones were asked for.
+    while let Some(words) = words_said.as_mut().and_then(|said| said.try_recv().ok()) {
+        if !words.trim().is_empty() {
+            interim = Some(words);
+        }
+    }
+    let interim = interim
+        .map(|words| crate::unfinished_words::without_fillers(&words))
+        .filter(|words| !words.trim().is_empty());
     // The coordinator's call, its words back after the next line began
     // (`LAMP_SECOND_NAME_CARRIES`, [`NameWords::Coming`]): they go to that
     // line, kept for whom it was said by, and nothing of this one is said,
@@ -5951,6 +6189,25 @@ async fn spoken(
                 .await;
         }
     };
+    // A cut-in over the lamp's answer whose final words came back empty,
+    // though speech to text had words for it on the way (#4938's replay 2,
+    // lamp-06c1 on 3 Nov at 02:34: "Stop Lamp." over a story committed with
+    // 760 ms of speech, and its final words were none, so it was answered
+    // as a cough). A stop among them is the stop it was
+    // (`LAMP_SPOKEN_STOP_ENDS`); any other words keep it from being taken
+    // for a wordless sound (`LAMP_CUT_IN_WORDLESS_ASKS`).
+    let on_the_way = words_on_the_way(&text, interim, marks.over_the_lamps_voice);
+    let text = match on_the_way.as_deref() {
+        Some(words) if shared.spoken_stop_ends && crate::spoken_stop::is_stop_request(words) => {
+            eprintln!(
+                "lamp-voice second: request {request}: its final words came back empty, but its {} words on the way were a stop: taken as said",
+                words.split_whitespace().count()
+            );
+            words.to_owned()
+        }
+        _ => text,
+    };
+    let words_were_on_the_way = on_the_way.is_some() && text.trim().is_empty();
     // Snapshot the actual line before name carries or older words are
     // joined. Those may belong to someone else and never prove this name.
     let enrollment_allowed = shared.remember_speaker
@@ -6657,11 +6914,18 @@ async fn spoken(
     // Judged after the echo, held and heed verdicts, so the lamp's own
     // "Stop it!" heard back, or desk talk not for it, is never answered
     // (the Reviewer-lead's P2 on #4004).
+    // Or just after the answer ended (Sixth's item 6 on #4710): a stop
+    // always gets the same short line.
+    let just_after = !marks.over_the_lamps_voice
+        && crate::spoken_stop::just_after(
+            said.lock().map_or(0, |said| said.0),
+            shared.said_until_us.load(Ordering::Relaxed),
+        );
     if shared.spoken_stop_ends
         && !echoed
         && !held
         && heeded.is_none()
-        && marks.over_the_lamps_voice
+        && (marks.over_the_lamps_voice || just_after)
         && !went_on
         && crate::spoken_stop::is_stop_request(&text)
         && !shared
@@ -6694,44 +6958,22 @@ async fn spoken(
             (shared.clock)(),
         );
         // In the owner's language, as its other fixed lines (#4473).
-        let line = shared.fixed(crate::spoken_stop::LINE);
         eprintln!(
-            "lamp-voice second: request {request}: a stop said over the lamp's answer: answered \"{line}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)"
+            "lamp-voice second: request {request}: a stop said {}: answered \"{}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)",
+            if just_after {
+                "just after the lamp's answer"
+            } else {
+                "over the lamp's answer"
+            },
+            shared.fixed(crate::spoken_stop::LINE)
         );
-        let said = shared
-            .emit(ProviderOutput::Transcript {
-                request: Some(request),
-                text: line.to_owned(),
-                finished: false,
-            })
-            .await;
-        if said {
-            let kept = shared.stop_line.lock().ok().and_then(|kept| kept.clone());
-            let clip = match kept {
-                Some(clip) => clip,
-                None => {
-                    let clip = render_line(&shared.services, line).await;
-                    if !clip.is_empty()
-                        && let Ok(mut kept) = shared.stop_line.lock()
-                    {
-                        *kept = Some(clip.clone());
-                    }
-                    clip
-                }
-            };
-            if (clip.is_empty() || cue(&shared, request, clip).await.is_ok())
-                && shared
-                    .emit(ProviderOutput::GenerationComplete { request })
-                    .await
-            {
-                shared
-                    .emit(ProviderOutput::TurnComplete {
-                        request,
-                        idle: true,
-                    })
-                    .await;
-            }
-        }
+        say_fixed(
+            &shared,
+            request,
+            crate::spoken_stop::LINE,
+            "LAMP_SPOKEN_STOP_ENDS",
+        )
+        .await;
         return;
     }
     // A held echo's journal line, with its counts, is said above.
@@ -6965,6 +7207,50 @@ async fn spoken(
             if !shared.emit(unclear).await {
                 return;
             }
+        }
+        // A cut-in that ended the lamp's answer and came back with no words
+        // (`LAMP_CUT_IN_WORDLESS_ASKS`): a cough, a beep or a knock left the
+        // lamp silent mid-answer. Its Start came over the lamp's answer:
+        // the yield committed and ended it, or it began in a gap of the
+        // answer's sound (lamp-06c1 on 3 Nov at 02:13); a yield that resumed
+        // sends none. Never in a busy room, where a wordless yield is the
+        // room's (`LAMP_CUT_IN_OVER_BED`), and never when speech to text had
+        // words for it on the way: those were words, not a cough (#4938).
+        if empty && shared.wordless_asks && marks.over_the_lamps_voice && words_were_on_the_way {
+            eprintln!(
+                "lamp-voice second: request {request}: a cut-in whose final words came back empty had words on the way: not asked if someone spoke (LAMP_CUT_IN_WORDLESS_ASKS)"
+            );
+        }
+        if empty
+            && shared.wordless_asks
+            && marks.over_the_lamps_voice
+            && !words_were_on_the_way
+            && !echoed
+            && heeded.is_none()
+            && !shared.busy(request)
+            && shared.wordless_asked_at.lock().is_ok_and(|mut at| {
+                let now = (shared.clock)();
+                let due = at.is_none_or(|at| {
+                    now.saturating_duration_since(at) >= crate::cut_in_wordless::AGAIN_AFTER
+                });
+                if due {
+                    *at = Some(now);
+                }
+                due
+            })
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: a cut-in with no words ended the lamp's answer: answered \"{}\", the model not asked (LAMP_CUT_IN_WORDLESS_ASKS)",
+                shared.fixed(crate::cut_in_wordless::LINE)
+            );
+            say_fixed(
+                &shared,
+                request,
+                crate::cut_in_wordless::LINE,
+                "LAMP_CUT_IN_WORDLESS_ASKS",
+            )
+            .await;
+            return;
         }
         if shared.stages(request, &times).await {
             shared
@@ -8028,6 +8314,14 @@ fn plain_words(words: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// The words speech to text had on the way for a line said over the lamp's
+/// answer (`over`) whose final words (`text`) came back empty: `interim`,
+/// the last of them that had any. None for a line with final words, or one
+/// begun in the clear (#4938).
+fn words_on_the_way(text: &str, interim: Option<String>, over: bool) -> Option<String> {
+    interim.filter(|words| over && text.trim().is_empty() && !words.trim().is_empty())
 }
 
 /// The next of a listener's early words; never, once there are none.
@@ -10900,7 +11194,9 @@ async fn answer(
                 // Each packet's words, as long as it plays, after the one
                 // before it or from now.
                 // Also kept for the echo's tail (`LAMP_SECOND_OWN_ECHO`).
-                if answering && (shared.did.is_some() || shared.own_echo) {
+                // And for a stop said just after it (`LAMP_SPOKEN_STOP_ENDS`).
+                if answering && (shared.did.is_some() || shared.own_echo || shared.spoken_stop_ends)
+                {
                     let until = shared.said_through(samples.len(), monotonic_us());
                     if let Some(did) = &shared.did {
                         did(Did::Said(request, until));

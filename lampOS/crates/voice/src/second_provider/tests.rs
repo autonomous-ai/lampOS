@@ -53,6 +53,10 @@ struct Script {
     speech_ready: Option<mpsc::UnboundedSender<String>>,
     /// An empty successful stream, as speech skipped after bounded retries.
     skipped: Option<&'static str>,
+    /// The same, for each of these sentences the first time it is asked.
+    silent_once: Mutex<Vec<&'static str>>,
+    /// Every sentence asked of the voice, in order.
+    spoken: Mutex<Vec<String>>,
     /// Pieces the voice could not start twice (`services::UNSAID`, #4338).
     unsaid: &'static [&'static str],
     /// Speech of this sentence never ends.
@@ -240,8 +244,16 @@ impl Services for Script {
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+        self.spoken.lock().unwrap().push(text.clone());
         if self.skipped == Some(text.as_str()) {
             return stream::empty().boxed();
+        }
+        {
+            let mut once = self.silent_once.lock().unwrap();
+            if let Some(at) = once.iter().position(|line| *line == text) {
+                once.remove(at);
+                return stream::empty().boxed();
+            }
         }
         if self.unsaid.contains(&text.as_str()) {
             return stream::once(async { Err(net::Error::Timeout(super::services::UNSAID)) })
@@ -10893,6 +10905,275 @@ async fn a_stop_said_over_the_lamp_is_answered_in_the_owners_language() {
         "{out:?}"
     );
     assert!(script.asked.lock().unwrap().is_empty());
+}
+
+/// lamp-06c1, 30 Oct 15:53:43 (#4710): "Okay, I'll stop there." was
+/// written but never heard. It was rendered only after the cut, whole,
+/// before any of it played, and the voice was slow; 5 s later a wordless
+/// line replaced its turn. Now it is rendered as the worker starts and
+/// played at once from that clip, even with the voice stuck, as the lamp's
+/// words (its first answer audio journalled), never a wait sound.
+#[tokio::test]
+async fn the_stop_line_rendered_ahead_plays_at_once_though_the_voice_is_stuck() {
+    let line = crate::spoken_stop::LINE;
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Stop.".to_owned())].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built.ending_spoken_stops(true);
+    engine.render_lines();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while engine.shared.fixed_clips.kept(line).is_none() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the stop line is rendered ahead");
+    // The voice now never answers the line: rendering it after the cut, as
+    // before, leaves the turn silent until something else replaces it.
+    let (_release, stuck) = tokio::sync::oneshot::channel::<()>();
+    *script.speech_hold.lock().unwrap() = Some((line, stuck));
+    engine.submit(start_marked(1, true, false, false));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let out = turn(&mut engine).await;
+    let said = format!("said:{line}");
+    let at = out
+        .iter()
+        .position(|o| *o == said)
+        .expect("the line is said");
+    assert_eq!(out[at + 1], format!("audio:{}", line.len()), "{out:?}");
+    assert_eq!(&out[out.len() - 2..], ["generated", "complete"], "{out:?}");
+    assert!(script.asked.lock().unwrap().is_empty());
+    // Played as words, so a line begun over it is over the lamp's voice.
+    assert!(!engine.shared.only_its_wait_sound(1));
+}
+
+/// Not rendered ahead, the line is said as the turn's piece as it comes;
+/// a voice that gives it no sound is asked once more, never a silent turn.
+#[tokio::test]
+async fn a_fixed_line_with_no_sound_is_asked_once_more() {
+    let line = crate::spoken_stop::LINE;
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Stop Lamp.".to_owned())].into()),
+        silent_once: Mutex::new(vec![line, line]),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = built.ending_spoken_stops(true);
+    engine.submit(start_marked(1, true, false, false));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let out = turn(&mut engine).await;
+    // The Start's own render ahead and the turn's first ask came to
+    // nothing; the turn's second ask is played.
+    assert!(out.contains(&format!("audio:{}", line.len())), "{out:?}");
+    assert!(script.asked.lock().unwrap().is_empty());
+    assert!(
+        script
+            .spoken
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|said| *said == line)
+            .count()
+            >= 2
+    );
+}
+
+/// Sixth's item 6 on #4710: a stop always gets the same short line. Over
+/// the answer, or begun within `spoken_stop::JUST_AFTER` of its end, "Stop",
+/// "Stop Lamp" and "Lamp, stop" are answered with it; "Don't stop", a long
+/// line with "stop" in it, or a stop long after the answer go to the model.
+#[tokio::test]
+async fn a_stop_over_or_just_after_the_answer_gets_the_one_line() {
+    // `until_ago`: how long before the stop's line began the answer's last
+    // sound played; none for no answer played.
+    async fn asked(words: &str, over: bool, until_ago: Option<Duration>) -> bool {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(words.to_owned())].into()),
+            chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built.ending_spoken_stops(true);
+        // The line's first sound read at 100 s on the monotonic clock.
+        const BEGAN_US: u64 = 100_000_000;
+        if let Some(ago) = until_ago {
+            engine
+                .shared
+                .said_until_us
+                .store(BEGAN_US - ago.as_micros() as u64, Ordering::Relaxed);
+        }
+        engine.submit(start_marked(1, over, false, false));
+        engine.submit(ProviderInput::Audio {
+            request: 1,
+            privacy_generation: 1,
+            sequence: 1,
+            read_completed_at_us: BEGAN_US,
+            samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+        });
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        !script.asked.lock().unwrap().is_empty()
+    }
+    let second = Some(Duration::from_secs(1));
+    for stop in ["Stop.", "Stop Lamp.", "Lamp, stop.", "Lamp stop"] {
+        assert!(!asked(stop, true, None).await, "{stop} over the answer");
+        assert!(!asked(stop, false, second).await, "{stop} just after it");
+    }
+    assert!(asked("Don't stop.", true, None).await);
+    assert!(asked("Don't stop.", false, second).await);
+    assert!(
+        asked(
+            "I had to stop at the shop on the way home today.",
+            true,
+            None
+        )
+        .await
+    );
+    // Past the window, or with no answer played, it is the model's.
+    assert!(asked("Stop.", false, Some(Duration::from_secs(5))).await);
+    assert!(asked("Stop.", false, None).await);
+}
+
+/// The first builder on #4710 (2 Nov): a cut-in that ended the answer with
+/// no words (a cough, a knock) is answered "Did someone say something?",
+/// the model not asked, with `LAMP_CUT_IN_WORDLESS_ASKS`. Not without it,
+/// not for a wordless line begun in the clear (no answer cut), not in a
+/// busy room, where a wordless yield is the room's, and never for a line
+/// with words.
+#[tokio::test]
+async fn a_wordless_cut_in_that_ended_the_answer_asks_one_short_question() {
+    let line = crate::cut_in_wordless::LINE;
+    async fn run(
+        words: &str,
+        on: bool,
+        over: bool,
+        busy: bool,
+    ) -> (Vec<String>, Vec<Vec<Message>>) {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(words.to_owned())].into()),
+            chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built
+            .asking_after_wordless_cut_ins(on)
+            .judging_busy(Arc::new(move |_| busy));
+        engine.submit(start_marked(1, over, false, false));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        (out, script.asked.lock().unwrap().clone())
+    }
+    let said = format!("said:{line}");
+    let (out, asked) = run("", true, true, false).await;
+    assert!(out.contains(&said), "{out:?}");
+    assert!(out.contains(&format!("audio:{}", line.len())), "{out:?}");
+    assert!(asked.is_empty());
+    for (words, on, over, busy) in [
+        ("", false, true, false),
+        ("", true, false, false),
+        ("", true, true, true),
+    ] {
+        let (out, asked) = run(words, on, over, busy).await;
+        assert!(!out.contains(&said), "{on} {over} {busy}: {out:?}");
+        assert!(asked.is_empty());
+    }
+    let (out, asked) = run("Tell me about the ogre.", true, true, false).await;
+    assert!(!out.contains(&said), "{out:?}");
+    assert_eq!(asked.len(), 1);
+}
+
+/// A second knock that cuts the question, or one within the minute, leaves
+/// the lamp quiet: asked at most once in `cut_in_wordless::AGAIN_AFTER`.
+#[tokio::test]
+async fn a_wordless_cut_in_asks_at_most_once_a_minute() {
+    let said = format!("said:{}", crate::cut_in_wordless::LINE);
+    let script = Arc::new(Script::default());
+    let (built, _, now) = scripted(script.clone());
+    let mut engine = built.asking_after_wordless_cut_ins(true);
+    async fn wordless(engine: &mut Engine, request: u64) -> Vec<String> {
+        engine.submit(start_marked(request, true, false, false));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        turn(engine).await
+    }
+    assert!(wordless(&mut engine, 1).await.contains(&said));
+    assert!(!wordless(&mut engine, 2).await.contains(&said));
+    *now.lock().unwrap() += crate::cut_in_wordless::AGAIN_AFTER;
+    assert!(wordless(&mut engine, 3).await.contains(&said));
+    assert!(script.asked.lock().unwrap().is_empty());
+}
+
+/// #4938's replay 2 (lamp-06c1, 3 Nov 02:34): "Stop Lamp." over a story
+/// committed and its final words came back empty, so it was asked "Did
+/// someone say something?". Words speech to text had on the way are words:
+/// a stop among them gets the stop line, other words keep the cut-in from
+/// being taken for a cough, and with none it still asks.
+#[tokio::test]
+async fn a_cut_in_with_words_on_the_way_but_none_final_is_not_taken_for_a_cough() {
+    let asks = format!("said:{}", crate::cut_in_wordless::LINE);
+    let stops = format!("said:{}", crate::spoken_stop::LINE);
+    async fn run(on_the_way: &[&str], over: bool) -> (Vec<String>, usize) {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(String::new())].into()),
+            said: Mutex::new([on_the_way.iter().map(|w| (*w).to_owned()).collect()].into()),
+            chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built
+            .asking_after_wordless_cut_ins(true)
+            .ending_spoken_stops(true);
+        engine.submit(start_marked(1, over, false, false));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        (out, asked)
+    }
+    // The stop heard on the way: the stop line, not the question.
+    let (out, asked) = run(&["Stop", "Stop Lamp.", ""], true).await;
+    assert!(out.contains(&stops), "{out:?}");
+    assert!(!out.contains(&asks), "{out:?}");
+    assert_eq!(asked, 0);
+    // Other words on the way: neither line, and the model is not asked
+    // words that never came back final.
+    let (out, asked) = run(&["Tell me"], true).await;
+    assert!(!out.contains(&asks) && !out.contains(&stops), "{out:?}");
+    assert_eq!(asked, 0);
+    // Fillers alone are no words.
+    let (out, _) = run(&["um"], true).await;
+    assert!(out.contains(&asks), "{out:?}");
+    // Nothing on the way: a cough, still asked.
+    let (out, _) = run(&[], true).await;
+    assert!(out.contains(&asks), "{out:?}");
+    // Begun in the clear: words on the way change nothing.
+    let (out, _) = run(&["Stop"], false).await;
+    assert!(!out.contains(&asks) && !out.contains(&stops), "{out:?}");
+}
+
+#[test]
+fn words_on_the_way_count_only_for_an_empty_cut_in() {
+    let some = || Some("Stop".to_owned());
+    assert_eq!(
+        super::words_on_the_way("", some(), true).as_deref(),
+        Some("Stop")
+    );
+    assert_eq!(
+        super::words_on_the_way("  ", some(), true).as_deref(),
+        Some("Stop")
+    );
+    assert_eq!(super::words_on_the_way("Stop.", some(), true), None);
+    assert_eq!(super::words_on_the_way("", some(), false), None);
+    assert_eq!(super::words_on_the_way("", None, true), None);
+    assert_eq!(
+        super::words_on_the_way("", Some(" ".to_owned()), true),
+        None
+    );
 }
 
 /// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's

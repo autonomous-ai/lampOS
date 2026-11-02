@@ -225,14 +225,15 @@ each line plays exactly as before.
 | No Wi-Fi, recovery hotspot | `language::WIFI_LOST`, `WIFI_RECOVERING` | the notices release's English file, asked by name through the say service | the same (`Recordings::samples`) |
 | The second route's own words before a look, and before a search with `LAMP_SECOND_CHECKING_LINE` | `second_provider::LOOKING` ("Let me look."), `CHECKING` ("Let me check.") | said as the turn's text, in English | the owner's words (`language::fixed_in`), and the next round is told those words were said (Thirteen's P2 on #4707) |
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
-| The second route's answer to a stop said over it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on) | the owner's words, rendered and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
+| The second route's answer to a stop said over it, or within 3 s after it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice as its worker starts, played at once as the lamp's words and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on; `FixedClips`, #4710) | the owner's words, rendered ahead and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
+| The second route's question after a cut-in that ended its answer with no words | `cut_in_wordless::LINE` ("Did someone say something?") | rendered ahead as the stop line, quiet room only (`LAMP_CUT_IN_WORDLESS_ASKS`, off in the product until the echo asks are near 0, #4710, #4938) | the owner's words, rendered ahead (`language::fixed_in`) |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, nineteen today (`FIXED_LINES`), then the English two
+lines first, twenty today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -1874,6 +1875,19 @@ order is kept. A written turn is the same from the chat on.
     call: it is asked as it is, without the note (lamp-4ace, 25 Oct: the
     name heard in "Nice. And what was my sister's name again?" was told
     as a call, and the model answered "May.").
+  - **A stop, or a cut-in with no words** (not-speech.md, "A stop always
+    gets one line"): a stop over the lamp's answer, or begun within
+    `spoken_stop::JUST_AFTER` (3 s) of its end, is answered
+    `spoken_stop::LINE` (`LAMP_SPOKEN_STOP_ENDS`); a cut-in that ended the
+    answer and came back with no words, in a quiet room, is answered
+    `cut_in_wordless::LINE` (`LAMP_CUT_IN_WORDLESS_ASKS`). A cut-in whose
+    final words came back empty but had words on the way is taken as that
+    stop when they are one, and otherwise is neither (#4938). Neither is asked
+    of the model; both are rendered ahead (`FixedClips`) and played at once
+    as the lamp's words, the journal saying "a stop said over (just after)
+    the lamp's answer: answered …" or "a cut-in with no words ended the
+    lamp's answer: answered …", then "first answer audio … its fixed
+    line".
   - The journal says each: "it began over the lamp's answer, and the
     model is told so", "the model is told it may follow on from what the
     lamp said" (or "… in a busy room; the model is not told …"), "only

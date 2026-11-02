@@ -162,12 +162,15 @@ Environment=LAMP_REPLY_END_REACH=on
 # Its own voice heard back, a cut-in told as one, words said once, and a reply that is not for it.
 Environment=LAMP_SECOND_OWN_ECHO=on
 Environment=LAMP_CUT_IN_TOLD=on
-# A stop said over the lamp's answer ("Stop", "Stop them.", "That's enough.") is answered
-# "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985).
+# A stop said over the lamp's answer, or within 3 s after it ended ("Stop", "Stop Lamp", "That's enough."), is
+# answered "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985, #4710).
 Environment=LAMP_SPOKEN_STOP_ENDS=on
 # An answer cut by a line or a stop is kept as the words that were played, so "go on" picks up from the cut
 # (#3997): probe-cut-in on lamp-06c1 on 30 Oct, resume 19/20 to 20/20 with LAMP_CUT_IN_TOLD; two played demos, 2 of 2.
 Environment=LAMP_SAID_AS_HEARD=on
+# LAMP_CUT_IN_WORDLESS_ASKS stays off (3 Nov, #4938): the lamp's own echo commits as a cut-in with 0 words, so
+# "Did someone say something?" would answer the lamp's own voice. On lamp-06c1 on 3 Nov 7 of 15 stories had such a
+# commit over the lamp's answer. It goes on once a replay shows those echo asks near 0.
 Environment=LAMP_SECOND_SAID_ONCE=on
 # A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
