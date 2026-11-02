@@ -2179,6 +2179,53 @@ fn a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds() {
     assert_eq!(began(&h, Some(turn)), WhileOwnLineWaits::AsBefore);
 }
 
+/// #4868, the night of 2 Nov: the first answer after a restart, its request
+/// the third turn the lamp left unanswered, was taken as begun in a quiet
+/// room. Whether the room was busy as a reply began was taken before the
+/// room counted the turn the request displaced. Now it is taken after: two
+/// unanswered turns and a third displaced by the request make the answer's
+/// room busy, so `LAMP_CUT_IN_OVER_BED` is in force for it.
+#[test]
+fn the_turn_a_request_displaces_counts_toward_the_room_its_answer_began_in() {
+    let mut room = crate::body_link::Attention::default();
+    let mut own_line_busy = None;
+    let mut clock = 1_000_000;
+    // Three turns of the room's talk, none answered; the third owns the
+    // lamp when the request displaces it.
+    for turn in 1..=3 {
+        for _ in 0..3 {
+            observe_room(
+                &mut room,
+                Some((turn, false)),
+                Some(turn),
+                &mut own_line_busy,
+                clock,
+            );
+            clock += 40_000;
+        }
+    }
+    assert_eq!(own_line_busy, Some((3, false)));
+    // The request's turn: the same tick counts the third turn unanswered.
+    observe_room(
+        &mut room,
+        Some((4, false)),
+        Some(4),
+        &mut own_line_busy,
+        clock,
+    );
+    assert_eq!(own_line_busy, Some((4, true)));
+    // Taken once a line: its own audio, an answer, changes nothing.
+    observe_room(
+        &mut room,
+        Some((4, true)),
+        Some(4),
+        &mut own_line_busy,
+        clock + 40_000,
+    );
+    assert!(!room.busy());
+    assert_eq!(own_line_busy, Some((4, true)));
+}
+
 /// `LAMP_OWN_LINE_OVER_TALK` (#2602's design): while a line the lamp
 /// started on its own is sounding, talk over it in a room busy as the line
 /// began is let go (`busy_room`), unless the lamp's name, a stop word or a
