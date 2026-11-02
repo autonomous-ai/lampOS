@@ -171,6 +171,10 @@ pub struct Ended {
 enum Work {
     Fold(Job),
     End(Ended, u64),
+    /// The memory probe's barrier ([`crate::remember::probe`]): answered
+    /// once every job queued before it is done. Absent from product builds.
+    #[cfg(any(test, lamp_memory_probe))]
+    Barrier(SyncSender<()>),
 }
 
 /// The jobs' way to the summary's own thread, and the notes it keeps.
@@ -260,6 +264,83 @@ fn jobs_due(
             forgets,
         })
         .collect()
+}
+
+/// The summary's clock: the memory probe's when one is installed
+/// ([`crate::remember::probe::Clock`]), which only a build with the probe
+/// has; [`Instant::now`] always otherwise.
+#[cfg(not(any(test, lamp_memory_probe)))]
+fn now() -> Instant {
+    Instant::now()
+}
+
+#[cfg(any(test, lamp_memory_probe))]
+fn now() -> Instant {
+    crate::remember::probe::installed().map_or_else(Instant::now, |clock| clock.instant())
+}
+
+/// The memory probe's barrier on this process's summary thread
+/// ([`crate::remember::probe::drain`]): `None` with no thread (nothing can be
+/// queued), else what answers once every job queued before it is done, or
+/// the barrier back when the queue stayed full.
+#[cfg(any(test, lamp_memory_probe))]
+pub(crate) fn barrier() -> Option<Result<Receiver<()>, ()>> {
+    let queue = QUEUE_TO.get()?;
+    let (done, answered) = sync_channel(1);
+    Some(match queue.jobs.try_send(Work::Barrier(done)) {
+        Ok(()) => Ok(answered),
+        Err(_) => Err(()),
+    })
+}
+
+/// Forgets this process's notes have seen ([`Summaries::forget`]), for the
+/// memory probe's forget count. Absent from product builds.
+#[cfg(any(test, lamp_memory_probe))]
+pub(crate) fn forgets() -> u64 {
+    SUMMARIES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .forgets
+}
+
+/// This process's notes, each scope's text, for the memory probe's
+/// checkpoint. Absent from product builds.
+#[cfg(any(test, lamp_memory_probe))]
+pub(crate) fn notes() -> Vec<(Option<String>, String)> {
+    SUMMARIES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .notes
+        .iter()
+        .map(|(scope, note)| (scope.clone(), note.text.clone()))
+        .collect()
+}
+
+/// The notes a probe's checkpoint held, as new as now, in place of this
+/// process's, only while no forget has come since `forgets` was read
+/// ([`forgets`]): whether they were put back. Absent from product builds.
+#[cfg(any(test, lamp_memory_probe))]
+pub(crate) fn put_back(notes: &[(Option<String>, String)], forgets: u64) -> bool {
+    let mut summaries = SUMMARIES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if summaries.forgets != forgets {
+        return false;
+    }
+    let at = now();
+    summaries.notes = notes
+        .iter()
+        .map(|(scope, text)| {
+            (
+                scope.clone(),
+                Note {
+                    text: text.clone(),
+                    at,
+                },
+            )
+        })
+        .collect();
+    true
 }
 
 /// Gives the summary its model: the second route's chat. Once a process.
@@ -372,7 +453,7 @@ pub fn for_observing(whose: Option<&str>) -> Option<String> {
     if !on() {
         return None;
     }
-    for_scope(whose, Instant::now())
+    for_scope(whose, now())
 }
 
 /// After a turn's end, off its path: the exchanges about to leave each
@@ -394,8 +475,12 @@ fn run(
 ) {
     for work in jobs {
         match work {
-            Work::Fold(job) => summarize(job, summarizer, summaries, Instant::now),
+            Work::Fold(job) => summarize(job, summarizer, summaries, now),
             Work::End(ended, forgets) => end(ended, forgets, summarizer, summaries, thread),
+            #[cfg(any(test, lamp_memory_probe))]
+            Work::Barrier(done) => {
+                let _ = done.send(());
+            }
         }
     }
 }
@@ -429,7 +514,7 @@ fn end(
             eprintln!("{FORGOTTEN}");
             return;
         }
-        summaries.of(whose.as_deref(), Instant::now())
+        summaries.of(whose.as_deref(), now())
     };
     // A conversation too short to have a note: its exchanges are recalled
     // themselves.

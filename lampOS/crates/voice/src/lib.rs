@@ -3,6 +3,15 @@
 //! Speech activity is an observation, not evidence of who is being addressed.
 //! The initial harness requires an explicitly opened, finite directed session;
 //! this does not qualify open-desk addressee recognition or background restraint.
+
+// The memory benchmark's probe (`remember::probe`, #4748) is built only for
+// tests, or with `RUSTFLAGS="--cfg lamp_memory_probe"`, which no product
+// build sets and no feature turns on. An optimised build with it is refused,
+// so a product build can never carry it by mistake.
+#[cfg(all(lamp_memory_probe, not(debug_assertions)))]
+compile_error!(
+    "the memory probe (--cfg lamp_memory_probe) is for tests and the memory benchmark only, never an optimised build"
+);
 /// A process-wide value the provider worker keeps, read through `$name()`.
 ///
 /// In the service it is one static: the provider worker is one process.

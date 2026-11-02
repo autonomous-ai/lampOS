@@ -972,6 +972,47 @@ response order, frozen session note or conversation-end handoff. The voice's
 switch for them, `LAMP_MEMORY_DAYS=on`, went on later: on lamp-4ace on
 15 Oct (#743), and in the product unit since ([switches.md](switches.md)).
 
+## The benchmark's probe (#4748)
+
+The memory benchmark (`docs/memory-bench.md`) runs a month of days through
+Voice's own Days client and the real store. `lamp_voice::remember::probe`
+gives it what that needs. It exists only in a test build or in one made with
+`RUSTFLAGS="--cfg lamp_memory_probe"`; no product build sets that, no feature
+turns it on, and `lamp-voice` refuses to build it optimised (`compile_error!`
+in `lib.rs`). Without it every changed line compiles to what it was: the
+dispatch reads `unix_ms()` and `local_time::system()`, and neither queue has a
+barrier variant. It has no socket, flag or switch of its own.
+
+- **Clock.** `Clock::install(start_ms, zone)`, once a process, moves only
+  forward (`set`). Installed, the tool dispatch (`run_for_request`), the
+  room's after-forget day, the rules' calls, the hand-on's wall time, the
+  observation pass's `today` and the running summary's age read it.
+  `DaysClient::run_probe_at(call, deadline, person, request, now_ms, zone)`
+  takes the moment per call and keeps the scope check, the request's identity
+  and a forget's reply out of the thread, as `run_in` does.
+- **Drain.** `drain(client, within, cancel)` puts a barrier on the writer's
+  queue, then on the observation pass's, then on the summary thread's, each
+  after the one before has answered: a conversation's end queues the other
+  two. A barrier is answered only once every job before it is done, its store
+  reply included. A timeout, a cancel, a held answer (`LAMP_SAID_AS_HEARD`) or
+  a lost exchange gives no `Drained`.
+- **Checkpoint and restore.** `checkpoint(client, drained, store, into,
+  cancel)` takes a `Drained` (not cloneable), copies the stopped store's files
+  (sources, kept things, observations, talk notes, follow-up marks and offers,
+  forget records, sessions) and the client's provider context, conversation,
+  forget-everything days and note mark, with the running notes. It refuses an
+  open conversation, a store whose files changed during the copy, and any
+  forget or exchange since the drain, and leaves nothing behind unless every
+  step finished. `restore` puts it back on the same client and store;
+  `copy_store` gives a disposable child its store.
+
+Bounds (reviewer-three): a restore is refused after any forget asked since
+its checkpoint (tool `forget`, `forget_everything`, a rule's forget, or
+memory's `memory/forgot`), so nothing a forget removed comes back; a timeout
+or a cancel never gives a checkpoint. The clock, the observation pass and the
+summary thread are the process's, so a probe is one view to a process: a
+private view is a separate process loaded before its workers start.
+
 ## Not shown
 
 Task 29's Mac client timings are recorded in
