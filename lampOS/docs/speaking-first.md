@@ -541,7 +541,13 @@ network. A miss is rendered once through the speech service the voice
 already speaks with (`Tts::speak`, ElevenLabs through the relay), within
 5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
 the lamp is unplugged after a shutdown) and played; at most 48 lines and
-20 s each are kept, a line past that is played but not kept. Without the
+20 s each are kept, a line past 20 s is played but not kept. A line written
+to a full cache first makes room (#4883): the oldest files go, never one of
+the owner's current fixed lines (those the voice warms at start, under this
+voice, model and language), so lines left by an earlier voice or language
+go before the current ones, a cache already full of them included (on
+lamp-52e6 on 2 Nov Korean's lines were never kept, and a Korean lamp said
+the English notices). Without the
 second route's configuration, or offline on a miss, it is refused at once
 with why (`the speech cache is off`, `not in the speech cache, and not
 rendered: …`), and the asker says the words another way. Its samples are
