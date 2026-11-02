@@ -594,7 +594,8 @@ fn lost_commit_reply_is_unknown_and_never_retried_with_another_guard() {
     assert!(!reply.to_string().contains("private label"));
     let requests = script.finish();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0]["op"], "status");
+    // A line's set reads its own list first (29e7: the same timer twice).
+    assert_eq!(requests[0]["op"], "list_set");
     assert_eq!(requests[1]["op"], "set");
     assert_eq!(requests[1]["guard"]["revision"], 0);
     assert_eq!(
@@ -1331,4 +1332,132 @@ fn a_persons_forget_cancels_their_reminders_only_through_the_voices_own_op() {
         ),
         ["Bo's call"]
     );
+}
+
+/// Each pending item acknowledged on the Schedule socket, as the voice's
+/// consumer does once one is said.
+fn ack_pending(schedule: &Schedule) {
+    let page = ask(
+        &schedule.socket,
+        json!({"op":"list","after_id":0,"limit":8,"pending_only":true}),
+    );
+    for item in page["items"].as_array().unwrap() {
+        let status = ask(&schedule.socket, json!({"op":"status"}));
+        let acked = ask(
+            &schedule.socket,
+            json!({"op":"ack","guard":{"store_id":status["store_id"],"revision":status["revision"],
+                "request_id":format!("ack-{}", item["id"])},"id":item["id"],"delivery":item["delivery"]}),
+        );
+        assert_eq!(acked["acknowledged"], true, "{acked}");
+    }
+}
+
+/// 29e7, 2 Nov: reminders said late were gone from the list, and "what
+/// reminders did I set earlier?" was answered "I don't see either still
+/// set". They are now listed as said, to their own line only, waiting for
+/// an answer until one comes; the app's list is as it was.
+#[test]
+fn a_reminder_said_late_is_listed_as_said_to_its_own_line_only() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let ann = caller(Some(ANN), false);
+    let bo = caller(Some(BO), false);
+    for text in ["Send the report", "Buy the gift"] {
+        let told = actions.call_as(
+            "set_reminder",
+            json!({"text":text,"time":"08:10"}),
+            ann.clone(),
+        );
+        assert_eq!(told["result"]["status"], "committed", "{told}");
+    }
+    // Thirteen hours on, the microphones open and both are said.
+    *schedule.clock.0.lock().unwrap() = sample(13 * 3_600_000);
+    thread::sleep(Duration::from_millis(1_200));
+    ack_pending(&schedule);
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert!(texts(&list).is_empty(), "{list}");
+    let said = list["result"]["said_recently"].as_array().unwrap();
+    let said_texts: Vec<_> = said.iter().map(|s| s["text"].as_str().unwrap()).collect();
+    assert_eq!(said_texts, ["Buy the gift", "Send the report"], "{list}");
+    assert_eq!(said[0]["waiting_for_answer"], true);
+    assert_eq!(said[0]["said_clock"], "21:00");
+    assert_eq!(said[0]["said_day"], "today");
+    assert_eq!(said[0]["due_clock"], "08:10");
+    assert_eq!(list["result"]["said_complete"], true);
+    // Bo hears none of them.
+    let theirs = actions.call_as("list_reminders", json!({}), bo.clone());
+    assert_eq!(theirs["result"]["said_recently"], json!([]), "{theirs}");
+    // An answer on a line: noticed, and still listed as said.
+    let noticed = ask(&schedule.socket, json!({"op":"noticed"}));
+    assert_eq!(noticed["noticed"], 2, "{noticed}");
+    let list = actions.call_as("list_reminders", json!({}), ann.clone());
+    assert_eq!(
+        list["result"]["said_recently"][0]["waiting_for_answer"],
+        false
+    );
+    // The app's list, `call_plain`, is as it was: no said record.
+    let app = schedule.adapter().call_plain("list_reminders", &json!({}));
+    assert!(app["result"].get("said_recently").is_none(), "{app}");
+    // A forget takes Ann's said ones with her reminders.
+    let forgot = actions.raw(json!({"op":"schedule_forget","person":ANN}));
+    assert_eq!(forgot["ok"], true, "{forgot}");
+    let list = actions.call_as("list_reminders", json!({}), ann);
+    assert_eq!(list["result"]["said_recently"], json!([]), "{list}");
+}
+
+/// 29e7, 2 Nov: one "remind me in 5 minutes" left two water timers. The
+/// same timer asked for again in a moment is the one already set; another
+/// length with the same words is set, and the model is told the first is
+/// still there.
+#[test]
+fn the_same_timer_asked_for_twice_in_a_moment_is_one() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter()));
+    let ann = caller(Some(ANN), false);
+    let first = actions.call_as(
+        "set_timer",
+        json!({"text":"Drink water","seconds":300}),
+        ann.clone(),
+    );
+    assert_eq!(first["result"]["status"], "committed", "{first}");
+    *schedule.clock.0.lock().unwrap() = sample(29_000);
+    let again = actions.call_as(
+        "set_timer",
+        json!({"text":"drink water","seconds":300}),
+        ann.clone(),
+    );
+    assert_eq!(again["result"]["status"], "already_set", "{again}");
+    assert_eq!(again["result"]["id"], first["result"]["id"]);
+    assert_eq!(again["result"]["clock"], first["result"]["clock"]);
+    assert_eq!(
+        texts(&actions.call_as("list_reminders", json!({}), ann.clone())).len(),
+        1
+    );
+    // Bo's is his own.
+    let bo = actions.call_as(
+        "set_timer",
+        json!({"text":"Drink water","seconds":300}),
+        caller(Some(BO), false),
+    );
+    assert_eq!(bo["result"]["status"], "committed", "{bo}");
+    // Another length: set, with the first named beside it.
+    let other = actions.call_as(
+        "set_timer",
+        json!({"text":"Drink water","seconds":120}),
+        ann.clone(),
+    );
+    assert_eq!(other["result"]["status"], "committed", "{other}");
+    assert_eq!(
+        other["result"]["same_words_set"][0]["id"], first["result"]["id"],
+        "{other}"
+    );
+    assert_eq!(other["result"]["note"], lamp_actions::schedule::SAME_WORDS);
+    // Past the window, the same again is a new one.
+    *schedule.clock.0.lock().unwrap() = sample(3 * 60_000);
+    let later = actions.call_as(
+        "set_timer",
+        json!({"text":"Drink water","seconds":300}),
+        ann,
+    );
+    assert_eq!(later["result"]["status"], "committed", "{later}");
 }

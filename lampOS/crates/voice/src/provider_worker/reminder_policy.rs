@@ -27,6 +27,7 @@ impl Policy {
         request: u64,
         session: u64,
         text: &str,
+        also: &[String],
         late: bool,
         late_by_ms: Option<u64>,
     ) -> Result<String, ReminderDeferral> {
@@ -42,7 +43,7 @@ impl Policy {
         if !self.enabled {
             return Err(ReminderDeferral::Disabled);
         }
-        checked_note(text, late, late_by_ms)
+        checked_note(text, also, late, late_by_ms)
     }
 
     pub fn is_reminder(&self, lineage: Lineage) -> bool {
@@ -73,17 +74,41 @@ impl Policy {
 /// both voice routes ([`super::reminder_note`]).
 pub(super) fn checked_note(
     text: &str,
+    also: &[String],
     late: bool,
     late_by_ms: Option<u64>,
 ) -> Result<String, ReminderDeferral> {
-    if text.trim().is_empty() || text.len() > 300 || text.chars().any(char::is_control) {
+    let invalid = |text: &str| {
+        text.trim().is_empty() || text.len() > 300 || text.chars().any(char::is_control)
+    };
+    if invalid(text) || also.len() > crate::reminders::MAX_JOINED || also.iter().any(|t| invalid(t))
+    {
         return Err(ReminderDeferral::Invalid);
     }
     // A due reminder is requested work. The coordinator admits it at
     // local silence under normal authority; the room adds no condition.
     // JSON quoting makes the data boundary explicit; the tool gate,
     // rather than prompt wording, enforces the ban on side effects.
-    Ok(note(&ReminderWords::installed(), text, late, late_by_ms))
+    let words = ReminderWords::installed();
+    if also.is_empty() {
+        return Ok(note(&words, text, late, late_by_ms));
+    }
+    let joined = joined_note(&words, text, also);
+    // The consumer joins only what fits ([`crate::reminders::JOINED_TEXT_BYTES`]).
+    if joined.len() > lamp_gemini::wire::MAX_NOTE_BYTES {
+        return Err(ReminderDeferral::Invalid);
+    }
+    Ok(joined)
+}
+
+/// How several late ones are said together, once (29e7, 2 Nov: four were
+/// said back to back in 34 s, as the microphones opened mid-talk).
+pub(crate) const JOINED: &str = "Several were due while they were away and are only now being said, to someone at the lamp: say them all together, once, in one short natural line, for example \"While you were away: you'd asked me to remind you about the report, and about the gift.\" Do not say how late any is.";
+
+/// The note for `text` and the others as late, `also`, said in one line.
+fn joined_note(words: &ReminderWords, text: &str, also: &[String]) -> String {
+    let data = serde_json::json!({"text":text,"also":also,"earlier":true});
+    words.note(JOINED, &data.to_string())
 }
 
 /// Late by less than this, a due item is said as on time: a creature does
@@ -169,6 +194,46 @@ mod tests {
 
     fn note(text: &str, late: bool, late_by_ms: Option<u64>) -> String {
         super::note(&words(), text, late, late_by_ms)
+    }
+
+    /// 29e7, 2 Nov: late ones are said together, once, in one line; the
+    /// longest the consumer joins fits one note.
+    #[test]
+    fn late_ones_joined_are_one_note_that_fits() {
+        let also = vec!["Buy the gift".to_owned(), "Drink water".to_owned()];
+        let joined = super::joined_note(&words(), "Send the report", &also);
+        assert_eq!(
+            data(&joined),
+            serde_json::json!({"text":"Send the report","also":["Buy the gift","Drink water"],"earlier":true})
+        );
+        assert!(joined.contains("all together, once, in one short natural line"));
+        // The most the consumer joins: texts of JOINED_TEXT_BYTES in all,
+        // each a `"`, two bytes in JSON, over the most entries.
+        let each = crate::reminders::JOINED_TEXT_BYTES / (crate::reminders::MAX_JOINED + 1);
+        let quote = "\"".repeat(each / 2 - 1);
+        assert!(crate::reminders::json_bytes(&quote) <= each);
+        let also = vec![quote.clone(); crate::reminders::MAX_JOINED];
+        let most = super::joined_note(&words(), &quote, &also);
+        assert!(
+            most.len() <= lamp_gemini::wire::MAX_NOTE_BYTES,
+            "{}",
+            most.len()
+        );
+        let one = super::joined_note(
+            &words(),
+            &"t".repeat(crate::reminders::JOINED_TEXT_BYTES - 2),
+            &["t".to_owned()],
+        );
+        assert!(
+            one.len() <= lamp_gemini::wire::MAX_NOTE_BYTES,
+            "{}",
+            one.len()
+        );
+        assert!(checked_note("a", &["b".to_owned()], true, None).is_ok());
+        assert_eq!(
+            checked_note("a", &vec!["b".to_owned(); 5], true, None),
+            Err(ReminderDeferral::Invalid)
+        );
     }
 
     fn delay(ms: u64) -> String {

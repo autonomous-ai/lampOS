@@ -69,6 +69,12 @@ pub enum Request {
     ///
     /// With `asker`, only the items that line may see ([`Asker::may_see`]),
     /// and `not_yet_due`, how many of those are set and not yet due.
+    ///
+    /// Its first page (`after_id` 0, not `pending_only`) also has `said`:
+    /// the one-time reminders and timers already said that the line may
+    /// see, newest first, from the store's said record (29e7, 2 Nov), as
+    /// many as fit. Each item also has `set_unix_ms`, and the reply
+    /// `now_unix_ms`, the time it was read at.
     ListSet {
         #[serde(default)]
         after_id: u64,
@@ -107,11 +113,18 @@ pub enum Request {
         asker: Option<Asker>,
     },
     /// Every reminder and timer `person` set, cancelled: their "forget
-    /// everything about me", or the app removing them entirely.
+    /// everything about me", or the app removing them entirely. Their
+    /// reminders already said go from the said record too.
     Forget {
         guard: Guard,
         person: String,
     },
+    /// Someone answered a line after a reminder said late (29e7, 2 Nov):
+    /// each one said late and still waiting for an answer is noticed, and
+    /// moves to the said record. Unguarded: noticing twice is noticing once,
+    /// and nothing is set, cancelled or said by it. An older build refuses
+    /// it as `bad_request`, and its late reminders were never kept.
+    Noticed {},
     // Saved exactly in the delivery ledger: a new field needs a `delivery::SCHEMA`
     // bump, or an older build refuses the whole ledger instead of setting it aside.
     Ack {
@@ -147,6 +160,7 @@ impl Request {
             Self::Cancel { .. } => "cancel",
             Self::Snooze { .. } => "snooze",
             Self::Forget { .. } => "forget",
+            Self::Noticed {} => "noticed",
             Self::Ack { .. } => "ack",
         }
     }

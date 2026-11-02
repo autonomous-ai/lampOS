@@ -83,7 +83,7 @@ impl Test {
         assert!(fixture.parent().active_valid(turn, monotonic_us()));
         assert_eq!(queue.len(), 1);
         assert!(matches!(queue.front(), Some(ProviderInput::Reminder {
-            request, session: 1, privacy_generation, text, late, late_by_ms,
+            request, session: 1, privacy_generation, text, late, late_by_ms, ..
         }) if *request == turn.turn() && *privacy_generation == snapshot.microphone_generation()
             && text == &offer.text && *late == offer.late && *late_by_ms == offer.late_by_ms));
 
