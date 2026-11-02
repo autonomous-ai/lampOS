@@ -940,12 +940,15 @@ pub fn offered(directory: &Path, sha256: &str, now_unix_ms: u64) -> io::Result<(
 /// `lamp_said` its words: the model, asked whether the skill is ready, may
 /// say it before the news is told (lamp-9adf, 31 Oct 09:32: "Is the skill I
 /// asked for ready yet?" was answered "… Shall I put it on the lamp?", and
-/// the plain yes after it found nothing waiting). Then the newest made
-/// skill never asked about, not on and kept after the newest ask, is kept as
+/// the plain yes after it found nothing waiting). Then the one made skill
+/// never asked about, not on and kept after the newest ask, is kept as
 /// asked when that answer was said, so [`waiting`] holds the yes to the
 /// usual [`PUT_ON_WITHIN`] (the first builder, 2 Nov 10:1x; the
 /// Reviewer-lead's P2 on #4880: only the turn right after the lamp itself
-/// asked, never a yes to another question). Whether one was kept so.
+/// asked, never a yes to another question). With two or more such skills
+/// the answer may have named any of them, so none is kept (the
+/// Reviewer-lead's second P2 on #4880): a yes then finds nothing waiting,
+/// as before. Whether one was kept so.
 pub fn asked_in_answer(
     directory: &Path,
     lamp_said: &str,
@@ -962,13 +965,19 @@ pub fn asked_in_answer(
         .max()
         .unwrap_or(0);
     let said_at = now_unix_ms.saturating_sub(ago.as_millis() as u64);
-    let untold = entries
+    let untold: Vec<&serde_json::Value> = entries
         .iter()
         .filter(|entry| entry["offered_at_unix_ms"].as_u64().is_none() && entry["on"] != true)
-        .filter_map(|entry| Some((entry["at_unix_ms"].as_u64()?, entry)))
-        .filter(|(kept_at, _)| *kept_at > asked_at && *kept_at <= said_at)
-        .max_by_key(|(kept_at, _)| *kept_at);
-    match untold.and_then(|(_, entry)| entry["sha256"].as_str()) {
+        .filter(|entry| {
+            entry["at_unix_ms"]
+                .as_u64()
+                .is_some_and(|kept_at| kept_at > asked_at && kept_at <= said_at)
+        })
+        .collect();
+    let [only] = untold.as_slice() else {
+        return Ok(false);
+    };
+    match only["sha256"].as_str() {
         Some(sha256) => offered(directory, sha256, said_at).map(|()| true),
         None => Ok(false),
     }
@@ -1681,7 +1690,12 @@ light = { dim = 1 }
             !asked_in_answer(&made, &answer, PUT_ON_WITHIN + Duration::from_secs(1), now).unwrap()
         );
         assert_eq!(waiting(&made, now), None);
-        // Said 5 s ago: the newest untold one is asked then, and waits.
+        // Two untold: the answer may have named either ("is evening-dim
+        // ready?"), so neither is asked, and a yes finds nothing waiting.
+        assert!(!asked_in_answer(&made, &answer, Duration::from_secs(5), now).unwrap());
+        assert_eq!(waiting(&made, now), None);
+        // One untold after the newest ask: it is asked then, and waits.
+        offered(&made, &"a".repeat(64), 1_500).unwrap();
         assert!(asked_in_answer(&made, &answer, Duration::from_secs(5), now).unwrap());
         let newest = Some(("posture-glow".to_owned(), "b".repeat(64)));
         assert_eq!(waiting(&made, now), newest);
