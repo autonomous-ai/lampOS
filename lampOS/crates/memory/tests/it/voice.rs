@@ -235,7 +235,9 @@ fn ranked_voice_recall_finds_an_earlier_day_and_respects_a_named_day() {
     assert!(ok, "{told}");
     assert_eq!(told["found"][0]["source_id"], 1);
     assert_eq!(told["found"][0]["you_said"], "the blue pot");
-    assert_eq!(told["found"][0]["when"], "2 days ago");
+    // How long ago, then the day itself (#4753).
+    let when = told["found"][0]["when"].as_str().unwrap();
+    assert!(when.starts_with("2 days ago, "), "{when}");
     assert_eq!(fixture.next("search").0["query"], "orchid");
     let (only, ok) = client.run(
         &call(RECALL, json!({"about":"orchid","days_ago":2})),

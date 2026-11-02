@@ -441,6 +441,33 @@ fn the_job_marks_whose_words_are_whose() {
     assert_eq!(job["exchanges"], "Person: my budget is 300\nYou: Got it.\n");
 }
 
+/// #4753: the job carries today's local day, so the note writes "Friday 6
+/// November", never a bare "Friday" read wrong on another day; with no
+/// zone it carries none.
+#[test]
+fn the_job_carries_today_and_the_prompt_asks_for_whole_days() {
+    let exchanges = [(1, "dinner on Friday".into(), "Nice.".into())];
+    let job: serde_json::Value =
+        serde_json::from_str(&input_on("", &exchanges, Some("Monday 2026-11-02"))).unwrap();
+    assert_eq!(job["today"], "Monday 2026-11-02");
+    let job: serde_json::Value = serde_json::from_str(&input_on("", &exchanges, None)).unwrap();
+    assert!(job.get("today").is_none());
+    // The day is the zone's: 23:30 on Saturday 31 October in New York
+    // (summer time, UTC-4) is Sunday in UTC.
+    let new_york = lamp_local_time::LocalTime::zone("America/New_York").unwrap();
+    assert_eq!(
+        today_at(&new_york, 1_793_503_800_000),
+        "Saturday 2026-10-31"
+    );
+    assert_eq!(
+        today_at(&lamp_local_time::LocalTime::Offset(0), 1_793_503_800_000),
+        "Sunday 2026-11-01"
+    );
+    assert!(PROMPT.contains(
+        "\"today\", when given, is today's day: write any day as that day itself, worked out from it (\"Friday 6 November\"), never a bare weekday"
+    ));
+}
+
 /// A note no exchange of its scope kept fresh is gone after the thread's
 /// time; one whose scope still talks stays.
 #[test]

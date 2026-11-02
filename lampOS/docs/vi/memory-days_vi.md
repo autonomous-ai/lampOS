@@ -121,6 +121,20 @@ tắc này từ 28/10: trên lamp-06c1, khi không có nó, một câu nói lạ
 lần thứ hai (lượt chạy của Friday, #3504). Vẫn còn nợ một lần kiểm tra trên
 lamp: cùng một câu nói hai lần chỉ giữ một điều.
 
+## Ngày được nói, chỉ khi được hỏi «khi nào» (#4753)
+
+Mỗi kết quả của `recall` (và mỗi dòng «said …» của gợi ý trong lượt) nay mang
+cả khoảng thời gian lẫn chính ngày đó, theo múi giờ của lamp
+(`remember::when_said`): «3 days ago, Saturday 31 October», quá sáu ngày cũng
+vậy («2 weeks ago, Tuesday 20 October»), thêm năm khi là năm khác; không bao
+giờ có giờ. Mô tả của `recall` (`remember::RECALL_WHEN`) dặn mô hình trả lời
+không kèm giờ và chỉ nói ngày khi người ta hỏi «khi nào»; câu trả lời thường
+vẫn nói đại khái («ba hôm trước»). Trước đây mô tả bảo «không ngày, không giờ»
+và chỉ đưa «last week», nên câu hỏi «khi nào» không có ngày (bench #4753:
+0,10–0,25). Ghi chú tóm tắt cuộc trò chuyện và lượt quan sát nay được biết
+ngày hôm nay và được dặn viết ngày đầy đủ («Friday 6 November»), không viết
+thứ trơn. `probe-tools ... --when` đo cách nói mới so với cũ trên mô hình thật.
+
 ## Kết thúc cuộc trò chuyện sau một lệnh quên
 
 Khi một cuộc trò chuyện còn mở mà có lệnh quên hoặc `forget_everything`,

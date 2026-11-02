@@ -5882,6 +5882,23 @@ any first call but `recall`, since one there would put a round before the
 first audio. It prints each arm's line counts, then `own recalled=N/M
 plain without recall=N/M`.
 
+With `--when` last (`probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+--when`, `second_provider/probe/when_asked.rs`, #4753) it asks only how a
+reply after a recall tells when: each line a fresh session as
+`quality-today` asks it, its `recall` already made and answered as the
+voice answers it (`remember::answer_for`, Monday 26 October at 09:00 in
+Ho Chi Minh City), in two arms: `before`, recall described "without dates
+or times" and each entry's `when` only how long ago ("2 days ago");
+`now`, as the voice tells them (`remember::RECALL_WHEN`, "without times;
+the day only if asked when", and "2 days ago, Saturday 24 October"). Four `when-*` lines ask when something was said
+(tea 2 days ago, a kept dentist 5 days ago, a sister's visit 10 days ago,
+running 3 days ago): right only when the reply names a day (a weekday, a
+month or a date such as "the 24th"). Four `plain-*` lines ask about the
+same things without asking when: right only when the reply names no day,
+since a date recited unasked is what a machine does. It prints each arm's
+line counts, then `when named a day=N/M plain without a day=N/M`. It needs
+no actions catalog: it declares the voice's own functions.
+
 Its first line says which way it asks, through the relay or on DeepSeek's
 own API, as the voice's start line does: never the URL. The probe only asks the model and
 counts the functions it calls; it runs none of them, so it never writes to

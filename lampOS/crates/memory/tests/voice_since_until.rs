@@ -145,17 +145,26 @@ fn recall_says_since_and_gives_history_with_until_only_when_asked() {
     let now = found(&client, Some(ANA), false);
     assert_eq!(now.len(), 1, "{now:?}");
     assert_eq!(now[0]["asked_to_remember"], GREEN);
-    assert_eq!(now[0]["since"], "since today");
+    // Today, then the day itself (#4753).
+    assert!(
+        now[0]["since"]
+            .as_str()
+            .unwrap()
+            .starts_with("since today, ")
+    );
     assert!(now[0].get("until").is_none(), "{now:?}");
 
     let then = found(&client, Some(ANA), true);
     assert_eq!(then.len(), 2, "{then:?}");
     for item in &then {
-        assert_eq!(item["since"], "since today");
+        assert!(item["since"].as_str().unwrap().starts_with("since today, "));
         match item["source_id"].as_u64().unwrap() {
             id if id == violet => {
                 assert_eq!(item["asked_to_remember"], VIOLET);
-                assert_eq!(item["until"], "until today", "{then:?}");
+                assert!(
+                    item["until"].as_str().unwrap().starts_with("until today, "),
+                    "{then:?}"
+                );
             }
             id => {
                 assert_eq!(id, green);
