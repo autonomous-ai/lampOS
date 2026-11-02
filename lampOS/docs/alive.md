@@ -338,6 +338,10 @@ software mute with the reason `sleep`: microphones off (First, #711).
   nothing else wakes it: not a tap the voice did not take, its name, a
   touch, a reminder or a face. After a restart of either part it is asleep
   again from the voice's first word.
+- Put to sleep, the voice ends its cycle and says no `voice/timing` until
+  it opens, only its mute. While that mute says sleep, Expression stands
+  its last timing in as a resting voice, so the asleep face is held through
+  the sleep, not dropped as "fresh voice timing" missing 0.5 s in (#3748).
 - The body sleeps with it (#1362): lamp-body, with `LAMP_HEAD_TOUCH=on`,
   reads the same word and folds now, over its stand time, even with
   somebody in front of it ([body.md](body.md), "Asleep"). The sleeping pose
