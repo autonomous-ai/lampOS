@@ -366,3 +366,205 @@ fn the_product_units_command_line_runs_and_ends_when_recovery_is_off() {
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// #4863: a made-up lamp's files under a folder of its own, its radio as
+/// `device-ap-mode` leaves it or as `device-sta-mode` puts it back.
+struct Radio {
+    root: std::path::PathBuf,
+    stations: u32,
+    station_fails: bool,
+    now_ms: u64,
+}
+
+impl Radio {
+    fn new(name: &str) -> Self {
+        let root =
+            std::env::temp_dir().join(format!("lamp-setup-radio-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for folder in [
+            "etc/systemd/system",
+            "var/lib/lampos-setup",
+            "sys/class/net/wlan0",
+        ] {
+            std::fs::create_dir_all(root.join(folder)).unwrap();
+        }
+        std::fs::write(root.join("etc/dhcpcd.conf"), "hostname\nclientid\n").unwrap();
+        Self {
+            root,
+            stations: 0,
+            station_fails: false,
+            now_ms: 0,
+        }
+    }
+    fn path(&self, name: &str) -> std::path::PathBuf {
+        self.root.join(name)
+    }
+    fn marker(&self) -> std::path::PathBuf {
+        self.path("var/lib/lampos-setup/done")
+    }
+    fn previous(&self) -> std::path::PathBuf {
+        self.path("etc/wpa_supplicant/wpa_supplicant-wlan0.conf.lamp-previous")
+    }
+    fn set_up(self) -> Self {
+        std::fs::write(self.marker(), "").unwrap();
+        self
+    }
+    /// What `device-ap-mode` leaves that outlives a boot.
+    fn hotspot_left(self) -> Self {
+        std::os::unix::fs::symlink(
+            "/dev/null",
+            self.path("etc/systemd/system/wpa_supplicant@wlan0.service"),
+        )
+        .unwrap();
+        std::fs::write(
+            self.path("etc/dhcpcd.conf"),
+            "denyinterfaces wlan0\nhostname\nclientid\n",
+        )
+        .unwrap();
+        self
+    }
+    fn start(&mut self, setup_active: bool) -> Option<std::io::Result<()>> {
+        let (root, marker, previous) = (self.root.clone(), self.marker(), self.previous());
+        lamp_setup::recover::at_start(self, &root, &marker, &previous, || setup_active)
+    }
+}
+
+impl Drop for Radio {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.root);
+    }
+}
+
+impl lamp_setup::wifi::Host for Radio {
+    fn read_conf(&mut self) -> std::io::Result<Option<Vec<u8>>> {
+        Ok(None)
+    }
+    fn write_conf(&mut self, _: Option<&[u8]>) -> std::io::Result<()> {
+        Ok(())
+    }
+    /// As `device-sta-mode`: the mask and the denied interface go.
+    fn station(&mut self) -> std::io::Result<()> {
+        self.stations += 1;
+        if self.station_fails {
+            return Err(std::io::Error::other("device-sta-mode ended with 1"));
+        }
+        let _ = std::fs::remove_file(self.path("etc/systemd/system/wpa_supplicant@wlan0.service"));
+        std::fs::write(self.path("etc/dhcpcd.conf"), "hostname\nclientid\n")
+    }
+    fn hotspot(&mut self) -> std::io::Result<()> {
+        unreachable!("never opened here")
+    }
+    fn internet(&mut self) -> bool {
+        false
+    }
+    fn current_ssid(&mut self) -> Option<String> {
+        None
+    }
+    fn has_station_ip(&mut self) -> bool {
+        false
+    }
+    fn wpa_state(&mut self) -> String {
+        String::new()
+    }
+    fn wpa_events(&mut self) -> Vec<String> {
+        vec![]
+    }
+    fn now_ms(&mut self) -> u64 {
+        self.now_ms
+    }
+    fn sleep(&mut self, duration: std::time::Duration) {
+        self.now_ms += duration.as_millis() as u64;
+    }
+}
+
+/// #4863: recover's stop closes its hotspot and the station comes back once.
+#[test]
+fn closing_the_hotspot_on_a_stop_returns_the_station_once() {
+    let mut radio = Radio::new("close").set_up().hotspot_left();
+    let marker = radio.marker();
+    assert!(lamp_setup::recover::closed(&mut radio, &marker).is_some_and(|done| done.is_ok()));
+    assert_eq!(radio.stations, 1);
+    assert!(!lamp_setup::recover::left_as_hotspot(&radio.root));
+}
+
+/// #4863: the marker gone is a reset, whose own setup takes the hotspot.
+#[test]
+fn closing_the_hotspot_after_a_reset_leaves_it_to_setup() {
+    let mut radio = Radio::new("close-reset").hotspot_left();
+    let marker = radio.marker();
+    assert!(lamp_setup::recover::closed(&mut radio, &marker).is_none());
+    assert_eq!(radio.stations, 0);
+}
+
+/// #4863: a set-up lamp that lost power with the hotspot open is a station
+/// again at the start, the switch off (it is never read here).
+#[test]
+fn a_set_up_lamp_left_a_hotspot_is_a_station_again_at_the_start_switch_or_not() {
+    for left in ["mask", "dhcpcd"] {
+        let mut radio = Radio::new(&format!("boot-{left}")).set_up().hotspot_left();
+        // Either change alone leaves the lamp with no client network.
+        match left {
+            "mask" => std::fs::write(radio.path("etc/dhcpcd.conf"), "hostname\n").unwrap(),
+            _ => {
+                std::fs::remove_file(radio.path("etc/systemd/system/wpa_supplicant@wlan0.service"))
+                    .unwrap()
+            }
+        }
+        assert!(lamp_setup::recover::left_as_hotspot(&radio.root), "{left}");
+        assert!(
+            radio.start(false).is_some_and(|done| done.is_ok()),
+            "{left}"
+        );
+        assert_eq!(radio.stations, 1, "{left}");
+        assert!(!lamp_setup::recover::left_as_hotspot(&radio.root), "{left}");
+    }
+}
+
+/// #4863: before the marker the hotspot is setup's own, meant: untouched.
+#[test]
+fn a_lamp_not_yet_set_up_keeps_its_first_setup_hotspot() {
+    let mut radio = Radio::new("boot-fresh").hotspot_left();
+    assert!(radio.start(false).is_none());
+    assert_eq!(radio.stations, 0);
+    assert!(lamp_setup::recover::left_as_hotspot(&radio.root));
+}
+
+/// #4863: setup running, or a Wi-Fi change's old file kept: theirs is the
+/// radio, untouched. A lamp already a station is untouched too.
+#[test]
+fn setup_running_a_wifi_change_or_a_station_already_leave_the_radio_alone() {
+    let mut radio = Radio::new("boot-setup").set_up().hotspot_left();
+    assert!(radio.start(true).is_none());
+    std::fs::create_dir_all(radio.path("etc/wpa_supplicant")).unwrap();
+    std::fs::write(radio.previous(), "network={}\n").unwrap();
+    assert!(radio.start(false).is_none());
+    assert_eq!(radio.stations, 0);
+    let mut station = Radio::new("boot-station").set_up();
+    assert!(station.start(false).is_none());
+    assert_eq!(station.stations, 0);
+}
+
+/// #4863: a failed return leaves the hotspot's state, so the next start
+/// tries again; a return that took clears it, so the one after does nothing.
+#[test]
+fn a_failed_return_is_tried_again_at_the_next_start_and_a_good_one_is_not() {
+    let mut radio = Radio::new("boot-retry").set_up().hotspot_left();
+    radio.station_fails = true;
+    assert!(radio.start(false).is_some_and(|done| done.is_err()));
+    assert!(lamp_setup::recover::left_as_hotspot(&radio.root));
+    radio.station_fails = false;
+    assert!(radio.start(false).is_some_and(|done| done.is_ok()));
+    assert!(radio.start(false).is_none());
+    assert_eq!(radio.stations, 2);
+}
+
+/// #4863: the interface not there yet is waited for, 30 s at most, then
+/// the station is tried all the same.
+#[test]
+fn the_start_waits_for_the_interface_a_bounded_time() {
+    let mut radio = Radio::new("boot-late").set_up().hotspot_left();
+    std::fs::remove_dir(radio.path("sys/class/net/wlan0")).unwrap();
+    assert!(radio.start(false).is_some());
+    assert_eq!(radio.now_ms, lamp_setup::recover::INTERFACE_WAIT_MS);
+    assert_eq!(radio.stations, 1);
+}

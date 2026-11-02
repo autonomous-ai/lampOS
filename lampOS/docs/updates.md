@@ -1928,7 +1928,10 @@ start mid-day. The one exception is recovery (`lamp-setup-recover.service`,
 outside the watch, the round starts it once when it is enabled and
 `LAMP_WIFI_RECOVERY` reads `on` through its drop-ins (`crate::switches`,
 as install reads a switch). Off, it is left alone. A start that fails is
-said and the round stays switched; nothing it does can put a build back.
+said and the round stays switched; nothing it does can put a build back. Each of
+its starts, the round's too, first returns a radio left a hotspot to the
+station, whatever the switch says (setup.md, "When the saved network is
+gone"); a round still starts it only with the switch on.
 
 All of it rides the switch's journal (`Switching::added`). A build put
 back, or a switch cut short and recovered at the next start, stops each
