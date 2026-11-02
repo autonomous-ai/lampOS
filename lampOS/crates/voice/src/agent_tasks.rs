@@ -2188,6 +2188,27 @@ fn run_for(
                     .and_then(|thread| thread.heard_for(request, Instant::now()))
                     .unwrap_or_default()
             });
+            // A spoken yes right after the lamp's own answer said the ask,
+            // before the news was told, is to that skill (the
+            // Reviewer-lead's P2 on #4880).
+            if heard
+                && let Some((lamp_said, ago)) =
+                    crate::thread::THREAD.lock().ok().and_then(|thread| {
+                        let now = Instant::now();
+                        Some((
+                            thread.said_last_but(request, &[])?.1,
+                            thread.said_last_ago_but(now, &[request])?,
+                        ))
+                    })
+                && let Err(error) = crate::made_skill::asked_in_answer(
+                    std::path::Path::new(crate::made_skill::DIRECTORY),
+                    &lamp_said,
+                    ago,
+                    now_unix_ms,
+                )
+            {
+                eprintln!("lamp-voice: a made skill's ask in an answer was not kept: {error}");
+            }
             // Once on, its news is told, so its harness is closed (Second's
             // P3 on #4246).
             (
