@@ -69,7 +69,8 @@ to the first sound) to reopen a fast path, and does today's path take wrong acti
 
 - `commands.txt`: 19 lines in `lines.txt`'s layout plus `expect`: clear and vague device commands, plain
   questions to the lamp, and lines said to a person. Every name is made up.
-- `cmd.sh preflight|run OUT`: under the lamp lock. It checks the live processes run
+- `cmd.sh preflight|run OUT`: under the lamp lock. It never plays over another lamp: Seventh's `otherplaying`
+  (`OPLIB`, Queue #3336) is read at the start and before each pass, waiting up to `OPWAIT` s, then it stops. It checks the live processes run
   `LAMP_SECOND_SAY_WITH_CALL=on` (lamp-voice) and `LAMP_SHORT_DONE=on` (lamp-actions), records both
   units, and reads the start light (light/state) and Speaker. It writes `/run/jev-cmd-restore.py` and arms
   a dead-man (`systemd-run --on-active=DEADMAN` min, default 75) that runs it with the start state, then
@@ -79,4 +80,5 @@ to the first sound) to reopen a fast path, and does today's path take wrong acti
   after the answer, then the restore (a failed one stops the run). On exit: the restore to the start state,
   checked, and only then the dead-man stopped; `lamp-voice turn-times` for the run's session is pulled
   (numbers and function names only). `cmd-test.sh` tests it.
+- In a booked slot: `TAG=#4861 WHAT="..." REPLAY=tools/jev-verify/cmd.sh slot.sh DAY START LAST END`.
 - `cmd-score.py OUT`: right, missed and wrong per class, and the timings over right command trials.

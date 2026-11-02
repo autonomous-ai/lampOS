@@ -54,6 +54,11 @@ case $a in
 esac
 EOF
 chmod +x "$T/ssh"
+# otherplaying stub: FAIL=other is a lamp PLAYING throughout; FAIL=otherpass2 only from pass 2's check.
+cat > "$T/oplib.sh" <<'EOF'
+otherplaying() { case ${FAIL:-} in other) return 0 ;; otherpass2) grep -q 'clips/c' "$DRY_PLAYLOG" 2>/dev/null ;; *) return 1 ;; esac; }
+EOF
+export OPLIB=$T/oplib.sh
 fails=0
 r() { mkdir -p "$T/st"; echo '{"on":true,"colour":"warm","level":3}' > "$T/st/light0"; echo 30 > "$T/st/spk"; rm -f "$T/st/timer" "$T/plays.log"
   STATE=$T/st DRY_PLAYLOG=$T/plays.log STUBLOG=$T/stub.log DRY=1 DRY_SSH=$T/ssh LAMP=lamp-test "$HERE/cmd.sh" "$@" 2>&1; }
@@ -88,4 +93,8 @@ want norestore-abort '^ABORT the restore did not give back the start state' "$o"
 want norestore-armed 'LIGHT OR SPEAKER NOT PUT BACK: the dead-man' "$o"
 grep -q DEADMAN-STOPPED "$T/stub.log" && bad "norestore: the dead-man was stopped though the restore failed"
 
+o=$(export FAIL=other; r preflight "$T/o"); want other-preflight '^ABORT another lamp is PLAYING on #3336 after waiting 600 s \(preflight\).*nothing ran' "$o"
+grep -qE 'clips/' "$T/plays.log" 2>/dev/null && bad "other: something played while another lamp was PLAYING"
+o=$(export FAIL=otherpass2; PASSES=2 ONLY='c01' r run "$T/o2"); want other-pass2 '^ABORT another lamp is PLAYING .*before pass 2' "$o"
+[ "$(grep -c 'clips/c01' "$T/plays.log")" = 1 ] || bad "otherpass2: c01 should have played once (pass 1 only)"
 [ "$fails" = 0 ] && echo PASS || { echo "FAIL ($fails)"; exit 1; }

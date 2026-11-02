@@ -15,7 +15,8 @@
 # Nothing else is touched: no unit, drop-in, skill or Jev setting. Lamp-policy is not read or restarted.
 # OUT_DIR holds what the lamp heard in the window: keep it on the Mac, never commit or post it.
 # Env: LAMP (lamp-52e6), MACVOL (45, raised to 60/75 if the wake is held back), PASSES (2), ONLY (an id
-# regex), DEADLINE (epoch s on the Mac), DEADMAN (minutes, 75), DRY=1 with DRY_SSH=<stub> (tests).
+# regex), DEADLINE (epoch s on the Mac), DEADMAN (minutes, 75), OPLIB (Seventh's lib.sh, for otherplaying),
+# OPWAIT (s to wait for another lamp to go QUIET, 600), DRY=1 with DRY_SSH=<stub> (tests).
 set -u
 MODE=${1:-} OUT=${2:-}
 case $MODE in preflight|run) [ -n "$OUT" ] ;; *) false ;; esac || { sed -n 2,8p "$0"; exit 2; }
@@ -24,6 +25,7 @@ git -C "$OUT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && { echo "OUT $OU
 cd "$(dirname "$0")" || exit 1
 LAMP=${LAMP:-lamp-52e6} MACVOL=${MACVOL:-45} PASSES=${PASSES:-2} ONLY=${ONLY:-.} HOLDER=jev-verifier
 DEADLINE=${DEADLINE:-} DEADMAN=${DEADMAN:-75} SET=commands.txt
+OPLIB=${OPLIB:-$HOME/seventh-watch/kit/lib.sh} OPWAIT=${OPWAIT:-600}
 GAP=22   # a line within 20 s of the lamp's last words may be taken as going on with it
 SO="-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ControlMaster=auto -o ControlPath=/tmp/jev-cm-%C -o ControlPersist=120"
 L="ssh -n $SO orangepi@$LAMP.local"
@@ -55,6 +57,16 @@ loans() { $L "echo \"\$(date '+%F %H:%M') $HOLDER: $*\" | sudo -n tee -a ~/loans
 order() { local id; for id in $(ids); do echo "$(md5 -q -s "$1$id") $id"; done | sort | cut -d' ' -f2; }
 wait_until() { local t=$1 d; [ -n "$DEADLINE" ] && [ "$DEADLINE" -lt "$t" ] && t=$DEADLINE
   d=$(( t - $(date +%s) )); [ "$d" -le 0 ] || sleep "$d"; }
+
+# Another lamp in earshot (lamp-4ace) must never be played over: Seventh's otherplaying reads Queue #3336
+# (a PLAYING with no QUIET after it, in its window; #3336 unreadable counts as PLAYING). Sourced in a subshell,
+# so nothing of lib.sh leaks into this script. quiet_lamps waits up to OPWAIT s, then stops.
+otherp() { ( . "$OPLIB" >/dev/null 2>&1 && otherplaying ); }
+quiet_lamps() { local k=0
+  [ -r "$OPLIB" ] || abort "cannot read $OPLIB (otherplaying): another lamp could not be checked"
+  while otherp; do
+    [ $k -ge "$OPWAIT" ] && abort "another lamp is PLAYING on #3336 after waiting $OPWAIT s ($1): never played over"
+    [ $k = 0 ] && note "another lamp is PLAYING on #3336 ($1): waiting up to $OPWAIT s"; sleep 15; k=$((k+15)); done; }
 
 # ---- lamp reads, as replay.sh
 nv() { $L "sudo -n journalctl -u lamp-voice --since @$1 --no-pager -o cat | grep -cE '$V'"; }
@@ -157,6 +169,7 @@ note "cmd $MODE: lamp=$LAMP lines=$n x passes $PASSES; ETA of run ~$(( (n * 40 *
 miss=; for id in $(ids) w00; do [ -s "clips/$id.wav" ] || miss="$miss $id"; done
 [ -z "$miss" ] || abort "clips missing:$miss (run SET=commands.txt render.sh)"
 ok "clips: every line in $SET and w00"
+quiet_lamps preflight; ok "no other lamp PLAYING on #3336"
 
 lk=$(../lamp-lock.sh "$LAMP" status 2>&1)
 printf '%s\n' "$lk" | grep -qE "^ *holder: $HOLDER\$" ||
@@ -252,6 +265,7 @@ trial() { local id=$1 s c b fs fp la cl
   echo "$(date +%H:%M:%S) pass $pass $id voice=$VD calls=${cl:-none} first_sound_ms=$fs"
   restore "$SPK50" || abort "after $id (pass $pass): the restore did not give back the start state"; }
 for pass in $(seq 1 "$PASSES"); do
+  quiet_lamps "before pass $pass"
   for id in $(order "$pass"); do trial "$id"; wait_until $(( $(date +%s) + GAP )); done
 done
 pull
