@@ -1063,15 +1063,21 @@ its only way back once its package carries the unit.
 - **Repaired at the start, whatever the switch says** (#4863, this changes
   every lamp's default). A power cut sends no stop, so `recover` first looks
   at whether the lamp was left a hotspot (`recover::left_as_hotspot`:
-  `wpa_supplicant@wlan0` masked, its unit a link to `/dev/null`, or the
+  `wpa_supplicant@wlan0` masked, its unit a link to `/dev/null`, or not
+  enabled, no link in `multi-user.target.wants`, or the
   `denyinterfaces wlan0` line), before it reads `LAMP_WIFI_RECOVERY`, and if
-  so runs `device-sta-mode` and `sync` (`recover::at_start`). Only with the
+  so runs `device-sta-mode` and `sync` (`recover::at_start`). A try that
+  fails with the lamp still left a hotspot is tried again, 3 tries in all,
+  20 s apart (the script disables the hotspot before an `iw` with no
+  fallback, so a radio not ready yet leaves it neither a hotspot nor a
+  station); at most about 4 minutes, before the watch begins. Only with the
   marker (the unit's `ConditionPathExists=` and the code again: a first
   setup's hotspot is meant), `lamp-setup.service` not active and no
   `.lamp-previous` (a Wi-Fi change's). It waits up to 30 s for `wlan0` to
   appear. The lamp's own state is read, not a note of ours: it repairs a
-  lamp a build before this one left (lamp-0c89, 2 Nov), a failed return
-  leaves it as it was so the next start tries again, and the unit can't
+  lamp a build before this one left (lamp-0c89, 2 Nov), a lamp whose 3
+  tries all failed is still read as one, so the next boot tries again, and
+  the unit can't
   write `/var/lib` (`ProtectSystem=strict`). The journal says
   `the radio was left a hotspot: back to the station`. A stuck lamp on an
   older build is put back by hand: `sudo /usr/local/bin/device-sta-mode`.
