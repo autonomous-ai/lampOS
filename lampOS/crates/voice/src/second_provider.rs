@@ -5024,13 +5024,14 @@ impl Engine {
                 text,
                 late,
                 late_by_ms,
+                also,
                 ..
             } => {
                 // Deferred unless this route is the lamp's only voice and the
                 // lamp says its reminders: standing by, Gemini says them once
                 // it is back.
                 let note = if self.reminders {
-                    crate::provider_worker::reminder_note(&text, late, late_by_ms)
+                    crate::provider_worker::reminder_note(&text, &also, late, late_by_ms)
                 } else {
                     Err(ReminderDeferral::Disabled)
                 };

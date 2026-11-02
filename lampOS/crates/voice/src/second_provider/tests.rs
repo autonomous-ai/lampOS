@@ -4392,6 +4392,7 @@ async fn a_reminder_is_deferred_as_the_fixture_does() {
         text: "Tea".into(),
         late: false,
         late_by_ms: None,
+        also: Vec::new(),
     });
     assert_eq!(turn(&mut engine).await, ["deferred:Disabled"]);
 }
@@ -4430,6 +4431,7 @@ fn reminder(request: u64, text: &str) -> ProviderInput {
         text: text.into(),
         late: false,
         late_by_ms: None,
+        also: Vec::new(),
     }
 }
 
@@ -4471,7 +4473,7 @@ async fn the_only_voice_says_a_due_reminder_with_the_live_routes_note_and_no_too
             "complete".into(),
         ]
     );
-    let note = crate::provider_worker::reminder_note("stretch", false, None).unwrap();
+    let note = crate::provider_worker::reminder_note("stretch", &[], false, None).unwrap();
     assert_eq!(script.asked.lock().unwrap()[0][1], Message::user(note));
     engine.submit(reminder(2, "stretch"));
     assert_eq!(

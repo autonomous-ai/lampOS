@@ -42,6 +42,11 @@ macro_rules! list_asked {
         "Call this, not recall, for any question about their reminders or timers: what is set, when one is due, or when they set it; never say you do not remember a reminder before calling this. set_day and set_clock say when each was set, as 'yesterday at 09:00'; if they are null, say you don't know when. Never list reminders unasked."
     };
 }
+macro_rules! list_said {
+    () => {
+        "said_recently: ones already said; said_day/said_clock: when you said it; waiting_for_answer: said late, unanswered. Asked what was set earlier, use both lists: 'I reminded you at 10:49 about the report', never none set."
+    };
+}
 /// `list_reminders`' description before questions about reminders were
 /// named in it: kept for the probe's old arm (`lamp-voice probe-tools`).
 pub const LIST_BEFORE: &str = list_before!();
@@ -50,8 +55,11 @@ pub const LIST_BEFORE: &str = list_before!();
 /// set, is answered from this list, not from memory, and the list is never
 /// read out unasked (rule 8). On both routes: they declare the same catalog.
 pub const LIST_ASKED: &str = list_asked!();
+/// What it adds for reminders already said (29e7, 2 Nov: four said late,
+/// then gone, and six minutes later "I don't see either still set").
+pub const LIST_SAID: &str = list_said!();
 /// `list_reminders`' description.
-pub const LIST_DESCRIBED: &str = concat!(list_before!(), " ", list_asked!());
+pub const LIST_DESCRIBED: &str = concat!(list_before!(), " ", list_asked!(), " ", list_said!());
 
 /// Voice reserves 16 bytes in its provider's 4096-byte tool-result allowance.
 pub const MAX_RESULT_BYTES: usize = 4096 - 16;
@@ -91,7 +99,7 @@ pub fn catalog_with(every: bool) -> Vec<Function> {
     vec![
         function(
             NAMES[0],
-            "Set a timer or a relative reminder only when asked. For a duration from now, such as 'in two minutes', 'in ten minutes', or 'in an hour', use this tool with the requested label and whole seconds (120, 600, or 3600 respectively); never round to a clock time. Confirm the returned time only after durable success. If the outcome is unknown, list current reminders before asking again.",
+            "Set a timer or a relative reminder only when asked. For a duration from now, such as 'in two minutes', 'in ten minutes', or 'in an hour', use this tool with the requested label and whole seconds (120, 600, or 3600 respectively); never round to a clock time. Confirm the returned time only after durable success. If the outcome is unknown, list current reminders before asking again. If they change the time of one already set, cancel that one before setting the new one; never leave both.",
             json!({"text":text,"seconds":seconds}),
             json!(["text", "seconds"]),
         ),
@@ -452,11 +460,44 @@ impl Adapter {
             }
             call => call,
         };
-        // Snooze obtains guard and delivery from the SAME Get reply. Other
-        // mutations use Status. No conflict or uncertain mutation is retried.
-        let before = match &call {
-            Call::Snooze { id, .. } => self.ask(&Request::Get { id: *id }, deadline)?,
+        // Snooze obtains guard and delivery from the SAME Get reply. A
+        // line's set reads its own first page, which says what it has set
+        // already with the same words (29e7, 2 Nov: a second water timer set
+        // beside the first). Other mutations use Status. No conflict or
+        // uncertain mutation is retried.
+        let before = match (&call, &asker) {
+            (Call::Snooze { id, .. }, _) => self.ask(&Request::Get { id: *id }, deadline)?,
+            (Call::Set { .. }, Some(asker)) => match self.ask_raw(
+                &Request::ListSet {
+                    after_id: 0,
+                    limit: 8,
+                    pending_only: false,
+                    asker: Some(asker.clone()),
+                },
+                deadline,
+            )? {
+                Ok(reply) => reply,
+                // An older Schedule: as before.
+                Err(_) => self.ask(&Request::Status {}, deadline)?,
+            },
             _ => self.ask(&Request::Status {}, deadline)?,
+        };
+        // The same timer asked for again in a moment (29e7's ids 8 and 9):
+        // the one already set, and nothing new.
+        if let (
+            Call::Set {
+                text,
+                when: When::After { seconds },
+            },
+            Some(_),
+        ) = (&call, &asker)
+            && let Some(set) = same_timer(&before, text, *seconds)
+        {
+            return Ok(set);
+        }
+        let same = match &call {
+            Call::Set { text, .. } => same_words_set(&before, text),
+            _ => Vec::new(),
         };
         let (store_id, revision) = identity(&before)?;
         let guard = guard(store_id, revision)?;
@@ -491,8 +532,85 @@ impl Adapter {
             }
         };
         let response = self.ask(&request, deadline)?;
-        committed(&request, &response)
+        let mut done = committed(&request, &response)?;
+        let new = done["id"].as_u64();
+        let same: Vec<_> = same
+            .into_iter()
+            .filter(|one| one["id"].as_u64() != new)
+            .collect();
+        if done["status"] == "committed" && !same.is_empty() {
+            done["same_words_set"] = json!(same);
+            done["note"] = json!(SAME_WORDS);
+        }
+        Ok(done)
     }
+}
+
+/// A line asking for the same timer again within this long of setting it,
+/// for the same length, gets the one already set (29e7, 2 Nov: two water
+/// timers 29 s apart).
+pub const SAME_SET_WITHIN_MS: i64 = 2 * 60_000;
+
+/// The timer in a `list_set` page (`page`) that is `text` for `seconds`,
+/// set within [`SAME_SET_WITHIN_MS`] before the page was read
+/// (`now_unix_ms`, Schedule's clock) and not yet due, snoozed or said, as a
+/// set's result: `already_set`. None in a reply without set times (an
+/// older Schedule).
+fn same_timer(page: &Value, text: &str, seconds: u64) -> Option<Value> {
+    let now_ms = page["now_unix_ms"].as_i64()?;
+    let length = i64::try_from(seconds.checked_mul(1_000)?).ok()?;
+    let item = page["items"].as_array()?.iter().find(|item| {
+        let (Some(set), Some(due)) = (item["set_unix_ms"].as_i64(), item["due_unix_ms"].as_i64())
+        else {
+            return false;
+        };
+        item["kind"] == "timer"
+            && item["state"] == "scheduled"
+            && item["snoozed"] == false
+            && item["delivery"] == 1
+            && (0..=SAME_SET_WITHIN_MS).contains(&now_ms.saturating_sub(set))
+            && due.saturating_sub(set) == length
+            && item["text"].as_str().is_some_and(|t| same_words(t, text))
+    })?;
+    let id = item["id"].as_u64().filter(|id| *id > 0)?;
+    let (due, local) = resolved(item).ok()?;
+    Some(
+        json!({"status":"already_set","id":id,"delivery":1,"due_unix_ms":due,"local":local,"clock":clock_of(local),"message":"This exact timer was set a moment ago, so nothing new was set: there is one, not two. Say its time as `clock`, the local HH:MM it is due."}),
+    )
+}
+
+/// The same words, as a person hears them: case and spacing aside.
+fn same_words(a: &str, b: &str) -> bool {
+    let words = |text: &str| {
+        text.split_whitespace()
+            .map(str::to_lowercase)
+            .collect::<Vec<_>>()
+    };
+    words(a) == words(b)
+}
+
+/// Told beside a set when the line already has another timer or reminder
+/// with the same words, not yet due (29e7, 2 Nov: a five-minute and a
+/// two-minute water timer, both left set).
+pub const SAME_WORDS: &str = "Another timer or reminder with the same words is still set (same_words_set). If the new one replaces it, cancel the old one by its id now; if both are wanted, say there are two.";
+
+/// The items in a `list_set` page with the same words as `text`, set and
+/// not yet due, as `{id, kind, clock}`; none from a reply without items.
+fn same_words_set(page: &Value, text: &str) -> Vec<Value> {
+    page["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|item| {
+            item["state"] != "pending" && item["text"].as_str().is_some_and(|t| same_words(t, text))
+        })
+        .filter_map(|item| {
+            Some(
+                json!({"id":item["id"].as_u64()?,"kind":item["kind"].as_str()?,
+                "clock":item["local"].as_str().and_then(clock_of)}),
+            )
+        })
+        .collect()
 }
 
 /// A fresh compare-and-set guard on the store's identity and revision.
@@ -1073,9 +1191,74 @@ fn page(
     } else {
         server_next
     };
-    Ok(
-        json!({"items":items,"next_after_id":next,"pending_only":pending_only,"complete":next.is_none()}),
-    )
+    let mut listed = json!({"items":items,"next_after_id":next,"pending_only":pending_only,"complete":next.is_none()});
+    if set_times && let Some(said) = reply.get("said") {
+        said_recently(&mut listed, said, pending_only)?;
+    }
+    Ok(listed)
+}
+
+/// The reminders already said (`list_set`'s `said`, 29e7, 2 Nov), as the
+/// model is told them: newest first, each with when it was due and said,
+/// as a day and a local `HH:MM`, whether on time, and whether it waits for
+/// an answer; as many as fit, with `said_complete` false when some don't.
+fn said_recently(listed: &mut Value, said: &Value, pending_only: bool) -> Result<(), Failure> {
+    let said = said
+        .as_array()
+        .filter(|said| said.len() <= lamp_schedule::engine::SAID_KEPT)
+        .ok_or(Failure::Unavailable)?;
+    let day_of = |value: &Value| {
+        value
+            .as_str()
+            .filter(|d| matches!(*d, "today" | "yesterday") || (d.len() == 10 && day(d)))
+            .map(str::to_owned)
+    };
+    let mut views = Vec::new();
+    for one in said {
+        let text = one["text"]
+            .as_str()
+            .filter(|t| valid_text(t))
+            .ok_or(Failure::Unavailable)?;
+        let kind = one["kind"]
+            .as_str()
+            .filter(|k| matches!(*k, "timer" | "reminder"))
+            .ok_or(Failure::Unavailable)?;
+        let (Some(on_time), Some(waiting)) = (
+            one["on_time"].as_bool(),
+            one["waiting_for_answer"].as_bool(),
+        ) else {
+            return Err(Failure::Unavailable);
+        };
+        let clock = |field: &str| one[field].as_str().and_then(clock_of);
+        let (said_day, said_clock) = match (day_of(&one["said_day"]), clock("said_local")) {
+            (Some(day), Some(clock)) => (Some(day), Some(clock)),
+            _ => (None, None),
+        };
+        let (due_day, due_clock) = match (day_of(&one["due_day"]), clock("due_local")) {
+            (Some(day), Some(clock)) => (Some(day), Some(clock)),
+            _ => (None, None),
+        };
+        views.push(json!({"text":text,"kind":kind,"said_day":said_day,"said_clock":said_clock,
+            "due_day":due_day,"due_clock":due_clock,"on_time":on_time,"waiting_for_answer":waiting}));
+    }
+    let mut kept = Vec::new();
+    for view in &views {
+        kept.push(view.clone());
+        let mut probe = listed.clone();
+        probe["said_recently"] = json!(kept);
+        probe["said_complete"] = json!(false);
+        if pending_only {
+            probe["not_yet_due"] = json!(u64::MAX);
+            probe["next"] = json!(NOT_YET_DUE);
+        }
+        if probe.to_string().len() > MAX_RESULT_BYTES {
+            kept.pop();
+            break;
+        }
+    }
+    listed["said_complete"] = json!(kept.len() == views.len());
+    listed["said_recently"] = json!(kept);
+    Ok(())
 }
 
 #[cfg(test)]

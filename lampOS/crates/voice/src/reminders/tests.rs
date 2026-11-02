@@ -37,6 +37,8 @@ impl Test {
             failed: false,
             by_skill: false,
             owed_told: None,
+            said_at_us: None,
+            notice_owed: false,
         };
         Self {
             parent,
@@ -96,6 +98,7 @@ fn offer() -> Offer {
         late_by_ms: None,
         observed_at_us: AT,
         expires_at_us: AT + LEASE_US,
+        also: Vec::new(),
     }
 }
 fn owner(boot: u8) -> (TurnOwner, u64) {
@@ -636,4 +639,45 @@ fn someone_is_here_for_two_minutes_after_speech_and_the_wait_is_said_once() {
         ..offer()
     };
     assert!(wait.may_begin(&on_time, false), "an on-time one begins");
+}
+
+/// 29e7, 2 Nov: a late one waits for a pause in the talk, three minutes at
+/// most; one on time does not wait.
+#[test]
+fn a_late_one_waits_for_a_pause_in_the_talk_and_no_longer_than_its_bound() {
+    use super::{TALK_PAUSE_US, TALK_PAUSE_WAIT_US, TalkPause};
+    let mut late = offer();
+    late.late = true;
+    late.late_by_ms = Some(13 * 3_600_000);
+    assert!(late.late_line());
+    let mut pause = TalkPause::default();
+    let now = 1_000_000_000;
+    // Nobody spoke: said now.
+    assert!(pause.may_begin(&late, None, now));
+    // Someone spoke 5 s ago: it waits.
+    assert!(!pause.may_begin(&late, Some(now - 5_000_000), now));
+    // A pause: said.
+    assert!(pause.may_begin(
+        &late,
+        Some(now - 5_000_000),
+        now - 5_000_000 + TALK_PAUSE_US
+    ));
+    // Talk that never pauses: said once the bound has passed.
+    let mut pause = TalkPause::default();
+    assert!(!pause.may_begin(&late, Some(now), now));
+    let later = now + TALK_PAUSE_WAIT_US - 1;
+    assert!(!pause.may_begin(&late, Some(later - 1_000_000), later));
+    assert!(pause.may_begin(&late, Some(later), later + 1));
+    // On time, or a few minutes late: no wait.
+    let mut on_time = offer();
+    on_time.late_by_ms = Some(0);
+    assert!(pause.may_begin(&on_time, Some(now), now));
+    let mut few = offer();
+    few.late = true;
+    few.late_by_ms = Some(4 * 60_000);
+    assert!(!few.late_line());
+    // Unknown lateness counts as late.
+    let mut unknown = offer();
+    unknown.late_by_ms = None;
+    assert!(unknown.late_line());
 }

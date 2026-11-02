@@ -5976,6 +5976,8 @@ fn conversation_with_gate_inner(
     let mut said_at_us: Option<u64> = None;
     // The overdue reminder last said to be waiting for someone.
     let mut overdue_wait = crate::reminders::OverdueWait::default();
+    // The late reminder waiting for a pause in the talk (29e7, 2 Nov).
+    let mut talk_pause = crate::reminders::TalkPause::default();
     // The turn last judged a sound and sent on only for the model to judge
     // (`LAMP_SHORT_SOUNDS`): until it is answered the lamp does not ponder
     // it, and the room and the provider do not count it as talk.
@@ -11647,10 +11649,20 @@ fn conversation_with_gate_inner(
             said_at_us,
             clock,
         );
+        // A line heard after a reminder was said is the answer to it: one
+        // said late no longer waits for one (29e7, 2 Nov).
+        if let Some(reminders) = reminders.as_mut() {
+            reminders.heard(said_at_us);
+        }
+        // A late one also waits for a pause in the talk, a few minutes at
+        // most: the person mid-conversation is not cut across by it.
         let overdue_may_begin = reminders
             .as_ref()
             .and_then(|reminders| reminders.offer(reminder_now_us))
-            .is_none_or(|offer| overdue_wait.may_begin(&offer, someone_here));
+            .is_none_or(|offer| {
+                overdue_wait.may_begin(&offer, someone_here)
+                    && talk_pause.may_begin(&offer, said_at_us, reminder_now_us)
+            });
         if !overdue_may_begin {
             reminder_held = None;
         }
@@ -13738,6 +13750,7 @@ fn commit_reminder_turn(
         text: offer.text.clone(),
         late: offer.late,
         late_by_ms: offer.late_by_ms,
+        also: offer.also_texts(),
     };
     current.reminder = Some(reminders.admitted(
         offer,

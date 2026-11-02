@@ -42,6 +42,20 @@ pub const MAX_ITEMS: usize = 128;
 pub const MAX_TEXT_BYTES: usize = 300;
 pub const LATE_AFTER_MS: u64 = 1000;
 
+/// A one-time reminder or timer said later than this after it was due, or
+/// late by an unknown amount, is kept in the said record as waiting for an
+/// answer (29e7, 2 Nov: four reminders 13 to 38 hours late were said back
+/// to back as the microphones opened and were gone six minutes later).
+/// The voice joins pending ones this late into one line.
+pub const SAID_LATE_MS: u64 = 10 * 60_000;
+/// One said late waits this long for someone to answer a line after it
+/// ([`Request::Noticed`]); after it, it counts as noticed.
+pub const NOTICE_GRACE_MS: i64 = 2 * 3_600_000;
+/// The said record holds at most this many reminders and timers...
+pub const SAID_KEPT: usize = 20;
+/// ...and none said longer ago than this.
+pub const SAID_KEPT_MS: i64 = 7 * 86_400_000;
+
 pub trait Persistence {
     fn load(&self) -> io::Result<Option<Vec<u8>>>;
     fn commit(&mut self, bytes: &[u8]) -> io::Result<()>;
@@ -168,6 +182,70 @@ fn visible(asker: Option<&Asker>, item: &Item) -> bool {
     item.rooms() || asker.is_none_or(|asker| asker.may_see(item.person.as_deref()))
 }
 
+/// A one-time reminder or timer already said, as the said record keeps it
+/// (29e7, 2 Nov): what, when it was due, when it was said and how late,
+/// and whose, as its item was. Optional stored metadata (`State::said`),
+/// so no `schema` bump; an older build leaves it out when it writes.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+struct Said {
+    id: u64,
+    text: String,
+    timer: bool,
+    /// The room's timer ([`Item::rooms`]): every line hears it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    room: bool,
+    due_unix_ms: i64,
+    due_local: String,
+    said_unix_ms: i64,
+    /// How late it was said; none when the clock could not tell.
+    late_by_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    person: Option<String>,
+    /// Said late ([`SAID_LATE_MS`]) and nobody has answered a line since.
+    waiting: bool,
+}
+
+impl Said {
+    /// Still waiting for an answer at `now`: said late, unanswered, and
+    /// within [`NOTICE_GRACE_MS`].
+    fn waiting_at(&self, now: &ClockSample) -> bool {
+        self.waiting && now.unix_ms.saturating_sub(self.said_unix_ms) < NOTICE_GRACE_MS
+    }
+    /// Kept at `now`: said within [`SAID_KEPT_MS`].
+    fn kept_at(&self, now: &ClockSample) -> bool {
+        now.unix_ms.saturating_sub(self.said_unix_ms) <= SAID_KEPT_MS
+    }
+    fn visible(&self, asker: Option<&Asker>) -> bool {
+        self.room || asker.is_none_or(|asker| asker.may_see(self.person.as_deref()))
+    }
+    fn valid(&self, next_id: u64) -> bool {
+        self.id > 0
+            && self.id < next_id
+            && valid_text(&self.text)
+            && (time::MIN_UNIX_MS..=time::MAX_UNIX_MS).contains(&self.due_unix_ms)
+            && (time::MIN_UNIX_MS..=time::MAX_UNIX_MS).contains(&self.said_unix_ms)
+            && !self.due_local.is_empty()
+            && self.due_local.len() <= 256
+            && !self.due_local.chars().any(char::is_control)
+            && self.person.as_deref().is_none_or(valid_person)
+    }
+}
+
+/// `said` added to the record at `now`: those older than [`SAID_KEPT_MS`]
+/// dropped, then the oldest no longer waiting, or else the oldest, until
+/// [`SAID_KEPT`] are left.
+fn remember_said(record: &mut Vec<Said>, said: Said, now: &ClockSample) {
+    record.retain(|kept| kept.kept_at(now));
+    record.push(said);
+    while record.len() > SAID_KEPT {
+        let oldest = record
+            .iter()
+            .position(|kept| !kept.waiting_at(now))
+            .unwrap_or(0);
+        record.remove(oldest);
+    }
+}
+
 /// A setter's person id as memory makes them: `p-` and 16 hex digits.
 fn valid_person(person: &str) -> bool {
     lamp_msgs::known::is_person_id(person) && person.len() <= 64
@@ -200,6 +278,15 @@ struct State {
     // nor may unknown request fields be stripped to manufacture an exact retry.
     #[serde(skip_deserializing)]
     last_receipt: Option<Receipt>,
+    /// One-time reminders and timers already said, oldest first (29e7, 2
+    /// Nov): at most [`SAID_KEPT`], none older than [`SAID_KEPT_MS`]. A
+    /// store from before it has none; one this build can't read is dropped.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "stored::readable_said"
+    )]
+    said: Vec<Said>,
 }
 
 /// A stored reminder or timer this build can't read: its JSON text as
@@ -334,6 +421,9 @@ impl State {
             }
             last_id = item.id;
         }
+        if self.said.len() > SAID_KEPT || self.said.iter().any(|said| !said.valid(self.next_id)) {
+            return Err(invalid());
+        }
         if let Some(receipt) = &self.last_receipt {
             let guard = receipt.request.guard().ok_or_else(invalid)?;
             if guard.store_id != self.store_id
@@ -379,6 +469,10 @@ impl State {
                         .items
                         .iter()
                         .any(|i| i.person.as_deref() == Some(person.as_str()))
+                        || self
+                            .said
+                            .iter()
+                            .any(|s| s.person.as_deref() == Some(person.as_str()))
                     {
                         return Err(invalid());
                     }
@@ -643,6 +737,7 @@ impl<P: Persistence> Engine<P> {
                     items: Vec::new(),
                     unread: Vec::new(),
                     last_receipt: None,
+                    said: Vec::new(),
                 },
                 None => State {
                     schema: SCHEMA,
@@ -652,6 +747,7 @@ impl<P: Persistence> Engine<P> {
                     items: Vec::new(),
                     unread: Vec::new(),
                     last_receipt: None,
+                    said: Vec::new(),
                 },
             },
         };
@@ -841,6 +937,9 @@ impl<P: Persistence> Engine<P> {
     fn item_view_set(&self, item: &Item, now: &ClockSample) -> Value {
         let mut view = self.item_view(item, now);
         let set = time::set_at(item.created_unix_ms, now, &self.zone).ok();
+        // When exactly, for the voice's adapter to tell the same timer
+        // asked for twice in a moment (29e7's ids 8 and 9).
+        view["set_unix_ms"] = json!(item.created_unix_ms);
         view["set_local"] = json!(set.as_ref().map(|(local, _)| local));
         view["set_day"] = json!(set.as_ref().map(|(_, day)| day));
         view
@@ -993,8 +1092,17 @@ impl<P: Persistence> Engine<P> {
                             .count()
                     );
                 }
+                if with_set {
+                    // The time it was read at, beside each item's
+                    // `set_unix_ms`, on the same clock.
+                    body["now_unix_ms"] = json!(now.unix_ms);
+                }
+                if with_set && *after_id == 0 && !pending_only {
+                    body["said"] = self.said_views(asker.as_ref(), &body, now)?;
+                }
                 return Ok(self.reply(body));
             }
+            Request::Noticed {} => return self.noticed(now),
             Request::Get { id } => {
                 let item = self
                     .state
@@ -1113,13 +1221,16 @@ impl<P: Persistence> Engine<P> {
                 let before = next.items.len();
                 next.items
                     .retain(|i| i.person.as_deref() != Some(person.as_str()));
+                // What was said to them goes with what was set (29e7).
+                next.said
+                    .retain(|s| s.person.as_deref() != Some(person.as_str()));
                 json!({"forgotten":before - next.items.len()})
             }
             Request::Ack { id, delivery, .. } => {
                 let index = find_pending(&next, *id, *delivery)?;
-                let item = &mut next.items[index];
-                match time::next_ahead(&item.deadline, now).map_err(bad_time)? {
+                match time::next_ahead(&next.items[index].deadline, now).map_err(bad_time)? {
                     Some(deadline) => {
+                        let item = &mut next.items[index];
                         item.delivery = item
                             .delivery
                             .checked_add(1)
@@ -1129,7 +1240,24 @@ impl<P: Persistence> Engine<P> {
                         item.snooze = None;
                     }
                     None => {
-                        next.items.remove(index);
+                        // Said, and kept in the said record: one said late
+                        // waits there for an answer (29e7, 2 Nov).
+                        let (_, late_by_ms) = self.late(&next.items[index], now);
+                        let shown = Self::shown(&next.items[index], now);
+                        let item = next.items.remove(index);
+                        let said = Said {
+                            id: item.id,
+                            room: item.rooms(),
+                            timer: item.timer(),
+                            text: item.text,
+                            due_unix_ms: shown.unix_ms,
+                            due_local: shown.local,
+                            said_unix_ms: now.unix_ms,
+                            late_by_ms,
+                            person: item.person,
+                            waiting: late_by_ms.is_none_or(|ms| ms > SAID_LATE_MS),
+                        };
+                        remember_said(&mut next.said, said, now);
                     }
                 }
                 json!({"acknowledged":true,"id":id,"delivery":delivery})
@@ -1147,6 +1275,76 @@ impl<P: Persistence> Engine<P> {
         });
         self.save(next)?;
         Ok(response)
+    }
+
+    /// [`Request::Noticed`]: each reminder said late and still waiting is
+    /// answered, and stays in the said record as said. With none waiting,
+    /// nothing is written.
+    fn noticed(&mut self, now: &ClockSample) -> Result<Value, Error> {
+        let waiting = self
+            .state
+            .said
+            .iter()
+            .filter(|said| said.waiting_at(now))
+            .count();
+        if waiting == 0 {
+            return Ok(self.reply(json!({"noticed":0})));
+        }
+        let mut next = self.state.clone();
+        for said in &mut next.said {
+            said.waiting = false;
+        }
+        next.said.retain(|said| said.kept_at(now));
+        next.revision = next
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| err("full", "Schedule revision is exhausted."))?;
+        self.save(next)?;
+        Ok(self.reply(json!({"noticed":waiting})))
+    }
+
+    /// The said record as `asker`'s line may hear it, newest first, as
+    /// many as fit in a reply beside `body`: each with when it was due and
+    /// said, in the lamp's zone, how late, and whether it still waits for
+    /// an answer.
+    fn said_views(
+        &self,
+        asker: Option<&Asker>,
+        body: &Value,
+        now: &ClockSample,
+    ) -> Result<Value, Error> {
+        let mut views = Vec::new();
+        let mut probe = body.clone();
+        for said in self
+            .state
+            .said
+            .iter()
+            .rev()
+            .filter(|said| said.kept_at(now) && said.visible(asker))
+        {
+            let at = |unix_ms| time::set_at(unix_ms, now, &self.zone).ok();
+            let (said_local, said_day) = at(said.said_unix_ms).unzip();
+            let due_day = at(said.due_unix_ms).map(|(_, day)| day);
+            views.push(json!({
+                "id": said.id, "text": said.text,
+                "kind": if said.timer { "timer" } else { "reminder" },
+                "due_unix_ms": said.due_unix_ms, "due_local": said.due_local, "due_day": due_day,
+                "said_unix_ms": said.said_unix_ms, "said_local": said_local, "said_day": said_day,
+                "late_by_ms": said.late_by_ms,
+                "on_time": said.late_by_ms.is_some_and(|ms| ms <= SAID_LATE_MS),
+                "waiting_for_answer": said.waiting_at(now),
+            }));
+            probe["said"] = json!(views);
+            if serde_json::to_vec(&self.reply(probe.clone()))
+                .map_err(storage)?
+                .len()
+                > MAX_REPLY_BYTES
+            {
+                views.pop();
+                break;
+            }
+        }
+        Ok(json!(views))
     }
 
     /// With `--zone system`, the system's zone as it is now; one that names

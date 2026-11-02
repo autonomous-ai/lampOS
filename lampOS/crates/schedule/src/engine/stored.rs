@@ -1,6 +1,6 @@
 //! Tolerant reads belong only to persisted state. Shared time and request
 //! types stay strict for live messages and delivery-ledger validation.
-use super::{Error, Item, Receipt, SCHEMA, State, Unread, storage};
+use super::{Error, Item, Receipt, SCHEMA, Said, State, Unread, storage};
 use crate::time::{Deadline, Elapsed, Repeat, Weekday};
 use serde::{Deserialize, Deserializer, de::IgnoredAny};
 use serde_json::{Value, value::RawValue};
@@ -74,6 +74,9 @@ pub(super) fn read(bytes: &[u8]) -> Result<Read, Error> {
         Some(CachedReceipt::Unreadable(_)) => dropped = true,
         None => {}
     }
+    // A said record this build can't use is dropped, never the store.
+    let next_id = state.next_id;
+    state.said.retain(|said| said.valid(next_id));
     // A future request or reply cannot be used as this build's retry cache.
     // Keep the committed revision: an old guard cannot run the mutation again.
     if state.check().is_err() && state.last_receipt.is_some() {
@@ -103,6 +106,18 @@ pub(super) fn readable_items<'de, D: Deserializer<'de>>(
     Ok(raw
         .iter()
         .filter_map(|item| serde_json::from_str::<Item>(item.get()).ok())
+        .collect())
+}
+
+/// The stored said record's entries this build reads; the others are
+/// dropped, never the store (29e7's said record, 2 Nov).
+pub(super) fn readable_said<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<Said>, D::Error> {
+    let raw = Option::<Vec<Box<RawValue>>>::deserialize(deserializer)?.unwrap_or_default();
+    Ok(raw
+        .iter()
+        .filter_map(|said| serde_json::from_str::<Said>(said.get()).ok())
         .collect())
 }
 

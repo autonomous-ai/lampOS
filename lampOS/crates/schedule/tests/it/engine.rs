@@ -1264,6 +1264,10 @@ fn a_list_set_item_says_when_it_was_set_in_the_lamps_zone() {
     let mut plain = item.as_object().unwrap().clone();
     plain.remove("set_local");
     plain.remove("set_day");
+    assert_eq!(
+        plain.remove("set_unix_ms"),
+        Some(json!(WALL + 15 * 3_600_000 + 1_800_000))
+    );
     assert_eq!(Value::Object(plain), get(&mut e, &at, 1));
     let list = e
         .answer(
@@ -1672,4 +1676,348 @@ fn every_is_refused_with_its_switch_off_and_cancelled_whole_with_it_on() {
     at.boot_ms += 10_000;
     e.tick(&at).unwrap();
     assert!(due(&e, &at).oldest.is_none());
+}
+
+// 29e7, 2 Nov: reminders said are kept in a said record, one said late
+// waits there for an answer, and the same set twice in a moment is one.
+
+const HOUR: u64 = 3_600_000;
+
+fn said(engine: &mut Engine<Disk>, at: &ClockSample, asker: Option<Asker>) -> Vec<Value> {
+    engine
+        .answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+                asker,
+            },
+            at,
+        )
+        .unwrap()["said"]
+        .as_array()
+        .unwrap()
+        .clone()
+}
+/// Every pending item acknowledged at `at`, oldest first, as the voice says
+/// them.
+fn ack_all(engine: &mut Engine<Disk>, at: &ClockSample) -> usize {
+    engine.tick(at).unwrap();
+    let pending: Vec<(u64, u64)> = engine
+        .answer(
+            Request::List {
+                after_id: 0,
+                limit: 8,
+                pending_only: true,
+            },
+            at,
+        )
+        .unwrap()["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| (i["id"].as_u64().unwrap(), i["delivery"].as_u64().unwrap()))
+        .collect();
+    for (id, delivery) in &pending {
+        ack(engine, at, *id, *delivery);
+    }
+    pending.len()
+}
+fn texts_of(said: &[Value]) -> Vec<&str> {
+    said.iter().map(|s| s["text"].as_str().unwrap()).collect()
+}
+
+/// The 29e7 sequence: four one-time reminders due while the microphones
+/// were closed, said 13 to 38 hours late, then "what reminders did I set
+/// earlier?": the list has none set, and all four as said, waiting for an
+/// answer.
+#[test]
+fn four_late_reminders_said_are_kept_as_said_and_wait_for_an_answer() {
+    let at = now(0);
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &at);
+    for (text, seconds) in [
+        ("Send the report", 3_600),
+        ("Buy the gift", 6 * 3_600),
+        ("Drink water", 60),
+        ("Water timer", 120),
+    ] {
+        set_when(&mut e, &at, text, Some(ANN), When::After { seconds });
+    }
+    let opened = now(39 * HOUR);
+    assert_eq!(ack_all(&mut e, &opened), 4);
+    let list = e
+        .answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+                asker: Some(asker(Some(ANN), false)),
+            },
+            &opened,
+        )
+        .unwrap();
+    assert_eq!(list["items"], json!([]));
+    let said = list["said"].as_array().unwrap();
+    // Newest first; all said at the same moment, so the last acked first.
+    assert_eq!(
+        texts_of(said),
+        [
+            "Water timer",
+            "Drink water",
+            "Buy the gift",
+            "Send the report"
+        ]
+    );
+    for one in said {
+        assert_eq!(one["waiting_for_answer"], true, "{one}");
+        assert_eq!(one["on_time"], false);
+        assert!(one["late_by_ms"].as_u64().unwrap() > 30 * HOUR);
+        assert!(one["said_local"].as_str().is_some() && one["said_day"].as_str().is_some());
+    }
+    // They survive a restart.
+    drop(e);
+    let mut e = open(disk, &opened);
+    assert_eq!(said_of(&mut e, &opened, ANN).len(), 4);
+}
+fn said_of(engine: &mut Engine<Disk>, at: &ClockSample, person: &str) -> Vec<Value> {
+    said(engine, at, Some(asker(Some(person), false)))
+}
+
+#[test]
+fn a_line_after_a_late_one_notices_it_and_the_grace_ends_the_wait() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    set_when(
+        &mut e,
+        &at,
+        "Stretch",
+        Some(ANN),
+        When::After { seconds: 60 },
+    );
+    let late = now(HOUR);
+    assert_eq!(ack_all(&mut e, &late), 1);
+    assert_eq!(said_of(&mut e, &late, ANN)[0]["waiting_for_answer"], true);
+    let revision = e.revision();
+    let noticed = e.answer(Request::Noticed {}, &late).unwrap();
+    assert_eq!(noticed["noticed"], 1);
+    assert_eq!(e.revision(), revision + 1);
+    let kept = said_of(&mut e, &late, ANN);
+    assert_eq!(kept[0]["waiting_for_answer"], false);
+    assert_eq!(kept[0]["text"], "Stretch");
+    // Noticing again writes nothing.
+    assert_eq!(e.answer(Request::Noticed {}, &late).unwrap()["noticed"], 0);
+    assert_eq!(e.revision(), revision + 1);
+
+    // One nobody answers stops waiting after the grace.
+    set_when(
+        &mut e,
+        &late,
+        "Pills",
+        Some(ANN),
+        When::After { seconds: 60 },
+    );
+    let later = now(2 * HOUR);
+    ack_all(&mut e, &later);
+    assert_eq!(said_of(&mut e, &later, ANN)[0]["waiting_for_answer"], true);
+    let after_grace = now(4 * HOUR + 1);
+    assert_eq!(
+        said_of(&mut e, &after_grace, ANN)[0]["waiting_for_answer"],
+        false
+    );
+    assert_eq!(
+        e.answer(Request::Noticed {}, &after_grace).unwrap()["noticed"],
+        0
+    );
+}
+
+#[test]
+fn one_said_on_time_is_kept_as_said_on_time_and_waits_for_nothing() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    timer_by(&mut e, &at, "Tea", None);
+    let due = now(600_000);
+    assert_eq!(ack_all(&mut e, &due), 1);
+    let kept = said(&mut e, &due, None);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0]["on_time"], true);
+    assert_eq!(kept[0]["waiting_for_answer"], false);
+    assert_eq!(kept[0]["kind"], "timer");
+    // A repeat is not one-time: it goes on, and is not kept as said.
+    create(
+        &mut e,
+        &due,
+        When::Daily {
+            time: "09:00".into(),
+            zone: None,
+        },
+    );
+    ack_all(&mut e, &now(HOUR + 600_000));
+    assert_eq!(said(&mut e, &now(HOUR + 600_000), None).len(), 1);
+}
+
+#[test]
+fn a_line_hears_only_its_own_said_ones_and_a_forget_takes_theirs() {
+    let at = now(0);
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &at);
+    set_when(
+        &mut e,
+        &at,
+        "Ann's pills",
+        Some(ANN),
+        When::After { seconds: 3 * 3_600 },
+    );
+    set_when(
+        &mut e,
+        &at,
+        "Bo's call",
+        Some(BO),
+        When::After { seconds: 3 * 3_600 },
+    );
+    set_by(&mut e, &at, "Water the plant", None);
+    // The room's timer: every line hears it.
+    timer_by(&mut e, &at, "Pasta", None);
+    ack_all(&mut e, &now(4 * HOUR));
+    let at = now(4 * HOUR);
+    let mut ann = texts_of(&said_of(&mut e, &at, ANN))
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    ann.sort();
+    assert_eq!(ann, ["Ann's pills", "Pasta"]);
+    let mut bo = texts_of(&said_of(&mut e, &at, BO))
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    bo.sort();
+    assert_eq!(bo, ["Bo's call", "Pasta"]);
+    let mut owner = texts_of(&said(&mut e, &at, Some(asker(None, true))))
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    owner.sort();
+    assert_eq!(owner, ["Pasta", "Water the plant"]);
+    assert_eq!(said(&mut e, &at, None).len(), 4);
+    // An unknown voice hears only the room's.
+    assert_eq!(
+        texts_of(&said(&mut e, &at, Some(asker(None, false)))),
+        ["Pasta"]
+    );
+    e.answer(
+        Request::Forget {
+            guard: guard(&e),
+            person: ANN.into(),
+        },
+        &at,
+    )
+    .unwrap();
+    assert_eq!(texts_of(&said_of(&mut e, &at, ANN)), ["Pasta"]);
+    assert_eq!(said(&mut e, &at, None).len(), 3);
+    drop(e);
+    let stored = String::from_utf8(disk.0.lock().unwrap().bytes.clone().unwrap()).unwrap();
+    assert!(!stored.contains("Ann's pills"), "{stored}");
+}
+
+#[test]
+fn the_said_record_keeps_the_last_twenty_and_none_past_a_week() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    for n in 0..25u64 {
+        let at = now(n * 60_000);
+        set_when(
+            &mut e,
+            &at,
+            &format!("Timer {n}"),
+            None,
+            When::After { seconds: 1 },
+        );
+        ack_all(&mut e, &now(n * 60_000 + 1_000));
+    }
+    let at = now(30 * 60_000);
+    let kept = said(&mut e, &at, None);
+    assert_eq!(kept.len(), lamp_schedule::engine::SAID_KEPT);
+    assert_eq!(kept[0]["text"], "Timer 24");
+    assert_eq!(kept[19]["text"], "Timer 5");
+    // A plain list, the app's, is as it was: no said record.
+    let plain = e
+        .answer(
+            Request::List {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+            },
+            &at,
+        )
+        .unwrap();
+    assert!(plain.get("said").is_none(), "{plain}");
+    // Nor a later page.
+    let later = e
+        .answer(
+            Request::ListSet {
+                after_id: 1,
+                limit: 8,
+                pending_only: false,
+                asker: None,
+            },
+            &at,
+        )
+        .unwrap();
+    assert!(later.get("said").is_none(), "{later}");
+    let week = now(8 * 24 * HOUR);
+    assert!(said(&mut e, &week, None).is_empty());
+}
+
+#[test]
+fn a_store_without_a_said_record_or_with_one_entry_unread_loads() {
+    let at = now(0);
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &at);
+    timer_by(&mut e, &at, "Tea", None);
+    drop(e);
+    let mut stored: Value =
+        serde_json::from_slice(disk.0.lock().unwrap().bytes.as_ref().unwrap()).unwrap();
+    assert!(stored.get("said").is_none(), "{stored}");
+    let mut e = open(disk.clone(), &at);
+    ack_all(&mut e, &now(600_000));
+    drop(e);
+    stored = serde_json::from_slice(disk.0.lock().unwrap().bytes.as_ref().unwrap()).unwrap();
+    assert_eq!(stored["said"].as_array().unwrap().len(), 1);
+    // A newer build's entry this build can't read is dropped, not the store.
+    stored["said"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id":1,"text":7}));
+    disk.0.lock().unwrap().bytes = Some(serde_json::to_vec(&stored).unwrap());
+    let mut e = open(disk, &now(600_000));
+    assert_eq!(said(&mut e, &now(600_000), None).len(), 1);
+}
+
+/// The engine sets what it is asked to, twice if asked twice: the same
+/// timer asked for again in a moment is the voice's adapter's to catch
+/// (29e7's ids 8 and 9), by each item's `set_unix_ms`.
+#[test]
+fn list_set_says_when_each_was_set_to_the_millisecond() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    timer_by(&mut e, &at, "Drink water", Some(ANN));
+    timer_by(&mut e, &now(29_000), "Drink water", Some(ANN));
+    let page = e
+        .answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+                asker: Some(asker(Some(ANN), false)),
+            },
+            &now(30_000),
+        )
+        .unwrap();
+    let set: Vec<_> = page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["set_unix_ms"].as_i64().unwrap())
+        .collect();
+    assert_eq!(set, [WALL, WALL + 29_000]);
 }

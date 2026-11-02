@@ -441,10 +441,60 @@ ahead, so the ones missed in between are stepped over, not delivered. The
 stored deadline is not rewritten by a scan (its receipt names it); only an
 acknowledgement moves it. With an untrusted wall clock nothing is stepped.
 
-Acknowledging a one-off removes it. Acknowledging a repeat advances to its
+Acknowledging a one-off removes it from the items and keeps it in the said
+record (below). Acknowledging a repeat advances to its
 next occurrence still ahead and increments its delivery token. Cancellation removes
 the whole item, including its recurrence. There is no separate “delete just
 one recurrence,” edit, pause, resume, monthly, yearly, or interval operation.
+
+### Reminders already said (29e7, 2 Nov)
+
+On lamp-29e7 on 1 Nov four one-time reminders, 13 to 38 hours late after
+the microphones had been closed, were said back to back in 34 s as they
+opened, in the middle of a conversation; each acknowledgement removed its
+item, and six minutes later "what reminders did I set earlier?" listed
+nothing and the lamp said "I don't see either still set". So:
+
+- **The said record.** The store keeps the one-time reminders and timers
+  already said (`State::said`): the text, kind, due instant and its local
+  time, when it was said, how late (null when the clock could not tell),
+  and the setter's person id, as the item had it. At most `SAID_KEPT` (20)
+  are kept, and none said longer ago than `SAID_KEPT_MS` (7 days); past 20,
+  the oldest no longer waiting goes first. It is optional stored metadata,
+  so no `schema` bump: a store from before it loads with none, an entry this
+  build can't read is dropped (not the store), and an older build drops the
+  record on its next save. Factory reset wipes it with the store
+  (`/var/lib/lampos-schedule/store` in the reset plan).
+- **A late one waits to be noticed.** One said later than `SAID_LATE_MS`
+  (10 min) after it was due, or late by an unknown amount, is kept as
+  `waiting_for_answer` until someone answers a line after it, or
+  `NOTICE_GRACE_MS` (2 h) passes. "Answers" is any line heard after the
+  reminder was said: the voice sends `{"op":"noticed"}` (`Request::Noticed`,
+  unguarded: noticing twice is noticing once) once every reminder it said is
+  acknowledged, and each one waiting is marked noticed. With none waiting it
+  writes nothing. An older Schedule refuses it, and kept none to notice. One
+  said on time is kept as said on time and waits for nothing; a repeat is not
+  kept (it goes on to its next occurrence).
+- **Whose it is.** A line hears only its own said ones, exactly as it hears
+  its items (`Asker::may_see`): a person's own; a no-person one only on the
+  owner's line; the room's short timers on every line. A person's `forget`
+  also drops their said ones.
+- **Where it is read.** `list_set`'s first page (`after_id` 0, not
+  `pending_only`) has `said`: the record as the line may hear it, newest
+  first, each with `due_local`, `due_day`, `said_local`, `said_day` (as
+  `set_day` is told), `late_by_ms`, `on_time` and `waiting_for_answer`, as
+  many as fit the reply. `list`, `get` and the delivery ledger's reads are
+  unchanged. The app's `schedule.list` asks plain `list`
+  (`Adapter::call_plain`), so **the app's owner view does not show the said
+  record**: its contract is unchanged.
+
+Tests (`crates/schedule/tests/it/engine.rs`):
+`four_late_reminders_said_are_kept_as_said_and_wait_for_an_answer`,
+`a_line_after_a_late_one_notices_it_and_the_grace_ends_the_wait`,
+`one_said_on_time_is_kept_as_said_on_time_and_waits_for_nothing`,
+`a_line_hears_only_its_own_said_ones_and_a_forget_takes_theirs`,
+`the_said_record_keeps_the_last_twenty_and_none_past_a_week` and
+`a_store_without_a_said_record_or_with_one_entry_unread_loads`.
 
 ## Private socket requests
 
@@ -461,7 +511,10 @@ are rejected. Read operations need no guard:
 ```
 
 `list_set` is `list` whose items also say when each was set (`set_local`,
-`set_day`; see the model tools below).
+`set_day`, and `set_unix_ms`, with the reply's `now_unix_ms` on the same
+clock; see the model tools below), and whose first page has the said record
+(`said`, above). `{"op":"noticed"}` marks the reminders said late as noticed
+(above).
 
 Each line above represents a separate connection. `status` returns the current
 store identity/revision, item and pending counts, waiting-for-clock count,
@@ -688,6 +741,48 @@ and `kept::each_kept_state_reads_with_its_items` (`crates/schedule/tests/it`),
 `list_reminders_is_described_for_questions_about_reminders`
 (`crates/actions/tests/it/schedule.rs`). The wording is measured with
 `lamp-voice probe-reminders` ([second-voice.md](second-voice.md)).
+
+**Reminders already said are answered from the list too (29e7, 2 Nov).**
+`list_reminders` returns `said_recently` beside `items`: the line's said
+record (above), newest first, each with `text`, `kind`, `said_day` and
+`said_clock` (when the lamp said it), `due_day` and `due_clock`, `on_time`,
+and `waiting_for_answer`; `said_complete` is false when some did not fit
+the 4,080-byte result. Its description adds `LIST_SAID`: asked what was set
+earlier, use both lists, "I reminded you at 10:49 about the report", never
+none set. Only Voice's `list_reminders` has it (`list_set`); the app's list
+has none.
+
+**The same timer asked for twice in a moment is one (29e7, 2 Nov).** One
+"remind me in 5 minutes" left two water timers there, ids 8 and 9, set
+29 s apart: the journal shows the first `set_timer` in request 9's first
+chat round (22:52:12), then request 11, a later two-word line, calling
+`list_reminders` and then `set_timer` again in its second round
+(22:52:41), for two minutes (timer 9 rang at 22:54:41; timer 8, five
+minutes, at 22:57:12). It was not a retried round (each call was answered
+in 29 to 30 ms, and no round was asked twice): the model set a second
+timer on a later line and left the first, and the lamp's "a two-minute
+timer just went off" was timer 9's own length. So, for a voice line:
+
+- A line's set reads its own first page (`list_set`) instead of `status`
+  for its guard: the same round trips as before.
+- `set_timer` for the same words (case and spacing aside) and the same
+  length as a timer the line set within `SAME_SET_WITHIN_MS` (2 min) and
+  not yet due, snoozed or said sets nothing: the result is that timer's,
+  `status: "already_set"`, "there is one, not two" (by each item's
+  `set_unix_ms` and the reply's `now_unix_ms`, Schedule's clock).
+- A set whose words match a timer or reminder the line has set and not yet
+  due (another length or time) is set, and its result names the other
+  (`same_words_set`, `{id, kind, clock}`) with `note` (`SAME_WORDS`): if the
+  new one replaces it, cancel the old one by its id; if both are wanted, say
+  there are two. `set_timer`'s description says the same: cancel the one
+  being changed before setting the new one, never leave both.
+- The app's calls (`call`, `call_plain`) are unchanged.
+
+Tests (`crates/actions/tests/it/schedule.rs`, against the real Schedule
+service): `a_reminder_said_late_is_listed_as_said_to_its_own_line_only`,
+`the_same_timer_asked_for_twice_in_a_moment_is_one`; and
+`list_set_says_when_each_was_set_to_the_millisecond`
+(`crates/schedule/tests/it/engine.rs`).
 
 **Whose reminders a line hears (Reviewer-three's after-merge P2 on #4527,
 the first builder's (a), 31 Oct).** After #4527 sent every question about
@@ -937,6 +1032,31 @@ consumer's persistent deduplication. The implementation below adds Voice and
 Actions only; installation and on-lamp qualification remain First's work.
 
 ## Optional Voice consumer
+
+**Late ones are said together, once, at a pause (29e7, 2 Nov).** When the
+oldest due reminder is late by `SAID_LATE_MS` (10 min) or more, or by an
+unknown amount (`Offer::late_line`), the consumer joins the other pending
+ones as late to it, in the order they were due: at most `MAX_JOINED` (4)
+more and `JOINED_TEXT_BYTES` (240) bytes of text in all, as JSON, so the
+line's note fits one provider note. Each joined one has its own prepared
+attempt in the ledger; the offer carries them (`Offer::also`), the provider
+is asked to say them all together, once, in one short line ("While you were
+away: …", `reminder_policy::JOINED`), and the one completion proof
+completes each, each acknowledged on its own. A retirement retries each; an
+abandon holds each. One the ledger already holds, or that can't be read or
+prepared, is said on its own, as before. A late line also waits for a pause
+in the talk (`TalkPause`): nobody's line heard for `TALK_PAUSE_US` (20 s),
+besides the lamp not answering and the room quiet as for any reminder, or
+`TALK_PAUSE_WAIT_US` (3 min) at most, then at the next quiet moment. One
+said on time waits for neither and joins nothing. A line heard after a
+reminder was said is the person's answer: the voice tells the consumer
+(`ToWorker::Noticed`), which tells Schedule (`noticed`, above) once every
+completed one is acknowledged. Tests:
+`late_ones_are_offered_as_one_line_and_noticed_after_their_acks`,
+`an_on_time_one_joins_nothing` (`reminders/consumer/tests.rs`),
+`a_late_one_waits_for_a_pause_in_the_talk_and_no_longer_than_its_bound`
+(`reminders/tests.rs`) and `late_ones_joined_are_one_note_that_fits`
+(`provider_worker/reminder_policy.rs`).
 
 Voice requires exact `LAMP_SCHEDULE_SPEAK=on` (or `skill`, where a due
 reminder also waits up to 10 s for the Reminders skill to ask for it through

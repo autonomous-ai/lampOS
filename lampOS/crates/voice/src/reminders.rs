@@ -76,6 +76,72 @@ impl OverdueWait {
 const POLL_TARGET_US: u64 = 2_000;
 const POLL_PACKETS: usize = 4;
 
+/// At most this many other late reminders are joined to the one offered, in
+/// one line (29e7, 2 Nov: four said back to back in 34 s).
+pub const MAX_JOINED: usize = 4;
+/// The reminders said in one line have at most this many bytes of text in
+/// all, as JSON ([`json_bytes`]), so the line's note fits one provider note.
+pub const JOINED_TEXT_BYTES: usize = 240;
+
+/// `text`'s bytes as a JSON string, quotes and escapes included.
+pub fn json_bytes(text: &str) -> usize {
+    serde_json::to_string(text).map_or(usize::MAX, |json| json.len())
+}
+/// A late reminder ([`Offer::late_line`]) waits for a pause in the talk: no
+/// one's line heard for this long...
+pub const TALK_PAUSE_US: u64 = 20_000_000;
+/// ...but waits no longer than this for one, then is said at the next quiet
+/// moment, as any due reminder is.
+pub const TALK_PAUSE_WAIT_US: u64 = 3 * 60_000_000;
+
+/// A late reminder's wait for a pause in the talk (29e7, 2 Nov: the four
+/// came between the person's own lines, as the microphones opened): it may
+/// begin once nobody has said a line for [`TALK_PAUSE_US`], or once it has
+/// waited [`TALK_PAUSE_WAIT_US`]. One on time does not wait.
+#[derive(Default)]
+pub(crate) struct TalkPause {
+    /// The attempt waiting, and since when.
+    since: Option<(PreparedToken, u64)>,
+}
+impl TalkPause {
+    pub(crate) fn may_begin(
+        &mut self,
+        offer: &Offer,
+        said_at_us: Option<u64>,
+        now_us: u64,
+    ) -> bool {
+        if !offer.late_line() {
+            return true;
+        }
+        let talking = said_at_us.is_some_and(|at| now_us.saturating_sub(at) < TALK_PAUSE_US);
+        if !talking {
+            self.since = None;
+            return true;
+        }
+        let since = match &self.since {
+            Some((token, since)) if *token == offer.token => *since,
+            _ => {
+                eprintln!(
+                    "lamp-voice: a late reminder waits for a pause in the talk, {} s at most",
+                    TALK_PAUSE_WAIT_US / 1_000_000
+                );
+                self.since = Some((offer.token.clone(), now_us));
+                now_us
+            }
+        };
+        now_us.saturating_sub(since) >= TALK_PAUSE_WAIT_US
+    }
+}
+
+/// Another late reminder said in the same line as the one offered
+/// ([`Offer::also`]): its own prepared attempt, completed with it.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Joined {
+    pub token: PreparedToken,
+    pub text: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Offer {
@@ -85,8 +151,23 @@ pub(crate) struct Offer {
     pub late_by_ms: Option<u64>,
     pub observed_at_us: u64,
     pub expires_at_us: u64,
+    /// Other reminders as late, said with it in one line (29e7, 2 Nov):
+    /// at most [`MAX_JOINED`], each completed when it is.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also: Vec<Joined>,
 }
 impl Offer {
+    /// Said late enough to be kept as said and to wait for a pause in the
+    /// talk: late by [`lamp_schedule::engine::SAID_LATE_MS`] or more, or by
+    /// an unknown amount.
+    pub fn late_line(&self) -> bool {
+        self.late_by_ms
+            .is_none_or(|ms| self.late && ms >= lamp_schedule::engine::SAID_LATE_MS)
+    }
+    /// The texts of the others said with it.
+    pub fn also_texts(&self) -> Vec<String> {
+        self.also.iter().map(|joined| joined.text.clone()).collect()
+    }
     /// Due an hour ago or more ([`OVERDUE_MS`]), or due by an unknown
     /// amount: Schedule gives no lateness while the wall clock is not
     /// trusted (the first minute after a boot), and that is never taken
@@ -102,11 +183,20 @@ impl Offer {
     }
 
     fn fresh(&self, now_us: u64) -> bool {
+        let text_ok = |text: &str| {
+            !text.trim().is_empty() && text.len() <= 300 && !text.chars().any(char::is_control)
+        };
         self.token.key.validate().is_ok()
             && self.token.attempt > 0
-            && !self.text.trim().is_empty()
-            && self.text.len() <= 300
-            && !self.text.chars().any(char::is_control)
+            && text_ok(&self.text)
+            && self.also.len() <= MAX_JOINED
+            && self.also.iter().all(|joined| {
+                joined.token.key.validate().is_ok()
+                    && joined.token.attempt > 0
+                    && joined.token.key.store_id == self.token.key.store_id
+                    && joined.token.key != self.token.key
+                    && text_ok(&joined.text)
+            })
             && self.observed_at_us <= now_us
             && self.observed_at_us < self.expires_at_us
             && self
@@ -131,6 +221,9 @@ pub(crate) enum ToWorker {
     Abandon {
         token: PreparedToken,
     },
+    /// Someone said a line after a reminder was said (29e7, 2 Nov): one
+    /// said late is noticed ([`lamp_schedule::protocol::Request::Noticed`]).
+    Noticed {},
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -326,6 +419,11 @@ pub(crate) struct Reminders {
     /// The attempt last said to be owed while the microphones are off
     /// ([`Self::owed_while_muted`]), so the journal says it once for each.
     owed_told: Option<PreparedToken>,
+    /// When a reminder's completion was last sent, until a line is heard
+    /// after it ([`Self::heard`]).
+    said_at_us: Option<u64>,
+    /// A line was heard after a reminder: Schedule is to be told.
+    notice_owed: bool,
 }
 impl Reminders {
     pub fn from_environment() -> io::Result<Option<Self>> {
@@ -346,7 +444,21 @@ impl Reminders {
             failed: false,
             by_skill,
             owed_told: None,
+            said_at_us: None,
+            notice_owed: false,
         }))
+    }
+
+    /// Someone's line was last heard at `said_at_us`: one heard after a
+    /// reminder was said is their answer to it, so a reminder said late
+    /// no longer waits for one (29e7, 2 Nov).
+    pub fn heard(&mut self, said_at_us: Option<u64>) {
+        if let (Some(said), Some(heard)) = (self.said_at_us, said_at_us)
+            && heard > said
+        {
+            self.said_at_us = None;
+            self.notice_owed = true;
+        }
     }
 
     /// Whether a due reminder waits for a skill's ask (`LAMP_SCHEDULE_SPEAK=skill`).
@@ -453,7 +565,13 @@ impl Reminders {
                 && let Some(settlement) = &state.settlement
             {
                 self.sent = self.transport.send(settlement)?;
+                if self.sent && matches!(settlement, ToWorker::Complete { .. }) {
+                    self.said_at_us = Some(now_us);
+                }
             }
+        }
+        if self.notice_owed && self.transport.send(&ToWorker::Noticed {})? {
+            self.notice_owed = false;
         }
         if !self.sent
             && let Some(settlement) = &self.unadmitted
