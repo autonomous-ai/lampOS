@@ -3263,6 +3263,15 @@ pub fn serve(
         );
     }
     engine = engine.asking_again_for_no_words(no_words_again);
+    // A cut-in that ended the lamp's answer with no words is asked "Did
+    // someone say something?" (`LAMP_CUT_IN_WORDLESS_ASKS=on`).
+    let wordless_asks = crate::cut_in_wordless::on();
+    if wordless_asks {
+        eprintln!(
+            "lamp-voice second: a cut-in that ended the lamp's answer with no words, in a quiet room, is answered with one short question, the model not asked (LAMP_CUT_IN_WORDLESS_ASKS)"
+        );
+    }
+    engine = engine.asking_after_wordless_cut_ins(wordless_asks);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
@@ -5470,6 +5479,9 @@ pub(crate) struct Heeding {
     /// The newest request, if it began over the lamp's own answer (its
     /// Start's `over_the_lamps_voice`), as [`Self::hear`] is told.
     began_over: Option<u64>,
+    /// The line begun within `spoken_stop::JUST_AFTER` of the lamp's
+    /// answer's end, not over it: a stop in it is said to the lamp too.
+    began_just_after: Option<u64>,
     /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
     /// [`Self::checking_the_voice`]), as the Live worker keeps it.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
@@ -6368,6 +6380,7 @@ impl Heeding {
             held_colleagues: held_colleagues::HeldColleagues::default(),
             sure_other_samples: CARRY_SURE_OTHER_SPEECH_SAMPLES,
             began_over: None,
+            began_just_after: None,
             voices: None,
             voice_ends_going_on: false,
             named_always: false,
@@ -7316,9 +7329,15 @@ impl Heeding {
         } = heard
         {
             self.began_over = over_the_lamps_voice.then_some(request);
+            self.began_just_after = (!over_the_lamps_voice
+                && self.said_until_us.is_some_and(|until_us| {
+                    crate::spoken_stop::just_after(monotonic_us(), until_us)
+                }))
+            .then_some(request);
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
+            self.began_just_after = None;
         }
         let Some(voices) = self.voices.as_mut() else {
             return;
@@ -9192,8 +9211,9 @@ impl Heeding {
         let mut verdict =
             attention.first_output_busy(request, seen.room, seen.going_on, self.strict, turned);
         let alone = attention.played_on_the_conversation_alone();
+        // Or just after its answer ended (Sixth's item 6 on #4710).
         let stop_over_the_lamp = self.spoken_stops
-            && self.began_over == Some(request)
+            && (self.began_over == Some(request) || self.began_just_after == Some(request))
             && crate::spoken_stop::is_stop_request(heard);
         if alone && lone_words(heard) && !stop_over_the_lamp {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
@@ -24789,6 +24809,17 @@ mod tests {
                 held.then_some(super::LONE_WORDS),
                 "{switch} {over}"
             );
+        }
+        // Sixth's item 6 on #4710: "Stop them." begun just after the lamp's
+        // answer ended is said to the lamp too; begun long after, the room's.
+        // ("Stop Lamp." names the lamp, and is let out by its name anyway.)
+        for (just_after, held) in [(true, false), (false, true)] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.hearing_spoken_stops();
+            heeding.began_just_after = just_after.then_some(9);
+            let verdict = heeding.judge(9, line, "Stop them.", signs(true, false));
+            assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{just_after}");
         }
         // In a busy room too, with someone else at the desk (the
         // Reviewer-lead's P2 on #4019): not held as `BUSY_SHORT`.
