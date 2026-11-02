@@ -188,8 +188,8 @@ fn catalog_body_and_core_metadata_follow_filtered_duplicate_tool_winners() {
         tools_file_with_requested_audio(&inventory, false),
         json!({
             "tools":[
-                {"name":"quiet_note","description":"quiet-first"},
                 {"name":"play_fixture","description":"media-fallback"},
+                {"name":"quiet_note","description":"quiet-first"},
                 {"name":"small_stretch","description":"body-first"}
             ],
             "body":["small_stretch"],
@@ -201,8 +201,8 @@ fn catalog_body_and_core_metadata_follow_filtered_duplicate_tool_winners() {
         tools_file_with_requested_audio(&inventory, true),
         json!({
             "tools":[
-                {"name":"quiet_note","description":"quiet-first"},
                 {"name":"play_fixture","description":"Play the requested local fixture."},
+                {"name":"quiet_note","description":"quiet-first"},
                 {"name":"small_stretch","description":"body-first"}
             ],
             "body":["play_fixture", "small_stretch"],

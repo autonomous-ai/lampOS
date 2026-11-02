@@ -239,11 +239,11 @@ break, already on, also waits while a head is down (reading, writing) and
 lets that sitting's stretch go if they don't look up within its ten minutes. Music sway reads
 the ears' sound classes, which stay off in the product until YAMNet's
 weights may be shipped (sound-events.md), so until then it never sways.
-Eight core skills not yet tried on a lamp are
+Seven core skills not yet tried on a lamp are
 installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Light out
 when you leave (#1677, [presence.md](presence.md), which must never take the
 light of someone reading face down), Light scenes, Point the light and Light
-show (#1679), Pose (#4135), whose stand needs `LAMP_BODY_POSE_ASK=on`,
+show (#1679),
 Smoky air and Dusty air
 (#1684), until they are measured for false alarms on real traces, and
 Feelings (#3691), which needs Mood on (`LAMP_MOOD=on`, trial-only). Install
@@ -284,9 +284,10 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp has 39 functions of its own: the voice's own 21 (with
+product lamp has 40 functions of its own: the voice's own 21 (with
 `LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them),
-the actions part's 17 and Dance's (`PRODUCT_FUNCTIONS` in
+the actions part's 17, Dance's and Pose's `set_pose`, which comes with the
+product since #4135 (`PRODUCT_FUNCTIONS` in
 `crates/update/tests/functions.rs`, which fails if one is left out or the
 count changes). On the product's route a chat request takes 48
 (`second_provider::MAX_TOOLS`), and each offers every one, with the

@@ -429,15 +429,16 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 39 of the lamp's own
+unit sets it: a product lamp's chat request offers 40 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 21 with these two among them, the actions part's 17 and Dance's
-`dance`. At the bound a core skill's function is never the one cut (the
+voice's own 21 with these two among them, the actions part's 17, Dance's
+`dance` and Pose's `set_pose` (#4135). At the bound a core skill's function is never the one cut (the
 owner's rule, on #2614; [install.md](install.md)), and on the chat route
 neither is `reports_stop` nor any of the actions part's (the first builder,
 on #2644): the cut takes the second route's fetch, then its time
 elsewhere, then `reports_state` (reading reports' state is rare), then the
-skills' functions that are not a core skill's, the last first, then the
+skills' functions that are not a core skill's, the last first (the skills'
+tools file lists them by name, `lamp_skills::tools_file`), then the
 weather, then the search (`chat_cut`). A Live session's bound is 32
 (`lamp_gemini::MAX_TOOLS`); the second route's chat requests have their
 own, 48 (`second_provider::MAX_TOOLS`, 22 Oct: Live's bound had left out
