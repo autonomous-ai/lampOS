@@ -128,14 +128,26 @@ pub fn again(error: &net::Error) -> bool {
     match error {
         net::Error::Status(status) => *status == 404 || (500..600).contains(status),
         net::Error::Timeout(_) | net::Error::Transport(_) => true,
-        net::Error::Url | net::Error::Protocol(_) => false,
+        // The relay's stream cut before its end (lamp-9adf, 2 Nov 17:49):
+        // a broken connection by another name.
+        net::Error::Protocol(what) => *what == CUT,
+        net::Error::Url => false,
     }
 }
 
 /// The model's answer to `brief`, its text whole, asked once more when
 /// [`again`] says so.
 pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
-    match write_once(chat, brief).await {
+    // An answer whose last fence never closed was cut short too (17:48:
+    // "its answer was cut off"): asked once more, as a broken stream.
+    let once = write_once(chat, brief).await.and_then(|text| {
+        if fences_closed(&text) {
+            Ok(text)
+        } else {
+            Err(net::Error::Protocol(CUT))
+        }
+    });
+    match once {
         Err(error) if again(&error) => {
             eprintln!(
                 "lamp-voice: a skill made here: the model's answer failed ({error}); asked once more"
@@ -144,6 +156,19 @@ pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
         }
         answer => answer,
     }
+}
+
+/// The chat client's word for a stream that ended before its end.
+const CUT: &str = "chat stream cut";
+
+/// Whether every fenced block the answer opened is closed: an even,
+/// non-zero count of fences.
+fn fences_closed(text: &str) -> bool {
+    let fences = text
+        .lines()
+        .filter(|line| line.trim_start().starts_with("```"))
+        .count();
+    fences > 0 && fences % 2 == 0
 }
 
 async fn write_once(chat: &Chat, brief: &str) -> net::Result<String> {
@@ -749,6 +774,22 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let made = made_skill::keep(EXAMPLE, false, "local:1", &keeping).unwrap();
         assert_eq!(made.name, "water-on-return");
         assert!(system().contains(EXAMPLE));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 2 Nov 17:48: an answer cut before its last fence closed
+    /// is asked once more, as a cut stream is; the whole one is kept.
+    #[test]
+    fn an_answer_cut_before_its_last_fence_is_asked_once_more() {
+        let (root, keeping) = keeping("cut");
+        let whole = good();
+        let cut = whole[..whole.rfind("```").unwrap()].to_owned();
+        assert!(!fences_closed(&cut) && fences_closed(&whole));
+        assert!(again(&net::Error::Protocol(CUT)));
+        let (url, served) = service(vec![(200, cut), (200, whole)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
         let _ = std::fs::remove_dir_all(&root);
     }
 
