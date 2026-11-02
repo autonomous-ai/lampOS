@@ -44,6 +44,62 @@ pub struct Lit {
     level: u8,
 }
 
+/// The most flashes of a computer's pixels in any [`FLASH_WINDOW_US`]: the
+/// photosensitive-epilepsy limit (three a second), kept by the ring itself
+/// ([`Face::pixels`]).
+pub const FLASHES_A_SECOND: u8 = 3;
+const FLASH_WINDOW_US: u64 = 1_000_000;
+/// A change of the ring's mean brightness this large, as a share of full,
+/// is one swing of a flash: a tenth, as the guidelines count a flash. It is
+/// measured from the last peak or trough, never frame to frame, so a swing
+/// made of small steps is one swing all the same (Thirteen's P2 on #4943).
+pub const SWING_SHARE: f32 = 0.1;
+
+/// The ring's mean brightness, 0 to 1, as the eye weighs the channels.
+fn mean_brightness(pixels: &[Rgb; PIXEL_COUNT]) -> f32 {
+    let sum: f32 = pixels
+        .iter()
+        .map(|p| {
+            0.2126 * f32::from(p.red) + 0.7152 * f32::from(p.green) + 0.0722 * f32::from(p.blue)
+        })
+        .sum();
+    sum / (PIXEL_COUNT as f32 * 255.0)
+}
+
+/// The ring's mean brightness as a share of the frame's `ceiling`, the
+/// ring's full: frames drawn under one ceiling compare as the given colours
+/// would.
+fn brightness_share(pixels: &[Rgb; PIXEL_COUNT], ceiling: u8) -> f32 {
+    mean_brightness(pixels) * 255.0 / f32::from(ceiling.max(1))
+}
+
+/// Whether a quarter of the ring or more is a saturated red: red at least
+/// four fifths of each pixel's light and at least half of `ceiling`, the
+/// flash the guidelines limit at any brightness.
+fn saturated_red(pixels: &[Rgb; PIXEL_COUNT], ceiling: u8) -> bool {
+    let half = u16::from(ceiling.max(1)).div_ceil(2);
+    let red = pixels
+        .iter()
+        .filter(|p| {
+            let total = u16::from(p.red) + u16::from(p.green) + u16::from(p.blue);
+            u16::from(p.red) >= half && u16::from(p.red) * 5 >= total * 4
+        })
+        .count();
+    red * 4 >= PIXEL_COUNT
+}
+
+/// The ring's light at rest as the flash bound follows it
+/// ([`Face::flash_safe`]): the last frame drawn, the brightness of the last
+/// turn (a peak or a trough) and the furthest since, and whether it was a
+/// saturated red.
+#[derive(Clone, Copy, Debug)]
+struct Shown {
+    frame: [Rgb; PIXEL_COUNT],
+    turn: f32,
+    extreme: f32,
+    red: bool,
+}
+
 /// How many levels a light has.
 pub const LEVELS: u8 = 5;
 /// The glow of each level as a share of the ceiling, and how much a slow
@@ -270,6 +326,14 @@ pub struct Face {
     /// ([`Face::skill_light`]).
     tints_speaking: bool,
     held: Option<Lit>,
+    /// A light's own pixels, drawn as given at rest ([`Face::pixels`]).
+    pixels: Option<[Rgb; PIXEL_COUNT]>,
+    /// The ring's light last drawn at rest, whatever drew it, and when each
+    /// of the last swings of it (a flash's half) began ([`Face::flash_safe`]).
+    rest_shown: Option<Shown>,
+    swings: std::collections::VecDeque<u64>,
+    /// Whether the last frame was a light's own pixels.
+    drew_own: bool,
 }
 
 impl Default for Face {
@@ -306,6 +370,10 @@ impl Face {
             breath: None,
             tints_speaking: false,
             held: None,
+            pixels: None,
+            rest_shown: None,
+            swings: std::collections::VecDeque::new(),
+            drew_own: false,
         }
     }
 
@@ -373,6 +441,98 @@ impl Face {
     /// Speaking again, eased like any other change.
     pub fn skill_light(&mut self, held: Option<Lit>) {
         self.held = held;
+    }
+
+    /// A light's own pixels, red, green and blue from 0 to 255
+    /// ([`crate::ring_light::RingLight::pixels`]): at rest the face draws
+    /// them as given, each channel scaled to the frame's ceiling, in place
+    /// of its eye, breath and the light's colour. A turn's faces and a
+    /// tap's listening are drawn as ever over them. Anything but the ring's
+    /// own count of pixels is none.
+    pub fn pixels(&mut self, pixels: Option<&[[u8; 3]]>) {
+        self.pixels = pixels.and_then(|given| {
+            let given: &[[u8; 3]; PIXEL_COUNT] = given.try_into().ok()?;
+            Some(given.map(|[red, green, blue]| Rgb::new(red, green, blue)))
+        });
+    }
+
+    /// Whether the last frame drawn was a light's own pixels: a computer's,
+    /// which a mark is kept apart from ([`crate::ring_mark::marked_apart`]).
+    /// Not while a tap's listening face is drawn over them (Thirteen's P3 on
+    /// #4943).
+    pub fn draws_own_pixels(&self) -> bool {
+        self.drew_own
+    }
+
+    /// The given frame if drawing it now keeps the ring within the
+    /// photosensitive limit, else the one already shown (the local leader's
+    /// one physical bound on a computer's pixels, 2 Nov): at most
+    /// [`FLASHES_A_SECOND`] flashes in any second, a flash being two swings
+    /// of the ring's light at rest. A swing is its mean brightness turning
+    /// back by [`SWING_SHARE`] of the ceiling or more from its last peak or
+    /// trough, however small each step, or going into or out of a saturated
+    /// red ([`saturated_red`]), whatever its brightness. Every resting frame
+    /// counts and is held, whatever drew it, so a computer's pixels
+    /// alternating with a named light are held too (Thirteen's P2s on #4943).
+    /// The lamp's own light never swings three times a second, so only a
+    /// computer's blink is ever held. It comes out at that pace at most,
+    /// never faster; a change too small to be a swing is drawn at once, and
+    /// so is a fade that only goes one way.
+    fn flash_safe(
+        &mut self,
+        wanted: [Rgb; PIXEL_COUNT],
+        now_us: u64,
+        ceiling: u8,
+    ) -> [Rgb; PIXEL_COUNT] {
+        let share = brightness_share(&wanted, ceiling);
+        let red = saturated_red(&wanted, ceiling);
+        let Some(shown) = self.rest_shown else {
+            self.rest_shown = Some(Shown {
+                frame: wanted,
+                turn: share,
+                extreme: share,
+                red,
+            });
+            return wanted;
+        };
+        if shown.frame == wanted {
+            return wanted;
+        }
+        // Going the same way as since the last turn (or still at it): the
+        // furthest so far. Turning back by a swing's share: a swing, and the
+        // furthest point is the new turn.
+        let rising = shown.extreme >= shown.turn;
+        let onward = if rising {
+            share >= shown.extreme
+        } else {
+            share <= shown.extreme
+        };
+        let turned = !onward && (share - shown.extreme).abs() >= SWING_SHARE;
+        let mut next = Shown {
+            frame: wanted,
+            turn: shown.turn,
+            extreme: if onward { share } else { shown.extreme },
+            red,
+        };
+        if turned {
+            next.turn = shown.extreme;
+            next.extreme = share;
+        }
+        if turned || red != shown.red {
+            while self
+                .swings
+                .front()
+                .is_some_and(|at| now_us.saturating_sub(*at) >= FLASH_WINDOW_US)
+            {
+                self.swings.pop_front();
+            }
+            if self.swings.len() >= usize::from(FLASHES_A_SECOND) * 2 {
+                return shown.frame;
+            }
+            self.swings.push_back(now_us);
+        }
+        self.rest_shown = Some(next);
+        wanted
     }
 
     /// Switch the eye on or off ([`Face::eye`]'s field says what it does).
@@ -462,6 +622,22 @@ impl Face {
         now_us: u64,
         ceiling: u8,
     ) -> [Rgb; PIXEL_COUNT] {
+        self.drew_own = false;
+        let frame = self.render_face(mood, level, now_us, ceiling);
+        if mood != Mood::Resting {
+            return frame;
+        }
+        // Every resting frame goes through the flash bound.
+        self.flash_safe(frame, now_us, ceiling)
+    }
+
+    fn render_face(
+        &mut self,
+        mood: Mood,
+        level: u8,
+        now_us: u64,
+        ceiling: u8,
+    ) -> [Rgb; PIXEL_COUNT] {
         // The first frame counts as one ordinary step from dark, so that the
         // very first thing shown is already visible.
         let step_us = self.last_us.map_or(FIRST_STEP_US, |last| {
@@ -493,6 +669,21 @@ impl Face {
             self.let_go_us = Some(now_us);
         }
         self.mood = Some(mood);
+        if mood == Mood::Resting
+            && since_tap_window.is_none()
+            && let Some(pixels) = self.pixels
+        {
+            self.drew_own = true;
+            let scale = |channel: u8| ((u16::from(channel) * u16::from(ceiling) + 127) / 255) as u8;
+            let mut drawn = pixels
+                .map(|pixel| Rgb::new(scale(pixel.red), scale(pixel.green), scale(pixel.blue)));
+            // The camera mark's pixel is never a computer's red, so no
+            // computer can draw a mark when the camera is off (Thirteen's P2
+            // on #4943): its red goes no higher than its green or blue.
+            let top = &mut drawn[crate::ring_mark::MARK_PIXEL];
+            top.red = top.red.min(top.green.max(top.blue));
+            return drawn;
+        }
         let since_let_go = self
             .let_go_us
             .map(|at| now_us.saturating_sub(at))
@@ -2273,5 +2464,186 @@ mod tests {
             assert_eq!(share(level), LEVEL_GLOW[index - 1].0 / LEVEL_GLOW[index].0);
             assert!((0.2..1.0).contains(&share(level)), "{level}");
         }
+    }
+
+    /// A paired computer's own pixels (docs/control.md, `light` with `rgb`
+    /// or `pixels`) are drawn as given at rest, each channel scaled to the
+    /// frame's ceiling; a turn's face draws over them, and they come back
+    /// at rest; none, the face as before.
+    #[test]
+    fn a_lights_own_pixels_are_drawn_at_rest_under_the_ceiling() {
+        let mut face = Face::default();
+        let mut given = [[0u8; 3]; PIXEL_COUNT];
+        given[0] = [255, 0, 0];
+        given[5] = [0, 255, 128];
+        given[31] = [255, 255, 255];
+        face.pixels(Some(&given));
+        let drawn = face.render(Mood::Resting, 0, 1_000_000, 120);
+        // Pixel 0, the camera mark's, never shows a computer's red.
+        assert_eq!(drawn[0], Rgb::BLACK);
+        assert_eq!(drawn[5], Rgb::new(0, 120, 60));
+        assert_eq!(drawn[31], Rgb::new(120, 120, 120));
+        assert_eq!(drawn[1], Rgb::BLACK);
+        // At night's ceiling, the same pixels dimmer, never over it.
+        let night = face.render(Mood::Resting, 0, 1_100_000, 40);
+        assert_eq!(night[31], Rgb::new(40, 40, 40));
+        // A turn's face is its own.
+        let listening = face.render(Mood::Listening, 0, 1_200_000, 120);
+        assert_ne!(listening, drawn);
+        assert_eq!(face.render(Mood::Resting, 0, 1_300_000, 120), drawn);
+        // Not the ring's count: none.
+        face.pixels(Some(&given[..31]));
+        assert_ne!(face.render(Mood::Resting, 0, 1_400_000, 120), drawn);
+        face.pixels(None);
+        assert_ne!(face.render(Mood::Resting, 0, 1_500_000, 120), drawn);
+    }
+
+    /// The one physical bound on a computer's pixels: a blink faster than
+    /// three flashes a second is held to that pace by the ring; a slow one,
+    /// a small change and a single pixel's blink are drawn as asked.
+    #[test]
+    fn a_computers_blink_is_held_to_three_flashes_a_second() {
+        let white = [[255u8; 3]; PIXEL_COUNT];
+        let dark = [[0u8; 3]; PIXEL_COUNT];
+        let mut face = Face::default();
+        // Ten frames a second, white and dark in turn, for two seconds.
+        let mut swings = 0;
+        let mut last = None;
+        for step in 0..20u64 {
+            face.pixels(Some(if step % 2 == 0 { &white } else { &dark }));
+            let drawn = face.render(Mood::Resting, 0, 1_000_000 + step * 100_000, 120);
+            if last.is_some_and(|last| last != drawn) {
+                swings += 1;
+            }
+            last = Some(drawn);
+        }
+        // At most six swings (three flashes) in each second.
+        assert!(swings <= 12, "{swings} swings in 2 s");
+        assert!(swings >= 6, "{swings}: it still blinks, at the limit");
+        // A blink at two a second (four swings a second) is drawn as asked.
+        let mut face = Face::default();
+        let mut swings = 0;
+        let mut last = None;
+        for step in 0..8u64 {
+            face.pixels(Some(if step % 2 == 0 { &white } else { &dark }));
+            let drawn = face.render(Mood::Resting, 0, 1_000_000 + step * 250_000, 120);
+            if last.is_some_and(|last| last != drawn) {
+                swings += 1;
+            }
+            last = Some(drawn);
+        }
+        assert_eq!(swings, 7);
+        // One pixel blinking fast is not a flash of the ring.
+        let mut one = dark;
+        one[3] = [255, 255, 255];
+        let mut face = Face::default();
+        let mut changes = 0;
+        let mut last = None;
+        for step in 0..20u64 {
+            face.pixels(Some(if step % 2 == 0 { &one } else { &dark }));
+            let drawn = face.render(Mood::Resting, 0, 1_000_000 + step * 50_000, 120);
+            if last.is_some_and(|last| last != drawn) {
+                changes += 1;
+            }
+            last = Some(drawn);
+        }
+        assert_eq!(changes, 19);
+    }
+
+    #[test]
+    fn a_saturated_red_flash_counts_however_dim() {
+        let mut dim_red = [[0u8; 3]; PIXEL_COUNT];
+        for pixel in dim_red.iter_mut().take(16) {
+            *pixel = [140, 0, 0];
+        }
+        let dark = [[0u8; 3]; PIXEL_COUNT];
+        assert!(saturated_red(&wrap(&dim_red), 255) && !saturated_red(&wrap(&dark), 255));
+        // Under a tenth of the ring's brightness, but red: still limited.
+        assert!(mean_brightness(&wrap(&dim_red)) < SWING_SHARE);
+        let mut face = Face::default();
+        let mut swings = 0;
+        let mut last = None;
+        for step in 0..20u64 {
+            face.pixels(Some(if step % 2 == 0 { &dim_red } else { &dark }));
+            let drawn = face.render(Mood::Resting, 0, 1_000_000 + step * 100_000, 120);
+            if last.is_some_and(|last| last != drawn) {
+                swings += 1;
+            }
+            last = Some(drawn);
+        }
+        assert!(swings <= 12, "{swings}");
+    }
+
+    /// The swings of the ring's light drawn at rest, as the flash bound
+    /// counts them: its brightness turning back by a swing's share or more
+    /// from the last peak or trough.
+    fn turns(frames: &[[Rgb; PIXEL_COUNT]], ceiling: u8) -> usize {
+        let mut count = 0;
+        let mut turn = None::<(f32, f32)>;
+        for frame in frames {
+            let share = brightness_share(frame, ceiling);
+            let (at, extreme) = *turn.get_or_insert((share, share));
+            let rising = extreme >= at;
+            if (rising && share >= extreme) || (!rising && share <= extreme) {
+                turn = Some((at, share));
+            } else if (share - extreme).abs() >= SWING_SHARE {
+                count += 1;
+                turn = Some((extreme, share));
+            }
+        }
+        count
+    }
+
+    /// Thirteen's first P2 on #4943: a computer's pixels alternating with a
+    /// named light, each frame a new request, are held to three flashes a
+    /// second like a blink of pixels alone; the bound follows the frame
+    /// drawn, whatever drew it.
+    #[test]
+    fn pixels_alternating_with_a_named_light_are_held_too() {
+        let white = [[255u8; 3]; PIXEL_COUNT];
+        let mut face = Face::default();
+        let mut drawn = Vec::new();
+        for step in 0..40u64 {
+            face.pixels((step % 2 == 0).then_some(&white[..]));
+            drawn.push(face.render(Mood::Resting, 0, 1_000_000 + step * 50_000, 120));
+        }
+        let swings = turns(&drawn, 120);
+        assert!(swings <= 12, "{swings} swings in 2 s");
+        assert!(swings >= 6, "{swings}: it still blinks, at the limit");
+    }
+
+    /// Thirteen's second P2 on #4943: a ramp of small steps up and down,
+    /// each under a swing's share, is a flash all the same: held to three a
+    /// second. A fade one way only is drawn as asked.
+    #[test]
+    fn a_ramp_of_small_steps_is_held_and_a_fade_one_way_is_not() {
+        let grey = |level: u8| [[level; 3]; PIXEL_COUNT];
+        let ramp = [0u8, 0x18, 0x30, 0x48, 0x30, 0x18];
+        let mut face = Face::default();
+        let mut drawn = Vec::new();
+        for step in 0..80u64 {
+            face.pixels(Some(&grey(ramp[step as usize % ramp.len()])[..]));
+            drawn.push(face.render(Mood::Resting, 0, 1_000_000 + step * 25_000, 120));
+        }
+        let swings = turns(&drawn, 120);
+        assert!(swings <= 12, "{swings} swings in 2 s");
+        // Dark to full white in a quarter of a second: every step drawn.
+        let mut face = Face::default();
+        let mut last = None;
+        let mut changes = 0;
+        for step in 0..=10u64 {
+            let level = (step * 25) as u8;
+            face.pixels(Some(&grey(level)[..]));
+            let frame = face.render(Mood::Resting, 0, 1_000_000 + step * 25_000, 120);
+            if last.is_some_and(|last| last != frame) {
+                changes += 1;
+            }
+            last = Some(frame);
+        }
+        assert_eq!(changes, 10);
+    }
+
+    fn wrap(given: &[[u8; 3]; PIXEL_COUNT]) -> [Rgb; PIXEL_COUNT] {
+        given.map(|[r, g, b]| Rgb::new(r, g, b))
     }
 }

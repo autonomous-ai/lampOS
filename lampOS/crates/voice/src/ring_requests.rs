@@ -197,11 +197,41 @@ mod tests {
             light: Light::new(true, colour, 3).unwrap(),
             pattern: None,
             fade_ms: None,
+            pixels: None,
         }
     }
 
     fn colour(requests: &Requests, now_us: u64) -> Option<&str> {
         requests.light(now_us).map(|light| light.colour.as_str())
+    }
+
+    /// A paired computer's own pixels (lamp-control's `light` with `rgb` or
+    /// `pixels`) come at a skill's priority like its named light, so the
+    /// person's own light wins over them as over any request: asked after
+    /// the pixels began, it is shown, and the pixels stay given way while
+    /// the computer keeps renewing them.
+    #[test]
+    fn the_persons_own_light_wins_over_a_computers_pixels() {
+        let mut requests = Requests::new(BOOT);
+        let mut pixels = request("control:c_1", Priority::Skill, 20 * S, "red");
+        pixels.pixels = Some(vec![[255, 0, 0]; LightRequest::PIXELS]);
+        assert!(requests.take(pixels.clone(), 0, false));
+        assert_eq!(
+            requests
+                .shown(S)
+                .and_then(|shown| shown.pixels.as_ref())
+                .map(Vec::len),
+            Some(32)
+        );
+        requests.person_asked(2 * S);
+        assert!(
+            requests.shown(3 * S).is_none(),
+            "the person's light, not the pixels"
+        );
+        // Renewed without a gap: still given way.
+        pixels.claim.until_us = 25 * S;
+        assert!(requests.take(pixels, 4 * S, false));
+        assert!(requests.shown(5 * S).is_none());
     }
 
     #[test]

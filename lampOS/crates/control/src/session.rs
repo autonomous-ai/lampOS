@@ -1151,6 +1151,7 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
             "say_max_chars": protocol::SAY_MAX_CHARS,
             "sounds": sounds_limits(),
             "quiet_hours": quiet_hours_of(quiet),
+            "ring": ring_limits(),
         });
     }
     json!({
@@ -1168,6 +1169,7 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
         "say_max_chars": protocol::SAY_MAX_CHARS,
         "sounds": sounds_limits(),
         "quiet_hours": quiet_hours_of(quiet),
+        "ring": ring_limits(),
     })
 }
 
@@ -1184,6 +1186,13 @@ fn sounds_limits() -> Value {
         "clips_max": crate::sounds::CLIPS_MOST,
         "store_max_bytes": crate::sounds::STORE_MOST_BYTES,
     })
+}
+
+/// The ring as `light`'s `pixels` see it (docs/control.md, "The ring, pixel
+/// by pixel"): how many pixels, in order around the ring from pixel 0, so a
+/// computer never assumes the count.
+fn ring_limits() -> Value {
+    json!({"pixels": lamp_msgs::LightRequest::PIXELS})
 }
 
 /// A window as hello tells it: `{"from": "22:00", "to": "07:00"}`, or
@@ -2050,6 +2059,8 @@ mod tests {
                 "store_max_bytes": 20_000_000,
             })
         );
+        // The ring's pixel count, for `light`'s `pixels`.
+        assert_eq!(limits["ring"], json!({"pixels": 32}));
         assert!(
             limits["motion"].is_null() && limits["express"].is_null(),
             "{limits}"

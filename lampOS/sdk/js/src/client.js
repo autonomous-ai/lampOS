@@ -97,6 +97,15 @@ function open(host, port, pin) {
   });
 }
 
+// '#rrggbb' from '#rrggbb' or [r, g, b], each 0-255.
+function hex(colour) {
+  if (typeof colour === 'string') return colour;
+  if (!Array.isArray(colour) || colour.length !== 3 || !colour.every((c) => Number.isInteger(c) && c >= 0 && c <= 255)) {
+    throw new LampError(`a colour's channels are 0 to 255: ${JSON.stringify(colour)}`, { code: 'bad_request' });
+  }
+  return `#${colour.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
 function check(op, fields) {
   if (!schema.ops.includes(op)) throw new LampError(`no op ${op} in v${schema.VERSION}`, { code: 'bad_request' });
   const allowed = { name: op === 'gesture' ? schema.gestures : null, colour: schema.colours, pattern: schema.patterns };
@@ -501,6 +510,24 @@ export class Lamp {
   play(name, { wait = false } = {}) { return this.act('play', { name }, wait); }
   joints(lease, withinMs, targets) { return this.act('joints', { lease: lease.id, targets, within_ms: withinMs }); }
   light(colour, level, forMs, pattern) { return this.act('light', { colour, level, pattern, for_ms: forMs }); }
+  // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
+  get ringPixels() { return this.limits.ring?.pixels; }
+  // Light the ring pixel by pixel for `forMs` (30 s at most): one colour per pixel, from pixel 0 around the ring,
+  // each '#rrggbb' or [r, g, b] from 0 to 255, exactly `ringPixels` of them, at `brightness` 0-100 (100 by default).
+  ring(pixels, { forMs, brightness, fadeMs } = {}) {
+    if (this.ringPixels !== undefined && pixels.length !== this.ringPixels) {
+      return Promise.reject(new LampError(`pixels: ${this.ringPixels} of them, one per pixel of the ring`, { code: 'bad_request' }));
+    }
+    let hexed;
+    try { hexed = pixels.map(hex); } catch (error) { return Promise.reject(error); }
+    return this.act('light', { pixels: hexed, brightness, fade_ms: fadeMs, for_ms: forMs });
+  }
+  // The whole ring in one colour of your own, '#rrggbb' or [r, g, b], for `forMs`, at `brightness` 0-100.
+  lightRgb(rgb, { forMs, brightness, fadeMs } = {}) {
+    let colour;
+    try { colour = hex(rgb); } catch (error) { return Promise.reject(error); }
+    return this.act('light', { rgb: colour, brightness, fade_ms: fadeMs, for_ms: forMs });
+  }
   // Say `text` in the lamp's voice, exactly as written, once the person isn't talking; `{ rephrase: true }` lets the
   // lamp's model say it in its own words instead, as before.
   say(text, { rephrase } = {}) { return this.act('say', { text, rephrase: rephrase ? true : undefined }); }

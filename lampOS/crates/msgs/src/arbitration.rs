@@ -80,6 +80,15 @@ pub struct LightRequest {
     /// without fades eases as quickly as ever.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fade_ms: Option<u32>,
+    /// Each of the ring's [`LightRequest::PIXELS`] pixels, red, green and
+    /// blue from 0 to 255, if the asker draws them itself: a paired
+    /// computer's `light` with `rgb` or `pixels` (docs/control.md). The ring
+    /// draws them at rest, under its own channel ceiling, in place of
+    /// `light`'s colour, and without a pattern. `light` still names the
+    /// nearest colour and level, which a ring without pixels shows instead
+    /// and `light/drawn` says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pixels: Option<Vec<[u8; 3]>>,
 }
 
 /// The ways a skill's light may move (#940 item 3), V1's effects judged by
@@ -191,6 +200,8 @@ impl LightRequest {
     /// A fade from a second, longer than any ease of the face, to a minute:
     /// longer is not seen as a fade, only as a light that is not answering.
     pub const FADE_MS: std::ops::RangeInclusive<u32> = 1_000..=60_000;
+    /// The ring's pixels, as `pixels` gives them.
+    pub const PIXELS: usize = 32;
 
     /// Each request is a message of its own: several askers share the topic.
     pub fn declaration() -> Declaration {
@@ -208,6 +219,18 @@ impl LightRequest {
                 Self::FADE_MS.start(),
                 Self::FADE_MS.end()
             )));
+        }
+        if let Some(pixels) = &self.pixels {
+            if pixels.len() != Self::PIXELS {
+                return Err(Invalid(format!(
+                    "{} pixels: the ring has {}",
+                    pixels.len(),
+                    Self::PIXELS
+                )));
+            }
+            if self.pattern.is_some() {
+                return Err(Invalid("pixels are drawn as given, with no pattern".into()));
+            }
         }
         match &self.pattern {
             Some(_) if !self.light.on => Err(Invalid("a light that is off has no pattern".into())),
@@ -480,6 +503,7 @@ mod tests {
             light: Light::new(true, "warm", 3).unwrap(),
             pattern: None,
             fade_ms: None,
+            pixels: None,
         };
         let text = serde_json::to_string(&request).unwrap();
         assert_eq!(
@@ -518,6 +542,7 @@ mod tests {
             light: Light::new(true, "warm", 3).unwrap(),
             pattern: Some(breath),
             fade_ms: None,
+            pixels: None,
         };
         let text = serde_json::to_string(&request).unwrap();
         assert!(
@@ -593,6 +618,7 @@ mod tests {
             light: Light::new(false, "warm", 3).unwrap(),
             pattern: None,
             fade_ms: Some(30_000),
+            pixels: None,
         };
         let text = serde_json::to_string(&out).unwrap();
         assert!(text.ends_with(",\"fade_ms\":30000}"), "{text}");

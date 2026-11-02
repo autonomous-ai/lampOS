@@ -310,14 +310,32 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
         Op::Move { step_ms, frames } => format!("{} frames, step_ms {step_ms}", frames.len()),
         Op::Express { feeling, strength } => format!("{}, strength {strength:.2}", word(feeling)),
         Op::Light {
-            colour,
+            colour: Some(colour),
             level,
             pattern,
             for_ms,
+            ..
         } => format!(
-            "{}, level {level}, {}, for_ms {for_ms}",
+            "{}, level {}, {}, for_ms {for_ms}",
             word(colour),
+            level.unwrap_or_default(),
             pattern.as_ref().map_or("steady".to_owned(), named)
+        ),
+        // A computer's own colours are not words: their form and count only.
+        Op::Light {
+            rgb,
+            pixels,
+            brightness,
+            for_ms,
+            ..
+        } => format!(
+            "{}, brightness {}, for_ms {for_ms}",
+            match (rgb, pixels) {
+                (Some(_), _) => "one rgb".to_owned(),
+                (_, Some(pixels)) => format!("{} pixels", pixels.len()),
+                _ => "nothing".to_owned(),
+            },
+            brightness.unwrap_or(100)
         ),
         Op::Look { at } => match at {
             LookAt::Target(target) => named(target),

@@ -1811,3 +1811,25 @@ def test_a_turns_prompt_is_summarised_in_the_debug_log_as_a_says_text():
     assert shown["prompt"] == debug.redact({"text": "Build passed."})["text"]
     assert debug.redact({"re": 2, "ok": True, "turn": "ended", "started": 1}) == {"re": 2, "ok": True, "turn": "ended", "started": 1}
     assert debug.redact({"re": 3, "ok": True, "mute": "held"}) == {"re": 3, "ok": True, "mute": "held"}
+
+
+def test_the_ring_is_lit_pixel_by_pixel_and_in_one_colour_of_ones_own(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                assert lamp.ring_pixels == 32
+                pixels = ["#000000"] * 32
+                pixels[0] = (255, 0, 0)
+                said = await lamp.ring(pixels, for_ms=3000, brightness=50)
+                assert (said["to"], said["pixels"]) == ("ring", 32)
+                assert (await lamp.light_rgb((0, 0, 255), for_ms=1000))["to"] == "ring"
+                asked = fake.asked("light")
+                assert asked[0]["pixels"][0] == "#ff0000" and asked[0]["brightness"] == 50
+                assert asked[1] == {"rgb": "#0000ff", "for_ms": 1000}
+                for wrong in (["#000000"] * 31, [(256, 0, 0)] * 32):
+                    with pytest.raises(LampError) as refused:
+                        await lamp.ring(wrong, for_ms=1000)
+                    assert refused.value.code == "bad_request"
+
+    run(go())

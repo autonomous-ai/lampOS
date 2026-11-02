@@ -50,6 +50,10 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `level` | integer | 1 to 5 | 3 | | |
 | | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
+| `lamp_ring` | `pixels` | list of strings | one `#rrggbb` per pixel, from pixel 0 around the ring, the lamp's count of them (`ring_pixels` in the answer). Exactly one of `pixels` or `rgb` | none | light | no |
+| | `rgb` | string | one `#rrggbb` for the whole ring | none | | |
+| | `brightness` | integer | 0 to 100 of the given colours, under the ring's own ceiling | 100 | | |
+| | `for_ms` | integer | milliseconds; more than 30000 lights 30000 | 10000 | | |
 | `lamp_say` | `text` | string, required | 300 characters at most, said exactly as written once the person isn't talking | — | speak | no |
 | | `rephrase` | boolean | `true`: the lamp says it in its own words instead | `false` | | |
 | `lamp_sound` | `name` | string, required | `hum`, the lamp's own short hum, or one of this computer's clips (`lamp_upload_sound`), played once the person isn't talking; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |

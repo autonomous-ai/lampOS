@@ -796,6 +796,7 @@ fn service(
             face.fade(light.fade(), at);
             face.tints_speaking(light.tints_speaking());
             face.skill_light(light.held());
+            face.pixels(light.pixels());
         }
         if let Some(mood) = mood.as_mut() {
             face.breath(mood.tick(at));
@@ -814,7 +815,7 @@ fn service(
                 .as_ref()
                 .filter(|_| face.lit().on && warning.is_none())
                 .and_then(|unplug| unplug.prepare(at));
-            if let Some(pixels) = warning {
+            if let RestWins::Warning(pixels) = rest_wins(warning, presentation.is_some()) {
                 ring.show_resting(&pixels, ceiling)
                     .map_err(io::Error::other)?;
             } else if let (Some(unplug), Some(presentation)) =
@@ -847,10 +848,15 @@ fn service(
                 if share > 0.0 {
                     pixels = crate::ring_night::over(&pixels, share, at);
                 }
-                // A computer's mark over all of it, night included.
+                // A computer's mark over all of it, night included; kept
+                // apart from a computer's own pixels, so they can't hide it.
                 let marked = marks.as_mut().is_some_and(|marks| marks.shown(at));
                 if marked {
-                    pixels = crate::ring_mark::marked(pixels);
+                    pixels = if face.draws_own_pixels() {
+                        crate::ring_mark::marked_apart(pixels)
+                    } else {
+                        crate::ring_mark::marked(pixels)
+                    };
                 }
                 let own_light = face.rests_on_its_light(at);
                 let painted = rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
@@ -867,6 +873,25 @@ fn service(
         if let Some(wait) = TICK_US.checked_sub(monotonic_us().saturating_sub(tick)) {
             std::thread::sleep(Duration::from_micros(wait));
         }
+    }
+}
+
+/// What a resting frame shows, first that holds: the shutdown's warning,
+/// then the unplug's presentation, then the face, whose own light may be a
+/// paired computer's pixels (docs/control.md, "The ring, pixel by pixel").
+/// So nothing a computer asks for covers the warning or the unplug.
+#[derive(Debug, PartialEq)]
+enum RestWins {
+    Warning([lamp_ring::Rgb; PIXEL_COUNT]),
+    Unplug,
+    Face,
+}
+
+fn rest_wins(warning: Option<[lamp_ring::Rgb; PIXEL_COUNT]>, unplugging: bool) -> RestWins {
+    match (warning, unplugging) {
+        (Some(pixels), _) => RestWins::Warning(pixels),
+        (None, true) => RestWins::Unplug,
+        (None, false) => RestWins::Face,
     }
 }
 
@@ -1090,6 +1115,94 @@ mod drawn_tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// A paired computer's pixels reach the ring only as a resting frame:
+    /// with the privacy switch closed (the mute's red breath is the privacy
+    /// worker's, `privacy_indicator.rs`) or a turn owning the lamp, the ring
+    /// writes nothing of them, so they can never cover either.
+    #[test]
+    fn a_computers_pixels_are_never_drawn_while_muted_or_in_a_turn() {
+        let mut face = Face::default();
+        face.pixels(Some(&[[255, 0, 0]; PIXEL_COUNT]));
+        let pixels = face.render(Mood::Resting, 0, 1_000_000, 120);
+        assert_eq!(pixels[5], lamp_ring::Rgb::new(120, 0, 0));
+        let ceiling = ChannelCeiling::new(120).unwrap();
+        let mut muted = ring_with(Permission::Denied, false);
+        assert!(muted.show_resting(&pixels, ceiling).unwrap().is_none());
+        let mut owned = ring_with(Permission::Allowed, true);
+        assert!(owned.show_resting(&pixels, ceiling).unwrap().is_none());
+        let mut open = ring_with(Permission::Allowed, false);
+        assert!(open.show_resting(&pixels, ceiling).unwrap().is_some());
+    }
+
+    /// #4521's camera mark over a computer's pixels (#4943's fourth before
+    /// ready): the resting frame draws the computer's pixels, and the mark
+    /// goes over them with the pixels beside it dark, so a ring painted red
+    /// all round can't hide the mark's red.
+    #[test]
+    fn the_camera_mark_draws_over_a_computers_pixels_and_stands_apart() {
+        let mark = crate::ring_mark::MARK_PIXEL;
+        let beside = [
+            (mark + 1) % PIXEL_COUNT,
+            (mark + PIXEL_COUNT - 1) % PIXEL_COUNT,
+        ];
+        let mut face = Face::new();
+        face.pixels(Some(&[[255, 0, 0]; PIXEL_COUNT]));
+        let pixels = face.render(Mood::Resting, 0, 1_000_000, 120);
+        assert!(face.draws_own_pixels());
+        assert_eq!(pixels[5], lamp_ring::Rgb::new(120, 0, 0));
+        let marked = crate::ring_mark::marked_apart(pixels);
+        assert_eq!(marked[mark], crate::ring_mark::MARK_BRIGHT);
+        for at in beside {
+            assert_eq!(marked[at], lamp_ring::Rgb::BLACK);
+        }
+        // The computer's own red at a third: the mark is the brightest red.
+        assert_eq!(marked[5], lamp_ring::Rgb::new(40, 0, 0));
+        // Thirteen's case on #4943: red dots with dark neighbours all round,
+        // the mark's own look. Marked, every dot is dimmer than the mark.
+        let mut dots = [[0u8; 3]; PIXEL_COUNT];
+        for at in (3..PIXEL_COUNT).step_by(3) {
+            dots[at] = [255, 0, 0];
+        }
+        let mut face = Face::new();
+        face.pixels(Some(&dots));
+        let drawn = face.render(Mood::Resting, 0, 1_000_000, 120);
+        let marked = crate::ring_mark::marked_apart(drawn);
+        for (at, pixel) in marked.iter().enumerate().filter(|(at, _)| *at != mark) {
+            assert!(pixel.red < marked[mark].red, "pixel {at}: {pixel:?}");
+        }
+        // Unmarked, the mark's own pixel never shows a computer's red, so no
+        // computer can draw a mark with the camera off.
+        let mut fake = [[0u8; 3]; PIXEL_COUNT];
+        fake[mark] = [255, 0, 0];
+        let mut face = Face::new();
+        face.pixels(Some(&fake));
+        let drawn = face.render(Mood::Resting, 0, 1_000_000, 120);
+        assert_eq!(drawn[mark], lamp_ring::Rgb::BLACK);
+        let mut white = fake;
+        white[mark] = [255, 255, 255];
+        face.pixels(Some(&white));
+        assert_eq!(
+            face.render(Mood::Resting, 0, 1_100_000, 120)[mark],
+            lamp_ring::Rgb::new(120, 120, 120)
+        );
+        // Without a computer's pixels, the mark is #4521's own, alone.
+        let mut plain = Face::new();
+        let resting = plain.render(Mood::Resting, 0, 1_000_000, 120);
+        assert!(!plain.draws_own_pixels());
+        assert_eq!(crate::ring_mark::marked(resting)[1], resting[1]);
+    }
+
+    /// The shutdown's warning and the unplug's presentation win over the
+    /// face, and so over a computer's pixels in it.
+    #[test]
+    fn the_shutdown_warning_and_the_unplug_win_over_a_computers_pixels() {
+        let warning = shutdown_warning();
+        assert_eq!(rest_wins(Some(warning), true), RestWins::Warning(warning));
+        assert_eq!(rest_wins(Some(warning), false), RestWins::Warning(warning));
+        assert_eq!(rest_wins(None, true), RestWins::Unplug);
+        assert_eq!(rest_wins(None, false), RestWins::Face);
+    }
+
     /// #1166: a requested light is reached only on resting frames the ring
     /// wrote. With the privacy switch closed every frame is refused and
     /// nothing is said; drawn, it is said once 350 ms have shown it.
@@ -1121,6 +1234,7 @@ mod drawn_tests {
                     light: asked.clone(),
                     pattern: None,
                     fade_ms: None,
+                    pixels: None,
                 },
             )
             .unwrap();

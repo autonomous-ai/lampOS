@@ -482,6 +482,7 @@ impl Real {
             light: light.clone(),
             pattern: None,
             fade_ms: None,
+            pixels: None,
         };
         out.publish_json(lamp_ipc::monotonic_us(), &request)
             .map(|_| ())

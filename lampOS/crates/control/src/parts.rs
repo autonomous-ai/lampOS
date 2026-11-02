@@ -312,12 +312,37 @@ impl Lamp {
         Ok(json!({"to": "body"}))
     }
 
+    /// A computer's own colour or pixels (`rgb`, `pixels`), at `brightness`
+    /// (0 to 100 of the ring's own ceiling): drawn as given at rest, under
+    /// the same claim and priority as a named light, with the nearest named
+    /// colour and level beside them for a ring that draws no pixels.
+    fn own_light(
+        &mut self,
+        client: &str,
+        given: Vec<[u8; 3]>,
+        brightness: u8,
+        fade_ms: Option<u32>,
+        for_ms: u32,
+    ) -> Result<Value, Error> {
+        let share = f32::from(brightness.min(100)) / 100.0;
+        let pixels: Vec<[u8; 3]> = given
+            .iter()
+            .map(|pixel| pixel.map(|channel| (f32::from(channel) * share).round() as u8))
+            .collect();
+        let light = nearest_light(&pixels);
+        let until_us = (self.clock)() + u64::from(for_ms) * 1_000;
+        self.publish_ring(client, light.clone(), None, fade_ms, Some(pixels), until_us)?;
+        self.lights.insert(client.to_owned(), (light, until_us));
+        Ok(json!({"to": "ring", "pixels": given.len()}))
+    }
+
     fn light(
         &mut self,
         client: &str,
         colour: &str,
         level: u8,
         pattern: Option<Pattern>,
+        fade_ms: Option<u32>,
         for_ms: u32,
     ) -> Result<Value, Error> {
         let pattern = pattern.map(|pattern| {
@@ -343,7 +368,7 @@ impl Lamp {
             level,
         };
         let until_us = (self.clock)() + u64::from(for_ms) * 1_000;
-        self.ask_ring(client, light.clone(), pattern, until_us)?;
+        self.publish_ring(client, light.clone(), pattern, fade_ms, None, until_us)?;
         self.lights.insert(client.to_owned(), (light, until_us));
         Ok(json!({"to": "ring"}))
     }
@@ -463,6 +488,18 @@ impl Lamp {
         pattern: Option<LightPattern>,
         until_us: u64,
     ) -> Result<(), Error> {
+        self.publish_ring(client, light, pattern, None, None, until_us)
+    }
+
+    fn publish_ring(
+        &mut self,
+        client: &str,
+        light: Light,
+        pattern: Option<LightPattern>,
+        fade_ms: Option<u32>,
+        pixels: Option<Vec<[u8; 3]>>,
+        until_us: u64,
+    ) -> Result<(), Error> {
         let Some(out) = self.light.as_mut() else {
             return Err(not_here("the ring"));
         };
@@ -475,7 +512,8 @@ impl Lamp {
             },
             light,
             pattern,
-            fade_ms: None,
+            fade_ms,
+            pixels,
         };
         match out.publish(&request) {
             Ok(0) => Err(Error::new(
@@ -925,6 +963,47 @@ fn played_us(step_ms: u64, frames: usize) -> u64 {
     (frames.saturating_sub(1) as u64) * step_ms * 1_000
 }
 
+/// The named light nearest a computer's own pixels, for a ring that draws
+/// none and for `light/drawn`: the tint nearest their mean colour, at the
+/// level nearest their brightness (the brightest channel of the brightest
+/// pixel), off when every pixel is.
+fn nearest_light(pixels: &[[u8; 3]]) -> Light {
+    let brightest = pixels
+        .iter()
+        .flat_map(|pixel| pixel.iter().copied())
+        .max()
+        .unwrap_or(0);
+    if brightest == 0 {
+        return Light {
+            on: false,
+            colour: "warm".to_owned(),
+            level: 1,
+        };
+    }
+    let lit: Vec<&[u8; 3]> = pixels
+        .iter()
+        .filter(|pixel| pixel.iter().any(|c| *c > 0))
+        .collect();
+    let mean: [f32; 3] = [0, 1, 2]
+        .map(|at| lit.iter().map(|pixel| f32::from(pixel[at])).sum::<f32>() / lit.len() as f32);
+    let top = mean.iter().copied().fold(0.0_f32, f32::max).max(1.0);
+    let tint = mean.map(|channel| channel / top);
+    let colour = Light::TINTS
+        .iter()
+        .min_by(|(_, a), (_, b)| {
+            let far = |t: &[f32; 3]| (0..3).map(|at| (t[at] - tint[at]).powi(2)).sum::<f32>();
+            far(a).total_cmp(&far(b))
+        })
+        .map_or("white", |(name, _)| name);
+    let level = ((f32::from(brightest) / 255.0 * f32::from(Light::BRIGHTEST)).round() as u8)
+        .clamp(1, Light::BRIGHTEST);
+    Light {
+        on: true,
+        colour: colour.to_owned(),
+        level,
+    }
+}
+
 fn source(client: &str) -> String {
     format!("control:{client}")
 }
@@ -961,11 +1040,46 @@ impl Parts for Lamp {
                 now_us,
             ),
             Op::Light {
-                colour,
+                colour: Some(colour),
                 level,
                 pattern,
+                fade_ms,
                 for_ms,
-            } => self.light(client, colour, *level, *pattern, *for_ms),
+                ..
+            } => self.light(
+                client,
+                colour,
+                level.unwrap_or(1),
+                *pattern,
+                *fade_ms,
+                *for_ms,
+            ),
+            Op::Light {
+                rgb,
+                pixels,
+                brightness,
+                fade_ms,
+                for_ms,
+                ..
+            } => {
+                let given: Vec<[u8; 3]> = match (rgb, pixels) {
+                    (Some(rgb), _) => vec![
+                        crate::protocol::hex_rgb(rgb).unwrap_or_default();
+                        lamp_msgs::LightRequest::PIXELS
+                    ],
+                    (_, Some(pixels)) => pixels
+                        .iter()
+                        .map(|pixel| crate::protocol::hex_rgb(pixel).unwrap_or_default())
+                        .collect(),
+                    _ => {
+                        return Err(Error::new(
+                            ErrorCode::BadRequest,
+                            "one of colour, rgb or pixels",
+                        ));
+                    }
+                };
+                self.own_light(client, given, brightness.unwrap_or(100), *fade_ms, *for_ms)
+            }
             Op::Say { text, rephrase } => self.say(client, re, text, rephrase.unwrap_or(false)),
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
@@ -1347,6 +1461,88 @@ mod tests {
         let asked = ring.0.lock().unwrap();
         assert_eq!(asked.len(), 2);
         assert_eq!(asked[1].claim.until_us, 61_000_000);
+    }
+
+    /// "The ring, pixel by pixel": a computer's own colour or pixels go to
+    /// the ring as given, at their brightness, under the same claim as a
+    /// named light, with the nearest named light beside them for a ring
+    /// that draws none.
+    #[test]
+    fn a_computers_own_pixels_go_to_the_ring_at_their_brightness() {
+        let ring = Ring::default();
+        let mut lamp = Lamp::new(
+            None,
+            Some(Box::new(ring.clone())),
+            None,
+            "boot".into(),
+            quiet(),
+        )
+        .with_clock(booted_61s_ago);
+        let mut pixels = vec!["#000000"; 32];
+        pixels[0] = "#ff0000";
+        pixels[1] = "#00ff80";
+        let frame =
+            json!({"id": 1, "op": "light", "pixels": pixels, "brightness": 50, "for_ms": 3000});
+        assert_eq!(
+            lamp.act("c_1", 1, &op(&frame.to_string()), 0).unwrap(),
+            json!({"to": "ring", "pixels": 32})
+        );
+        let rgb = r##"{"id":2,"op":"light","rgb":"#2040ff","fade_ms":2000,"for_ms":1000}"##;
+        lamp.act("c_1", 2, &op(rgb), 0).unwrap();
+        let asked = ring.0.lock().unwrap();
+        let first = &asked[0];
+        let drawn = first.pixels.as_ref().unwrap();
+        assert_eq!(
+            (drawn.len(), drawn[0], drawn[1], drawn[2]),
+            (32, [128, 0, 0], [0, 128, 64], [0, 0, 0])
+        );
+        assert_eq!(first.claim.priority, Priority::Skill);
+        assert_eq!(first.claim.until_us, 64_000_000);
+        assert!(first.pattern.is_none() && first.check().is_ok());
+        // Red and teal, half bright: their mean is near white, at level 3,
+        // on a ring without pixels.
+        assert_eq!(
+            (
+                first.light.on,
+                first.light.colour.as_str(),
+                first.light.level
+            ),
+            (true, "white", 3)
+        );
+        assert_eq!(nearest_light(&[[200, 10, 0]; 32]).colour, "red");
+        let second = &asked[1];
+        assert_eq!(
+            second.pixels.as_ref().unwrap(),
+            &vec![[0x20, 0x40, 0xff]; 32]
+        );
+        assert_eq!(
+            (second.fade_ms, second.light.colour.as_str()),
+            (Some(2000), "blue")
+        );
+    }
+
+    #[test]
+    fn every_pixel_black_is_the_light_off_and_a_named_light_is_as_before() {
+        let ring = Ring::default();
+        let mut lamp = Lamp::new(
+            None,
+            Some(Box::new(ring.clone())),
+            None,
+            "boot".into(),
+            quiet(),
+        )
+        .with_clock(booted_61s_ago);
+        let off = json!({"id": 1, "op": "light", "pixels": vec!["#000000"; 32], "for_ms": 1000});
+        lamp.act("c_1", 1, &op(&off.to_string()), 0).unwrap();
+        let named = r#"{"id":2,"op":"light","colour":"warm","level":2,"for_ms":1000}"#;
+        lamp.act("c_1", 2, &op(named), 0).unwrap();
+        let asked = ring.0.lock().unwrap();
+        assert!(!asked[0].light.on && asked[0].check().is_ok());
+        assert_eq!(asked[1].pixels, None);
+        assert_eq!(
+            (asked[1].light.colour.as_str(), asked[1].light.level),
+            ("warm", 2)
+        );
     }
 
     #[test]
