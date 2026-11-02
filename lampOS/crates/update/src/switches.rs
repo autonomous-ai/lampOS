@@ -323,6 +323,16 @@ mod tests {
             found.iter().any(|name| name == "LAMP_SKILLS_SHARE"),
             "{found:?}"
         );
+        // On in the product's voice: a skill made by the lamp's own model.
+        let (_, voice) = crate::install::PRODUCT
+            .iter()
+            .find(|(name, _)| *name == "lamp-voice.service")
+            .unwrap();
+        assert!(
+            switches(voice)
+                .iter()
+                .any(|name| name == "LAMP_MAKE_SKILL_LOCAL")
+        );
         // A commented example line is no switch.
         let (_, addons) = crate::install::PRODUCT
             .iter()
