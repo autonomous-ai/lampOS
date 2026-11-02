@@ -1738,6 +1738,53 @@ process, shows there before any trial waits for it. For each face:
   the picture, or with an eye or the nose outside it, has neither: it
   counts for nothing either way.
 
+### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
+
+The eyes report every face the detector finds, however small or unsure.
+With `LAMP_FACES_AT_DESK_ONLY=on` in the voice's unit (on in the product),
+the voice counts a face as **someone at the lamp** only when the detector
+is at least 0.70 sure of it and its box is at least 0.6 of the reference
+face's height in the same look (`known_faces::at_desk`,
+`AT_DESK_CONFIDENCE`, `AT_DESK_HEIGHT`). The reference is the tallest face
+at least 0.70 sure and at most 0.6 of the frame tall (`AT_DESK_TALLEST`), so
+a giant false box (seen on lamp-06c1 while the arm moved: 0.85 to 0.97 of
+the frame tall at 0.61 to 0.81) never drops the owner. A look with a face
+in it never counts nobody: when no face passes, its tallest one counts. The
+size is relative, so the rule holds with the person close to the lamp or
+further back. A second person
+beside the owner is about their size and counts; someone 1 to 2 m behind
+them, a poster, a face on a screen across the room, or a false detection
+does not. One helper (`known_faces::people_at_lamp`) gives the count to
+everything that asks how many people are at the lamp: the owner's name by
+default, the typed name's one face, the face cache's held gap, the busy
+room's two faces and the join's (`bus_out::faces_in_view`), and the scope
+by sight's one face, no other face and alone in view (`SpeakingFaces`). A
+face not counted is still tracked and still read speaking, so a far face
+seen speaking a line still makes that line not the owner's, and one that
+read speaking in the last 10 s holds the owner's name by default back ("a
+face not at the desk seen speaking", `known_faces::spoke_not_at_desk_lately`):
+a guest far behind the owner who is the only voice is not told the owner's
+name. A face under 0.70 sure is dropped whatever its size, so a guest at the
+desk turned sideways (about 0.65) counts 0: one who speaks still holds the
+name back, a silent one doesn't. The eyes' own list on the bus is never
+changed. Off, every face counts, as before.
+
+Why: on lamp-a0ae on 2 Nov, right after setup, the owner's name was held
+back on 51 of 79 turns as "more than one face in view". Beside the owner's
+face (0.09 to 0.19 of the picture wide, 0.80 to 0.92 sure) the eyes kept
+reporting faces 0.02 to 0.06 wide at 0.61 to 0.78, with a new id nearly
+every look, in about half of all looks. The name-by-default decision line
+now tells the deciding look's faces as `[faces counted w0.15 h0.20 c0.88;
+dropped w0.06 h0.08 c0.67]` with the switch on or a face dropped
+(`known_faces::faces_worth_telling`; off, the line reads as before), and the scope line's looks summary adds `N
+faces not at the desk`: sizes and confidence only, no id and no place in
+the picture. The values come from a recording on lamp-06c1 (3 Nov, test
+faces on a screen): a same-size face beside the owner read 0.93 to 0.95 of
+their height and counts, one at 0.55 of the size read 0.55 to 0.56 at 0.83
+to 0.85 sure and does not; a0ae's far faces were at most 0.46 of the
+owner's width. A real person 1 m behind the owner is still untested: the
+detector misses screen faces that small.
+
 A list lasts two seconds, and an empty one says the camera looked and saw
 nobody. With the camera closed nothing is published and the last list
 runs out. This is the sign a person gives, without meaning to, that they

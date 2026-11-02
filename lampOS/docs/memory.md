@@ -543,6 +543,14 @@ still reaches the person's turn, marked `(said in the room)`: a guest's
 words, said aloud beside them, are told to the person's turn; never into
 their running summary, talk note or saved memory.
 
+**Only faces at the desk are other faces** (`LAMP_FACES_AT_DESK_ONLY=on`,
+on in the product, [eyes.md](eyes.md), "Who counts as someone at the
+lamp"): for the one face in view, no other face and alone in view below,
+a face under 0.6 of the reference face's height or under 0.70 sure is
+nobody at the lamp. On lamp-3e83 (#4584) 30 looks had none with one face,
+and on lamp-a0ae (2 Nov) far faces 0.02 to 0.06 wide came and went beside
+the owner. Such a face is still tracked, and still read speaking.
+
 **A line of theirs no face was seen speaking, their face the one face in
 view** (`LAMP_PERSON_SCOPE_ONE_FACE=on`, on in the product; the launch
 testers' item 1 on #3997): on lamp-220c on 30 Oct the owner's face was in 17

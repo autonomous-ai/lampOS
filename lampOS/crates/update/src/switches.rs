@@ -333,6 +333,13 @@ mod tests {
                 .iter()
                 .any(|name| name == "LAMP_MAKE_SKILL_LOCAL")
         );
+        // On in the product's voice: only faces at the desk are people at
+        // the lamp (the a0ae name-forget report, 2 Nov).
+        assert!(
+            switches(voice)
+                .iter()
+                .any(|name| name == "LAMP_FACES_AT_DESK_ONLY")
+        );
         // A commented example line is no switch.
         let (_, addons) = crate::install::PRODUCT
             .iter()
