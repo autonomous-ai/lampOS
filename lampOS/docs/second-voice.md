@@ -4356,6 +4356,15 @@ newest look alone: in the same run, with two faces in 36 of 37 looks, one
 reply read a look with none and named the owner. The count is the most
 faces seen in at least two of those looks, so one look that saw a second
 face that isn't there never makes one person two (lamp-52e6, 29 Oct 16:52,
+With `LAMP_FACES_AT_DESK_ONLY=on` (on in the product) a look counts only
+the faces of people at the desk (`known_faces::people_at_lamp`, [eyes.md](eyes.md),
+"Who counts as someone at the lamp"): on lamp-a0ae (2 Nov) tiny, unsure
+faces far behind the owner held the name back on 51 of 79 turns. The
+decision line `the owner is not named by default: WHY [faces counted ...;
+dropped ...]` gives the deciding look's faces' sizes and confidence, with the
+switch on or a face dropped. A face not counted that read speaking in the
+last 10 s holds the name back (`a face not at the desk seen speaking`,
+`known_faces::spoke_not_at_desk_lately`): a far guest who is the only voice.
 the one screen face read as two). The face the eyes know is read from their
 known file while it is at most 8 s old (`known_faces::known_lately`): the
 eyes rewrite it at each check, every 2–3 s, and remove it as soon as the

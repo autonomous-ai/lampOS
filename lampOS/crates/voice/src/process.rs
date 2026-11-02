@@ -1168,6 +1168,10 @@ fn worker_command(
             role,
             var(crate::person::OWNER_ONLY_ENVIRONMENT).as_deref(),
         ))
+        .envs(faces_at_desk_worker_environment(
+            role,
+            var(crate::known_faces::AT_DESK_ENVIRONMENT).as_deref(),
+        ))
         .envs(tasks_told_worker_environment(
             role,
             var(crate::task_news::TOLD_ENVIRONMENT).as_deref(),
@@ -1605,6 +1609,19 @@ fn person_name_owner_only_worker_environment(
     value
         .filter(|value| matches!(role, "provider" | "second") && *value == "on")
         .map(|_| (crate::person::OWNER_ONLY_ENVIRONMENT, "on"))
+}
+
+// Only faces of people at the desk counted as people at the lamp (the a0ae
+// name-forget report, 2 Nov), to the two workers that count the eyes' faces:
+// both routes' busy room and typed name, the second's name by default,
+// carries and keeps. Only the exact value `on`.
+fn faces_at_desk_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    value
+        .filter(|value| matches!(role, "provider" | "second") && *value == "on")
+        .map(|_| (crate::known_faces::AT_DESK_ENVIRONMENT, "on"))
 }
 
 // The file of task news already told (#2762), to the two workers that read
@@ -2404,6 +2421,34 @@ mod tests {
         }
     }
 
+    /// The a0ae name-forget report (2 Nov): the at-desk switch goes to the
+    /// provider and second workers only, and only as `on`.
+    #[test]
+    fn the_at_desk_switch_reaches_only_the_workers_that_count_faces() {
+        let on = std::ffi::OsStr::new("on");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                faces_at_desk_worker_environment(role, Some(on)),
+                Some((crate::known_faces::AT_DESK_ENVIRONMENT, "on"))
+            );
+            assert_eq!(faces_at_desk_worker_environment(role, None), None);
+            for unfit in ["off", "", "ON", "on "] {
+                assert_eq!(
+                    faces_at_desk_worker_environment(role, Some(std::ffi::OsStr::new(unfit))),
+                    None,
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in ["capture", "speaker", "ring", "camera", "privacy"] {
+            assert_eq!(
+                faces_at_desk_worker_environment(role, Some(on)),
+                None,
+                "{role}"
+            );
+        }
+    }
+
     /// The reviewer on #1158: the switches reach a worker through the real
     /// command it is started with. A script in the worker's place writes
     /// the environment it got: the provider has the memory's two switches,
@@ -2463,6 +2508,7 @@ mod tests {
                     lamp_msgs::SHUTDOWN_SWITCH,
                     crate::ring_night::ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
+                    crate::known_faces::AT_DESK_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -2606,6 +2652,7 @@ mod tests {
                 "provider",
                 vec![
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
+                    "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EARLY_WORDS=on",
@@ -2644,6 +2691,7 @@ mod tests {
                     "LAMP_CONVERSATION_SUMMARY=on",
                     "LAMP_DECLINE_SILENT=on",
                     "LAMP_EYES_SPEAKING=on",
+                    "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",

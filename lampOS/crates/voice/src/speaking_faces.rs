@@ -189,6 +189,12 @@ struct Look {
     /// Every passing id in this look, speaking or not
     /// ([`SpeakingFaces::in_view_at`]).
     tracked: Vec<String>,
+    /// Of those, the ones counted as people at the lamp
+    /// (`LAMP_FACES_AT_DESK_ONLY`, [`crate::known_faces::at_desk`]): every
+    /// one with the switch off. Whether another person was in view
+    /// ([`SpeakingFaces::alone_in_view`], [`SpeakingFaces::one_face_in_view`],
+    /// [`SpeakingFaces::no_other_face_in_view`]) is read from these.
+    counted: Vec<String>,
     /// The faces whose mouth read still (`no`), turned to the lamp or not
     /// ([`SpeakingFaces::alone_in_view`]).
     still: Vec<String>,
@@ -275,6 +281,14 @@ impl SpeakingFaces {
     /// [`EYES_EVERY`]. Each face's `follows` (#4885) is kept with its look
     /// as the eyes said it, never merged into the looks before it.
     pub fn look(&self, at: Instant, frame: Option<((&str, u64), &Faces)>) {
+        self.look_at_desk(at, frame, crate::known_faces::at_desk_only());
+    }
+
+    /// [`Self::look`] with `LAMP_FACES_AT_DESK_ONLY` given: with
+    /// `desk_only`, a face too small or too unsure to be someone at the desk
+    /// ([`crate::known_faces::at_desk`]) is still tracked and still read
+    /// speaking, but is no other person in view.
+    pub fn look_at_desk(&self, at: Instant, frame: Option<((&str, u64), &Faces)>, desk_only: bool) {
         let Ok(mut looks) = self.looks.lock() else {
             return;
         };
@@ -316,6 +330,17 @@ impl SpeakingFaces {
         let speaking = speaking_faces.iter().map(|face| face.id.clone()).collect();
         let tracked = frame
             .map(|(_, faces)| faces.faces.iter().map(|face| face.id.clone()).collect())
+            .unwrap_or_default();
+        let counted = frame
+            .map(|(_, faces)| {
+                faces
+                    .faces
+                    .iter()
+                    .zip(crate::known_faces::at_desk(&faces.faces, desk_only))
+                    .filter(|(_, counted)| *counted)
+                    .map(|(face, _)| face.id.clone())
+                    .collect()
+            })
             .unwrap_or_default();
         let still = frame
             .map(|(_, faces)| {
@@ -390,6 +415,7 @@ impl SpeakingFaces {
             boot,
             speaking,
             tracked,
+            counted,
             still,
             turned,
             turned_silent,
@@ -569,7 +595,7 @@ impl SpeakingFaces {
         during.len() >= FEWEST_LOOKS
             && during
                 .iter()
-                .all(|look| look.tracked.len() == 1 && own(look, &look.tracked))
+                .all(|look| look.counted.len() == 1 && own(look, &look.counted))
             && during.iter().any(|look| own(look, &look.speaking))
             && still * 2 < during.len()
     }
@@ -594,7 +620,7 @@ impl SpeakingFaces {
         let own = |look: &Look, id: &String| format!("{}/{id}", look.boot) == face;
         during
             .iter()
-            .all(|look| look.tracked.iter().all(|id| own(look, id)))
+            .all(|look| look.counted.iter().all(|id| own(look, id)))
             && during
                 .iter()
                 .filter(|look| look.tracked.iter().any(|id| own(look, id)))
@@ -622,8 +648,8 @@ impl SpeakingFaces {
             .peekable();
         during.peek().is_some()
             && during.all(|look| {
-                look.tracked.len() <= 1
-                    && look.tracked.iter().all(|id| {
+                look.counted.len() <= 1
+                    && look.counted.iter().all(|id| {
                         face.is_some_and(|face| {
                             one_face(format!("{}/{id}", look.boot), &links) == face
                         })
@@ -684,15 +710,23 @@ impl SpeakingFaces {
         let own = |look: &Look, ids: &[String]| {
             face.is_some_and(|face| ids.iter().any(|id| format!("{}/{id}", look.boot) == face))
         };
-        let (mut one, mut yes, mut still, mut seen) = (0, 0, 0, 0);
+        let (mut one, mut yes, mut still, mut seen, mut dropped) = (0, 0, 0, 0, 0);
         for look in &during {
-            one += usize::from(look.tracked.len() == 1);
+            one += usize::from(look.counted.len() == 1);
+            dropped += look.tracked.len().saturating_sub(look.counted.len());
             seen += usize::from(own(look, &look.tracked));
             yes += usize::from(own(look, &look.speaking));
             still += usize::from(own(look, &look.still));
         }
+        // Faces not at the desk (`LAMP_FACES_AT_DESK_ONLY`), told only when
+        // there were any, so the line is as before without them.
+        let dropped = if dropped > 0 {
+            format!("; {dropped} faces not at the desk")
+        } else {
+            String::new()
+        };
         format!(
-            "{} looks, {one} with one face; the known face in {seen}, read speaking in {yes}, still in {still}, unread in {}",
+            "{} looks, {one} with one face; the known face in {seen}, read speaking in {yes}, still in {still}, unread in {}{dropped}",
             during.len(),
             seen.saturating_sub(yes + still)
         )
@@ -1166,6 +1200,88 @@ mod tests {
     /// any, its mouth never read speaking; empty looks between are no other
     /// face. One look with a second face, an unknown face alone, too few
     /// looks, or another boot's `f1`, and it is not.
+    /// The a0ae name-forget report (2 Nov): with `LAMP_FACES_AT_DESK_ONLY`,
+    /// a tiny, unsure face that comes and goes beside the known face is no
+    /// other person, so the one-face keep and the carry's no other face
+    /// act; a second person at the desk still stops both, and off, the tiny
+    /// face stops them as before. A tiny face seen speaking still counts as
+    /// speaking.
+    #[test]
+    fn faces_not_at_the_desk_are_no_other_face() {
+        let face = |id: &str, width: f32, confidence: f32| Face {
+            id: id.to_owned(),
+            xmin: 0.3,
+            ymin: 0.2,
+            xmax: 0.3 + width,
+            ymax: 0.2 + width * 4.0 / 3.0,
+            confidence,
+            yaw: None,
+            facing: None,
+            speaking: Some(Speaking {
+                state: SpeakingState::No,
+                score: 0.9,
+                from: None,
+            }),
+            follows: None,
+        };
+        let looks = |frames: &[&[(&str, f32, f32)]], desk_only: bool| {
+            let eyes = SpeakingFaces::default();
+            let from = Instant::now();
+            for (seq, look) in frames.iter().enumerate() {
+                let faces = Faces {
+                    faces: look
+                        .iter()
+                        .map(|(id, width, confidence)| face(id, *width, *confidence))
+                        .collect(),
+                };
+                eyes.look_at_desk(
+                    Instant::now(),
+                    Some((("b", seq as u64 + 1), &faces)),
+                    desk_only,
+                );
+            }
+            (eyes, from, Instant::now())
+        };
+        let a0ae: &[&[(&str, f32, f32)]] = &[
+            &[("f802", 0.15, 0.88)],
+            &[("f802", 0.13, 0.80), ("f816", 0.06, 0.67)],
+            &[
+                ("f802", 0.12, 0.87),
+                ("f816", 0.04, 0.78),
+                ("f817", 0.02, 0.61),
+            ],
+            &[("f802", 0.15, 0.88), ("f818", 0.06, 0.67)],
+            &[("f802", 0.14, 0.86)],
+        ];
+        let (eyes, from, to) = looks(a0ae, true);
+        assert!(eyes.one_face_in_view("b/f802", from, to), "one face kept");
+        assert!(
+            eyes.no_other_face_in_view(Some("b/f802"), from, to),
+            "no other face for the carry"
+        );
+        assert!(
+            eyes.sight_told(Some("b/f802"), from, to)
+                .contains("5 looks, 5 with one face")
+                && eyes
+                    .sight_told(Some("b/f802"), from, to)
+                    .ends_with("; 4 faces not at the desk")
+        );
+        // The tiny faces are still tracked.
+        assert!(eyes.in_view_at("b/f816", to));
+        let (eyes, from, to) = looks(a0ae, false);
+        assert!(!eyes.one_face_in_view("b/f802", from, to), "off: as before");
+        assert!(!eyes.no_other_face_in_view(Some("b/f802"), from, to));
+        // A second person at the desk is another face.
+        let two: &[&[(&str, f32, f32)]] = &[
+            &[("f802", 0.14, 0.85), ("f9", 0.12, 0.82)],
+            &[("f802", 0.14, 0.85), ("f9", 0.12, 0.82)],
+            &[("f802", 0.14, 0.85), ("f9", 0.12, 0.82)],
+        ];
+        let (eyes, from, to) = looks(two, true);
+        assert!(!eyes.one_face_in_view("b/f802", from, to));
+        assert!(!eyes.no_other_face_in_view(Some("b/f802"), from, to));
+    }
+
     #[test]
     fn one_face_in_view_needs_their_face_in_enough_looks_and_no_other_in_any() {
         let face = |id: &str| Face {

@@ -2463,17 +2463,35 @@ pub fn serve(
                         .and_then(|_| crate::known_faces::most_faces_lately());
                     let known_now = who.as_deref().and_then(crate::known_faces::known_lately);
                     let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
+                    // A face not at the desk seen speaking: a far guest who
+                    // is the only voice (`LAMP_FACES_AT_DESK_ONLY`).
+                    let speaking_not_at_desk = bus.is_some()
+                        && crate::known_faces::spoke_not_at_desk_lately();
                     match crate::person::someone_else_now(
                         &owners,
                         faces,
                         known_now.as_deref(),
                         another,
+                        speaking_not_at_desk,
                         carried.as_deref(),
                     )
                     {
                         Some(why) => {
+                            // The faces' sizes of the look that counted
+                            // (`LAMP_FACES_AT_DESK_ONLY`): sizes only.
+                            // Only with the switch on or a face dropped:
+                            // off, the line reads as before.
+                            let sizes = crate::known_faces::most_faces_lately_told();
+                            let sizes = if crate::known_faces::faces_worth_telling(
+                                &sizes,
+                                crate::known_faces::at_desk_only(),
+                            ) {
+                                format!(" [faces {sizes}]")
+                            } else {
+                                String::new()
+                            };
                             eprintln!(
-                                "lamp-voice second: the owner is not named by default: {why}; their name is taken out of the conversation's earlier lines (LAMP_PERSON_NAME_BY_DEFAULT)"
+                                "lamp-voice second: the owner is not named by default: {why}{sizes}; their name is taken out of the conversation's earlier lines (LAMP_PERSON_NAME_BY_DEFAULT)"
                             );
                             withheld = Some(name.to_owned());
                             format!("\n\n{}", crate::person::HELD_BACK_NOTE)
@@ -6742,7 +6760,7 @@ impl Heeding {
                                     }
                                     let look = FacesLook {
                                         at_us: message.header.at_us,
-                                        faces: seen.faces.len(),
+                                        faces: crate::known_faces::people_at_lamp(&seen),
                                         expires_ms: message.header.expires_ms,
                                     };
                                     held.look(look, epoch, monotonic_us());

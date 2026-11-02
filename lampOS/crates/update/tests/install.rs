@@ -1577,6 +1577,28 @@ fn the_product_keeps_a_keep_theirs_with_one_known_face_in_view() {
     }
 }
 
+/// Only faces of people at the desk count as people at the lamp
+/// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
+/// beside the owner held their name back on 51 of 79 turns as "more than one
+/// face in view". Beside the name by default and the one-face keep it
+/// acts on.
+#[test]
+fn the_product_counts_only_faces_at_the_desk() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_FACES_AT_DESK_ONLY=on",
+        "Environment=LAMP_PERSON_NAME_BY_DEFAULT=on",
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A long conversation keeps its rules and score past the thread's view
 /// (`LAMP_CONVERSATION_SUMMARY`, #1693's long-conversation plan, step 3): on
 /// lamp-06c1 on 29 Oct, 11 exchanges after a quiz's rules the lamp said
