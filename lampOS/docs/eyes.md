@@ -2458,8 +2458,10 @@ with the known face's id the eyes keep beside the known file
   `yes` together while both boxes moved, and faces under 24 detector pixels
   between the eyes (about 0.85 m) read `unknown` (`small`) on every look.
   On, the eyes keep the last second of `body/joint_states` readings
-  (`speaking::JointHistory`, `JOINT_HISTORY_MS`, the newest read each loop
-  pass) and each look judges its frame by the reading nearest the frame's
+  (`speaking::JointHistory`, `JOINT_HISTORY_MS`, the newest read at most
+  every 40 ms, `JOINT_READ_EVERY_US`, half the body's 80 ms period: read on
+  each ~5 ms loop pass, the staged eyes took 47 to 70% of a core on
+  lamp-52e6 with a face in view) and each look judges its frame by the reading nearest the frame's
   capture, before or after it (`speaking::head_moved`: the
   camera's aim, `full_look::aim_speeds`, turning faster than
   `HEAD_MOVED_RADIANS_A_SECOND`, the full look's own still bar, 25 counts a

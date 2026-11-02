@@ -2156,8 +2156,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             continue;
         }
         // With LAMP_EYES_SPEAKING_STEADY, the body's newest joint reading,
-        // kept each pass, so a look finds the one nearest its frame's capture.
+        // read at most every 40 ms (half its period, not each ~5 ms pass), so
+        // a look finds the one nearest its frame's capture.
         if let Some(bus) = steady_bus.as_ref()
+            && joint_history.read_due(lamp_ipc::monotonic_us())
             && let Some(message) = bus.latest(lamp_msgs::JointState::TOPIC).ok().flatten()
             && let Ok(joints) = message.parse::<lamp_msgs::JointState>()
         {
