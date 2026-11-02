@@ -415,6 +415,31 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   still end; a worker dead in the wait still ends the voice. Two Linux
   tests of the real worker (a 900 ms Denied lapse ridden, a granting lapse
   ends) run on the ARM64 gate only. Not yet tried on a lamp.
+- **A killed privacy worker's sockets left in the muted wait.** On
+  lamp-06c1 on a cold boot of stock 9528 (`on4`), the wait found no switch
+  reading within 50 ms of Ready, its privacy worker did not stop within the
+  300 ms grace and was killed, and at 17.96 the voice exited 1 on
+  `privacy switch unreadable: Controls privacy unavailable while waiting;
+  verified cleanup failed: privacy worker privacy wait shared stop deadline
+  exceeded; reaped with signal: 9 (SIGKILL); verified cleanup failed:
+  Directory not empty (os error 39)` (#4332). Each socket's owner unlinks
+  its own path as it ends; a killed worker cannot, so its `privacy.c.w` and
+  `privacy.d.w` stayed and the session directory could not be removed. The
+  wait's cleanup (`killed_privacy_worker` in `service_privacy_controls.rs`)
+  now, once that worker is reaped, removes those two paths and only them,
+  each only while it is a socket, read with `symlink_metadata`, so a
+  symlink is never followed. The kill is then the switch unreadable, read
+  again after 1 s with a fresh worker, also when the look had allowed; a
+  wait that had failed otherwise keeps its own error, and the kill is said
+  on its own line. On this route the worker only reads Controls' bus and
+  holds the wait's Denied authority, with no microphone and no GPIO line,
+  so its end grants nothing. Any other path there, a worker not reaped, a
+  killed or failed ring indicator and any other cleanup failure still end
+  the service as before. Unit tests: a stalled stand-in killed in the wait
+  leaves no socket and no directory and is read again (before: a cleanup
+  failure); a regular file or a symlink to a socket at either path is left
+  and still fails; a worker that stops keeps its sockets for itself to
+  unlink. Not yet tried on a lamp.
 - **A worker's first control message older than 100 ms.** A worker sends its
   first control message as soon as its peer is there; at start the
   coordinator may read it only after starting its other workers. lamp-4ace

@@ -238,6 +238,14 @@ one second of waiting past one read stale before the microphone is first
 allowed (`PRIVACY_START_STALE_US`) counts from its loop's start, after the
 prologue, with the gate closed until then.
 
+A privacy worker that does not stop within the wait's 300 ms grace is killed,
+and a killed worker cannot unlink its own sockets. Once it is reaped, the
+wait's cleanup removes its `privacy.c.w` and `privacy.d.w`, each only while
+it is a socket (never through a symlink), so the session directory goes too,
+and the kill is the switch unreadable, read again after 1 s (lamp-06c1's cold
+boot on stock 9528, `Directory not empty`, #4332). Anything else at those
+paths stays, and stays a cleanup failure that ends the service.
+
 Ears also holds Voice to its latch: once a `voice/privacy` session has reported
 the switch closed, Ears refuses any later permit from that session, and only a
 new worker's session can reopen MIC1.
