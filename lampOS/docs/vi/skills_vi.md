@@ -109,10 +109,10 @@ Diễn ra như sau:
 
 Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến cùng với việc cài nó.
 
-## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, tắt)
+## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, bật trong sản phẩm từ 2/11, #4948)
 
 Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng
-trang kỹ năng và `LAMP_CLOUD`); chưa unit sản phẩm nào bật. Khi bật,
+trang kỹ năng và `LAMP_CLOUD`); unit `lamp-cloud` của sản phẩm bật nó (#4948). Khi bật,
 `lamp-cloud` nhận ba lệnh từ ứng dụng, không bao giờ bằng giọng nói:
 
 - **`skills.share`** (`{"name", "author"?}`): chỉ một kỹ năng tạo trên đèn
