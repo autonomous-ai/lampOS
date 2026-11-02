@@ -131,13 +131,34 @@ elif name == "curl":
     HAL_PROBES = r'''
 free() { printf '%s\n' "total used free shared buff/cache available" "Mem: 3900 3700 50 10 150 120" "Swap: 1000 900 100"; }
 df() { printf '%s\n' "Filesystem Size Used Avail Use% Mounted" "/dev/root 29G 28G 200M 99% /"; }
+systemctl() {
+  if [ "$1" = show ]; then
+    printf '%s\n' LoadState=loaded UnitFileState=enabled ActiveState=inactive SubState=dead Result=success \
+      ExecMainStatus=0 NRestarts=0 ConditionResult=no "ActiveEnterTimestamp=Fri 2026-10-30 10:00:00 UTC" \
+      "InactiveEnterTimestamp=Sat 2026-10-31 00:06:00 UTC"
+    return 0
+  fi
+  printf '%s\n' "$*" >> "$TEST_ROOT/events"
+  case "$1" in
+    is-enabled) return 0 ;;
+    is-active) [ "$3" != "${DEAD_UNIT:-}" ]; return $? ;;
+  esac
+  return 0
+}
 journalctl() {
   if [ "$1" = -k ]; then echo "Out of memory: Killed process 42 (python)"; return 0; fi
   printf '%s\n' "user said: I failed my exam" "ERROR user asked about the error in my code" \
-    "WARNING heard: please kill the fatal exception" "Traceback (most recent call last):" \
+    "WARNING heard: please kill the fatal exception" "ValueError: bad value from user text" \
+    "INFO hal started" "Stopped HAL Hardware Runtime. and the user said hello" \
+    "hal.service: I heard call mum and then something private" \
+    "ImportError: cannot import name my_secret from private_thing" \
+    "ModuleNotFoundError: No module named 'x'; the user said hello" \
+    "Traceback (most recent call last):" \
     '  File "/opt/hal/server.py", line 10, in main' "    secret = user_text" \
-    "ValueError: bad value from user text" "ModuleNotFoundError: No module named 'torch'" \
-    "hal.service: Main process exited, code=killed, status=9/KILL" "INFO hal started"
+    "ModuleNotFoundError: No module named 'torch'" \
+    "hal.service: Main process exited, code=killed, status=9/KILL" \
+    "Stopped HAL Hardware Runtime." "hal.service: Deactivated successfully." \
+    "Condition check resulted in HAL Hardware Runtime being skipped."
 }
 '''
 
@@ -146,13 +167,18 @@ journalctl() {
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         for expected in ("HAL diagnostics", "total=3900M avail=120M swap_used=900M", "use=99%",
                          'File "/opt/hal/server.py", line 10, in main',
-                         "ModuleNotFoundError: No module named 'torch'", "ValueError:",
-                         "hal.service: Main process exited", "Out of memory"):
+                         "ModuleNotFoundError: No module named 'torch'",
+                         "hal.service: Main process exited", "Out of memory",
+                         "UnitFileState=enabled", "ConditionResult=no", "InactiveEnterTimestamp=Sat 2026-10-31",
+                         "Stopped HAL Hardware Runtime.", "hal.service: Deactivated successfully.",
+                         "Condition check resulted in HAL Hardware Runtime being skipped."):
             self.assertIn(expected, result.stderr)
+        # A line that only imitates a known prefix is dropped or cut to its type name.
         # HAL logs what users say; no free-text line may reach the report, even one
         # containing an error-looking word, and exception messages are dropped.
         for leaked in ("failed my exam", "asked about", "kill the fatal", "bad value from user text",
-                       "user_text", "INFO hal started"):
+                       "user_text", "INFO hal started", "call mum", "my_secret",
+                       "the user said hello", "and the user"):
             self.assertNotIn(leaked, result.stderr)
 
     def test_healthy_hal_prints_no_diagnostics(self):
@@ -162,7 +188,7 @@ journalctl() {
 
     def test_hal_diagnostics_stay_short_for_noisy_journals(self):
         noisy = self.HAL_PROBES + r'''
-journalctl() { for i in $(seq 1 400); do printf 'hal.service: %0500d\n' "$i"; done; }
+journalctl() { for i in $(seq 1 400); do printf '  File "/%0500d", line 1, in f\n' "$i"; printf "hal.service: Failed with result 'exit-code'.\n"; done; }
 if check_hal; then exit 0; else exit 1; fi
 '''
         result = self.run_shell(noisy, BAD_HEALTH="1")
