@@ -40,7 +40,9 @@ sau:
    ngày 2/11), 5xx, quá giờ, mất kết nối hoặc câu trả lời bị cắt trước khi
    khối cuối đóng thì được hỏi lại một lần (`make_skill_local::again`); lỗi
    khác thì không. Mô hình được xem một kỹ năng hoàn chỉnh mà bước kiểm tra
-   chấp nhận (`make_skill_local::EXAMPLE`) và được dặn rằng kỹ năng không
+   chấp nhận (`make_skill_local::EXAMPLE`, `example-only`: màu cyan mức 2
+   trong 25 giây khi có người ở đó, được gọi rõ là ví dụ về hình thức,
+   "never answer with it") và được dặn rằng kỹ năng không
    nói được và không tự giữ giờ được. Câu trả lời phải đúng hai khối có rào,
    `skill.toml` và `SKILL.md`, mỗi khối tối đa 8 KiB.
 4. **Giới hạn những gì kỹ năng tạo ra được dùng** (giới hạn của điều phối
@@ -62,8 +64,19 @@ sau:
      `<folder>`, tối đa 600 byte) trước lời yêu cầu của người dùng
      (`made_skill::repair_brief`). Câu trả lời đó được giữ, hoặc được nói là
      không tạo được; không bao giờ có lần thứ ba. Chỉ lỗi của bước kiểm tra
-     (hoặc của phần nói rõ bên dưới) được sửa; sai định dạng hay xin dùng
-     nhiều hơn đèn và đầu thì được nói là không tạo được ngay.
+     (hoặc của phần nói rõ bên dưới, hoặc khi trả lại chính ví dụ) được
+     sửa; sai định dạng hay xin dùng nhiều hơn đèn và đầu thì được nói là
+     không tạo được ngay.
+   - **Không bao giờ là ví dụ** (lamp-9adf, 3/11 16:15: "when I come back
+     to my desk, glow warm" được trả lời bằng đúng nguyên văn ví dụ, ánh
+     cyan, được giữ và hỏi; lần thử lại ra đúng các byte đó). Câu trả lời có
+     `skill.toml` giống ví dụ (bỏ qua khoảng trắng), hoặc `SKILL.md` mang tên
+     của ví dụ, bị từ chối trước bước kiểm tra
+     (`make_skill_local::is_example`) và được gửi lại một lần như lỗi của
+     bước kiểm tra, với "that is the example, not what was asked; make the
+     skill the person asked for". Nếu lại là ví dụ thì được nói là không
+     tạo được, "it gave back the lamp's own example, not what was asked";
+     không giữ và không hỏi gì.
    - **Nói rõ** (Mobile trên #4710, 3/11). Khi bước kiểm tra đã qua, đèn tự
      viết kỹ năng làm gì từ `skill.toml`, không bao giờ lấy mô tả của mô
      hình (`made_skill::plainly`): "When the lamp has been quiet for a
@@ -101,7 +114,14 @@ sau:
 6. **Giữ lại, không cài.** Gói nằm trong thư mục riêng của giọng nói,
    `/var/lib/lampOS/voice/made-skills` (0700, người dùng của giọng nói),
    được ghi là tạo từ `local:<ms>`:
-   - giữ tối đa 5, cái cũ nhất bị bỏ cùng gói của nó;
+   - mỗi kỹ năng một mục: cùng SHA-256, hoặc cùng tên mà chưa bật, khi
+     giữ lại sẽ thay mục cũ, ghi theo lần yêu cầu mới nhất, và mục đang bật
+     vẫn bật (lamp-9adf, 3/11: ví dụ được giữ hai lần thành hai mục);
+   - giữ tối đa 5: quá số đó thì cái cũ nhất chưa bật bị bỏ cùng gói của
+     nó, không bao giờ bỏ cái đang bật hay cái vừa giữ; nếu mọi cái khác
+     đều bật thì giữ hết, quá 5. Gói mà một mục còn lại vẫn nêu tên thì
+     được giữ (lamp-9adf, 3/11: mục trùng đã đẩy mất gói của
+     `glow-yellow-on-return`, đang bật);
    - mỗi cái được giữ cùng SHA-256 và những gì nó xin dùng (`made.json`);
    - cùng một `local:<ms>` được giữ lại thì trả về cái đã giữ, không kiểm
      tra lại.

@@ -34,7 +34,9 @@ pub const FROM: &str = "local:";
 /// A made skill that `lamp-skills pack` and [`made_skill::capped`] take,
 /// shown to the model whole: the brief alone names the fields, and the
 /// lamp's own model, without a whole skill, wrote fields the check refused (lamp-9adf, 2 Nov 16:10 and 16:12: a
-/// trigger field and a light step it doesn't know).
+/// trigger field and a light step it doesn't know). Named as an example,
+/// with a level and a time a request seldom names: given back as an
+/// answer, it is refused ([`is_example`]).
 const EXAMPLE: &str = "```skill.toml
 kind = \"installable\"
 version = \"1.0.0\"
@@ -56,19 +58,42 @@ rearm = \"ends\"
 policy = \"nudge\"
 
 [[do]]
-light = { colour = \"cyan\", level = 3, for = \"20s\" }
+light = { colour = \"cyan\", level = 2, for = \"25s\" }
 ```
 
 ```SKILL.md
 ---
-name: water-on-return
-description: Glows cyan for twenty seconds when you come back to the desk, a nudge to drink some water.
+name: example-only
+description: An example of the form only: glows cyan when someone comes back to the desk.
 ---
 
-# Water on return
+# Example only
 
 When someone is back at the lamp, it glows cyan for a moment.
 ```";
+
+/// The check's lines a repair carries when the answer was [`EXAMPLE`]
+/// given back: what the model is told, once.
+const EXAMPLE_GIVEN_BACK: &str =
+    "that is the example, not what was asked; make the skill the person asked for";
+
+/// Whether `answer` is [`EXAMPLE`] given back (lamp-9adf, 3 Nov 16:15:
+/// "when I come back to my desk, glow warm" was answered with the example
+/// word for word, kept and offered as a cyan glow): its skill.toml the
+/// example's but for whitespace, or its SKILL.md named as the example.
+fn is_example(answer: &str) -> bool {
+    let (Ok(given), Ok(example)) = (made_skill::files(answer), made_skill::files(EXAMPLE)) else {
+        return false;
+    };
+    let bare = |text: &str| text.split_whitespace().collect::<String>();
+    let name = |card: &str| {
+        card.lines()
+            .find_map(|line| line.trim().strip_prefix("name:"))
+            .map(|name| name.trim().trim_matches('"').to_owned())
+    };
+    bare(&given.toml) == bare(&example.toml)
+        || name(&given.card).is_some_and(|given| Some(given) == name(&example.card))
+}
 
 /// What the model is told it is, before the brief: the format, and a whole
 /// skill the lamp's check takes.
@@ -77,7 +102,8 @@ fn system() -> String {
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
          blocks and nothing else. Use only the keys and values the request names, written as \
-         in this skill, which the lamp's check takes:\n\n{EXAMPLE}\n\nA skill can't speak \
+         in this example, which the lamp's check takes:\n\n{EXAMPLE}\n\nThe example shows \
+         the form only: never answer with it. A skill can't speak \
          or keep time by itself: a reminder at a time or every so often is the lamp's own \
          timer, not a skill. Make what the request asks with the light or the head, on the \
          lamp's resting or someone being there. A skill can't hear what is said: a request \
@@ -256,6 +282,15 @@ pub fn make_kept(
     let began = std::time::Instant::now();
     let chat = Arc::new(chat);
     let kept = |answer: Result<String, String>| match answer {
+        // The maker's own example is never kept: refused as the check
+        // refuses, so it goes back to the model once.
+        Ok(text) if is_example(&text) => {
+            eprintln!("lamp-voice: a skill made here: the model gave back the example");
+            Err(Refused(
+                "it gave back the lamp's own example, not what was asked".into(),
+                Some(EXAMPLE_GIVEN_BACK.into()),
+            ))
+        }
         Ok(text) => made_skill::keep(&text, false, from, keeping),
         Err(why) => {
             eprintln!("lamp-voice: a skill made here: the model didn't answer: {why}");
@@ -263,8 +298,8 @@ pub fn make_kept(
         }
     };
     let mut made = kept(ask(Arc::clone(&chat), brief));
-    // Refused by the lamp's check: its lines go back to the model once
-    // (`made_skill::repair_brief`).
+    // Refused by the lamp's check, or the example given back: its lines go
+    // back to the model once (`made_skill::repair_brief`).
     if let Err(Refused(_, Some(lines))) = &made
         && let Ok(repair) = made_skill::repair_brief(request, lines)
     {
@@ -998,8 +1033,102 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     fn the_example_shown_to_the_model_is_a_skill_the_lamp_takes() {
         let (root, keeping) = keeping("example");
         let made = made_skill::keep(EXAMPLE, false, "local:1", &keeping).unwrap();
-        assert_eq!(made.name, "water-on-return");
+        assert_eq!(made.name, "example-only");
         assert!(system().contains(EXAMPLE));
+        assert!(system().contains("never answer with it"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// An answer whose genuine skill fires as the example does, on someone
+    /// coming back, but glows warm: lamp-9adf's request, answered.
+    fn glow_warm() -> String {
+        EXAMPLE
+            .replace(
+                "colour = \"cyan\", level = 2, for = \"25s\"",
+                "colour = \"warm\", level = 3, for = \"20s\"",
+            )
+            .replace("example-only", "warm-on-return")
+            .replace("An example of the form only: glows cyan", "Glows warm")
+    }
+
+    /// The example is the example word for word, its skill.toml however
+    /// spaced, or its name on another skill; a skill like it is not.
+    #[test]
+    fn the_example_given_back_is_known_however_written() {
+        assert!(is_example(EXAMPLE));
+        assert!(is_example(
+            &EXAMPLE.replace(" = ", "=").replace("\n\n", "\n")
+        ));
+        assert!(is_example(
+            &EXAMPLE.replace("example-only", "glow-on-return")
+        ));
+        assert!(is_example(&good().replace("evening-dim", "example-only")));
+        assert!(!is_example(&good()));
+        assert!(!is_example(&glow_warm()));
+        let repair = made_skill::repair_brief(REQUEST, EXAMPLE_GIVEN_BACK).unwrap();
+        assert!(repair.contains(EXAMPLE_GIVEN_BACK), "{repair}");
+    }
+
+    /// lamp-9adf, 3 Nov 16:15: the model gave the example back for "glow
+    /// warm" and the lamp offered a cyan glow. It is refused as the check
+    /// refuses, and goes back to the model once: its own skill is kept.
+    #[test]
+    fn the_example_given_back_goes_back_to_the_model_once() {
+        let (root, keeping) = keeping("example-once");
+        let (url, served) = service(vec![(200, EXAMPLE.to_owned()), (200, glow_warm())]);
+        let told = make(
+            "when I come back to my desk, glow warm",
+            &keeping,
+            chat_at(url),
+            NOW,
+        );
+        assert_eq!(told["made"], "warm-on-return", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        let kept = made_skill::entries(&keeping.directory);
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert_eq!(kept[0]["name"], "warm-on-return");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The example given back twice: said as not made, in plain words,
+    /// asked no third time; nothing is kept, nothing is offered.
+    #[test]
+    fn the_example_given_back_twice_keeps_nothing() {
+        let (root, keeping) = keeping("example-twice");
+        let (url, served) = service(vec![(200, EXAMPLE.to_owned()), (200, EXAMPLE.to_owned())]);
+        let told = make(
+            "when I come back to my desk, glow warm",
+            &keeping,
+            chat_at(url),
+            NOW,
+        );
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            "the skill couldn't be made: it gave back the lamp's own example, not what was asked",
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 2);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        assert!(untold(&keeping.directory, NOW).is_empty());
+        assert_eq!(waiting(&keeping.directory), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A request whose genuine answer fires as the example does but isn't
+    /// it is kept at once: the model is asked once.
+    #[test]
+    fn a_skill_like_the_example_but_not_it_is_kept() {
+        let (root, keeping) = keeping("example-like");
+        let (url, served) = service(vec![(200, glow_warm())]);
+        let told = make(
+            "when I come back to my desk, glow warm",
+            &keeping,
+            chat_at(url),
+            NOW,
+        );
+        assert_eq!(told["made"], "warm-on-return", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }
 
