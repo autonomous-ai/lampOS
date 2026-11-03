@@ -14,7 +14,7 @@ SDKs generate from.
 - **piece 1** (#3715): the protocol's messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the rates (`rate.rs`), with their tests;
 - **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
 - **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Its actions were refused until piece 4.
-- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event, `sound` is the voice's built-in short hum through the same socket and gates (`hum` is the only name in this release), and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` at `ahead` or `{yaw, pitch}` goes on the body's lease socket under the lease the door holds (`body_lease.rs`), its end a `done` with the angles reached; `look` at `hand` has the body follow the hand in view, said with the body's lease (below). `look` at `face` or `name` is refused as out of this release ("not in this release: look at a face or a name"); `joints` and `play` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
+- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, `say` goes to the voice's say socket with its outcome as a `done` event, `sound` is the voice's built-in short hum through the same socket and gates, or a clip of the computer's own (`sounds.rs`, "Sounds" below), played as an exact `say` is, and `express` is the `feelings` skill's own move and light (`feelings.rs`). Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` at `ahead` or `{yaw, pitch}` goes on the body's lease socket under the lease the door holds (`body_lease.rs`), its end a `done` with the angles reached; `look` at `hand` has the body follow the hand in view, said with the body's lease (below). `look` at `face` or `name` is refused as out of this release ("not in this release: look at a face or a name"); `joints` and `play` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
 - **piece 5**: the bus as events, lease signals and state (`watch.rs`, with `--bus-root`). Events go out by edge, never per message: someone arrived or left, turned to or from the lamp, or stood up; the lamp's name heard; a sound class past its bar (never `speech`); a touch or the button; the lamp talking, paused, private or asleep. Each goes only to a connection subscribed to it that holds its grant. Words heard are matched on the lamp against each connection's own phrases, and only the phrase leaves it. Talking suspends every lease and resting holds them again; a hand on the body, a stop, a pause, privacy or sleep loses them. `get` answers presence (counts, never who), the light, the inner state and the lamp's own.
 - **piece 6**: the body's lease (`body_lease.rs`): with `--lease-socket`, a computer's `body` lease holds lamp-body's own, so the lamp's own life stands back, and the body's end of it is the computer's (`slumped` added to the whys).
 - **piece 7**: skills pushed from a computer (`push.rs`, with `--manage-socket`): the `skills` grant, `skill.push` in parts, `skill.list` and `skill.remove`, each asked of root's manage helper off the door's lock, and a revoke turning the computer's pushed skills off. The helper's side is lamp-skills' (Eighth's piece B); until it is in, the helper refuses what it doesn't know.
@@ -102,7 +102,8 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
 | `say` | `text`, at most 300 characters; optional `rephrase` | `say.sock` with `exact: true`: the words as sent, rendered straight through the voice's speech service (no model, no tools) and played as the lamp's own line once nobody is talking with the lamp (`say::may_play_exact`: it waits while a conversation with the lamp is going on, its speaker is busy, or an answer or reminder is owed, never for speech in the room that nobody addresses to the lamp; the keeper's pause and the privacy switch refuse it; no quiet gap or rarity). With `rephrase: true`, a written turn for the voice's model, through its quiet after a turn, privacy and busy gates, as before | `speak` | no |
-| `sound` | `name`: `hum` only in this release, the voice's built-in short hum (no file, no model); the recorded notices are never a computer's | `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates; its `done` follows | `speak` | no |
+| `sound` | `name`: `hum`, the voice's built-in short hum (no file, no model), or one of the computer's own clips by name ("Sounds" below); the recorded notices are never a computer's, and no path is ever asked | `hum`: `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates. A clip: `say.sock` `{clip: PATH}`, its path in the clips folder, read by the voice with a skill sound's format and loudness checks and up to 30 s (`say::read_clip`) and played as an exact `say` is (`say::may_play_exact`). Its `done` follows | `speak` | no |
+| `sound.upload`, `sound.list`, `sound.remove` | a clip of the computer's own, kept, listed or deleted ("Sounds" below) | the state folder's `sounds/` | `speak` | no |
 | `stop` | | ends the client's own actions now | none | no |
 
 **Gestures** a client may name: `nod`, `headshake`, `greeting`, `laugh`,
@@ -463,7 +464,10 @@ which back. An SDK's wait for them returns at the answer.
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`; degrees from −180 to 180, at least one), `within_ms` ≤ 5,000 | `body` | body |
 | `light` | `colour` (one of the ten), `level` 1–5, optional `pattern` (`breathe`, `candle`, `pulse`), `for_ms` 1–30,000 | `light` | — |
 | `say` | `text`: words, ≤ 300 chars; optional `rephrase` (boolean) | `speak` | — |
-| `sound` | `name`: `hum` (the only one in this release) | `speak` | — |
+| `sound` | `name`: `hum`, or a clip's name (a lowercase letter, then lowercase letters, digits, `_` or `-`, ≤ 64) | `speak` | — |
+| `sound.upload` | `name` (a clip's, never `hum`), `sha256` (64 hex), `size` 1–1,444,140, `part` from 0, `parts` 1–64, `data` (base64, ≤ 49,152 chars) | `speak` | — |
+| `sound.list` | — | `speak` | — |
+| `sound.remove` | `name` | `speak` | — |
 | `stop` | — | — | — |
 | `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |
 | `skill.list` | — | `skills` | — |
@@ -569,7 +573,8 @@ sends (`crates/control/src/journal.rs`).
 - the op, and what it asked in its harmless fields, so two requests that
   went to the same place can be told apart:
   - `light`: colour, level, pattern (or steady) and `for_ms`;
-  - `gesture`, `play` and `sound`: the name;
+  - `gesture`, `play`, `sound` and `sound.remove`: the name;
+  - `sound.upload`: the name, and which part of how many;
   - `move`: how many frames, and `step_ms`;
   - `express`: the feeling and strength;
   - `look`: the target, or its angles;
@@ -662,6 +667,59 @@ agent.
 
 They run on the developer's computer, never on a lamp. Until `lamp-control`
 is built they are tested against a fake server that speaks this schema.
+
+## Sounds
+
+A paired computer keeps clips of its own on its lamp and plays them by name
+(the local leader's 3 Nov, for "an SDK that controls the lamp 100%"):
+
+```json
+{"id":30,"op":"sound.upload","name":"chime","sha256":"41a68bae2ca6137df21f7702589888700856c7da2e55804d76a7b72eec7246a4","size":96044,"part":0,"parts":3,"data":"UklGRiR3AQBXQVZF"}
+{"re":30,"ok":true,"got":1}
+…
+{"re":32,"ok":true,"sound":{"name":"chime","bytes":96044,"ms":2000}}
+{"id":33,"op":"sound","name":"chime"}
+{"re":33,"ok":true,"to":"voice"}
+{"ev":"done","re":33,"how":"finished"}
+```
+
+- **A clip** is a WAV of 16-bit mono PCM at 24 kHz, the voice's speaker
+  path's, at most 30 s (1,444,140 bytes with its header). It goes up in
+  parts of at most 49,152 base64 characters (36 KiB), in order from 0, at
+  most 64 parts and 120 s from the first to the last; a broken upload is
+  sent again from 0. The last part checks the size and the SHA-256 and then
+  the clip itself, with the voice's own checks: the format and length, no
+  sample past −12 dBFS and no 10 ms past −30 dBFS RMS. That loudness cap is
+  the speaker's and the ear's bound, the same one a skill's sound has; it is
+  the only bound on what a clip may hold. A clip of the same name is
+  replaced.
+- **Kept** in lamp-control's state folder, `sounds/<client>/<name>.wav`,
+  0600 in a 0700 folder, written aside and renamed into place. Each computer
+  keeps at most 64 clips and 20 MB in all, so no computer can fill the
+  lamp's disk; past either, the upload is `refused` with why. Hello's
+  `limits.sounds` says each bound.
+- **Played** by `sound` with its name: lamp-control sends the voice its
+  path (`say.sock` `{clip}`), which the voice reads only from under its
+  clips folder (`LAMP_SAY_CLIPS`, `/var/lib/lampos-control/sounds` by
+  default), every link followed, with the same checks again, on the asker's
+  thread. It plays as an exact `say` does: it waits while someone is talking
+  with the lamp, the speaker is busy, or an answer or reminder is owed;
+  the keeper's pause and the privacy switch refuse it; there is no one in
+  30 s rarity. Quiet hours refuse it at the door, as `say`. A name the
+  computer hasn't kept is `refused`, "no clip named …".
+- **Its own only:** `sound.list` answers the computer's clips (`sounds`,
+  each name, bytes and ms), `sound.remove` deletes one (`removed`), and no
+  computer can play, list or delete another's.
+- **A revoke deletes them all**, with its upload in flight.
+- **Not logged:** the journal says the name and the part, never the bytes.
+- A lamp-control without `--say-socket` keeps none: each clip op is
+  `refused`, "this lamp keeps no computer's clips".
+- **lamp-control and lamp-voice go together.** The say socket refuses a
+  field it doesn't know, so a lamp-control from this change with a
+  lamp-voice from before it gets "not a say request" for every clip, as one
+  from #4958 does for every `say` (its `exact`). A product round ships both;
+  a `lamp-try` of lamp-control alone needs the lamp-voice of the same
+  round.
 
 ## Skills pushed from a computer (piece 7)
 

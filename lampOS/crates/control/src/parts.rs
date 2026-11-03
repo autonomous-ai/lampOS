@@ -111,6 +111,9 @@ pub struct Lamp {
     /// The camera, read from the eyes' newest frame (`--sight-file`); none
     /// without one.
     camera: Option<crate::camera::Camera>,
+    /// Where the computers' own clips are kept (`crate::sounds`), which the
+    /// voice plays from; none, and `sound` is the hum only.
+    clips: Option<PathBuf>,
 }
 
 impl Lamp {
@@ -139,7 +142,15 @@ impl Lamp {
             follow: None,
             motion: None,
             camera: None,
+            clips: None,
         }
+    }
+
+    /// The computers' own clips, kept under `folder` (the door's
+    /// `with_sound_folder`).
+    pub fn with_clips(mut self, folder: PathBuf) -> Self {
+        self.clips = Some(folder);
+        self
     }
 
     /// `camera.snapshot` and `camera.stream` from the eyes' sight file,
@@ -403,12 +414,34 @@ impl Lamp {
 
     /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
     /// no model), through the same queue, quiet, rarity and privacy gates as
-    /// a skill's sound; its outcome is a `done`, as a say's is.
-    fn sound(&self, client: &str, re: u64) -> Result<Value, Error> {
+    /// a skill's sound; or one of the computer's own clips by name, played
+    /// from the clips folder as an exact line is (once the person isn't
+    /// talking, no rarity). Its outcome is a `done`, as a say's is.
+    fn sound(&self, client: &str, re: u64, name: &str) -> Result<Value, Error> {
+        if crate::protocol::SOUNDS.contains(&name) {
+            return self.to_voice(
+                client,
+                re,
+                json!({"skill": "control", "cue": "hum", "expires_in_ms": SAY_EXPIRES_MS}),
+            );
+        }
+        let Some(folder) = &self.clips else {
+            return Err(Error::new(ErrorCode::Refused, crate::session::SOUNDS_OFF));
+        };
+        let Some(path) =
+            crate::sounds::Sounds::path(folder, client, name).filter(|path| path.is_file())
+        else {
+            return Err(Error::new(
+                ErrorCode::Refused,
+                format!(
+                    "no clip named {name} on this lamp for this computer: sound.upload it first"
+                ),
+            ));
+        };
         self.to_voice(
             client,
             re,
-            json!({"skill": "control", "cue": "hum", "expires_in_ms": SAY_EXPIRES_MS}),
+            json!({"skill": "control", "clip": path, "expires_in_ms": SAY_EXPIRES_MS}),
         )
     }
 
@@ -535,8 +568,7 @@ impl Parts for Lamp {
                     .stream(client, *on, *fps, size.as_deref(), events)
             }
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
-            // Only the hum today (protocol.rs refuses any other name).
-            Op::Sound { .. } => self.sound(client, re),
+            Op::Sound { name } => self.sound(client, re, name),
             Op::Play { .. } => Err(waits_for("client packages")),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
         }
@@ -1046,6 +1078,62 @@ mod tests {
                 "c_1".to_owned(),
                 json!({"ev": "done", "re": 14, "how": "finished"})
             )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A computer's own clip, by name: its path in the clips folder sent to
+    /// the voice as `clip`, never one of another computer's; one not kept,
+    /// or on a lamp keeping none, is refused with why and nothing is sent.
+    #[test]
+    fn a_clip_is_sent_to_the_voice_by_its_path_in_the_computers_folder() {
+        let dir = dir("clip");
+        let clips = dir.join("sounds");
+        std::fs::create_dir_all(clips.join("c_1")).unwrap();
+        std::fs::write(clips.join("c_1").join("chime.wav"), b"RIFF").unwrap();
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let events: Events = Arc::new(|_, _| {});
+        let voice = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(&stream, r#"{{"outcome":"spoken"}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let mut none = Lamp::new(
+            None,
+            None,
+            Some(path.clone()),
+            "boot".into(),
+            events.clone(),
+        );
+        assert_eq!(
+            none.act("c_1", 1, &op(r#"{"id":1,"op":"sound","name":"chime"}"#), 0)
+                .unwrap_err()
+                .why,
+            crate::session::SOUNDS_OFF
+        );
+        let mut lamp =
+            Lamp::new(None, None, Some(path), "boot".into(), events).with_clips(clips.clone());
+        assert!(
+            lamp.act("c_2", 1, &op(r#"{"id":1,"op":"sound","name":"chime"}"#), 0)
+                .unwrap_err()
+                .why
+                .starts_with("no clip named chime")
+        );
+        assert_eq!(
+            lamp.act("c_1", 2, &op(r#"{"id":2,"op":"sound","name":"chime"}"#), 0)
+                .unwrap(),
+            json!({"to": "voice"})
+        );
+        assert_eq!(
+            voice.join().unwrap(),
+            json!({
+                "skill": "control",
+                "clip": clips.join("c_1").join("chime.wav"),
+                "expires_in_ms": 30000,
+            })
         );
         let _ = std::fs::remove_dir_all(&dir);
     }

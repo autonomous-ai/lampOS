@@ -18,6 +18,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import datetime
+import hashlib
+import io
 import ipaddress
 import json
 import math
@@ -26,6 +28,7 @@ import random
 import ssl
 import tempfile
 import time
+import wave
 from collections import defaultdict
 from typing import Any
 
@@ -128,8 +131,48 @@ LIMITS = {
     "hold_max_ms": 30_000,
     "take_max_ms": 600_000,
     "say_max_chars": 300,
+    "sounds": {
+        "rate_hz": 24_000,
+        "clip_max_ms": 30_000,
+        "clip_max_bytes": 1_444_140,
+        "part_max_chars": 49_152,
+        "parts_max": 64,
+        "clips_max": 64,
+        "store_max_bytes": 20_000_000,
+    },
     "quiet_hours": {"from": "22:00", "to": "07:00"},
 }
+
+def _clip(name: str, data: bytes) -> dict:
+    """A clip as sound.upload and sound.list say it."""
+    frames = _frames_of(data) or 0
+    return {"name": name, "bytes": len(data), "ms": frames * 1_000 // 24_000}
+
+
+def _frames_of(data: bytes) -> int | None:
+    try:
+        with wave.open(io.BytesIO(data)) as read:
+            if read.getnchannels() != 1 or read.getsampwidth() != 2 or read.getframerate() != 24_000:
+                return None
+            return read.getnframes()
+    except (wave.Error, EOFError):
+        return None
+
+
+def _clip_refusal(data: bytes) -> str | None:
+    """Why lamp-control would refuse this clip, its format and length only."""
+    try:
+        with wave.open(io.BytesIO(data)):
+            pass
+    except (wave.Error, EOFError):
+        return "not a WAV file"
+    frames = _frames_of(data)
+    if frames is None:
+        return "not 16-bit mono PCM at 24000 Hz"
+    if not 1 <= frames <= 24_000 * 30:
+        return "not 1 to 720000 frames (30 s at most)"
+    return None
+
 
 # How a synthetic hand moves (`hand_track`): across the picture and back
 # (`wave`), round in a circle, left to right once, or held still.
@@ -299,6 +342,10 @@ class FakeLamp:
         # Every frame that arrived, taken or refused.
         self.received: list[dict] = []
         self.leases: dict[str, dict] = {}
+        # Each computer's clips, by name (`sound.upload`), and its upload in
+        # flight: as lamp-control's sounds.rs, without its loudness check.
+        self.clips: dict[str, dict[str, bytes]] = defaultdict(dict)
+        self._uploads: dict[str, dict] = {}
         # The newest light a computer asked for, and until when (the fake's
         # `clock`): what the ring shows while it lasts (`light_state`).
         self.shown: tuple[dict, float] | None = None
@@ -562,6 +609,9 @@ class FakeLamp:
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
             return sorted({self.STATE_GRANT[s] for s in request.get("state", []) if s in self.STATE_GRANT})
+        if op == "lease.take":
+            # A lease's parts; `sound.upload`'s `parts` is a count.
+            return [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])]
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") in ("face", "hand") else ["body"]
@@ -572,8 +622,45 @@ class FakeLamp:
             "sound": ["speak"],
             "camera.snapshot": ["camera"],
             "camera.stream": ["camera"],
-            "lease.take": [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])],
+            "sound.upload": ["speak"],
+            "sound.list": ["speak"],
+            "sound.remove": ["speak"],
         }.get(op, [])
+
+    async def _upload(self, ws, client: str, request: dict) -> None:
+        """One `sound.upload` part, as lamp-control's sounds.rs gathers it:
+        in order from 0, the same clip, then checked and kept whole."""
+        id_ = request["id"]
+        key = (request["name"], request["sha256"].lower(), request["size"], request["parts"])
+        if request["part"] == 0:
+            self._uploads[client] = {"key": key, "next": 0, "bytes": b""}
+        flight = self._uploads.get(client)
+        if flight is None or flight["key"] != key or flight["next"] != request["part"]:
+            self._uploads.pop(client, None)
+            await self._refuse(ws, id_, "bad_request", "part: out of order; send the upload again from 0")
+            return
+        flight["bytes"] += base64.b64decode(request["data"])
+        flight["next"] += 1
+        if flight["next"] < request["parts"]:
+            await self._ok(ws, id_, got=flight["next"])
+            return
+        data = self._uploads.pop(client)["bytes"]
+        if len(data) != request["size"] or hashlib.sha256(data).hexdigest() != key[1]:
+            await self._refuse(ws, id_, "bad_request", "sha256: not the clip's")
+            return
+        why = _clip_refusal(data)
+        if why is not None:
+            await self._refuse(ws, id_, "bad_request", f"clip: {why}")
+            return
+        kept = {n: b for n, b in self.clips[client].items() if n != request["name"]}
+        if len(kept) >= LIMITS["sounds"]["clips_max"]:
+            await self._refuse(ws, id_, "refused", "this computer keeps 64 clips already: remove one first")
+            return
+        if sum(map(len, kept.values())) + len(data) > LIMITS["sounds"]["store_max_bytes"]:
+            await self._refuse(ws, id_, "refused", "this computer's clips would take over 20000000 bytes: remove one first")
+            return
+        self.clips[client][request["name"]] = data
+        await self._ok(ws, id_, sound=_clip(request["name"], data))
 
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]
@@ -684,9 +771,24 @@ class FakeLamp:
             if self.auto_done:
                 at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
                 await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
+        elif op == "sound.upload":
+            await self._upload(ws, client, request)
+        elif op == "sound.list":
+            await self._ok(ws, id_, sounds=[_clip(n, b) for n, b in sorted(self.clips[client].items())])
+        elif op == "sound.remove":
+            if self.clips[client].pop(request["name"], None) is None:
+                await self._refuse(ws, id_, "refused", f"no clip named {request['name']} on this lamp for this computer")
+                return
+            await self._ok(ws, id_, removed=request["name"])
         elif op in ("say", "sound"):
-            # As lamp-control: the voice takes it (a sound is its hum), and
-            # its `done` follows.
+            # As lamp-control: the voice takes it (a sound is its hum or one
+            # of the computer's clips), and its `done` follows.
+            if op == "sound" and request["name"] != "hum" and request["name"] not in self.clips[client]:
+                self.requests.remove(request)
+                await self._refuse(
+                    ws, id_, "refused", f"no clip named {request['name']} on this lamp for this computer: sound.upload it first"
+                )
+                return
             await self._ok(ws, id_, to="voice")
             if self.auto_done:
                 await self.done(id_)

@@ -32,6 +32,8 @@ serde_json.workspace = true
 ring = "0.17"
 base64 = "0.22"
 sha2.workspace = true
+# A computer's clip checked at upload as the voice checks it (`sounds`).
+hound.workspace = true
 # The door on the network: WebSocket over TLS 1.3, the lamp's own
 # certificate (made on the lamp, pinned at pairing), as lamp-gemini and
 # lamp-voice pin tokio, tokio-tungstenite and rustls.
@@ -48,6 +50,8 @@ tokio-tungstenite = { version = "=0.30.0", default-features = false, features = 
 # `express`'s table checked against the feelings skill's own `[[do]]` and
 # lamp-skills' light rule (`glow::relative`), so the two can't drift.
 lamp-skills = { path = "../skills" }
+# `sounds`' checks held to the voice's own (`lamp_voice::say::decode_clip`).
+lamp-voice = { path = "../voice" }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [lints]

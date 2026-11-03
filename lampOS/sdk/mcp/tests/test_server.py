@@ -21,7 +21,8 @@ from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
     "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
-    "lamp_light", "lamp_say", "lamp_sound", "lamp_events", "lamp_stop",
+    "lamp_light", "lamp_say", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound", "lamp_events",
+    "lamp_stop",
 }
 # The schema's ops a tool doesn't send itself: pairing and hello are the
 # SDK's, before any tool; leases go with each body tool; the camera's stream
@@ -120,7 +121,14 @@ def test_every_op_of_the_schema_is_sent_by_a_tool(tmp_path):
 
     source = inspect.getsource(module)
     # Sent through the SDK's own calls rather than by name.
-    through = {"get": "lamp.get(", "subscribe": "lamp.on(", "unsubscribe": "lamp.off("}
+    through = {
+        "get": "lamp.get(",
+        "subscribe": "lamp.on(",
+        "unsubscribe": "lamp.off(",
+        "sound.upload": "lamp.upload_sound(",
+        "sound.list": "lamp.sounds(",
+        "sound.remove": "lamp.remove_sound(",
+    }
     sent = set()
     for op in schema.ops():
         if op in NOT_A_TOOL:
@@ -958,5 +966,36 @@ def test_the_camera_tool_is_offered_only_with_the_camera_grant_and_gives_a_pictu
             assert base64.b64decode(image.data) == FAKE_JPEG
         async with connected(tmp_path / "plain") as (_, _, session):
             assert "lamp_camera_snapshot" not in {tool.name for tool in (await session.list_tools()).tools}
+
+    run(go())
+
+
+def test_a_clip_is_uploaded_from_a_file_played_listed_and_removed(tmp_path):
+    import io
+    import wave
+
+    out = io.BytesIO()
+    with wave.open(out, "wb") as file:
+        file.setnchannels(1)
+        file.setsampwidth(2)
+        file.setframerate(24_000)
+        file.writeframes((1_000).to_bytes(2, "little", signed=True) * 24_000)
+    clip = tmp_path / "chime.wav"
+    clip.write_bytes(out.getvalue())
+
+    async def go():
+        async with connected(tmp_path / "lamp", grants=("speak",)) as (fake, _, session):
+            kept = await session.call_tool("lamp_upload_sound", {"name": "chime", "path": str(clip)})
+            assert not kept.isError, text(kept)
+            assert json.loads(text(kept)) == {"name": "chime", "bytes": len(out.getvalue()), "ms": 1_000}
+            listed = await session.call_tool("lamp_sounds", {})
+            assert "chime" in text(listed)
+            assert not (await session.call_tool("lamp_sound", {"name": "chime"})).isError
+            assert fake.asked("sound") == [{"name": "chime"}]
+            assert not (await session.call_tool("lamp_remove_sound", {"name": "chime"})).isError
+            gone = await session.call_tool("lamp_sound", {"name": "chime"})
+            assert gone.isError and "no clip named chime" in text(gone)
+            missing = await session.call_tool("lamp_upload_sound", {"name": "a", "path": str(tmp_path / "none.wav")})
+            assert missing.isError and "can't be read" in text(missing)
 
     run(go())

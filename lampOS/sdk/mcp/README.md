@@ -52,7 +52,11 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `pattern` | string | `breathe`, `candle` or `pulse` | none: steady | | |
 | `lamp_say` | `text` | string, required | 300 characters at most, said exactly as written once the person isn't talking | — | speak | no |
 | | `rephrase` | boolean | `true`: the lamp says it in its own words instead | `false` | | |
-| `lamp_sound` | `name` | string, required | a sound's name: lowercase letters, digits, `-` and `_`, 40 at most; `hum`, the lamp's own short hum, is the only one in this release; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
+| `lamp_sound` | `name` | string, required | `hum`, the lamp's own short hum, or one of this computer's clips (`lamp_upload_sound`), played once the person isn't talking; refused in quiet hours, and by a lamp that doesn't route `sound` yet | — | speak | no |
+| `lamp_upload_sound` | `name` | string, required | the clip's name: a lowercase letter, then lowercase letters, digits, `_` or `-`, 64 at most, never `hum`; replaces a clip of the same name | — | speak | no |
+| | `path` | string, required | a WAV file on this computer: 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS. Each computer keeps up to 64 clips and 20 MB on the lamp; revoking it deletes them | — | | |
+| `lamp_sounds` | none | | | | speak | no |
+| `lamp_remove_sound` | `name` | string, required | one of this computer's clips | — | speak | no |
 | `lamp_events` | `since` | integer | a `seq` from an earlier answer; 0 for every event kept (the last 200) | 0 | the event's (`person.*` and `hand` look, `name.heard` hear, `sound.heard` sound; `touch`, `button`, `lamp.changed` none) | no |
 | | `wait_s` | number | 0 to 120: with nothing after `since`, how long to wait for the next | 0 | | |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |
@@ -66,7 +70,7 @@ needs is refused the same way, `bad_request: lamp_light needs colour`, never
 in the validator's words. `serverInfo.version` is lamp-mcp's own.
 
 `joints` is left out: a 20 Hz stream isn't something an agent drives turn by
-turn. `play` needs a skill package; `sound` takes only `hum` in this release.
+turn. `play` needs a skill package; `sound` plays `hum` or a clip the computer uploaded.
 
 **Leases** are taken for you: a body tool (`lamp_look`, `lamp_move`,
 `lamp_play`, `lamp_joints`) takes a 10 s body lease, or renews the one this

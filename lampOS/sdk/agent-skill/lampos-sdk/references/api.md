@@ -84,7 +84,10 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | aim the joints | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
 | light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | say | `await lamp.say("Build passed.")` | `lamp.say('Build passed.')` | `lamp_say(text)` | speak |
-| a sound | `await lamp.sound(name)` | `lamp.sound(name)` | `lamp_sound(name)` | speak |
+| a sound (`hum`, or a clip of yours) | `await lamp.sound(name)` | `lamp.sound(name)` | `lamp_sound(name)` | speak |
+| keep a clip on the lamp | `await lamp.upload_sound(name, "chime.wav")` | `lamp.uploadSound(name, bytes)` | `lamp_upload_sound(name, path)` | speak |
+| your clips | `await lamp.sounds()` | `lamp.sounds()` | `lamp_sounds()` | speak |
+| delete a clip | `await lamp.remove_sound(name)` | `lamp.removeSound(name)` | `lamp_remove_sound(name)` | speak |
 | stop everything of mine | `await lamp.stop()` | `lamp.stop()` | `lamp_stop()` | none |
 
 Ranges, from lamp-control and the body:
@@ -98,7 +101,14 @@ Ranges, from lamp-control and the body:
 - **move:** 2–500 frames of 5 joints (pitch, roll, yaw, shoulder, elbow) in
   counts from home, first and last all 0; `step_ms` 40–1,000; 1.5 to 10 s
   in all; each joint within reach (200, 200, 150, 350, 350 counts) and speed.
-- **say:** up to 300 characters. **look:** `yaw` −180 to 180, `pitch` −90 to
+- **clips:** a WAV of 16-bit mono PCM at 24 kHz, up to 30 s, no sample past
+  −12 dBFS and no 10 ms past −30 dBFS RMS; a name of a lowercase letter,
+  then lowercase letters, digits, `_` or `-`, never `hum`. Up to 64 clips and
+  20 MB a computer (`limits.sounds`); a revoke deletes them. A clip plays
+  as an exact `say` does: once the person isn't talking.
+- **say:** up to 300 characters, said exactly as written since #4958;
+  `rephrase=True` (`{ rephrase: true }`, `lamp_say(text, rephrase)`) for the
+  model's own words, every say's behaviour before it. **look:** `yaw` −180 to 180, `pitch` −90 to
   90, right and up positive.
 
 ## Skills of your own
