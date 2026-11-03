@@ -228,11 +228,13 @@ impl Looks {
     /// The links the eyes say hold as of `at` (`boot/f1` followed by
     /// `boot/f2`, #4885), from their own looks at or before it, as a chain:
     /// a face re-found twice is `f1` to `f2` to `f3`, though the eyes say
-    /// only the last hop by then (#4966). As the eyes keep a link, each
-    /// pair lasts until a later look ends it: its old id in view again (in
-    /// the look that says it too), or its new id in view without the eyes
-    /// saying it (the Reviewer-lead's P1 on #4917). A link the eyes ended
-    /// is gone at once.
+    /// only the last hop by then (#4966). Each pair lasts until a later
+    /// look ends it: its old id in view again (in the look that says it
+    /// too), or its new id in view without the eyes saying it (the
+    /// Reviewer-lead's P1 on #4917). A link the eyes ended is gone at once.
+    /// The voice keeps a pair longer than the eyes do: they drop a link
+    /// 1.5 s after the old id was lost (`lamp-eyes` bus_out.rs), it lasts
+    /// here for the looks kept ([`KEPT`]) unless a look cuts it.
     fn links_at(&self, at: Instant) -> Vec<(String, String)> {
         let mut links: Vec<(String, String)> = Vec::new();
         for look in self
