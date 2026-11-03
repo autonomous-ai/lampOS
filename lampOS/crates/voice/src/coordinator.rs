@@ -6945,7 +6945,7 @@ fn conversation_with_gate_inner(
     let late_yield = duplex && crate::turn_taking::cut_in_late_yield();
     if late_yield {
         eprintln!(
-            "lamp-voice: late yields commit: a yield with {} blocks over the lamp in the {} before it commits on stillness instead of resuming the answer",
+            "lamp-voice: late yields commit: a yield with {} blocks heard plainly over the lamp in the {} before it commits on stillness instead of resuming the answer",
             lamp_audio::duplex::LATE_YIELD_OVER_BLOCKS,
             lamp_audio::duplex::LATE_YIELD_WINDOW_BLOCKS,
         );
