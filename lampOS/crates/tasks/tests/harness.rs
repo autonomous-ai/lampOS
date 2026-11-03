@@ -107,6 +107,7 @@ impl Rig {
             absolute_folder: false,
             new_folder: None,
             journal: None,
+            calls: None,
         };
         let rig = Self {
             root,
@@ -3261,6 +3262,192 @@ fn with_new_folder_an_unreadable_file_costs_one_ask() {
     let news = new_args(&rig);
     assert_eq!(news[0][4], "--new");
     assert_eq!(news[1][4], "~/harnesses/lamp-tasks");
+}
+
+/// The call lines one Cli says, with the rig's call journal kept.
+fn calls_of(rig: &mut Rig) -> (Cli, Arc<Mutex<Vec<String>>>) {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    rig.config.calls = Some(calls.clone());
+    (rig.cli(), calls)
+}
+
+/// No call line holds the ask, a word of it, a question, an answer, a
+/// progress line, a name, a folder, or a whole machine or agent id.
+fn assert_call_said_nothing_private(line: &str, private: &[&str]) {
+    for word in private {
+        assert!(!line.contains(word), "{word}: {line}");
+    }
+    for whole in [MACHINE, AGENT, OTHER] {
+        assert!(!line.contains(whole), "{whole}: {line}");
+    }
+}
+
+/// Proposal L1 and L2: every Harness call says one journal line: its verb,
+/// the machine and agent ids cut to 8, the exit, the time, stdout's size,
+/// the state and tool count read, and the ids Harness gave. Never the ask.
+#[test]
+fn every_harness_call_says_one_line_with_ids_cut_and_no_words() {
+    const SECRET: &str = "Zanzibar-Quokka whispers lavender passcode 4417";
+    let private = [
+        "Zanzibar",
+        "Quokka",
+        "lavender",
+        "passcode",
+        "4417",
+        "Earlier unrelated question",
+        "Observed answer",
+        "Suggest three names",
+        "Read the brief",
+        "lamp-task-001",
+        "lamp-0a1b",
+        "fixture-project",
+        "/home/person",
+    ];
+    // A Devin hand-over: machines, new, show, then reply with the ask.
+    let mut rig = Rig::new();
+    let mut request = launch();
+    request.prompt = SECRET.into();
+    request.target.engine = EngineKind::Devin;
+    let (cli, calls) = calls_of(&mut rig);
+    assert!(matches!(
+        cli.launch(&request),
+        LaunchOutcome::Created { .. }
+    ));
+    let lines = calls.lock().unwrap().clone();
+    assert_eq!(lines.len(), 4, "{lines:?}");
+    for line in &lines {
+        assert_call_said_nothing_private(line, &private);
+    }
+    assert!(
+        lines[0].starts_with("tasks: harness machines: exit=0 ms=")
+            && lines[0].ends_with(" listed=1"),
+        "{}",
+        lines[0]
+    );
+    assert!(
+        lines[1].starts_with("tasks: harness new: machine=01234567 exit=0 ms=")
+            && lines[1].ends_with(" state=ok id=11111111"),
+        "{}",
+        lines[1]
+    );
+    assert!(
+        lines[2].starts_with("tasks: harness show: machine=01234567 agent=11111111 exit=0 ms=")
+            && lines[2].ends_with(" state=idle tools=2 id=11111111"),
+        "{}",
+        lines[2]
+    );
+    assert!(
+        lines[3].starts_with("tasks: harness reply: machine=01234567 agent=11111111 exit=0 ms=")
+            && lines[3].ends_with(" state=queued id=11111111 message=m1"),
+        "{}",
+        lines[3]
+    );
+    // The same ask through `new --task` and a route first.
+    let mut rig = Rig::new();
+    rig.config.route = true;
+    rig.plan(json!({"machines":{"default":true},"route":{"default":true},"new":{"default":true}}));
+    let mut request = launch();
+    request.prompt = SECRET.into();
+    let (cli, calls) = calls_of(&mut rig);
+    assert!(matches!(
+        cli.launch(&request),
+        LaunchOutcome::Created { .. }
+    ));
+    let lines = calls.lock().unwrap().clone();
+    assert_eq!(lines.len(), 3, "{lines:?}");
+    assert!(
+        lines[1].starts_with("tasks: harness route: machine=01234567 exit=0 ms=")
+            && lines[1].ends_with(" state=new"),
+        "{}",
+        lines[1]
+    );
+    for line in &lines {
+        assert_call_said_nothing_private(line, &private);
+    }
+    // `ps`: how many, in which state, never the about lines or names.
+    let mut rig = Rig::new();
+    rig.plan(json!({"ps":step(listing())}));
+    let (cli, calls) = calls_of(&mut rig);
+    cli.status(MACHINE).unwrap();
+    let line = calls.lock().unwrap()[0].clone();
+    assert!(
+        line.starts_with("tasks: harness ps: machine=01234567 exit=0 ms=")
+            && line.contains(" out=")
+            && line.ends_with(" listed=3 states=idle:1,starting:1,working:1"),
+        "{line}"
+    );
+    assert_call_said_nothing_private(&line, &private);
+    // `wait`: how many waited on, and the ids it came back for.
+    let mut rig = Rig::new();
+    rig.plan(json!({"wait":{"stdout":waited("idle", AGENT)}}));
+    let (cli, calls) = calls_of(&mut rig);
+    cli.wait(
+        MACHINE,
+        &[AGENT.into(), OTHER.into()],
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    let line = calls.lock().unwrap()[0].clone();
+    assert!(
+        line.starts_with("tasks: harness wait: machine=01234567 agents=2 exit=0 ms=")
+            && line.ends_with(" listed=1 states=idle:1 ids=11111111"),
+        "{line}"
+    );
+    assert_call_said_nothing_private(&line, &private);
+    // `close`, refused with a nonzero exit and Harness's words, one of them
+    // a single word in `message` (the reviewer-lead's P2 on #5092).
+    let mut rig = Rig::new();
+    rig.plan(json!({"close":{"exit":1,"stdout":
+        "{\"ok\":false,\"error\":\"Zanzibar is working\",\"message\":\"Zanzibar\"}\n"}}));
+    let (cli, calls) = calls_of(&mut rig);
+    assert_eq!(cli.close(MACHINE, AGENT), Err("close_failed".into()));
+    let line = calls.lock().unwrap()[0].clone();
+    assert!(
+        line.starts_with("tasks: harness close: machine=01234567 agent=11111111 exit=1 ms=")
+            && line.ends_with(" state=failed error=?"),
+        "{line}"
+    );
+    assert_call_said_nothing_private(&line, &private);
+    // A code Harness gives is said as it is.
+    let mut rig = Rig::new();
+    rig.new_step(json!({"exit":1,"stdout":"{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n"}));
+    let (cli, calls) = calls_of(&mut rig);
+    cli.launch(&launch());
+    let line = calls.lock().unwrap()[1].clone();
+    assert!(
+        line.contains(" exit=1 ms=") && line.ends_with(" state=failed error=SPAWN_FAILED"),
+        "{line}"
+    );
+    // A timeout: no exit, no stdout, only the adapter's code.
+    let mut rig = Rig::new();
+    rig.config.read_timeout = Duration::from_millis(300);
+    rig.show_step(json!({"delay_ms":2000}));
+    let (cli, calls) = calls_of(&mut rig);
+    assert_eq!(cli.observe(MACHINE, AGENT), Err("timeout".into()));
+    let line = calls.lock().unwrap()[0].clone();
+    assert!(
+        line.starts_with("tasks: harness show: machine=01234567 agent=11111111 exit=timeout ms=")
+            && !line.contains("out="),
+        "{line}"
+    );
+}
+
+/// A cloud agent's id keeps its `cloud_` and the first 8 after it.
+#[test]
+fn a_call_line_cuts_a_cloud_agents_id_after_its_kind() {
+    let mut rig = Rig::new();
+    rig.show_step(step(
+        json!({"id":CLOUD,"state":"idle","ask":null,"answer":"","truncated":false,"tools":0}),
+    ));
+    let (cli, calls) = calls_of(&mut rig);
+    cli.observe(MACHINE, CLOUD).unwrap();
+    let line = calls.lock().unwrap()[0].clone();
+    let cut = "cloud_4b0055ec";
+    assert!(
+        line.contains(&format!(" agent={cut} ")) && line.ends_with(&format!(" id={cut}")),
+        "{line}"
+    );
+    assert!(!line.contains(CLOUD), "{line}");
 }
 
 /// Seen on a lamp on 3 Nov: `show` against the person's Mac took 16 to 39
