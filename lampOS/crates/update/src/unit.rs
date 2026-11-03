@@ -270,12 +270,13 @@ mod tests {
     /// lamp moved from V1 answers only when spoken to (Migrate on #2602,
     /// 22 Oct). Not `LAMP_NAMES`: it needs the eyes' who socket, which the
     /// generic eyes unit does not serve.
-    const WHO_IT_ANSWERS: [&str; 13] = [
+    const WHO_IT_ANSWERS: [&str; 14] = [
         "LAMP_BUS",
         "LAMP_BUS_AUDIO",
         "LAMP_ATTENTION",
         "LAMP_ROOM_FACTS",
         "LAMP_SPOKEN_TO",
+        "LAMP_ONE_AS_LAMP",
         "LAMP_NAME_IN_PASSING",
         "LAMP_NAME_NOTE",
         "LAMP_NAME_NOTE_BUSY",
