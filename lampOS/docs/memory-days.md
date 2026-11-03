@@ -123,13 +123,27 @@ what it sent before and the function has no span. The voice needs a
 lamp-memory from the same build: an older memory refuses the new fields,
 so recall answers nothing until both are updated.
 
+Three switches bring ideas from memory-tiers (Tiers, `memory-tiers.md`,
+`tiers/recall-adapter`) into Days as request fields (the 3 November plan).
+Each is off unless set to exactly `on`, with the Days client only, and read
+once at start; each adds its field only when on, so with all three off every
+request is byte-identical to before. `LAMP_MEMORY_NEWER_FIRST` adds
+`"newer_first":true` to a recall's `search`; `LAMP_MEMORY_STRENGTH` adds
+`"strength":true` to a recall's `search` and to `session_open`;
+`LAMP_MEMORY_PROFILE` adds `"profile":true` to `session_open`. A bare
+`recall` (no query) carries none of them. What Days does with each is
+described with its request below. All three are read-path only: nothing new
+is kept, said or read, and no model is asked. They need a lamp-memory from the
+same build: an older memory refuses an unknown field (`deny_unknown_fields`),
+so a recall with one answers nothing and a session note is unavailable until
+both are updated.
+
 With `LAMP_MEMORY_NEWER_FIRST=on` (the memory owner's Tiers-ideas plan, 3
 Nov, part P1; off unless set, with the Days client only; the idea adapted
 from memory-tiers' "newer owner evidence only" supersession, Tiers on
 `tiers/recall-adapter`, [memory-tiers.md](memory-tiers.md)), a recall's
-`search` or `recall` is to carry `"newer_first":true`. **Not wired until
-P4: the voice doesn't send the field yet, so setting the switch changes
-nothing today**; only the store answers it. Of the records the query
+`search` carries `"newer_first":true` (P4, above; a bare `recall` does not,
+though the store answers it there too). Of the records the query
 already found for a known person, a later one that corrects an earlier one
 goes first in a search and the earlier one says `"earlier":true`; a recall
 keeps its time order and only says `earlier`. For the room's scope (no
