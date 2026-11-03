@@ -3340,6 +3340,22 @@ pub fn serve(
         if let Ok(mut heeding) = heeding.lock() {
             heeding.telling_another_voice(another_voice.clone());
         }
+        // The connected services ask whose voice a line is in
+        // (`crate::services::VoiceAsk`): a send only in the voice that asked,
+        // a read in full only in the conversation's.
+        {
+            let heeding = heeding.clone();
+            crate::services::judging_voices(Arc::new(move |ask| {
+                let mut heeding = heeding.lock().ok()?;
+                let voices = heeding.voices.as_mut()?;
+                match ask {
+                    crate::services::VoiceAsk::Alike(a, b) => voices.alike(a, b),
+                    crate::services::VoiceAsk::Conversation(request) => {
+                        voices.likeness_so_far(request)
+                    }
+                }
+            }));
+        }
         let quiet_same_one =
             std::env::var(crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT)
                 .is_ok_and(|value| value == "on");
@@ -4006,6 +4022,10 @@ pub fn serve(
                 .and_then(|mut heeding| heeding.heed_led(request, said, heard, from, lead))
         }));
     }
+    // The second route without the rule has no prints: still this route's
+    // judge, which knows none, so a write is refused for an unknown voice
+    // and a read is brief (`crate::services::judging_voices`, set once).
+    crate::services::judging_voices(Arc::new(|_| None));
     // Without the rule, a line's own words say whether it called the lamp.
     if !files.attention {
         engine = engine.noting_whether_called(Arc::new(|_, words| {
@@ -7402,6 +7422,9 @@ impl Heeding {
                     crate::spoken_stop::just_after(monotonic_us(), until_us)
                 }))
             .then_some(request);
+            // A write waiting for its "send" is timed from when a line
+            // began, not when its words came (`crate::services`).
+            crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;

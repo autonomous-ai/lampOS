@@ -31,6 +31,8 @@ rustix = { version = "=1.1.5", features = ["fs", "net"] }
 base64 = "=0.22.1"
 # A pending write's random id, from the ring the TLS already builds.
 ring = "0.17"
+# A security text read composed (NFC): Vietnamese with combining accents.
+unicode-normalization = "=0.1.25"
 
 [dev-dependencies]
 tempfile = "3"

@@ -37,6 +37,8 @@ pub const PREVIEW_MOST: usize = 300;
 pub const TEXT_MOST: usize = 3_000;
 /// What stands in for a security mail.
 pub const SECURITY_LEFT_OUT: &str = "a security mail, left out";
+/// What stands in for a security item of any other service.
+pub const SECURITY_MESSAGE_LEFT_OUT: &str = "a security message, left out";
 
 /// Why a mail exchange failed, said without anything the server sent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -167,14 +169,43 @@ const SECURITY_PHRASES: &[&str] = &[
     "dat lai mat khau",
     "đăng nhập",
     "dang nhap",
+    "steam guard",
 ];
 
 /// Short words that count only as whole words.
 const SECURITY_WORDS: &[&str] = &["otp", "2fa", "mfa", "pin"];
 
-/// Words that make a mail a security one when a code number
-/// ([`has_code_number`]) is near them.
-const CODE_WORDS: &[&str] = &["code", "mã", "token", "pin"];
+/// Words that make a mail a security one when a code ([`has_code_number`],
+/// [`has_mixed_code`]) is within [`NEAR`] of them.
+const CODE_WORDS: &[&str] = &[
+    "code",
+    "mã",
+    "token",
+    "pin",
+    "enter",
+    "confirm",
+    "confirmation",
+    "verify",
+    "verification",
+    "nhập",
+    "xác nhận",
+    "xac nhan",
+];
+
+/// How far from a code word a code still counts, in bytes either way.
+const NEAR: usize = 200;
+
+/// Words in a link's path that make it a sign-in or verification link.
+const LINK_PATH_WORDS: &[&str] = &[
+    "magic", "verify", "login", "log-in", "signin", "sign-in", "auth", "confirm", "reset", "otp",
+];
+
+/// Words that ask to follow a link, beside which a long opaque value in it
+/// is a sign-in link's secret.
+const FOLLOW_WORDS: &[&str] = &["click", "link", "tap", "nhấn", "bấm"];
+
+/// The shortest opaque query value taken for a link's secret.
+const OPAQUE_LEAST: usize = 24;
 
 /// Signing in, which makes a mail a security one with a link or a code
 /// number anywhere in it ("Use 482913 to sign in", "Log in to Notion:
@@ -202,8 +233,8 @@ fn whole_word(text: &str, word: &str) -> bool {
 }
 
 /// A code standing alone within `text`: 4 to 8 digits, unbroken or in
-/// groups split by one space or dash ("482913", "482 913", "482-913",
-/// "4 8 2 9 1 3").
+/// groups split by one space, dash or dot, or a dash between spaces
+/// ("482913", "482 913", "482-913", "482.913", "482 - 913", "4 8 2 9 1 3").
 fn has_code_number(text: &str) -> bool {
     let chars: Vec<char> = text.chars().collect();
     let mut at = 0;
@@ -219,13 +250,22 @@ fn has_code_number(text: &str) -> bool {
                 digits += 1;
                 end += 1;
             }
-            let joined = end + 1 < chars.len()
-                && matches!(chars[end], ' ' | '-')
-                && chars[end + 1].is_ascii_digit();
-            if !joined {
+            let gap = if end + 1 < chars.len()
+                && matches!(chars[end], ' ' | '-' | '.')
+                && chars[end + 1].is_ascii_digit()
+            {
+                1
+            } else if end + 3 < chars.len()
+                && chars[end] == ' '
+                && matches!(chars[end + 1], '-' | '–')
+                && chars[end + 2] == ' '
+                && chars[end + 3].is_ascii_digit()
+            {
+                3
+            } else {
                 break;
-            }
-            end += 1;
+            };
+            end += gap;
         }
         let alone = !chars.get(end).is_some_and(|c| c.is_alphanumeric());
         if alone && (4..=8).contains(&digits) {
@@ -236,13 +276,60 @@ fn has_code_number(text: &str) -> bool {
     false
 }
 
-/// `all`'s text within 80 bytes of `at`, on character boundaries.
+/// A code of letters and digits standing alone within `text`: a word of 4
+/// to 8 ASCII letters and digits with both in it ("F7K2Q").
+fn has_mixed_code(text: &str) -> bool {
+    text.split(|c: char| !c.is_alphanumeric()).any(|word| {
+        (4..=8).contains(&word.len())
+            && word.chars().all(|c| c.is_ascii_alphanumeric())
+            && word.chars().any(|c| c.is_ascii_digit())
+            && word.chars().any(|c| c.is_ascii_alphabetic())
+    })
+}
+
+/// A link that signs in or verifies: a word of [`LINK_PATH_WORDS`] in its
+/// path or query, or, with a word asking to follow it ([`FOLLOW_WORDS`]),
+/// a long opaque value in its query.
+fn has_login_link(all: &str) -> bool {
+    let follow = FOLLOW_WORDS.iter().any(|word| all.contains(word));
+    all.match_indices("http").any(|(at, _)| {
+        let link = all[at..]
+            .split(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | ')'))
+            .next()
+            .unwrap_or("");
+        let Some(rest) = link
+            .strip_prefix("https://")
+            .or_else(|| link.strip_prefix("http://"))
+        else {
+            return false;
+        };
+        let Some((_, path)) = rest.split_once(['/', '?']) else {
+            return false;
+        };
+        let words = path
+            .split(|c: char| !c.is_alphanumeric() && c != '-')
+            .any(|word| LINK_PATH_WORDS.contains(&word));
+        let opaque = follow
+            && path
+                .split(['?', '&'])
+                .filter_map(|pair| pair.split_once('='))
+                .any(|(_, value)| {
+                    value.len() >= OPAQUE_LEAST
+                        && value.chars().all(|c| {
+                            c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '%')
+                        })
+                });
+        words || opaque
+    })
+}
+
+/// `all`'s text within [`NEAR`] bytes of `at`, on character boundaries.
 fn around(all: &str, at: usize, len: usize) -> &str {
-    let mut start = at.saturating_sub(80);
+    let mut start = at.saturating_sub(NEAR);
     while !all.is_char_boundary(start) {
         start -= 1;
     }
-    let mut end = (at + len + 80).min(all.len());
+    let mut end = (at + len + NEAR).min(all.len());
     while !all.is_char_boundary(end) {
         end += 1;
     }
@@ -253,12 +340,20 @@ fn around(all: &str, at: usize, len: usize) -> &str {
 /// sign-in alert or link, or a verification, in English or Vietnamese.
 /// Such a text is never spoken, forwarded or kept: it is dropped from what
 /// is returned and said only as [`SECURITY_LEFT_OUT`]. A text that says
-/// "code" (or "mã", "token", "pin") near a 4 to 8 digit number counts too,
-/// and so does one that says "sign in" or "log in" with a link or such a
-/// number anywhere. It errs on hiding: a discount code or a postal code
-/// near a number is left out too.
+/// "code" (or "mã", "token", "pin", "enter", "confirm", …) within [`NEAR`]
+/// of a 4 to 8 digit number or a letters-and-digits code counts too; so does
+/// one that says "sign in" or "log in" with a link or such a number
+/// anywhere, and one with a sign-in or verification link
+/// ([`has_login_link`]). Read composed (NFC). It errs on hiding: a discount
+/// code or a postal code near a number is left out too.
 pub fn is_security_mail(from: &str, subject: &str, text: &str) -> bool {
-    let all = format!("{from}\n{subject}\n{text}").to_lowercase();
+    use unicode_normalization::UnicodeNormalization;
+    // Composed (NFC) first: Vietnamese written with combining accents
+    // matches the phrases as written here.
+    let all = format!("{from}\n{subject}\n{text}")
+        .nfc()
+        .collect::<String>()
+        .to_lowercase();
     if SECURITY_PHRASES.iter().any(|phrase| all.contains(phrase))
         || SECURITY_WORDS.iter().any(|word| whole_word(&all, word))
     {
@@ -276,12 +371,13 @@ pub fn is_security_mail(from: &str, subject: &str, text: &str) -> bool {
                         .chars()
                         .next()
                         .is_some_and(char::is_alphanumeric));
-            whole && has_code_number(around(&all, at, word.len()))
+            let near = around(&all, at, word.len());
+            whole && (has_code_number(near) || has_mixed_code(near))
         })
     });
     let signs_in = SIGN_IN_WORDS.iter().any(|word| all.contains(word))
         && (LINK_STARTS.iter().any(|link| all.contains(link)) || has_code_number(&all));
-    near_code || signs_in
+    near_code || signs_in || has_login_link(&all)
 }
 
 // --- MIME -------------------------------------------------------------------
@@ -1244,6 +1340,31 @@ mod tests {
                 "Click https://x.test/a?token=abc to continue",
             ),
             ("x@y.z", "Account", "Choose a new password here"),
+            // Dots and a spaced dash between groups.
+            ("x@y.z", "Hi", "Your code: 482 - 913"),
+            ("x@y.z", "Hi", "Your code: 482.913"),
+            // Letters and digits.
+            ("x@y.z", "Steam", "Steam Guard code: F7K2Q"),
+            ("x@y.z", "Hi", "Your access key is ready. Code: F7K2Q"),
+            // Enter or confirm with a number.
+            ("x@y.z", "Hi", "Enter 482913 to confirm"),
+            ("x@y.z", "Order", "Your confirmation number: 482913"),
+            // A sign-in link with no sign-in words and no token=.
+            ("x@y.z", "Hi", "Open https://app.test/magic/abc to continue"),
+            ("x@y.z", "Hi", "Go to https://x.test/auth/cb?c=1"),
+            (
+                "x@y.z",
+                "Hi",
+                "Click this link: https://x.test/go?k=Zq8x0PjL3mW9vB2nT7yR4sKd",
+            ),
+            // Vietnamese with combining accents (NFD).
+            ("x@y.z", "", "Ma\u{0303} xa\u{0301}c minh: 482913"),
+            // A code far from the word "code".
+            (
+                "x@y.z",
+                "Your code",
+                "Hello! We are glad you are here, and we hope you enjoy every part of it. Here it is, just for you, from the whole team: 482913",
+            ),
         ] {
             assert!(is_security_mail(from, subject, text), "{subject} {text}");
         }
