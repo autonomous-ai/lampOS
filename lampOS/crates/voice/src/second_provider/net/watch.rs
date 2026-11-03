@@ -126,11 +126,21 @@ enum Connection {
     New(Opens),
 }
 
+/// What a round's two tries tell once between them: both may meet the same
+/// refused key or fall from the same near address, and each still goes where
+/// that sends it.
+#[derive(Default)]
+struct ToldOnce {
+    fall: AtomicBool,
+    refusal: AtomicBool,
+}
+
 /// How far one try of a chat request got, in the journal's words.
 #[derive(Default)]
 pub struct Reach {
     connection: Mutex<Option<Connection>>,
     answer_begun: AtomicBool,
+    once: Arc<ToldOnce>,
 }
 
 impl Reach {
@@ -144,11 +154,17 @@ impl Reach {
         self.answer_begun.store(true, Ordering::SeqCst);
     }
 
+    /// Whether the response's head came: the connection is plainly alive,
+    /// though no word or call has yet.
+    pub fn answer_has_begun(&self) -> bool {
+        self.answer_begun.load(Ordering::SeqCst)
+    }
+
     /// `answer begun` (the response's head came, no word or call yet), `sent`
     /// (handed to an open connection, which says nothing of whether it got
     /// anywhere), or `nothing`.
     pub fn told(&self) -> String {
-        if self.answer_begun.load(Ordering::SeqCst) {
+        if self.answer_has_begun() {
             return "answer begun".to_owned();
         }
         let Ok(connection) = self.connection.lock() else {
@@ -182,6 +198,28 @@ impl Watch {
             reach: Arc::default(),
             opening_told: Some(told),
         }
+    }
+
+    /// [`Self::on_a_new_connection`] for the second try of a round whose first
+    /// reached `first`: between them they tell a fall and a refusal once.
+    pub fn second_to(first: &Reach, told: OpeningTold) -> Self {
+        Self {
+            reach: Arc::new(Reach {
+                once: first.once.clone(),
+                ..Reach::default()
+            }),
+            ..Self::on_a_new_connection(told)
+        }
+    }
+
+    /// Whether this try is the round's first to fall from a near address.
+    pub fn first_to_tell_a_fall(&self) -> bool {
+        !self.reach.once.fall.swap(true, Ordering::SeqCst)
+    }
+
+    /// Whether this try is the round's first to have its key refused.
+    pub fn first_to_tell_a_refusal(&self) -> bool {
+        !self.reach.once.refusal.swap(true, Ordering::SeqCst)
     }
 
     pub fn reach(&self) -> Arc<Reach> {

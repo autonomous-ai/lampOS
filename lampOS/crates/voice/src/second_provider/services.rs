@@ -672,7 +672,11 @@ impl Net {
             if let Some((near_chat, taken, service)) = near {
                 let answer = near_chat.send_watched(&messages, only, &[], watch).await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
-                    Some(why) => taken.fell(service, &why),
+                    Some(why) => {
+                        if watch.is_none_or(net::Watch::first_to_tell_a_fall) {
+                            taken.fell(service, &why);
+                        }
+                    }
                     None => return answer,
                 }
             }
@@ -680,7 +684,9 @@ impl Net {
             if let (Err(error), Some(refused)) = (&answer, &refused_to)
                 && let Some(status) = key_refused(error)
             {
-                (refused.told)(status);
+                if watch.is_none_or(net::Watch::first_to_tell_a_refusal) {
+                    (refused.told)(status);
+                }
                 return refused
                     .relay
                     .send_watched(&messages, only, &[], watch)
@@ -917,7 +923,11 @@ impl Net {
                     .send_watched(&messages, None, without, watch)
                     .await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
-                    Some(why) => taken.fell(service, &why),
+                    Some(why) => {
+                        if watch.is_none_or(net::Watch::first_to_tell_a_fall) {
+                            taken.fell(service, &why);
+                        }
+                    }
                     None => return answer,
                 }
             }

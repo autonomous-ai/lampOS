@@ -1404,7 +1404,7 @@ struct Shared {
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
     /// With `LAMP_SECOND_CHAT_SECOND_TRY=on`: how long after the words a first
-    /// round with nothing begun goes once more ([`Engine::trying_the_chat_twice`]).
+    /// round with no response head goes once more ([`Engine::trying_the_chat_twice`]).
     second_try: Option<Duration>,
     /// A test's copy of each second-try journal line.
     #[cfg(test)]
@@ -4454,10 +4454,11 @@ impl Engine {
     }
 
     /// `LAMP_SECOND_CHAT_SECOND_TRY=on` (#4710): `after` the words, a turn's
-    /// first round with nothing begun goes once more on a new connection, and
-    /// whichever try begins first answers ([`second_try`]). Not a look, and not
-    /// a round that follows something already run. The wait's sound, its limit
-    /// and the slow line stay as they are. Before any turn only.
+    /// first round with no response head goes once more on a new connection, and
+    /// whichever try has the first event answers ([`second_try`]). Not a look, not
+    /// a round that follows something already run, and not with too little of
+    /// the wait left. The wait's sound, its limit and the slow line stay as they
+    /// are. Before any turn only.
     pub fn trying_the_chat_twice(mut self, after: Option<Duration>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.second_try = after;
@@ -11290,13 +11291,26 @@ async fn answer(
                 let say = second_try::Say::new(request);
                 #[cfg(test)]
                 let say = say.keeping(shared.second_try_journal.clone());
-                let (racing, kept) =
-                    second_try::race(stream, first_reach, from + after, from, say, move |watch| {
+                // The wait below, which is the most this round can be answered in.
+                let limit = if shared.cues.is_some() && heard {
+                    shared.cue_after + BEGIN_WITHIN_AFTER_CUE
+                } else {
+                    begin_within(heard, shared.written_wait)
+                };
+                let (racing, kept) = second_try::race(
+                    stream,
+                    first_reach,
+                    from + after,
+                    from + limit,
+                    from,
+                    say,
+                    move |watch| {
                         if lease.as_ref().is_some_and(|lease| !lease.is_current()) {
                             return None;
                         }
                         services.chat_second_try(again, told, watch)
-                    });
+                    },
+                );
                 stream = racing;
                 tries = Some(kept);
             }

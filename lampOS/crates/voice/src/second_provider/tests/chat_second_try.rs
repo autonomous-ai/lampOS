@@ -17,6 +17,9 @@ enum Says {
     Nothing,
     /// The response's head, then nothing.
     HeadOnly,
+    /// The response's head after the first time, these words after the second
+    /// more: a live connection and a slow answer.
+    HeadThen(Duration, Duration, &'static str),
     /// These words, after this long.
     Words(Duration, &'static str),
     /// A call of this function, at once.
@@ -144,11 +147,18 @@ fn events(body: &str) -> String {
     )
 }
 
-fn words_answer(words: &str) -> String {
-    events(&format!(
+fn words_events(words: &str) -> String {
+    format!(
         "data: {{\"choices\":[{{\"delta\":{{\"content\":\"{words}\"}},\"finish_reason\":\"stop\"}}]}}\n\ndata: [DONE]\n\n"
-    ))
+    )
 }
+
+fn words_answer(words: &str) -> String {
+    events(&words_events(words))
+}
+
+const HEAD: &str =
+    "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n";
 
 fn call_answer(name: &str) -> String {
     events(&format!(
@@ -170,12 +180,23 @@ async fn serving(
             seen.len() - 1
         };
         let says = plan.get(index).cloned().unwrap_or(Says::Nothing);
+        if let Says::HeadThen(head_after, words_after, words) = says {
+            tokio::time::sleep(head_after).await;
+            if socket.write_all(HEAD.as_bytes()).await.is_err() {
+                return;
+            }
+            tokio::time::sleep(words_after).await;
+            let data = words_events(words);
+            let chunk = format!("{:x}\r\n{data}\r\n0\r\n\r\n", data.len());
+            if socket.write_all(chunk.as_bytes()).await.is_err() {
+                return;
+            }
+            continue;
+        }
         let (wait, answer) = match says {
+            Says::HeadThen(..) => unreachable!("answered above"),
             Says::Nothing => (None, None),
-            Says::HeadOnly => (
-                None,
-                Some("HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n".to_owned()),
-            ),
+            Says::HeadOnly => (None, Some(HEAD.to_owned())),
             Says::Words(after, words) => (Some(after), Some(words_answer(words))),
             Says::Calls(name) => (Some(Duration::ZERO), Some(call_answer(name))),
             Says::Refuses(after, status) => (
@@ -291,7 +312,7 @@ impl Lamp {
         after: Option<Duration>,
         set: impl FnOnce(Engine) -> Engine,
     ) -> Self {
-        Self::built(server, name, after, Vec::new(), set)
+        Self::built(server, name, after, Vec::new(), |net| net, set)
     }
 
     /// [`Self::on`], with a chat begun on the line's `early` words.
@@ -301,7 +322,14 @@ impl Lamp {
         after: Option<Duration>,
         early: Vec<net::Early>,
     ) -> Self {
-        Self::built(server, name, after, early, |engine| engine.preparing(true))
+        Self::built(
+            server,
+            name,
+            after,
+            early,
+            |net| net,
+            |engine| engine.preparing(true),
+        )
     }
 
     fn built(
@@ -309,18 +337,21 @@ impl Lamp {
         name: &str,
         after: Option<Duration>,
         early: Vec<net::Early>,
+        set_net: impl FnOnce(Net) -> Net,
         set: impl FnOnce(Engine) -> Engine,
     ) -> Self {
-        let net = Net::new(
-            config_at(
-                &format!("second-try-{name}"),
-                "k-second-try",
-                &server.url,
-                &server.url,
-            ),
-            Arc::new(Vec::new),
-        )
-        .unwrap();
+        let net = set_net(
+            Net::new(
+                config_at(
+                    &format!("second-try-{name}"),
+                    "k-second-try",
+                    &server.url,
+                    &server.url,
+                ),
+                Arc::new(Vec::new),
+            )
+            .unwrap(),
+        );
         let script = Script {
             heard: Mutex::new(
                 std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
@@ -472,6 +503,99 @@ async fn the_first_answers_in_time_and_no_second_try_goes() {
     assert_eq!(server.requests(), 1);
     assert_eq!(lamp.spoken(), ["It is noon."]);
     assert!(lamp.journal().is_empty(), "{:?}", lamp.journal());
+}
+
+/// Its response's head came early and its first word is slow: the connection is
+/// plainly alive, so no second request goes, and the first answers. The case
+/// that would count a healthy slow answer as a second try.
+#[tokio::test]
+async fn a_head_in_time_and_a_slow_first_word_send_no_second_try() {
+    let server = Server::saying(
+        vec![Says::HeadThen(AFTER / 2, AFTER * 2, "Slow, but alive.")],
+        None,
+    )
+    .await;
+    let mut lamp = Lamp::on(&server, "head-then", Some(AFTER));
+    lamp.says(1).await;
+    assert_eq!(server.requests(), 1);
+    assert_eq!(server.opened(), 1);
+    assert_eq!(lamp.spoken(), ["Slow, but alive."]);
+    lamp.told(&[
+        "request 1 second try: none goes, ",
+        "ms after the words: the first's answer has begun",
+    ]);
+    assert_eq!(lamp.journal().len(), 1, "{:?}", lamp.journal());
+}
+
+/// A head and then nothing: still no second try, and the slow line comes at its
+/// own time.
+#[tokio::test]
+async fn a_head_and_nothing_after_it_sends_no_second_try() {
+    let server = Server::saying(vec![Says::HeadOnly], None).await;
+    let mut lamp = Lamp::set(&server, "head-only", Some(AFTER), |engine| {
+        engine.saying_when_down(true)
+    });
+    let (took, heard) = lamp.says(1).await;
+    about(took, BEGIN_WITHIN);
+    assert_eq!(server.requests(), 1);
+    assert!(
+        heard.contains(&format!("audio:{}", DOWN_LINE.len())),
+        "{heard:?}"
+    );
+    lamp.told(&["second try: none goes, ", "the first's answer has begun"]);
+}
+
+/// Both refused the person's key: each still goes to the relay, and the refusal
+/// is told once, as one turn's. The second is refused first and waits there; the
+/// first, refused after it, is the one answered.
+#[tokio::test]
+async fn both_tries_refused_are_told_once() {
+    let server = Server::saying(
+        vec![
+            Says::Refuses(AFTER * 3 / 2, 401),
+            Says::Refuses(Duration::ZERO, 401),
+            Says::Nothing,
+            Says::Words(Duration::ZERO, "From the relay."),
+        ],
+        None,
+    )
+    .await;
+    let told = Arc::new(Mutex::new(Vec::new()));
+    let telling = told.clone();
+    let relay = server.url.clone();
+    let mut lamp = Lamp::built(
+        &server,
+        "refused-once",
+        Some(AFTER),
+        Vec::new(),
+        move |net| {
+            net.falling_back_to_the_relay(
+                &relay,
+                Arc::new(move |status| telling.lock().unwrap().push(status)),
+            )
+            .unwrap()
+        },
+        |engine| engine,
+    );
+    lamp.says(1).await;
+    assert_eq!(server.requests(), 4);
+    assert_eq!(lamp.spoken(), ["From the relay."]);
+    assert_eq!(*told.lock().unwrap(), [401]);
+}
+
+/// A round's two tries tell a fall and a refusal once between them; another
+/// round's try has its own to tell.
+#[test]
+fn a_rounds_tries_tell_a_fall_and_a_refusal_once() {
+    let first = net::Watch::default();
+    let second = net::Watch::second_to(&first.reach(), Arc::new(|_| {}));
+    assert!(second.first_to_tell_a_fall());
+    assert!(!first.first_to_tell_a_fall());
+    assert!(!second.first_to_tell_a_fall());
+    assert!(first.first_to_tell_a_refusal());
+    assert!(!second.first_to_tell_a_refusal());
+    assert!(net::Watch::default().first_to_tell_a_fall());
+    assert!(net::Watch::default().first_to_tell_a_refusal());
 }
 
 /// The first begins after the second went: it answers, the second is dropped,
@@ -976,59 +1100,94 @@ impl Services for Timed {
     }
 }
 
+/// A turn on the paused clock: how long it took from the words, when each second
+/// try was asked for, and the journal's lines.
+async fn on_the_clock(
+    switch: Option<Duration>,
+    offers: bool,
+    sound: bool,
+) -> (Duration, Vec<Duration>, Vec<String>) {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
+        chats: Mutex::new([vec![], vec![]].into()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let services = Arc::new(Timed {
+        script,
+        second: Mutex::default(),
+        offers,
+    });
+    let words_at = Arc::new(Mutex::new(None));
+    let heard_at = words_at.clone();
+    let journal: Arc<Mutex<Vec<String>>> = Arc::default();
+    let mut engine = Engine::with_clock(
+        services.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) })),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .waiting_with_a_sound(sound)
+    .saying_when_down(true)
+    .trying_the_chat_twice(switch)
+    .keeping_second_try_journal(journal.clone())
+    .hearing_words(Arc::new(move |_, _| {
+        *heard_at.lock().unwrap() = Some(tokio::time::Instant::now());
+    }));
+    if sound {
+        wait_clip_ready(&engine, true);
+    }
+    spoken_turn(&mut engine);
+    let _ = sent(&mut engine).await;
+    let words = words_at.lock().unwrap().expect("the words came");
+    let tries = services
+        .second
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|at| at.duration_since(words))
+        .collect();
+    let lines = journal.lock().unwrap().clone();
+    (words.elapsed(), tries, lines)
+}
+
+fn near(actual: Duration, expected: Duration) {
+    let gap = actual.max(expected) - actual.min(expected);
+    assert!(gap < Duration::from_millis(50), "{actual:?} {expected:?}");
+}
+
+/// With the wait's sound off the wait is 3 s, so 2.5 s leaves too little to answer
+/// in: no second try, and the journal says so. The turn's end stays where it was.
+#[tokio::test(start_paused = true)]
+async fn with_too_little_of_the_wait_left_no_second_try_goes() {
+    let (ended, tries, lines) = on_the_clock(Some(SECOND_TRY_AFTER), true, false).await;
+    near(ended, BEGIN_WITHIN);
+    assert!(tries.is_empty(), "{tries:?}");
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(
+        lines[0].contains("second try: none goes, ")
+            && lines[0].contains("ms after the words: only ")
+            && lines[0].contains("ms of the wait left"),
+        "{lines:?}"
+    );
+    assert!(lines.iter().all(|line| !line.contains("chat round")));
+
+    // The rule's edge: with 1.6 s left one goes; with 1.4 s left none does.
+    let (_, tries, _) = on_the_clock(Some(Duration::from_millis(1_400)), true, false).await;
+    assert_eq!(tries.len(), 1, "{tries:?}");
+    let (_, tries, lines) = on_the_clock(Some(Duration::from_millis(1_600)), true, false).await;
+    assert!(tries.is_empty(), "{tries:?}");
+    assert!(lines[0].contains("none goes"), "{lines:?}");
+}
+
 /// On the product's times, with the wait's sound: the sound at 1.5 s, the
 /// second try at 2.5 s, the slow line and the end at 4.5 s, each from the words,
 /// as they are with the switch off. Services that can't offer a second try keep
 /// the same times, and say nothing of one.
 #[tokio::test(start_paused = true)]
 async fn on_the_products_times_only_the_second_try_is_new() {
-    async fn run(switch: Option<Duration>, offers: bool) -> (Duration, Vec<Duration>, Vec<String>) {
-        let script = Arc::new(Script {
-            heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
-            chats: Mutex::new([vec![], vec![]].into()),
-            hold_chat: true,
-            ..Script::default()
-        });
-        let services = Arc::new(Timed {
-            script,
-            second: Mutex::default(),
-            offers,
-        });
-        let words_at = Arc::new(Mutex::new(None));
-        let heard_at = words_at.clone();
-        let journal: Arc<Mutex<Vec<String>>> = Arc::default();
-        let mut engine = Engine::with_clock(
-            services.clone(),
-            Arc::new(|| "SYSTEM".to_owned().into()),
-            Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) })),
-            Arc::new(Instant::now),
-        )
-        .announcing(false)
-        .waiting_with_a_sound(true)
-        .saying_when_down(true)
-        .trying_the_chat_twice(switch)
-        .keeping_second_try_journal(journal.clone())
-        .hearing_words(Arc::new(move |_, _| {
-            *heard_at.lock().unwrap() = Some(tokio::time::Instant::now());
-        }));
-        wait_clip_ready(&engine, true);
-        spoken_turn(&mut engine);
-        let _ = sent(&mut engine).await;
-        let words = words_at.lock().unwrap().expect("the words came");
-        let tries = services
-            .second
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|at| at.duration_since(words))
-            .collect();
-        let lines = journal.lock().unwrap().clone();
-        (words.elapsed(), tries, lines)
-    }
-    let near = |actual: Duration, expected: Duration| {
-        let gap = actual.max(expected) - actual.min(expected);
-        assert!(gap < Duration::from_millis(50), "{actual:?} {expected:?}");
-    };
+    let run = |switch, offers| on_the_clock(switch, offers, true);
     let limit = CUE_AFTER + BEGIN_WITHIN_AFTER_CUE;
 
     let (ended, tries, lines) = run(None, true).await;

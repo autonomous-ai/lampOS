@@ -3495,7 +3495,7 @@ pub fn serve(
         );
     }
     engine = engine.waiting_for_written(written_wait);
-    // A first round with nothing begun goes once more on a new connection
+    // A first round with no response head goes once more on a new connection
     // (`LAMP_SECOND_CHAT_SECOND_TRY=on`; #4710).
     let second_try = crate::second_provider::second_try_on(
         std::env::var(crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT)
@@ -3504,7 +3504,7 @@ pub fn serve(
     );
     if second_try {
         eprintln!(
-            "lamp-voice second: a turn's first chat with nothing begun {} ms after the words goes once more on a new connection (LAMP_SECOND_CHAT_SECOND_TRY)",
+            "lamp-voice second: a turn's first chat with no response head {} ms after the words goes once more on a new connection (LAMP_SECOND_CHAT_SECOND_TRY)",
             crate::second_provider::SECOND_TRY_AFTER.as_millis()
         );
     }
