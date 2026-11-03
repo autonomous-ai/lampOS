@@ -311,6 +311,45 @@ removed tier reads **not exercised**, never **no value**. Missing diagnostics
 read **unknown**. Timestamp and structure checks precede scoring and never
 use answer quality to decide which setups to keep.
 
+### Preliminary plan and record time revision: 3 November 2026
+
+Made after six preliminary runs on the development month and before any Tiers
+score or any registered run. Questions, answer keys, rubric and scorers are
+unchanged.
+
+- **The preliminary leaves out full history.** Its preliminary score is known
+  from three runs (0.84, 0.80, 0.83) and it was about 95% of each run's cost.
+  The preliminary kind now runs `none`, `lampos_today_partial` and `tiers`.
+  Full history stays in the registered order as the ceiling.
+- **A second preliminary order: `none`, `lampos_today_partial`,
+  `lampos_today_partial_next`** (the memory owner's Tiers-ideas plan, P4b).
+  The new setup is the partial arm with Days' `newer_first`, `strength` and
+  `profile` request fields on; Tiers is not rerun. It needs a runner built
+  with P1-P3's Days, which refuses the fields otherwise. Either order is
+  admitted, so earlier preliminary campaigns still read.
+- **Experiment version 2: each record carries its local day.** The partial
+  current-product arm and full history showed each record only as its epoch
+  `at_unix_ms`. With thinking off, the answerer converted it in its head: in
+  runs 2, 3 and 5 the partial arm had the latest mention in its prompt in 58
+  of 60 "when" answers but dated it wrongly in 39, 26 of them two days early.
+  The voice never shows an epoch; its recall says "3 days ago, Saturday
+  31 October" (`remember.rs` `when_said`). Both arms now show that wording,
+  with the year when it is not this one, read in the persona's zone, and no
+  epoch. The partial arm's recall entries take the voice's shape (`when`,
+  `heard`, `you_said`; a kept thing's `asked_to_remember`) plus the source id.
+  The answerer's own clock line and the recent-conversation evidence are
+  unchanged. Scores from earlier runs are version 1 and are not pooled with
+  version 2.
+- **A transient connection failure is a failed question, not a failed run**
+  (the common answer and judge policy below).
+
+The policy records the last two as `record_time` and `failed_call`, so
+`evaluation_sha256` changes.
+
+The bench's JSON reads floats exactly (`serde_json` `float_roundtrip`): run 7's
+partial setup finished with an overall mean that parsed one unit in the last
+place off, and its ledger then failed its own hash chain when read back.
+
 ## JSON-lines arm contract, draft v2.1
 
 The wire envelope remains version 2. Minor version 2.1 adds only optional
@@ -664,11 +703,17 @@ eligibility checks take precedence over the judge. A malformed answer reply
 (empty, whitespace, not the registered JSON, out of bounds, or ended by a finish
 other than `stop`, such as `length`, with its usage charged) is recorded and its
 question scores 0 with audit, without a judge call; a malformed judge reply scores
-its question 0 with audit. Both are counted in the run summary. A failed call
-still leaves the attempt incomplete; no silent repair or unregistered retry is
-allowed. DeepSeek's JSON mode can return a whitespace-only reply (the first live
-preliminary run, 1 Nov), and a long reply can end at the output limit (run 4,
-2 Nov); either one before this stopped the whole setup.
+its question 0 with audit. Both are counted in the run summary. An answer or
+judge call that fails in transit (its connection, headers or stream fails, or
+the relay answers 429 or 5xx) is a recorded failed question: it scores 0 with
+audit, keeps its reserved charge and is counted (`failed_answer_calls`,
+`failed_judge_calls`); more than ten in one run end the run. Any other failed
+call, a refused request (other 4xx) included, still leaves the attempt
+incomplete; no silent repair or unregistered retry is allowed. DeepSeek's JSON
+mode can return a whitespace-only reply (the first live preliminary run,
+1 Nov), a long reply can end at the output limit (run 4, 2 Nov), and one dropped
+connection ended preliminary run 6 at full history's call 288 (2 Nov); each of
+them before stopped the whole setup.
 Rubric results remain provisional until the registered human audit.
 
 The live campaign policy pins both model routes, dated prices, fixture and

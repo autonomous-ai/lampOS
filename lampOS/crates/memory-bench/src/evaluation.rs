@@ -42,7 +42,9 @@ pub fn policy() -> Value {
         "judge_sources":"gold and eligible candidate-cited scripted records plus fixed probe questions; generated candidate answers have explicit IDs and can witness timing or dialogue, never establish independent owner facts",
         "probe_citations":"an answer may cite a source from the main prefix or an earlier completed exchange in its own isolated probe, never a future or current exchange; restoration removes probe sources",
         "deterministic_precedence":"exact/date/abstention/forbidden claims and unsupported citations cannot be overruled by the judge",
-        "invalid_output":"an answer reply that is empty, whitespace, not the registered JSON, out of bounds or ended by a non-stop finish (length, filter, refusal; its usage charged) is recorded as a malformed answer and its question scores 0 with audit, with no judge call; a malformed judge reply scores its question 0 with audit; both are counted in the run summary; a failed call still leaves the trial incomplete; no silent repair or unregistered retry",
+        "invalid_output":"an answer reply that is empty, whitespace, not the registered JSON, out of bounds or ended by a non-stop finish (length, filter, refusal; its usage charged) is recorded as a malformed answer and its question scores 0 with audit, with no judge call; a malformed judge reply scores its question 0 with audit; both are counted in the run summary; any other failed call (see failed_call) still leaves the trial incomplete; no silent repair or unregistered retry",
+        "failed_call":"an answer or judge call whose connection, headers or stream fails in transit, or that the relay answers 429 or 5xx, is a recorded failed question scored 0 with audit, its reserved charge kept; both are counted in the run summary; more than ten in one run end the run; a refused request (other 4xx) still ends it; no retry",
+        "record_time":"experiment version 2 (3 Nov): every record a reference or partial arm shows the answerer carries its local day as the voice says it (\"3 days ago, Saturday 10 October\", the year when not this one), never a raw epoch",
         "forget_restart":"after an actual forget attempt, drop the current round and all cached memory, take a fresh snapshot and restart from the current question plus a content-free forget-status note; apply uniformly to every setup",
         "current_product_forget_gap":"the current product clears future recent history but retains the current request prefix and previous tool results; the uniform bench restart is stronger and may improve its measured forgetting",
         "forget_probe_replay":"when an actual action suppresses confirmation, keep the answer in evaluation evidence but omit its post-answer memory ingest and source eligibility; original scripted ingestion remains unchanged",
@@ -244,6 +246,12 @@ pub fn evaluate(
 /// The reasons a question scores 0 under the policy's `invalid_output`.
 pub const MALFORMED_ANSWER: &str = "malformed answer recorded; scored 0 without a judge";
 pub const MALFORMED_JUDGE: &str = "malformed judge reply; scored 0";
+/// The reasons a question scores 0 under the policy's `failed_call`.
+pub const FAILED_ANSWER_CALL: &str = "answer call failed in transit; scored 0 without a judge";
+pub const FAILED_JUDGE_CALL: &str = "judge call failed in transit; scored 0";
+/// More failed calls than this in one run end it: a relay that is down is not
+/// a run of zero scores.
+pub const MAX_FAILED_CALLS: usize = 10;
 /// A question scored 0 with audit for a malformed answer or judge reply.
 pub fn malformed(reason: &str, judge_request_hash: Option<String>) -> Evaluation {
     Evaluation {
@@ -274,10 +282,16 @@ pub fn evaluate_with_history(
             judge_request_hash: None,
         });
     };
-    let reply = worker.call(
+    let reply = match worker.call(
         &call,
         Instant::now() + Duration::from_millis(crate::protocol::MODEL_MS),
-    )?;
+    ) {
+        Ok(reply) => reply,
+        Err(crate::Error::Transport(_)) => {
+            return Ok(malformed(FAILED_JUDGE_CALL, Some(call.request_hash()?)));
+        }
+        Err(error) => return Err(error),
+    };
     if !reply.tool_calls.is_empty() {
         return Err(invalid("blind judge requested tools"));
     }
@@ -291,6 +305,11 @@ pub fn evaluate_with_history(
         return Ok(malformed(MALFORMED_JUDGE, Some(call.request_hash()?)));
     };
     scored_question.evidence_ids = supplied_judge_ids(question, answers);
+    // A reply off the frozen rubric (wrong award count, no explanation, or an
+    // evidence id the question never offered) is a malformed judgment too.
+    if preliminary.needs_judge && !score::judge_fits(&scored_question, &judge) {
+        return Ok(malformed(MALFORMED_JUDGE, Some(call.request_hash()?)));
+    }
     let score = score::judge_score(&scored_question, &aggregate, &judge)?;
     Ok(Evaluation {
         score,
