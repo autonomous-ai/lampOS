@@ -20,6 +20,7 @@ mod binary;
 mod days;
 mod days_recall;
 mod days_speakers;
+mod days_strength;
 mod days_timing;
 mod fixture_child;
 #[path = "../../src/fixture_schedule.rs"]
