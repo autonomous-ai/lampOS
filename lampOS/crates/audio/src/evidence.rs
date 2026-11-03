@@ -139,8 +139,9 @@ pub struct EchoMatch {
     /// How far `render_block_level` is under its own peak over the last
     /// 150 ms at the alignment held, in tenths of a decibel: high on the
     /// tail of a word the lamp just stopped, near zero while it holds.
-    /// From [`crate::duplex::TAIL_DROP_TENTHS`] on, `Hearing::heard` takes
-    /// the block as the lamp's own tail (#5032).
+    /// From [`crate::duplex::TAIL_DROP_TENTHS`] on, with the canceller
+    /// taking [`crate::duplex::TAIL_CANCELLED_TENTHS`] of the microphone,
+    /// `Hearing::heard` takes the block as the lamp's own tail (#5032).
     pub render_drop: u16,
 }
 
@@ -901,6 +902,71 @@ mod tests {
         assert!(mean <= 20, "held {held:?}");
         assert!(tail.len() >= 3, "tail matched {} blocks", tail.len());
         assert!(tail.iter().all(|&drop| drop >= 60), "tail {tail:?}");
+    }
+
+    /// The reviewer-lead's P1 on #5037: a person saying a short "Stop."
+    /// (150 ms) some 9 dB over the lamp's echo, mid-answer, across one of
+    /// the dips its voice makes between syllables, where the render at the
+    /// alignment falls 6 dB and more under its 150 ms peak. The canceller
+    /// takes 20 dB of the echo and none of the person. The person is over
+    /// the lamp in every block and it yields within the onset: a dip is
+    /// not a word's tail while what reaches the microphone is not mostly
+    /// the lamp's. Before the guard the dip's blocks were the lamp's own,
+    /// each reset the run, and it never yielded.
+    #[test]
+    fn a_person_over_the_lamps_dips_yields_within_the_onset() {
+        use crate::duplex::{Confirmation, Heard, Hearing, Interruption, Step, TAIL_DROP_TENTHS};
+        // The lamp speaks from 0.5 s to 3.5 s, its echo 110 ms late.
+        let voice = |seconds: f64| {
+            if !(0.5..3.5).contains(&seconds) {
+                return 0.0;
+            }
+            8_000.0
+                * noise(1, (seconds * 4_000.0) as u64)
+                * (0.4 + 0.6 * (seconds * 19.0).sin().abs())
+        };
+        let (start, end) = (202u64, 217u64);
+        let mut observer = EchoObserver::new();
+        let mut interruption = Interruption::new(Confirmation::EVALUATED);
+        let (mut heard, mut dips, mut yielded) = (Vec::new(), 0, None);
+        for block in 0..end + 20 {
+            let render: RenderBlock = std::array::from_fn(|index| {
+                voice((block * RENDER_SAMPLES as u64 + index as u64) as f64 / 24_000.0) as i16
+            });
+            let (mut raw, mut clean) = ([0; CAPTURE_SAMPLES], [0; CAPTURE_SAMPLES]);
+            for index in 0..CAPTURE_SAMPLES {
+                let sample = block * CAPTURE_SAMPLES as u64 + index as u64;
+                let echo = -0.5 * voice(sample as f64 / 16_000.0 - 0.11);
+                let person = if (start..end).contains(&block) {
+                    9_000.0 * noise(3, sample / 2)
+                } else {
+                    0.0
+                };
+                let room = 4.0 * noise(2, sample);
+                raw[index] = (echo + person + room).round() as i16;
+                clean[index] = (0.1 * echo + person + room).round() as i16;
+            }
+            observer.render(&render);
+            let evidence = observer.capture(&raw, &clean);
+            let speaking = (start..end).contains(&block);
+            let block_heard = Hearing::EVALUATED.heard(if speaking { 0.9 } else { 0.1 }, &evidence);
+            if speaking {
+                heard.push(block_heard);
+                dips += usize::from(
+                    evidence
+                        .echo
+                        .is_some_and(|echo| echo.render_drop >= TAIL_DROP_TENTHS),
+                );
+            }
+            let plain = Hearing::EVALUATED.plain(block_heard, &evidence);
+            if interruption.observe(block_heard, plain, true) == Step::Yield {
+                yielded.get_or_insert(block);
+            }
+        }
+        assert!(dips >= 3, "the person's blocks crossed {dips} dip blocks");
+        assert!(heard.iter().all(|&h| h == Heard::Over), "{heard:?}");
+        let onset = u64::from(Confirmation::EVALUATED.onset_blocks);
+        assert_eq!(yielded, Some(start + onset - 1));
     }
 
     /// The same scene through an observer that skips and one that does not:
