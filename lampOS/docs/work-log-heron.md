@@ -219,3 +219,9 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   folder: PR #5091 (`heron/4450-lamp-fc4b-9788`, head `dd5313474`), READ
   ASK posted with the hour at 17:0x; #4450 told. The clean run is owed:
   retry from 17:40, PLAYING first, with the person's yes.
+- 17:07: Reviewer-lead READ-OK on #5091 `dd5313474` with a P3: the README
+  section named in the body was missing (a failed command broke the
+  chain before the append; only the four excerpts were committed). 17:13:
+  section pushed as `cc63be548`, re-mark asked. Friday: DeepSeek's 503
+  "too busy" stopped their bench too; the clean after2 run waits for the
+  service, retry from 17:40.
