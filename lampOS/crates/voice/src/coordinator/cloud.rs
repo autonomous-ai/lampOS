@@ -206,6 +206,9 @@ impl CloudRequest {
 
     pub(super) fn submitted(&mut self, command: &ProviderInput) -> io::Result<()> {
         self.validate_submission(command)?;
+        // A line handed on stops the memory's nightly pass
+        // (`LAMP_MEMORY_NIGHTLY`); off, one load.
+        crate::nightly::stir();
         match command {
             ProviderInput::Start { .. } => self.start_submitted = true,
             ProviderInput::End { .. } => self.input_end_submitted = true,
