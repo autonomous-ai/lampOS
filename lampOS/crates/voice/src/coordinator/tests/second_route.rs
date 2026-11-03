@@ -4275,6 +4275,66 @@ fn a_sign_ins_news_is_told_at_the_first_pause_without_the_switch() {
     );
 }
 
+/// #4342 (b): news told once more (`LAMP_TASK_NEWS_RETELL=on`, its first
+/// telling cut short) waits for no conversation going on, 15 s with
+/// nothing said by or to the lamp, even with `LAMP_TASK_NEWS_AT_PAUSE=on`:
+/// the person speaking always wins. The same news not due once more is
+/// told at the first pause after the answer, as before.
+#[test]
+fn news_told_once_more_waits_for_no_conversation_even_at_pause() {
+    let _one = super::pilot_faults::one_session();
+    let told = |retelling: bool| {
+        let (news, _heard) = crate::task_news::TaskNews::waiting_for_test_heard(
+            crate::task_news::News {
+                key: "s1:2:4".into(),
+                note: "Claude Code just finished the story you asked for.".into(),
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            },
+            Duration::from_secs(30),
+        );
+        let news = if retelling {
+            news.retelling_for_test(&["s1:2:4"])
+        } else {
+            news
+        };
+        TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+        let run = run(Script {
+            second: false,
+            only: true,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+        TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+        run
+    };
+    let run = told(false);
+    run.assert_clean();
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "{}", run.summary());
+    assert_eq!(news[0]["retold"], false);
+    assert!(
+        news[0]["since_turn_ms"].as_u64().unwrap() < crate::task_news::QUIET_US / 1_000,
+        "{}",
+        run.summary()
+    );
+    let run = told(true);
+    run.assert_clean();
+    for news in run.events("task_news") {
+        assert_eq!(news["retold"], true, "{}", run.summary());
+        assert!(
+            news["since_turn_ms"].as_u64().unwrap() >= crate::task_news::QUIET_US / 1_000,
+            "{}",
+            run.summary()
+        );
+    }
+}
+
 /// The reviewer-lead's P2 on #2642: with `LAMP_TASK_NEWS_AT_PAUSE=on`, as
 /// on product lamps, a sign-in's news waiting behind a task's is told
 /// first, at the first pause after the answer.

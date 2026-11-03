@@ -8,6 +8,7 @@ use crate::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, Launch,
         LaunchOutcome, Listed, MOST_WAITED, Observation, SignIn, Target,
     },
+    now::Now as TasksNow,
     progress::{Reads, Tracker},
     protocol::{Answer, MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
     sign_in::{By as SignInBy, Method as SignInMethod, Session as SignInSession, Starter},
@@ -880,6 +881,10 @@ fn owner<C: Clock>(
     // agent says while it works is not part of the durable record.
     // Each run counts changes afresh, and says which run it is.
     let mut tracker = progress.then(|| Tracker::started(unix_ms()));
+    // "Tasks now" (#4342), beside it and in memory only too: each task's
+    // last step outlives the tracker's line, which goes when the watch
+    // lets the task go.
+    let mut tasks_now = progress.then(TasksNow::new);
     let mut status: Option<(u64, Arc<TaskStatus>)> = None;
     let mut status_began = Instant::now();
     // A store kept aside is looked for again once a minute (#1505).
@@ -1178,6 +1183,13 @@ fn owner<C: Clock>(
                     };
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
+                } else if let (Request::TasksNow {}, Some(tracker), Some(record)) =
+                    (&work.request, tracker.as_ref(), tasks_now.as_mut())
+                {
+                    record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
+                    let answer = engine.identified(record.body(unix_ms()));
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
                 } else {
                     moved = true;
                     let answer =
@@ -1187,6 +1199,13 @@ fn owner<C: Clock>(
                         answer,
                         set_up.and_then(|found| found.sign_in),
                     );
+                    // The voice told this task's news: kept for "tasks now",
+                    // also when nothing is written (without `--close-told`).
+                    if let (Request::Told { id, .. }, Ok(_), Some(record)) =
+                        (&work.request, &answer, tasks_now.as_mut())
+                    {
+                        record.told(*id, unix_ms());
+                    }
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                     if engine.failed() {
@@ -1196,6 +1215,11 @@ fn owner<C: Clock>(
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        // "Tasks now" takes each task's line before the watch can let the
+        // task go, below.
+        if let (Some(record), Some(tracker)) = (tasks_now.as_mut(), tracker.as_ref()) {
+            record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
         }
         if !busy && !stop.load(Ordering::Acquire) {
             let now = clock.sample()?;
