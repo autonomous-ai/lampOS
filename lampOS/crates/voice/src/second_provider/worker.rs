@@ -3594,6 +3594,9 @@ pub fn serve(
         // A decline of an answer to the lamp's own question from the
         // person it asked is asked again (`LAMP_ANSWER_ASK_AGAIN`).
         if answer_again {
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.answer_again = true;
+            }
             let heeding = heeding.clone();
             engine = engine.answering_the_asked_person(Arc::new(move |request| {
                 heeding
@@ -5494,6 +5497,9 @@ pub(crate) struct Heeding {
     /// The request judged last, if the person the lamp asked said it
     /// ([`asked_person_said`], `LAMP_ANSWER_ASK_AGAIN`).
     asked_one: Option<u64>,
+    /// `LAMP_ANSWER_ASK_AGAIN=on`: only then is [`Self::asked_one`] judged,
+    /// so with it off nothing more runs per line.
+    answer_again: bool,
     /// `LAMP_GOING_ON_NOT_OWN=on` ([`Self::not_counting_own_answers`]).
     not_own: bool,
     /// With it: the lines let out only as the conversation going on since
@@ -5802,11 +5808,14 @@ pub(crate) fn named_to_a_face(
 /// first builder on Queue #4710): the same voice
 /// ([`crate::same_voice::SAME_FROM`] or more), or a face turned to the lamp,
 /// and never a voice printed as another's
-/// ([`crate::same_voice::DIFFERENT_BELOW`]). Neither known: no.
+/// ([`crate::same_voice::DIFFERENT_BELOW`]) nor a face known turned away:
+/// a person who turns from the lamp to say a line is talking to someone
+/// else, even in the asked voice (Thirteen's P2 on #5078). Neither known:
+/// no.
 pub(crate) fn asked_person_said(likeness: Option<f32>, turned: Option<bool>) -> bool {
     let another = likeness.is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW);
     let same = likeness.is_some_and(|likeness| likeness >= crate::same_voice::SAME_FROM);
-    !another && (same || turned == Some(true))
+    turned != Some(false) && !another && (same || turned == Some(true))
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -6398,6 +6407,7 @@ impl Heeding {
             named_always: false,
             named_faced: None,
             asked_one: None,
+            answer_again: false,
             not_own: false,
             chain: Vec::new(),
             said_until_free_us: None,
@@ -8661,11 +8671,14 @@ impl Heeding {
         // Said by the person the lamp asked (`LAMP_ANSWER_ASK_AGAIN`): the
         // conversation's voice, or a face turned to the lamp with no other
         // voice heard. Read without using up the line's one judgement.
-        let likeness = self
-            .voices
-            .as_mut()
-            .and_then(|voices| voices.likeness_so_far(request));
-        self.asked_one = asked_person_said(likeness, signs.turned).then_some(request);
+        self.asked_one = None;
+        if self.answer_again {
+            let likeness = self
+                .voices
+                .as_mut()
+                .and_then(|voices| voices.likeness_so_far(request));
+            self.asked_one = asked_person_said(likeness, signs.turned).then_some(request);
+        }
         attention.ended(request, ended_us);
         if self.cut_in == Some(request) {
             attention.ended_as_cut_in(request);
@@ -16948,6 +16961,10 @@ mod tests {
         ));
         assert!(!super::asked_person_said(Some(0.5), Some(false)));
         assert!(!super::asked_person_said(None, None));
+        // The asked voice with a face turned away: talking to someone else
+        // (Thirteen's P2 on #5078).
+        assert!(!super::asked_person_said(Some(SAME_FROM), Some(false)));
+        assert!(!super::asked_person_said(Some(1.0), Some(false)));
     }
 
     /// What the engine is told for a checked sound (17 October): the lamp's
