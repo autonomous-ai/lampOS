@@ -4847,7 +4847,7 @@ fn a_computers_turn_plays_the_cue_opens_eight_seconds_and_ends_on_nobody_or_a_mu
 fn computers_turn_with_an_end(
     holds: bool,
     other_id: bool,
-) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>) {
+) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>, bool) {
     // The thread is the whole voice's: hold it from the other tests that
     // read or reset it (`provider_worker::tests::one_thread`).
     let _thread = crate::provider_worker::tests::one_thread();
@@ -4887,14 +4887,22 @@ fn computers_turn_with_an_end(
         .take()
         .map(|answered| answered.try_iter().collect())
         .unwrap_or_default();
-    (run, answered.try_iter().collect(), ended)
+    // Whether the end closed the conversation: the thread keeps no
+    // conversation going from the turn's exchange.
+    let closed = {
+        let thread = crate::thread::THREAD.lock().unwrap();
+        thread.closed_at().is_some() && !thread.going_on(std::time::Instant::now())
+    };
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    (run, answered.try_iter().collect(), ended, closed)
 }
 
 #[test]
 fn a_line_in_a_computers_window_is_answered_on_the_second_route() {
     use crate::say::{Answer, Outcome};
     let _one = super::pilot_faults::one_session();
-    let (run, answered, ended) = computers_turn_with_an_end(false, true);
+    let (run, answered, ended, closed) = computers_turn_with_an_end(false, true);
+    assert!(!closed, "another id's end closes nothing");
     assert!(
         matches!(
             answered.as_slice(),
@@ -4940,7 +4948,10 @@ fn a_line_in_a_computers_window_is_answered_on_the_second_route() {
 fn a_computers_end_with_its_id_cuts_the_answer_awaited() {
     use crate::say::{Answer, Outcome};
     let _one = super::pilot_faults::one_session();
-    let (run, answered, ended) = computers_turn_with_an_end(true, false);
+    let (run, answered, ended, closed) = computers_turn_with_an_end(true, false);
+    // The end closed the conversation (lamp-75c9, 3 Nov 20:56): a room line
+    // after it is not taken as the conversation going on.
+    assert!(closed, "{}", run.summary());
     assert!(
         matches!(
             answered.as_slice(),
