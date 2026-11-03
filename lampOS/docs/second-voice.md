@@ -4439,8 +4439,11 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   went to (#3699). A face the eyes say `follows` a lost passing id (their
   `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`, #4885, eyes.md "The
   followed id") is that face, but only on the eyes' word as of the line's
-  end: the links in their last look at or before it, none kept past it,
-  and none whose old id is in that look (`Looks::links_at`, the
+  end: each link said in their looks up to it, kept as a chain as the eyes
+  keep it, so a face re-found twice in a line (`f15` to `f16` to `f17`,
+  the eyes saying only the last hop by its end; lamp-52e6, #4966) is one
+  face, and each link ended by a later look, its old id in view again or
+  its new id in view without the link said (`Looks::links_at`, the
   Reviewer-lead's P1 on #4917: a link the eyes ended is gone at once). Under
   those links the old id's looks count as the new id's for
   `speakers_with_boot` and `no_other_face_in_view`, and a look with two
@@ -4448,8 +4451,8 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   link when read (`known_with_boot`): only the eyes' file moves it to the
   new id, once a print of it passes their hold's bar. A link is position
   only, and someone else may sit where they were, so before the eyes'
-  print decides the line is not theirs. When the eyes' last look at the
-  line's end still says a new id follows the known face, `line_sight`
+  print decides the line is not theirs. When the eyes' links at the
+  line's end still say a new id follows the known face, `line_sight`
   waits for that print (`known_once_decided`, #4966, the Reviewer-lead's
   P2 on #4967): it reads the known file again every 100 ms, at most 1 s
   past the line's end (`FOLLOW_DECIDED_WITHIN`: the eyes check a new near
