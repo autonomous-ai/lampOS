@@ -316,8 +316,14 @@ pub enum Words {
     /// [`Self::ExactSound`]: played as an exact line is.
     ClipAt(PathBuf),
     /// lamp-control asks for a turn to be opened, with the words said
-    /// first if any (`turn: "start"`, [`TURN_SKILL`] only).
-    TurnStart(Option<String>),
+    /// first if any (`turn: "start"`, [`TURN_SKILL`] only). `after` names
+    /// the same computer's earlier turn, whose conversation may still go
+    /// on: a turn going on with that id is its own, and is continued, not
+    /// a reason to refuse ([`crate::control_turn::ControlTurns`]).
+    TurnStart {
+        prompt: Option<String>,
+        after: Option<u64>,
+    },
     /// lamp-control asks for the turn it opened as `id` to be ended
     /// (`turn: "end"`).
     TurnEnd(u64),
@@ -343,7 +349,7 @@ impl Words {
             | Self::Exact(_)
             | Self::ExactSound(_)
             | Self::ClipAt(_)
-            | Self::TurnStart(_)
+            | Self::TurnStart { .. }
             | Self::TurnEnd(_)
             | Self::Listen(_) => None,
         }
@@ -478,6 +484,10 @@ struct Wire {
     /// The turn a `turn: "end"` ends, as its start's `begun` named it.
     #[serde(default)]
     id: Option<u64>,
+    /// With `turn: "start"` only: the same computer's earlier turn, as its
+    /// `begun` named it, whose conversation the new turn may continue.
+    #[serde(default)]
+    after: Option<u64>,
     /// A computer's mute: `false` holds one, `true` lifts it
     /// ([`TURN_SKILL`] only, alone).
     #[serde(default)]
@@ -554,6 +564,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     }
     if wire.id.is_some() {
         return Err("id goes only with turn end".into());
+    }
+    if wire.after.is_some() {
+        return Err("after goes only with turn start".into());
     }
     let Some(expires_in_ms) = wire.expires_in_ms else {
         return Err("not a say request".into());
@@ -728,8 +741,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
 }
 
 /// A `turn` ask, checked: lamp-control's alone, a start with at most its
-/// prompt (`text`, under a text's rules) and an expiry, an end with only
-/// its `id`. Nothing else goes with either.
+/// prompt (`text`, under a text's rules), the earlier turn it may continue
+/// (`after`, nonzero) and an expiry, an end with only its `id`. Nothing
+/// else goes with either.
 fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, String> {
     if skill != TURN_SKILL {
         return Err("turn is lamp-control's only".into());
@@ -749,12 +763,15 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
         || wire.who
         || wire.priority.is_some()
     {
-        return Err("turn goes with text, expires_in_ms or id only".into());
+        return Err("turn goes with text, expires_in_ms, after or id only".into());
     }
     let (words, expires_in_ms) = match turn {
         TurnWire::Start => {
             if wire.id.is_some() {
                 return Err("id goes only with turn end".into());
+            }
+            if wire.after == Some(0) {
+                return Err("after is a nonzero turn id".into());
             }
             if let Some(text) = &wire.text
                 && (text.trim().is_empty()
@@ -769,10 +786,19 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
                 .expires_in_ms
                 .filter(|expires| (1..=LONGEST_EXPIRY_MS).contains(expires))
                 .ok_or_else(|| format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"))?;
-            (Words::TurnStart(wire.text), expires_in_ms)
+            (
+                Words::TurnStart {
+                    prompt: wire.text,
+                    after: wire.after,
+                },
+                expires_in_ms,
+            )
         }
         TurnWire::End => {
-            if wire.text.is_some() || wire.expires_in_ms.is_some() || wire.start_before_us.is_some()
+            if wire.text.is_some()
+                || wire.expires_in_ms.is_some()
+                || wire.start_before_us.is_some()
+                || wire.after.is_some()
             {
                 return Err("turn end goes with its id only".into());
             }
@@ -819,6 +845,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         || wire.start_before_us.is_some()
         || wire.turn.is_some()
         || wire.id.is_some()
+        || wire.after.is_some()
         || wire.exact
         || wire.who
     {
@@ -1497,7 +1524,7 @@ impl Says {
                     | Words::Exact(_)
                     | Words::ExactSound(_)
                     | Words::ClipAt(_)
-                    | Words::TurnStart(_)
+                    | Words::TurnStart { .. }
                     | Words::TurnEnd(_)
                     | Words::Listen(_)
             )
@@ -1507,17 +1534,39 @@ impl Says {
     /// Whether a turn start waits, not yet expired at `now_us`.
     pub fn turn_start_waits(&self, now_us: u64) -> bool {
         self.waiting.iter().any(|waiting| {
-            matches!(waiting.request.words, Words::TurnStart(_)) && now_us < waiting.expires_at_us
+            matches!(waiting.request.words, Words::TurnStart { .. })
+                && now_us < waiting.expires_at_us
         })
     }
 
+    /// The earlier turn the oldest turn start not yet expired at `now_us`
+    /// names (`after`), the one [`Self::take_turn_start`] takes next: read
+    /// before it is taken, so the voice knows whether a turn going on is
+    /// that computer's own.
+    pub fn turn_start_after(&self, now_us: u64) -> Option<u64> {
+        self.waiting
+            .iter()
+            .filter(|waiting| {
+                matches!(waiting.request.words, Words::TurnStart { .. })
+                    && now_us < waiting.expires_at_us
+            })
+            .min_by_key(|waiting| waiting.order)
+            .and_then(|waiting| match waiting.request.words {
+                Words::TurnStart { after, .. } => after,
+                _ => None,
+            })
+    }
+
     /// Take the oldest turn start, as the voice opens or refuses it at
-    /// `now_us`: its prompt, if any, and its ticket. Those whose time ran
-    /// out are answered `expired` first.
-    pub fn take_turn_start(&mut self, now_us: u64) -> Option<(Option<String>, Ticket)> {
-        self.take_turn_of(now_us, |words| matches!(words, Words::TurnStart(_)))
+    /// `now_us`: its prompt, if any, the earlier turn it names, if any, and
+    /// its ticket. Those whose time ran out are answered `expired` first.
+    pub fn take_turn_start(
+        &mut self,
+        now_us: u64,
+    ) -> Option<(Option<String>, Option<u64>, Ticket)> {
+        self.take_turn_of(now_us, |words| matches!(words, Words::TurnStart { .. }))
             .map(|(words, ticket)| match words {
-                Words::TurnStart(prompt) => (prompt, ticket),
+                Words::TurnStart { prompt, after } => (prompt, after, ticket),
                 _ => unreachable!("only a turn start was chosen"),
             })
     }
@@ -4427,11 +4476,27 @@ mod tests {
         let words = |line: &str| parse(line).map(|request| request.words);
         assert_eq!(
             words(r#"{"skill":"control","turn":"start","expires_in_ms":5000}"#),
-            Ok(Words::TurnStart(None))
+            Ok(Words::TurnStart {
+                prompt: None,
+                after: None
+            })
         );
         assert_eq!(
             words(r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":5000}"#),
-            Ok(Words::TurnStart(Some("Ready?".into())))
+            Ok(Words::TurnStart {
+                prompt: Some("Ready?".into()),
+                after: None
+            })
+        );
+        // A start may name the same computer's earlier turn it continues.
+        assert_eq!(
+            words(
+                r#"{"skill":"control","turn":"start","expires_in_ms":5000,"after":7,"text":"And?"}"#
+            ),
+            Ok(Words::TurnStart {
+                prompt: Some("And?".into()),
+                after: Some(7)
+            })
         );
         let end = parse(r#"{"skill":"control","turn":"end","id":7}"#).unwrap();
         assert_eq!(end.words, Words::TurnEnd(7));
@@ -4472,19 +4537,35 @@ mod tests {
             ),
             (
                 r#"{"skill":"control","turn":"start","note":"Ask.","expires_in_ms":5}"#.to_owned(),
-                "turn goes with text, expires_in_ms or id only".into(),
+                "turn goes with text, expires_in_ms, after or id only".into(),
             ),
             (
                 r#"{"skill":"control","turn":"start","cue":"hum","expires_in_ms":5}"#.to_owned(),
-                "turn goes with text, expires_in_ms or id only".into(),
+                "turn goes with text, expires_in_ms, after or id only".into(),
             ),
             (
                 r#"{"skill":"control","turn":"start","quoted":"Hi.","expires_in_ms":5}"#.to_owned(),
-                "turn goes with text, expires_in_ms or id only".into(),
+                "turn goes with text, expires_in_ms, after or id only".into(),
             ),
             (
                 r#"{"skill":"control","turn":"start","id":3,"expires_in_ms":5}"#.to_owned(),
                 "id goes only with turn end".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"start","after":0,"expires_in_ms":5}"#.to_owned(),
+                "after is a nonzero turn id".into(),
+            ),
+            (
+                r#"{"skill":"control","turn":"end","id":3,"after":2}"#.to_owned(),
+                "turn end goes with its id only".into(),
+            ),
+            (
+                r#"{"skill":"control","listen":false,"after":2}"#.to_owned(),
+                "listen goes alone".into(),
+            ),
+            (
+                r#"{"skill":"control","text":"Hi.","after":2,"expires_in_ms":5}"#.to_owned(),
+                "after goes only with turn start".into(),
             ),
             (
                 r#"{"skill":"control","turn":"end"}"#.to_owned(),
@@ -4554,8 +4635,10 @@ mod tests {
         assert!(says.turn_start_waits(10));
         let (id, _) = says.take_turn_end(10).unwrap();
         assert_eq!(id, 4);
-        let (prompt, ticket) = says.take_turn_start(10).unwrap();
+        assert_eq!(says.turn_start_after(10), None);
+        let (prompt, after, ticket) = says.take_turn_start(10).unwrap();
         assert_eq!(prompt.as_deref(), Some("Ready?"));
+        assert_eq!(after, None);
         assert!(!says.turn_start_waits(10));
         let (asker, answered) = Ticket::own("control");
         asker.begun_turn(42, 9);

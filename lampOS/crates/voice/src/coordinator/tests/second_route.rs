@@ -4796,6 +4796,9 @@ fn a_scheduled_exact_say_uses_only_the_second_route_and_finishes_spoken() {
 fn a_computers_turn_plays_the_cue_opens_eight_seconds_and_ends_on_nobody_or_a_mute() {
     use crate::say::{Answer, Outcome};
     let _one = super::pilot_faults::one_session();
+    // The thread is the whole voice's: hold it from the other tests that
+    // read or reset it (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
     for (mute_after_frames, why) in [
         (1_200, crate::control_turn::NOBODY_SPOKE),
         (200, crate::control_turn::MUTED),
@@ -4845,6 +4848,9 @@ fn computers_turn_with_an_end(
     holds: bool,
     other_id: bool,
 ) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>) {
+    // The thread is the whole voice's: hold it from the other tests that
+    // read or reset it (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
     // A conversation another loop test left with the lamp would refuse
     // the turn: none goes on here.
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
@@ -4954,6 +4960,108 @@ fn a_computers_end_with_its_id_cuts_the_answer_awaited() {
     );
 }
 
+/// A computer's turn whose line was answered, its conversation still going
+/// on, then a second `turn: "start"` read with `after` as `after_of` makes
+/// it from the first turn's id (`None`: no `after`). The first turn's
+/// answers, the second's, and the first turn's id.
+fn computers_second_turn(
+    after_of: fn(u64) -> Option<u64>,
+) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>, u64) {
+    // The thread is the whole voice's: hold it from the other tests that
+    // read or reset it (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
+    // A conversation another loop test left with the lamp would refuse
+    // the first turn: none goes on here.
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let (says, line, answered) = crate::say::Says::line_for_test(
+        r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
+    );
+    let again = line.clone();
+    let first = std::rc::Rc::new(std::cell::Cell::new(0));
+    let second_answered = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let (kept, kept_first) = (second_answered.clone(), first.clone());
+    let start = move || {
+        let id = crate::control_turn::last_opened_for_test();
+        kept_first.set(id);
+        let line = match after_of(id) {
+            Some(after) => format!(
+                r#"{{"skill":"control","turn":"start","expires_in_ms":60000,"after":{after}}}"#
+            ),
+            None => r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#.to_owned(),
+        };
+        let (line, answered) = again.another(&line);
+        *kept.borrow_mut() = Some(answered);
+        line
+    };
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    let run = run(Script {
+        second: false,
+        only: true,
+        speech_frames: 0,
+        speak_at: &[1_750],
+        say_at_frame: Some((1_600, line)),
+        // The first turn's answer has played: its conversation goes on,
+        // well inside a say's quiet.
+        say_later: Some((2_400, std::rc::Rc::new(start))),
+        written: Written::Said(12),
+        mute_at_frame: Some(3_000),
+        limit: Duration::from_secs(40),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let second = second_answered
+        .borrow_mut()
+        .take()
+        .map(|answered| answered.try_iter().collect())
+        .unwrap_or_default();
+    (run, answered.try_iter().collect(), second, first.get())
+}
+
+/// lamp-75c9, 3 Nov 19:27: a computer's next turn, asked while its own
+/// answered turn's conversation went on, was refused by that conversation.
+/// Naming its turn (`after`, as the door sends it) the same computer's start
+/// opens a new turn with a new id; the first, answered, is told nothing
+/// more. Without `after`, or naming another turn, it is refused as another
+/// computer's would be.
+#[test]
+fn a_computers_start_naming_its_own_turn_going_on_opens_and_others_are_refused() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    let (run, first, second, first_id) = computers_second_turn(Some);
+    assert!(
+        matches!(
+            first.as_slice(),
+            [Answer::BegunTurn { id, .. }, Answer::Done(Outcome::Spoken)] if *id == first_id
+        ),
+        "{first:?}: {}",
+        run.summary()
+    );
+    let Some(Answer::BegunTurn { id, .. }) = second.first() else {
+        panic!("{second:?}: {}", run.summary());
+    };
+    assert_ne!(*id, first_id);
+    for after_of in [(|_| None) as fn(u64) -> Option<u64>, |id| Some(id + 1_000)] {
+        let (run, first, second, _) = computers_second_turn(after_of);
+        assert!(
+            matches!(
+                first.as_slice(),
+                [Answer::BegunTurn { .. }, Answer::Done(Outcome::Spoken)]
+            ),
+            "{first:?}: {}",
+            run.summary()
+        );
+        assert_eq!(
+            second,
+            vec![Answer::Done(Outcome::Refused(
+                crate::control_turn::CONVERSATION.into()
+            ))],
+            "{}",
+            run.summary()
+        );
+    }
+}
+
 /// Only the lamp's own words waiting for the provider count as the lamp
 /// speaking when a computer's turn is asked: a person's line on its way to
 /// the route (lamp-75c9, 3 Nov 17:51: a room line, then held back, refused
@@ -4989,6 +5097,9 @@ fn only_the_lamps_own_words_queued_count_as_it_speaking() {
 fn a_computers_turn_opens_at_once_after_a_line_that_drew_no_answer() {
     use crate::say::Answer;
     let _one = super::pilot_faults::one_session();
+    // The thread is the whole voice's: hold it from the other tests that
+    // read or reset it (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     let (says, line, answered) = crate::say::Says::line_for_test(
         r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
@@ -5023,6 +5134,9 @@ fn a_computers_turn_opens_at_once_after_a_line_that_drew_no_answer() {
 fn a_computers_turn_opens_over_room_speech_with_no_conversation() {
     use crate::say::{Answer, Outcome};
     let _one = super::pilot_faults::one_session();
+    // The thread is the whole voice's: hold it from the other tests that
+    // read or reset it (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     let (says, line, answered) = crate::say::Says::line_for_test(
         r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
@@ -5063,6 +5177,9 @@ fn a_computers_turn_opens_over_room_speech_with_no_conversation() {
 fn a_computers_turn_opens_after_the_lamps_own_words_alone_have_gone_quiet() {
     use crate::say::Answer;
     let _one = super::pilot_faults::one_session();
+    // The thread is the whole voice's: hold it from the other tests that
+    // read or reset it (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
     {
         let mut thread = crate::thread::THREAD.lock().unwrap();
         *thread = crate::thread::Thread::new();
@@ -5103,6 +5220,9 @@ fn a_computers_turn_opens_after_the_lamps_own_words_alone_have_gone_quiet() {
 fn a_computers_turn_is_refused_while_a_conversation_with_the_lamp_goes_on() {
     use crate::say::{Answer, Outcome};
     let _one = super::pilot_faults::one_session();
+    // The thread is the whole voice's: hold it from the other tests that
+    // read or reset it (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
     let (says, line, answered) = crate::say::Says::line_for_test(
         r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":60000}"#,
     );

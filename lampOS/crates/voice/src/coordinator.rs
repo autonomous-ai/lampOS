@@ -12256,13 +12256,21 @@ fn conversation_with_gate_inner(
             // Only the lamp's own words waiting for the provider; a
             // person's line on its way to it is not the lamp speaking.
             let own_words_queued = provider_queue.iter().any(own_words);
+            // A start naming the turn going on (`after`) is that computer's
+            // own: its turn, and the thread's conversation that turn began,
+            // don't refuse it (lamp-75c9, 3 Nov 19:27: a computer's next
+            // turn was refused by its own turn's conversation). Another
+            // computer's start, or one naming no turn going on, is refused
+            // as before; a person's answer and the lamp's words still are.
+            let own_turn = control_turns.continues(says.turn_start_after(control_now_us));
             let signs = [
-                ("a computer's turn", control_turns.going_on()),
+                ("a computer's turn", control_turns.going_on() && !own_turn),
                 (
                     "the thread",
-                    crate::thread::THREAD
-                        .lock()
-                        .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
+                    !own_turn
+                        && crate::thread::THREAD
+                            .lock()
+                            .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
                 ),
                 (
                     "a person's answer",
@@ -12283,7 +12291,7 @@ fn conversation_with_gate_inner(
                 speaking: signs[3..].iter().any(|(_, on)| *on),
             });
             if let Some(why) = refusal {
-                if let Some((_, ticket)) = says.take_turn_start(control_now_us) {
+                if let Some((_, _, ticket)) = says.take_turn_start(control_now_us) {
                     // Which signs refused it, never what was said.
                     let by: Vec<&str> = signs
                         .iter()
@@ -12313,7 +12321,7 @@ fn conversation_with_gate_inner(
                 && playback_mask.available(control_now_us)
                 && !(refused_hold && model_refusing.holds(control_now_us))
                 && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
-                && let Some((prompt, ticket)) = says.take_turn_start(control_now_us)
+                && let Some((prompt, _, ticket)) = says.take_turn_start(control_now_us)
             {
                 match prompt {
                     Some(prompt) => {
