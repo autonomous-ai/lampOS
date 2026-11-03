@@ -124,6 +124,11 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-addons.service",
         include_str!("../../../deploy/product/lamp-addons.service"),
     ),
+    // The person's linked services (Queue #4710): root's, off unless set.
+    (
+        "lamp-services.service",
+        include_str!("../../../deploy/product/lamp-services.service"),
+    ),
     // The lamp's inner state (#1670); off unless set.
     (
         "lamp-mood.service",
@@ -3155,9 +3160,8 @@ mod tests {
     #[test]
     fn every_deploy_product_unit_is_installed_or_named_left_out() {
         // Left out until their lamp check: the keeper's restart helper
-        // (#2193), the own keys' helper (#2094) and linked services (#4710).
+        // (#2193) and the own keys' helper (#2094).
         const LEFT_OUT: &[&str] = &[
-            "lamp-services.service",
             "lamp-keeper-restart.socket",
             "lamp-keeper-restart@.service",
             "lamp-setup-keys.socket",

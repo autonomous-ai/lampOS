@@ -93,7 +93,7 @@ dịch vụ.
 
 | Công tắc | Được đọc bởi | Tắt (mặc định) |
 |---|---|---|
-| `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`) và `lamp-voice` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào |
+| `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -101,15 +101,15 @@ Một lần ghi, và một lần đọc được nói đầy đủ, còn cần k
 `LAMP_EYES_SPEAKING=on` trong `lamp-voice` ("Ai dùng được chúng", ở trên):
 khi một trong hai tắt, mọi lần ghi bị từ chối và mọi lần đọc đều ngắn gọn.
 
-Bản thân `lamp-services` không đọc công tắc nào cho việc đọc: nó không mở
-socket nào trừ khi được khởi động với `--enable`, mà unit của nó truyền vào,
-nên khi công tắc tắt thì nó đóng vì không được cài.
-`deploy/product/lamp-services.service` chưa nằm trong danh sách của
-`lamp-update install` (các unit bị bỏ ra của `install.rs`, cùng với helper
-khởi động lại của keeper và helper own keys), nên chưa đèn nào nhận nó cho đến
-lần kiểm tra trên đèn; nó được bật bằng tay cùng với công tắc.
-`LAMP_SERVICES_WRITE` được đặt trong một drop-in trên `lamp-services.service`.
-Không unit sản phẩm nào đặt công tắc nào trong hai công tắc này
+`lamp-services.service` nằm trong danh sách của `lamp-update install` và được
+bật trên mọi đèn, như `lamp-addons.service`, nhưng `lamp-services` không mở
+socket nào trừ khi `LAMP_SERVICES=on` có trong môi trường của nó (hoặc nó được
+khởi động với `--enable`, mà unit của nó không truyền vào): khi tắt, nó ghi
+một dòng và thoát 0 ngay, nên unit ở trạng thái inactive và không bị khởi động
+lại. Công tắc được đặt bằng một drop-in trên mỗi unit trong ba unit,
+`lamp-services.service`, `lamp-cloud.service` và `lamp-voice.service`, và
+`LAMP_SERVICES_WRITE` cũng vậy, trên `lamp-services.service`. Không unit sản
+phẩm nào đặt công tắc nào trong hai công tắc này
 ([switches.md](../switches.md)).
 
 ## Ba phần và các socket của chúng
@@ -664,8 +664,8 @@ chờ thì phát âm thanh đó, như một cuộc trò chuyện chậm.
 - **Các host MCP còn phải xác nhận với Backend2**: rằng `mcp_url` của backend
   cho Slack, monday.com, HubSpot và Amplitude nằm trên các host đã ghim ở
   trên; một liên kết trên host khác bị từ chối.
-- `lamp-services.service` chưa nằm trong danh sách của `lamp-update install`,
-  và chưa phần nào ở đây chạy trên một đèn: các kiểm tra cgroup dưới socket
+- `lamp-services.service` đã được cài nhưng tắt trên mọi đèn, và chưa phần
+  nào ở đây chạy trên một đèn: các kiểm tra cgroup dưới socket
   thật, các trao đổi IMAP và SMTP với Gmail, `get-message` và làm mới của
   backend, và API riêng của từng dịch vụ.
 
@@ -720,5 +720,6 @@ lịch đều bị từ chối, cả đọc lẫn ghi), không gì khác chạy 
 trong cùng yêu cầu, một lần đọc rút gọn còn ai gửi và về việc gì khi có thể có
 người khác, lời của một lần đọc không được giữ ở đâu trong luồng hay bản tóm
 tắt, một kỹ năng tự tạo không bao giờ chạm đến dịch vụ. `-p lamp-update` (unit được
-nêu là bị bỏ ra, hash của kế hoạch reset) và `-p lamp-setup`
+cài mà không có dòng `LAMP_SERVICES` và không có `--enable`, hash của kế
+hoạch reset) và `-p lamp-setup`
 (`tests/it/reset.rs`).
