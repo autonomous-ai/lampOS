@@ -2,7 +2,7 @@
 //! snapshots and migration. No model, network connection or lamp is involved.
 use lamp_memory::{
     Options, Person, Store,
-    days::{DATABASE, Days, FOLLOW_UP_OFFERS, NOTE_BYTES},
+    days::{DATABASE, Days, FOLLOW_UP_OFFERS, NOTE_BYTES, PROFILE_BYTES},
     days_protocol,
     store::{Ask, Entry, Kind},
     tidy::{Category, Input, Output, Proposal},
@@ -4114,4 +4114,292 @@ fn a_store_without_said_again_opens_and_records_it() {
         last_said_told(&mut store, "p-minh", id, NOW + DAY),
         [Some(NOW + DAY); 3]
     );
+}
+
+// `profile` (the voice's `LAMP_MEMORY_PROFILE`, the memory owner's
+// Tiers-ideas plan, 3 Nov; the owner profile idea adapted from
+// memory-tiers): preferences and kept facts get their band of the note
+// first, from the same candidates, under the same cap.
+
+/// Four kept preferences, then 24 newer open threads that fill the note.
+/// Returns the preferences' and the threads' IDs.
+fn crowded(store: &mut Days, who: &Person) -> (Vec<u64>, Vec<u64>) {
+    let mut preferences = vec![];
+    for (index, text) in [
+        "Drinks jasmine tea without sugar",
+        "Likes the window open at night",
+        "Prefers quiet music while reading",
+        "Takes a walk after lunch",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        preferences.push(
+            store
+                .remember(who, NOW - 2_000 + index as u64, text)
+                .unwrap(),
+        );
+    }
+    let mut threads = vec![];
+    for conversation in 0..3u64 {
+        let at = NOW - 1_000 + conversation;
+        let heard = format!(
+            "This week I am planning the garden, the move, the trip and the party, part {conversation}"
+        );
+        let line = store.append(who, at, &heard, "Sounds busy", &[]).unwrap();
+        let job = store
+            .conversation_end(who, &format!("busy-{conversation}"), &[line])
+            .unwrap();
+        let observations = (0..8)
+            .map(|n| Proposal {
+                text: format!(
+                    "Is still planning the garden, the move, the trip and the party, part {conversation}, item {n}"
+                ),
+                category: Category::Thread,
+                source_ids: vec![line],
+                supersedes: None,
+                replaces: None,
+                on: None,
+            })
+            .collect();
+        threads.extend(
+            store
+                .tidy_apply(who, &job.job, &Output { observations })
+                .unwrap(),
+        );
+    }
+    (preferences, threads)
+}
+
+fn profile_note(store: &mut Days, who: &Person, session: &str, profile: bool) -> Value {
+    let mut open = json!({"op":"session_open","session":session,"max_bytes":NOTE_BYTES});
+    if who.as_str() != Person::EVERYONE {
+        open["person"] = json!(who.as_str());
+    }
+    if profile {
+        open["profile"] = json!(true);
+    }
+    let (reply, _) = request(store, open, NOW + 10_000);
+    assert_eq!(reply["ok"], true, "{reply}");
+    reply["snapshot"].clone()
+}
+
+fn note_ids(snapshot: &Value) -> Vec<u64> {
+    snapshot["source_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| id.as_u64().unwrap())
+        .collect()
+}
+
+#[test]
+fn profile_band_keeps_preferences_when_threads_fill() {
+    let scratch = Scratch::new("profile-band");
+    let mut store = scratch.open(30, NOW);
+    let mai = person("mai");
+    let (preferences, threads) = crowded(&mut store, &mai);
+    let today = profile_note(&mut store, &mai, "today", false);
+    let banded = profile_note(&mut store, &mai, "banded", true);
+    let today_ids = note_ids(&today);
+    let banded_ids = note_ids(&banded);
+    // Without it, the threads crowd the preferences out: at most one
+    // short one fits the gap they leave.
+    let kept_today = preferences
+        .iter()
+        .filter(|id| today_ids.contains(id))
+        .count();
+    assert!(kept_today <= 1, "{today}");
+    // With it, every preference is in, and threads fill the rest.
+    assert!(
+        preferences.iter().all(|id| banded_ids.contains(id)),
+        "{banded}"
+    );
+    assert!(banded_ids.iter().any(|id| threads.contains(id)), "{banded}");
+    for note in [&today, &banded] {
+        let text = note["note"].as_str().unwrap();
+        assert!(text.len() <= NOTE_BYTES);
+        let facts: Value = serde_json::from_str(text).unwrap();
+        // Written in the candidates' order: threads first, then the rest.
+        let kinds: Vec<&str> = facts["facts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|fact| fact["kind"].as_str().unwrap())
+            .collect();
+        let first_preference = kinds.iter().position(|kind| *kind == "preference");
+        if let Some(first) = first_preference {
+            assert!(kinds[first..].iter().all(|kind| *kind == "preference"));
+        }
+    }
+}
+
+#[test]
+fn note_never_exceeds_cap() {
+    let scratch = Scratch::new("profile-cap");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    crowded(&mut store, &room);
+    for index in 0..40u64 {
+        store
+            .remember(
+                &room,
+                NOW + 2_000 + index,
+                &format!("Likes {}", "é".repeat(40)),
+            )
+            .unwrap();
+    }
+    for cap in [0, 1, 50, 100, 420, PROFILE_BYTES, 700, NOTE_BYTES] {
+        let note = store
+            .session_open_with(&room, &format!("cap-{cap}"), cap, true)
+            .unwrap();
+        assert!(note.note.len() <= cap, "{cap}: {}", note.note.len());
+        if !note.note.is_empty() {
+            serde_json::from_str::<Value>(&note.note).unwrap();
+        }
+    }
+    // The band itself fills at most its share: with only preferences
+    // offered at a cap of the band, the note is within it.
+    let band = store
+        .session_open_with(&room, "band", PROFILE_BYTES, true)
+        .unwrap();
+    assert!(band.note.len() <= PROFILE_BYTES);
+}
+
+#[test]
+fn same_candidates_as_today() {
+    let scratch = Scratch::new("profile-same");
+    let mut store = scratch.open(30, NOW);
+    let mai = person("mai");
+    let other = person("bao");
+    // Everything fits: the note is today's, byte for byte.
+    store.remember(&mai, NOW, "Drinks jasmine tea").unwrap();
+    let line = store
+        .append(&mai, NOW - 1, "I am planning the garden", "Nice", &[])
+        .unwrap();
+    let job = store.conversation_end(&mai, "small", &[line]).unwrap();
+    store
+        .tidy_apply(
+            &mai,
+            &job.job,
+            &Output {
+                observations: vec![Proposal {
+                    category: Category::Thread,
+                    ..proposal("Is planning the garden", &[line], None)
+                }],
+            },
+        )
+        .unwrap();
+    let today = profile_note(&mut store, &mai, "small-today", false);
+    let banded = profile_note(&mut store, &mai, "small-banded", true);
+    assert_eq!(today["note"], banded["note"]);
+    assert_eq!(today["source_ids"], banded["source_ids"]);
+    // Crowded: what is chosen is only ever the person's own active kept
+    // facts and observations, never another person's (IDs are a person's
+    // own, so their texts tell them apart).
+    for index in 0..40u64 {
+        store
+            .remember(&other, NOW + index, &format!("Bao keeps fern {index}"))
+            .unwrap();
+    }
+    let (preferences, threads) = crowded(&mut store, &mai);
+    let banded = profile_note(&mut store, &mai, "crowded", true);
+    let mut own: BTreeSet<u64> = preferences.into_iter().chain(threads).collect();
+    own.extend(note_ids(&today));
+    for id in note_ids(&banded) {
+        assert!(own.contains(&id), "{id} is not mai's");
+    }
+    assert!(
+        !banded["note"].as_str().unwrap().contains("Bao"),
+        "{banded}"
+    );
+}
+
+#[test]
+fn off_is_byte_identical() {
+    let scratch = Scratch::new("profile-off");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    crowded(&mut store, &room);
+    for index in 0..12u64 {
+        store
+            .remember(
+                &room,
+                NOW + 3_000 + index,
+                &format!("Preference {index}: {}", "é".repeat(30)),
+            )
+            .unwrap();
+    }
+    let absent = profile_note(&mut store, &room, "absent", false);
+    let (said_off, _) = request(
+        &mut store,
+        json!({"op":"session_open","session":"said-off","max_bytes":NOTE_BYTES,"profile":false}),
+        NOW + 10_000,
+    );
+    let direct = store.session_open(&room, "direct", NOTE_BYTES).unwrap();
+    assert_eq!(absent["note"], said_off["snapshot"]["note"]);
+    assert_eq!(absent["source_ids"], said_off["snapshot"]["source_ids"]);
+    assert_eq!(absent["note"], json!(direct.note));
+    assert_eq!(absent["source_ids"], json!(direct.source_ids));
+    drop(store);
+    // Today's note, rebuilt from the table as it was built before
+    // `profile`: the same candidates in the same order, taken greedily.
+    let connection = Connection::open(scratch.0.join(DATABASE)).unwrap();
+    let rows: Vec<(u64, String, Option<String>, String)> = connection
+        .prepare("SELECT id,kind,category,text FROM entries WHERE person=? AND active=1 AND kind IN ('kept','observation') ORDER BY CASE category WHEN 'promise' THEN 0 WHEN 'thread' THEN 1 ELSE 2 END,at_unix_ms DESC,id DESC LIMIT 256")
+        .unwrap()
+        .query_map([Person::EVERYONE], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    let render = |facts: &Vec<Value>| {
+        json!({"scope":"said in this room; speaker unknown","untrusted":true,"facts":facts})
+            .to_string()
+    };
+    let (mut facts, mut ids) = (vec![], vec![]);
+    let mut text = render(&facts);
+    for (id, kind, category, fact_text) in rows {
+        let kind = match (kind.as_str(), category.as_deref()) {
+            ("observation", Some(category @ ("promise" | "thread" | "preference"))) => {
+                category.to_owned()
+            }
+            _ => "preference".to_owned(),
+        };
+        facts.push(json!({"id":id,"kind":kind,"text":fact_text}));
+        let next = render(&facts);
+        if next.len() > NOTE_BYTES {
+            facts.pop();
+            continue;
+        }
+        text = next;
+        ids.push(id);
+    }
+    assert_eq!(absent["note"], json!(text));
+    assert_eq!(absent["source_ids"], json!(ids));
+}
+
+#[test]
+fn profile_frozen_note_reuse_is_unchanged() {
+    let scratch = Scratch::new("profile-frozen");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    crowded(&mut store, &room);
+    let off = profile_note(&mut store, &room, "off", false);
+    let on = profile_note(&mut store, &room, "on", true);
+    assert_ne!(off["source_ids"], on["source_ids"]);
+    store
+        .remember(&room, NOW + 5_000, "Likes a late breakfast")
+        .unwrap();
+    // A frozen note is reused as it opened, whatever the reopen says.
+    for profile in [false, true] {
+        assert_eq!(profile_note(&mut store, &room, "off", profile), off);
+        assert_eq!(profile_note(&mut store, &room, "on", profile), on);
+    }
+    // The field is still refused where it is unknown.
+    let (reply, _) = request(
+        &mut store,
+        json!({"op":"session_close","session":"on","profile":true}),
+        NOW + 10_000,
+    );
+    assert_eq!(reply["ok"], false, "{reply}");
 }
