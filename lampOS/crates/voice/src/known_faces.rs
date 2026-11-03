@@ -1959,6 +1959,116 @@ pub fn owner_forgotten() {
     *now = (None, now.1.wrapping_add(1));
 }
 
+/// Renames of the owner's face under way ([`OwnerRename`]), by onboarding
+/// file: how many are in flight, and how many have ended, so a refresh that
+/// overlapped one never drops the owner it was moving ([`refresh_owner`]).
+static OWNER_RENAMES: std::sync::Mutex<std::collections::BTreeMap<PathBuf, (u32, u64)>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+
+/// What [`OWNER_RENAMES`] says for `file` now.
+fn renames_of(file: &Path) -> (u32, u64) {
+    OWNER_RENAMES
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(file)
+        .copied()
+        .unwrap_or_default()
+}
+
+/// A `remember_my_face` with `replace` while setup keeps an owner: the eyes
+/// may rename the owner's own record (a face saved at setup under a name
+/// misheard, renamed from name A to name B by the person, a tester's lamp
+/// on 3 Nov), and [`refresh_owner`], matching the owner by name, would then
+/// find A gone and drop the owner for good, so the lamp no longer knew
+/// them. Counted in flight from before the eyes are asked until the owner
+/// is moved ([`OwnerRename::answered`]) or the call came to nothing
+/// (dropped).
+pub struct OwnerRename {
+    file: PathBuf,
+    socket: PathBuf,
+    owner: String,
+}
+
+impl OwnerRename {
+    /// Begun only for a `remember_my_face` with `replace` and an owner kept
+    /// in the onboarding file `onboarding`; else there is nothing to move.
+    pub fn begin(socket: &Path, call: &ToolCall, onboarding: Option<&Path>) -> Option<Self> {
+        if call.name != REMEMBER || call.args.get("replace").and_then(Value::as_bool) != Some(true)
+        {
+            return None;
+        }
+        let file = onboarding?;
+        let owner = crate::onboarding::owner_of(file)?;
+        OWNER_RENAMES
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(file.to_owned())
+            .or_default()
+            .0 += 1;
+        Some(Self {
+            file: file.to_owned(),
+            socket: socket.to_owned(),
+            owner,
+        })
+    }
+
+    /// The eyes' answer as the model is told it (`told`): a face kept under
+    /// a name moves the owner to it ([`Self::moved`]) off the reply's path,
+    /// as the eyes' list can take seconds on a busy lamp ([`LIST_WITHIN`]);
+    /// anything else ends the rename here.
+    pub fn answered(self, told: &Value) {
+        let Some(to) = told["remembered"]
+            .as_str()
+            .filter(|_| told["ok"] == true)
+            .map(str::to_owned)
+        else {
+            return;
+        };
+        std::thread::spawn(move || self.moved(&to));
+    }
+
+    /// The owner moved to `to` when the eyes now know `to` and no longer the
+    /// owner's name: theirs was the face renamed. Asked up to three times,
+    /// since eyes slow to answer would leave the owner to the next
+    /// refresh's drop. The owner the voice names follows at once.
+    // ponytail: the owner's face removed in the app within one OWNER_EVERY
+    // before someone else's is renamed to `to` reads the same; the eyes
+    // would need to say which name they replaced.
+    fn moved(&self, to: &str) {
+        for _ in 0..3 {
+            let Some(Some(names)) = names_reached(&self.socket) else {
+                continue;
+            };
+            if among(&names, to) && !among(&names, &self.owner) {
+                crate::onboarding::owner_renamed(&self.file, &self.owner, to);
+                let mut now = OWNER_NOW
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if now
+                    .0
+                    .as_ref()
+                    .is_some_and(|owner| owner.to_lowercase() == self.owner.to_lowercase())
+                {
+                    now.0 = Some(to.to_owned());
+                }
+            }
+            return;
+        }
+    }
+}
+
+impl Drop for OwnerRename {
+    fn drop(&mut self) {
+        let mut renames = OWNER_RENAMES
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((in_flight, ended)) = renames.get_mut(&self.file) {
+            *in_flight = in_flight.saturating_sub(1);
+            *ended = ended.wrapping_add(1);
+        }
+    }
+}
+
 /// The owner kept at setup (`onboarding::owner_of`) while the eyes still
 /// know them ([`still_known`]), refreshed into [`owner_now`] every
 /// [`OWNER_EVERY`] on a thread of its own.
@@ -1984,6 +2094,13 @@ fn keep_owner_fresh_now(file: Option<PathBuf>, socket: Option<PathBuf>) {
 /// a face saved later under that name is never taken for the owner (the
 /// Reviewer-lead's and Reviewer-two's P2 on #4290). The eyes' ids can't
 /// tell them apart: a name forgotten gets the same id back.
+///
+/// A rename of the owner's face ([`OwnerRename`]) in flight, or ended,
+/// while the eyes were asked drops nothing and leaves [`owner_now`] as it
+/// was: the eyes may already know them by the new name while the owner
+/// mark is still being moved. The drop names the owner it drops
+/// ([`crate::onboarding::owner_gone`]), so one read before a move the walk
+/// had not yet committed is let go once the owner is the new name.
 // ponytail: a forget and a save of the same name within one OWNER_EVERY
 // keeps the mark; the eyes would need to say when a face was added.
 fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
@@ -1991,13 +2108,18 @@ fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .1;
+    let renames = file.map(renames_of);
     let owner = file.and_then(crate::onboarding::owner_of);
     let names = owner.as_ref().and(socket).and_then(names_reached);
     let found = match (owner, names) {
         (Some(owner), Some(Some(names))) if among(&names, &owner) => Some(owner),
-        (Some(_), Some(Some(_))) => {
+        (Some(owner), Some(Some(_))) => {
             if let Some(file) = file {
-                crate::onboarding::face_forgotten(file);
+                let now = renames_of(file);
+                if now.0 > 0 || Some(now) != renames {
+                    return;
+                }
+                crate::onboarding::owner_gone(file, &owner);
             }
             None
         }
@@ -3262,11 +3384,64 @@ mod tests {
         refresh_owner(Some(&file), Some(&socket));
         assert_eq!(told(), "");
         refresh_owner(Some(&file), Some(&socket));
-        assert_eq!(told(), "{\"face_forgotten\":true}\n");
+        assert_eq!(
+            told(),
+            "{\"face_forgotten\":true,\"owner\":\"Example Name\"}\n"
+        );
         // No eyes to ask: nothing is told.
         std::fs::remove_file(&mailbox).unwrap();
         refresh_owner(Some(&file), Some(&socket.with_file_name("none.sock")));
         assert_eq!(told(), "");
+    }
+
+    /// A tester's lamp, 3 Nov: the setup owner's face saved under a misheard
+    /// name A, renamed to name B, moves the owner to B, and a refresh while
+    /// the rename is in flight drops nothing; a rename of someone else's
+    /// face, or a remembering without `replace`, leaves the owner alone.
+    #[test]
+    fn a_rename_of_the_owners_face_moves_the_owner_and_no_refresh_drops_them() {
+        let (socket, asked) = eyes(vec![
+            // The refresh in flight: the eyes know B already.
+            serde_json::json!({"people": ["Name B"]}),
+            // The move: A gone, B there.
+            serde_json::json!({"people": ["Name B"]}),
+            // Someone else's face renamed: A still there.
+            serde_json::json!({"people": ["Name A", "Name D"]}),
+        ]);
+        let file = socket.with_file_name("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Name A"}"#).unwrap();
+        let mailbox = crate::onboarding::mailbox_of(&file);
+        let told = || std::fs::read_to_string(&mailbox).unwrap_or_default();
+        let call = |replace: bool| ToolCall {
+            id: "c".into(),
+            name: REMEMBER.into(),
+            args: serde_json::json!({"name": "Name B", "replace": replace}),
+        };
+        assert!(OwnerRename::begin(&socket, &call(false), Some(&file)).is_none());
+        assert!(OwnerRename::begin(&socket, &call(true), None).is_none());
+        let renaming = OwnerRename::begin(&socket, &call(true), Some(&file)).unwrap();
+        refresh_owner(Some(&file), Some(&socket));
+        assert_eq!(told(), "", "no drop while the rename is in flight");
+        renaming.moved("Name B");
+        drop(renaming);
+        assert_eq!(renames_of(&file).0, 0);
+        assert_eq!(
+            told(),
+            "{\"owner_renamed\":{\"from\":\"Name A\",\"to\":\"Name B\"}}\n"
+        );
+        std::fs::remove_file(&mailbox).unwrap();
+        let other = OwnerRename::begin(&socket, &call(true), Some(&file)).unwrap();
+        other.moved("Name D");
+        drop(other);
+        assert_eq!(told(), "", "someone else's rename moves nothing");
+        assert_eq!(
+            asked.join().unwrap(),
+            vec![serde_json::json!({"list": true}); 3]
+        );
+        // A failed remembering ends the rename at once, moving nothing.
+        let failed = OwnerRename::begin(&socket, &call(true), Some(&file)).unwrap();
+        failed.answered(&serde_json::json!({"error": "busy"}));
+        assert_eq!(renames_of(&file).0, 0);
     }
 
     /// A face `width` of the frame wide at `confidence`, square in a 4:3
