@@ -527,6 +527,9 @@ impl RoomTold {
                 if why == crate::going_on_asks::NOT_THE_LAMPS
                     || why == crate::going_on_same_one::HELD
                     || why == crate::turned_away::HELD
+                    // `LAMP_UNTIED_GOING_ON=held` (#5008): desk talk held
+                    // in a quiet room is what makes it busy.
+                    || why == crate::untied_going_on::HELD
                     || self.ends_sooner
                         && (why == crate::attention::BUSY_UNCALLED
                             || why == crate::attention::BUSY_NAMED_UNTURNED
@@ -2165,6 +2168,41 @@ mod tests {
             !room.talked_past_the_lamp(),
             "a held line ends no conversation"
         );
+    }
+
+    /// #5008, lamp-52e6 on 3 Nov at 07:13 (stable 9610), seconds from a
+    /// known-quiet room: a call answered, then desk talk. Each desk line was
+    /// answered as the conversation going on, nothing was left alone, and
+    /// the room never formed. With `LAMP_UNTIED_GOING_ON=held` two untied
+    /// desk lines held are talk between people: the room is busy at the
+    /// second, as two left alone would make it. Any other hold is not.
+    #[test]
+    fn untied_desk_lines_held_make_a_quiet_room_busy() {
+        let run = |why: &'static str| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room.end_busy_sooner(true);
+            room.end_busy_once_answered(true);
+            assert_eq!(room.at(S), Room::Unknown);
+            assert_eq!(room.at(302 * S), Room::Quiet);
+            room.heard(1, 310 * S);
+            room.ended(1, 313 * S);
+            room.spoke(1, 314 * S);
+            let held = crate::attention::Verdict::Hold(why);
+            for (request, at) in [(2, 325), (3, 335)] {
+                room.heard(request, (at - 5) * S);
+                room.ended(request, (at - 1) * S);
+                room.judged(request, Some(held), false);
+                room.left_unanswered(request, at * S);
+            }
+            (room.at(336 * S), room.talked_past_the_lamp())
+        };
+        assert_eq!(
+            run(crate::untied_going_on::HELD),
+            (Room::Busy, false),
+            "held untied desk talk is talk, and ends no conversation"
+        );
+        assert_eq!(run(crate::attention::NOT_SPOKEN_TO).0, Room::Quiet);
     }
 
     /// #829: the conversation is over only by another voice until talk is

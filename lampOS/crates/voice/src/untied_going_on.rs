@@ -28,17 +28,37 @@
 //! An untied line's answer renews no window (the worker's chain, as
 //! `LAMP_GOING_ON_NOT_OWN` keeps it), and the line is told it may be
 //! people's talk even when it began over the lamp's answer.
+//!
+//! With `LAMP_UNTIED_GOING_ON=held` (#5008), an untied line is held, not
+//! told: the model gets no turn on it, and it counts as talk between people
+//! for the busy room. On lamp-52e6 on 3 Nov (stable 9610, 07:07 to 07:38),
+//! of 15 desk lines let out only as the conversation going on, told so or
+//! begun over the lamp's answer, the model answered 10: the note alone does
+//! not keep it out, and each answer kept the next line inside the window,
+//! so no busy room ever formed.
 
-/// Where the worker reads the switch. `on` only.
+/// Where the worker reads the switch. `on` or `held`.
 pub const ENVIRONMENT: &str = "LAMP_UNTIED_GOING_ON";
 
-/// Whether the switch is on in this process's environment.
+/// What an untied line is held as, with `LAMP_UNTIED_GOING_ON=held`.
+pub const HELD: &str = "a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp";
+
+/// Whether the switch is on in this process's environment (`on` or `held`).
 pub fn on() -> bool {
     on_for(std::env::var(ENVIRONMENT).ok().as_deref())
 }
 
+/// Whether an untied line is held, not told (`held`, #5008).
+pub fn held() -> bool {
+    held_for(std::env::var(ENVIRONMENT).ok().as_deref())
+}
+
 fn on_for(value: Option<&str>) -> bool {
-    value == Some("on")
+    matches!(value, Some("on" | "held"))
+}
+
+fn held_for(value: Option<&str>) -> bool {
+    value == Some("held")
 }
 
 /// Small words any line has, beside the memory's own list
@@ -430,6 +450,15 @@ mod tests {
         assert!(on_for(Some("on")));
         for value in [None, Some(""), Some("off"), Some("ON"), Some("1")] {
             assert!(!on_for(value), "{value:?}");
+        }
+    }
+
+    /// `held` is on and holds; `on` is on and only tells (#5008).
+    #[test]
+    fn held_is_on_and_holds() {
+        assert!(on_for(Some("held")) && held_for(Some("held")));
+        for value in [None, Some("on"), Some("off"), Some("HELD"), Some("hold")] {
+            assert!(!held_for(value), "{value:?}");
         }
     }
 
