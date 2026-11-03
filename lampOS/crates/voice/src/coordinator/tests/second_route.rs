@@ -5073,6 +5073,25 @@ fn a_computers_start_naming_its_own_turn_going_on_opens_and_others_are_refused()
     }
 }
 
+/// A computer's `turn.end` and the person's own stop, the button's or a
+/// spoken "stop", close the conversation; a touch on the head while the
+/// lamp speaks, the voice's own cuts and anything muted don't (the local
+/// leader, 3 Nov).
+#[test]
+fn a_computers_end_and_the_persons_stop_close_the_conversation() {
+    use super::super::closes_conversation;
+    use crate::receipt_history::{
+        BODY_PUSHED, CAPTURE_GAP, CONTROL_ENDED, HAND_STOP, HEAD_STOP, SPOKEN_STOP,
+    };
+    for reason in [CONTROL_ENDED, HAND_STOP, SPOKEN_STOP] {
+        assert!(closes_conversation(reason, false), "{reason}");
+        assert!(!closes_conversation(reason, true), "{reason} muted");
+    }
+    for reason in [HEAD_STOP, BODY_PUSHED, CAPTURE_GAP, "new_owner"] {
+        assert!(!closes_conversation(reason, false), "{reason}");
+    }
+}
+
 /// Only the lamp's own words waiting for the provider count as the lamp
 /// speaking when a computer's turn is asked: a person's line on its way to
 /// the route (lamp-75c9, 3 Nov 17:51: a room line, then held back, refused
