@@ -252,7 +252,8 @@ nên token của nó chỉ đi đến hai host đó.
 - **Liên kết:** `auth_type: "pat"`, mật khẩu ứng dụng trong `api_key` (hoặc
   `access_token`), email của tài khoản trong `credentials.email`. Nó không
   hết hạn hay làm mới. Google hiện mật khẩu thành các nhóm bốn ký tự có dấu
-  cách; các dấu cách được bỏ đi trước khi dùng.
+  cách; mọi khoảng trắng (bản chép từ điện thoại có thể mang dấu cách không
+  ngắt dòng) được bỏ đi trước khi dùng.
 - **Ở `set`:** một lệnh IMAP `LOGIN` được thử trước. Bị từ chối: `failure` với
   "Gmail refused the app password"; không kết nối được: "Gmail couldn't be
   reached"; dù trường hợp nào cũng không gì được lưu. Một liên kết Gmail OAuth
@@ -564,7 +565,16 @@ dịch vụ được giữ chờ quyết định của Policy như các lệnh c
 `LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Kỹ năng tự tạo không
 chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
 không bao giờ được nói thẳng ra, và một hàm riêng cùng tên của kỹ năng tự tạo
-bị từ chối (`made_skill::plainly`, `made_skill::capped`).
+bị từ chối (`made_skill::plainly`, `made_skill::capped`). Một yêu cầu tạo
+kỹ năng có nêu thư hay lịch ("mail", "email", "e-mail", "gmail", "inbox",
+"calendar", là một từ nguyên vẹn) không bao giờ được giao cho mô hình:
+`made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "A skill can't read your
+mail or calendar, but you can just ask me to read it once it's linked in the
+app: Skills, then Connectors."
+
+Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
+to this lamp yet. It can be linked in the app: Skills, then Connectors."
+(`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
 
 ## Làm mới
 
