@@ -161,6 +161,13 @@ pub trait Lamp {
         false
     }
 
+    /// lamp-voice's app-make socket, for a skill written in the owner's
+    /// app in their own words (`LAMP_SKILL_WRITTEN=on` with the skills
+    /// page, `crate::make_skill::write`).
+    fn write_skill(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
     /// The Skills Store's owner upload and this lamp's key, for a made
     /// skill sent to the Store (`LAMP_SKILLS_SHARE=on` with the skills page,
     /// fourteen-P13, `crate::share`).
@@ -240,7 +247,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 49] = [
+pub const KINDS: [(&str, Switch); 50] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -283,7 +290,8 @@ pub const KINDS: [(&str, Switch); 49] = [
     ("guard.on", |lamp| lamp.guard().is_some()),
     ("guard.off", |lamp| lamp.guard().is_some()),
     ("skills.make", MAKE_SKILL),
-    ("skills.made", MAKE_SKILL),
+    ("skills.made", MADE_SKILL),
+    ("skills.write", WRITE_SKILL),
     (crate::share::KINDS[0], SHARE),
     (crate::share::KINDS[1], SHARE),
     (crate::share::KINDS[2], SHARE),
@@ -302,6 +310,11 @@ pub const KINDS: [(&str, Switch); 49] = [
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
 /// The switch, and a computer to make the skill on (fourteen-P15).
 const MAKE_SKILL: Switch = |lamp| lamp.make_skill().is_some() && lamp.make_skill_ready();
+/// A skill written in the app: its switch alone, since no computer and no
+/// model writes it.
+const WRITE_SKILL: Switch = |lamp| lamp.write_skill().is_some();
+/// What became of the app's ask, made or written.
+const MADE_SKILL: Switch = |lamp| MAKE_SKILL(lamp) || WRITE_SKILL(lamp);
 /// The skills page and the Store's upload (fourteen-P13).
 const SHARE: Switch = |lamp| lamp.skills().is_some() && lamp.share().is_some();
 const KEYS: Switch = |lamp| lamp.changes().is_some_and(|c| c.keys_on());
@@ -546,9 +559,19 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
             crate::make_skill::make(&socket, data)
         }
-        "skills.made" if lamp.make_skill().is_some() => {
-            let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
+        "skills.made" if lamp.make_skill().is_some() || lamp.write_skill().is_some() => {
+            let socket = lamp
+                .make_skill()
+                .or_else(|| lamp.write_skill())
+                .ok_or_else(|| not_here(kind))?;
             crate::make_skill::made(&socket, data)
+        }
+        // A skill written in the app (`LAMP_SKILL_WRITTEN=on`): its text
+        // goes to lamp-voice as written, kept there with no model; only a
+        // spoken yes at the lamp puts it on.
+        "skills.write" if on(lamp, kind) => {
+            let socket = lamp.write_skill().ok_or_else(|| not_here(kind))?;
+            crate::make_skill::write(&socket, data)
         }
         // A made skill sent to the Skills Store (fourteen-P13): packed here,
         // only a skill made on this lamp and on, and uploaded with the
@@ -663,6 +686,7 @@ pub mod tests {
         pub guard: Option<std::path::PathBuf>,
         pub make_skill: Option<std::path::PathBuf>,
         pub make_skill_ready: bool,
+        pub write_skill: Option<std::path::PathBuf>,
         pub share: Option<crate::share::Store>,
         pub upload: Option<std::sync::Arc<crate::upload::Uploads>>,
         pub update_page: bool,
@@ -770,6 +794,9 @@ pub mod tests {
         }
         fn make_skill_ready(&self) -> bool {
             self.make_skill_ready
+        }
+        fn write_skill(&self) -> Option<std::path::PathBuf> {
+            self.write_skill.clone()
         }
         fn share(&self) -> Option<crate::share::Store> {
             self.share.clone()
@@ -1133,6 +1160,8 @@ pub mod tests {
             // Without LAMP_APP_MAKE_SKILL=on (#2813).
             "skills.make",
             "skills.made",
+            // Without LAMP_SKILL_WRITTEN=on.
+            "skills.write",
         ] {
             assert_eq!(
                 answer(&mut lamp, kind, &Value::Null),
@@ -1335,6 +1364,13 @@ pub mod tests {
                     )))
                 },
                 &["skills.upload"],
+            ),
+            (
+                // A skill written in the app: its switch alone, no
+                // computer needed; `skills.made` tells what became of it.
+                "write skill",
+                |f| f.write_skill = Some(std::path::PathBuf::from("/nowhere/make.sock")),
+                &["skills.made", "skills.write"],
             ),
             (
                 "update page",

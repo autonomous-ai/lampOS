@@ -266,6 +266,10 @@ fn main() -> ExitCode {
         make_skill: skills::on_from_environment()
             .then(lamp_cloud::make_skill::from_environment)
             .flatten(),
+        // A skill written in the app: only with LAMP_SKILL_WRITTEN=on and the skills page.
+        write_skill: skills::on_from_environment()
+            .then(lamp_cloud::make_skill::write_from_environment)
+            .flatten(),
         share,
         services,
         upload,
@@ -316,6 +320,7 @@ fn main() -> ExitCode {
         restart: None,
         guard: None,
         make_skill: None,
+        write_skill: None,
         share: None,
         services: None,
         upload: None,
