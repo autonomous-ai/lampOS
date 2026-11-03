@@ -1710,6 +1710,13 @@ fn run_call_with_scope(
             if let Some(told) = crate::remember::heard::yes_alone(call, request, heard, lease) {
                 return ("the memory", (told, true));
             }
+            // With `LAMP_KEEP_QUIETLY`, a `remember` the line did not ask
+            // for, in a known person's own scope, is kept only when every key
+            // word of its sentence was heard: a quiet keep is never said
+            // back, so it is never the model's own words (#5053).
+            if let Some(told) = crate::keep_quietly::unheard(call, request, heard, lease) {
+                return ("the memory", (told, true));
+            }
             // The words also give a day the model left out (#3987).
             let words = (heard && call.name == crate::remember::REMEMBER)
                 .then(|| crate::remember::heard::words_for(request, lease))

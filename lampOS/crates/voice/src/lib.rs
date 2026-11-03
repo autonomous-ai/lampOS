@@ -80,6 +80,7 @@ pub mod hand_controls;
 pub mod head_qualification;
 pub mod health_told;
 pub(crate) mod holding_answer;
+pub mod keep_quietly;
 pub mod known_faces;
 pub mod language;
 pub mod light_told;

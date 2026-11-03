@@ -1112,6 +1112,10 @@ fn worker_command(
             role,
             var(crate::remember::heard::ENVIRONMENT).as_deref(),
         ))
+        .envs(keep_quietly_worker_environment(
+            role,
+            var(crate::keep_quietly::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_remember_once_worker_environment(
             role,
             var(crate::remember::REMEMBER_ONCE_ENVIRONMENT).as_deref(),
@@ -1375,6 +1379,17 @@ fn memory_keep_heard_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::heard::ENVIRONMENT, "on"))
+}
+
+// Plain facts kept quietly, few offers to keep (`LAMP_KEEP_QUIETLY`),
+// passed the same narrow way: the exact `on`, to the second route alone,
+// whose turns say the offers and are told the words.
+fn keep_quietly_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::keep_quietly::ENVIRONMENT, "on"))
 }
 
 // A correction replacing a kept thing (#2510), passed the same narrow way:
@@ -2231,6 +2246,12 @@ mod tests {
                         "LAMP_MEMORY_KEEP_HEARD",
                         ["provider", "second"].as_slice(),
                     ),
+                    // Plain facts kept quietly: the second route alone.
+                    (
+                        keep_quietly_worker_environment,
+                        "LAMP_KEEP_QUIETLY",
+                        ["second"].as_slice(),
+                    ),
                     // A remember of what is kept already (#2176).
                     (
                         memory_remember_once_worker_environment,
@@ -2542,6 +2563,7 @@ mod tests {
                     crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
+                    crate::keep_quietly::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
                     crate::remember::REPLACES_ENVIRONMENT,
                     crate::remember::FORGET_ASKS_ENVIRONMENT,
@@ -2760,6 +2782,7 @@ mod tests {
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_HISTORY_KEEPS_CALLS=on",
                     "LAMP_JOIN_CUT_WORDS=on",
+                    "LAMP_KEEP_QUIETLY=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
                     "LAMP_LIGHT_TOLD=on",
