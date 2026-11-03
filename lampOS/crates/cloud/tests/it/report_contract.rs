@@ -278,3 +278,33 @@ fn a_lamp_with_the_armed_way_back_or_the_switch_off_says_nothing_waits() {
             .is_none()
     );
 }
+
+/// Skills, counted (#4710): an added field under `lamp-report/1`, Backend3's
+/// word on #4710, left out when the skills weren't read.
+#[test]
+fn the_skills_field_is_added_under_schema_one_and_left_out_when_unread() {
+    use lamp_cloud::reports::skills::{Reading, Source};
+    let mut reports = Reports::open(places("skills"));
+    reports
+        .health(1_792_382_400, None, &Seen::default())
+        .unwrap();
+    let sent = reports.due("dev-42");
+    let unread: Value = serde_json::from_str(&sent[0].1).unwrap();
+    assert_eq!(unread.get("skills"), None);
+    reports.acked(sent[0].0);
+    let seen = Seen {
+        skills: Some(Reading {
+            on: [(Source::Core, 12), (Source::MadeVoice, 1)].into(),
+            kept_off: [(Source::Store, 2)].into(),
+            ..Reading::default()
+        }),
+        ..Seen::default()
+    };
+    reports.health(1_792_382_460, None, &seen).unwrap();
+    let health: Value = serde_json::from_str(&reports.due("dev-42")[0].1).unwrap();
+    assert_eq!(health["schema"], "lamp-report/1");
+    assert_eq!(
+        health["skills"],
+        json!({"on": {"core": 12, "made_voice": 1}, "kept_off": {"store": 2}})
+    );
+}

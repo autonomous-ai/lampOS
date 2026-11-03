@@ -30,6 +30,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod query;
+pub mod skills;
 
 /// `on` sends reports, with `LAMP_CLOUD=on` and the person's yes. Anything
 /// else: nothing of this runs.
@@ -43,6 +44,14 @@ pub fn topic(fd_channel: &str) -> String {
 /// The longest device id a report carries; room is kept for it in
 /// [`MOST_BYTES`].
 pub const ID_MOST: usize = 128;
+
+/// The room `due` needs for the id: `,"id":"…"` at its longest.
+const ID_ROOM: usize = ID_MOST + r#","id":"""#.len();
+
+/// Whether `report`, with the longest id, is within [`MOST_BYTES`].
+fn fits(report: &Report) -> bool {
+    serde_json::to_string(report).is_ok_and(|bytes| bytes.len() + ID_ROOM <= MOST_BYTES)
+}
 
 /// The record's schema. Adding a field keeps `/1`; removing, renaming or
 /// retyping one is `/2`.
@@ -373,6 +382,10 @@ pub struct HealthBody {
     /// Left out when nothing waits, so a report without it is unchanged.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub waits: BTreeMap<&'static str, &'static str>,
+    /// Skills, counted ([`skills`]): left out when the skills folder
+    /// wasn't read, so a report without it is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skills: Option<skills::SkillsBody>,
 }
 
 /// The self-update switch, as `lamp-update.service` reads it (#2709). Set
@@ -612,6 +625,9 @@ pub struct Seen {
     pub failed_units: Vec<&'static str>,
     /// What waits ([`HealthBody::waits`]).
     pub waits: BTreeMap<&'static str, &'static str>,
+    /// The skills and their running totals, read at a health report
+    /// ([`skills::read`]).
+    pub skills: Option<skills::Reading>,
 }
 
 /// The health part of a report, from what was seen: names by the lists only.
@@ -698,6 +714,7 @@ pub fn health_body(seen: &Seen) -> HealthBody {
         restarts: seen.restarts.clone(),
         failed_units,
         waits: seen.waits.clone(),
+        skills: None,
     }
 }
 
@@ -1005,6 +1022,8 @@ struct Entry {
     once_more: bool,
     /// A `stopped` acknowledged twice is through.
     acks: u8,
+    /// The skills' day a health carries whole: let go on its ack.
+    skill_day: Option<u64>,
 }
 
 /// The state the queue keeps beside the crashes. A field a newer build
@@ -1021,6 +1040,8 @@ struct Kept {
     notes: BTreeMap<String, u64>,
     /// The crashes taken, wall seconds, for the rate.
     crashes: VecDeque<u64>,
+    /// Skills, counted: each day's counts until acknowledged.
+    skills: skills::Days,
 }
 
 /// The reports' engine: what waits, the counts and the bounds. Nothing in
@@ -1139,6 +1160,7 @@ impl Reports {
                         handed: false,
                         once_more: false,
                         acks: 0,
+                        skill_day: None,
                     }),
                     Queued::Later(what) => {
                         reports.later.push(seq);
@@ -1385,6 +1407,8 @@ impl Reports {
             let _ = fs::remove_file(self.places.queue.join(format!("{seq}.json")));
         }
         self.error_since.clear();
+        // The days' counts are deleted too, and begun again on a yes.
+        self.kept.skills = skills::Days::default();
         let report = self.report(now_s, None, &Seen::default(), Body::Stopped);
         self.put(report);
     }
@@ -1413,7 +1437,7 @@ impl Reports {
         let Ok(bytes) = serde_json::to_string(&report) else {
             return None;
         };
-        if bytes.len() + ID_MOST > MOST_BYTES {
+        if bytes.len() + ID_ROOM > MOST_BYTES {
             self.kept.dropped.too_big += 1;
             self.keep();
             return None;
@@ -1445,6 +1469,7 @@ impl Reports {
             handed: false,
             once_more: false,
             acks: 0,
+            skill_day: None,
         });
         self.bound(at_s);
         self.keep();
@@ -1492,9 +1517,39 @@ impl Reports {
             return None;
         }
         self.look(now_s, seen);
-        let body = Body::Health(Box::new(health_body(seen)));
-        let report = self.report(now_s, build, seen, body);
-        self.put(report)
+        let mut body = health_body(seen);
+        let mut skill_day = None;
+        if let Some(reading) = &seen.skills {
+            self.kept.skills.add(now_s, reading);
+            let day = self.kept.skills.oldest(now_s);
+            skill_day = day.as_ref().and_then(|(_, over)| *over);
+            body.skills = Some(skills::SkillsBody {
+                on: reading.on.clone(),
+                kept_off: reading.kept_off.clone(),
+                day: day.map(|(day, _)| day),
+            });
+        }
+        let mut report = self.report(now_s, build, seen, Body::Health(Box::new(body)));
+        // Within [`MOST_BYTES`]: the Store list cut first, then the day.
+        while !fits(&report) {
+            let Body::Health(body) = &mut report.body else {
+                break;
+            };
+            let Some(skills) = &mut body.skills else {
+                break;
+            };
+            if !skills.cut() {
+                break;
+            }
+            if skills.day.is_none() {
+                skill_day = None;
+            }
+        }
+        let seq = self.put(report)?;
+        if let Some(entry) = self.queue.iter_mut().find(|entry| entry.seq == seq) {
+            entry.skill_day = skill_day;
+        }
+        Some(seq)
     }
 
     /// The parts' levels from `seen`, for `level_before`, and whether one
@@ -1641,9 +1696,17 @@ impl Reports {
             return;
         };
         entry.acks += 1;
-        if entry.kind == Kind::Stopped && entry.acks < 2 {
+        let day = entry.skill_day.take();
+        let once_more = entry.kind == Kind::Stopped && entry.acks < 2;
+        if once_more {
             entry.once_more = true;
             entry.handed = false;
+        }
+        if let Some(day) = day {
+            self.kept.skills.acked(day);
+            self.keep();
+        }
+        if once_more {
             return;
         }
         self.forget(seq);
@@ -1783,6 +1846,11 @@ pub trait Sources {
     fn waits(&mut self) -> BTreeMap<&'static str, &'static str> {
         BTreeMap::new()
     }
+    /// The skills and their running totals ([`skills::read`]); nothing
+    /// when they can't be read.
+    fn skills(&mut self) -> Option<skills::Reading> {
+        None
+    }
     /// Whether the voice is resting (not in a turn); true when unknown.
     fn voice_resting(&mut self) -> bool;
     /// Asks taken from `reports/request` since the last look.
@@ -1874,6 +1942,7 @@ pub fn step(
             }
             (seen.restarts, seen.failed_units) = sources.unit_health();
             seen.waits = sources.waits();
+            seen.skills = sources.skills();
             put |= shared
                 .with(|reports| reports.health(now_s, build, &seen))
                 .is_some();
@@ -1935,6 +2004,8 @@ pub struct Lamp {
     requests_refused: bool,
     state: Option<lamp_bus::Publisher>,
     units_read: Option<(Instant, UnitStates)>,
+    /// Where the skills are counted from; none reads nothing.
+    pub skills: Option<skills::Places>,
 }
 
 impl Lamp {
@@ -1948,6 +2019,7 @@ impl Lamp {
             requests_refused: false,
             state: None,
             units_read: None,
+            skills: Some(skills::Places::product()),
         }
     }
 
@@ -1992,7 +2064,13 @@ impl Sources for Lamp {
             restarts: BTreeMap::new(),
             failed_units: Vec::new(),
             waits: BTreeMap::new(),
+            skills: None,
         }
+    }
+
+    /// Read at a health report only, with the person's yes.
+    fn skills(&mut self) -> Option<skills::Reading> {
+        skills::read(self.skills.as_ref()?)
     }
 
     /// Only with the self-update switch on, asked of systemd within
@@ -2698,6 +2776,7 @@ pub(crate) mod tests {
                 "lamp-update.service",
             ],
             waits: BTreeMap::new(),
+            skills: None,
         }
     }
 
@@ -2800,7 +2879,16 @@ pub(crate) mod tests {
         // A build that is not one, and the identity's strings nowhere to go.
         let build = Build::of("Alice");
         assert_eq!(build, None);
-        reports.health(NOW, build.as_ref(), &planted()).unwrap();
+        // The skills' field too (#4710): their names, words and totals.
+        let skill_places = planted_skills("canary-all", &runs_file(5, 3));
+        reports
+            .kept
+            .skills
+            .add(NOW - 60, &skills::read(&skill_places).unwrap());
+        fs::write(&skill_places.runs, runs_file(9, 7).to_string()).unwrap();
+        let mut seen = planted();
+        seen.skills = skills::read(&skill_places);
+        reports.health(NOW, build.as_ref(), &seen).unwrap();
         let mut forged = planted_note("lamp-voice.service", 1);
         forged.result = "Alice said HomeWiFi-5G".into();
         forged.code = "killed".into();
@@ -2812,11 +2900,240 @@ pub(crate) mod tests {
         bytes.extend(reports.due(ID).into_iter().map(|(_, b)| b));
         bytes.push(reports.answer().to_string());
         assert_eq!(bytes.len(), 4);
+        assert!(bytes[0].contains(r#""runs":{"core":4"#), "{}", bytes[0]);
         for report in &bytes {
             for secret in SECRETS {
                 assert!(!report.contains(secret), "{secret} in {report}");
             }
         }
+    }
+
+    /// A skills folder with secrets in names, words, the runs' file and the
+    /// voice's answer, as `skills::read` finds them; `runs` the totals'
+    /// file's contents.
+    fn planted_skills(name: &str, runs: &Value) -> skills::Places {
+        let page = crate::skills::tests::places(name);
+        crate::skills::tests::skill(
+            &page,
+            "stretch",
+            "Stretch",
+            "",
+            "kind = \"core\"\n[permissions]\nbody = true",
+        );
+        crate::skills::tests::skill(
+            &page,
+            "alice-s3cret",
+            "Alice: remind me at 192.168.1.42",
+            "made: here\n",
+            "[permissions]\nbody = true",
+        );
+        fs::write(&page.off, "alice-s3cret\n").unwrap();
+        let runs_file = page.off.with_file_name(lamp_skills::usage::RUNS_FILE);
+        fs::write(&runs_file, runs.to_string()).unwrap();
+        let voice = page.off.with_file_name("v.sock");
+        let _ = fs::remove_file(&voice);
+        let listener = std::os::unix::net::UnixListener::bind(&voice).unwrap();
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                let _ = io::BufRead::read_line(
+                    &mut io::BufReader::new(stream.try_clone().unwrap()),
+                    &mut line,
+                );
+                let reply = json!({
+                    "made_by_voice": {"kept": 1, "on": 0, "refused": 2, "left_off": 1,
+                                      "said": "Alice: s3cret"},
+                    "app": ["Alice", "b".repeat(64)],
+                    "words": "remind me",
+                });
+                let _ = writeln!(stream, "{reply}");
+            }
+        });
+        skills::Places {
+            folder: page.folder,
+            off: page.off,
+            runs: runs_file,
+            voice,
+            addons: false,
+        }
+    }
+
+    fn runs_file(core: u64, store: u64) -> Value {
+        json!({"version": 1, "core": core, "store": store, "made": 1,
+               "store_ids": {"Alice": store, "a".repeat(64): store},
+               "made_ids": {"b".repeat(64): 1, "HomeWiFi-5G": 1}})
+    }
+
+    /// The canary, for the skills' field: secrets in a skill's name and
+    /// words, the off file, the runs' totals and the voice's answer reach
+    /// no report, while the counts do.
+    #[test]
+    fn no_secret_planted_in_the_skills_reaches_a_report() {
+        let places = places("canary-skills");
+        yes(&places);
+        let mut reports = Reports::open(places);
+        let skill_places = planted_skills("canary", &runs_file(5, 3));
+        let first = skills::read(&skill_places).unwrap();
+        reports.kept.skills.add(NOW - 60, &first);
+        fs::write(&skill_places.runs, runs_file(9, 7).to_string()).unwrap();
+        let mut seen = planted();
+        seen.skills = skills::read(&skill_places);
+        reports.health(NOW, None, &seen).unwrap();
+        let bytes: Vec<String> = reports.due(ID).into_iter().map(|(_, b)| b).collect();
+        let sent: Value = serde_json::from_str(&bytes[0]).unwrap();
+        assert_eq!(
+            sent["skills"],
+            json!({
+                "on": {"core": 1},
+                "kept_off": {"made_voice": 1},
+                "day": {"date": "2026-10-18", "complete": false,
+                        "made_by_voice": {}, "runs": {"core": 4, "store": 4},
+                        "store": {"a".repeat(64): 4}, "store_rest": 0}
+            }),
+            "{sent}"
+        );
+        for secret in SECRETS.iter().chain(&["alice", "Stretch", "made_ids"]) {
+            assert!(!bytes[0].contains(secret), "{secret} in {}", bytes[0]);
+        }
+    }
+
+    /// A day goes on the acknowledgement of the report that carried it
+    /// whole, the next one goes after it, and a no deletes the counts.
+    #[test]
+    fn a_skills_day_goes_on_its_ack_and_a_no_deletes_the_counts() {
+        let places = places("skill-days");
+        yes(&places);
+        let mut reports = Reports::open(places);
+        let reading = |core: u64| skills::Reading {
+            runs: Some(skills::Runs {
+                by_source: [(skills::Source::Core, core)].into(),
+                store: BTreeMap::new(),
+            }),
+            ..skills::Reading::default()
+        };
+        let health = |reports: &mut Reports, at: u64, core: u64| {
+            let seen = Seen {
+                skills: Some(reading(core)),
+                ..Seen::default()
+            };
+            reports.health(at, None, &seen).unwrap();
+            let sent = sent(reports);
+            (
+                sent[0]["seq"].as_u64().unwrap(),
+                sent[0]["skills"]["day"].clone(),
+            )
+        };
+        let (seq, day) = health(&mut reports, NOW, 10);
+        assert_eq!(day, Value::Null);
+        reports.acked(seq);
+        let (seq, day) = health(&mut reports, NOW + 60, 12);
+        assert_eq!(
+            (&day["complete"], &day["runs"]["core"]),
+            (&json!(false), &json!(2))
+        );
+        // A day not over stays after its ack, and grows.
+        reports.acked(seq);
+        let (seq, day) = health(&mut reports, NOW + 86_400, 15);
+        assert_eq!(
+            (&day["date"], &day["complete"]),
+            (&json!("2026-10-18"), &json!(true))
+        );
+        assert_eq!(day["runs"]["core"], 2);
+        // Not acknowledged: the same day again.
+        reports.unhand(None);
+        let again = sent(&mut reports)[0]["skills"]["day"].clone();
+        assert_eq!(again["date"], "2026-10-18");
+        reports.acked(seq);
+        let (seq, day) = health(&mut reports, NOW + 86_401, 15);
+        assert_eq!(
+            (&day["date"], &day["runs"]["core"]),
+            (&json!("2026-10-19"), &json!(3))
+        );
+        // A day not over is kept after its ack; a no deletes it.
+        reports.acked(seq);
+        assert!(reports.kept.skills.oldest(NOW + 86_401).is_some());
+        reports.stop(NOW + 86_402, false).unwrap();
+        assert_eq!(reports.kept.skills, skills::Days::default());
+    }
+
+    /// At the limit: a day with more Store packages than fit is cut to
+    /// what fits with the longest id, the Store's runs kept whole in
+    /// `store_rest`; with no room for the day, it is left out.
+    #[test]
+    fn the_skills_field_is_cut_to_the_report_limit() {
+        let places = places("skill-size");
+        yes(&places);
+        let mut reports = Reports::open(places);
+        let shas: Vec<String> = (0..60).map(|n| format!("{n:064x}")).collect();
+        let reading = |runs: &dyn Fn(usize) -> u64| skills::Reading {
+            on: [(skills::Source::Core, 12), (skills::Source::Store, 60)].into(),
+            runs: Some(skills::Runs {
+                by_source: [(skills::Source::Store, 0)].into(),
+                store: shas
+                    .iter()
+                    .enumerate()
+                    .map(|(n, sha)| (sha.clone(), runs(n)))
+                    .collect(),
+            }),
+            ..skills::Reading::default()
+        };
+        reports.kept.skills.add(NOW - 60, &reading(&|_| 0));
+        let mut seen = planted();
+        seen.skills = Some(reading(&|n| n as u64 + 1));
+        reports.health(NOW, None, &seen).unwrap();
+        let id = "x".repeat(ID_MOST);
+        let bytes = reports.due(&id).remove(0).1;
+        assert!(bytes.len() <= MOST_BYTES, "{}", bytes.len());
+        // Cut to the limit, not below it by more than one package.
+        assert!(bytes.len() + 80 > MOST_BYTES, "{}", bytes.len());
+        let sent: Value = serde_json::from_str(&bytes).unwrap();
+        let day = &sent["skills"]["day"];
+        let listed = day["store"].as_object().unwrap();
+        assert!(
+            !listed.is_empty() && listed.len() < skills::STORE_MOST,
+            "{day}"
+        );
+        let total: u64 = listed
+            .values()
+            .map(|runs| runs.as_u64().unwrap())
+            .sum::<u64>()
+            + day["store_rest"].as_u64().unwrap();
+        assert_eq!(total, (1..=60).sum::<u64>());
+        // The most run are the ones listed.
+        assert!(listed.contains_key(&shas[59]));
+        // No room left for even the day: left out, the rest of skills kept,
+        // and the day not let go by the ack.
+        reports.acked(sent["seq"].as_u64().unwrap());
+        let mut full = planted();
+        let missing = &mut full.health.as_mut().unwrap().0.missing;
+        let base = serde_json::to_string(&Report {
+            kind_of_message: "report",
+            schema: SCHEMA,
+            device: DEVICE,
+            generation: GENERATION,
+            seq: 2,
+            sent_at: crate::online::rfc3339(UNIX_EPOCH + Duration::from_secs(NOW + 86_400)),
+            clock_synced: Some(true),
+            build: None,
+            uptime_s: 187_220,
+            dropped: Dropped::default(),
+            body: Body::Health(Box::new(health_body(&planted()))),
+        })
+        .unwrap()
+        .len();
+        // Each "voice" adds 8 bytes: room for `skills` without its day
+        // (about 55 bytes), not with it (about 100 more).
+        let room = MOST_BYTES - ID_ROOM - base - 90;
+        missing.extend(vec!["voice".to_owned(); room / 8]);
+        full.skills = Some(reading(&|n| n as u64 + 2));
+        reports.health(NOW + 86_400, None, &full).unwrap();
+        let bytes = reports.due(&id).remove(0).1;
+        assert!(bytes.len() <= MOST_BYTES, "{}", bytes.len());
+        let sent: Value = serde_json::from_str(&bytes).unwrap();
+        assert_eq!(sent["skills"]["on"], json!({"core": 12, "store": 60}));
+        assert_eq!(sent["skills"].get("day"), None, "{}", sent["skills"]);
+        reports.acked(sent["seq"].as_u64().unwrap());
+        assert!(reports.kept.skills.oldest(NOW + 86_400).is_some());
     }
 
     #[test]

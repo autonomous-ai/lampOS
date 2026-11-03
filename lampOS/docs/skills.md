@@ -434,6 +434,22 @@ skills".)
   unit gives `--state-dir /var/lib/lampos-skills-state` with
   `StateDirectory=lampos-skills-state` (mode 0700, which the daily journal
   requires), the folder #1732's daily journal shares.
+- **Runs, counted** (#4710, for `lamp-cloud`'s opt-in health report,
+  `cloud.md`, "Skills, counted"; `lamp_skills::usage`). With `--state-dir`,
+  each run is counted where it starts against its skill's source: core, the
+  Skills Store (by the package's SHA-256, from its `installed_from`), made
+  here (`made: here`, by its package's SHA-256 when it has one), pushed by a
+  paired computer, or other. The source is found at each load; a run adds
+  one to an atomic, with no lock and no file on its way. A thread of its own
+  adds what was counted to `DIR/runs.json` at most once a minute (written
+  whole beside it and moved over it, 0600), so a restart loses at most a
+  minute's runs. The file is running totals since it began: `{"version": 1,
+  "core", "store", "made", "pushed", "other", "store_ids", "made_ids"}`, the
+  two maps by SHA-256, at most 256 each, the smallest let go past that; no
+  skill's name, words or files. One that can't be read is begun again
+  (`lamp-cloud` reads a smaller total as a new beginning). No new switch:
+  `lamp-cloud` reads it only with the reports' gates and the person's yes.
+  Tests: `usage::tests`.
 - It loads every folder in `--dir` (`/var/lib/lampOS/skills`), looks at the
   folder every two seconds, and loads them all again when a file other
   than a test changed. Cooldowns are kept across a reload.
@@ -2288,6 +2304,17 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    makes it itself. It reads nothing of the asks. `lamp-cloud` asks it every
    60 s and names `skills.make` in `can` while it is ready, so the app's
    "Make a skill" shows on the switch alone.
+   `{"counts": {}}` (#4710): what became of the skills made by voice, as
+   running totals, `{"made_by_voice": {"kept", "on", "refused",
+   "left_off"}, "app": [SHA-256, ...]}`, for `lamp-cloud`'s opt-in health
+   report (`cloud.md`, "Skills, counted"; `made_counts::counts`). `kept`,
+   `on` and `left_off` are read from the made skills' index, each skill
+   counted once by its SHA-256; `refused`, an ask by voice that made
+   nothing, is counted on an atomic where it is told and written at most
+   once a minute by a thread of its own, so a voice turn never waits on a
+   file. Kept in `counts.json` beside the made skills, numbers and SHA-256s
+   only. `app` names the packages the app's asks made, so `lamp-cloud` tells
+   a made skill as the voice's or the app's. Tests: `made_counts::tests`.
 4. **Told aloud.** Kept, the lamp says aloud, through the say service's own
    asks at a good moment within an hour (`app_make::ask_line`, `say_ask`):
    "I made the skill you typed in the app." with what it does, then exactly
