@@ -265,24 +265,41 @@ giờ có tên, lời hay tệp của một kỹ năng.
 - **Số lần chạy, trong `lamp-skills`** (`lamp_skills::usage`). Có
   `--state-dir` thì mỗi lần chạy được đếm ngay khi bắt đầu theo nguồn của kỹ
   năng: core, Skills Store (theo SHA-256 của gói, từ `installed_from`), tạo
-  tại đây (`made: here`, theo SHA-256 của gói nếu có), do máy tính đã ghép
-  đẩy lên, hoặc khác. Nguồn được xác định lúc nạp; mỗi lần chạy chỉ cộng một
-  vào một biến nguyên tử, không khóa và không ghi tệp. Một luồng riêng cộng
-  phần đã đếm vào `DIR/runs.json` tối đa mỗi phút một lần (ghi trọn bên cạnh
-  rồi chuyển đè, 0600), nên khởi động lại mất tối đa một phút số đếm. Tệp là
-  tổng cộng dồn: `{"version": 1, "core", "store", "made", "pushed", "other",
-  "store_ids", "made_ids"}`, hai bảng theo SHA-256, tối đa 256 mục mỗi bảng.
-  Tệp không đọc được thì bắt đầu lại. Kiểm thử: `usage::tests`.
+  tại đây theo người tạo ghi trên chính thẻ của nó (`made: here` kèm
+  `made_by: voice` hoặc `made_by: app`, hoặc `written: app` cho kỹ năng viết
+  trong ứng dụng; kỹ năng tạo trước khi có dấu này không ghi gì và được đếm
+  là `made_unknown`, không bao giờ đoán: `usage::made_by`), do máy tính đã
+  ghép đẩy lên, hoặc khác. Nguồn được xác định lúc nạp; mỗi lần chạy chỉ cộng
+  một vào một biến nguyên tử, không khóa và không ghi tệp. Một luồng riêng
+  cộng phần đã đếm vào `DIR/runs.json` tối đa mỗi phút một lần (ghi trọn bên
+  cạnh rồi chuyển đè, 0600, giữ khóa trên `DIR`), nên khởi động lại mất tối
+  đa một phút số đếm. Tệp là tổng cộng dồn: `{"version": 1, "core", "store",
+  "made_voice", "made_app", "made_unknown", "pushed", "other", "store_ids"}`,
+  bảng của Store theo SHA-256, tối đa 256 mục; không có SHA-256 của kỹ năng
+  tự tạo. Tệp không đọc được thì bắt đầu lại. Kiểm thử: `usage::tests`.
+- **Người tạo nằm trên thẻ** (`made_skill::Maker`). Khi đóng gói, giọng nói
+  ghi `made_by: voice` hoặc `made_by: app` (lời nhờ từ ứng dụng có `from` là
+  `local:app:…`) cạnh `made: here` trong `SKILL.md`, bên trong gói, nên
+  SHA-256 và lời đồng ý bao gồm nó; dòng `made` hay `made_by` do mô hình viết
+  bị bỏ. Gói chia sẻ được bỏ dấu này cùng `made: here`.
 - **Lời nhờ tạo kỹ năng bằng giọng nói, trong `lamp-voice`**
   (`made_counts`). Socket của ứng dụng nhận thêm `{"counts": {}}` và trả
-  `{"made_by_voice": {"kept", "on", "refused", "left_off"}, "app": [SHA-256,
-  ...]}`, là tổng cộng dồn. `kept`, `on` và `left_off` đọc từ chỉ mục kỹ năng
+  `{"made_by_voice": {"kept", "on", "refused", "left_off"}}`, là tổng cộng
+  dồn. `kept`, `on` và `left_off` đọc từ chỉ mục kỹ năng
   tự tạo, mỗi kỹ năng đếm một lần theo SHA-256; `refused` (lời nhờ không tạo
   được gì) được cộng vào một biến nguyên tử và ghi tối đa mỗi phút một lần
   bởi một luồng riêng, nên lượt nói không bao giờ chờ tệp. Lưu trong
-  `counts.json` cạnh các kỹ năng tự tạo. `app` là các gói do lời nhờ từ ứng
-  dụng tạo ra, để `lamp-cloud` phân biệt kỹ năng tạo bằng giọng nói với kỹ
-  năng tạo từ ứng dụng. Kiểm thử: `made_counts::tests`.
+  `counts.json` cạnh các kỹ năng tự tạo; lời nhờ từ ứng dụng (`local:app:…`
+  hoặc `written:app:…`) không nằm trong đó. Câu trả lời không nêu gói nào:
+  người tạo đã nằm trên thẻ. Kiểm thử: `made_counts::tests`.
 - `lamp-cloud` đọc cả hai ở mỗi báo cáo sức khỏe, tính số của từng ngày UTC
-  từ chênh lệch giữa hai lần đọc, giữ trong trạng thái của báo cáo đến khi
-  được xác nhận, và gửi ngày cũ nhất chưa được xác nhận.
+  từ chênh lệch giữa hai lần đọc, giữ trong trạng thái của báo cáo, và chỉ
+  gửi ngày đã kết thúc, ngày cũ nhất chưa được xác nhận; ngày hôm nay không
+  bao giờ được gửi, nên hai báo cáo cách nhau 15 phút không để lộ một lần
+  chạy giữa chúng.
+- **Khi người dùng nói không** với báo cáo, `lamp-cloud` nhờ trình quản lý
+  (`{"forget_counts": {}}`, của root, sở hữu cả hai tệp) xóa `runs.json` và
+  `counts.json`, mỗi tệp dưới khóa của bên ghi nó (`usage::forget`,
+  `made_counts::forget`); hỏi lại mỗi 10 giây cho đến khi xong. Số đếm còn
+  trong bộ nhớ chưa ghi (tối đa một phút) bắt đầu tệp mới. Kiểm thử:
+  `package::tests::forget_counts_deletes_both_counts`.

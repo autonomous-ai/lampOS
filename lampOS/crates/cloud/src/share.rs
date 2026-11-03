@@ -141,7 +141,8 @@ pub fn made_here_and_on(places: &crate::skills::Places, name: &str) -> Result<Pa
     Ok(places.folder.join(name))
 }
 
-/// `SKILL.md` with `made: here` taken out of its front matter.
+/// `SKILL.md` with `made: here` and its maker (`made_by`) taken out of its
+/// front matter.
 fn not_made_here(card: &str) -> String {
     let Some(rest) = card.strip_prefix("---\n") else {
         return card.to_owned();
@@ -153,7 +154,8 @@ fn not_made_here(card: &str) -> String {
         .lines()
         .filter(|line| {
             line.split_once(':').is_none_or(|(key, value)| {
-                key.trim() != "made" || value.trim() != crate::skills::MADE_HERE
+                key.trim() != "made_by"
+                    && (key.trim() != "made" || value.trim() != crate::skills::MADE_HERE)
             })
         })
         .collect();
