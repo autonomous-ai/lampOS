@@ -11,8 +11,9 @@
 //!   window opens.
 //! - **Refused**, never queued, while the lamp is muted or paused, while a
 //!   conversation goes on and while the lamp speaks its own words
-//!   ([`refused`]). Every other gate is a say's: the turn waits for them as
-//!   a say does, until its own expiry.
+//!   ([`refused`]). Otherwise it waits only for its speaker, a line still
+//!   being admitted, a reminder held, listening ready and the model service,
+//!   never a say's quiet after any line heard, until its own expiry.
 //! - **Answered** `spoken` once the person spoke in it and the lamp's
 //!   answer sounded (played whole or cut), `dropped` with "nobody spoke"
 //!   when the window passes unused, or `dropped` with the voice's why.

@@ -565,14 +565,19 @@ end one it opened. The door serves them as `turn.start` and `turn.end`
 
 A start is **refused at once**, never queued, while the microphone is not
 allowed, by anyone (`the lamp is muted`), while the keeper's pause holds
-(`the lamp is paused`), while a conversation goes on (`a conversation is
-going on`: a line heard now, its answer in hand, the person's last line or
-its answer less than 15 s ago, an answer owed, or a computer's turn still
-going on), and while the lamp's own words or sounds are in hand or playing
-(`the lamp is speaking`). Otherwise it waits for a say's other gates
-(no reminder held, nothing being heard, 15 s since the last turn, listening
-ready, a fresh capture, the playback mask, the model service answering) and
-is `expired` if they don't pass in time. The quiet hours are the door's,
+(`the lamp is paused`), while a conversation with the lamp goes on (`a
+conversation is going on`, as the second route judges one: the thread's
+exchange with the lamp's words in it within 45 s, a person's answer in hand
+once something of it has sounded or come, or a computer's turn still going
+on), and while the lamp's own words or sounds are in hand or playing, or
+its own written lines or reminders wait for the model (`the lamp is
+speaking`). The journal line names the signs that refused it (`(by the
+thread)`, …), never a word heard. A room line heard, or held back as said to
+nobody, refuses nothing. Otherwise it waits only for no reminder held,
+nothing being heard, listening ready, the playback mask and the model
+service answering, never a say's 15 s quiet after the last turn or the
+reminders' quiet after speech, as an exact say doesn't (lamp-75c9, 3 Nov),
+and is `expired` if they don't pass in time. The quiet hours are the door's,
 not the voice's. Then:
 - **Without `text`**, it does what a tap on the head does: the listening
   face and the "hm?" (at the tap's level, and not held to the tap's one in
