@@ -49,7 +49,7 @@ naming every public call, tool, event and error code they have.
 | `air.changed` (air) | `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`); a value the sensor doesn't know is left out | the first reading, then a value moves by its step (particles 5, CO2 50 ppm, humidity 3, temperature 0.5 °C) or `feel` changes; at most every 5 s |
 | `time` | your schedule | accepted, not produced yet |
 | `lease` (unasked) | `lease`, `state` (`held`, `suspended`, `lost`), `why` | the lamp takes your lease back, or gives it again |
-| `done` (unasked) | `re`, `how` (`finished`, `cut_short`, `dropped`), `why` | an action that ends later has ended (`say`, a `look` at an angle) |
+| `done` (unasked) | `re`, `how` (`finished`, `cut_short`, `dropped`), `why` | an action that ends later has ended (`say`, a turn, a `look` at an angle; a mute a hand lifted, `cut_short`) |
 
 **State** with `get`: `presence` (`count`, `near`, `facing`; needs look),
 `light` (the person's own `on`, `colour`, `level`, and `shows`: what the ring
@@ -88,6 +88,9 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | keep a clip on the lamp | `await lamp.upload_sound(name, "chime.wav")` | `lamp.uploadSound(name, bytes)` | `lamp_upload_sound(name, path)` | speak |
 | your clips | `await lamp.sounds()` | `lamp.sounds()` | `lamp_sounds()` | speak |
 | delete a clip | `await lamp.remove_sound(name)` | `lamp.removeSound(name)` | `lamp_remove_sound(name)` | speak |
+| start a turn (the lamp asks, the person answers) | `await lamp.start_turn("Shall we start?", wait=True)` | `lamp.startTurn('Shall we start?', { wait: true })` | `lamp_start_turn(prompt, wait)` | speak and hear |
+| end the turn you started | `await lamp.end_turn()` | `lamp.endTurn()` | `lamp_end_turn()` | speak |
+| your mute on, off | `await lamp.set_listening(False)`, `set_listening(True)` | `lamp.setListening(false)` | `lamp_set_listening(on)` | hear |
 | stop everything of mine | `await lamp.stop()` | `lamp.stop()` | `lamp_stop()` | none |
 
 Ranges, from lamp-control and the body:

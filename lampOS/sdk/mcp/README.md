@@ -57,6 +57,10 @@ parameter, as `src/lamp_mcp/server.py` declares it:
 | | `path` | string, required | a WAV file on this computer: 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS. Each computer keeps up to 64 clips and 20 MB on the lamp; revoking it deletes them | — | | |
 | `lamp_sounds` | none | | | | speak | no |
 | `lamp_remove_sound` | `name` | string, required | one of this computer's clips | — | speak | no |
+| `lamp_start_turn` | `prompt` | string | words the lamp says first, 300 characters at most. Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. What the person says never comes back, only how the turn ended (`turn finished`, or `turn dropped: …` with the voice's why); refused in quiet hours, as `lamp_say` | none | speak, hear | no |
+| | `wait` | boolean | return when the turn ends, 120 s at most | false | | |
+| `lamp_end_turn` | none | | ends the turn this computer started, never another's; with none, `busy: not this computer's turn` | | speak | no |
+| `lamp_set_listening` | `on` | boolean, required | `false` mutes the lamp's listening for this computer until `true`, a hand on its head, or lamp-mcp going (its connection closes); `lamp_stop` doesn't lift it. The person always wins | — | hear | no |
 | `lamp_events` | `since` | integer | a `seq` from an earlier answer; 0 for every event kept (the last 200) | 0 | the event's (`person.*` and `hand` look, `name.heard` hear, `sound.heard` sound; `touch`, `button`, `lamp.changed` none) | no |
 | | `wait_s` | number | 0 to 120: with nothing after `since`, how long to wait for the next | 0 | | |
 | `lamp_stop` | none | | | | none | lets go of every lease this server holds |

@@ -26,8 +26,8 @@ export function binaryFrame(message) {
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
 
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
-// (docs/control.md): a wait for them ends at that answer. `say` answers
-// `{"to":"voice"}` and its `done` does follow.
+// (docs/control.md): a wait for them ends at that answer. `say` and
+// `turn.start` answer `{"to":"voice"}` and their `done` does follow.
 export const ENDS_AT_REPLY = new Set(['gesture', 'move']);
 // A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 // The SDK's check is a pre-check: it may let through what the lamp refuses,
@@ -548,6 +548,22 @@ export class Lamp {
   async sounds() { return (await this.request('sound.list', {})).sounds ?? []; }
   // Delete one of this computer's clips from the lamp.
   removeSound(name) { return this.request('sound.remove', { name }); }
+  // Turns and listening (docs/control.md): the person wins over each.
+  // Opens a conversation turn, as a tap on the head does: the person's next
+  // line is answered as spoken to the lamp; with `prompt`, the lamp says it
+  // first, as a `say`. The reply is `{ to: 'voice' }`; with `wait`, its
+  // `done`: `finished` once the answer has sounded, else `dropped` with the
+  // voice's why. Needs speak and hear.
+  startTurn(prompt, { wait = false } = {}) { return this.act('turn.start', { prompt }, wait); }
+  // Ends the turn this computer started, never another's: `{ turn: 'ended',
+  // started: <the turn.start's id> }`. With none of this computer's, `busy`.
+  endTurn() { return this.act('turn.end', {}); }
+  // `false` holds this computer's mute (`{ mute: 'held' }`) until
+  // `setListening(true)` (`{ mute: 'lifted' }`, or `'nothing_held'`), this
+  // computer goes, or a hand on the head lifts it: then a `done` `cut_short`,
+  // "a hand on the head", names the request that held it
+  // (`lamp.on('done', ...)`). A `stop` doesn't lift it. Needs hear.
+  setListening(on) { return this.act('listen.set', { on }); }
   async stop() {
     const reply = await this.act('stop', {});
     const following = this.following;

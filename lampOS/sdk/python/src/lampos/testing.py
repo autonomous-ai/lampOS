@@ -376,6 +376,13 @@ class FakeLamp:
         # last hand said.
         self.following: dict[int, tuple[ServerConnection, str]] = {}
         self.hand: dict | None = None
+        # Each computer's own turn, by the id of the turn.start that opened
+        # it, until its `done`; and each computer's mute, held by the
+        # connection and request id of its listen.set false, until it says
+        # true, its last connection closes or `hand_on_head` lifts it.
+        self.turns: dict[str, int] = {}
+        self.mutes: dict[str, tuple[ServerConnection, int]] = {}
+        self._client_of: dict[int, str] = {}
         self._connections: set[ServerConnection] = set()
         self._next_lease = 1
         self._server = None
@@ -501,7 +508,16 @@ class FakeLamp:
 
     async def done(self, re: int, how: str = "finished", why: str | None = None) -> None:
         """End the action whose request id was `re`, to the client that asked."""
+        # A turn's outcome ends it, as the voice's does.
+        self.turns = {client: started for client, started in self.turns.items() if started != re}
         await self._send_done(re, {"how": how} if why is None else {"how": how, "why": why})
+
+    async def hand_on_head(self) -> None:
+        """A hand on the head lifts every computer's mute, as the voice does:
+        each is told with a `done` `cut_short` on the listen.set that held it."""
+        mutes, self.mutes = self.mutes, {}
+        for ws, re in mutes.values():
+            await ws.send(json.dumps({"ev": "done", "re": re, "how": "cut_short", "why": "a hand on the head"}))
 
     async def _send_done(self, re: int, fields: dict[str, Any]) -> None:
         ws = self._asker.get(re)
@@ -555,6 +571,8 @@ class FakeLamp:
                     continue
                 if op == "hello":
                     client = await self._hello(ws, request, nonce)
+                    if client is not None:
+                        self._client_of[id(ws)] = client
                     continue
                 if client is None:
                     await self._refuse(ws, id_, "no_hello", "hello first")
@@ -564,6 +582,10 @@ class FakeLamp:
             self._connections.discard(ws)
             self.subscribed.pop(id(ws), None)
             self.following.pop(id(ws), None)
+            # A computer gone lifts its mute: its last connection closed.
+            gone = self._client_of.pop(id(ws), None)
+            if gone is not None and gone not in self._client_of.values():
+                self.mutes.pop(gone, None)
             for lease in [l for l, held in self.leases.items() if held["ws"] is ws]:
                 self.leases.pop(lease)
 
@@ -631,6 +653,10 @@ class FakeLamp:
             "skill.push": ["skills"],
             "skill.list": ["skills"],
             "skill.remove": ["skills"],
+            # A turn speaks and hears what is said to the lamp.
+            "turn.start": ["speak", "hear"],
+            "turn.end": ["speak"],
+            "listen.set": ["hear"],
         }.get(op, [])
 
     async def _upload(self, ws, client: str, request: dict) -> None:
@@ -878,6 +904,29 @@ class FakeLamp:
                 await ws.send(json.dumps(frame))
             else:
                 await self._ok(ws, id_, stream="off")
+        elif op == "turn.start":
+            # As lamp-control: handed to the voice, kept as this computer's
+            # turn until its `done`; finished at once with auto_done.
+            self.turns[client] = id_
+            await self._ok(ws, id_, to="voice")
+            if self.auto_done:
+                await self.done(id_)
+        elif op == "turn.end":
+            started = self.turns.pop(client, None)
+            if started is None:
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "busy", "not this computer's turn")
+                return
+            await self._ok(ws, id_, turn="ended", started=started)
+            await self.done(started, "dropped", "dropped: ended by the computer")
+        elif op == "listen.set":
+            # As lamp-control: false holds this computer's mute (again,
+            # nothing new); true lifts it, or says nothing was held.
+            if not request["on"]:
+                self.mutes.setdefault(client, (ws, id_))
+                await self._ok(ws, id_, mute="held")
+            else:
+                await self._ok(ws, id_, mute="lifted" if self.mutes.pop(client, None) else "nothing_held")
         else:
             await self._ok(ws, id_)
             if op == "play" and self.auto_done:

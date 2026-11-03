@@ -52,13 +52,16 @@ test('proofs name what they are for', async () => {
 
 test('every op has a call and every error code a class', () => {
   const plumbing = new Set(['pair', 'hello', 'subscribe', 'unsubscribe', 'get', 'lease.take', 'lease.renew', 'lease.release']);
-  const call = (op) => op.replace(/\.(\w)/g, (_, c) => c.toUpperCase());
-  // The clips' and skills' calls read as English, not as their ops.
+  // The clips' and skills' calls read as English, not as their ops, and a
+  // dotted op that is a program's own action is a call named for what it does
+  // (the Python SDK's test has the same); any other is its camelCase.
   const named = {
     'sound.upload': 'uploadSound', 'sound.list': 'sounds', 'sound.remove': 'removeSound',
     'skill.push': 'pushSkill', 'skill.list': 'skills', 'skill.remove': 'removeSkill',
+    'turn.start': 'startTurn', 'turn.end': 'endTurn', 'listen.set': 'setListening',
   };
-  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[named[op] ?? call(op)] === 'function', op);
+  const call = (op) => named[op] ?? op.replace(/\.(\w)/g, (_, c) => c.toUpperCase());
+  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[call(op)] === 'function', op);
   for (const code of schema.errorCodes) assert.equal(new byCode[code]('x').code, code);
   assert.equal(fromReply({ code: 'rate', why: 'x', retry_ms: 900 }).retryMs, 900);
   assert.ok(fromReply({ code: 'no_grant', why: 'x' }) instanceof byCode.no_grant);
@@ -1155,4 +1158,70 @@ test('a path lamp-skills refuses or no header holds is refused before packing', 
   writeFileSync(file, pack(skill('desk-long', `${'a'.repeat(100)}/w.json`)).data);
   assert.ok(execFileSync('tar', ['-tf', file], { encoding: 'utf8' }).split('\n').includes(`desk-long/${'a'.repeat(100)}/w.json`));
   assert.throws(() => pack(skill('desk-over', `${'a'.repeat(100)}/${'b'.repeat(100)}/c.json`)), (error) => /longer than a tar header holds/.test(error.why));
+});
+
+test('a turn starts with its prompt, ends by its computer and needs speak and hear', async () => {
+  await withLamp({ grants: ['speak', 'hear'], autoDone: false }, async (lamp, fake, keyring) => {
+    await assert.rejects(lamp.endTurn(), (error) => error instanceof byCode.busy && /not this computer's turn/.test(error.why));
+    assert.equal((await lamp.startTurn("Shall we go over today's list?")).to, 'voice');
+    const [begun] = fake.requests.filter((r) => r.op === 'turn.start').map((r) => r.id);
+    const ended = await lamp.endTurn();
+    assert.deepEqual([ended.turn, ended.started], ['ended', begun]);
+    // Waiting, the turn's `done` is its answer.
+    const waiting = lamp.startTurn(undefined, { wait: true });
+    await until(() => fake.asked('turn.start').length === 2);
+    fake.done(fake.turns.get(keyring.pairing().client), 'dropped', 'dropped: nobody spoke');
+    assert.equal((await waiting).why, 'dropped: nobody spoke');
+    assert.deepEqual(fake.asked('turn.start'), [{ prompt: "Shall we go over today's list?" }, {}]);
+    assert.deepEqual(fake.asked('turn.end'), [{}]);
+  });
+  await withLamp({ grants: ['speak'] }, async (lamp) => {
+    await assert.rejects(lamp.startTurn(), (error) => error instanceof byCode.no_grant && /hear/.test(error.why));
+  });
+  await withLamp({ grants: ['speak', 'hear'] }, async (lamp) => {
+    // Taken and finished at once with autoDone; the turn is over.
+    assert.equal((await lamp.startTurn('Ready?', { wait: true })).how, 'finished');
+    await assert.rejects(lamp.endTurn(), byCode.busy);
+  });
+});
+
+test("the computer's mute is held, lifted, and ended by a hand or its going", async () => {
+  const fake = await FakeLamp.start({ grants: ['hear'] });
+  try {
+    const keyring = new Keyring(folder());
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring });
+    const client = keyring.pairing().client;
+    const lamp = await Lamp.connect(undefined, { keyring });
+    assert.equal((await lamp.setListening(true)).mute, 'nothing_held');
+    assert.equal((await lamp.setListening(false)).mute, 'held');
+    assert.equal((await lamp.setListening(false)).mute, 'held');
+    // A stop doesn't lift it.
+    await lamp.stop();
+    assert.ok(fake.mutes.has(client));
+    assert.equal((await lamp.setListening(true)).mute, 'lifted');
+    // A hand on the head lifts it, said on the listen.set that held it.
+    const dones = [];
+    lamp.on('done', (event) => dones.push(event));
+    await lamp.setListening(false);
+    const held = fake.mutes.get(client).re;
+    fake.handOnHead();
+    await until(() => dones.length);
+    assert.deepEqual(dones, [{ ev: 'done', re: held, how: 'cut_short', why: 'a hand on the head' }]);
+    assert.equal((await lamp.setListening(true)).mute, 'nothing_held');
+    await lamp.setListening(false);
+    // The computer gone lifts it.
+    await lamp.close();
+    await until(() => !fake.mutes.has(client));
+  } finally { await fake.stop(); }
+  await withLamp({ grants: ['speak'] }, async (lamp) => {
+    await assert.rejects(lamp.setListening(false), byCode.no_grant);
+  });
+});
+
+test("a turn's prompt is summarised in the debug log as a say's text", async () => {
+  const debug = await import('../src/debug.js');
+  const shown = debug.redact({ id: 1, op: 'turn.start', prompt: 'Build passed.' });
+  assert.equal(shown.prompt, debug.redact({ text: 'Build passed.' }).text);
+  assert.deepEqual(debug.redact({ re: 2, ok: true, turn: 'ended', started: 1 }), { re: 2, ok: true, turn: 'ended', started: 1 });
+  assert.deepEqual(debug.redact({ re: 3, ok: true, mute: 'held' }), { re: 3, ok: true, mute: 'held' });
 });
