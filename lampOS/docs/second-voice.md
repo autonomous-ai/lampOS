@@ -1144,20 +1144,36 @@ order is kept. A written turn is the same from the chat on.
   the path had already dropped, though the cause isn't shown; this switch
   is the test of it. A line whose connection the pool has let go opens a new
   one, a TLS handshake before its first word (its cost not measured here).
-- **With `LAMP_SECOND_CHAT_SECOND_TRY=on` a first round with nothing begun
+  With the chat's warm also on, the warm comes from 20 s idle
+  (`WARM_AFTER_KEPT`) rather than 60 s, counted from the last request; it
+  may still reuse a pooled connection, and may still be opening when a short
+  line ends, so it makes a ready connection likelier, not certain. The
+  other clients are unchanged. The journal says so at start. Measured by
+  `chat round 1 had not begun` counts against nights without it, with the
+  gap since the last request from `chat request going out` (#3107).
+- **With `LAMP_SECOND_CHAT_SECOND_TRY=on` a first round with no response head
   2.5 s after the words goes once more** (off unless set;
   `second_try::SECOND_TRY_AFTER`, #4710): the same request, on a new
-  connection that no other request shares. The first stays open, whichever
-  begins first answers, and the other is dropped the moment one begins, so no
-  word of it is read and its answer's line is never written. A failure on one
-  try leaves the turn to the other; both failing end the turn as one failure,
-  and a line lost on the network is then not asked a third time. At most one in
-  a turn; never a look, nor a round after anything has run (a held forget, or
-  rounds carried from a cut answer), nor once the turn's scope is revoked: only
-  before anything has run can nothing happen twice. The wait's sound, the turn's
-  limit and the slow line stay as they are. It costs one extra chat request in
-  those turns, counted to the lamp's use; a first try that also ran to its end
-  counts too. The journal:
+  connection that no other request shares. A head with no word yet is a live
+  connection and a slow answer, so none goes for it. The first stays open,
+  whichever has the first event answers, and the other is dropped at that
+  moment, so no word of it is read and its answer's line is never written. A
+  failure on one try leaves the turn to the other; both failing end the turn as
+  one failure, and a line lost on the network is then not asked a third time.
+  A key refused or a near address fallen from is told once between the two.
+  At most one in a turn; never a look, nor a round after anything has run (a
+  held forget, or rounds carried from a cut answer), nor once the turn's scope
+  is revoked: only before anything has run can nothing happen twice. None goes
+  with under 1.5 s of the round's wait left (`second_try::SECOND_TRY_ROOM`), as
+  it would have too little time to answer in: with the wait's sound off the wait
+  is 3 s, so none ever goes at 2.5 s, and the product's 4.5 s leaves 2 s. None
+  goes either when the first itself went only at or after its time, as the two
+  would go out together. The wait's sound, the turn's limit and the slow line
+  stay as they are. It costs one extra chat request in those turns, counted to
+  the lamp's use; a first try that also ran to its end counts too. Any first
+  event wins, so an answer that ends at once with no words beats a second try
+  that would have spoken; the turn then goes as an empty answer does today. The
+  journal:
   - On every chat request, with the switch on or off: `chat connection: kept, no
     new one opened for this request; the client's last answer or warm ended S s
     before`, or `chat connection: new; …`. New or kept is what the client's
@@ -1167,6 +1183,9 @@ order is kept. A written turn is the same from the chat on.
     kept connection still leads anywhere.
   - When it goes: `request R second try goes N ms after the words, on a new
     connection; the first stays open, having reached W`.
+  - When none goes at its time: `request R second try: none goes, N ms after the
+    words: the first's answer has begun`, `…: only M ms of the wait left`, or
+    `…: the first went only then`.
   - Its connection: `request R second try: its new connection opened in N ms`,
     or `could not open, after N ms`. One still opening when the turn ends is told
     only by the end's line.
@@ -1185,13 +1204,6 @@ order is kept. A written turn is the same from the chat on.
   was down; one that opens and stays silent says the wait is further along. These
   lines say `second try`, never `chat round`, so `lamp-voice-eval` counts a turn
   as it did. Tests only so far; not run on a lamp.
-  With the chat's warm also on, the warm comes from 20 s idle
-  (`WARM_AFTER_KEPT`) rather than 60 s, counted from the last request; it
-  may still reuse a pooled connection, and may still be opening when a short
-  line ends, so it makes a ready connection likelier, not certain. The
-  other clients are unchanged. The journal says so at start. Measured by
-  `chat round 1 had not begun` counts against nights without it, with the
-  gap since the last request from `chat request going out` (#3107).
 - **With `LAMP_SECOND_SPEECH_WARM=on` the configured voice's connection is
   opened as a line begins** (off unless set, as the chat's switch is; its
   own switch, since `LAMP_SECOND_CHAT_WARM` names the chat), when no piece
