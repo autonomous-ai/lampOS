@@ -30,6 +30,10 @@ Environment=LAMP_ACTIVITY=place
 # Whether each face is speaking, from YuNet's five marks, on humans/faces/tracked: the voice's
 # LAMP_SECOND_SPEAKING_FACE reads it (#720, #2008; the lead, 21 Oct 07:19 on #1711).
 Environment=LAMP_EYES_SPEAKING=on
+# One memory id per person, kept in people.json through a rename and said on the known file's second line (#2176
+# row 3); the voice's unit sets it too. Anyone remembered before is given exactly `person_id` of their name, so no
+# memory moves. The memory owner's yes on 4 Nov (#4710).
+Environment=LAMP_MEMORY_STABLE_ID=on
 # Whether anyone is at the lamp, on room/presence (presence.md): a face seen, or a voice said to the
 # lamp (addressed, so chatter at the next desk never counts), within 20 s. Read by skills made on the
 # lamp ("when I come back to my desk"); Light out stays off until its own check (the first builder, 2 Nov).

@@ -1769,6 +1769,26 @@ fn the_product_reads_speaking_on_steady_looks() {
     }
 }
 
+/// #2176 row 3: a rename keeps the person's memory, so the eyes and the
+/// voice both set the stable id. The voice uses an id only when its own
+/// switch and the eyes' agree, so one without the other keys nobody on it
+/// (lamp-0c4e, a rename to an empty memory with it off; the memory owner's
+/// yes, 4 Nov, #4710).
+#[test]
+fn the_product_keeps_memory_through_a_rename() {
+    for name in ["lamp-eyes.service", "lamp-voice.service"] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1;
+        assert!(
+            section(text, "Service").contains(&"Environment=LAMP_MEMORY_STABLE_ID=on"),
+            "{name} lacks LAMP_MEMORY_STABLE_ID=on"
+        );
+    }
+}
+
 /// #1176 (Nine and the reviewer): Expression's `--head-touch` only beside
 /// the voice's own head touch and its sleep mute (`LAMP_HEAD_TOUCH=on` and
 /// `--controls-mute`). Without the mute a hand held 3 s puts the face to
