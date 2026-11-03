@@ -104,6 +104,7 @@ impl Rig {
             folder_missing: false,
             engines_ready: false,
             route: false,
+            absolute_folder: false,
             journal: None,
         };
         let rig = Self {
@@ -1628,6 +1629,153 @@ fn only_the_name_taken_refusal_is_asked_again_and_only_once() {
         "{outcome:?}"
     );
     assert_eq!(new_projects(&rig).len(), 1);
+}
+
+/// A launch to the `~/harnesses/lamp-tasks` folder, as
+/// `--targets-from-machines` writes it.
+fn home_launch() -> Launch {
+    let mut request = launch();
+    request.target.project = "~/harnesses/lamp-tasks".into();
+    request
+}
+
+/// Harness's `new --json` reply, with the folder the agent works in.
+fn created_in(cwd: &str) -> Value {
+    let mut reply = created();
+    reply["agent"]["project"] = json!({"cwd": cwd});
+    step(reply)
+}
+
+/// `serve --absolute-folder` (P4 step 1): Harness asks the computer for its
+/// home on each `~/…` folder, one more round trip through the relay. Once
+/// a `new` there showed the folder it started in, the next hand-over to
+/// that computer sends the absolute folder; the first still goes as `~/…`.
+/// Off, every one goes as the target names it, as before.
+#[test]
+fn a_home_folder_is_sent_absolute_once_the_computer_showed_its_home() {
+    for (switch, second) in [
+        (true, "/Users/lee/harnesses/lamp-tasks"),
+        (false, "~/harnesses/lamp-tasks"),
+    ] {
+        let mut rig = Rig::new();
+        rig.config.absolute_folder = switch;
+        rig.plan(json!({
+            "machines": {"default": true},
+            "new": {"each": [created_in("/Users/lee/harnesses/lamp-tasks")]}
+        }));
+        let cli = rig.cli();
+        let started = LaunchOutcome::Created {
+            agent_id: AGENT.into(),
+        };
+        assert_eq!(cli.launch(&home_launch()), started, "{switch}");
+        assert_eq!(cli.launch(&home_launch()), started, "{switch}");
+        assert_eq!(
+            new_projects(&rig),
+            ["~/harnesses/lamp-tasks", second],
+            "{switch}"
+        );
+        // The home learned serves any `~/…` folder on that computer.
+        let mut other = home_launch();
+        other.target.project = "~/code/site".into();
+        assert_eq!(cli.launch(&other), started, "{switch}");
+        let third = if switch {
+            "/Users/lee/code/site"
+        } else {
+            "~/code/site"
+        };
+        assert_eq!(new_projects(&rig)[2], third, "{switch}");
+    }
+}
+
+/// A `new` sent in a learned home that fails forgets the home: the next
+/// hand-over goes as `~/…` again, so a home that moved costs one, never
+/// every one. Nothing is asked twice.
+#[test]
+fn a_failed_new_in_a_learned_home_forgets_it() {
+    let mut rig = Rig::new();
+    rig.config.absolute_folder = true;
+    rig.config.folder_missing = true;
+    rig.plan(json!({
+        "machines": {"default": true},
+        "new": {"each": [
+            created_in("/Users/lee/harnesses/lamp-tasks"),
+            {"stdout":"{\"ok\":false,\"error\":\"CWD_NOT_FOUND\"}\n", "exit": 1},
+            created_in("/Users/lee/harnesses/lamp-tasks"),
+        ]}
+    }));
+    let cli = rig.cli();
+    let started = LaunchOutcome::Created {
+        agent_id: AGENT.into(),
+    };
+    assert_eq!(cli.launch(&home_launch()), started);
+    assert_eq!(cli.launch(&home_launch()), not_sent("folder_missing"));
+    assert_eq!(cli.launch(&home_launch()), started);
+    assert_eq!(
+        new_projects(&rig),
+        [
+            "~/harnesses/lamp-tasks",
+            "/Users/lee/harnesses/lamp-tasks",
+            "~/harnesses/lamp-tasks"
+        ]
+    );
+}
+
+/// Only a plain absolute home, from an `ok` reply for that computer whose
+/// folder ends in the target's own words, is learned; anything else leaves
+/// the next hand-over as `~/…`. A target that is already absolute, or a
+/// project name, is sent as it is.
+#[test]
+fn only_a_plain_home_from_that_computer_is_learned() {
+    let other_machine = {
+        let mut reply = created();
+        reply["machineId"] = json!("fedcba9876543210fedcba9876543210");
+        reply["agent"]["project"] = json!({"cwd": "/Users/lee/harnesses/lamp-tasks"});
+        step(reply)
+    };
+    let no_project = step(created());
+    for first in [
+        created_in("/Users/lee/elsewhere/lamp-tasks"),
+        created_in("/harnesses/lamp-tasks"),
+        created_in("/Users/../lee/harnesses/lamp-tasks"),
+        created_in("/Users//lee/harnesses/lamp-tasks"),
+        created_in("Users/lee/harnesses/lamp-tasks"),
+        created_in("~/harnesses/lamp-tasks"),
+        created_in("/Users/le\u{7}e/harnesses/lamp-tasks"),
+        created_in(&format!("/{}/harnesses/lamp-tasks", "a".repeat(500))),
+        other_machine,
+        no_project,
+    ] {
+        let mut rig = Rig::new();
+        rig.config.absolute_folder = true;
+        rig.plan(json!({
+            "machines": {"default": true},
+            "new": {"each": [first.clone(), step(created())]}
+        }));
+        let cli = rig.cli();
+        let _ = cli.launch(&home_launch());
+        assert_eq!(
+            cli.launch(&home_launch()),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{first}"
+        );
+        assert_eq!(new_projects(&rig)[1], "~/harnesses/lamp-tasks", "{first}");
+    }
+    for project in ["/srv/work/lamp-tasks", "fixture-project"] {
+        let mut rig = Rig::new();
+        rig.config.absolute_folder = true;
+        rig.plan(json!({
+            "machines": {"default": true},
+            "new": {"each": [created_in("/Users/lee/harnesses/lamp-tasks")]}
+        }));
+        let mut request = launch();
+        request.target.project = project.into();
+        let cli = rig.cli();
+        cli.launch(&request);
+        cli.launch(&request);
+        assert_eq!(new_projects(&rig), [project, project]);
+    }
 }
 
 /// The journal lines one launch says, with the rig's journal kept.
