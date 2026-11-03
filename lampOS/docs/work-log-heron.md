@@ -182,3 +182,9 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   a macOS socket-path length, ARM64 CI green). A tag `lampos-lamp-voice-9736`
   the person saw is the ARM64 build of this log's own push at 14:55, not
   a stable.
+- 15:2x: READ-OK on #5049 `2d9ea6c09` (Friday, `newer_first`), the second
+  read for Tests: order and flags as the body says, entries and records
+  zipped one to one, room scope off, 5 integration and 6 unit tests pass,
+  two mutations caught (the room guard; two shared words, by
+  `no_cue_keeps_fts_rank`); the whole lamp-memory suite, switches and
+  notes pass on the Mac; CI green.
