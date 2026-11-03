@@ -89,6 +89,8 @@ pub mod messages;
 pub mod mic_holder;
 pub mod misheard_hum;
 pub mod motion_voice;
+pub mod nightly;
+pub mod nightly_prompt;
 pub mod owner_place;
 pub mod person;
 pub mod photo_faces;

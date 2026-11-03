@@ -5715,6 +5715,21 @@ its dash, comes before the cut-in lines.
 It prints counts only: each arm and line's outcomes, then each arm's total
 for each kind. Never the character, a key or what the model said.
 
+### One nightly pass through the relay (`probe-tools --nightly`)
+
+`lamp-voice probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] --nightly`
+(`second_provider/probe/nightly.rs`) runs the memory's nightly pass
+(`LAMP_MEMORY_NIGHTLY`, memory.md "The nightly pass", its runner adapted
+from the Tiers night, #5000) once a run for a made-up person on a made-up
+day of 12 lines, through the second route's relay (`deepseek_base_url`,
+the relay's own credential), with the night's own bounds. With
+`LAMP_NIGHTLY_MEMORY` set to a lamp-memory binary that has the nightly ops,
+it runs that binary on a fresh folder of its own and prints Days' accepted
+and dropped counts per kind and the drop reasons; without it, what the
+model proposed per kind. `LAMP_MEMORY_NIGHTLY_PATTERNS` and
+`LAMP_MEMORY_NIGHTLY_FEELINGS` are read as the voice reads them. Counts
+only: never the character, a key, a URL or what the model said.
+
 ### Which function each follow-up line calls (`probe-tools`)
 
 `lamp-voice probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20, 3 by

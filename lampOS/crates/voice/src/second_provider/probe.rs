@@ -56,6 +56,7 @@ pub mod cache;
 pub mod cut_in;
 pub mod handover;
 pub mod kept_earlier;
+pub mod nightly;
 pub mod quality;
 pub mod recall_first;
 pub mod reminders;
