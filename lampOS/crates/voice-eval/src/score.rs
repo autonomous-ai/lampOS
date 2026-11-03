@@ -831,6 +831,28 @@ Oct 19 20:31:30 lamp-4ace kernel: something else at 20:31:30
         assert!(!table.contains("no voice lines"), "{table}");
     }
 
+    /// `LAMP_SECOND_CHAT_SECOND_TRY`'s lines count for nothing here: a first
+    /// round that goes twice is one round, whichever try answers, and the end of
+    /// one where neither did is read from the turn's own `had not begun` line.
+    #[test]
+    fn a_second_tries_lines_change_no_row() {
+        const LINES: &str = "\
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: chat connection: kept, no new one opened for this request; the client's last answer or warm ended 20 s before
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: chat connection: new; no answer or warm has ended on this client
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try goes 2500 ms after the words, on a new connection; the first stays open, having reached sent, on a kept connection (LAMP_SECOND_CHAT_SECOND_TRY)
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: its new connection opened in 180 ms
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: its new connection could not open, after 12 ms
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: the first ended 3000 ms after the words (request failed); the second still waits
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: the second answered, its first event 2890 ms after the words; the first was dropped, having reached sent, on a kept connection
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: neither answered in 4500 ms; the first reached sent, on a kept connection, the second reached nothing, its new connection not open, then failed: request failed
+";
+        let arms = [Arm::parse("deepgram", "20:00", "20:30").unwrap()];
+        assert_eq!(
+            score(JOURNAL, &arms),
+            score(&format!("{JOURNAL}{LINES}"), &arms)
+        );
+    }
+
     /// The first builder on #1712 (19 Oct 23:29): a Live arm without
     /// `LAMP_NAME_SIGNAL` has no first-sound lines, and read 0 answered.
     /// Its answers judged played count, less those held back, and a request

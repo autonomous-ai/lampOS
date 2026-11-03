@@ -3,6 +3,7 @@ use super::*;
 
 mod action_claim;
 mod after_forget;
+mod chat_second_try;
 mod checking_line;
 mod cut_to_a_person;
 mod decline_silent;
@@ -3577,6 +3578,7 @@ fn early_words_stand_only_for_the_same_line_asked_the_same_way() {
         events: done,
         at: Instant::now(),
         task: None,
+        reach: None,
     };
     let base = [Message::system("SYSTEM".to_owned())];
     assert_eq!(prepared.misfit(&base, &[], "Lamp, what time is it?"), None);

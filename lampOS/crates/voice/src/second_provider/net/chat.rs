@@ -1,7 +1,8 @@
 //! A streamed OpenAI-compatible chat completion with function tools: text
 //! as it is written, then the tool calls the model asked for. The caller
 //! runs the tools and sends their results back as `tool` messages.
-use super::{Error, Result, chat_client, chunk, openai_base, post};
+use super::watch::{Opens, Watch};
+use super::{Error, Result, chat_client, chunk, fresh_client_watched, openai_base, post};
 use crate::second_config::SecondConfig;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -221,6 +222,9 @@ pub const WARM_AFTER_KEPT: std::time::Duration = std::time::Duration::from_secs(
 /// models list, so its connection goes back to the pool.
 const WARM_BYTES: usize = 256 << 10;
 
+/// When an answer or a warm on a chat's client last ended ([`Chat::send_watched`]).
+type LastEnded = Arc<std::sync::Mutex<Option<std::time::Instant>>>;
+
 pub struct Chat {
     client: reqwest::Client,
     url: String,
@@ -239,6 +243,13 @@ pub struct Chat {
     /// the client's pool keep (`chat_client`: 90 s, or 25 s with
     /// `LAMP_SECOND_CHAT_KEPT=on`) is made anew.
     last_sent: std::sync::Mutex<Option<std::time::Instant>>,
+    /// When an answer or a warm on this client last ended, for the journal:
+    /// what a connection kept since then has been idle. A second try's never
+    /// counts, its connection not being kept.
+    last_ended: LastEnded,
+    /// The client's connector, watched: whether a request opened a new
+    /// connection or took one kept.
+    opens: Opens,
     /// The last request's tools and first message, hashed, for the
     /// journal: a service's prompt cache holds only a prefix that is the
     /// same as before ([`Prefix`]).
@@ -404,6 +415,7 @@ impl Chat {
             WARM_BYTES,
         )
         .await?;
+        told_ended(&self.last_ended);
         Some((status, took))
     }
 
@@ -425,9 +437,12 @@ impl Chat {
     }
 
     pub(crate) fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
-        let (client, kept) = chat_client()?;
+        let opens = Opens::default();
+        let (client, kept) = chat_client(&opens)?;
         Ok(Self {
             client,
+            opens,
+            last_ended: LastEnded::default(),
             warm_after: if kept { WARM_AFTER_KEPT } else { WARM_AFTER },
             url: format!("{}/chat/completions", openai_base(base_url)),
             auth: format!("Bearer {key}"),
@@ -541,36 +556,84 @@ impl Chat {
         only: Option<&[&str]>,
         without: &[&str],
     ) -> Result<ChatStream> {
+        self.send_watched(messages, only, without, None).await
+    }
+
+    /// [`Self::send_without`], saying how far it gets to `watch`, and on a
+    /// client and a connection of its own when `watch` asks for one
+    /// ([`Watch::on_a_new_connection`]), whose request neither the warm nor the
+    /// next request's journal line counts as this client's.
+    pub async fn send_watched(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+        watch: Option<&Watch>,
+    ) -> Result<ChatStream> {
         let body = self.body_without(messages, only, without);
+        let own = match watch.and_then(Watch::own_opens) {
+            Some(opens) => Some((fresh_client_watched(&opens)?, opens)),
+            None => None,
+        };
+        let (client, opens) = match &own {
+            Some((client, opens)) => (client, opens),
+            None => (&self.client, &self.opens),
+        };
+        let second = own.is_some();
         let asked = std::time::Instant::now();
         let before = self
             .last_sent
             .lock()
             .ok()
-            .and_then(|mut last| last.replace(asked));
+            .and_then(|mut last| if second { *last } else { last.replace(asked) });
         let prefix = Prefix::of(&body);
         let prefix_before = self
             .last_prefix
             .lock()
             .ok()
-            .and_then(|mut last| last.replace(prefix));
-        let response = post(
-            &self.client,
+            .and_then(|mut last| if second { *last } else { last.replace(prefix) });
+        let opened_before = opens.began();
+        let mut going = std::pin::pin!(post(
+            client,
             &self.url,
             ("authorization", &self.auth),
-            &body,
-        )
-        .await?;
+            &body
+        ));
+        // One poll sets it going: there the client takes a kept connection, or
+        // begins to open a new one. It says so for a request that never
+        // answers too, which waiting for its response would not.
+        let polled =
+            std::future::poll_fn(|context| std::task::Poll::Ready(going.as_mut().poll(context)))
+                .await;
+        let new = opens.began() != opened_before;
+        if !second {
+            let ended = self.last_ended.lock().ok().and_then(|ended| *ended);
+            eprintln!(
+                "lamp-voice second: {}",
+                connection_told(new, ended.map(|at| asked.duration_since(at)))
+            );
+        }
+        if let Some(watch) = watch {
+            watch.reach().went(new.then(|| opens.clone()));
+        }
+        let response = match polled {
+            std::task::Poll::Ready(response) => response,
+            std::task::Poll::Pending => going.await,
+        }?;
+        if let Some(watch) = watch {
+            watch.reach().answer_began();
+        }
         // What was asked and how soon the service began to answer, without
         // words (#1712, the first builder at 18:26: the chat's first event
         // came in 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe).
         eprintln!(
-            "lamp-voice second: {}",
+            "lamp-voice second: {}{}",
             asked_told(
                 &body,
                 asked.elapsed(),
                 before.map(|at| asked.duration_since(at))
-            ) + &prefix_told(prefix, prefix_before)
+            ) + &prefix_told(prefix, prefix_before),
+            if second { "; the second try" } else { "" }
         );
         Ok(ChatStream {
             response,
@@ -580,6 +643,7 @@ impl Chat {
             done: false,
             asked,
             first: None,
+            last_ended: (!second).then(|| self.last_ended.clone()),
         })
     }
 }
@@ -604,6 +668,36 @@ fn asked_told(
             |since| format!("the last request {} s before", since.as_secs())
         )
     )
+}
+
+/// The connection a chat request went on, in the journal's words: a new one, or
+/// one kept, as the client's connector shows, and how long before it the client's
+/// last answer or warm ended, which a kept connection has been idle since, as
+/// the pool gives back the one it had last. It never says whether that
+/// connection still leads anywhere.
+fn connection_told(new: bool, since_ended: Option<std::time::Duration>) -> String {
+    let which = if new {
+        "new"
+    } else {
+        "kept, no new one opened for this request"
+    };
+    let since = since_ended.map_or(
+        "no answer or warm has ended on this client".to_owned(),
+        |since| {
+            format!(
+                "the client's last answer or warm ended {} s before",
+                since.as_secs()
+            )
+        },
+    );
+    format!("chat connection: {which}; {since}")
+}
+
+/// An answer or a warm on this client ended, now.
+fn told_ended(last_ended: &LastEnded) {
+    if let Ok(mut ended) = last_ended.lock() {
+        *ended = Some(std::time::Instant::now());
+    }
 }
 
 /// Whether a request's tools and first message are the last request's, for
@@ -686,6 +780,8 @@ pub struct ChatStream {
     /// call came, for [`answer_told`].
     asked: std::time::Instant,
     first: Option<std::time::Duration>,
+    /// Told when the answer ends, on a client that keeps its connection.
+    last_ended: Option<LastEnded>,
 }
 
 impl ChatStream {
@@ -726,6 +822,9 @@ impl ChatStream {
             }
             if self.ready.last() == Some(&ChatEvent::Done) {
                 self.done = true;
+                if let Some(last_ended) = &self.last_ended {
+                    told_ended(last_ended);
+                }
                 eprintln!(
                     "lamp-voice second: {}",
                     answer_told(self.deltas.usage.as_ref(), self.first, self.asked.elapsed())
@@ -1618,6 +1717,99 @@ data: [DONE]
         .unwrap();
         server.await.unwrap();
         assert_eq!(replies, b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}");
+    }
+
+    /// The journal's line on a request's connection says what the client's
+    /// connector shows and no more.
+    #[test]
+    fn a_requests_connection_is_told_as_measured() {
+        let at = |seconds| Some(std::time::Duration::from_secs(seconds));
+        assert_eq!(
+            connection_told(false, at(20)),
+            "chat connection: kept, no new one opened for this request; the client's last answer or warm ended 20 s before"
+        );
+        assert_eq!(
+            connection_told(true, at(120)),
+            "chat connection: new; the client's last answer or warm ended 120 s before"
+        );
+        assert_eq!(
+            connection_told(true, None),
+            "chat connection: new; no answer or warm has ended on this client"
+        );
+    }
+
+    /// Watching the chat's connections changes nothing it sends: the same bytes
+    /// as the client unwatched, head and body, on a connection of its own too.
+    #[tokio::test]
+    async fn a_watched_client_sends_the_same_bytes() {
+        async fn sent_by(send: impl AsyncFnOnce(String)) -> Vec<u8> {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            // One port for all three, as the host is among the bytes.
+            let url = format!("http://{}/v1", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut read = Vec::new();
+                let mut buffer = [0; 4096];
+                loop {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    assert!(n > 0, "closed before the whole request");
+                    read.extend_from_slice(&buffer[..n]);
+                    let text = String::from_utf8_lossy(&read);
+                    let Some(ends) = text.find("\r\n\r\n") else {
+                        continue;
+                    };
+                    let length: usize = text[..ends]
+                        .lines()
+                        .find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .and_then(|n| n.trim().parse().ok())
+                        })
+                        .unwrap_or(0);
+                    if read.len() >= ends + 4 + length {
+                        break;
+                    }
+                }
+                let _ = socket
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: 14\r\n\r\ndata: [DONE]\n\n",
+                    )
+                    .await;
+                read
+            });
+            send(url).await;
+            let read = server.await.unwrap();
+            // The port differs from one run to the next, and nothing else may.
+            let text = String::from_utf8(read).unwrap();
+            text.lines()
+                .filter(|line| !line.to_ascii_lowercase().starts_with("host:"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes()
+        }
+        let asked = || vec![Message::user("hello")];
+        let declare = || -> Declare { Arc::new(Vec::new) };
+        let plain = sent_by(async |url| {
+            let chat = Chat::with(&url, "m", "k", declare()).unwrap();
+            let body = chat.body_only(&asked(), None);
+            let client = super::super::client_kept(None).unwrap();
+            let _ = post(&client, &chat.url, ("authorization", &chat.auth), &body).await;
+        })
+        .await;
+        let watched = sent_by(async |url| {
+            let chat = Chat::with(&url, "m", "k", declare()).unwrap();
+            let _ = chat.send(&asked()).await;
+        })
+        .await;
+        let own = sent_by(async |url| {
+            let chat = Chat::with(&url, "m", "k", declare()).unwrap();
+            let watch = Watch::on_a_new_connection(Arc::new(|_| {}));
+            let _ = chat.send_watched(&asked(), None, &[], Some(&watch)).await;
+        })
+        .await;
+        assert_eq!(plain, watched);
+        assert_eq!(plain, own);
     }
 
     /// #2602 (`LAMP_SECOND_CHAT_KEPT`): a kept client lets an idle

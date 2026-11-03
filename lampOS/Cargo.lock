@@ -2526,6 +2526,8 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "toml",
+ "tower-layer",
+ "tower-service",
  "unicode-normalization",
  "webpki-roots 1.0.9",
 ]

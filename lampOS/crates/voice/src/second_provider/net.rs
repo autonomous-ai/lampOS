@@ -13,6 +13,7 @@ pub mod search;
 mod sentences;
 mod stt;
 mod tts;
+mod watch;
 pub mod weather;
 
 pub use chat::{
@@ -31,6 +32,7 @@ pub(crate) use tts::{
 };
 #[cfg(test)]
 pub(crate) use tts::{SocketShape, socket_end, socket_opening};
+pub use watch::{Opening, OpeningTold, Reach, Watch};
 
 /// To open a connection, TLS included.
 pub(crate) const CONNECT: Duration = Duration::from_secs(10);
@@ -114,11 +116,15 @@ fn http_client() -> Result<reqwest::Client> {
 }
 
 /// The chat's client: [`http_client`], or with [`CHAT_KEPT_ENVIRONMENT`] on,
-/// idle connections kept at most [`CHAT_POOL_IDLE`]; and whether it is kept
-/// so.
-fn chat_client() -> Result<(reqwest::Client, bool)> {
+/// idle connections kept at most [`CHAT_POOL_IDLE`], its connector watched by
+/// `opens`; and whether it is kept so.
+fn chat_client(opens: &watch::Opens) -> Result<(reqwest::Client, bool)> {
     let kept = chat_kept(std::env::var(CHAT_KEPT_ENVIRONMENT).ok().as_deref());
-    Ok((client_kept(kept.then_some(CHAT_POOL_IDLE))?, kept))
+    let client = kept_builder(kept.then_some(CHAT_POOL_IDLE))?
+        .connector_layer(opens.clone())
+        .build()
+        .map_err(|_| Error::Transport("HTTPS client setup"))?;
+    Ok((client, kept))
 }
 
 /// Whether [`CHAT_KEPT_ENVIRONMENT`]'s value keeps the chat's connections
@@ -131,13 +137,25 @@ fn chat_kept(value: Option<&str>) -> bool {
 /// own: a speech piece asked again after it failed to start is never sent on
 /// the connection that may have held it (#4338, lamp-3e83 on 29 Oct).
 pub(crate) fn fresh_client() -> Result<reqwest::Client> {
-    reqwest::Client::builder()
+    fresh_builder()?
+        .build()
+        .map_err(|_| Error::Transport("HTTPS client setup"))
+}
+
+fn fresh_builder() -> Result<reqwest::ClientBuilder> {
+    Ok(reqwest::Client::builder()
         .tls_backend_preconfigured(tls()?)
         .https_only(!cfg!(test))
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(CONNECT)
         .read_timeout(STALL)
-        .pool_max_idle_per_host(0)
+        .pool_max_idle_per_host(0))
+}
+
+/// [`fresh_client`], its connector watched by `opens`.
+fn fresh_client_watched(opens: &watch::Opens) -> Result<reqwest::Client> {
+    fresh_builder()?
+        .connector_layer(opens.clone())
         .build()
         .map_err(|_| Error::Transport("HTTPS client setup"))
 }
@@ -146,18 +164,22 @@ pub(crate) fn fresh_client() -> Result<reqwest::Client> {
 /// at most one idle connection per host, so a warm still running when a chat
 /// goes can't leave two pooled (El's P3 on #3115).
 fn client_kept(idle: Option<Duration>) -> Result<reqwest::Client> {
+    kept_builder(idle)?
+        .build()
+        .map_err(|_| Error::Transport("HTTPS client setup"))
+}
+
+fn kept_builder(idle: Option<Duration>) -> Result<reqwest::ClientBuilder> {
     let builder = reqwest::Client::builder()
         .tls_backend_preconfigured(tls()?)
         .https_only(!cfg!(test))
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(CONNECT)
         .read_timeout(STALL);
-    match idle {
+    Ok(match idle {
         Some(idle) => builder.pool_idle_timeout(idle).pool_max_idle_per_host(1),
         None => builder,
-    }
-    .build()
-    .map_err(|_| Error::Transport("HTTPS client setup"))
+    })
 }
 
 /// Send a JSON POST and check the status. The body is a string so that no

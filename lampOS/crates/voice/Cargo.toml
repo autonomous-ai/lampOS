@@ -44,6 +44,11 @@ reqwest = { version = "0.13", default-features = false, features = ["stream", "r
 # journal can say whether a speech request reused a connection; the version
 # and features `reqwest` already builds, so no new package.
 hyper-util = { version = "=0.1.21", default-features = false, features = ["client-legacy", "tokio"] }
+# Only to watch when the chat's client opens a connection (`net::watch`), as a
+# layer on its connector; the versions `reqwest` already builds, so no new
+# package.
+tower-layer = "=0.3.3"
+tower-service = "=0.3.3"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
 # A look's picture in a chat request (`second_provider`), as `lamp-gemini` pins it.

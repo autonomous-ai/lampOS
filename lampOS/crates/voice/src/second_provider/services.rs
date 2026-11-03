@@ -4,6 +4,7 @@ use super::net::{
     self, Chat, ChatEvent, GeminiTts, Message, SttStream, Tts,
     routes::{self, Routes},
 };
+use super::second_try::ChatTold;
 use crate::second_config::{SecondConfig, Stt};
 use futures_util::{
     StreamExt, TryStreamExt,
@@ -46,6 +47,35 @@ pub trait Services: Send + Sync + 'static {
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         let _ = without;
         self.chat(messages)
+    }
+    /// [`Self::chat`], [`Self::chat_only`] or [`Self::chat_without`] as `told`
+    /// says, saying how far it gets to `watch`
+    /// (`LAMP_SECOND_CHAT_SECOND_TRY`); services that keep no such count chat
+    /// as asked.
+    fn chat_watched(
+        &self,
+        messages: Vec<Message>,
+        told: ChatTold,
+        watch: net::Watch,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let _ = watch;
+        match told {
+            ChatTold::Every => self.chat(messages),
+            ChatTold::Only(only) => self.chat_only(messages, only),
+            ChatTold::Without(without) => self.chat_without(messages, without),
+        }
+    }
+    /// The same chat again on a new connection, the one `watch` asks for
+    /// ([`net::Watch::on_a_new_connection`]). None, from services that have no
+    /// connection to choose: then no second try goes.
+    fn chat_second_try(
+        &self,
+        messages: Vec<Message>,
+        told: ChatTold,
+        watch: net::Watch,
+    ) -> Option<BoxStream<'static, net::Result<ChatEvent>>> {
+        let _ = (messages, told, watch);
+        None
     }
     /// Whether a chat on `messages`, told without the functions named in
     /// `without`, declares the function `name` ([`Self::chat_without`]), for
@@ -622,25 +652,39 @@ impl Net {
         messages: Vec<Message>,
         only: Option<&'static [&'static str]>,
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_told_watched(messages, only, None)
+    }
+
+    /// [`Self::chat_told`], saying how far it gets to `watch` when given.
+    fn chat_told_watched(
+        &self,
+        messages: Vec<Message>,
+        only: Option<&'static [&'static str]>,
+        watch: Option<net::Watch>,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
         let chat = self.chat.clone();
         let refused_to = self.refused_to.clone();
         let near = self.near_chat();
         stream::once(async move {
+            let watch = watch.as_ref();
             // Near, unless it fails on the link: then the same request goes
             // to the chat's own address (#2882).
             if let Some((near_chat, taken, service)) = near {
-                let answer = near_chat.send_only(&messages, only).await;
+                let answer = near_chat.send_watched(&messages, only, &[], watch).await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
                     Some(why) => taken.fell(service, &why),
                     None => return answer,
                 }
             }
-            let answer = chat.send_only(&messages, only).await;
+            let answer = chat.send_watched(&messages, only, &[], watch).await;
             if let (Err(error), Some(refused)) = (&answer, &refused_to)
                 && let Some(status) = key_refused(error)
             {
                 (refused.told)(status);
-                return refused.relay.send_only(&messages, only).await;
+                return refused
+                    .relay
+                    .send_watched(&messages, only, &[], watch)
+                    .await;
             }
             answer
         })
@@ -857,6 +901,37 @@ fn in_one_voice_near(
 }
 
 impl Net {
+    /// [`Services::chat_without`], saying how far it gets to `watch` when given.
+    fn chat_without_watched(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+        watch: Option<net::Watch>,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let chat = self.chat.clone();
+        let near = self.near_chat();
+        stream::once(async move {
+            let watch = watch.as_ref();
+            if let Some((near_chat, taken, service)) = near {
+                let answer = near_chat
+                    .send_watched(&messages, None, without, watch)
+                    .await;
+                match answer.as_ref().err().and_then(routes::fallback_why) {
+                    Some(why) => taken.fell(service, &why),
+                    None => return answer,
+                }
+            }
+            chat.send_watched(&messages, None, without, watch).await
+        })
+        .map_ok(|answer| {
+            stream::try_unfold(answer, |mut answer| async move {
+                Ok(answer.next().await?.map(|event| (event, answer)))
+            })
+        })
+        .try_flatten()
+        .boxed()
+    }
+
     /// The lamp's one voice: Gemini's, or the configured one.
     fn voice(&self) -> Voice {
         match &self.gemini_tts {
@@ -935,25 +1010,29 @@ impl Services for Net {
         messages: Vec<Message>,
         without: &'static [&'static str],
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
-        let chat = self.chat.clone();
-        let near = self.near_chat();
-        stream::once(async move {
-            if let Some((near_chat, taken, service)) = near {
-                let answer = near_chat.send_without(&messages, None, without).await;
-                match answer.as_ref().err().and_then(routes::fallback_why) {
-                    Some(why) => taken.fell(service, &why),
-                    None => return answer,
-                }
-            }
-            chat.send_without(&messages, None, without).await
-        })
-        .map_ok(|answer| {
-            stream::try_unfold(answer, |mut answer| async move {
-                Ok(answer.next().await?.map(|event| (event, answer)))
-            })
-        })
-        .try_flatten()
-        .boxed()
+        self.chat_without_watched(messages, without, None)
+    }
+
+    fn chat_watched(
+        &self,
+        messages: Vec<Message>,
+        told: ChatTold,
+        watch: net::Watch,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        match told {
+            ChatTold::Every => self.chat_told_watched(messages, None, Some(watch)),
+            ChatTold::Only(only) => self.chat_told_watched(messages, Some(only), Some(watch)),
+            ChatTold::Without(without) => self.chat_without_watched(messages, without, Some(watch)),
+        }
+    }
+
+    fn chat_second_try(
+        &self,
+        messages: Vec<Message>,
+        told: ChatTold,
+        watch: net::Watch,
+    ) -> Option<BoxStream<'static, net::Result<ChatEvent>>> {
+        Some(self.chat_watched(messages, told, watch))
     }
 
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
