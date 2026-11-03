@@ -51,6 +51,10 @@ pub const CONVERSATION: &str = "a conversation is going on";
 pub const SPEAKING: &str = "the lamp is speaking";
 /// Why a turn whose person's line was not answered is dropped.
 pub const NOT_ANSWERED: &str = "not answered";
+/// Why a turn whose window was open is ended when a person's answer to a
+/// line of their own begins to sound: the person is talking with the lamp,
+/// and the person wins. The door says it `cut_short`.
+pub const PERSON_TALKING: &str = "the person is talking";
 
 /// Turn ids, unique for the voice's life, so an id from an earlier
 /// conversation never names a later turn.
@@ -240,7 +244,17 @@ impl ControlTurns {
     /// Each pass of the voice's loop, at `now_us`: the turn in hand and
     /// whether it has sounded, and whether the conversation is over (no
     /// turn in hand, quiet as long as a say waits for).
-    pub fn tick(&mut self, now_us: u64, in_hand: Option<(u64, bool)>, quiet: bool) {
+    /// `persons_sounding`: a person's answer is in hand and has sounded. In
+    /// an open window that is never the turn's own (a line begun in it makes
+    /// the turn grown when it is admitted), so the turn ends at once with
+    /// [`PERSON_TALKING`] and the person's conversation goes on.
+    pub fn tick(
+        &mut self,
+        now_us: u64,
+        in_hand: Option<(u64, bool)>,
+        persons_sounding: bool,
+        quiet: bool,
+    ) {
         let Some(turn) = self.turn.as_mut() else {
             return;
         };
@@ -264,6 +278,10 @@ impl ControlTurns {
                     over = true;
                 }
             },
+            Phase::Open { .. } if persons_sounding => {
+                turn.tell(Outcome::Dropped(PERSON_TALKING.into()));
+                over = true;
+            }
             Phase::Open { since_us } => {
                 if now_us > since_us.saturating_add(OPEN_FOR_US) {
                     turn.tell(Outcome::Dropped(NOBODY_SPOKE.into()));
@@ -401,19 +419,57 @@ mod tests {
         );
         assert_eq!(OPEN_FOR_US, 8 * S);
         // Within the window, at its last moment too.
-        turns.tick(10 * S + OPEN_FOR_US, None, false);
+        turns.tick(10 * S + OPEN_FOR_US, None, false, false);
         assert!(turns.admitted(7, 10 * S + OPEN_FOR_US));
         // Its answer sounds, then ends: spoken.
-        turns.tick(19 * S, Some((7, false)), false);
-        turns.tick(20 * S, Some((7, true)), false);
+        turns.tick(19 * S, Some((7, false)), false, false);
+        turns.tick(20 * S, Some((7, true)), false, false);
         assert!(answers(&answered).is_empty());
-        turns.tick(21 * S, None, false);
+        turns.tick(21 * S, None, false, false);
         assert_eq!(answers(&answered), vec![Answer::Done(Outcome::Spoken)]);
         // The conversation goes on, and may still be ended, until quiet.
         assert!(turns.ends(id));
-        turns.tick(40 * S, None, true);
+        turns.tick(40 * S, None, false, true);
         assert!(!turns.going_on());
         assert!(!turns.ends(id));
+    }
+
+    /// The local leader's condition (3 Nov): a person's answer to a line of
+    /// their own that begins to sound while a computer's window is open ends
+    /// the computer's turn at once, and the person's conversation goes on.
+    #[test]
+    fn a_persons_answer_sounding_in_the_window_ends_the_computers_turn() {
+        let mut turns = ControlTurns::default();
+        let (asker, answered) = ticket_for_test("control");
+        let id = turns.open(asker, 10 * S);
+        let _ = answers(&answered);
+        // A person's line, begun before the window, still being judged:
+        // nothing of its answer has sounded, the turn stays open.
+        turns.tick(11 * S, Some((5, false)), false, false);
+        assert!(turns.going_on() && answers(&answered).is_empty());
+        // Its answer sounds: the person is talking, the computer's turn ends.
+        turns.tick(12 * S, Some((5, true)), true, false);
+        assert_eq!(
+            answers(&answered),
+            vec![Answer::Done(Outcome::Dropped(PERSON_TALKING.into()))]
+        );
+        assert!(!turns.going_on() && !turns.ends(id));
+    }
+
+    /// The turn's own line, begun in its window, is never "the person is
+    /// talking": it grew the turn when it was admitted, and its answer is
+    /// the turn's answer.
+    #[test]
+    fn the_turns_own_answer_sounding_is_its_answer_not_the_person_talking() {
+        let mut turns = ControlTurns::default();
+        let (asker, answered) = ticket_for_test("control");
+        turns.open(asker, 10 * S);
+        let _ = answers(&answered);
+        assert!(turns.admitted(7, 11 * S));
+        turns.tick(12 * S, Some((7, true)), true, false);
+        assert!(answers(&answered).is_empty());
+        turns.tick(13 * S, None, false, false);
+        assert_eq!(answers(&answered), vec![Answer::Done(Outcome::Spoken)]);
     }
 
     #[test]
@@ -423,7 +479,7 @@ mod tests {
         turns.open(asker, 10 * S);
         let _ = answers(&answered);
         assert!(!turns.admitted(3, 10 * S + OPEN_FOR_US + 1));
-        turns.tick(10 * S + OPEN_FOR_US + 1, Some((3, true)), false);
+        turns.tick(10 * S + OPEN_FOR_US + 1, Some((3, true)), false, false);
         assert_eq!(
             answers(&answered),
             vec![Answer::Done(Outcome::Dropped(NOBODY_SPOKE.into()))]
@@ -440,8 +496,8 @@ mod tests {
         assert!(turns.admitted(4, 11 * S));
         // Its line goes on as a newer request, which is answered.
         assert!(turns.admitted(5, 12 * S));
-        turns.tick(13 * S, Some((6, true)), false);
-        turns.tick(14 * S, None, false);
+        turns.tick(13 * S, Some((6, true)), false, false);
+        turns.tick(14 * S, None, false, false);
         assert_eq!(answers(&answered), vec![Answer::Done(Outcome::Spoken)]);
         // Another turn whose line is held unanswered.
         let mut turns = ControlTurns::default();
@@ -449,8 +505,8 @@ mod tests {
         turns.open(asker, 10 * S);
         let _ = answers(&answered);
         assert!(turns.admitted(4, 11 * S));
-        turns.tick(12 * S, Some((4, false)), false);
-        turns.tick(13 * S, None, false);
+        turns.tick(12 * S, Some((4, false)), false, false);
+        turns.tick(13 * S, None, false, false);
         assert_eq!(
             answers(&answered),
             vec![Answer::Done(Outcome::Dropped(NOT_ANSWERED.into()))]
@@ -463,20 +519,20 @@ mod tests {
         let (asker, answered) = ticket_for_test("control");
         let said = turns.prompt(asker);
         said.begun(5 * S);
-        turns.tick(5 * S, Some((2, true)), false);
+        turns.tick(5 * S, Some((2, true)), false, false);
         // Nothing is told while the prompt plays.
         assert!(answers(&answered).is_empty());
         said.answer(Outcome::Spoken);
-        turns.tick(8 * S, None, false);
+        turns.tick(8 * S, None, false, false);
         let id = turns.id().unwrap();
         assert_eq!(
             answers(&answered),
             vec![Answer::BegunTurn { at_us: 8 * S, id }]
         );
         // The window runs from the prompt's end.
-        turns.tick(8 * S + OPEN_FOR_US, None, false);
+        turns.tick(8 * S + OPEN_FOR_US, None, false, false);
         assert!(turns.going_on());
-        turns.tick(8 * S + OPEN_FOR_US + 1, None, false);
+        turns.tick(8 * S + OPEN_FOR_US + 1, None, false, false);
         assert_eq!(
             answers(&answered),
             vec![Answer::Done(Outcome::Dropped(NOBODY_SPOKE.into()))]
@@ -486,7 +542,7 @@ mod tests {
         let (asker, answered) = ticket_for_test("control");
         let said = turns.prompt(asker);
         said.answer(Outcome::Dropped("hand_stop".into()));
-        turns.tick(6 * S, None, false);
+        turns.tick(6 * S, None, false, false);
         assert_eq!(
             answers(&answered),
             vec![Answer::Done(Outcome::Dropped("hand_stop".into()))]
@@ -499,7 +555,7 @@ mod tests {
         assert!(turns.admitted(9, 7 * S));
         drop(said);
         let id = turns.id().unwrap();
-        turns.tick(7 * S, Some((9, false)), false);
+        turns.tick(7 * S, Some((9, false)), false, false);
         assert_eq!(
             answers(&answered),
             vec![Answer::BegunTurn { at_us: 7 * S, id }]
@@ -511,7 +567,7 @@ mod tests {
         let mut turns = ControlTurns::default();
         let (asker, answered) = ticket_for_test("control");
         let old = turns.open(asker, 10 * S);
-        turns.tick(10 * S + OPEN_FOR_US + 1, None, false);
+        turns.tick(10 * S + OPEN_FOR_US + 1, None, false, false);
         let _ = answers(&answered);
         // An old id names nothing, and nothing goes on.
         assert!(!turns.ends(old));
@@ -535,7 +591,7 @@ mod tests {
         let id = turns.open(asker, 50 * S);
         let _ = answers(&answered);
         assert!(turns.admitted(12, 51 * S));
-        turns.tick(52 * S, Some((12, true)), false);
+        turns.tick(52 * S, Some((12, true)), false, false);
         turns.cancelled("hand_stop");
         assert_eq!(answers(&answered), vec![Answer::Done(Outcome::Spoken)]);
         assert!(!turns.ends(id));

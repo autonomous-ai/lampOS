@@ -12226,6 +12226,9 @@ fn conversation_with_gate_inner(
             reply
                 .as_ref()
                 .map(|current| (current.owner.turn(), current.sounded)),
+            reply.as_ref().is_some_and(|current| {
+                current.sounded && person_line.is_some_and(|(line, _)| line == current.owner.turn())
+            }),
             reply.is_none()
                 && admission.idle_for_reminder()
                 && clock.saturating_sub(last_turn_us) >= crate::say::QUIET_US,

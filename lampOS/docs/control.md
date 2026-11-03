@@ -524,13 +524,16 @@ listening. The person wins over each, as "Who wins" says.
 
 | op | what the lamp does |
 |---|---|
-| `turn.start` | Opens a turn as a tap on the head does: the next line the person starts within 8 s is answered as spoken to the lamp. With `prompt`, the lamp says it first, and the 8 s start when it ends. The lamp shows its normal listening cue, and the journal names the computer. `done`: `finished` when the person spoke and the lamp answered, or `dropped` with why (`nobody spoke`, `muted`, `busy`, `refused: …`). |
+| `turn.start` | Opens a turn as a tap on the head does: the next line the person starts within 8 s is answered as spoken to the lamp. With `prompt`, the lamp says it first, and the 8 s start when it ends. The lamp shows its normal listening cue, and the journal names the computer. `done`: `finished` when the person spoke and the lamp answered; `cut_short`, "the person is talking", when the lamp's answer to a line of the person's own begins to sound while the window is open; or `dropped` with why (`nobody spoke`, `muted`, `busy`, `refused: …`). |
 | `turn.end` | Ends a turn this computer started with `turn.start`, and the conversation that grew from it, as the button's stop does: the answer playing, what waits to be said, and the open window. Never the person's own conversation, another computer's turn or the lamp's own words: the conversation outranks a computer ("Who wins"), so any other is refused `busy`, "not this computer's turn". |
 | `listen.set` | `false`: this computer's mute, `muted_by: control`, shown on the ring the way the person's mute is shown, so nobody thinks the lamp listens when it doesn't, and journaled with the computer. `true`: lifts only this computer's own mute, never another computer's, nor the person's switch, button or sleep mute. While two computers hold one, the lamp listens again only when both are lifted. A computer's mute ends when its connection does, or when it is revoked, so a computer gone can't leave the lamp deaf; the person's hand on the head lifts it too, as it lifts the restart guard's. |
 
 - **The person wins.** The privacy switch, the button, sleep and "stop" are
   checked before any of these. The person's mute ends the whole
-  conversation, a computer's turn with it.
+  conversation, a computer's turn with it. A person already talking with
+  the lamp wins too: when the lamp's answer to their line begins to sound
+  while a computer's window is open, the computer's turn ends at once
+  (`cut_short`, "the person is talking") and their conversation goes on.
 - **When `turn.start` is refused:** while the lamp is muted, by anyone;
   while the person's own conversation goes on; and while the lamp speaks
   its own words. It is never queued behind them. With or without a
