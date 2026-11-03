@@ -282,15 +282,20 @@ giờ có tên, lời hay tệp của một kỹ năng.
   `local:app:…`) cạnh `made: here` trong `SKILL.md`, bên trong gói, nên
   SHA-256 và lời đồng ý bao gồm nó; dòng `made` hay `made_by` do mô hình viết
   bị bỏ. Gói chia sẻ được bỏ dấu này cùng `made: here`.
-- **Lời nhờ tạo kỹ năng bằng giọng nói, trong `lamp-voice`**
-  (`made_counts`). Socket của ứng dụng nhận thêm `{"counts": {}}` và trả
-  `{"made_by_voice": {"kept", "on", "refused", "left_off"}}`, là tổng cộng
-  dồn. `kept`, `on` và `left_off` đọc từ chỉ mục kỹ năng
-  tự tạo, mỗi kỹ năng đếm một lần theo SHA-256; `refused` (lời nhờ không tạo
-  được gì) được cộng vào một biến nguyên tử và ghi tối đa mỗi phút một lần
-  bởi một luồng riêng, nên lượt nói không bao giờ chờ tệp. Lưu trong
-  `counts.json` cạnh các kỹ năng tự tạo; lời nhờ từ ứng dụng (`local:app:…`
-  hoặc `written:app:…`) không nằm trong đó. Câu trả lời không nêu gói nào:
+- **Lời nhờ tạo kỹ năng, bằng giọng nói và từ ứng dụng, trong
+  `lamp-voice`** (`made_counts`). Socket của ứng dụng nhận thêm
+  `{"counts": {}}` và trả `{"made_by_voice": {"kept", "on", "refused",
+  "left_off"}, "made_by_app": {...}}`, là tổng cộng dồn theo người tạo.
+  `kept`, `on` và `left_off` đọc từ chỉ mục kỹ năng tự tạo, mỗi kỹ năng đếm
+  một lần theo SHA-256, dưới người tạo mà `from` của nó cho biết
+  (`local:app:…` hoặc `written:app:…` là của ứng dụng, `local:…` là của
+  giọng nói); `refused` (lời nhờ không tạo được gì) được cộng vào một biến
+  nguyên tử riêng cho mỗi người tạo, ngay nơi nó được báo (lượt nói, hoặc
+  `make_here` của ứng dụng), và ghi tối đa mỗi phút một lần bởi một luồng
+  riêng, nên lượt nói không bao giờ chờ tệp. Cả hai người tạo được đếm ở đây,
+  trên đèn, nên backend không tự đếm lời nhờ tạo từ ứng dụng và không gì bị
+  đếm hai lần (chủ sở hữu, 3/11). Lưu trong `counts.json` cạnh các kỹ năng
+  tự tạo. Câu trả lời không nêu gói nào:
   người tạo đã nằm trên thẻ. Kiểm thử: `made_counts::tests`.
 - `lamp-cloud` đọc cả hai ở mỗi báo cáo sức khỏe, tính số của từng ngày UTC
   từ chênh lệch giữa hai lần đọc, giữ trong trạng thái của báo cáo, và chỉ

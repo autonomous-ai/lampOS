@@ -11,9 +11,11 @@
 //! - **Runs**, by [`Source`], and by Store package: `lamp-skills`' running
 //!   totals ([`lamp_skills::usage::RUNS_FILE`] in its `--state-dir`), made
 //!   skills' split by the same card.
-//! - **Made-skill asks by voice**, by [`Outcome`]: the voice's running totals,
-//!   asked on its app-make socket (`{"counts": {}}`,
-//!   `lamp_voice::made_counts`).
+//! - **Made-skill asks, by voice and from the app**, by [`Outcome`]: the
+//!   voice's running totals per maker, asked on its app-make socket
+//!   (`{"counts": {}}`, `lamp_voice::made_counts`). The app's makes are
+//!   counted here, on the lamp, never by the backend, so none is counted
+//!   twice.
 //!
 //! A day's counts are the change in the running totals between two
 //! readings, kept in [`Days`] in the reports' own state, and sent only once
@@ -90,7 +92,7 @@ impl Source {
     }
 }
 
-/// What became of a made-skill ask by voice.
+/// What became of a made-skill ask, by voice or from the app.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Outcome {
@@ -132,8 +134,12 @@ pub struct Reading {
     pub kept_off: BTreeMap<Source, u32>,
     /// `None` when `lamp-skills`' totals can't be read.
     pub runs: Option<Runs>,
-    /// `None` when the voice did not answer.
+    /// Made-skill asks by voice; `None` when the voice did not answer.
     pub asks: Option<BTreeMap<Outcome, u64>>,
+    /// Made-skill asks from the app, counted on the lamp as the voice's
+    /// are (the backend counts no app make); `None` when the voice did not
+    /// answer, or is one from before it counted them.
+    pub app_asks: Option<BTreeMap<Outcome, u64>>,
 }
 
 /// Where the lamp's skills and their counts are read.
@@ -225,15 +231,18 @@ pub fn read(places: &Places) -> Option<Reading> {
         ]),
         store: totals.store_ids,
     });
-    reading.asks = ask_voice(&places.voice).and_then(|told| {
-        let made = told.get("made_by_voice")?;
+    let told = ask_voice(&places.voice);
+    let outcomes = |maker: &str| {
+        let made = told.as_ref()?.get(maker)?;
         Some(
             Outcome::ALL
                 .into_iter()
                 .map(|outcome| (outcome, made[outcome.key()].as_u64().unwrap_or_default()))
                 .collect(),
         )
-    });
+    };
+    reading.asks = outcomes("made_by_voice");
+    reading.app_asks = outcomes("made_by_app");
     Some(reading)
 }
 
@@ -262,13 +271,15 @@ fn ask_voice(socket: &Path) -> Option<Value> {
 }
 
 /// The days' counts kept beside the queue, until acknowledged. Flat, by
-/// key: `run/<source>`, `store/<sha256>`, `store_rest`, `ask/<outcome>`.
+/// key: `run/<source>`, `store/<sha256>`, `store_rest`, `ask/<outcome>`
+/// (by voice), `app_ask/<outcome>` (from the app).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Days {
     /// The running totals last read.
     last: BTreeMap<String, u64>,
-    /// The kinds of total read once at least: `run`, `store`, `ask`.
+    /// The kinds of total read once at least: `run`, `store`, `ask`,
+    /// `app_ask`.
     begun: BTreeSet<String>,
     /// By UTC day (days since 1970), the counts not yet acknowledged.
     days: BTreeMap<u64, BTreeMap<String, u64>>,
@@ -282,6 +293,9 @@ pub struct Day {
     pub date: String,
     /// Made-skill asks by voice; an outcome not there is 0.
     pub made_by_voice: BTreeMap<Outcome, u64>,
+    /// Made-skill asks from the app, made on the lamp; an outcome not
+    /// there is 0.
+    pub made_by_app: BTreeMap<Outcome, u64>,
     /// Runs by source; a source not there is 0.
     pub runs: BTreeMap<Source, u64>,
     /// Runs by Store package SHA-256, the most run first, at most
@@ -352,19 +366,21 @@ fn totals(reading: &Reading) -> Vec<(&'static str, BTreeMap<String, u64>)> {
                 .collect(),
         ));
     }
-    if let Some(asks) = &reading.asks {
-        kinds.push((
-            "ask",
-            Outcome::ALL
-                .into_iter()
-                .map(|outcome| {
-                    (
-                        format!("ask/{}", outcome.key()),
-                        asks.get(&outcome).copied().unwrap_or_default(),
-                    )
-                })
-                .collect(),
-        ));
+    for (kind, asks) in [("ask", &reading.asks), ("app_ask", &reading.app_asks)] {
+        if let Some(asks) = asks {
+            kinds.push((
+                kind,
+                Outcome::ALL
+                    .into_iter()
+                    .map(|outcome| {
+                        (
+                            format!("{kind}/{}", outcome.key()),
+                            asks.get(&outcome).copied().unwrap_or_default(),
+                        )
+                    })
+                    .collect(),
+            ));
+        }
     }
     kinds
 }
@@ -427,15 +443,19 @@ impl Days {
         let date = crate::online::rfc3339(
             std::time::UNIX_EPOCH + Duration::from_secs(number.saturating_mul(DAY_S)),
         );
-        let day = Day {
-            date: date.get(..10).unwrap_or_default().to_owned(),
-            made_by_voice: Outcome::ALL
+        let outcomes = |kind: &str| -> BTreeMap<Outcome, u64> {
+            Outcome::ALL
                 .into_iter()
                 .filter_map(|outcome| {
-                    let count = *counts.get(&format!("ask/{}", outcome.key()))?;
+                    let count = *counts.get(&format!("{kind}/{}", outcome.key()))?;
                     (count > 0).then_some((outcome, count))
                 })
-                .collect(),
+                .collect()
+        };
+        let day = Day {
+            date: date.get(..10).unwrap_or_default().to_owned(),
+            made_by_voice: outcomes("ask"),
+            made_by_app: outcomes("app_ask"),
             runs: Source::ALL
                 .into_iter()
                 .filter_map(|source| {
@@ -477,6 +497,9 @@ mod tests {
                     .collect(),
             }),
             asks: Some(BTreeMap::from([(Outcome::Refused, refused)])),
+            // The app's asks move with the voice's, kept rather than
+            // refused, so the two never mix.
+            app_asks: Some(BTreeMap::from([(Outcome::Kept, refused)])),
         }
     }
 
@@ -497,6 +520,7 @@ mod tests {
         assert_eq!(day.runs, BTreeMap::from([(Source::Core, 3)]));
         assert_eq!(day.store, BTreeMap::from([(a.clone(), 2)]));
         assert_eq!(day.made_by_voice, BTreeMap::from([(Outcome::Refused, 1)]));
+        assert_eq!(day.made_by_app, BTreeMap::from([(Outcome::Kept, 1)]));
         days.acked(over);
         assert_eq!(days.oldest(NOW + DAY_S), None);
         // A part not read keeps its count where it was.
