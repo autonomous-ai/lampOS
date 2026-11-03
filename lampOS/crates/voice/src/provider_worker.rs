@@ -1060,6 +1060,14 @@ pub enum ProviderOutput {
     OwnWordsSaid {
         request: u64,
     },
+    /// The second route said its down line ([`crate::second_provider::DOWN_LINE`]
+    /// or the shorter one) for `request`, a spoken turn whose chat refused it
+    /// before any word (#4332): the person was told it broke, so its failure
+    /// says no `turn_lost` over it. Sent after the line's audio, before its
+    /// `TurnFailed`; nothing is asked or answered.
+    DownLineSaid {
+        request: u64,
+    },
     /// The second route's times for `request` (19 Oct: an A/B is scored on
     /// each request's first answer audio, never a wait cue), sent once,
     /// before its `TurnComplete` or `TurnFailed`, for every request: in
@@ -1444,6 +1452,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
+        | ProviderOutput::DownLineSaid { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };

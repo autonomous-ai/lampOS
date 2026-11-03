@@ -558,6 +558,11 @@ pub(super) fn select_failure_notice_in(
     // A local-only turn says the offline line, once an outage and only for
     // speech; any other try gets no words, only the ring's offline breath.
     let (selected, stands_in, kind) = match current.local_only {
+        // The second route's down line already told the person it broke
+        // (#4332, lamp-e82d: "thoughts are slow", then `turn_lost` 1.8 s
+        // later). Only that line: an answer cut off mid-sentence still owes
+        // `turn_lost`, so `had_audio` is not the key.
+        None if current.down_line_said => return Ok(()),
         None => (&catalog.selected, true, NoticeKind::TurnLost),
         // Signed out comes first: it holds whether or not the link is up.
         // Only for speech, and the lamp's own turn is never stood in for.
