@@ -81,6 +81,19 @@ pub const SERVICES: &[Service] = &[
         writes: &[(Post, "/gmail/v1/users/me/messages/send")],
         mcp: None,
     },
+    // A Lamp 2's Google sign-in for Gmail (Queue #4710): send only, its
+    // scopes the account's identity and `gmail.send`, so it reads nothing.
+    // Renewed through the backend under this code, as Google Calendar is.
+    Service {
+        code: "gmail-app",
+        name: "Gmail with Google sign-in",
+        hosts: &["gmail.googleapis.com"],
+        api: Some("https://gmail.googleapis.com"),
+        graphql: false,
+        reads: &[],
+        writes: &[(Post, "/gmail/v1/users/me/messages/send")],
+        mcp: None,
+    },
     Service {
         code: "google_calendar",
         name: "Google Calendar",
@@ -563,6 +576,18 @@ mod tests {
             Post,
             "/gmail/v1/users/me/messages/1/trash"
         ));
+        // A Google sign-in for sending only: its send, no read, one host.
+        assert!(write_allowed(
+            "gmail-app",
+            Post,
+            "/gmail/v1/users/me/messages/send"
+        ));
+        assert!(!ok("gmail-app", Get, "/gmail/v1/users/me/messages"));
+        assert!(!ok("gmail-app", Get, "/gmail/v1/users/me/profile"));
+        assert!(host_allowed("gmail-app", "gmail.googleapis.com"));
+        for host in ["imap.gmail.com", "smtp.gmail.com", "www.googleapis.com"] {
+            assert!(!host_allowed("gmail-app", host), "{host}");
+        }
         assert!(!ok("linear", Get, "/graphql"));
         // Writes have their own list, which reads never use.
         assert!(write_allowed(

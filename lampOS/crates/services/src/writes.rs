@@ -49,6 +49,7 @@ pub struct Pending {
 /// What each service writes, by `action`, for the tools' description.
 pub const ACTIONS: &[(&str, &str)] = &[
     ("gmail", "send_mail {to, cc, subject, text}"),
+    ("gmail-app", "send_mail {to, cc, subject, text}"),
     (
         "google_calendar",
         "create_event {title, start, end, calendar, attendees, text}",
@@ -205,7 +206,8 @@ pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, Strin
         return Err(format!("{code} writes: {MCP_ACTIONS}"));
     }
     match (code, action) {
-        ("gmail", "send_mail") => {
+        // An app password's link or a Google sign-in's, sent alike.
+        ("gmail" | "gmail-app", "send_mail") => {
             let to = addresses(args, "to")?;
             let cc = addresses(args, "cc")?;
             if to.is_empty() {
@@ -555,6 +557,18 @@ mod tests {
         ] {
             assert!(pending.read_back.contains(part), "{part}");
         }
+        // A send-only Google sign-in's mail is read back the same, from
+        // its own account, as the same mail.
+        let signed_in = Entry::from_set(
+            "gmail-app",
+            &json!({"auth_type":"oauth","access_token":"t","user_email":"me@home.test"}),
+            0,
+        )
+        .unwrap();
+        let from_app = prepare("gmail-app", &args, &signed_in).unwrap();
+        assert_eq!(from_app.service, "gmail-app");
+        assert_eq!(from_app.read_back, pending.read_back);
+        assert_eq!(from_app.action, pending.action);
         let post = prepare(
             "facebook",
             &json!({"action":"page_post","text":"Open today"}),

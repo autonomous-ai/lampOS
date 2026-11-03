@@ -4,7 +4,7 @@ Bản tiếng Việt của [services.md](../services.md); nếu hai trang khác 
 bản tiếng Anh đúng.
 
 Một người liên kết các tài khoản của chính mình trong ứng dụng, như ở V1:
-Gmail, Google Calendar và Drive, Notion, Figma, GitHub, Linear, Asana, Ahrefs
+Gmail (và trên Lamp 2 một đăng nhập Google chỉ-gửi cho nó), Google Calendar và Drive, Notion, Figma, GitHub, Linear, Asana, Ahrefs
 và một Facebook Page, cùng các dịch vụ MCP của V1, Slack, monday.com, HubSpot
 và Amplitude. Đèn giữ token của mỗi liên kết và chỉ dùng nó khi chủ của đèn
 nói ra thành lời: đèn đọc, và với một công tắc thứ hai thì đèn ghi, mỗi lần
@@ -212,6 +212,7 @@ backend của đèn, không bao giờ đến Google).
 | Code | Tên | Host | Đọc (`what`) | Ghi (`action`) |
 |---|---|---|---|---|
 | `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
+| `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | không có: nó chỉ gửi | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}`, `calendars` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | không có |
 | `notion` | Notion | `api.notion.com` | `search {query, count}`, `page {id}` | `append_text {id, text}` |
@@ -242,7 +243,8 @@ không có: một giờ kể từ bây giờ) có thể mang một `refresh_toke
 `refresh: true`; một khoá tĩnh (`pat`, hoặc một `api_key` không có access
 token) không cho thời hạn thì không bao giờ hết hạn. Mật khẩu ứng dụng Gmail
 cần email của tài khoản (của một đăng nhập Google thì được đọc từ Gmail ở
-`set` khi liên kết không có); một lần ghi lên Facebook cần
+`set` khi liên kết không có; của một liên kết `gmail-app` thì phải có sẵn
+trong nó); một lần ghi lên Facebook cần
 `credentials.page_id` (việc đọc thì lùi về `me`).
 
 ## Gmail: mật khẩu ứng dụng qua IMAP và SMTP, hoặc đăng nhập Google qua API của nó
@@ -322,6 +324,36 @@ giữ gì.
   `https://mail.google.com/`. Một token thiếu scope mà lệnh gọi cần nhận 403:
   "Gmail refused the lamp's link: it may need linking again in the app".
 - **Làm mới:** qua backend, như mọi liên kết OAuth ([Làm mới](#làm-mới)).
+
+**Một đăng nhập Google chỉ-gửi (`gmail-app`):** đăng nhập Google cho Gmail
+của một Lamp 2 là một mã riêng, `gmail-app` (Backend, Queue #4710, 3/11
+21:29), bên cạnh `gmail`, vẫn là liên kết của mật khẩu ứng dụng. Scope của
+nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.readonly`.
+
+- **Liên kết:** `connector.set.gmail-app`, dữ liệu được lấy về như của mọi
+  mã: `{"auth_type": "oauth", "access_token", "refresh_token", "expires_in",
+  "scopes", "user_email", "client_id", "refresh": true}`. Nó phải có một
+  access token (`auth_type` không phải `pat`): "Gmail's Google sign-in needs
+  its access token"; và tài khoản của nó, `user_email` (nếu không thì
+  `credentials.email`): "Gmail's Google sign-in needs the account's email".
+  Thiếu một trong hai thì không giữ gì.
+- **Ở `set`:** không hỏi Google gì cả. `users.getProfile` cần một scope đọc
+  mà liên kết không có, nên liên kết được giữ chỉ dựa vào các trường của nó,
+  và một token bị Google từ chối được báo lần đầu ở một lần gửi.
+- **Đọc:** không có. Một `service_read` của `gmail-app`, đã liên kết hay
+  chưa, đều trả lời "This Gmail link, made with Google sign-in, can only send
+  mail. To read mail, link Gmail with an app password in the app: Skills,
+  then Connectors." Danh sách đọc của nó rỗng, nên không route đọc nào được
+  gọi với token của nó.
+- **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
+  "send" nói ra: một `POST /gmail/v1/users/me/messages/send` từ chính tài
+  khoản đó, không bao giờ qua SMTP. 401 hoặc 403: "not sent: Google refused
+  the Gmail sign-in".
+- **Khi cả hai được liên kết**, một lần gửi có thể đi qua một trong hai; một
+  lần đọc chỉ qua `gmail`. Mô tả của hàm đọc ghi `gmail-app: none, it only
+  sends: reads use gmail`.
+- **Làm mới:** qua backend dưới mã riêng của nó (`connector: "gmail-app"`),
+  như của Google Calendar.
 
 ## Dịch vụ MCP
 
@@ -642,7 +674,8 @@ chúng thì journal ghi "no backend link: OAuth links are used until they
 expire, never renewed".
 
 Đăng nhập Google của Gmail được gia hạn cùng cách, như của Google Calendar
-(`connector: "gmail"`); mật khẩu ứng dụng của nó thì không bao giờ.
+(`connector: "gmail"`, hoặc `"gmail-app"` cho đăng nhập chỉ-gửi của một Lamp
+2); mật khẩu ứng dụng của nó thì không bao giờ.
 
 Việc này xảy ra trước một lần đọc hoặc ghi, khi liên kết cho phép (`refresh`
 là true và có refresh token), có hạn, và còn dưới 600 s (`connectorRefreshSkew`
@@ -753,7 +786,12 @@ tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp th
 của từng thư, một thư trọn vẹn từ phần văn bản thuần, token của nó bị xoá,
 thư bảo mật bị bỏ ra, một id không phải của Gmail không bao giờ được gửi),
 được gia hạn qua backend, được gửi qua API chỉ khi có câu "send" nói ra, và
-mật khẩu ứng dụng không bao giờ được gửi đến API; thư bảo mật được phát hiện và bỏ
+mật khẩu ứng dụng không bao giờ được gửi đến API; một liên kết `gmail-app`
+được giữ chỉ dựa vào các trường của nó (không có tài khoản: bị từ chối,
+không gọi Google), mọi lần đọc nó được trả lời là chỉ-gửi (đã liên kết hay
+chưa, không gọi gì), lần gửi của nó chỉ qua API, một token bị từ chối được
+nói là "Google refused the Gmail sign-in", và việc gia hạn dưới mã riêng
+của nó; thư bảo mật được phát hiện và bỏ
 trọn; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
 bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; luật
 đọc/ghi MCP, host được ghim của nó, một liên kết trên host khác không bao giờ
