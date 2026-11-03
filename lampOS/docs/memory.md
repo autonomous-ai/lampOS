@@ -1496,6 +1496,28 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     not nine, a kept thing by span, bad spans, and without the option the
     same answers).
 
+- **A newer correction first** (`LAMP_MEMORY_NEWER_FIRST=on`, the memory
+  owner's Tiers-ideas plan, 3 Nov, P1; with the Days client only; off unless
+  set; adapted from memory-tiers' supersession, [memory-tiers.md](memory-tiers.md)).
+  - **What changes:** of what recall found, a later line of the person's own
+    that corrects an earlier one ("Actually, my tea is now peppermint, no
+    longer jasmine" after "it is jasmine tea") goes before it, and the
+    earlier one is marked `earlier`. A correction is later, says a cue
+    (`actually`, `no longer`, `not … anymore`, `changed to`, `moved to`,
+    `now it's`, `instead`, `thật ra`, `không còn`, `đổi sang`, `chuyển
+    sang`, `bây giờ là`, `thay vì`; never a bare `now` or `giờ`) and is
+    about the same fact: two or more of the earlier line's distinctive
+    words, all but at most one. Ignored for the room's scope, whose lines
+    are many speakers'.
+  - **What does not:** the same records, of the same person, nothing
+    retired or kept; no model call, no migration (memory-days.md).
+  - **Off:** no field is sent and every answer is as before.
+  - Tests: `crates/memory/tests/it/days_recall.rs` `newer_first::`
+    (`newer_correction_ranks_first`, `no_cue_keeps_fts_rank`,
+    `other_person_never_reordered_in`, `room_scope_is_never_reordered`,
+    `off_is_byte_identical`) and
+    `search::newer_first_tests`. The voice sends the field with P4.
+
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
   client only; off unless set; both voice routes; on in the product unit
   since 28 Oct, after lamp-06c1 kept a line said again a second time). `remember` asks the
