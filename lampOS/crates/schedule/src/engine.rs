@@ -169,7 +169,9 @@ impl Item {
 /// a kitchen timer is minutes, a roast's an hour or two. `set_timer` also
 /// sets relative reminders, up to a year out ("in three weeks, renew my
 /// prescription", Reviewer-three's P1 and Third's line on #4668), and a
-/// longer one is kept as a reminder is.
+/// longer one is kept as a reminder is. Since a reminder set with nobody sure
+/// is the room's too (#4710, 3 Nov), it no longer changes who hears one:
+/// every line does ([`Asker::may_see`]); left for a follow-up to remove.
 const ROOM_TIMER_MS: i64 = 2 * 3_600_000;
 
 /// Whether `asker`, if any, may see `item`: no asker sees everything, and
