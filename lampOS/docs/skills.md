@@ -2056,7 +2056,9 @@ gone ([switches.md](switches.md)). What happens:
    2 Nov), a 5xx, a timeout, a broken connection or an answer cut before
    its last fence closed is asked once more (`make_skill_local::again`);
    anything else is not. The model is shown a whole skill the check takes
-   (`make_skill_local::EXAMPLE`, light on someone being there) and told
+   (`make_skill_local::EXAMPLE`, `example-only`: cyan at level 2 for 25 s
+   on someone being there, named as an example of the form, "never answer
+   with it") and told
    that a skill can't speak or keep time: on lamp-9adf on 2 Nov, before
    both, its first two skills were refused for a trigger field and a light
    step the check didn't know. Its answer must be exactly two fenced
@@ -2087,8 +2089,19 @@ gone ([switches.md](switches.md)). What happens:
      (`made_skill::repair_brief`). They are the model's own skill read
      back to it, never the conversation. That answer is kept, or told as
      not made; never a third. Only a refusal by the check is repaired, or
-     by the plain words below; a wrong format or a skill asking for more
-     than the light and the head is told as not made at once.
+     by the plain words below, or the example given back; a wrong format
+     or a skill asking for more than the light and the head is told as
+     not made at once.
+   - **Never the example** (lamp-9adf, 3 Nov 16:15: "when I come back to
+     my desk, glow warm" was answered with the example word for word, a
+     cyan glow, kept and offered; a retry made the same bytes). An answer
+     whose `skill.toml` is the example's but for whitespace, or whose
+     `SKILL.md` has the example's name, is refused before it is checked
+     (`make_skill_local::is_example`) and goes back once as a check's
+     refusal, with "that is the example, not what was asked; make the
+     skill the person asked for". The example again is told as not made,
+     "it gave back the lamp's own example, not what was asked"; nothing is
+     kept or offered.
    - **Said plainly** (Mobile on #4710, 3 Nov). Once the check passes, the
      lamp writes what the skill does from its `skill.toml`, never from the
      model's description (`made_skill::plainly`): "When the lamp has been
@@ -2137,11 +2150,26 @@ gone ([switches.md](switches.md)). What happens:
      `a_failed_check_gives_its_lines_with_the_folder_replaced`, and
      `make_skill_local::tests::a_skill_the_check_refuses_goes_back_to_the_model_once`,
      `a_cannot_answer_is_asked_once_and_said_as_not_made`,
-     `what_it_says_is_what_will_run_and_what_was_left_out`.
+     `what_it_says_is_what_will_run_and_what_was_left_out`,
+     `the_example_given_back_is_known_however_written`,
+     `the_example_given_back_goes_back_to_the_model_once`,
+     `the_example_given_back_twice_keeps_nothing`,
+     `a_skill_like_the_example_but_not_it_is_kept`.
 6. **Kept, not installed.** The package goes in the voice's own folder,
    `/var/lib/lampOS/voice/made-skills` (0700, the voice's user), kept as
    made from `local:<ms>`:
-   - at most 5 are kept, and the oldest is let go with its package;
+   - one entry a skill: the same SHA-256, or the same name not on, kept
+     again takes the old entry's place, made from the newest ask, and one
+     on stays on (lamp-9adf, 3 Nov: the example kept twice was listed
+     twice);
+   - at most 5 are kept: past that the oldest not on is let go with its
+     package, never one on and never the one just kept; with all the
+     others on, all are kept past 5. A package another entry still names
+     stays (lamp-9adf, 3 Nov: the duplicate pushed out the package of
+     `glow-yellow-on-return`, which was on). Tests:
+     `made_skill::tests::a_skill_kept_twice_is_one_entry`,
+     `letting_go_skips_skills_on_and_packages_still_named`,
+     `a_skill_on_keeps_its_package_however_often_others_are_kept`;
    - each is kept with its SHA-256 and what it asks to use (`made.json`);
    - the same `local:<ms>` kept again gives back the kept one, not checked
      again.
