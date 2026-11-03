@@ -1891,6 +1891,11 @@ fn run_call_with_scope(
                 || (call.name == crate::known_faces::REMEMBER && switches.remember_speaker))
                 .then(|| crate::speaking_faces::line_seen(request))
                 .flatten();
+            // A rename of the setup owner's face moves the owner with it,
+            // counted in flight before the eyes are asked so the owner's
+            // refresh never drops them meanwhile (`OwnerRename`).
+            let renaming =
+                crate::known_faces::OwnerRename::begin(socket, call, onboarding.as_deref());
             let told = crate::known_faces::run_scoped(
                 socket,
                 call,
@@ -1900,6 +1905,9 @@ fn run_call_with_scope(
                 request,
                 lease,
             );
+            if let Some(renaming) = renaming {
+                renaming.answered(&told.0);
+            }
             // "Forget my face" by the known person whose line it is: their
             // memory goes with it (`LAMP_MEMORY_FORGET_ALL`, #2850).
             let told = match lease {

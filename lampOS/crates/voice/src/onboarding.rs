@@ -3199,11 +3199,44 @@ impl Onboarding {
             // longer answers "who you are", and the owner mark goes, whoever's
             // face it was, so a later face saved under that name is never
             // taken for the owner (Reviewer-three's and the Reviewer-lead's
-            // P2 on #4290).
+            // P2 on #4290). One that names the owner it drops
+            // ([`owner_gone`]) is let go when the owner is another by now
+            // ([`owner_renamed`]): their face was renamed, not forgotten.
             if told.get("face_forgotten").and_then(Value::as_bool) == Some(true) {
+                if let Some(gone) = told.get("owner").and_then(Value::as_str)
+                    && !self
+                        .desired
+                        .owner
+                        .as_ref()
+                        .is_some_and(|owner| same_owner(owner, gone))
+                {
+                    continue;
+                }
                 self.face_saved_unasked = false;
                 self.face_saved_name = None;
                 if self.desired.owner.take().is_some() {
+                    self.save();
+                }
+                continue;
+            }
+            // The owner's face renamed ([`owner_renamed`]): the owner is
+            // the new name, only while it is still the old one, bounded as
+            // a saved name is.
+            if let Some(renamed) = told.get("owner_renamed") {
+                let from = renamed.get("from").and_then(Value::as_str);
+                let to = renamed
+                    .get("to")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty() && name.len() <= 64);
+                if let (Some(from), Some(to)) = (from, to)
+                    && self
+                        .desired
+                        .owner
+                        .as_ref()
+                        .is_some_and(|owner| same_owner(owner, from))
+                {
+                    self.desired.owner = Some(to.to_owned());
                     self.save();
                 }
                 continue;
@@ -4146,6 +4179,33 @@ pub fn face_forgotten(file: &Path) {
     if let Err(error) = post(file, &json!({"face_forgotten": true})) {
         eprintln!("lamp-voice: onboarding: a face forgotten, not noted: {error}");
     }
+}
+
+/// The owner `owner` the eyes no longer know (`known_faces::refresh_owner`):
+/// as [`face_forgotten`], but let go when the walk keeps another owner by
+/// then, as after [`owner_renamed`] posted before it and not yet committed
+/// when the refresh read the file.
+pub fn owner_gone(file: &Path, owner: &str) {
+    if let Err(error) = post(file, &json!({"face_forgotten": true, "owner": owner})) {
+        eprintln!("lamp-voice: onboarding: a face forgotten, not noted: {error}");
+    }
+}
+
+/// The owner's face renamed by the person, from name `from` to name `to`
+/// (`known_faces::OwnerRename`): the walk moves the owner to `to` only
+/// while it is still `from`, so the lamp keeps knowing them (a tester's
+/// lamp on 3 Nov: a face saved at setup under a misheard name, renamed,
+/// then dropped as forgotten). The rest of the file is kept as it is.
+pub fn owner_renamed(file: &Path, from: &str, to: &str) {
+    if let Err(error) = post(file, &json!({"owner_renamed": {"from": from, "to": to}})) {
+        eprintln!("lamp-voice: onboarding: the owner's face renamed, not noted: {error}");
+    }
+}
+
+/// Whether two names are the same owner, as the eyes match a name (any
+/// case, `known_faces::among`).
+fn same_owner(one: &str, other: &str) -> bool {
+    one.to_lowercase() == other.to_lowercase()
 }
 
 /// One line for the runner, appended to the mailbox, at most 16 KiB in all.
@@ -5624,6 +5684,46 @@ mod tests {
         korean.wait(20 * S, Some(NEAR_MIDDLE));
         assert_eq!(korean.outcome(Step::WhoYouAre), Some(Outcome::Done));
         assert_eq!(korean.walk.desired.owner.as_deref(), Some("민수"));
+    }
+
+    /// A tester's lamp, 3 Nov: the owner's face renamed from a misheard name
+    /// A to name B moves the owner to B, even with the refresh's drop of A
+    /// read before the move was committed; a rename of anyone else's leaves
+    /// the owner alone; a real forget still drops it.
+    #[test]
+    fn a_rename_of_the_owners_face_moves_the_owner_and_a_forget_still_drops_it() {
+        let mut room = Room::new("owner-renamed");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        face_saved(&room.walk.file, Some("Name A"));
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Name A"));
+        // Renamed, and a refresh that read A before the move: B is kept.
+        owner_renamed(&room.walk.file, "Name A", "Name B");
+        owner_gone(&room.walk.file, "Name A");
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Name B"));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        // Someone else's face renamed: the owner stays.
+        owner_renamed(&room.walk.file, "Robin", "Name C");
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file).as_deref(), Some("Name B"));
+        // B gone from the eyes for real (the app's face removal): dropped.
+        owner_gone(&room.walk.file, "name b");
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&room.walk.file), None);
+        // "Forget my face" drops a renamed owner as before.
+        let mut forgot = Room::new("owner-renamed-forgot");
+        forgot.wait(7 * S, Some(NEAR_MIDDLE));
+        forgot.wait(20 * S, Some(NEAR_MIDDLE));
+        face_saved(&forgot.walk.file, Some("Name A"));
+        forgot.wait(S, Some(NEAR_MIDDLE));
+        owner_renamed(&forgot.walk.file, "Name A", "Name B");
+        forgot.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&forgot.walk.file).as_deref(), Some("Name B"));
+        face_forgotten(&forgot.walk.file);
+        forgot.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(owner_of(&forgot.walk.file), None);
     }
 
     /// The onboarding forgets report (30 Oct), fix C: a face saved while

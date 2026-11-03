@@ -4378,7 +4378,20 @@ after a take-over, but now for every turn:
   way) loses the mark at the next refresh, so a later face saved under that
   name is never taken for the owner (the eyes' ids can't tell the two apart:
   a forgotten name gets the same id back); a whole redo or a reset drops it
-  too. Names match as the eyes match them, in any case. The name kept is the one the eyes
+  too. A rename of the owner's own face is no forget: a `remember_my_face`
+  with `replace` while an owner is kept (`known_faces::OwnerRename`) is
+  counted in flight before the eyes are asked, and once the eyes keep the
+  face under name B and no longer know the owner's name A, the owner moves
+  to B (`onboarding::owner_renamed`, a mailbox line the walk takes only
+  while the owner is still A; the rest of the file is kept), and is named
+  as B at once. The eyes' list for that is asked off the reply's path, up
+  to three times. A refresh while a rename is in flight, or one that
+  overlapped its end, drops nothing and leaves the owner as it was, and a
+  refresh's drop names the owner it drops (`onboarding::owner_gone`), so
+  one that read A before the walk committed the move is let go. On a
+  tester's lamp on 3 Nov a face saved at setup under a misheard name A and
+  renamed to B lost the owner at the next refresh, and the lamp said it did
+  not know their name yet. Names match as the eyes match them, in any case. The name kept is the one the eyes
   kept (`remembered`). With a typed name too, the owner is kept as well, and
   a face the eyes know under either name is the owner's, matched by memory
   person id (`person::by_default_owner`, `known_faces::memory_person`); the
