@@ -805,7 +805,19 @@ dropping the field (its items then are no one's: the room's, heard on every line
   none (`crates/voice/src/tools/schedule_whose.rs`).
 - **The reader** is the line's person as memory's reads take it
   (`ScopeLease::scope`): a one-face line reads the room's, so it is not
-  "theirs" for listing; a held gap reads nothing of theirs.
+  "theirs" for listing; a held gap reads nothing of theirs. With
+  `LAMP_ONE_FACE_REMINDERS=on` (on in the product, the memory owner's call
+  on 4 Nov), a one-face line's `list_reminders`, `cancel_reminder` and
+  `snooze_reminder` read as the person its keep goes to
+  (`ScopeLease::kept_by_one_face`, `schedule_whose::one_face_reader`): their
+  own and the room's, never another person's, and never as the owner's line
+  (so an older Schedule lists none of theirs, not every item). On lamp-29e7
+  on 3 Nov the person's face was alone in 17 of 17 looks, read speaking in
+  0, and "What reminders do I have?" left out their own. Set calls, a second
+  face, an unknown face, another voice, a narrowed line or the switch off
+  read as before. Known risk, accepted by the memory owner on 4 Nov: a voice
+  not seen saying it, with the person's face alone in view, hears their
+  reminders and may cancel or snooze them.
 - **A line hears its own and the room's.** `list_set` with an `asker`
   (`protocol::Asker`, `{person, owner}`) lists only the items it may see
   (`Asker::may_see`): a person's own, only on their line; one set by no one,
