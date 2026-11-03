@@ -347,13 +347,29 @@ fn plain_code(all: &str, number: &Number) -> bool {
         || after.starts_with("vnd")
         || after.starts_with("usd");
     let decimal = number.groups.len() == 2 && number.groups[1] == 2 && number.splits[0] == '.';
+    // A time of day after a word saying when ("the meeting at 1430"), as
+    // a date is (the Reviewer-lead's P3 on #5070).
+    let time = number.groups.len() == 1
+        && number.digits == 4
+        && all[number.start..number.end]
+            .parse::<u32>()
+            .is_ok_and(|hhmm| hhmm / 100 <= 23 && hhmm % 100 <= 59)
+        && before
+            .rsplit(|c: char| !c.is_alphanumeric())
+            .next()
+            .is_some_and(|word| TIME_WORDS.contains(&word));
     let labelled = before.ends_with('#')
         || before
             .rsplit(|c: char| !c.is_alphanumeric())
             .next()
             .is_some_and(|word| NUMBER_LABELS.contains(&word));
-    number.is_code() && !year && !money && !decimal && !labelled
+    number.is_code() && !year && !money && !decimal && !time && !labelled
 }
+
+/// Words a time of day follows ([`plain_code`]): "at 1430", "by 0900".
+const TIME_WORDS: &[&str] = &[
+    "at", "by", "from", "until", "till", "before", "after", "lúc", "luc",
+];
 
 /// Whether `between` keeps a weak code word and a code in one clause.
 fn one_clause(between: &str) -> bool {
@@ -1503,6 +1519,9 @@ mod tests {
             ("x@y.z", "Hi", "Your access key is ready. Code: F7K2Q"),
             // Enter or confirm with a number.
             ("x@y.z", "Hi", "Enter 482913 to confirm"),
+            // Four digits that could be a time, but not after a word
+            // saying when: still a code.
+            ("x@y.z", "Hi", "Your verification code is 1430"),
             ("x@y.z", "Order", "Your confirmation number: 482913"),
             // A sign-in link with no sign-in words and no token=.
             ("x@y.z", "Hi", "Open https://app.test/magic/abc to continue"),
@@ -1557,6 +1576,10 @@ mod tests {
             ("x@y.z", "Trip", "Flight VN123 confirmation"),
             ("x@y.z", "Event", "Please confirm by replying"),
             ("x@y.z", "Event", "Please confirm by 2026-11-04"),
+            // A time of day after a word saying when.
+            ("x@y.z", "Meeting", "Please confirm the meeting at 1430"),
+            ("x@y.z", "Visit", "Enter the building at 0900 tomorrow"),
+            ("x@y.z", "Họp", "Vui lòng xác nhận cuộc họp lúc 1430"),
             (
                 "x@y.z",
                 "Meeting",

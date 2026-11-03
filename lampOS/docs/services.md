@@ -345,7 +345,9 @@ words `enter`, `confirm`, `confirmation`, `verify`, `nhập`, `xác nhận` with
 a code-shaped token next to them (`weak_code_near`: within 80 bytes, in the
 same clause, no `,`, `;`, `!`, `?`, line end or sentence end between; a code
 number that is not a year 1900 to 2099, a price beside `$`, `€`, `£`, `¥`,
-`₫`, `đ`, `%`, `vnd` or `usd`, a decimal like "1299.00", or labelled by `#`
+`₫`, `đ`, `%`, `vnd` or `usd`, a decimal like "1299.00", a time of day
+(an HHMM after `at`, `by`, `from`, `until`, `till`, `before`, `after` or
+`lúc`: "the meeting at 1430"), or labelled by `#`
 or a word such as `room`, `build`, `flight`, `order`, `door`, `phòng`; or a
 letters-and-digits word that changes between letters and digits at least
 twice, "A7B3C9" but not "VN123" or "10am"); "sign in", "log in", "login" or
@@ -373,8 +375,11 @@ answer) by every text in it but its `id` and `parent`. Items of one group
 are also read with the next two (`reads::without_security`): a group is
 what the read says they share (`reads::group_of`: `channel`, `channel_id`,
 `thread_ts`, `threadId`, `thread_id`, a Notion block's `parent` page or
-block, `page_id`), and all the plain text of one MCP answer; items with
-none, such as separate mails or events, are never joined. Two items fine
+block, `page_id`); items whose read names none are one group with the rest of
+their answer (a channel's history names its channel once, at the top, not
+on each message: `reads::ANSWER`), as is all the plain text of one MCP
+answer; only Gmail's mails and Google Calendar's events are each their own
+and never joined (`kept_apart`). Two items fine
 alone that are a security text joined are both left out, and so are the
 two ends of three when they are ("Your code", "is", "482913" keeps "is");
 beside a security text with no code or link of its own ("Your verification
@@ -663,7 +668,8 @@ reviewed ordinary texts kept (a date, a door and street, a version and
 build, a price, a flight, "please confirm by replying"); a code next to
 "confirm" or "enter" and a short value on a sign-in path found; only the
 items making a code left out, within a group and across three, never two
-separate mails or two items with no group. `-p lamp-voice` (`services`, `tools`,
+separate mails or two calendar events; one answer's items with no group
+key read as one (the Reviewer-lead's P2 on #5070); "at 1430" kept as a time. `-p lamp-voice` (`services`, `tools`,
 `thread`, `made_skill`): the switch giving the flag and folder, the three
 declared and routed only with the switch and the folder, the rule first, a
 plain send and nothing else ("do it" never; "gởi", "gui di", "ừ, gửi đi
