@@ -13,12 +13,15 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import inspect
 import json
+import os
 import socket
 import ssl
 import unicodedata
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Callable
 
 from websockets.asyncio.client import ClientConnection, connect as ws_connect
@@ -110,7 +113,8 @@ def _check(op: str, fields: dict) -> None:
     for value in fields.get("events", ()):
         if value not in schema.events():
             raise LampError(f"no event {value!r}", code="bad_request")
-    for value in fields.get("parts", ()):
+    # A lease's parts; `sound.upload`'s `parts` is a count.
+    for value in fields.get("parts", ()) if op == "lease.take" else ():
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
 
@@ -712,7 +716,41 @@ class Lamp:
         return await self.request("camera.stream", **fields)
 
     async def sound(self, name: str) -> dict:
+        """Play `hum`, the lamp's own, or one of this computer's clips by
+        name (`upload_sound`), once the person isn't talking."""
         return await self._act("sound", False, name=name)
+
+    async def upload_sound(self, name: str, wav: bytes | str | os.PathLike) -> dict:
+        """Keep a clip on the lamp as `name`, over one of the same name, to
+        play with `sound(name)`: a WAV of 16-bit mono PCM at 24 kHz, at most
+        30 s, within the voice's loudness cap. `wav` is its bytes or a path.
+        Sent in parts, as the lamp takes them; the lamp checks it whole and
+        refuses it with why. Returns the clip as kept: name, bytes, ms."""
+        data = wav if isinstance(wav, bytes) else Path(wav).read_bytes()
+        sha256 = hashlib.sha256(data).hexdigest()
+        # 36 KiB a part: 48 Ki characters of base64, a part's most.
+        step = 36 * 1024
+        pieces = [data[at : at + step] for at in range(0, len(data), step)] or [b""]
+        reply: dict = {}
+        for part, piece in enumerate(pieces):
+            reply = await self.request(
+                "sound.upload",
+                name=name,
+                sha256=sha256,
+                size=len(data),
+                part=part,
+                parts=len(pieces),
+                data=base64.b64encode(piece).decode(),
+            )
+        return reply.get("sound", {})
+
+    async def sounds(self) -> list[dict]:
+        """This computer's clips on the lamp: each its name, bytes and ms."""
+        return (await self.request("sound.list")).get("sounds", [])
+
+    async def remove_sound(self, name: str) -> dict:
+        """Delete one of this computer's clips from the lamp."""
+        return await self.request("sound.remove", name=name)
 
     async def stop(self) -> dict:
         reply = await self._act("stop", False)

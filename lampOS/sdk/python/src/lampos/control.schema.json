@@ -195,6 +195,15 @@
           "$ref": "#/$defs/sound"
         },
         {
+          "$ref": "#/$defs/sound.upload"
+        },
+        {
+          "$ref": "#/$defs/sound.list"
+        },
+        {
+          "$ref": "#/$defs/sound.remove"
+        },
+        {
           "$ref": "#/$defs/stop"
         },
         {
@@ -768,7 +777,7 @@
       "additionalProperties": false
     },
     "sound": {
-      "description": "One of the lamp's own sounds, by name: in this release only `hum`, the voice's built-in short hum, through the voice's quiet, rarity and privacy gates. Its `done` follows, as a say's does.",
+      "description": "A sound, by name: `hum`, the voice's built-in short hum, through the voice's quiet, rarity and privacy gates; or one of this computer's own clips (sound.upload), played as an exact say is, once the person isn't talking, refused paused, muted or in quiet hours, with no rarity. Its `done` follows, as a say's does.",
       "type": "object",
       "properties": {
         "id": {
@@ -778,8 +787,118 @@
           "const": "sound"
         },
         "name": {
-          "enum": [
-            "hum"
+          "$ref": "#/$defs/sound_name"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "sound_name": {
+      "description": "`hum`, the lamp's own, or a clip's name: a lowercase letter, then lowercase letters, digits, _ or -, at most 64.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "sound.upload": {
+      "description": "One part of a clip of this computer's own, sent in order from part 0: a WAV of 16-bit mono PCM at 24 kHz, at most 30 s, no sample past -12 dBFS and no 10 ms past -30 dBFS RMS (the voice's own bound). Each part's answer carries got; the last part's carries sound, once the clip is checked and kept, over one of the same name. A computer keeps at most 64 clips and 20 MB (hello's limits.sounds); a revoke deletes them.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "sound.upload"
+        },
+        "name": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/sound_name"
+            },
+            {
+              "not": {
+                "const": "hum"
+              }
+            }
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1444140
+        },
+        "part": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 63
+        },
+        "parts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 49152,
+          "description": "This part's bytes, base64."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name",
+        "sha256",
+        "size",
+        "part",
+        "parts",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "sound.list": {
+      "description": "This computer's own clips: the reply's sounds.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "sound.list"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "sound.remove": {
+      "description": "One of this computer's own clips, deleted: the reply's removed.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "sound.remove"
+        },
+        "name": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/sound_name"
+            },
+            {
+              "not": {
+                "const": "hum"
+              }
+            }
           ]
         }
       },
@@ -789,6 +908,28 @@
         "name"
       ],
       "additionalProperties": false
+    },
+    "clip": {
+      "description": "A clip of this computer's own, as sound.upload and sound.list say it.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "name",
+        "bytes",
+        "ms"
+      ]
     },
     "stop": {
       "description": "Ends the client's own actions now. Needs no grant and no lease.",
@@ -810,7 +951,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed.",
           "type": "object",
           "properties": {
             "re": {
@@ -1078,6 +1219,18 @@
             "fast": {
               "description": "camera.stream: true when its frames come binary, every frame the camera makes.",
               "type": "boolean"
+            },
+            "sound": {
+              "$ref": "#/$defs/clip"
+            },
+            "sounds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/clip"
+              }
+            },
+            "removed": {
+              "type": "string"
             }
           },
           "required": [
@@ -1151,7 +1304,7 @@
       "description": "A refusal. New fields may come; a client ignores what it doesn't know."
     },
     "limits": {
-      "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), the lease and say bounds, and this lamp's quiet hours.",
+      "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), the lease and say bounds, and this lamp's quiet hours, and a computer's clips (sounds).",
       "type": "object",
       "properties": {
         "rates": {
@@ -1331,6 +1484,42 @@
         },
         "say_max_chars": {
           "type": "integer"
+        },
+        "sounds": {
+          "description": "A computer's own clips (sound.upload): the clip's rate and longest, its largest file, how it is sent, and each computer's store.",
+          "type": "object",
+          "properties": {
+            "rate_hz": {
+              "type": "integer"
+            },
+            "clip_max_ms": {
+              "type": "integer"
+            },
+            "clip_max_bytes": {
+              "type": "integer"
+            },
+            "part_max_chars": {
+              "type": "integer"
+            },
+            "parts_max": {
+              "type": "integer"
+            },
+            "clips_max": {
+              "type": "integer"
+            },
+            "store_max_bytes": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "rate_hz",
+            "clip_max_ms",
+            "clip_max_bytes",
+            "part_max_chars",
+            "parts_max",
+            "clips_max",
+            "store_max_bytes"
+          ]
         },
         "push": {
           "type": "array",

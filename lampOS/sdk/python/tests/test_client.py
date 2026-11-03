@@ -53,8 +53,9 @@ def test_proofs_name_what_they_are_for():
 
 def test_every_op_has_a_call_and_every_error_code_a_class():
     calls = {"lease.take", "lease.renew", "lease.release", "pair", "hello", "subscribe", "unsubscribe", "get"}
+    named = {"sound.upload": "upload_sound", "sound.list": "sounds", "sound.remove": "remove_sound"}
     for op in schema.ops():
-        assert op in calls or callable(getattr(Lamp, op.replace(".", "_"), None)), op
+        assert op in calls or callable(getattr(Lamp, named.get(op, op.replace(".", "_")), None)), op
     for code in schema.error_codes():
         assert errors.BY_CODE[code].code == code
     assert errors.from_reply({"code": "rate", "why": "x", "retry_ms": 900}).retry_ms == 900
@@ -1469,3 +1470,44 @@ def test_a_fast_binary_frame_is_its_header_and_the_jpeg_as_data():
     frame = binary_frame(len(header).to_bytes(4, "big") + header + jpeg)
     assert (frame["ev"], frame["width"], frame["fps_now"]) == ("camera.frame", 640, 24.8)
     assert frame["data"] == jpeg
+
+
+def _wav(seconds: float, level: int = 1_000) -> bytes:
+    import io
+    import wave
+
+    out = io.BytesIO()
+    with wave.open(out, "wb") as file:
+        file.setnchannels(1)
+        file.setsampwidth(2)
+        file.setframerate(24_000)
+        file.writeframes(level.to_bytes(2, "little", signed=True) * int(24_000 * seconds))
+    return out.getvalue()
+
+
+def test_a_clip_is_uploaded_in_parts_played_listed_and_removed(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                # 2 s, about 96 KB: three parts of 36 KiB.
+                clip = _wav(2)
+                path = tmp_path / "chime.wav"
+                path.write_bytes(clip)
+                kept = await lamp.upload_sound("chime", path)
+                assert kept == {"name": "chime", "bytes": len(clip), "ms": 2_000}
+                parts = fake.asked("sound.upload")
+                assert [p["part"] for p in parts] == [0, 1, 2] and {p["parts"] for p in parts} == {3}
+                assert all(len(p["data"]) <= 49_152 for p in parts)
+                assert await lamp.sounds() == [kept]
+                await lamp.sound("chime")
+                await lamp.sound("hum")
+                assert fake.asked("sound") == [{"name": "chime"}, {"name": "hum"}]
+                await lamp.remove_sound("chime")
+                assert await lamp.sounds() == []
+                with pytest.raises(errors.BY_CODE["refused"], match="no clip named chime"):
+                    await lamp.sound("chime")
+                with pytest.raises(errors.BY_CODE["bad_request"], match="not a WAV"):
+                    await lamp.upload_sound("bad", b"not a wav")
+
+    run(go())

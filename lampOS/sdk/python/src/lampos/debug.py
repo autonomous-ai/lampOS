@@ -5,7 +5,7 @@ read the lamp's pin, never reaches the log: `proof`, `sig`, `key`, `nonce`,
 `pin` and `fp` are replaced, and so is a pair request's `code`, the owner's
 one-time code (a reply's `code` is a refusal's, and is kept). A say's `text` is
 given only as its length and a tag keyed for this run (an HMAC), and a pushed
-skill part's `data` only as its length.
+skill part's or an uploaded clip's `data` only as its length.
 """
 
 from __future__ import annotations
@@ -37,6 +37,10 @@ SHOWN = frozenset({
     "pm2_5", "pm4_0", "temperature", "temperature_c", "uptime_s",
     # A camera picture's size, age and a stream's rate (never the picture).
     "age_ms", "bytes", "fast", "fps", "fps_now", "stream",
+    # A computer's own clips (`sound.upload`, `sound.list`, `sound.remove`)
+    # and hello's limits for them: names, sizes and lengths, never the bytes.
+    "sound", "sounds", "removed", "ms", "sha256", "part", "rate_hz", "clip_max_ms",
+    "clip_max_bytes", "part_max_chars", "parts_max", "clips_max", "store_max_bytes",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
@@ -51,7 +55,7 @@ SHOWN = frozenset({
 # and a `look` at `hand`'s `follow`).
 SHOWN_BEYOND_SCHEMA = frozenset({
     "to", "move", "on", "energy", "warmth", "awake", "shows", "seen", "x", "y", "size", "open",
-    "confidence", "sha256", "part", "follow",
+    "confidence", "follow",
 })
 # A said text's tag is keyed with this process's own random key: the same text
 # gives the same tag within a run, and nobody holding the log can test a guess.

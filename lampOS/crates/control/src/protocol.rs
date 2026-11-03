@@ -237,8 +237,13 @@ pub struct Angles {
 /// own ask (blue on #3504, 27 Oct).
 pub const GESTURES_REFUSED: [&str; 2] = ["idle", "scanning"];
 
-/// The sounds a computer may ask for: the voice's built-in hum.
+/// The sounds a computer may ask for by the lamp's own name: the voice's
+/// built-in hum. Any other name is one of the computer's own clips
+/// (`sound.upload`, `crate::sounds`).
 pub const SOUNDS: [&str; 1] = ["hum"];
+/// The most parts one clip is sent in: a 30 s clip, about 1.4 MB, is 40
+/// parts of [`SKILL_PART_MAX_CHARS`].
+pub const SOUND_PARTS_MAX: u32 = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -366,8 +371,26 @@ pub enum Op {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rephrase: Option<bool>,
     },
+    /// The lamp's own hum, or one of the computer's own clips by name.
     #[serde(rename = "sound")]
     Sound { name: String },
+    /// One part of a clip of the computer's own, a WAV sent in order from
+    /// 0 (`crate::sounds`); the last part's answer says it's kept.
+    #[serde(rename = "sound.upload")]
+    SoundUpload {
+        name: String,
+        sha256: String,
+        size: usize,
+        part: u32,
+        parts: u32,
+        data: String,
+    },
+    /// The computer's own clips.
+    #[serde(rename = "sound.list")]
+    SoundList {},
+    /// One of the computer's own clips, deleted.
+    #[serde(rename = "sound.remove")]
+    SoundRemove { name: String },
     /// Ends the client's own actions now. Needs no lease.
     #[serde(rename = "stop")]
     Stop {},
@@ -436,7 +459,11 @@ impl Op {
                 _ => vec![Grant::Body],
             },
             Self::Light { .. } => vec![Grant::Light],
-            Self::Say { .. } | Self::Sound { .. } => vec![Grant::Speak],
+            Self::Say { .. }
+            | Self::Sound { .. }
+            | Self::SoundUpload { .. }
+            | Self::SoundList {}
+            | Self::SoundRemove { .. } => vec![Grant::Speak],
             Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
                 vec![Grant::Skills]
             }
@@ -599,13 +626,44 @@ impl Op {
             Self::Play { name } => {
                 plain_name(name, "name")?;
             }
-            // The lamp's own short hum, its one built-in chime; the
-            // recorded notices (no Wi-Fi) are never a computer's to play.
+            // The lamp's own short hum, or a clip of the computer's own by
+            // its name; the recorded notices (no Wi-Fi) are never a
+            // computer's to play, and no clip path is ever asked.
             Self::Sound { name } => {
-                if name != SOUNDS[0] {
-                    return Err(format!("name: {} only, in this release", SOUNDS[0]));
+                if !SOUNDS.contains(&name.as_str()) {
+                    plain_name(name, "name")?;
                 }
             }
+            Self::SoundUpload {
+                name,
+                sha256,
+                size,
+                part,
+                parts,
+                data,
+            } => {
+                clip_name(name)?;
+                if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return Err("sha256: the clip's SHA-256, 64 hex".to_owned());
+                }
+                if *size == 0 || *size > crate::sounds::CLIP_MOST_BYTES {
+                    return Err(format!(
+                        "size: 1 to {} bytes",
+                        crate::sounds::CLIP_MOST_BYTES
+                    ));
+                }
+                if *parts == 0 || *parts > SOUND_PARTS_MAX || part >= parts {
+                    return Err(format!(
+                        "parts: 1 to {SOUND_PARTS_MAX}, and part from 0 to parts - 1"
+                    ));
+                }
+                if data.is_empty() || data.len() > SKILL_PART_MAX_CHARS {
+                    return Err(format!(
+                        "data: 1 to {SKILL_PART_MAX_CHARS} characters of base64"
+                    ));
+                }
+            }
+            Self::SoundRemove { name } => clip_name(name)?,
             Self::Look { at } => {
                 if let LookAt::Angles(Angles { yaw, pitch }) = at
                     && !(yaw.is_finite()
@@ -697,7 +755,7 @@ impl Op {
                     return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
                 }
             }
-            Self::Stop {} | Self::SkillList {} | Self::CameraSnapshot {} => {}
+            Self::Stop {} | Self::SkillList {} | Self::CameraSnapshot {} | Self::SoundList {} => {}
         }
         Ok(())
     }
@@ -921,6 +979,15 @@ fn held_for(ms: u32) -> Result<(), String> {
 
 /// A lowercase name, as skills', moves' and gestures' are: a letter, then
 /// at most 63 lowercase letters, digits, `_` or `-`.
+/// A clip's name: a plain name, and never the lamp's own (`hum`).
+fn clip_name(name: &str) -> Result<(), String> {
+    plain_name(name, "name")?;
+    if SOUNDS.contains(&name) {
+        return Err(format!("name: {name} is the lamp's own sound"));
+    }
+    Ok(())
+}
+
 fn plain_name(text: &str, what: &str) -> Result<(), String> {
     let mut bytes = text.bytes();
     let first = bytes.next().is_some_and(|b| b.is_ascii_lowercase());
@@ -973,6 +1040,10 @@ mod tests {
             r#"{"id":13,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}"#.to_owned(),
             r#"{"id":14,"op":"say","text":"Build passed."}"#.to_owned(),
             r#"{"id":15,"op":"sound","name":"hum"}"#.to_owned(),
+            r#"{"id":15,"op":"sound","name":"chime"}"#.to_owned(),
+            format!(r#"{{"id":15,"op":"sound.upload","name":"chime","sha256":"{}","size":4,"part":0,"parts":1,"data":"AAAA"}}"#, "0".repeat(64)),
+            r#"{"id":15,"op":"sound.list"}"#.to_owned(),
+            r#"{"id":15,"op":"sound.remove","name":"chime"}"#.to_owned(),
             r#"{"id":16,"op":"play","name":"wave-hello"}"#.to_owned(),
             r#"{"id":17,"op":"stop"}"#.to_owned(),
         ];
@@ -1062,11 +1133,20 @@ mod tests {
             r#"{"id":1,"op":"express","feeling":"glad","strength":1.5}"#.to_owned(),
             r#"{"id":1,"op":"express","feeling":"Glad"}"#.to_owned(),
             r#"{"id":1,"op":"gesture","name":"../nod"}"#.to_owned(),
-            // The hum only, in this release: no other sound, and never a
-            // recorded notice (wifi_lost) or a path.
-            r#"{"id":1,"op":"sound","name":"chime"}"#.to_owned(),
-            r#"{"id":1,"op":"sound","name":"wifi_lost"}"#.to_owned(),
+            // The hum or a clip's plain name: never a path. A recorded
+            // notice's name (wifi_lost) is only ever a clip of the
+            // computer's own, which the voice reads from its folder.
             r#"{"id":1,"op":"sound","name":"../hum"}"#.to_owned(),
+            r#"{"id":1,"op":"sound","name":"/etc/hosts"}"#.to_owned(),
+            r#"{"id":1,"op":"sound","name":"Chime"}"#.to_owned(),
+            // A clip: never named as the lamp's own, its size within a
+            // 30 s clip's, its parts in range, its SHA-256 64 hex.
+            format!(r#"{{"id":1,"op":"sound.upload","name":"hum","sha256":"{}","size":4,"part":0,"parts":1,"data":"AAAA"}}"#, "0".repeat(64)),
+            format!(r#"{{"id":1,"op":"sound.upload","name":"a","sha256":"{}","size":{},"part":0,"parts":1,"data":"AAAA"}}"#, "0".repeat(64), crate::sounds::CLIP_MOST_BYTES + 1),
+            format!(r#"{{"id":1,"op":"sound.upload","name":"a","sha256":"{}","size":4,"part":1,"parts":1,"data":"AAAA"}}"#, "0".repeat(64)),
+            format!(r#"{{"id":1,"op":"sound.upload","name":"a","sha256":"{}","size":4,"part":0,"parts":65,"data":"AAAA"}}"#, "0".repeat(64)),
+            r#"{"id":1,"op":"sound.upload","name":"a","sha256":"00","size":4,"part":0,"parts":1,"data":"AAAA"}"#.to_owned(),
+            r#"{"id":1,"op":"sound.remove","name":"hum"}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":200,"pitch":0}}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":10,"pitch":5,"roll":30}}"#.to_owned(),
             r#"{"id":1,"op":"stop","lease":"l_1"}"#.to_owned(),

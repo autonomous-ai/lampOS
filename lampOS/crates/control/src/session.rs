@@ -165,6 +165,9 @@ pub struct Door {
     /// and skill push is off on this lamp.
     push_folder: Option<PathBuf>,
     pushes: Pushes,
+    /// The computers' own clips (`crate::sounds`): none, and `sound` plays
+    /// the hum only.
+    sounds: Option<crate::sounds::Sounds>,
     /// Each computer's pairing generation, raised at its every pair,
     /// re-pair and revoke from one counter, so an install asked under one
     /// pairing knows when it's no longer the same (the same key gets the
@@ -271,6 +274,7 @@ impl Door {
             quiet: None,
             push_folder: None,
             pushes: Pushes::default(),
+            sounds: None,
             revs: BTreeMap::new(),
             last_rev: 0,
             asking: BTreeSet::new(),
@@ -339,6 +343,13 @@ impl Door {
     /// Skill push on, its packages kept in `folder` for the manage helper.
     pub fn with_push_folder(mut self, folder: PathBuf) -> Self {
         self.push_folder = Some(folder);
+        self
+    }
+
+    /// The computers' own clips kept under `folder` (the state folder's
+    /// `sounds`, which the voice plays from).
+    pub fn with_sound_folder(mut self, folder: PathBuf) -> Self {
+        self.sounds = Some(crate::sounds::Sounds::new(folder));
         self
     }
 
@@ -437,9 +448,13 @@ impl Door {
             self.unsaved_revokes.insert(client.to_owned());
             self.new_rev(client);
         }
-        // Its pushed skills off (not deleted), whether or not it had any.
+        // Its pushed skills off (not deleted), whether or not it had any;
+        // its clips deleted (the local leader's 3 Nov).
         if was || waiting {
             self.tell_helper_off(client);
+            if let Some(sounds) = &mut self.sounds {
+                sounds.forget(client);
+            }
         }
         // To the file: now, or with the next save that succeeds (a retry,
         // a pairing), so a restart can't bring the key back once the disk
@@ -748,6 +763,45 @@ impl Door {
                     Err(error) => reply_refused(Some(re), error),
                 };
             }
+            Op::SoundUpload { .. } | Op::SoundList {} | Op::SoundRemove { .. }
+                if self.sounds.is_none() =>
+            {
+                return refuse(ErrorCode::Refused, SOUNDS_OFF.to_owned());
+            }
+            Op::SoundUpload {
+                name,
+                sha256,
+                size,
+                part,
+                parts: count,
+                data,
+            } => {
+                let part = crate::sounds::Part {
+                    name,
+                    sha256,
+                    size: *size,
+                    part: *part,
+                    parts: *count,
+                    data,
+                };
+                let sounds = self.sounds.as_mut().expect("sounds on");
+                return match sounds.part(&client, &part, now_us) {
+                    Ok(crate::sounds::Step::Got(got)) => ok(re, json!({"got": got})),
+                    Ok(crate::sounds::Step::Kept(sound)) => ok(re, json!({"sound": sound})),
+                    Err(error) => reply_refused(Some(re), error),
+                };
+            }
+            Op::SoundList {} => {
+                let sounds = self.sounds.as_ref().expect("sounds on");
+                return ok(re, json!({"sounds": sounds.list(&client)}));
+            }
+            Op::SoundRemove { name } => {
+                let sounds = self.sounds.as_ref().expect("sounds on");
+                return match sounds.remove(&client, name) {
+                    Ok(()) => ok(re, json!({"removed": name})),
+                    Err(error) => reply_refused(Some(re), error),
+                };
+            }
             Op::SkillList {} | Op::SkillRemove { .. } => {
                 // Bounded before the helper is asked: one at a time for each
                 // computer, a few for the lamp, and a rate (Reviewer-two's
@@ -974,6 +1028,9 @@ impl Door {
     }
 }
 
+/// Why a clip op is refused on a lamp that keeps no clips.
+pub const SOUNDS_OFF: &str = "this lamp keeps no computer's clips";
+
 /// Why a skill op is refused on a lamp where skill push is off.
 pub const PUSH_OFF: &str = "skill push is not on this lamp";
 
@@ -998,6 +1055,7 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
             "hold_max_ms": protocol::HOLD_MAX_MS,
             "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
             "say_max_chars": protocol::SAY_MAX_CHARS,
+            "sounds": sounds_limits(),
             "quiet_hours": quiet_hours_of(quiet),
         });
     }
@@ -1014,7 +1072,23 @@ pub fn limits(quiet: Option<lamp_local_time::QuietWindow>, rates_off: bool) -> V
         "hold_max_ms": protocol::HOLD_MAX_MS,
         "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
         "say_max_chars": protocol::SAY_MAX_CHARS,
+        "sounds": sounds_limits(),
         "quiet_hours": quiet_hours_of(quiet),
+    })
+}
+
+/// A computer's clips, as hello tells them (`crate::sounds`): a clip's
+/// format and length, how it is sent, and the store each computer has.
+fn sounds_limits() -> Value {
+    json!({
+        "rate_hz": crate::sounds::CLIP_RATE,
+        "clip_max_ms": u64::from(crate::sounds::CLIP_MOST_FRAMES) * 1_000
+            / u64::from(crate::sounds::CLIP_RATE),
+        "clip_max_bytes": crate::sounds::CLIP_MOST_BYTES,
+        "part_max_chars": protocol::SKILL_PART_MAX_CHARS,
+        "parts_max": protocol::SOUND_PARTS_MAX,
+        "clips_max": crate::sounds::CLIPS_MOST,
+        "store_max_bytes": crate::sounds::STORE_MOST_BYTES,
     })
 }
 
@@ -1786,6 +1860,18 @@ mod tests {
         );
         let limits = &reply(&hello)["limits"];
         assert_eq!(limits["rates"], "off");
+        assert_eq!(
+            limits["sounds"],
+            json!({
+                "rate_hz": 24_000,
+                "clip_max_ms": 30_000,
+                "clip_max_bytes": 1_444_140,
+                "part_max_chars": 49_152,
+                "parts_max": 64,
+                "clips_max": 64,
+                "store_max_bytes": 20_000_000,
+            })
+        );
         assert!(
             limits["motion"].is_null() && limits["express"].is_null(),
             "{limits}"
@@ -2115,6 +2201,94 @@ mod tests {
         );
         assert_eq!(code_of(&outcome), Some("unpaired"));
         assert!(outcome.close);
+    }
+
+    /// A computer's own clips at the door (docs/control.md, "Sounds"): the
+    /// speak grant, uploaded, listed and removed as its own, refused on a
+    /// lamp keeping none, and deleted with its revoke.
+    #[test]
+    fn clips_are_uploaded_listed_removed_and_deleted_with_a_revoke() {
+        use base64::Engine as _;
+        use sha2::Digest as _;
+        let folder =
+            std::env::temp_dir().join(format!("lamp-control-door-clips-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        let mut clip = std::io::Cursor::new(Vec::new());
+        let mut writer = hound::WavWriter::new(
+            &mut clip,
+            hound::WavSpec {
+                channels: 1,
+                sample_rate: 24_000,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            },
+        )
+        .unwrap();
+        for _ in 0..2_400 {
+            writer.write_sample(1_000_i16).unwrap();
+        }
+        writer.finalize().unwrap();
+        let clip = clip.into_inner();
+        let sha256: String = sha2::Sha256::digest(&clip)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let upload = format!(
+            r#"{{"id":2,"op":"sound.upload","name":"chime","sha256":"{sha256}","size":{},"part":0,"parts":1,"data":"{}"}}"#,
+            clip.len(),
+            base64::engine::general_purpose::STANDARD.encode(&clip)
+        );
+
+        // No speak grant: refused.
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Look]);
+        let mut door = door.with_sound_folder(folder.clone());
+        let outcome = door.handle(&mut session, &upload, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&outcome), Some("no_grant"));
+
+        // A lamp keeping none: refused with why.
+        let computer = Computer::new(2);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Speak]);
+        let outcome = door.handle(&mut session, &upload, &mut fake, 2 * S, 1);
+        assert_eq!(reply(&outcome)["error"]["why"], SOUNDS_OFF);
+
+        let computer = Computer::new(3);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak]);
+        let id = pairing::client_id(&computer.key());
+        let mut door = door.with_sound_folder(folder.clone());
+        let outcome = door.handle(&mut session, &upload, &mut fake, 2 * S, 1);
+        assert_eq!(
+            reply(&outcome)["sound"],
+            json!({"name": "chime", "bytes": clip.len(), "ms": 100})
+        );
+        assert!(folder.join(&id).join("chime.wav").is_file());
+        let outcome = door.handle(
+            &mut session,
+            r#"{"id":3,"op":"sound.list"}"#,
+            &mut fake,
+            2 * S,
+            1,
+        );
+        assert_eq!(
+            reply(&outcome)["sounds"],
+            json!([{"name": "chime", "bytes": clip.len(), "ms": 100}])
+        );
+        let outcome = door.handle(
+            &mut session,
+            r#"{"id":4,"op":"sound.remove","name":"chime"}"#,
+            &mut fake,
+            2 * S,
+            1,
+        );
+        assert_eq!(reply(&outcome)["removed"], "chime");
+        assert!(!folder.join(&id).join("chime.wav").exists());
+
+        // Kept again, then the computer revoked: its clips go with it.
+        door.handle(&mut session, &upload, &mut fake, 2 * S, 1);
+        assert!(folder.join(&id).join("chime.wav").is_file());
+        assert!(door.revoke(&id, 3 * S).was);
+        assert!(!folder.join(&id).exists());
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     #[test]

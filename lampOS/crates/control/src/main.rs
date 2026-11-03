@@ -181,6 +181,12 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     }
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
+    // A computer's own clips: kept in the state folder's `sounds`, which
+    // the voice plays from (its LAMP_SAY_CLIPS), with the voice only.
+    let clips = state.join(lamp_control::sounds::SOUNDS_FOLDER);
+    if say.is_some() {
+        door = door.with_sound_folder(clips.clone());
+    }
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
         None => None,
@@ -271,7 +277,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let follow = lamp_control::body_lease::Follower::default();
     let on_lease = lease_socket.is_some().then(|| (looks, follow.clone()));
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
-        let lamp = parts::Lamp::new(body, light, say, clock_id, events).watching(watching);
+        let lamp = parts::Lamp::new(body, light, say, clock_id, events)
+            .watching(watching)
+            .with_clips(clips);
         let lamp = match sight {
             Some((sight, mark)) => match frames {
                 Some(frames) => lamp.seeing(sight, mark).fast_frames(frames, sink_for_lamp),

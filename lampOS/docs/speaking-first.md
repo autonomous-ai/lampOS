@@ -477,6 +477,18 @@ said as they are end none.
   little at a time cannot keep its place), 16 already waiting, or the voice
   going.
 
+**A paired computer's clip** (the local leader's 3 Nov, lamp-control's
+`sound` of a clip it keeps, docs/control.md "Sounds"): `{"skill": "control",
+"clip": "/var/lib/lampos-control/sounds/c_…/chime.wav", "expires_in_ms":
+30000}`, the absolute path of a WAV, at most 1,024 bytes. It is read on the
+client's thread as a skill's sound is, refused with why unless its real
+place is under lamp-control's clips folder (`LAMP_SAY_CLIPS`,
+`/var/lib/lampos-control/sounds` if unset), with a skill sound's opening,
+format and loudness checks and up to 30 s (`say::read_clip`, at most
+1,444,140 bytes), and then played as an exact `text` is
+(`say::may_play_exact`): never as a skill's sound, so no one in 30 s
+rarity.
+
 **A skill's own sound** (#938, a skill's `sounds/`): `{"skill": "chime",
 "sound": "/var/lib/lampOS/skills/chime/sounds/ding.wav", "priority": 5,
 "expires_in_ms": 30000}`, the absolute path of a WAV, at most 1,024 bytes.

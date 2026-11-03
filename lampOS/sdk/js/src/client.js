@@ -5,6 +5,8 @@
 //
 // Every message is docs/control.schema.json's. Names the schema enumerates are
 // checked before sending, and a refusal rejects with its typed error.
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import WebSocket from 'ws';
 import * as debug from './debug.js';
@@ -107,7 +109,8 @@ function check(op, fields) {
   for (const event of fields.events ?? []) {
     if (!schema.events.includes(event)) throw new LampError(`no event ${event}`, { code: 'bad_request' });
   }
-  for (const part of fields.parts ?? []) {
+  // A lease's parts; `sound.upload`'s `parts` is a count.
+  for (const part of op === 'lease.take' ? fields.parts ?? [] : []) {
     if (!schema.parts.includes(part)) throw new LampError(`no part ${part}`, { code: 'bad_request' });
   }
 }
@@ -520,7 +523,31 @@ export class Lamp {
     if (size !== undefined) fields.size = size;
     return this.request('camera.stream', fields);
   }
+  // `hum`, the lamp's own, or one of this computer's clips by name (`uploadSound`), once the person isn't talking.
   sound(name) { return this.act('sound', { name }); }
+  // Keep a clip on the lamp as `name`, over one of the same name, to play with `sound(name)`: a WAV of 16-bit mono PCM
+  // at 24 kHz, at most 30 s, within the voice's loudness cap. `wav` is its bytes (a Buffer or Uint8Array) or a path.
+  // Sent in parts, as the lamp takes them; the lamp checks it whole and refuses it with why. Resolves to the clip as
+  // kept: name, bytes, ms.
+  async uploadSound(name, wav) {
+    const data = typeof wav === 'string' ? await readFile(wav) : Buffer.from(wav);
+    const sha256 = createHash('sha256').update(data).digest('hex');
+    // 36 KiB a part: 48 Ki characters of base64, a part's most.
+    const step = 36 * 1024;
+    const parts = Math.max(1, Math.ceil(data.length / step));
+    let reply = {};
+    for (let part = 0; part < parts; part += 1) {
+      const piece = data.subarray(part * step, (part + 1) * step);
+      reply = await this.request('sound.upload', {
+        name, sha256, size: data.length, part, parts, data: piece.toString('base64'),
+      });
+    }
+    return reply.sound ?? {};
+  }
+  // This computer's clips on the lamp: each its name, bytes and ms.
+  async sounds() { return (await this.request('sound.list', {})).sounds ?? []; }
+  // Delete one of this computer's clips from the lamp.
+  removeSound(name) { return this.request('sound.remove', { name }); }
   async stop() {
     const reply = await this.act('stop', {});
     const following = this.following;
