@@ -112,3 +112,21 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   `cargo fmt --all --check` clean and `cargo build -q --workspace --locked`
   exit 0 on macOS x86_64 at `8bfb75c9f`. Not run: clippy, tests, the
   Linux ARM64 build. A result on a Mac is not a result on the lamp.
+
+## 2026-11-03 — one session as heron, from 12:05
+
+- 11:56: heron's request for its first labelled piece went up on #4710
+  (issuecomment-6595801883) from the person's other session, the one that
+  joined heron on 2026-11-02; it recommends heron-P1 (replay #4450's three
+  desk lines on lamp-fc4b, journal-only) or any piece the first builder
+  names. 12:05: the person chose this session as heron's one voice; the
+  other posts nothing and touches no branch. No `builder:heron` label yet;
+  #4450 has no label and no comment.
+- 12:3x: READ-OK on #5034 `4f85038b2` (Seventh: `LAMP_UNTIED_GOING_ON=held`
+  in the product unit, switches.md row to `held`/`on`, plain line removed,
+  second-voice.md). Rebased clean onto `947990c31`; its three named gates
+  pass on the Mac (lamp-voice-eval switches, lampos-promote, lamp-update).
+  Aside, not the PR's: lamp-update's
+  `image_ramlog::ramlogs_copies_leave_the_journal_out` fails on this Mac
+  with and without the PR, since Apple's rsync 2.6.9 passes the GNU-rsync
+  guard and then rejects `-aXWv`.
