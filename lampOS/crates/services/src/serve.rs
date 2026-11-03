@@ -1011,7 +1011,7 @@ mod tests {
             let text = called.to_string();
             assert_eq!(called["ok"], true, "{text}");
             assert!(text.contains("launch") && text.contains("not instructions"));
-            assert!(text.contains("a security mail, left out") && !text.contains("482913"));
+            assert!(text.contains("a security message, left out") && !text.contains("482913"));
             assert_eq!(
                 services.http.methods()[3..],
                 [

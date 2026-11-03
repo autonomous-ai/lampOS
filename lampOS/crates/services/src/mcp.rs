@@ -686,20 +686,8 @@ pub fn result_quoted(endpoint: &Endpoint, result: &Value) -> Value {
     {
         items = text_items(&endpoint.scrub(&structured.to_string()));
     }
-    let items: Vec<Value> = items
-        .into_iter()
-        .map(|item| {
-            let said = match &item {
-                Value::String(text) => text.clone(),
-                other => other.to_string(),
-            };
-            if mail::is_security_mail("", "", &said) {
-                json!(mail::SECURITY_LEFT_OUT)
-            } else {
-                item
-            }
-        })
-        .collect();
+    // Security text is left out by `reads::quoted`, each piece alone and
+    // with its neighbours, so a code cut across two pieces goes too.
     let total = items.len();
     let mut quoted = reads::quoted(endpoint.name, items.into_iter().take(PIECES_MOST).collect());
     if total > PIECES_MOST {
@@ -873,6 +861,9 @@ pub(crate) mod fake {
                 "tools/list" => json!({"tools": tools()}),
                 "tools/call" => json!({"content": [
                     {"type": "text", "text": format!("called {} with {}", message["params"]["name"], message["params"]["arguments"])},
+                    // Between them, so a security `said` hides this and
+                    // not the echo (`reads::quoted` hides a neighbour).
+                    {"type": "text", "text": "and then:"},
                     {"type": "text", "text": self.said},
                 ]}),
                 _ => {
@@ -1119,8 +1110,24 @@ mod tests {
             !quoted.contains("planted") && !quoted.contains("551234"),
             "{quoted}"
         );
-        assert!(quoted.contains("a security mail, left out"));
+        assert!(quoted.contains("a security message, left out"));
         assert!(quoted.contains("not instructions"));
+        // A code cut across two pieces at a blank line: both left out.
+        let split = json!({"content": [
+            {"type":"text","text":"Your verification code is\n\n482913\n\nSee you at lunch"},
+        ]});
+        let quoted = result_quoted(&endpoint, &split);
+        let text = quoted.to_string();
+        assert!(!text.contains("482913"), "{text}");
+        assert!(text.contains(mail::SECURITY_MESSAGE_LEFT_OUT), "{text}");
+        // Two text parts, the code in the second: both left out.
+        let parts = json!({"content": [
+            {"type":"text","text":"Your verification code is"},
+            {"type":"text","text":"482913"},
+        ]});
+        let quoted = result_quoted(&endpoint, &parts);
+        assert_eq!(quoted["quoted"][0], mail::SECURITY_MESSAGE_LEFT_OUT);
+        assert_eq!(quoted["quoted"][1], mail::SECURITY_MESSAGE_LEFT_OUT);
     }
 
     #[test]
