@@ -1867,11 +1867,16 @@ order is kept. A written turn is the same from the chat on.
   without it, on lamp-4ace on 19 Oct, the yes was taken as a new
   hand-over, asked about again and never started.
   With `LAMP_HISTORY_KEEPS_CALLS=on` (on in the product since 3 Nov) the
-  functions a turn ran with no
-  arguments (the light's and the volume's steps, on, off, mute) are kept
-  with its exchange (`Thread::called`, `Engine::keeping_calls`), and the
-  history tells such an exchange as a round with calls goes: the person's
-  words, an assistant message with the calls (no arguments, ids
+  functions a turn ran are kept with its exchange (`Thread::called`,
+  `Engine::keeping_calls`, `second_provider::kept_args`): one made with
+  no arguments (the light's and the volume's steps, on, off, mute), and
+  a light's or volume's call (`light_*`, `volume_*` but the app's two,
+  as `lamp_actions::is_short`) with its own arguments, `light_colour
+  {"colour":"red"}`, at most 256 bytes of compact JSON (#5045(a): with
+  colour turns told as words alone, "Make the light red." was answered
+  "Done." with no call on lamp-52e6 at 9730). The history tells such an
+  exchange as a round with calls goes: the person's words, an assistant
+  message with the calls (each with the arguments it was kept with, ids
   `kept-<request>-<n>`), one `tool` message for each saying `(done
   earlier; its result was not kept)`, then the lamp's words
   (`worker::messages_marked`). Without it every earlier action reads as
@@ -1885,9 +1890,12 @@ order is kept. A written turn is the same from the chat on.
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
   build would set the file aside, #1505): after a restart, earlier
-  exchanges are words only. A call that took arguments is never kept: it
-  is told with none, and would teach calling it bare (Fourteen's P3 on
-  #5018). At most 8 calls an exchange, each name once. With
+  exchanges are words only. Any other call that took arguments (a keep, a
+  reminder) is never kept: its arguments are the person's words, and told
+  bare it would teach calling it bare (Fourteen's P3 on #5018). A light's
+  or volume's call whose arguments pass 256 bytes is kept bare if its
+  function takes none, else not at all. At most 8 calls an exchange, each
+  name with the same arguments once. With
   `LAMP_CONVERSATION_ROOM_LINES_TOLD` on, a room exchange's calls reach a
   person's history with its words. A chat that refuses round 1 (a status
   not 429 or 5xx) with kept calls in the history is asked once more

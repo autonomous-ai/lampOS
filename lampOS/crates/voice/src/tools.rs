@@ -1033,6 +1033,32 @@ pub enum Route {
 /// does not link `lamp-actions`).
 pub const APP_CALLS: [&str; 2] = ["volume_level", "volume_to"];
 
+/// Whether `name` is one of the light's or the volume's functions, the
+/// executive's changes the model asks for: `lamp_actions::is_short`, which
+/// a test holds this equal to (the voice does not link `lamp-actions`). A
+/// call of one is kept with its arguments in a later turn's history
+/// (`LAMP_HISTORY_KEEPS_CALLS`, `second_provider::kept_args`).
+pub fn is_light_or_volume(name: &str) -> bool {
+    name.starts_with("light_") || (name.starts_with("volume_") && !APP_CALLS.contains(&name))
+}
+
+/// The light's and the volume's functions that take no arguments, as the
+/// executive's catalog declares them (`lamp_actions::catalog`, a test
+/// holds the two equal): a call of one whose arguments are too long to
+/// keep is kept bare (`second_provider::kept_args`).
+pub const LIGHT_OR_VOLUME_BARE: [&str; 10] = [
+    "volume_up",
+    "volume_down",
+    "volume_mute",
+    "volume_unmute",
+    "light_on",
+    "light_off",
+    "light_brighter",
+    "light_dimmer",
+    "light_warmer",
+    "light_cooler",
+];
+
 /// The face functions' switches. The yes and no to being named need the
 /// memory too: only with it is a line's scope a known person's (the face
 /// cache), so without it every yes would be refused while still asked for.
@@ -3005,6 +3031,39 @@ mod tests {
         flags.pop();
         flags.push("onboarding.json".into());
         assert!(take(&flags).is_err());
+    }
+
+    /// The light's and the volume's functions, whose calls a later turn's
+    /// history keeps with their arguments (#5045(a)), are the executive's
+    /// own (`lamp_actions::is_short`), and the bare ones its catalog's
+    /// functions of them that take none.
+    #[test]
+    fn the_light_and_volume_functions_are_the_executives() {
+        let catalog = lamp_actions::catalog(true, true);
+        let names = catalog
+            .iter()
+            .map(|function| function.name)
+            .chain(APP_CALLS)
+            .chain(["remember", "set_reminder", "lights_out", "volumes", "light"]);
+        for name in names {
+            assert_eq!(
+                is_light_or_volume(name),
+                lamp_actions::is_short(name),
+                "{name}"
+            );
+        }
+        let bare: Vec<&str> = catalog
+            .iter()
+            .filter(|function| lamp_actions::is_short(function.name))
+            .filter(|function| function.parameters.is_none())
+            .map(|function| function.name)
+            .collect();
+        assert_eq!(bare, LIGHT_OR_VOLUME_BARE);
+        assert!(
+            catalog
+                .iter()
+                .any(|function| function.name == "light_colour" && function.parameters.is_some())
+        );
     }
 
     #[test]

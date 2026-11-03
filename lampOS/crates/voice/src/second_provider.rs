@@ -318,6 +318,32 @@ pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, u
     (dropped > 0).then_some((without, dropped))
 }
 
+/// The arguments a call of `name` made with `args` is kept with for a
+/// later turn's history (`LAMP_HISTORY_KEEPS_CALLS`), or `None`: not kept.
+/// A call made with none is kept bare, whatever its function. A light's or
+/// volume's call ([`crate::tools::is_light_or_volume`]) is kept with its
+/// own arguments, at most [`crate::thread::KEPT_ARGS_BYTES`] of compact
+/// JSON (#5045(a)); past that, bare if its function takes none
+/// ([`crate::tools::LIGHT_OR_VOLUME_BARE`]), else not kept. Any other
+/// call made with arguments (a keep's, a reminder's) is never kept: its
+/// arguments are the person's own words, and told bare it would teach
+/// calling it bare (Fourteen's P3 on #5018).
+pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_json::Value> {
+    let bare = || serde_json::Value::Object(serde_json::Map::new());
+    if args.as_object().is_none_or(serde_json::Map::is_empty) {
+        return Some(bare());
+    }
+    if !crate::tools::is_light_or_volume(name) {
+        return None;
+    }
+    if args.to_string().len() <= crate::thread::KEPT_ARGS_BYTES {
+        return Some(args.clone());
+    }
+    crate::tools::LIGHT_OR_VOLUME_BARE
+        .contains(&name)
+        .then(bare)
+}
+
 /// Told before a round asked again after a reply that was only a step's
 /// own word with no call ("Louder.", lamp-52e6, 3 Nov): not said, and
 /// nothing changed.
@@ -1630,8 +1656,9 @@ pub(crate) type AnotherVoice = Arc<dyn Fn() -> bool + Send + Sync>;
 pub(crate) type GoingOnWith = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 
 /// [`Shared::keeps_calls`]: request `request`'s turn ran function `name`
-/// ([`crate::thread::Thread::called`]).
-pub(crate) type CallsKept = Arc<dyn Fn(u64, &str) + Send + Sync>;
+/// with the arguments it is told with ([`kept_args`],
+/// [`crate::thread::Thread::called`]).
+pub(crate) type CallsKept = Arc<dyn Fn(u64, &str, &serde_json::Value) + Send + Sync>;
 
 /// A carry's sign that nobody else is in the talk, beside no face seen
 /// speaking the line (#4339): with [`Shared::past_silent`]
@@ -3651,9 +3678,9 @@ impl Engine {
     /// quoted line, which are never run.
     pub fn keeping_calls(self, on: bool) -> Self {
         self.keeping_calls_by(on.then(|| -> CallsKept {
-            Arc::new(|request: u64, name: &str| {
+            Arc::new(|request: u64, name: &str, args: &serde_json::Value| {
                 if let Ok(mut thread) = crate::thread::THREAD.lock() {
-                    thread.called(request, name);
+                    thread.called(request, name, args);
                 }
             })
         }))
@@ -11557,18 +11584,16 @@ async fn answer(
                 // What it did, for a later turn's history
                 // (`LAMP_HISTORY_KEEPS_CALLS`): never the call for the rest
                 // of the functions, which would give a later turn all of
-                // them (`worker::few_tools`), and only a call made with no
-                // arguments: a kept call is told with none, and one that
-                // took some ("light_colour", "set_reminder") would teach
-                // calling it bare (Fourteen's P3 on #5018). The light's and
-                // the volume's steps, the asks found answered in words, take
-                // none.
+                // them (`worker::few_tools`), and only as [`kept_args`]
+                // keeps it: bare, or a light's or volume's call with its
+                // own arguments (#5045(a): colour turns told as words alone
+                // were copied as "Done." with no call).
                 if did
                     && call.name != worker::MORE
-                    && call.args.as_object().is_none_or(serde_json::Map::is_empty)
                     && let Some(keep) = &shared.keeps_calls
+                    && let Some(args) = kept_args(&call.name, &call.args)
                 {
-                    keep(request, &call.name);
+                    keep(request, &call.name, &args);
                 }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {
