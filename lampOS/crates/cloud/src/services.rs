@@ -34,9 +34,11 @@ pub const ADMIN_SOCKET: &str = "/run/lampos-services/admin.sock";
 
 /// The services this lamp knows, by V1's codes. Figma is `figma-api` as
 /// the backend lists it for lamps, and `figma` as V1's helper named it.
-/// The last four are V1's MCP services.
-pub const CODES: [&str; 15] = [
+/// `gmail-app` is a Lamp 2's Google sign-in for Gmail, send only; `gmail`
+/// its app password. The last four are V1's MCP services.
+pub const CODES: [&str; 16] = [
     "gmail",
+    "gmail-app",
     "google_calendar",
     "google_drive",
     "notion",
@@ -620,9 +622,14 @@ pub mod tests {
             connector_kind("connector.remove.github"),
             Some((Asked::Remove, "github"))
         );
+        assert_eq!(
+            connector_kind("connector.set.gmail-app"),
+            Some((Asked::Set, "gmail-app"))
+        );
+        assert!(known("gmail-app"));
         assert_eq!(connector_kind("services.list"), None);
         assert!(CODES.iter().all(|code| known(code)));
-        for other in ["dropbox", "", "GMAIL", "gmail.x", "../gmail"] {
+        for other in ["dropbox", "", "GMAIL", "gmail.x", "../gmail", "gmail_app"] {
             assert!(!known(other), "{other}");
         }
     }

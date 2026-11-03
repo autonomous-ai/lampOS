@@ -375,6 +375,11 @@ impl<H: Http, M: Mail> Services<H, M> {
         let name = service.name;
         match reply.status {
             200..=299 => {}
+            // The send-only Google sign-in, checked at `set` by its fields
+            // alone, is first told refused here, in `set`'s words for one.
+            401 | 403 if service.code == "gmail-app" => {
+                return Err(Failure::SignInRefused.words().into());
+            }
             401 | 403 => {
                 return Err(format!(
                     "{name} refused the lamp's link: it may need linking again in the app"
@@ -402,8 +407,8 @@ impl<H: Http, M: Mail> Services<H, M> {
         write: bool,
     ) -> Result<net::Reply, String> {
         // Gmail's app password goes over IMAP and SMTP only, never to its
-        // REST API, which takes a Google sign-in.
-        if service.code == "gmail" && !entry.oauth() {
+        // REST API, which takes a Google sign-in (`gmail-app` is one only).
+        if service.code.starts_with("gmail") && !entry.oauth() {
             return Err("the lamp sends a Gmail app password only over IMAP and SMTP".into());
         }
         let mut call = Call {
@@ -554,6 +559,14 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     async fn read(&self, args: &Value) -> Result<Value, String> {
+        // A send-only link is answered so whether or not it is linked.
+        if let Some(why) = args
+            .get("service")
+            .and_then(Value::as_str)
+            .and_then(reads::never_read)
+        {
+            return Err(why.into());
+        }
         let (service, entry) = self.linked(args).await?;
         if service.mcp.is_some() {
             return self.mcp_read(service, &entry, args).await;
@@ -641,7 +654,8 @@ impl<H: Http, M: Mail> Services<H, M> {
         }
         let (service, entry) = self.linked(args).await?;
         match pending.action {
-            Action::Mail(out) if entry.oauth() => {
+            // `gmail-app` is a Google sign-in only: never over SMTP.
+            Action::Mail(out) if entry.oauth() || service.code == "gmail-app" => {
                 let body = mail::api_send_body(
                     &entry.account(),
                     &out,
@@ -1663,6 +1677,136 @@ mod tests {
             run(services.send_with_token(gmail, &entry, Method::Get, url, None, false)).is_err()
         );
         assert!(services.http.calls().is_empty());
+    }
+
+    /// A Lamp 2's `connector.set.gmail-app`, as Backend sends it: identity
+    /// and `gmail.send` only.
+    fn gmail_app(token: &str, data: Value) -> String {
+        let mut connector = json!({"connector":"gmail-app","auth_type":"oauth","access_token":token,
+               "refresh_token":"r-1","expires_in":3599,"client_id":"c-1","refresh":true,
+               "scopes":["openid","https://www.googleapis.com/auth/userinfo.email",
+                         "https://www.googleapis.com/auth/gmail.send"]});
+        for (key, value) in data.as_object().unwrap() {
+            connector[key] = value.clone();
+        }
+        set_line("gmail-app", connector)
+    }
+
+    #[test]
+    fn a_send_only_gmail_sign_in_is_kept_by_its_fields_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), false);
+        let (answer, said) = run(services.admin(&gmail_app("planted-app-4710", json!({}))));
+        assert_eq!(
+            answer,
+            json!({"ok":false,"error":"Gmail's Google sign-in needs the account's email"})
+        );
+        assert!(!said.contains("planted"));
+        assert!(services.store.load("gmail-app").is_none());
+        let (answer, _) = run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["connector"], "gmail-app");
+        // Nothing asked of Google: its profile needs a read scope.
+        assert!(services.http.calls().is_empty());
+        let connected =
+            run(services.tool(r#"{"op":"call","name":"services_connected","args":{}}"#));
+        assert_eq!(
+            connected["result"]["connected"][0],
+            json!({"service":"gmail-app","name":"Gmail with Google sign-in","account":"me@work.test","expired":false})
+        );
+    }
+
+    #[test]
+    fn a_send_only_gmail_sign_in_reads_nothing_and_sends_through_the_api() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        // Not linked, or linked: a read is told plainly it can't be.
+        for _ in 0..2 {
+            let answer =
+                run(services.tool(&read_line(json!({"service":"gmail-app","what":"recent"}))));
+            assert_eq!(answer["error"], reads::GMAIL_APP_NO_READS);
+            run(services.admin(&gmail_app(
+                "planted-app-4710",
+                json!({"user_email":"me@work.test"}),
+            )));
+        }
+        assert!(services.http.calls().is_empty());
+        let ask = r#"{"op":"call","name":"service_write","args":{"service":"gmail-app","action":"send_mail","to":["mom@home.test"],"subject":"Dinner","text":"Home by 7"}}"#;
+        let send = |id: &str| {
+            json!({"op":"call","name":"service_write","args":{"service":"gmail-app","send_id":id,"said":"send"}}).to_string()
+        };
+        let answer = run(services.tool(ask));
+        assert!(
+            answer["result"]["read_back"]
+                .as_str()
+                .unwrap()
+                .contains("from me@work.test to mom@home.test")
+        );
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let sent = run(services.tool(&send(&id)));
+        assert_eq!(
+            sent["result"],
+            json!({"sent":true,"service":"Gmail with Google sign-in"})
+        );
+        let calls = services.http.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0].url,
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+        );
+        assert!(
+            calls[0]
+                .headers
+                .contains(&("authorization".into(), "Bearer planted-app-4710".into()))
+        );
+        assert!(services.mail.sent.lock().unwrap().is_empty());
+        // A token Google refuses is said so at the send.
+        run(services.admin(&gmail_app(
+            "planted-refused",
+            json!({"user_email":"me@work.test"}),
+        )));
+        let id = run(services.tool(ask))["result"]["send_id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            run(services.tool(&send(&id)))["error"],
+            "not sent: Google refused the Gmail sign-in"
+        );
+        // Unlinked, it is not linked.
+        run(services.admin(r#"{"op":"remove","code":"gmail-app"}"#));
+        assert_eq!(
+            run(services.tool(ask))["error"],
+            format!("Gmail with Google sign-in {NOT_LINKED}")
+        );
+    }
+
+    #[test]
+    fn a_send_only_gmail_sign_in_is_renewed_under_its_own_code() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        let mut entry = services.store.load("gmail-app").unwrap();
+        entry.expires_at = crate::now_secs() + 60;
+        services.store.keep(&entry).unwrap();
+        let answer = run(services.tool(
+            r#"{"op":"call","name":"service_write","args":{"service":"gmail-app","action":"send_mail","to":["mom@home.test"],"subject":"Dinner","text":"Home by 7"}}"#,
+        ));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let calls = services.http.calls();
+        assert_eq!(calls[0].url, "https://backend.test/connector/refresh-token");
+        let body: Value = serde_json::from_slice(calls[0].body.as_ref().unwrap()).unwrap();
+        assert_eq!(body, json!({"connector":"gmail-app","refresh_token":"r-1"}));
+        assert_eq!(
+            services.store.load("gmail-app").unwrap().access_token,
+            "renewed-tok"
+        );
     }
 
     #[test]

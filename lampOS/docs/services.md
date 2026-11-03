@@ -1,7 +1,7 @@
 # Connectors: a person's services on the lamp (Queue #4710, built, off unless set)
 
-A person links their own accounts in the app, as in V1: Gmail, Google
-Calendar and Drive, Notion, Figma, GitHub, Linear, Asana, Ahrefs and a
+A person links their own accounts in the app, as in V1: Gmail (and on a
+Lamp 2 a send-only Google sign-in for it), Google Calendar and Drive, Notion, Figma, GitHub, Linear, Asana, Ahrefs and a
 Facebook Page, and V1's MCP services, Slack, monday.com, HubSpot and
 Amplitude. The lamp keeps each link's token and uses it only when the lamp's
 owner asks out loud: it reads, and with a second switch it writes, each write
@@ -202,6 +202,7 @@ refresh goes to the lamp's backend, never to Google).
 | Code | Name | Hosts | Reads (`what`) | Writes (`action`) |
 |---|---|---|---|---|
 | `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
+| `gmail-app` | Gmail with Google sign-in | `gmail.googleapis.com` | none: it only sends | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}`, `calendars` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | none |
 | `notion` | Notion | `api.notion.com` | `search {query, count}`, `page {id}` | `append_text {id, text}` |
@@ -230,7 +231,7 @@ named it; both are known. Facebook is asked at Graph API `v19.0`, Notion with
 `refresh: true`; a static key (`pat`, or an `api_key` with no access token)
 with no time given never expires. Gmail's app password needs the account's
 email (a Google sign-in's is read from Gmail at `set` when the link has
-none); a Facebook write needs `credentials.page_id` (reads fall back to
+none; a `gmail-app` link's must be in it); a Facebook write needs `credentials.page_id` (reads fall back to
 `me`).
 
 ## Gmail: an app password over IMAP and SMTP, or a Google sign-in over its API
@@ -305,6 +306,36 @@ heard line only, nothing kept.
   only `https://mail.google.com/`. A token without a scope a call needs gets
   403: "Gmail refused the lamp's link: it may need linking again in the app".
 - **Refresh:** through the backend, as every OAuth link ([Refresh](#refresh)).
+
+**A send-only Google sign-in (`gmail-app`):** a Lamp 2's Google sign-in
+for Gmail is its own code, `gmail-app` (Backend, Queue #4710, 3 Nov 21:29),
+beside `gmail`, which stays the app password's link. Its scopes are the
+account's identity and `gmail.send` only, no `gmail.readonly`.
+
+- **The link:** `connector.set.gmail-app`, its data fetched as any code's:
+  `{"auth_type": "oauth", "access_token", "refresh_token", "expires_in",
+  "scopes", "user_email", "client_id", "refresh": true}`. It must hold an
+  access token (`auth_type` not `pat`): "Gmail's Google sign-in needs its
+  access token"; and its account, `user_email` (else `credentials.email`):
+  "Gmail's Google sign-in needs the account's email". Without either nothing
+  is kept.
+- **At `set`:** nothing is asked of Google. `users.getProfile` needs a read
+  scope the link lacks, so the link is kept on its fields alone, and a token
+  Google refuses is first told at a send.
+- **Reads:** none. A `service_read` of `gmail-app`, linked or not, answers
+  "This Gmail link, made with Google sign-in, can only send mail. To read
+  mail, link Gmail with an app password in the app: Skills, then
+  Connectors." Its read list is empty, so no read route is ever called with
+  its token.
+- **Writes:** `send_mail`, read back and sent as `gmail`'s, on a spoken
+  "send": one `POST /gmail/v1/users/me/messages/send` from the account
+  itself, never SMTP. 401 or 403: "not sent: Google refused the Gmail
+  sign-in".
+- **With both linked**, a send may go through either; a read only through
+  `gmail`. The read function's description says `gmail-app: none, it only
+  sends: reads use gmail`.
+- **Refresh:** through the backend under its own code
+  (`connector: "gmail-app"`), as Google Calendar's.
 
 ## MCP services
 
@@ -619,7 +650,8 @@ them the journal says "no backend link: OAuth links are used until they
 expire, never renewed".
 
 Gmail's Google sign-in is renewed the same way, as Google Calendar's is
-(`connector: "gmail"`); its app password never is.
+(`connector: "gmail"`, or `"gmail-app"` for a Lamp 2's send-only one); its
+app password never is.
 
 It happens before a read or a write, when the link allows it (`refresh`
 true and a refresh token), expires, and has under 600 s left (V1's
@@ -729,7 +761,11 @@ refused Gmail login; a Gmail Google sign-in checked at `set` with its profile
 (the inbox list, each mail's metadata, one mail whole from its plain part,
 its token scrubbed, security mails left out, an id not Gmail's never sent),
 renewed through the backend, sent through the API only on a spoken "send",
-and an app password never sent to the API; security mails found and left out whole; answers quoted
+and an app password never sent to the API; a `gmail-app` link kept on its
+fields alone (no account: refused, no call to Google), every read of it
+answered as send-only (linked or not, no call made), its send through the
+API only, a refused token said as "Google refused the Gmail sign-in", and
+its renewal under its own code; security mails found and left out whole; answers quoted
 and under the voice's cap; a write refused when off, read back in full and
 sent once within two minutes; the MCP read/write rule, its pinned host, a
 link on another host never called, a write tool read back whole and called
