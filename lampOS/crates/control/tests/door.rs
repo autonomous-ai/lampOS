@@ -1569,3 +1569,85 @@ async fn skill_push_is_off_without_the_helper() {
         json!({"code": "refused", "why": session::PUSH_OFF})
     );
 }
+
+/// docs/control.md, "Turns and listening", end to end: `listen.set false`
+/// is answered on its own connection once the voice has taken the mute, and
+/// the say socket connection holding it closes when the computer's last
+/// connection does, and when it is revoked; `turn.end` with no turn of its
+/// own is refused without asking the voice.
+#[tokio::test]
+async fn a_computers_mute_is_held_while_it_is_here_and_let_go_when_it_goes() {
+    use tokio::io::AsyncReadExt as _;
+    let dir = std::env::temp_dir().join(format!("lamp-control-door-voice-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("say.sock");
+    let voice = tokio::net::UnixListener::bind(&path).unwrap();
+    let parts =
+        lamp_control::parts::Lamp::new(None, None, Some(path), "boot".into(), Arc::new(|_, _| {}));
+    let lamp = lamp_with("mute", Box::new(parts)).await;
+    // A line from the door, and the connection kept to answer on.
+    async fn asked(voice: &tokio::net::UnixListener) -> (tokio::net::UnixStream, Value) {
+        let (stream, _) = tokio::time::timeout(Duration::from_secs(5), voice.accept())
+            .await
+            .expect("the door asks the voice")
+            .unwrap();
+        let mut stream = tokio::io::BufReader::new(stream);
+        let mut line = String::new();
+        stream.read_line(&mut line).await.unwrap();
+        (stream.into_inner(), serde_json::from_str(&line).unwrap())
+    }
+    async fn closes(mut stream: tokio::net::UnixStream) {
+        let mut rest = Vec::new();
+        tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut rest))
+            .await
+            .expect("the door closes the mute's connection")
+            .unwrap();
+    }
+    let mut socket = paired(&lamp, json!(["speak", "hear"]), 21).await;
+    let refused = send(&mut socket, json!({"id": 3, "op": "turn.end"})).await;
+    assert_eq!(refused["error"]["code"], "busy", "{refused}");
+    assert_eq!(refused["error"]["why"], "not this computer's turn");
+    socket
+        .send(Message::text(
+            json!({"id": 4, "op": "listen.set", "on": false}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let (mut held, line) = asked(&voice).await;
+    assert_eq!(line, json!({"skill": "control", "listen": false}));
+    held.write_all(b"{\"outcome\":\"muted\"}\n").await.unwrap();
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"re": 4, "ok": true, "mute": "held"})
+    );
+    // Its last connection closes: so does the mute's.
+    socket.close(None).await.unwrap();
+    closes(held).await;
+
+    // Held again by another computer, then revoked.
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let mut socket = paired(&lamp, json!(["hear"]), 22).await;
+    socket
+        .send(Message::text(
+            json!({"id": 5, "op": "listen.set", "on": false}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let (mut held, _) = asked(&voice).await;
+    held.write_all(b"{\"outcome\":\"muted\"}\n").await.unwrap();
+    assert_eq!(next(&mut socket).await["mute"], "held");
+    let client = admin(&lamp, json!({"clients": true})).await["clients"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap().to_owned())
+        .next_back()
+        .unwrap();
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    closes(held).await;
+    let _ = std::fs::remove_dir_all(&dir);
+}

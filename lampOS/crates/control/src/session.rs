@@ -43,6 +43,68 @@ pub trait Parts {
     fn camera_streaming(&self, _client: &str) -> bool {
         false
     }
+    /// Does `op` for `client`, as [`Parts::act`], where the reply may wait
+    /// on the part: a `turn.end` or a `listen.set` the voice answers. What
+    /// to run for it off the door's lock comes back as [`Reply::Later`].
+    fn reply(&mut self, client: &str, re: u64, op: &Op, now_us: u64) -> Result<Reply, Error> {
+        self.act(client, re, op, now_us).map(Reply::Now)
+    }
+    /// `client` is gone, its last connection closed or its pairing revoked:
+    /// as its `stop`, and what it holds on the lamp (its mute) is let go,
+    /// so a computer gone never leaves the lamp deaf.
+    fn gone(&mut self, client: &str, now_us: u64) {
+        self.stop(client, now_us);
+    }
+}
+
+/// A part's answer: now, or what to run off the door's lock for it.
+pub enum Reply {
+    Now(Value),
+    Later(Pending),
+}
+
+impl std::fmt::Debug for Reply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Now(with) => write!(f, "Now({with})"),
+            Self::Later(_) => write!(f, "Later"),
+        }
+    }
+}
+
+/// The part's own wait for its answer (the voice's), run on a thread of its
+/// own: what the reply adds, or why the part refused.
+pub type Pending = Box<dyn FnOnce() -> Result<Value, Error> + Send>;
+
+/// A reply that comes later, to the asking connection only: the request,
+/// its computer and op (for the journal), and the part's wait.
+pub struct Later {
+    pub re: u64,
+    pub client: String,
+    pub op: &'static str,
+    pub run: Pending,
+}
+
+impl Later {
+    /// The reply: the part's answer as the protocol says it.
+    pub fn reply(self) -> Value {
+        match (self.run)() {
+            Ok(with) => protocol::ok(self.re, with),
+            Err(error) => protocol::refused(Some(self.re), &error),
+        }
+    }
+}
+
+impl std::fmt::Debug for Later {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Later({} {} {})", self.re, self.client, self.op)
+    }
+}
+
+impl PartialEq for Later {
+    fn eq(&self, other: &Self) -> bool {
+        (self.re, &self.client, self.op) == (other.re, &other.client, other.op)
+    }
 }
 
 /// The parts before actions are routed to them: every action is refused
@@ -131,6 +193,10 @@ pub struct Outcome {
     /// A request for the manage helper (a pushed skill installed, listed or
     /// removed), asked off the door's lock; its answer goes to the client.
     pub ask: Option<Ask>,
+    /// A reply the part gives later (the voice's answer to a `turn.end` or
+    /// a `listen.set`), waited for off the door's lock and sent to this
+    /// connection only.
+    pub later: Option<Later>,
 }
 
 /// The door: pairing, the paired clients, the leases and the rates, shared
@@ -318,6 +384,21 @@ impl Door {
     /// ([`Journal::tick`]).
     pub fn journal_tick(&mut self, now_us: u64) {
         self.journal.tick(now_us);
+    }
+
+    /// A reply that came later ([`Later`]): its op and how it ended, the
+    /// refusal's code, never its why.
+    pub fn journal_answer(&mut self, client: &str, op: &str, reply: &Value, now_us: u64) {
+        let how = if reply["ok"] == json!(true) {
+            "ok".to_owned()
+        } else {
+            format!(
+                "refused: {}",
+                reply["error"]["code"].as_str().unwrap_or("unknown")
+            )
+        };
+        let line = format!("{}: {op}: answered {how}", self.who(client));
+        self.journal.line(client, now_us, &line);
     }
 
     /// An event sent to `client`: its kind, never its fields.
@@ -863,8 +944,10 @@ impl Door {
                 "another computer holds the body".to_owned(),
             );
         }
-        // The quiet hours, before the rate, so a refusal isn't counted.
-        if matches!(op, Op::Say { .. } | Op::Sound { .. })
+        // The quiet hours, before the rate, so a refusal isn't counted. A
+        // turn meets them with or without a prompt: it opens the lamp to
+        // talk.
+        if matches!(op, Op::Say { .. } | Op::Sound { .. } | Op::TurnStart { .. })
             && let Some(why) = self
                 .quiet
                 .as_mut()
@@ -880,13 +963,24 @@ impl Door {
             error.retry_ms = Some(retry_ms);
             return reply_refused(Some(re), error);
         }
-        match parts.act(&client, re, &op, now_us) {
-            Ok(with) => {
+        match parts.reply(&client, re, &op, now_us) {
+            Ok(reply) => {
                 // Counted only once the part took it.
                 if let Some(class) = class {
                     self.rates.count(&client, class, now_us);
                 }
-                ok(re, with)
+                match reply {
+                    Reply::Now(with) => ok(re, with),
+                    Reply::Later(run) => Outcome {
+                        later: Some(Later {
+                            re,
+                            client,
+                            op: journal::op_name(&op),
+                            run,
+                        }),
+                        ..Outcome::default()
+                    },
+                }
             }
             Err(error) => {
                 let mut outcome = reply_refused(Some(re), error);
@@ -1150,6 +1244,9 @@ fn answered(outcome: &Outcome, went: &str) -> String {
     let closing = if outcome.close { ", closing" } else { "" };
     if outcome.ask.is_some() {
         return format!("handed to the skill helper{closing}");
+    }
+    if outcome.later.is_some() {
+        return format!("handed to {went}{closing}");
     }
     let Some(reply) = outcome.send.first() else {
         return format!("no answer{closing}");
@@ -1690,7 +1787,8 @@ mod tests {
     #[test]
     fn say_and_sound_are_refused_in_the_quiet_hours_and_while_the_time_is_unknown() {
         let computer = Computer::new(1);
-        let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak, Grant::Light]);
+        let (door, mut session, mut fake) =
+            paired(&computer, &[Grant::Speak, Grant::Light, Grant::Hear]);
         // UTC+7, as the lamps' own; 2026-10-28 at 00:00 UTC is 07:00 there.
         let utc7 = std::sync::Arc::new(lamp_local_time::LocalTime::Offset(7 * 60));
         let mut door = door.with_quiet_hours(Quiet::new(Some(utc7)));
@@ -1703,8 +1801,11 @@ mod tests {
         }
         let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
         let sound = r#"{"id":4,"op":"sound","name":"hum"}"#;
+        // A turn, with a prompt or without, opens the lamp to talk.
+        let turn = r#"{"id":6,"op":"turn.start"}"#;
+        let prompted = r#"{"id":7,"op":"turn.start","prompt":"Shall we go over the list?"}"#;
         for hour in [22, 23, 0, 3, 6] {
-            for frame in [say, sound] {
+            for frame in [say, sound, turn, prompted] {
                 let refused = send!(door, frame, at(hour));
                 assert_eq!(
                     code_of(&refused),
@@ -1740,6 +1841,83 @@ mod tests {
         let unknown = door.handle(&mut session, say, &mut fake, 2 * S, at(12));
         assert_eq!(code_of(&unknown), Some("quiet_hours"));
         assert!(fake.did.is_empty());
+    }
+
+    /// docs/control.md, "Turns and listening": `turn.start` needs `speak`
+    /// and `hear`, `turn.end` `speak` and `listen.set` `hear`; a turn counts
+    /// in say's rate; none needs a lease, and another computer's `voice`
+    /// lease doesn't stop a turn, as it doesn't stop a say. The journal
+    /// names a turn's prompt by its length and tag, never its words.
+    #[test]
+    fn turns_and_listening_need_their_grants_and_a_turn_counts_as_a_say() {
+        let send = |door: &mut Door, session: &mut Session, fake: &mut Fake, frame: &str| {
+            door.handle(session, frame, fake, 2 * S, 1)
+        };
+        let start = r#"{"id":3,"op":"turn.start"}"#;
+        let end = r#"{"id":4,"op":"turn.end"}"#;
+        let mute = r#"{"id":5,"op":"listen.set","on":false}"#;
+        let (mut door, mut session, mut fake) = paired(&Computer::new(1), &[Grant::Speak]);
+        let refused = send(&mut door, &mut session, &mut fake, start);
+        assert_eq!(code_of(&refused), Some("no_grant"));
+        assert_eq!(reply(&refused)["error"]["why"], "not granted: hear");
+        assert_eq!(
+            code_of(&send(&mut door, &mut session, &mut fake, mute)),
+            Some("no_grant")
+        );
+        assert_eq!(
+            reply(&send(&mut door, &mut session, &mut fake, end))["ok"],
+            true
+        );
+        let (mut door, mut session, mut fake) = paired(&Computer::new(2), &[Grant::Hear]);
+        let refused = send(&mut door, &mut session, &mut fake, start);
+        assert_eq!(reply(&refused)["error"]["why"], "not granted: speak");
+        assert_eq!(
+            code_of(&send(&mut door, &mut session, &mut fake, end)),
+            Some("no_grant")
+        );
+        assert_eq!(
+            reply(&send(&mut door, &mut session, &mut fake, mute))["ok"],
+            true
+        );
+        assert_eq!(fake.did.len(), 1, "{:?}", fake.did);
+
+        let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let into = lines.clone();
+        let (door, mut session, mut fake) = paired(&Computer::new(3), &[Grant::Speak, Grant::Hear]);
+        let mut door = door.with_journal(Journal::to(move |line| {
+            into.lock().unwrap().push(line.to_owned())
+        }));
+        // Another computer holds the voice: a turn goes on, as a say would.
+        door.leases()
+            .take("c_other", &[Part::Voice], 30_000, 2 * S)
+            .unwrap();
+        let prompt = "Shall we go over today's list?";
+        for id in 0..3 {
+            let frame = json!({"id": 10 + id, "op": "turn.start", "prompt": prompt}).to_string();
+            assert_eq!(
+                reply(&send(&mut door, &mut session, &mut fake, &frame))["ok"],
+                true
+            );
+            let frame = format!(r#"{{"id":{},"op":"say","text":"Hi."}}"#, 20 + id);
+            assert_eq!(
+                reply(&send(&mut door, &mut session, &mut fake, &frame))["ok"],
+                true
+            );
+        }
+        // Six in the minute: say's rate.
+        let refused = send(&mut door, &mut session, &mut fake, start);
+        assert_eq!(code_of(&refused), Some("rate"), "{refused:?}");
+        let lines = lines.lock().unwrap();
+        let turn = lines
+            .iter()
+            .find(|line| line.contains("turn.start ("))
+            .expect("a turn's line");
+        assert!(turn.contains("30 characters, tag "), "{turn}");
+        assert!(turn.contains("ok, to the voice, by say.sock"), "{turn}");
+        assert!(
+            !lines.iter().any(|line| line.contains("today")),
+            "{lines:?}"
+        );
     }
 
     /// A lamp's own quiet hours (`--quiet-hours`): `off` refuses nothing,

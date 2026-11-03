@@ -61,9 +61,9 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 |---|---|
 | `body` | `gesture`, `move`, `play`, `look`, `joints`; with `light`, `express` |
 | `light` | `light`; with `body`, `express` |
-| `speak` | `say`, `sound` |
+| `speak` | `say`, `sound`, `turn.end`; with `hear`, `turn.start` |
 | `look` | presence events and state: arrivals, leavings, facing, standing up, a hand in view. Positions, never who |
-| `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard` |
+| `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard`, `listen.set` (its own mute); with `speak`, `turn.start` |
 | `sound` | `sound.heard`, by class |
 | `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer") |
 | `air` | `air.changed` and `get` `air`: the air sensor's readings (particles, carbon dioxide, humidity, temperature at the sensor). Carbon dioxide and humidity rise when someone comes in and stays, so they can show when someone is in the room, even to a computer without `look`: the pairing screen says so |
@@ -104,7 +104,10 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `say` | `text`, at most 300 characters; optional `rephrase` | `say.sock` with `exact: true`: the words as sent, rendered straight through the voice's speech service (no model, no tools) and played as the lamp's own line once nobody is talking with the lamp (`say::may_play_exact`: it waits while a conversation with the lamp is going on, its speaker is busy, or an answer or reminder is owed, never for speech in the room that nobody addresses to the lamp; the keeper's pause and the privacy switch refuse it; no quiet gap or rarity). With `rephrase: true`, a written turn for the voice's model, through its quiet after a turn, privacy and busy gates, as before | `speak` | no |
 | `sound` | `name`: `hum`, the voice's built-in short hum (no file, no model), or one of the computer's own clips by name ("Sounds" below); the recorded notices are never a computer's, and no path is ever asked | `hum`: `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates. A clip: `say.sock` `{clip: PATH}`, its path in the clips folder, read by the voice with a skill sound's format and loudness checks and up to 30 s (`say::read_clip`) and played as an exact `say` is (`say::may_play_exact`). Its `done` follows | `speak` | no |
 | `sound.upload`, `sound.list`, `sound.remove` | a clip of the computer's own, kept, listed or deleted ("Sounds" below) | the state folder's `sounds/` | `speak` | no |
-| `stop` | | ends the client's own actions now | none | no |
+| `turn.start` | `prompt` (optional) | `say.sock` `{turn: "start"}`, with its prompt as `text` ("Turns and listening") | `speak`, `hear` | no |
+| `turn.end` | | `say.sock` `{turn: "end", id}`, the id of this computer's own turn | `speak` | no |
+| `listen.set` | `on` | `say.sock` `{listen}` on one connection the door holds for the computer | `hear` | no |
+| `stop` | | ends the client's own actions now (not its mute) | none | no |
 
 **Gestures** a client may name: `nod`, `headshake`, `greeting`, `laugh`,
 `shy`, `stretching`, `acknowledge`, `curious`, `happy`, `caring`,
@@ -406,12 +409,17 @@ connection closed), `slumped` (the body gave way under load and let go). Ids are
 {"id":14,"op":"say","text":"Build passed."}
 {"id":16,"op":"play","name":"wave"}
 {"id":17,"op":"sound","name":"hum"}
+{"id":18,"op":"turn.start","prompt":"Shall we go over today's list?"}
+{"id":19,"op":"turn.end"}
+{"id":20,"op":"listen.set","on":false}
 {"id":15,"op":"stop"}
 ```
 
 A reply comes when the action is taken. A long one also ends with
 `{"ev":"done","re":11,"how":"finished","why":"…"}`, `how` one of
-`finished`, `cut_short`, `dropped`. Today `say` and `look` end with `done`.
+`finished`, `cut_short`, `dropped`. Today `say`, `sound`, `turn.start` and
+`look` end with `done`, and a mute `listen.set` held ends with one when the
+lamp lifts it ("Turns and listening").
 `say`'s is `finished` once it's spoken, or `dropped` with the voice's own word
 and why (`expired`, `refused: …`, `dropped: …`, or the voice not reached).
 `look`'s is `finished` once the head is there, with `yaw` and `pitch` as the
@@ -437,9 +445,9 @@ which back. An SDK's wait for them returns at the answer.
 | `no_hello` | an op before `hello` on this connection |
 | `no_grant` | the client lacks the grant; `why` names it |
 | `no_lease`, `lease_lost` | the action needs a lease the client doesn't hold |
-| `busy` | another client holds the part, or this one by another lease |
-| `refused` | the body's own check, with its why: "centre of gravity 27 mm > 22 mm", "pitch past its window" |
-| `quiet_hours` (`say` and `sound`, see "Limits, rates and quiet hours"), `private`, `paused`, `asleep` | the lamp's state refuses it |
+| `busy` | another client holds the part, or this one by another lease; a `turn.end` with no turn of this computer's, "not this computer's turn" |
+| `refused` | the body's own check, with its why: "centre of gravity 27 mm > 22 mm", "pitch past its window"; the voice's, for `turn.end` and `listen.set`, and "the voice here doesn't take turns from a computer" or "…doesn't take a computer's mute" from a voice older than them |
+| `quiet_hours` (`say`, `sound` and `turn.start`, see "Limits, rates and quiet hours"), `private`, `paused`, `asleep` | the lamp's state refuses it |
 | `rate` | over a rate below; `retry_ms` says when |
 | `bad_request` | not this schema, or an op it doesn't know |
 | `off` | developer access is off in the app |
@@ -469,9 +477,9 @@ which back. An SDK's wait for them returns at the answer.
 | `sound.list` | — | `speak` | — |
 | `sound.remove` | `name` | `speak` | — |
 | `stop` | — | — | — |
-| `turn.start` | optional `prompt`: words said first, ≤ 300 chars. **Not built yet** ("Turns and listening") | `speak` + `hear` | — |
-| `turn.end` | —; only a turn this computer started. **Not built yet** | `speak` | — |
-| `listen.set` | `on`: `true` or `false`. **Not built yet** | `hear` | — |
+| `turn.start` | optional `prompt`: words said first, as `say`'s `text` (≤ 300 chars) | `speak` + `hear` | — |
+| `turn.end` | —; only a turn this computer started | `speak` | — |
+| `listen.set` | `on`: `true` or `false` | `hear` | — |
 | `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |
 | `skill.list` | — | `skills` | — |
 | `camera.snapshot` | — | `camera` | — |
@@ -500,13 +508,13 @@ light comes back when it ends. While anyone holds a lease, the ring shows a
 small steady "held" mark. A client's `say` is always in the lamp's own voice,
 through its own gates.
 
-## Turns and listening (not built yet)
+## Turns and listening
 
-**Not built yet:** this is the design of three ops for the draft that
-builds them (the turn and listening op, claimed on #4710 on 2 Nov). Until
-the door serves them, each is a `bad_request`, an op it doesn't know.
-`control.schema.json` gains them with the SDKs' calls and lamp-mcp's tools,
-as its tests want every op it names to have both.
+The door serves these three ops (`crates/control/src/parts.rs`), and the
+voice takes them on its say socket ([speaking-first.md](speaking-first.md),
+"A turn for lamp-control" and "A computer's mute for lamp-control").
+`control.schema.json`, the SDKs' calls and lamp-mcp's tools don't name them
+yet; they follow in their own piece.
 
 A computer can start a conversation turn, end one, and set the lamp's
 listening. The person wins over each, as "Who wins" says.
@@ -534,7 +542,61 @@ listening. The person wins over each, as "Who wins" says.
 - **No touch is faked.** The ops go to the voice over its say socket, as
   new request kinds beside `say`, under the same gates. A voice that
   doesn't know them refuses them, and the door answers `refused`, "the
-  voice here doesn't take turns from a computer".
+  voice here doesn't take turns from a computer" (for `listen.set`, "the
+  voice here doesn't take a computer's mute"). A `turn.start` has been
+  answered by then, so its `done` says it: `dropped`, "refused: the voice
+  here doesn't take turns from a computer".
+
+**On the wire, as built:**
+
+```json
+{"id":18,"op":"turn.start","prompt":"Shall we go over today's list?"}
+{"id":19,"op":"turn.end"}
+{"id":20,"op":"listen.set","on":false}
+{"id":21,"op":"listen.set","on":true}
+```
+
+- **`turn.start`** is held to `say`'s quiet hours, with or without a
+  `prompt`, before the rate, and counts in `say`'s rate class when the rates
+  are on. It needs no lease, and another computer's `voice` lease doesn't
+  stop it, as it doesn't stop a `say`. It goes to the voice as
+  `{"skill":"control","turn":"start","expires_in_ms":30000}`, the prompt as
+  `text`. The reply is `{"to":"voice"}` once it is handed on; then `done`:
+  `finished` on the voice's `spoken`, else `dropped` with the voice's word
+  and why (`dropped: nobody spoke`, `refused: the lamp is muted`,
+  `expired`, or the voice not reached). The turn's id from the voice's
+  `begun` is kept for that computer, with the request that started it,
+  until its outcome comes.
+- **`turn.end`** sends `{"skill":"control","turn":"end","id":N}` with the id
+  of this computer's own turn. With no turn of its own it is refused `busy`,
+  "not this computer's turn", and the voice isn't asked; asked before the
+  voice began it, `busy`, "this computer's turn has not begun yet". The
+  reply waits for the voice: `{"turn":"ended","started":18}` (the
+  `turn.start` it ended) on `ended`; the voice's "not this computer's turn"
+  is the same `busy`; anything else is `refused` with the voice's why. The
+  start's `done` follows (`dropped: ended by the computer`, or `finished`
+  if its answer had sounded).
+- **`listen.set false`** opens one say socket connection for the computer
+  and sends `{"skill":"control","listen":false}` on it; the reply waits for
+  the voice's `muted`: `{"mute":"held"}`. The door keeps that connection,
+  and the voice holds the mute while it is open. Asked again while held:
+  `{"mute":"held"}`, nothing new; asked while the voice is still taking the
+  first, `busy`. **`listen.set true`** sends `{"skill":"control",
+  "listen":true}` on that connection and closes it: `{"mute":"lifted"}`; with
+  nothing held, `{"mute":"nothing_held"}` and the voice isn't asked.
+- **A computer gone lifts it.** The door closes the held connection when the
+  computer's last connection to the door closes and when it is revoked,
+  and the voice lifts the mute as its connection closes. A `stop` doesn't
+  lift it.
+- **A hand on the head lifts it** in the voice, which says `lifted`, "a hand
+  on the head", and closes the connection. The door forgets it and tells the
+  computer with a `done` naming the `listen.set` that held it:
+  `{"ev":"done","re":20,"how":"cut_short","why":"a hand on the head"}` (or
+  "the voice let it go", if the voice closed it without a word).
+- **Replies that wait on the voice** (`turn.end`, `listen.set false`) are
+  waited for off the door's lock and sent on the asking connection only,
+  and the journal gives each a second line, "answered ok" or the refusal's
+  code. A command's own line says "handed to the voice, by say.sock".
 
 ## Limits, rates and quiet hours
 
@@ -554,7 +616,7 @@ Rates a client is held to with `--rates default`. By default the rates are off, 
 | `joints` | 40 a second |
 | `gesture`, `move`, `play`, `look` | 1 a second |
 | `light` | 5 a second |
-| `say`, `sound` | 6 a minute and 60 an hour |
+| `say`, `sound`, `turn.start` | 6 a minute and 60 an hour |
 | `express` | 20 a minute |
 | `skill.push` | 1 every 10 s and 20 an hour, counted once at part 0 |
 | `skill.list`, `skill.remove` | 6 a minute; one at a time for a computer, and 4 with the helper at once on the lamp (`busy` past either) |
@@ -584,7 +646,7 @@ At night the ring's night caps still clamp every light, and nothing moves
 while the lamp sleeps. **Quiet hours:** from 22:00 to 07:00 local unless
 this lamp sets its own (`--quiet-hours`, one definition in
 `lamp_local_time::QuietWindow`; lamp-skills keeps its own), a computer's
-`say` and `sound` are refused with `quiet_hours`, the window in its why
+`say`, `sound` and `turn.start` are refused with `quiet_hours`, the window in its why
 ("quiet hours: 22:00 to 07:00 local, this lamp's setting"), and so are they
 while the lamp's local time isn't known (its clock not yet
 set, or its zone unreadable: "quiet hours: the lamp's local time isn't
@@ -620,6 +682,9 @@ sends (`crates/control/src/journal.rs`).
   - `get`: the states;
   - `subscribe` and `unsubscribe`: the events;
   - `lease.take`: the parts and `for_ms`, and `lease.renew` its `for_ms`;
+  - `turn.start`: its prompt as a `say`'s words are written (how many
+    characters and a tag), or "no prompt";
+  - `listen.set`: `on true` or `on false`;
   - a name a computer chose is written only as a plain word (letters,
     digits, `_` and `-`, 32 at most), otherwise as "a name the door doesn't
     write";
@@ -640,7 +705,10 @@ lamp-control: c_3f9a (lab-mac): event phrase.heard sent
 - `light` goes to the ring, by `light/request`.
 - `gesture` and `move` go to the body, by `mood.sock`.
 - `express` goes to both.
-- `say` goes to the voice, by `say.sock`.
+- `say`, `turn.start`, `turn.end` and `listen.set` go to the voice, by
+  `say.sock`. A `turn.end` or `listen.set` whose reply waits on the voice is
+  "handed to the voice, by say.sock", and a second line, "answered ok" or
+  "answered refused: busy", says how it ended.
 - `look` goes to the body, by `lease.sock`, once it is routed; until then
   it's refused, and a refusal names no place.
 - `skill.push`, `skill.list` and `skill.remove` go to the skill helper.

@@ -76,12 +76,13 @@ pub enum Grant {
     Body,
     /// The light, and feelings.
     Light,
-    /// `say` and `sound`.
+    /// `say` and `sound`; with `hear`, `turn.start`; `turn.end`.
     Speak,
     /// Presence: arrivals, leavings, facing, standing up (positions, never
     /// who).
     Look,
-    /// Its own phrases heard, never the words around them, and the name.
+    /// Its own phrases heard, never the words around them, and the name;
+    /// with `speak`, `turn.start`; `listen.set`, its own mute.
     Hear,
     /// Sound classes heard.
     Sound,
@@ -391,6 +392,22 @@ pub enum Op {
     /// One of the computer's own clips, deleted.
     #[serde(rename = "sound.remove")]
     SoundRemove { name: String },
+    /// Opens a conversation turn as a tap on the head does: the person's
+    /// next line is answered as spoken to the lamp. With `prompt`, the lamp
+    /// says it first (docs/control.md, "Turns and listening").
+    #[serde(rename = "turn.start")]
+    TurnStart {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prompt: Option<String>,
+    },
+    /// Ends the turn this computer started, and the conversation grown from
+    /// it; never another's.
+    #[serde(rename = "turn.end")]
+    TurnEnd {},
+    /// `false`: this computer's mute, held until it says `true`, its last
+    /// connection closes, it is revoked or a hand on the head lifts it.
+    #[serde(rename = "listen.set")]
+    ListenSet { on: bool },
     /// Ends the client's own actions now. Needs no lease.
     #[serde(rename = "stop")]
     Stop {},
@@ -464,6 +481,10 @@ impl Op {
             | Self::SoundUpload { .. }
             | Self::SoundList {}
             | Self::SoundRemove { .. } => vec![Grant::Speak],
+            Self::TurnEnd {} => vec![Grant::Speak],
+            // A turn speaks and hears what is said to the lamp.
+            Self::TurnStart { .. } => vec![Grant::Speak, Grant::Hear],
+            Self::ListenSet { .. } => vec![Grant::Hear],
             Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
                 vec![Grant::Skills]
             }
@@ -746,19 +767,36 @@ impl Op {
                 }
                 held_for(*for_ms)?;
             }
-            Self::Say { text, .. } => {
-                let chars = text.chars().count();
-                if !text.chars().any(char::is_alphanumeric)
-                    || chars > SAY_MAX_CHARS
-                    || text.chars().any(|c| c.is_control() && c != '\n')
-                {
-                    return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
-                }
-            }
-            Self::Stop {} | Self::SkillList {} | Self::CameraSnapshot {} | Self::SoundList {} => {}
+            Self::Say { text, .. } => words("text", text)?,
+            // A turn's prompt is a say's words.
+            Self::TurnStart {
+                prompt: Some(prompt),
+            } => words("prompt", prompt)?,
+            Self::TurnStart { prompt: None }
+            | Self::TurnEnd {}
+            | Self::ListenSet { .. }
+            | Self::Stop {}
+            | Self::SkillList {}
+            | Self::SoundList {}
+            | Self::CameraSnapshot {} => {}
         }
         Ok(())
     }
+}
+
+/// Words the lamp says, a `say`'s `text` or a turn's `prompt`: some letter
+/// or digit, at most [`SAY_MAX_CHARS`], no control character but a newline.
+fn words(field: &str, text: &str) -> Result<(), String> {
+    let chars = text.chars().count();
+    if !text.chars().any(char::is_alphanumeric)
+        || chars > SAY_MAX_CHARS
+        || text.chars().any(|c| c.is_control() && c != '\n')
+    {
+        return Err(format!(
+            "{field}: words, at most {SAY_MAX_CHARS} characters"
+        ));
+    }
+    Ok(())
 }
 
 /// A request: its id, as its reply names it, and its operation.

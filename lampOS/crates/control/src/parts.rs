@@ -16,6 +16,18 @@
 //! - `say` → the voice's say socket as written words (`text`), through its
 //!   quiet, privacy, pause and busy gates. Its outcome comes later as a
 //!   `done` event: spoken, dropped, expired or refused, with why.
+//! - `turn.start` → the voice's say socket as a turn (`turn: "start"`,
+//!   with its prompt as `text`), opened as a tap on the head opens one. Its
+//!   outcome comes later as a `done`; the turn's id, from the voice's
+//!   `begun`, is kept for the computer, so its `turn.end` names its own
+//!   turn and no other. `turn.end` → `turn: "end"` with that id, answered
+//!   once the voice says.
+//! - `listen.set` → the voice's say socket as `listen`: `false` holds one
+//!   connection for the computer, which holds the voice's mute while it is
+//!   open; `true` lifts it on that connection and closes it. The door
+//!   closes it too when the computer is gone (its last connection, a
+//!   revoke), so a computer gone never leaves the lamp deaf. A hand on the
+//!   head lifts it in the voice, told to the computer as a `done`.
 //! - `express` → the `feelings` skill's own move for it, sent whole on the
 //!   mood socket as `move` is, and its light as `light` is
 //!   (`crate::feelings`). With no light to show (off, not known, or at its
@@ -37,10 +49,11 @@
 //! bus come in their own piece.
 
 use std::collections::HashMap;
-use std::io::{BufReader, Write as _};
+use std::io::{BufRead as _, BufReader, Write as _};
+use std::net::Shutdown;
 use std::os::unix::net::{UnixDatagram, UnixStream};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority};
@@ -48,12 +61,28 @@ use serde_json::{Value, json};
 
 use crate::feelings;
 use crate::protocol::{Angles, Error, ErrorCode, LookAt, LookTarget, Op, Pattern, StateKind};
-use crate::session::Parts;
+use crate::session::{Parts, Reply};
 
 /// How long a `say` may wait to begin before the voice lets it go.
 pub const SAY_EXPIRES_MS: u64 = 30_000;
 /// How long the say socket's answer may take, its turn included.
 pub const SAY_ANSWER_WITHIN: Duration = Duration::from_secs(90);
+
+/// How long the voice's first answer to a `turn.end` or a `listen` may
+/// take: it waits at most 10 s on an end (`say::TURN_END_EXPIRY_MS`) and
+/// 5 s to take a mute (`control_mute::TAKE_WITHIN`).
+pub const VOICE_ANSWER_WITHIN: Duration = Duration::from_secs(15);
+/// What a voice says of a line it doesn't know: a field it doesn't take,
+/// so a voice from before turns and a computer's mute.
+pub const NOT_ITS_PROTOCOL: &str = "not a say request";
+/// A `turn.start` or `turn.end` an older voice refused.
+pub const NO_TURNS: &str = "the voice here doesn't take turns from a computer";
+/// A `listen.set` an older voice refused.
+pub const NO_MUTE: &str = "the voice here doesn't take a computer's mute";
+/// A `turn.end` with no turn of this computer's to end, the voice's words.
+pub const NOT_THIS_TURN: &str = "not this computer's turn";
+/// A `listen.set` asked while this computer's last is still with the voice.
+pub const MUTE_BEING_TAKEN: &str = "this computer's mute is still being taken by the voice";
 
 /// Where the events of actions that end later go: the client, and the
 /// event (`done`).
@@ -114,6 +143,50 @@ pub struct Lamp {
     /// Where the computers' own clips are kept (`crate::sounds`), which the
     /// voice plays from; none, and `sound` is the hum only.
     clips: Option<PathBuf>,
+    /// Each computer's turns and mute on the voice, shared with the threads
+    /// that wait on the say socket.
+    voice: Arc<Mutex<Voice>>,
+}
+
+/// What each computer has going on the voice.
+#[derive(Default)]
+struct Voice {
+    turns: HashMap<String, Vec<Turn>>,
+    mutes: HashMap<String, Mute>,
+    /// Numbers each turn and mute, so a thread that ends one never ends a
+    /// newer one in its place.
+    last: u64,
+}
+
+impl Voice {
+    fn next(&mut self) -> u64 {
+        self.last += 1;
+        self.last
+    }
+
+    /// Forgets `client`'s mute numbered `seq`: whether it was still held.
+    fn forget_mute(&mut self, client: &str, seq: u64) -> bool {
+        let ours = self.mutes.get(client).is_some_and(|mute| mute.seq == seq);
+        if ours {
+            self.mutes.remove(client);
+        }
+        ours
+    }
+}
+
+/// A computer's turn: the request that started it, and the voice's id for
+/// it once begun.
+struct Turn {
+    seq: u64,
+    re: u64,
+    id: Option<u64>,
+}
+
+/// A computer's mute: the say socket's connection holding it, once the
+/// voice has taken it.
+struct Mute {
+    seq: u64,
+    held: Option<UnixStream>,
 }
 
 impl Lamp {
@@ -143,6 +216,7 @@ impl Lamp {
             motion: None,
             camera: None,
             clips: None,
+            voice: Arc::default(),
         }
     }
 
@@ -445,6 +519,193 @@ impl Lamp {
         )
     }
 
+    /// `turn.start`: a turn asked of the voice, as a say is, its outcome a
+    /// `done`. The turn's id from the voice's `begun` is kept for this
+    /// computer until the outcome, for its `turn.end`.
+    fn turn_start(&self, client: &str, re: u64, prompt: Option<&str>) -> Result<Value, Error> {
+        let Some(path) = self.say.clone() else {
+            return Err(not_here("the voice"));
+        };
+        let mut line =
+            json!({"skill": "control", "turn": "start", "expires_in_ms": SAY_EXPIRES_MS});
+        if let Some(prompt) = prompt {
+            line["text"] = json!(prompt);
+        }
+        let seq = {
+            let mut voice = self.voice.lock().expect("voice");
+            let seq = voice.next();
+            voice
+                .turns
+                .entry(client.to_owned())
+                .or_default()
+                .push(Turn { seq, re, id: None });
+            seq
+        };
+        let (voice, events, client) = (self.voice.clone(), self.events.clone(), client.to_owned());
+        // Off the door's lock, as a say.
+        std::thread::spawn(move || {
+            let begun = |said: &Value| {
+                if let Some(id) = said["id"].as_u64() {
+                    let mut voice = voice.lock().expect("voice");
+                    if let Some(turn) = voice
+                        .turns
+                        .get_mut(&client)
+                        .and_then(|turns| turns.iter_mut().find(|turn| turn.seq == seq))
+                    {
+                        turn.id = Some(id);
+                    }
+                }
+            };
+            let (how, why) = match UnixStream::connect(&path)
+                .and_then(|mut stream| writeln!(stream, "{line}").map(|()| stream))
+            {
+                Ok(stream) => {
+                    let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
+                    outcome_with(BufReader::new(stream), begun)
+                }
+                Err(error) => (
+                    "dropped",
+                    Some(format!("the voice did not take it: {error}")),
+                ),
+            };
+            // A voice from before turns refuses the field it doesn't know.
+            let why = why.map(|why| {
+                if why == format!("refused: {NOT_ITS_PROTOCOL}") {
+                    format!("refused: {NO_TURNS}")
+                } else {
+                    why
+                }
+            });
+            {
+                let mut voice = voice.lock().expect("voice");
+                if let Some(turns) = voice.turns.get_mut(&client) {
+                    turns.retain(|turn| turn.seq != seq);
+                    if turns.is_empty() {
+                        voice.turns.remove(&client);
+                    }
+                }
+            }
+            let mut done = json!({"ev": "done", "re": re, "how": how});
+            if let Some(why) = why {
+                done["why"] = json!(why);
+            }
+            events(&client, done);
+        });
+        Ok(json!({"to": "voice"}))
+    }
+
+    /// `turn.end`: the end of this computer's own turn, by the id the voice
+    /// gave it, answered once the voice says. Without a turn of its own the
+    /// voice isn't asked.
+    fn turn_end(&self, client: &str) -> Result<Reply, Error> {
+        let Some(path) = self.say.clone() else {
+            return Err(not_here("the voice"));
+        };
+        let (id, started) = {
+            let voice = self.voice.lock().expect("voice");
+            let turns = voice.turns.get(client).map_or(&[][..], Vec::as_slice);
+            match turns
+                .iter()
+                .rev()
+                .find_map(|turn| turn.id.map(|id| (id, turn.re)))
+            {
+                Some(found) => found,
+                // Asked and not begun: the voice has no id for it yet.
+                None if !turns.is_empty() => {
+                    return Err(Error::new(
+                        ErrorCode::Busy,
+                        "this computer's turn has not begun yet",
+                    ));
+                }
+                None => return Err(Error::new(ErrorCode::Busy, NOT_THIS_TURN)),
+            }
+        };
+        Ok(Reply::Later(Box::new(move || {
+            let (_, said) =
+                ask_voice(&path, &json!({"skill": "control", "turn": "end", "id": id}))?;
+            if said["outcome"] == "ended" {
+                Ok(json!({"turn": "ended", "started": started}))
+            } else {
+                Err(refusal_of(&said, NO_TURNS))
+            }
+        })))
+    }
+
+    /// `listen.set`: `false` holds this computer's mute on one say socket
+    /// connection, answered once the voice took it; again while held, the
+    /// same. `true` lifts it on that connection and closes it; with none
+    /// held, nothing is asked.
+    fn listen(&self, client: &str, re: u64, on: bool) -> Result<Reply, Error> {
+        let mut voice = self.voice.lock().expect("voice");
+        match voice.mutes.get(client) {
+            Some(Mute { held: None, .. }) => {
+                return Err(Error::new(ErrorCode::Busy, MUTE_BEING_TAKEN));
+            }
+            Some(Mute { held: Some(_), .. }) if !on => {
+                return Ok(Reply::Now(json!({"mute": "held"})));
+            }
+            Some(Mute { held: Some(_), .. }) => {
+                if let Some(Mute {
+                    held: Some(held), ..
+                }) = voice.mutes.remove(client)
+                {
+                    lift(&held);
+                }
+                return Ok(Reply::Now(json!({"mute": "lifted"})));
+            }
+            None if on => return Ok(Reply::Now(json!({"mute": "nothing_held"}))),
+            None => {}
+        }
+        let Some(path) = self.say.clone() else {
+            return Err(not_here("the voice"));
+        };
+        let seq = voice.next();
+        voice
+            .mutes
+            .insert(client.to_owned(), Mute { seq, held: None });
+        drop(voice);
+        let (voice, events, client) = (self.voice.clone(), self.events.clone(), client.to_owned());
+        Ok(Reply::Later(Box::new(move || {
+            let asked = ask_voice(&path, &json!({"skill": "control", "listen": false}));
+            let reader = match asked {
+                Ok((reader, said)) if said["outcome"] == "muted" => reader,
+                Ok((_, said)) => {
+                    voice.lock().expect("voice").forget_mute(&client, seq);
+                    return Err(refusal_of(&said, NO_MUTE));
+                }
+                Err(error) => {
+                    voice.lock().expect("voice").forget_mute(&client, seq);
+                    return Err(error);
+                }
+            };
+            {
+                let mut held = voice.lock().expect("voice");
+                let kept = reader.get_ref().try_clone();
+                match (held.mutes.get_mut(&client), kept) {
+                    (Some(mute), Ok(kept)) if mute.seq == seq => mute.held = Some(kept),
+                    // Gone while the voice took it (its last connection, a
+                    // revoke), or no way to keep it: let go at once.
+                    (_, kept) => {
+                        held.forget_mute(&client, seq);
+                        drop(held);
+                        let _ = reader.get_ref().shutdown(Shutdown::Both);
+                        return Err(Error::new(
+                            ErrorCode::Refused,
+                            match kept {
+                                Ok(_) => "this computer went as the voice took its mute".to_owned(),
+                                Err(error) => {
+                                    format!("the mute's connection can't be kept: {error}")
+                                }
+                            },
+                        ));
+                    }
+                }
+            }
+            std::thread::spawn(move || watch_mute(reader, &voice, &client, seq, re, &events));
+            Ok(json!({"mute": "held"}))
+        })))
+    }
+
     fn to_voice(&self, client: &str, re: u64, line: Value) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
@@ -484,12 +745,21 @@ impl Lamp {
 /// `expired`, `refused` and no outcome at all are `dropped`, the voice's
 /// own word and why in `why`.
 fn outcome(reader: impl std::io::BufRead) -> (&'static str, Option<String>) {
+    outcome_with(reader, |_| {})
+}
+
+/// As [`outcome`], each event before it (`begun`) handed to `event`.
+fn outcome_with(
+    reader: impl std::io::BufRead,
+    mut event: impl FnMut(&Value),
+) -> (&'static str, Option<String>) {
     for line in reader.lines() {
         let Ok(line) = line else { break };
         let Ok(said) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
         if said.get("event").is_some() {
+            event(&said);
             continue;
         }
         let word = said["outcome"].as_str().unwrap_or("failed");
@@ -503,6 +773,97 @@ fn outcome(reader: impl std::io::BufRead) -> (&'static str, Option<String>) {
         return ("dropped", Some(why));
     }
     ("dropped", Some("the voice gave no outcome".to_owned()))
+}
+
+/// `line` on a new say socket connection, and the voice's first outcome on
+/// it (past any event): the connection kept, to read on or hold.
+fn ask_voice(
+    path: &std::path::Path,
+    line: &Value,
+) -> Result<(BufReader<UnixStream>, Value), Error> {
+    let not_taken = |error: std::io::Error| {
+        Error::new(
+            ErrorCode::Refused,
+            format!("the voice did not take it: {error}"),
+        )
+    };
+    let mut stream = UnixStream::connect(path).map_err(not_taken)?;
+    writeln!(stream, "{line}").map_err(not_taken)?;
+    let _ = stream.set_read_timeout(Some(VOICE_ANSWER_WITHIN));
+    let mut reader = BufReader::new(stream);
+    let mut said = String::new();
+    loop {
+        said.clear();
+        match reader.read_line(&mut said) {
+            Ok(0) | Err(_) => {
+                return Err(Error::new(ErrorCode::Refused, "the voice gave no answer"));
+            }
+            Ok(_) => {}
+        }
+        if let Ok(said) = serde_json::from_str::<Value>(&said)
+            && said.get("outcome").is_some()
+        {
+            return Ok((reader, said));
+        }
+    }
+}
+
+/// The voice's refusal of a `turn.end` or a `listen`, in the protocol's
+/// words: `busy` for another's turn, the voice's own why otherwise, and
+/// `older` for a voice from before these, which doesn't know the field.
+fn refusal_of(said: &Value, older: &str) -> Error {
+    let word = said["outcome"].as_str().unwrap_or("failed");
+    let why = said["why"].as_str();
+    match (word, why) {
+        ("refused", Some(NOT_THIS_TURN)) => Error::new(ErrorCode::Busy, NOT_THIS_TURN),
+        ("refused", Some(NOT_ITS_PROTOCOL)) => Error::new(ErrorCode::Refused, older),
+        ("refused", Some(why)) => Error::new(ErrorCode::Refused, why),
+        (word, Some(why)) => Error::new(ErrorCode::Refused, format!("{word}: {why}")),
+        (word, None) => Error::new(ErrorCode::Refused, word),
+    }
+}
+
+/// Lifts a held mute: `listen: true` on its own connection, then closed,
+/// which lifts it too if the line didn't reach the voice.
+fn lift(held: &UnixStream) {
+    let _ = held.set_write_timeout(Some(Duration::from_millis(200)));
+    let mut out = held;
+    let _ = writeln!(out, "{}", json!({"skill": "control", "listen": true}));
+    let _ = held.shutdown(Shutdown::Both);
+}
+
+/// Reads a held mute's connection until it ends. Ended by the voice (a
+/// hand on the head lifted it, or the voice let the connection go) while
+/// still this computer's, it is forgotten and the computer told, a `done`
+/// naming the `listen.set` that asked for it, `cut_short` with the voice's
+/// why. Ended by the door (`listen.set true`, the computer gone), nothing
+/// is told.
+fn watch_mute(
+    reader: BufReader<UnixStream>,
+    voice: &Mutex<Voice>,
+    client: &str,
+    seq: u64,
+    re: u64,
+    events: &Events,
+) {
+    let _ = reader.get_ref().set_read_timeout(None);
+    let mut why = "the voice let it go".to_owned();
+    for line in reader.lines() {
+        let Ok(line) = line else { break };
+        if let Ok(said) = serde_json::from_str::<Value>(&line)
+            && said["outcome"] == "lifted"
+        {
+            why = said["why"].as_str().unwrap_or("lifted").to_owned();
+            break;
+        }
+    }
+    if voice.lock().expect("voice").forget_mute(client, seq) {
+        eprintln!("lamp-control: {client}'s mute was lifted by the voice: {why}");
+        events(
+            client,
+            json!({"ev": "done", "re": re, "how": "cut_short", "why": why}),
+        );
+    }
 }
 
 /// How long the body plays a move of these frames: from the first frame
@@ -570,7 +931,28 @@ impl Parts for Lamp {
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
             Op::Sound { name } => self.sound(client, re, name),
             Op::Play { .. } => Err(waits_for("client packages")),
+            Op::TurnStart { prompt } => self.turn_start(client, re, prompt.as_deref()),
             _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
+        }
+    }
+
+    fn reply(&mut self, client: &str, re: u64, op: &Op, now_us: u64) -> Result<Reply, Error> {
+        match op {
+            Op::TurnEnd {} => self.turn_end(client),
+            Op::ListenSet { on } => self.listen(client, re, *on),
+            _ => self.act(client, re, op, now_us).map(Reply::Now),
+        }
+    }
+
+    /// As `stop`, and its mute's connection closed, which lifts it.
+    fn gone(&mut self, client: &str, now_us: u64) {
+        self.stop(client, now_us);
+        let held = self.voice.lock().expect("voice").mutes.remove(client);
+        if let Some(Mute {
+            held: Some(held), ..
+        }) = held
+        {
+            let _ = held.shutdown(Shutdown::Both);
         }
     }
 
@@ -616,8 +998,6 @@ impl Parts for Lamp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::BufRead as _;
-    use std::sync::Mutex;
 
     #[derive(Clone, Default)]
     struct Ring(Arc<Mutex<Vec<LightRequest>>>);
@@ -1213,6 +1593,303 @@ mod tests {
             done["why"].as_str().unwrap().contains("did not take"),
             "{done}"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Events kept as the door would send them, by client.
+    type Told = Arc<Mutex<Vec<(String, Value)>>>;
+
+    fn kept() -> (Events, Told) {
+        let told: Told = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        (events, told)
+    }
+
+    fn until_told(told: &Told, count: usize) {
+        for _ in 0..300 {
+            if told.lock().unwrap().len() >= count {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("told {:?}", told.lock().unwrap());
+    }
+
+    /// A connection to the fake voice and its one line read.
+    fn accepted(listener: &std::os::unix::net::UnixListener) -> (UnixStream, Value) {
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        (stream, serde_json::from_str(&line).unwrap())
+    }
+
+    /// Nobody connected to the fake voice.
+    fn untouched(listener: &std::os::unix::net::UnixListener) {
+        listener.set_nonblocking(true).unwrap();
+        assert_eq!(
+            listener.accept().map(|_| ()).unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        listener.set_nonblocking(false).unwrap();
+    }
+
+    fn say(stream: &UnixStream, line: &str) {
+        let mut out = stream;
+        writeln!(out, "{line}").unwrap();
+    }
+
+    fn now(reply: Result<Reply, Error>) -> Value {
+        match reply.unwrap() {
+            Reply::Now(with) => with,
+            Reply::Later(_) => panic!("a reply now was wanted"),
+        }
+    }
+
+    /// The part's wait, on a thread as the door runs it.
+    fn later(reply: Result<Reply, Error>) -> std::thread::JoinHandle<Result<Value, Error>> {
+        match reply.unwrap() {
+            Reply::Later(run) => std::thread::spawn(run),
+            Reply::Now(with) => panic!("a reply later was wanted, not {with}"),
+        }
+    }
+
+    /// docs/control.md, "Turns and listening": a turn goes to the voice as
+    /// its `turn` line, prompt as `text`; its id from `begun` is kept for its
+    /// computer alone, so `turn.end` names it and another computer's end is
+    /// refused without asking the voice; the outcome is the start's `done`.
+    #[test]
+    fn a_turn_is_asked_of_the_voice_and_only_its_computer_ends_it() {
+        let dir = dir("turn");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let (events, told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let end = op(r#"{"id":4,"op":"turn.end"}"#);
+        // No turn of its own: refused, the voice not asked.
+        let refused = lamp.reply("c_1", 4, &end, 0).unwrap_err();
+        assert_eq!(
+            (refused.code, refused.why.as_str()),
+            (ErrorCode::Busy, NOT_THIS_TURN)
+        );
+        let start = op(r#"{"id":3,"op":"turn.start","prompt":"Shall we go over today's list?"}"#);
+        assert_eq!(
+            lamp.act("c_1", 3, &start, 0).unwrap(),
+            json!({"to": "voice"})
+        );
+        let (turn, line) = accepted(&listener);
+        assert_eq!(
+            line,
+            json!({"skill": "control", "turn": "start", "text": "Shall we go over today's list?", "expires_in_ms": 30000})
+        );
+        // Asked and not begun: no id to end it by yet.
+        let early = lamp.reply("c_1", 4, &end, 0).unwrap_err();
+        assert_eq!(early.code, ErrorCode::Busy);
+        assert_eq!(early.why, "this computer's turn has not begun yet");
+        say(&turn, r#"{"event":"begun","at_us":5,"id":7}"#);
+        for _ in 0..300 {
+            if lamp.voice.lock().unwrap().turns["c_1"][0].id == Some(7) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        // Another computer's end: refused, the voice not asked.
+        let other = lamp.reply("c_2", 9, &end, 0).unwrap_err();
+        assert_eq!(
+            (other.code, other.why.as_str()),
+            (ErrorCode::Busy, NOT_THIS_TURN)
+        );
+        untouched(&listener);
+        let ending = later(lamp.reply("c_1", 4, &end, 0));
+        let (asked, line) = accepted(&listener);
+        assert_eq!(line, json!({"skill": "control", "turn": "end", "id": 7}));
+        say(&asked, r#"{"outcome":"ended"}"#);
+        assert_eq!(
+            ending.join().unwrap().unwrap(),
+            json!({"turn": "ended", "started": 3})
+        );
+        say(
+            &turn,
+            r#"{"outcome":"dropped","why":"ended by the computer"}"#,
+        );
+        until_told(&told, 1);
+        assert_eq!(
+            told.lock().unwrap()[0],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 3, "how": "dropped", "why": "dropped: ended by the computer"})
+            )
+        );
+        // Its outcome said, the turn is no longer its to end.
+        let after = lamp.reply("c_1", 5, &end, 0).unwrap_err();
+        assert_eq!(after.why, NOT_THIS_TURN);
+        // Without a prompt, no text; spoken is finished.
+        lamp.act("c_1", 6, &op(r#"{"id":6,"op":"turn.start"}"#), 0)
+            .unwrap();
+        let (turn, line) = accepted(&listener);
+        assert_eq!(
+            line,
+            json!({"skill": "control", "turn": "start", "expires_in_ms": 30000})
+        );
+        say(&turn, r#"{"event":"begun","at_us":5,"id":8}"#);
+        say(&turn, r#"{"outcome":"spoken"}"#);
+        until_told(&told, 2);
+        assert_eq!(
+            told.lock().unwrap()[1].1,
+            json!({"ev": "done", "re": 6, "how": "finished"})
+        );
+        // A voice from before turns refuses the field: said so.
+        lamp.act("c_1", 7, &op(r#"{"id":7,"op":"turn.start"}"#), 0)
+            .unwrap();
+        let (turn, _) = accepted(&listener);
+        say(&turn, r#"{"outcome":"refused","why":"not a say request"}"#);
+        until_told(&told, 3);
+        assert_eq!(
+            told.lock().unwrap()[2].1,
+            json!({"ev": "done", "re": 7, "how": "dropped", "why": format!("refused: {NO_TURNS}")})
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The voice's refusals of an end or a mute, in the protocol's words.
+    #[test]
+    fn the_voices_refusals_are_the_protocols() {
+        let refused = |why: &str| json!({"outcome": "refused", "why": why});
+        let busy = refusal_of(&refused(NOT_THIS_TURN), NO_TURNS);
+        assert_eq!(
+            (busy.code, busy.why.as_str()),
+            (ErrorCode::Busy, NOT_THIS_TURN)
+        );
+        let older = refusal_of(&refused("not a say request"), NO_TURNS);
+        assert_eq!(
+            (older.code, older.why.as_str()),
+            (ErrorCode::Refused, NO_TURNS)
+        );
+        let older = refusal_of(&refused("not a say request"), NO_MUTE);
+        assert_eq!(older.why, NO_MUTE);
+        let muted = refusal_of(&refused("the lamp is muted"), NO_TURNS);
+        assert_eq!(
+            (muted.code, muted.why.as_str()),
+            (ErrorCode::Refused, "the lamp is muted")
+        );
+        assert_eq!(
+            refusal_of(&json!({"outcome": "expired"}), NO_TURNS).why,
+            "expired"
+        );
+    }
+
+    /// docs/control.md, "Turns and listening": a computer's mute is one say
+    /// socket connection held for it, `listen: false` on it; `true` is said
+    /// on that same connection and it closes; the computer gone closes it
+    /// (a `stop` doesn't); a hand on the head lifting it is the computer's
+    /// `done`; an older voice's refusal is said as that.
+    #[test]
+    fn a_computers_mute_is_one_held_connection_let_go_as_it_goes() {
+        let dir = dir("mute");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let (events, told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let off = op(r#"{"id":5,"op":"listen.set","on":false}"#);
+        let on = op(r#"{"id":6,"op":"listen.set","on":true}"#);
+        let closed = |stream: &UnixStream| {
+            let mut rest = String::new();
+            BufReader::new(stream).read_line(&mut rest).unwrap() == 0
+        };
+        // Nothing held: said so, the voice not asked.
+        assert_eq!(
+            now(lamp.reply("c_1", 6, &on, 0)),
+            json!({"mute": "nothing_held"})
+        );
+        untouched(&listener);
+        let taking = later(lamp.reply("c_1", 5, &off, 0));
+        let (held, line) = accepted(&listener);
+        assert_eq!(line, json!({"skill": "control", "listen": false}));
+        // While the voice takes it, another is busy.
+        let busy = lamp.reply("c_1", 6, &on, 0).unwrap_err();
+        assert_eq!(
+            (busy.code, busy.why.as_str()),
+            (ErrorCode::Busy, MUTE_BEING_TAKEN)
+        );
+        say(&held, r#"{"outcome":"muted"}"#);
+        assert_eq!(taking.join().unwrap().unwrap(), json!({"mute": "held"}));
+        // Again while held: nothing new.
+        assert_eq!(now(lamp.reply("c_1", 7, &off, 0)), json!({"mute": "held"}));
+        untouched(&listener);
+        // Lifted on its own connection, which then closes.
+        assert_eq!(now(lamp.reply("c_1", 6, &on, 0)), json!({"mute": "lifted"}));
+        let mut line = String::new();
+        BufReader::new(&held).read_line(&mut line).unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&line).unwrap(),
+            json!({"skill": "control", "listen": true})
+        );
+        assert!(closed(&held));
+
+        // Held again; a stop leaves it, the computer gone closes it.
+        let taking = later(lamp.reply("c_1", 8, &off, 0));
+        let (held, _) = accepted(&listener);
+        say(&held, r#"{"outcome":"muted"}"#);
+        taking.join().unwrap().unwrap();
+        lamp.stop("c_1", 0);
+        held.set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+        let mut nothing = String::new();
+        assert!(BufReader::new(&held).read_line(&mut nothing).is_err());
+        held.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        lamp.gone("c_1", 0);
+        assert!(closed(&held));
+        assert_eq!(
+            now(lamp.reply("c_1", 6, &on, 0)),
+            json!({"mute": "nothing_held"})
+        );
+
+        // Gone while the voice takes it: let go as soon as it's taken.
+        let taking = later(lamp.reply("c_1", 9, &off, 0));
+        let (held, _) = accepted(&listener);
+        lamp.gone("c_1", 0);
+        say(&held, r#"{"outcome":"muted"}"#);
+        assert_eq!(taking.join().unwrap().unwrap_err().code, ErrorCode::Refused);
+        assert!(closed(&held));
+
+        // A hand on the head lifts it: the computer is told, it's forgotten.
+        let taking = later(lamp.reply("c_1", 10, &off, 0));
+        let (held, _) = accepted(&listener);
+        say(&held, r#"{"outcome":"muted"}"#);
+        taking.join().unwrap().unwrap();
+        say(&held, r#"{"outcome":"lifted","why":"a hand on the head"}"#);
+        drop(held);
+        until_told(&told, 1);
+        assert_eq!(
+            told.lock().unwrap()[0],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 10, "how": "cut_short", "why": "a hand on the head"})
+            )
+        );
+        assert_eq!(
+            now(lamp.reply("c_1", 6, &on, 0)),
+            json!({"mute": "nothing_held"})
+        );
+
+        // A voice from before a computer's mute.
+        let taking = later(lamp.reply("c_1", 11, &off, 0));
+        let (held, _) = accepted(&listener);
+        say(&held, r#"{"outcome":"refused","why":"not a say request"}"#);
+        let older = taking.join().unwrap().unwrap_err();
+        assert_eq!(
+            (older.code, older.why.as_str()),
+            (ErrorCode::Refused, NO_MUTE)
+        );
+        assert_eq!(
+            now(lamp.reply("c_1", 6, &on, 0)),
+            json!({"mute": "nothing_held"})
+        );
+        assert_eq!(told.lock().unwrap().len(), 1);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
