@@ -6125,6 +6125,14 @@ fn ended_ago(until_us: Option<u64>, now_us: u64) -> Option<Duration> {
 /// thread's `said_ago` is from when its answer began, `ended_ago` from when
 /// the words it sent were played to their end, if it sent any. Nothing
 /// when the thread has no words of it, as after it forgot them.
+/// The person's last call let out (`Heeding::called_at`), unless a
+/// computer's `turn.end` closed the conversation at or after it
+/// (`closed_at`, `Thread::close_conversation`): the turn's own call keeps
+/// no conversation going past its end.
+fn carried_call(called_at: Option<Instant>, closed_at: Option<Instant>) -> Option<Instant> {
+    called_at.filter(|at| closed_at.is_none_or(|closed| *at > closed))
+}
+
 fn to_the_end(said_ago: Option<Duration>, ended_ago: Option<Duration>) -> Option<Duration> {
     said_ago.map(|ago| ended_ago.map_or(ago, |ended| ended.min(ago)))
 }
@@ -7048,10 +7056,13 @@ impl Heeding {
             .map_or(Duration::ZERO, |(began, _)| {
                 Duration::from_micros(now_us.saturating_sub(began))
             });
-        let said_ago = crate::thread::current(self.thread.as_deref(), |thread| {
-            thread.said_last_ago_but(Instant::now(), &self.chain)
+        let (said_ago, closed_at) = crate::thread::current(self.thread.as_deref(), |thread| {
+            (
+                thread.said_last_ago_but(Instant::now(), &self.chain),
+                thread.closed_at(),
+            )
         })
-        .flatten();
+        .unwrap_or_default();
         let until_us = if self.chain.is_empty() {
             self.said_until_us
         } else {
@@ -7059,7 +7070,7 @@ impl Heeding {
         };
         follows_up(
             to_the_end(said_ago, ended_ago(until_us, now_us)),
-            self.called_at.map(|at| at.elapsed()),
+            carried_call(self.called_at, closed_at).map(|at| at.elapsed()),
             began_ago,
         )
     }
@@ -8603,7 +8614,10 @@ impl Heeding {
         // `LAMP_GOING_ON_NOT_OWN`: the lamp's answers to lines let out only
         // as the conversation going on are left out, unless this line may
         // answer its question.
-        let (lamp_asked, said_ago, person, but) =
+        // A computer's `turn.end` closed the conversation at `closed_at`
+        // (`Thread::close_conversation`): the thread gives no words from
+        // before it, and a call let out before it carries none.
+        let (lamp_asked, said_ago, person, but, closed_at) =
             crate::thread::current(self.thread.as_deref(), |thread| {
                 let lamp_asked = thread.lamp_asked(request);
                 let but: &[u64] = if lamp_asked { &[] } else { &self.chain };
@@ -8612,6 +8626,7 @@ impl Heeding {
                     thread.said_last_ago_but(now, but),
                     thread.opened_for().map(str::to_owned),
                     !but.is_empty(),
+                    thread.closed_at(),
                 )
             })
             .unwrap_or_default();
@@ -8658,7 +8673,8 @@ impl Heeding {
         // let out (#1712: on lamp-4ace on 19 Oct the owner's next lines came
         // before the lamp's answers were said, and were held as no
         // conversation).
-        let called_ago = self.called_at.map(|at| now.saturating_duration_since(at));
+        let called_ago =
+            carried_call(self.called_at, closed_at).map(|at| now.saturating_duration_since(at));
         // From the end of what the lamp said, not from when its answer began,
         // which the thread keeps (#1712, the first builder at 19:21: "And what
         // about tomorrow?" 18 s after the weather line, a long answer, was
@@ -12212,6 +12228,86 @@ mod tests {
                 "{room:?}: the next line is not the turn's"
             );
         }
+    }
+
+    /// lamp-75c9 on 3 Nov 20:56: a paired computer's `turn.end` cut its
+    /// turn's answer, and a room line nobody said to the lamp 36 s later was
+    /// answered as the conversation going on, from the turn's exchange in
+    /// the thread. With the product's rule (`--spoken-to`, strict, the name
+    /// or a follow-up needed, busy calls narrowed, remarks held), a line with
+    /// no name after the lamp's words and the person's call goes on as the
+    /// conversation; once the conversation is closed
+    /// (`Thread::close_conversation`) the same line is held, in a quiet room
+    /// and a busy one.
+    #[test]
+    fn a_room_line_after_a_computers_turn_end_is_held() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
+        use crate::room_told::Room;
+        let s = Duration::from_secs;
+        let judged = |room: Room, closed: bool| {
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            if room == Room::Busy {
+                let mut told = crate::room_told::room().lock().unwrap();
+                for other in 901..=903 {
+                    told.unanswered(other, monotonic_us());
+                }
+                assert_eq!(told.at(monotonic_us()), Room::Busy);
+            }
+            // The turn's exchange, its answer begun 10 s ago, its words
+            // ended 8 s ago; the person's call let out 10 s ago.
+            let answered = Instant::now() - s(10);
+            let mut thread = crate::thread::Thread::new();
+            thread.person("What is on my list today?", true, answered);
+            thread.lamp(1, "You have three meetings and a", answered);
+            if closed {
+                // The computer's end, 8 s ago.
+                thread.close_conversation(Instant::now() - s(8));
+            }
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.attention.speak_when_spoken_to(true);
+            heeding.needing_name_or_follow_up();
+            heeding.narrowing_busy_calls();
+            heeding.holding_remarks_about_it();
+            heeding.called_at = Some(answered);
+            let now_us = monotonic_us();
+            heeding.lamp_did(crate::second_provider::Did::Said(1, now_us - 8_000_000));
+            let said = (now_us - 1_000_000, now_us);
+            let held = heeding.heed(2, said, "Did you finish the slides for Monday?", None);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            held
+        };
+        for room in [Room::Quiet, Room::Busy] {
+            assert_eq!(
+                judged(room, false),
+                None,
+                "{room:?}: not closed, the conversation going on"
+            );
+            assert!(
+                judged(room, true).is_some(),
+                "{room:?}: closed by the computer's end, nobody spoke to the lamp"
+            );
+        }
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    }
+
+    /// The turn's own call carries no conversation past the close: a call
+    /// let out at or before it is not `called_ago`; one after it is.
+    #[test]
+    fn a_call_before_the_close_carries_none() {
+        let now = Instant::now();
+        let before = now - Duration::from_secs(3);
+        assert_eq!(super::carried_call(Some(before), None), Some(before));
+        assert_eq!(super::carried_call(Some(before), Some(before)), None);
+        assert_eq!(super::carried_call(Some(before), Some(now)), None);
+        assert_eq!(
+            super::carried_call(Some(now), Some(before)),
+            Some(now),
+            "a call after the close carries"
+        );
+        assert_eq!(super::carried_call(None, Some(now)), None);
     }
 
     /// #1712, the first builder at 18:57: in a busy room, a line let out

@@ -632,7 +632,13 @@ what waits to be said and the window. It is answered `{"outcome":"ended"}`,
 and the start `spoken` if its answer had sounded, else `dropped`, `ended by
 the computer`. Any other id, an old one too, is `refused`, `not this
 computer's turn`: never the person's own conversation or the lamp's own
-words. The person wins: the privacy switch, the button, sleep and "stop"
+words. The end closes the conversation too (`Thread::close_conversation`,
+`crates/voice/src/thread.rs`): the turn's exchange stays in the thread for
+memory and summaries but keeps no conversation going, nor does the turn's
+own call, so the next room line needs the lamp's name, a turn or a tap to
+be answered (lamp-75c9 on 3 Nov: a room line 36 s after an end was
+answered as the conversation going on). The person's own stops leave the
+conversation as before. The person wins: the privacy switch, the button, sleep and "stop"
 end a computer's turn as any other.
 
 **A computer's mute for lamp-control** ([control.md](control.md), "Turns
