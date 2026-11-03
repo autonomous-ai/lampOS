@@ -12240,6 +12240,17 @@ fn conversation_with_gate_inner(
             // a person's answer in hand; never the room's speech, a line
             // heard and held back, or a look the voice wanted (lamp-75c9,
             // 3 Nov: the room's talk refused every turn).
+            // A person's line the second route has not yet decided to
+            // answer (nothing of an answer sounded or came): a room line
+            // heard, then held back as said to nobody, is no answer in hand
+            // and no words of the lamp's (lamp-75c9, 3 Nov 17:51).
+            let undecided = reply.as_ref().is_some_and(|current| {
+                persons(current.owner.turn())
+                    && !crate::control_turn::answer_decided(current.had_audio, current.sounded)
+            });
+            // Only the lamp's own words waiting for the provider; a
+            // person's line on its way to it is not the lamp speaking.
+            let own_words_queued = provider_queue.iter().any(own_words);
             let signs = [
                 ("a computer's turn", control_turns.going_on()),
                 (
@@ -12250,13 +12261,14 @@ fn conversation_with_gate_inner(
                 ),
                 (
                     "a person's answer",
-                    reply
-                        .as_ref()
-                        .is_some_and(|current| persons(current.owner.turn())),
+                    !undecided
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| persons(current.owner.turn())),
                 ),
-                ("its words in hand", reply.is_some()),
+                ("its words in hand", !undecided && reply.is_some()),
                 ("its speaker", speaker_pending.is_some()),
-                ("the provider's queue", !provider_queue.is_empty()),
+                ("the provider's queue", own_words_queued),
                 ("a submission draining", submission_draining),
             ];
             let refusal = crate::control_turn::refused(&crate::control_turn::StartNow {
@@ -13698,6 +13710,16 @@ fn tell_voice_of_turn(
 /// says so. While the person talks or a turn is under way it stays waiting
 /// (until its expiry); the keeper's pause or the privacy switch refuses it.
 /// The authority's new snapshot when it plays.
+/// A provider input that is the lamp's own words (a written line or a
+/// reminder), not a person's line on its way: only these count as the lamp
+/// speaking when a computer's turn is asked.
+fn own_words(input: &ProviderInput) -> bool {
+    matches!(
+        input,
+        ProviderInput::Written { .. } | ProviderInput::Reminder { .. }
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn play_exact_line(
     says: &mut crate::say::Says,
