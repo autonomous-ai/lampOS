@@ -88,24 +88,50 @@ pub const BRIEF_HEAD: &str = "Write one lamp skill (lampOS lamp-skills)";
 /// What comes before the person's request in the brief.
 const REQUEST_MARK: &str = "Request: ";
 
-/// What a request for a skill that reads mail or a calendar is told: a made
-/// skill never reaches a linked service, but the person can ask the lamp
-/// itself, and where the link is made.
-pub const NOT_A_SERVICE: &str = "A skill can't read your mail or calendar, but you can just ask \
-     me to read it once it's linked in the app: Skills, then Connectors.";
-/// Words that name a linked service ([`crate::services`]) in a request.
-const SERVICE_WORDS: [&str; 7] = [
-    "mail", "mails", "email", "emails", "gmail", "inbox", "calendar",
+/// What a request for a skill that uses one of the person's services (mail,
+/// a calendar, Slack, ...) is told: a made skill never reaches a linked
+/// service, but the person can ask the lamp itself, and where the link is
+/// made.
+pub const NOT_A_SERVICE: &str = "A skill can't use your mail, calendar or other services, but \
+     you can just ask me once the service is linked in the app: Skills, then Connectors.";
+/// Words that name a linked service ([`crate::services`]) in a request, as
+/// a whole word: mail and a calendar, and the services' own names.
+const SERVICE_WORDS: [&str; 17] = [
+    "mail",
+    "mails",
+    "email",
+    "emails",
+    "gmail",
+    "inbox",
+    "calendar",
+    "gdrive",
+    "notion",
+    "figma",
+    "github",
+    "asana",
+    "ahrefs",
+    "facebook",
+    "slack",
+    "hubspot",
+    "amplitude",
 ];
+/// Services whose one word is also a plain one ("drive", "linear",
+/// "monday"): named only as these.
+const SERVICE_PHRASES: [&str; 3] = ["google drive", "linear app", "monday com"];
 
-/// Whether a request names a linked service, as a whole word (any case;
-/// "e-mail" too), so a skill to make is never asked of the model for one.
+/// Whether a request names a linked service (any case; "e-mail" too), so
+/// a skill to make is never asked of the model for one.
 fn names_a_linked_service(request: &str) -> bool {
-    request
-        .to_lowercase()
-        .replace("e-mail", "email")
+    let request = request.to_lowercase().replace("e-mail", "email");
+    let words: Vec<&str> = request
         .split(|c: char| !c.is_alphanumeric())
-        .any(|word| SERVICE_WORDS.contains(&word))
+        .filter(|word| !word.is_empty())
+        .collect();
+    let joined = format!(" {} ", words.join(" "));
+    words.iter().any(|word| SERVICE_WORDS.contains(word))
+        || SERVICE_PHRASES
+            .iter()
+            .any(|phrase| joined.contains(&format!(" {phrase} ")))
 }
 
 /// The brief: the format of a skill a lamp can make, what it may use, and
@@ -1331,21 +1357,31 @@ light = { dim = 1 }
         assert!(!is_brief("Write a poem about lamps"));
     }
 
-    /// A skill asked to read mail or a calendar is never made: the person
+    /// A skill asked to use any linked service is never made: the person
     /// is told a skill can't, that the lamp itself can, and where it is
-    /// linked; a word that only holds one of those is still a skill.
+    /// linked; a word that only holds one, or a plain word that is also a
+    /// service's name, is still a skill.
     #[test]
-    fn a_skill_for_mail_or_a_calendar_points_to_asking_the_lamp() {
+    fn a_skill_for_a_linked_service_points_to_asking_the_lamp() {
         for request in [
             "read my mail every morning",
             "Glow blue when I get an E-mail",
             "check my Gmail inbox",
             "nod when my calendar has a meeting",
+            "glow red when Slack has a message",
+            "open my Google Drive file",
+            "nod when a GitHub build fails",
+            "glow when my Notion page changes",
         ] {
             assert_eq!(brief(request), Err(NOT_A_SERVICE), "{request}");
         }
         assert!(NOT_A_SERVICE.contains("Connectors"));
-        for request in ["glow warm when the mailman comes", "dim the light at 10 pm"] {
+        for request in [
+            "glow warm when the mailman comes",
+            "dim the light at 10 pm",
+            "nod every monday morning",
+            "glow when I drive home",
+        ] {
             assert!(brief(request).is_ok(), "{request}");
         }
     }
