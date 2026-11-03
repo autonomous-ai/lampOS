@@ -2412,7 +2412,10 @@ pub fn serve(
     // The connected services are the owner's only, and read in full only
     // with them alone in view (`crate::services`): the owner and the faces
     // counted, whatever the by-default name's switch.
-    if std::env::var(crate::services::ENVIRONMENT).ok().as_deref() == Some("on") {
+    // The worker is told the services by their folder (`--services-dir`),
+    // never by `LAMP_SERVICES`, which isn't in its environment.
+    let services_on = tools.services.is_some();
+    if services_on {
         if let Some(bus) = files
             .bus_root
             .as_deref()
@@ -2858,9 +2861,7 @@ pub fn serve(
     engine = engine_seeing;
     // A services write is the owner's only with their face seen saying its
     // line (`crate::services`): that reading is kept for it.
-    engine = engine.keeping_sight_for_services(
-        std::env::var(crate::services::ENVIRONMENT).ok().as_deref() == Some("on"),
-    );
+    engine = engine.keeping_sight_for_services(services_on);
     // A known person's line no face was seen speaking, in their conversation
     // going on with no other face in view, is carried as theirs (#4339,
     // `LAMP_CONVERSATION_CARRIES=on`): only beside the scoping by sight above.
