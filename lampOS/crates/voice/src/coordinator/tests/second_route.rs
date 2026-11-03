@@ -4800,6 +4800,9 @@ fn a_computers_turn_plays_the_cue_opens_eight_seconds_and_ends_on_nobody_or_a_mu
         (1_200, crate::control_turn::NOBODY_SPOKE),
         (200, crate::control_turn::MUTED),
     ] {
+        // A conversation another loop test left with the lamp would refuse
+        // the turn: none goes on here.
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
         let (says, line, answered) = crate::say::Says::line_for_test(
             r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
         );
@@ -4842,6 +4845,9 @@ fn computers_turn_with_an_end(
     holds: bool,
     other_id: bool,
 ) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>) {
+    // A conversation another loop test left with the lamp would refuse
+    // the turn: none goes on here.
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     let (says, line, answered) = crate::say::Says::line_for_test(
         r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
     );
@@ -4948,20 +4954,69 @@ fn a_computers_end_with_its_id_cuts_the_answer_awaited() {
     );
 }
 
-/// A computer's turn asked while the person is speaking is refused at once,
-/// never queued behind them.
+/// A computer's turn asked while the room talks, with no conversation with
+/// the lamp going on, opens: speech heard is not a conversation with the
+/// lamp. In a busy office the person's talk to others refused every turn
+/// (lamp-75c9, 3 Nov), so only the thread's exchange with the lamp's words
+/// in it refuses one, as it holds a computer's exact say.
 #[test]
-fn a_computers_turn_is_refused_while_the_person_speaks() {
+fn a_computers_turn_opens_over_room_speech_with_no_conversation() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let (says, line, answered) = crate::say::Says::line_for_test(
+        r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
+    );
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    TEST_ROOM_BUSY.with(|busy| busy.set(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_hears: Some("so we went to the shop after work"),
+        say_at_frame: Some((700, line)),
+        written: Written::Said(12),
+        mute_at_frame: Some(2_000),
+        limit: Duration::from_secs(30),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_ROOM_BUSY.with(|busy| busy.set(false));
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    let answered: Vec<_> = answered.try_iter().collect();
+    assert!(
+        matches!(answered.first(), Some(Answer::BegunTurn { .. })),
+        "{answered:?} {}",
+        run.summary()
+    );
+    assert!(
+        !answered.contains(&Answer::Done(Outcome::Refused(
+            crate::control_turn::CONVERSATION.into()
+        ))),
+        "{answered:?}"
+    );
+}
+
+/// A computer's turn asked while a conversation with the lamp goes on (the
+/// thread holds an exchange with the lamp's words in it) is refused at
+/// once, never queued behind it.
+#[test]
+fn a_computers_turn_is_refused_while_a_conversation_with_the_lamp_goes_on() {
     use crate::say::{Answer, Outcome};
     let _one = super::pilot_faults::one_session();
     let (says, line, answered) = crate::say::Says::line_for_test(
         r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":60000}"#,
     );
     TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    {
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        *thread = crate::thread::Thread::new();
+        thread.person("What time is it?", true, std::time::Instant::now());
+        thread.lamp(9_000, "It's three o'clock.", std::time::Instant::now());
+        assert!(thread.going_on(std::time::Instant::now()));
+    }
     let run = run(Script {
         second: false,
         only: true,
-        speech_frames: 500,
+        silent: true,
         say_at_frame: Some((100, line)),
         written: Written::Said(12),
         mute_at_frame: Some(900),
@@ -4969,6 +5024,7 @@ fn a_computers_turn_is_refused_while_the_person_speaks() {
         ..Script::question(Live::Answer(12))
     });
     TEST_SAYS.with(|given| given.borrow_mut().take());
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     let answered: Vec<_> = answered.try_iter().collect();
     assert_eq!(
         answered,
