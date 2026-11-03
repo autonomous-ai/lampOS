@@ -74,3 +74,61 @@ fn with_no_boot_known_a_build_put_back_stays_refused() {
     boot(&lamp, "boot-b");
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
 }
+
+/// A lamp whose updater build was put back for good still takes a newer,
+/// different lamp-update when the channel carries one: by its own switch,
+/// and by a climb when the build needs a newer updater.
+#[test]
+fn an_updater_refused_for_good_does_not_block_a_newer_updater() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, BAD);
+    switched_and_put_back(&mut lamp, "boot-a", "boot-a");
+    assert!(own::refused_for_good(&lamp.records(), &sha(BAD)));
+    product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    assert_eq!(
+        lamp.round(),
+        Outcome::SelfSwitched {
+            sequence: 3,
+            from: old,
+            to: sha("lamp-update 3")
+        },
+        "{:?}",
+        lamp.said
+    );
+
+    // Too old for the build: the climb to BAD is put back for good, and a
+    // later build carrying a fixed lamp-update is climbed to.
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let build = product_build_with_updater(&mut lamp, 2, BAD);
+    needing(&mut lamp, build, 2);
+    boot(&lamp, "boot-a");
+    assert!(
+        matches!(lamp.round(), Outcome::Climbs { .. }),
+        "{:?}",
+        lamp.said
+    );
+    let back = lamp.back(update_unit("failed", "failed"), records_now());
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert!(own::refused_for_good(&lamp.records(), &sha(BAD)));
+    assert!(
+        matches!(lamp.round(), Outcome::Refused(_)),
+        "{:?}",
+        lamp.said
+    );
+    let build = product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    needing(&mut lamp, build, 2);
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 3,
+            needed: 2,
+            from: old,
+            to: sha("lamp-update 3")
+        },
+        "{:?}",
+        lamp.said
+    );
+}
