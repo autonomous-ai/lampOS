@@ -1707,6 +1707,81 @@ struct Shared {
     /// Each function a turn ran and nothing refused, handed on by request
     /// (`LAMP_HISTORY_KEEPS_CALLS`, [`Engine::keeping_calls`]); none, off.
     keeps_calls: Option<CallsKept>,
+    /// With [`Self::scope_seen`], the known person's own voice confirms a
+    /// line as seen said by them (`LAMP_SAME_VOICE_CONFIRMS`,
+    /// [`Engine::confirming_by_voice`]); none, off.
+    voice_confirms: Option<VoiceConfirms>,
+}
+
+/// A line's voice print, once it has come (`same_voice::Voices::print_to_confirm`).
+pub type PrintOf = Arc<dyn Fn(u64) -> Option<Vec<f32>> + Send + Sync>;
+
+/// [`Shared::voice_confirms`]: the known person's own prints, and where a
+/// line's print is read.
+#[derive(Clone)]
+pub struct VoiceConfirms {
+    pub owner: Arc<crate::same_voice::OwnerVoice>,
+    pub print_of: PrintOf,
+}
+
+/// `LAMP_SAME_VOICE_CONFIRMS` (the memory owner's decision of 4 Nov: CAM++
+/// one way only), for the line `request` admitted as `person`'s, after the
+/// eyes' `speakers` of it: the faces seen speaking it, as they will be
+/// read for every keep, read and seen-saying check after.
+/// - Their own known face (`own_face`) alone seen speaking it, and the one
+///   face in view through it (`one_face`): its print is kept as theirs
+///   while fewer than `same_voice::OWNER_PRINTS` are
+///   ([`crate::same_voice::OwnerVoice::learn`]). Never from a line the
+///   voice confirmed, so the voice never vouches for itself.
+/// - No face seen speaking it, their known face the one face in view, and
+///   its print at the bar or over against theirs: their face is taken as
+///   seen saying it, and the speakers returned are that face.
+/// - Anything else, a score under the bar among it, changes nothing: the
+///   speakers come back as they went in. Never a face not in view.
+fn confirmed_by_voice(
+    confirms: Option<&VoiceConfirms>,
+    request: u64,
+    person: &str,
+    speakers: crate::speaking_faces::Speakers,
+    own_face: Option<&str>,
+    one_face: impl FnOnce(&str) -> bool,
+) -> crate::speaking_faces::Speakers {
+    let (Some(confirms), Some(face)) = (confirms, own_face) else {
+        return speakers;
+    };
+    let seen_alone = speakers.len() == 1 && speakers[0] == face;
+    if !(speakers.is_empty() || seen_alone) || !one_face(face) {
+        return speakers;
+    }
+    let Some(print) = (confirms.print_of)(request) else {
+        return speakers;
+    };
+    if seen_alone {
+        if confirms.owner.learn(person, request, print) {
+            eprintln!(
+                "lamp-voice second: request {request}: the known person's face alone seen speaking it: its print kept as their voice, {} of {} (LAMP_SAME_VOICE_CONFIRMS)",
+                confirms.owner.known(person),
+                crate::same_voice::OWNER_PRINTS
+            );
+        }
+        return speakers;
+    }
+    let bar = confirms.owner.bar();
+    match confirms.owner.judge(person, &print) {
+        crate::same_voice::Confirmed::Theirs(cosine) => {
+            eprintln!(
+                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view, their voice (cosine {cosine:.2}, bar {bar:.2}): taken as seen said by them (LAMP_SAME_VOICE_CONFIRMS)"
+            );
+            vec![face.to_owned()]
+        }
+        crate::same_voice::Confirmed::Under(cosine) => {
+            eprintln!(
+                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view, their voice under the bar (cosine {cosine:.2}, bar {bar:.2}): nothing changes (LAMP_SAME_VOICE_CONFIRMS)"
+            );
+            speakers
+        }
+        crate::same_voice::Confirmed::Unknown => speakers,
+    }
 }
 
 /// [`Shared::past_silent`]: whether the conversation going on has shown
@@ -3523,6 +3598,7 @@ impl Engine {
                 past_silent: None,
                 one_face: None,
                 keeps_calls: None,
+                voice_confirms: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -3870,6 +3946,17 @@ impl Engine {
     pub fn scoping_by_one_face(mut self, another_voice: Arc<AtomicBool>) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.one_face = Some(another_voice);
+        self
+    }
+
+    /// With [`Self::scoping_by_sight`], a known person's line no face was
+    /// seen speaking counts as seen said by them when their known face was
+    /// the one face in view through it and its voice print is at
+    /// `confirms`' bar or over against their own (`LAMP_SAME_VOICE_CONFIRMS`,
+    /// [`confirmed_by_voice`]). Under the bar, nothing changes.
+    pub fn confirming_by_voice(mut self, confirms: VoiceConfirms) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.voice_confirms = Some(confirms);
         self
     }
 
@@ -6960,6 +7047,24 @@ async fn spoken(
             Some((eyes, known)) => {
                 let (speakers, pair, alone) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
+                // `LAMP_SAME_VOICE_CONFIRMS`: their voice, their face the one
+                // face in view, is their face seen saying it.
+                let speakers = if shared.scope_seen {
+                    let own_face = pair
+                        .as_ref()
+                        .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
+                        .map(|(_, face)| face.as_str());
+                    confirmed_by_voice(
+                        shared.voice_confirms.as_ref(),
+                        request,
+                        &person,
+                        speakers,
+                        own_face,
+                        |face| eyes.one_face_in_view(face, begun, finishing),
+                    )
+                } else {
+                    speakers
+                };
                 // With `LAMP_SERVICES`, who was seen saying it is kept for
                 // the line's own services write before the chat begins: a
                 // write is the owner's only when their face was seen saying
@@ -7176,6 +7281,7 @@ async fn spoken(
         let speaking = shared.speaking.clone();
         let seen_only = shared.scope_seen;
         let one_voice = shared.one_face.clone();
+        let voice_confirms = shared.voice_confirms.clone();
         tokio::spawn(async move {
             let found = late_face.await.ok().flatten();
             let keeper = match (found, speaking) {
@@ -7190,6 +7296,19 @@ async fn spoken(
                         .as_ref()
                         .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
                         .map(|(_, face)| face.clone());
+                    // `LAMP_SAME_VOICE_CONFIRMS`, as at its admission.
+                    let speakers = if seen_only {
+                        confirmed_by_voice(
+                            voice_confirms.as_ref(),
+                            request,
+                            &person,
+                            speakers,
+                            own_face.as_deref(),
+                            |face| eyes.one_face_in_view(face, begun, finishing),
+                        )
+                    } else {
+                        speakers
+                    };
                     let one_face = seen_only
                         && speakers.is_empty()
                         && one_face_theirs(

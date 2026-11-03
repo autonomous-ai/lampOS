@@ -86,6 +86,9 @@ pub const FOR_SERVICES_FLAG: &str = "--same-voice-for-services";
 /// The provider worker's flag for it, with the path, right after
 /// `--spoken-to`.
 pub const FLAG: &str = "--same-voice-model";
+/// The provider worker's flag for [`CONFIRMS_ENVIRONMENT`], with its bar,
+/// right after [`FLAG`] and its path.
+pub const CONFIRMS_FLAG: &str = "--same-voice-confirms";
 /// The child's executable, installed beside `lamp-voice`.
 pub const EXECUTABLE: &str = "lamp-same-voice";
 /// Samples a second.
@@ -151,6 +154,40 @@ pub const SAME_FROM: f32 = 0.70;
 /// from being refused while still turning away a clearly different voice.
 /// CAM++ cosine for one speaker usually runs above 0.6, for two 0.2-0.4.
 pub const SERVICES_SAME_FROM: f32 = 0.55;
+/// `on` exactly, beside [`ENVIRONMENT`], on the second route: the voice
+/// only ever confirms ([`OwnerVoice`], the memory owner's decision of 4 Nov:
+/// CAM++ one way only). A line no face was seen speaking, in the voice of
+/// the known person whose face is the one face in view, at
+/// [`CONFIRM_BAR_ENVIRONMENT`]'s bar or over, counts as seen said by them.
+/// A score under it does nothing, and no score ends, holds or splits a
+/// conversation ([`Voices::confirming_only`]). Off unless set.
+pub const CONFIRMS_ENVIRONMENT: &str = "LAMP_SAME_VOICE_CONFIRMS";
+/// The cosine against the known person's own prints a line needs to be
+/// confirmed as theirs ([`CONFIRMS_ENVIRONMENT`]): a number over 0 and at
+/// most 1, else [`CONFIRM_BAR`].
+pub const CONFIRM_BAR_ENVIRONMENT: &str = "LAMP_SAME_VOICE_CONFIRM_BAR";
+/// [`CONFIRM_BAR_ENVIRONMENT`]'s default, set from real voices: the memory
+/// owner's own voice on lamp-06c1's mic against 14 Mac `say` voices
+/// through its speaker, printed on the lamp's CPU (4 Nov, 20:48;
+/// `drafts/memory-architecture/campp-voices/owner2/bar-20261104.md`). At
+/// the voice's 1.8 s cut an owner print, the mean of 3 segments, scored
+/// 0.47 to 0.70 (median 0.64) against a left-out segment of theirs, and
+/// the Mac voices at most 0.28 against it; at the full cut 0.72 to 0.87
+/// against at most 0.29. So 0.45 sits under the owner's short floor and
+/// well over every other voice; the earlier 0.70 confirmed almost no
+/// short line. A single 1.8 s segment pair fell to 0.29, at the other
+/// voices' 0.31, so the bar holds only against a mean of
+/// [`OWNER_LEAST_PRINTS`] or more. One owner and Mac voices: a voice close
+/// to theirs (a relative) is not measured.
+pub const CONFIRM_BAR: f32 = 0.45;
+/// How many of a known person's own prints are kept to confirm their voice
+/// by: the first lines their face alone was seen speaking, in RAM only.
+pub const OWNER_PRINTS: usize = 4;
+/// How many of their prints must be kept before any line is judged against
+/// their mean: a single short print against another scored 0.29 on
+/// lamp-06c1, at another voice's level, while a mean of 3 kept the owner at
+/// 0.47 or over ([`CONFIRM_BAR`]).
+pub const OWNER_LEAST_PRINTS: usize = 3;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
 /// A child that ends this many times in a row before it is ready is not
@@ -205,7 +242,43 @@ fn arguments_for(model: Option<&Path>, uses: Option<&str>, journal: &Journal) ->
             PrintsFor::Nothing => arguments.clear(),
         }
     }
+    let confirms = confirms_arguments(&arguments, confirms_from_environment());
+    arguments.extend(confirms);
     arguments
+}
+
+/// [`CONFIRMS_FLAG`] and its bar, only beside a model's flags.
+fn confirms_arguments(model: &[String], bar: Option<f32>) -> Vec<String> {
+    match bar {
+        Some(bar) if !model.is_empty() => vec![CONFIRMS_FLAG.to_owned(), bar.to_string()],
+        _ => Vec::new(),
+    }
+}
+
+/// Take a leading `--same-voice-confirms BAR` off a worker's flags, right
+/// after [`take`]: the bar the voice confirms a line at, the voice then
+/// only confirming ([`CONFIRMS_ENVIRONMENT`]).
+pub fn take_confirms(flags: &[String]) -> io::Result<(Option<f32>, &[String])> {
+    match flags {
+        [flag, bar, rest @ ..] if flag == CONFIRMS_FLAG => {
+            match bar
+                .parse::<f32>()
+                .ok()
+                .filter(|bar| bar.is_finite() && *bar > 0.0 && *bar <= 1.0)
+            {
+                Some(bar) => Ok((Some(bar), rest)),
+                None => Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("{CONFIRMS_FLAG} takes a bar over 0 and at most 1"),
+                )),
+            }
+        }
+        [flag, ..] if flag == CONFIRMS_FLAG => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("{CONFIRMS_FLAG} takes a bar"),
+        )),
+        _ => Ok((None, flags)),
+    }
 }
 
 fn arguments(model: Option<&Path>) -> Vec<String> {
@@ -656,6 +729,147 @@ pub struct Voices<P: Printer> {
     /// A line is asked for only while this says yes
     /// ([`Self::asking_only_while`]): with none, always.
     asks_while: Option<Box<dyn Fn() -> bool + Send>>,
+    /// Prints are made, but nothing is judged by them here
+    /// ([`Self::confirming_only`]).
+    confirm_only: bool,
+}
+
+/// The bar [`CONFIRM_BAR_ENVIRONMENT`] says: a number over 0 and at most 1,
+/// else [`CONFIRM_BAR`].
+pub fn confirm_bar(value: Option<&str>) -> f32 {
+    value
+        .and_then(|value| value.trim().parse::<f32>().ok())
+        .filter(|bar| bar.is_finite() && *bar > 0.0 && *bar <= 1.0)
+        .unwrap_or(CONFIRM_BAR)
+}
+
+/// With [`CONFIRMS_ENVIRONMENT`] `on`, the bar a line is confirmed at.
+pub fn confirms_from_environment() -> Option<f32> {
+    confirms_from(|name| std::env::var(name).ok())
+}
+
+/// [`confirms_from_environment`], each variable read by `var`.
+pub fn confirms_from(var: impl Fn(&str) -> Option<String>) -> Option<f32> {
+    (var(CONFIRMS_ENVIRONMENT).as_deref() == Some("on"))
+        .then(|| confirm_bar(var(CONFIRM_BAR_ENVIRONMENT).as_deref()))
+}
+
+/// The known person's own voice, to confirm a line as theirs by
+/// ([`CONFIRMS_ENVIRONMENT`]): the prints of the first [`OWNER_PRINTS`]
+/// lines their face alone was seen speaking, the one face in view. In RAM
+/// only, for one person at a time: another known person, or the voice
+/// starting again, begins it afresh. Nothing is written anywhere.
+pub struct OwnerVoice {
+    bar: f32,
+    /// Whose, and each print with its line's request.
+    kept: std::sync::Mutex<Option<OwnPrints>>,
+}
+
+/// Whose prints [`OwnerVoice`] keeps, and each with its line's request.
+type OwnPrints = (String, Vec<(u64, Vec<f32>)>);
+
+/// What [`OwnerVoice::judge`] made of a line.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Confirmed {
+    /// At the bar or over: theirs.
+    Theirs(f32),
+    /// Under it: nothing changes.
+    Under(f32),
+    /// Fewer than [`OWNER_LEAST_PRINTS`] of their prints kept yet, or no
+    /// cosine.
+    Unknown,
+}
+
+/// The mean of `prints`, each first made of unit length; none for no print,
+/// prints of two lengths, or one not finite or all zero.
+fn mean_of_units<'a>(prints: impl Iterator<Item = &'a [f32]>) -> Option<Vec<f32>> {
+    let mut sum: Option<Vec<f64>> = None;
+    for print in prints {
+        let norm = print
+            .iter()
+            .map(|&value| f64::from(value) * f64::from(value))
+            .sum::<f64>()
+            .sqrt();
+        if !norm.is_finite() || norm == 0.0 {
+            return None;
+        }
+        let sum = sum.get_or_insert_with(|| vec![0.0; print.len()]);
+        if sum.len() != print.len() {
+            return None;
+        }
+        for (total, &value) in sum.iter_mut().zip(print) {
+            *total += f64::from(value) / norm;
+        }
+    }
+    sum.map(|sum| sum.into_iter().map(|value| value as f32).collect())
+}
+
+impl OwnerVoice {
+    pub fn new(bar: f32) -> Self {
+        Self {
+            bar,
+            kept: std::sync::Mutex::new(None),
+        }
+    }
+
+    pub fn bar(&self) -> f32 {
+        self.bar
+    }
+
+    /// `print`, of the line `request`, is of a line `person`'s face alone
+    /// was seen speaking: kept while fewer than [`OWNER_PRINTS`] of theirs
+    /// are, once a line. Another person's replaces what was kept. Whether
+    /// it was kept.
+    pub fn learn(&self, person: &str, request: u64, print: Vec<f32>) -> bool {
+        let Ok(mut kept) = self.kept.lock() else {
+            return false;
+        };
+        match kept.as_mut() {
+            Some((of, prints)) if of == person => {
+                if prints.len() >= OWNER_PRINTS || prints.iter().any(|(line, _)| *line == request) {
+                    return false;
+                }
+                prints.push((request, print));
+            }
+            _ => *kept = Some((person.to_owned(), vec![(request, print)])),
+        }
+        true
+    }
+
+    /// How many of `person`'s prints are kept.
+    pub fn known(&self, person: &str) -> usize {
+        self.kept
+            .lock()
+            .ok()
+            .and_then(|kept| {
+                kept.as_ref()
+                    .filter(|(of, _)| of == person)
+                    .map(|(_, prints)| prints.len())
+            })
+            .unwrap_or(0)
+    }
+
+    /// `print`'s cosine against the mean of `person`'s kept prints, each
+    /// first made of unit length, against the bar; [`Confirmed::Unknown`]
+    /// while fewer than [`OWNER_LEAST_PRINTS`] are kept. The mean, not the
+    /// highest of them: on the Mac matrix (4 Nov) the highest confirmed 76%
+    /// of the owner's long lines at 0.70 against the mean's 89%, with no
+    /// other voice passing either.
+    pub fn judge(&self, person: &str, print: &[f32]) -> Confirmed {
+        let Ok(kept) = self.kept.lock() else {
+            return Confirmed::Unknown;
+        };
+        let best = kept
+            .as_ref()
+            .filter(|(of, prints)| of == person && prints.len() >= OWNER_LEAST_PRINTS)
+            .and_then(|(_, prints)| mean_of_units(prints.iter().map(|(_, own)| own.as_slice())))
+            .and_then(|mean| cosine(&mean, print));
+        match best {
+            Some(cosine) if cosine >= self.bar => Confirmed::Theirs(cosine),
+            Some(cosine) => Confirmed::Under(cosine),
+            None => Confirmed::Unknown,
+        }
+    }
 }
 
 impl<P: Printer> Voices<P> {
@@ -677,6 +891,7 @@ impl<P: Printer> Voices<P> {
             sure_of_another: None,
             for_services: false,
             asks_while: None,
+            confirm_only: false,
         }
     }
 
@@ -703,6 +918,23 @@ impl<P: Printer> Voices<P> {
     pub fn for_services_only(mut self, on: bool) -> Self {
         self.for_services = on;
         self
+    }
+
+    /// With `on` ([`CONFIRMS_ENVIRONMENT`]), prints are still made for
+    /// [`Self::print_of`], but nothing here judges by them: no likeness, no
+    /// cosine of two lines or to the asker, no line known late for another
+    /// voice's. So no rule that ends, holds or splits a conversation by
+    /// voice can fire, nor one that joins or carries by it: the voice only
+    /// confirms, as [`OwnerVoice`] does (the memory owner's decision of
+    /// 4 Nov).
+    pub fn confirming_only(mut self, on: bool) -> Self {
+        self.confirm_only = on;
+        self
+    }
+
+    /// Whether the voice only confirms ([`Self::confirming_only`]).
+    pub fn is_confirming_only(&self) -> bool {
+        self.confirm_only
     }
 
     /// From now on, a print come after its line's verdict ends the
@@ -859,8 +1091,20 @@ impl<P: Printer> Voices<P> {
         }
     }
 
-    /// The print of the line `request`, once it has come.
+    /// The print of the line `request`, once it has come. None with
+    /// [`Self::confirming_only`]: no rule outside the confirm sees a print.
     pub fn print_of(&mut self, request: u64) -> Option<Vec<f32>> {
+        self.poll();
+        if self.confirm_only {
+            return None;
+        }
+        self.print(request).cloned()
+    }
+
+    /// The print of the line `request`, once it has come, for the confirm
+    /// alone ([`OwnerVoice`], [`CONFIRMS_ENVIRONMENT`]), whatever
+    /// [`Self::confirming_only`] says.
+    pub fn print_to_confirm(&mut self, request: u64) -> Option<Vec<f32>> {
         self.poll();
         self.print(request).cloned()
     }
@@ -890,7 +1134,7 @@ impl<P: Printer> Voices<P> {
     /// conversation's. Once a line: asked again for the same line, nothing.
     pub fn likeness(&mut self, request: u64) -> Option<f32> {
         self.poll();
-        if self.judged == Some(request) {
+        if self.confirm_only || self.judged == Some(request) {
             return None;
         }
         let likeness = self.likest(self.print(request)?)?;
@@ -903,6 +1147,9 @@ impl<P: Printer> Voices<P> {
     /// while its print or the conversation's voice is not known.
     pub fn likeness_so_far(&mut self, request: u64) -> Option<f32> {
         self.poll();
+        if self.confirm_only {
+            return None;
+        }
         self.likest(self.print(request)?)
     }
 
@@ -911,6 +1158,9 @@ impl<P: Printer> Voices<P> {
     /// on from the one it cut short, which the rule judged already.
     pub fn alike(&mut self, a: u64, b: u64) -> Option<f32> {
         self.poll();
+        if self.confirm_only {
+            return None;
+        }
         cosine(self.print(a)?, self.print(b)?)
     }
 
@@ -923,6 +1173,9 @@ impl<P: Printer> Voices<P> {
     /// here lasts until the next one begins.
     pub fn like_asker(&mut self, request: u64) -> Option<f32> {
         self.poll();
+        if self.confirm_only {
+            return None;
+        }
         cosine(self.asker.as_deref()?, self.print(request)?)
     }
 
@@ -930,7 +1183,7 @@ impl<P: Printer> Voices<P> {
     /// journal of a line not joined ([`Self::alike`]).
     pub fn printed(&mut self, request: u64) -> bool {
         self.poll();
-        self.print(request).is_some()
+        !self.confirm_only && self.print(request).is_some()
     }
 
     /// The highest cosine of `print` against the conversation's prints.
@@ -958,7 +1211,10 @@ impl<P: Printer> Voices<P> {
     /// lamp, or whose print could not be asked for.
     pub fn unjudged(&self, request: u64) -> Option<&'static str> {
         let coming = self.print_coming(request);
-        if self.judged == Some(request) || !coming && self.print(request).is_none() {
+        if self.confirm_only
+            || self.judged == Some(request)
+            || !coming && self.print(request).is_none()
+        {
             return None;
         }
         match (self.conversation.is_empty(), self.answered) {
@@ -987,7 +1243,7 @@ impl<P: Printer> Voices<P> {
     /// unknown voice let out by the ordinary follow-up at 3 s matched itself
     /// at 12 s).
     fn adopt(&mut self, request: u64, print: Vec<f32>, going_on: bool) {
-        let likeness = (going_on && self.judged != Some(request))
+        let likeness = (going_on && !self.confirm_only && self.judged != Some(request))
             .then(|| self.likest(&print))
             .flatten();
         // With `sure_of_another`, an unsure print is neither another voice
@@ -1093,6 +1349,9 @@ impl<P: Printer> Voices<P> {
     /// began the count afresh, has been spoken.
     pub fn take_late_other(&mut self) -> Option<u64> {
         self.poll();
+        if self.confirm_only {
+            return None;
+        }
         self.late_other.take()
     }
 
@@ -2163,5 +2422,146 @@ exec sleep 30"#,
         );
         assert!(answer(r#"{"request":7,"print":[]}"#, 7).is_err());
         assert!(answer("lamp", 7).is_err());
+    }
+
+    /// `LAMP_SAME_VOICE_CONFIRMS`: another voice going on, a print under
+    /// every bar, judges nothing by voice: no likeness, no late other voice,
+    /// no cosine of two lines or to the asker, and no print for any other
+    /// rule. Only the confirm reads it. So nothing ends, holds or splits
+    /// the conversation from that score.
+    #[test]
+    fn a_low_match_confirming_only_ends_and_holds_nothing() {
+        for confirming in [false, true] {
+            let mut voices = Voices::new(StandIn::default()).confirming_only(confirming);
+            assert_eq!(voices.is_confirming_only(), confirming);
+            said(&mut voices, 1, 1, 48_000);
+            voices.decided(1, true, false);
+            // Another voice, judged at its verdict.
+            said(&mut voices, 2, -1, 48_000);
+            let at = voices.at_verdict(2, true, false);
+            // Another voice let out unjudged, known only after its answer.
+            said(&mut voices, 3, -1, 48_000);
+            voices.decided(3, true, true);
+            let late = voices.take_late_other();
+            let printed = voices.print_of(2).is_some();
+            if confirming {
+                assert_eq!(
+                    at,
+                    AtVerdict {
+                        likeness: None,
+                        unjudged: None,
+                        late_other: None
+                    }
+                );
+                assert_eq!(late, None);
+                assert!(!printed);
+                assert_eq!(voices.alike(1, 2), None);
+                assert_eq!(voices.like_asker(2), None);
+                assert_eq!(voices.likeness_so_far(2), None);
+                assert!(!voices.printed(2));
+                // The confirm alone still has the print.
+                assert_eq!(voices.print_to_confirm(2), Some(vec![0.0, 1.0, 0.0]));
+            } else {
+                // As before: another voice, at the verdict and late.
+                assert_eq!(at.likeness, Some(0.0));
+                assert_eq!(late, Some(3));
+                assert!(printed);
+            }
+        }
+    }
+
+    /// The confirm's bar is read from `LAMP_SAME_VOICE_CONFIRM_BAR`, only
+    /// with `LAMP_SAME_VOICE_CONFIRMS=on`; a bar out of (0, 1] or not a
+    /// number is the default.
+    #[test]
+    fn the_confirm_bar_is_read_from_the_environment() {
+        let env = |confirms: Option<&'static str>, bar: Option<&'static str>| {
+            move |name: &str| match name {
+                CONFIRMS_ENVIRONMENT => confirms.map(str::to_owned),
+                CONFIRM_BAR_ENVIRONMENT => bar.map(str::to_owned),
+                _ => None,
+            }
+        };
+        assert_eq!(confirms_from(env(None, Some("0.6"))), None);
+        assert_eq!(confirms_from(env(Some("yes"), Some("0.6"))), None);
+        assert_eq!(confirms_from(env(Some("on"), None)), Some(CONFIRM_BAR));
+        assert_eq!(confirms_from(env(Some("on"), Some("0.62"))), Some(0.62));
+        assert_eq!(confirms_from(env(Some("on"), Some(" 1 "))), Some(1.0));
+        for wrong in ["0", "-0.4", "1.2", "NaN", "inf", "high", ""] {
+            assert_eq!(
+                confirms_from(env(Some("on"), Some(wrong))),
+                Some(CONFIRM_BAR),
+                "{wrong}"
+            );
+        }
+    }
+
+    /// Off, the worker's flags are as before: nothing after the model's,
+    /// and a flag list without the confirm's comes back whole. On, the bar
+    /// goes after the model's path, and only beside it.
+    #[test]
+    fn the_confirm_flag_is_only_beside_the_model_and_off_is_unchanged() {
+        let model = arguments(Some(Path::new("/m.onnx")));
+        assert!(confirms_arguments(&model, None).is_empty());
+        assert!(confirms_arguments(&[], Some(0.5)).is_empty());
+        let mut flags = model.clone();
+        flags.extend(confirms_arguments(&model, Some(0.62)));
+        flags.push("--rest".to_owned());
+        assert_eq!(flags[2..4], [CONFIRMS_FLAG.to_owned(), "0.62".to_owned()]);
+        let (path, rest) = take(&flags).unwrap();
+        assert_eq!(path.as_deref(), Some(Path::new("/m.onnx")));
+        let (bar, rest) = take_confirms(rest).unwrap();
+        assert_eq!(bar, Some(0.62));
+        assert_eq!(rest, ["--rest".to_owned()]);
+        let plain = vec!["--rest".to_owned()];
+        let (bar, rest) = take_confirms(&plain).unwrap();
+        assert_eq!((bar, rest), (None, &plain[..]));
+        assert!(take_confirms(&[CONFIRMS_FLAG.to_owned(), "2".to_owned()]).is_err());
+        assert!(take_confirms(&[CONFIRMS_FLAG.to_owned()]).is_err());
+    }
+
+    /// The known person's own voice: their kept prints against the bar, one
+    /// person at a time, each line once, at most `OWNER_PRINTS`.
+    #[test]
+    fn the_owner_voice_judges_against_their_own_prints_only() {
+        let owner = OwnerVoice::new(0.5);
+        assert_eq!(owner.judge("a", &[1.0, 0.0]), Confirmed::Unknown);
+        // Against the mean of their prints, each of unit length: prints at
+        // right angles, scaled apart, are matched best half way. Under
+        // `OWNER_LEAST_PRINTS` of them, nothing is judged.
+        let three = OwnerVoice::new(0.9);
+        three.learn("a", 1, vec![3.0, 0.0]);
+        three.learn("a", 2, vec![0.0, 0.5]);
+        assert_eq!(three.judge("a", &[1.0, 1.0]), Confirmed::Unknown);
+        three.learn("a", 3, vec![0.0, 0.0]);
+        assert_eq!(three.known("a"), OWNER_LEAST_PRINTS);
+        // An all-zero print makes no mean.
+        assert_eq!(three.judge("a", &[1.0, 1.0]), Confirmed::Unknown);
+        let three = OwnerVoice::new(0.9);
+        three.learn("a", 1, vec![3.0, 0.0]);
+        three.learn("a", 2, vec![0.0, 0.5]);
+        three.learn("a", 3, vec![2.0, 2.0]);
+        assert!(matches!(three.judge("a", &[1.0, 1.0]), Confirmed::Theirs(c) if c > 0.99));
+        assert!(
+            matches!(three.judge("a", &[1.0, 0.0]), Confirmed::Under(c) if (c - 0.707).abs() < 0.01)
+        );
+        assert!(owner.learn("a", 1, vec![1.0, 0.0]));
+        assert!(!owner.learn("a", 1, vec![1.0, 0.0]));
+        owner.learn("a", 2, vec![1.0, 0.0]);
+        owner.learn("a", 3, vec![1.0, 0.0]);
+        assert!(matches!(
+            owner.judge("a", &[0.9, 0.1]),
+            Confirmed::Theirs(_)
+        ));
+        assert!(matches!(owner.judge("a", &[0.1, 0.9]), Confirmed::Under(_)));
+        assert_eq!(owner.judge("b", &[1.0, 0.0]), Confirmed::Unknown);
+        for request in 4..10 {
+            owner.learn("a", request, vec![1.0, 0.0]);
+        }
+        assert_eq!(owner.known("a"), OWNER_PRINTS);
+        // Another known person begins it afresh.
+        assert!(owner.learn("b", 11, vec![0.0, 1.0]));
+        assert_eq!(owner.known("a"), 0);
+        assert_eq!(owner.known("b"), 1);
     }
 }
