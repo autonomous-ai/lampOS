@@ -4954,6 +4954,31 @@ fn a_computers_end_with_its_id_cuts_the_answer_awaited() {
     );
 }
 
+/// Only the lamp's own words waiting for the provider count as the lamp
+/// speaking when a computer's turn is asked: a person's line on its way to
+/// the route (lamp-75c9, 3 Nov 17:51: a room line, then held back, refused
+/// the turn "by the provider's queue") is not.
+#[test]
+fn only_the_lamps_own_words_queued_count_as_it_speaking() {
+    let written = ProviderInput::Written {
+        request: 1,
+        session: 1,
+        privacy_generation: 1,
+        text: "Time to stretch.".into(),
+        look: false,
+        search: false,
+        quoted: false,
+    };
+    let persons_end = ProviderInput::End {
+        request: 2,
+        privacy_generation: 1,
+        sound: false,
+        cut_in: false,
+    };
+    assert!(super::super::own_words(&written));
+    assert!(!super::super::own_words(&persons_end));
+}
+
 /// A computer's turn asked while the room talks, with no conversation with
 /// the lamp going on, opens: speech heard is not a conversation with the
 /// lamp. In a busy office the person's talk to others refused every turn
