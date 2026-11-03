@@ -113,3 +113,58 @@ left alone since it last spoke`.
   distance; the counts here are not its counts.
 - Nothing on the lamp was changed; the Mac's speaker volume was put back
   (it had been 14 %).
+
+## after2 again on stable 9788, 16:50–16:57 (the first builder's yes, 13:26)
+
+Stable moved to 9788 at 16:30 (it carries #5034: the product unit sets
+`LAMP_UNTIED_GOING_ON=held`). lamp-fc4b took it by itself: `lamp-update:
+up to date: build 9788` at 16:48:09, the voice restarted at 16:47:01, and
+`systemctl show lamp-voice` has `LAMP_UNTIED_GOING_ON=held`. Nothing was
+installed or changed by hand. The same runner, the same clips, `after2`
+four times (passes a–d, 16:50, 16:52, 16:54, 16:56), the Mac's speaker at
+45 % beside the lamp, one person present, silent, nobody in view.
+
+**The chat service was failing through the run**, on this lamp and on
+others (Mobile on lamp-0c89 and Migrate on lamp-3e83 posted the same on
+#4710 at 16:5x; Friday's bench on lamp-06c1 stopped on DeepSeek's 503 "too
+busy"). On lamp-fc4b since 16:47: 9 `a service answered HTTP 503
+(service_unavailable_error)`, 3 `said its thoughts are slow`, 7 `ended
+before its answer: a newer line began`, and **one** `first answer audio`,
+67 419 ms after its words. So "Lamp, what time is it?" was never answered
+within the runner's 14 s in any pass, and d07 went 4 s after a 14 s wait
+instead of 4 s after an answer. The passes do not reproduce #4450's
+after-answer condition; they are kept for what they do show
+(`journal-9788-pass-a.txt` to `-d.txt`).
+
+| pass | line | request | the voice's verdict | answered |
+|---|---|---|---|---|
+| a | a01 | 13 | played: its name was heard in the room's sound; its chat began in 1854 ms and said nothing; cut by d07 20 s later (`0 of its answer's 0 words were played`) | no sound in 20 s |
+| a | d07 | 14 | held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on; its chat round failed, HTTP 503 | no |
+| a | d08 | 15 | held back: nobody spoke to the lamp (as above); then, as "request 13's words, answered in its place", **first answer audio 67 419 ms** later, at 16:52:25 | the ask's answer, 67 s late |
+| b | a01 | 16 | played: the text shows it was called; it began while that late answer was still playing; cut by d07 | no sound in 20 s |
+| b | d07 | 17 | **held back: a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp** (`LAMP_UNTIED_GOING_ON=held`) | no |
+| b | d08 | 18 | **held back, the same `held` reason**; its chat round (for the words answered in its place) failed, HTTP 503 | no |
+| c | a01 | 21 | played: the text shows it was called; chat began in 1615 ms and said nothing; cut by d07 | no sound in 20 s |
+| c | d07 | 22 | held back: nobody spoke to the lamp | no |
+| c | d08 | 23 | held back: nobody spoke to the lamp; HTTP 503 | no |
+| d | a01 | 26 | played: its name was heard in the room's sound; chat began in 783 ms and said nothing; `ended before its answer: a newer line began` | no sound in 20 s |
+| d | d07 | 27 | held back: nobody spoke to the lamp; HTTP 503, `said its thoughts are slow` | no |
+| d | d08 | — | no request opened (the lamp was saying its thoughts are slow) | no |
+
+What it says:
+
+- **`held` fires on 9788.** In pass b the lamp was in a conversation (its
+  67 s-late answer was playing), and both desk lines were held with the
+  new reason, `a conversation with the lamp is going on, but the line has
+  no tie to the lamp`. On 9724 the same lines in a conversation were let
+  out to the model and d08 was answered (above). That is one pass, in an
+  odd conversation.
+- **The clean case is not shown.** With the chat service answering, a01
+  is answered in about 3 s and d07 comes 4 s after the answer's end; then
+  d08 either is held by `held` or is not. That run is still owed, and
+  takes a few minutes once the service answers again.
+- The desk lines were held in every pass (8 of 8 held or unopened), but
+  in a, c and d for the old reason, since no conversation was going on.
+- The 503s are the chat service's, seen on four lamps at once; not 9788's
+  and not this lamp's. Before the switch (16:00–16:47) the lamp had no 503
+  and no answer either, since nobody spoke to it.
