@@ -12299,16 +12299,15 @@ fn conversation_with_gate_inner(
                     );
                     ticket.answer(crate::say::Outcome::Refused(why.into()));
                 }
+            // Not a say's quiet after any line heard, nor the reminders'
+            // quiet after speech: as an exact say does, a computer's turn
+            // waits only for speech to the lamp (refused above), its
+            // speaker, a line still being admitted and an answer owed
+            // (lamp-75c9, 3 Nov 18:45: a room line held back made a turn
+            // wait 15 s).
             } else if !reminder_waiting
                 && admission.idle_for_reminder()
-                && clock.saturating_sub(last_turn_us) >= crate::say::QUIET_US
                 && snapshot.listening_ready(MonoTime::from_micros(control_now_us))
-                && reminder_quiet(
-                    control_now_us,
-                    reminder_cycle_started_us,
-                    last_speech_us,
-                    last_capture,
-                )
                 && playback_mask.available(control_now_us)
                 && !(refused_hold && model_refusing.holds(control_now_us))
                 && let Some(provider_session) = unasked_session(&cloud, unasked_paused)

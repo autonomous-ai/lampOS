@@ -4979,6 +4979,41 @@ fn only_the_lamps_own_words_queued_count_as_it_speaking() {
     assert!(!super::super::own_words(&persons_end));
 }
 
+/// A computer's turn asked just after a line that drew no answer (heard as
+/// no words, so nobody spoke to the lamp) opens at once: it waits for speech
+/// to the lamp, its speaker and an answer owed, never for a say's quiet
+/// after any line heard. On lamp-75c9 on 3 Nov (18:45) a room line held back
+/// made the turn wait 15 s, and its window opened after the person's
+/// question had passed.
+#[test]
+fn a_computers_turn_opens_at_once_after_a_line_that_drew_no_answer() {
+    use crate::say::Answer;
+    let _one = super::pilot_faults::one_session();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let (says, line, answered) = crate::say::Says::line_for_test(
+        r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
+    );
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_hears: Some(""),
+        say_at_frame: Some((300, line)),
+        written: Written::Said(12),
+        // 5 s after the ask: well inside a say's 15 s quiet.
+        mute_at_frame: Some(800),
+        limit: Duration::from_secs(20),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    let answered: Vec<_> = answered.try_iter().collect();
+    assert!(
+        matches!(answered.first(), Some(Answer::BegunTurn { .. })),
+        "{answered:?} {}",
+        run.summary()
+    );
+}
+
 /// A computer's turn asked while the room talks, with no conversation with
 /// the lamp going on, opens: speech heard is not a conversation with the
 /// lamp. In a busy office the person's talk to others refused every turn
