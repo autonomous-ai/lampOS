@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-03 16:32 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-11-03 20:50 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 92.3% over 76 rows. Quality 67.6% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 92.3% over 76 rows. Quality 67.1% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -51,7 +51,7 @@ Written by the first builder from the team's review page at 2026-11-03 16:32 (+0
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
 | Moves with its words while it speaks | 1.00 | #933 #1067 #1365 #2030 | thirteen | 20 Oct 09:4x, built: #1759 (with #1067’s sway) merged into lamp-voice after its try on lamp-52e6 with the lead, so every lamp nods and sways while it speaks, sparse as the lead chose. |
 | Never tips itself over | 1.00 | #1072 #704 | — | Built with V1’s limits; |
-| One inner state (mood) every behaviour reads, and familiarity *(mood, for later: not in the build figure)* | 0.72 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, sixth, jarvis, seventh | 22 Oct 22:0x, up from 0.7: a say’s record keeps who it told and the familiar level (#3056 merged, Seventh), so #2831’s last bar can be read on 52e6. |
+| One inner state (mood) every behaviour reads, and familiarity *(mood, for later: not in the build figure)* | 0.72 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, sixth, seventh | 22 Oct 22:0x, up from 0.7: a say’s record keeps who it told and the familiar level (#3056 merged, Seventh), so #2831’s last bar can be read on 52e6. |
 | Music matched to your mood (for later) *(mood, for later: not in the build figure)* | 0.00 | #3504 | — | 27 Oct 08:1x, new, from the lead’s 07:58 list: music to relax plays one 48 s piece. |
 | Shows its feelings in body and light, as V1’s emotions did | 0.50 | #3504 #3691 #4020 | jarvis | 29 Oct 06:3x, up from 0: this row was stale. |
 | Joys: sways to music, watches you leave, core skills | 0.80 | #1669 #1707 #1748 #2832 #2833 #2834 | sixth, fifth, nine | 23 Oct 16:1x, up from 0.7: music sway and watching you leave are on in the product units, with watch-you-leave by place only and no face print (#3219, a21f45e56). |
@@ -101,7 +101,7 @@ Written by the first builder from the team's review page at 2026-11-03 16:32 (+0
 | Cutting in | 0.55 | 0.75 | 31 Oct 16:1x, unchanged: on lamp-4ace’s product unit (c08b4c08f6), “Wait, hold on.” about 6 s into a story was handled 4 of 6 times. |
 | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.70 | 0.90 | 3 Nov 16:4x, up from 0.6: stable 9788 holds untied desk talk in a going-on conversation (#5034): desk lines left alone 8/8 against 6/8 off on lamp-52e6, named calls 8/8, tied follow-ups 4/4. |
+| Not spoken to | 0.60 | 0.90 | 3 Nov 21:0x, back to 0.6: stable 9868 (promote 3, 20:48) reverts #5034 (#5109): its quiet-room owner count failed on the switch’s own cost (OFF 37/37, HELD 25/28: a name split by a pause, a follow-up sharing no word, a t… |
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.70 | 0.85 | 3 Nov 13:1x, up from 0.4: stable 9724 (promoted 12:06) on lamp-9adf (Fourteen, 11:56): “every fifteen minutes” set with the call; |
