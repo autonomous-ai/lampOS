@@ -671,8 +671,8 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `set_reminder` | `text`, `time` | `day`, `zone`, `fold` | `Set` with `At` |
 | `repeat_reminder` | `text`, `time`, `every` | `weekday` (required for weekly), `zone` | `Set` with `Daily` or `Weekly` |
 | `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own, and the room's (set by no one) |
-| `cancel_reminder` | `id`, or `text` | none | `Cancel` of the selected whole item/series, only the line's own; by `text`, the one item whose text holds the words (case and edge spaces aside), resolved from the line's own list, else the matches named and nothing cancelled |
-| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, only the line's own |
+| `cancel_reminder` | `id`, or `text` | none | `Cancel` of the selected whole item/series, only the line's own or the room's; by `text`, the one item whose text holds the words (case and edge spaces aside), resolved from the line's own list, else the matches named and nothing cancelled |
+| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, only the line's own or the room's |
 
 Text is 1–300 UTF-8 bytes, nonblank and without controls. Seconds are whole
 integers from 1 through 31,536,000. `time` is exact `HH:MM`; `day` is `today`,
@@ -794,7 +794,7 @@ hex digits, as the hello does in #4625), never a name: the stored item's
 optional `person`, written by `Set`'s optional `person`. It is optional
 stored metadata, so there is no `schema` bump: a store from before loads
 with every item set by no one, and an older build reads a newer store,
-dropping the field (its items then are no one's, which only narrows).
+dropping the field (its items then are no one's: the room's, heard on every line).
 
 - **The setter** is the person a keep in that line would be written for
   at that moment, under memory's scope rules (`memory_scope`): the line's
@@ -857,7 +857,7 @@ dropping the field (its items then are no one's, which only narrows).
   and schedule ship together.
 - **A due reminder is said as before**, to whoever is there: it is due, so
   it is said. The delivery ledger's `list` and `get` are unchanged.
-- **No switch:** it only narrows who hears what.
+- **No switch.** It narrows a person's reminders to their own line, and widens the ones with no setter to every line: one stored before setters existed (an owner's "take my pills" set on an older build), or one whose `person` an older build dropped when it rewrote the store, was the owner's line's only and is now the room's.
 
 A reminder set while nobody known is in view is the room's (the first
 builder on #4710, 3 Nov 10:09): anyone in the room may hear it listed and
