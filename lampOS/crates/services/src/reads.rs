@@ -677,13 +677,32 @@ fn without_security(items: Vec<(Option<String>, Value)>, left_out: &str) -> Vec<
 /// is "a security mail, left out" in Gmail and "a security message, left
 /// out" in any other.
 pub fn quoted(name: &str, items: Vec<Value>) -> Value {
+    let apart = kept_apart(name);
     quoted_in(
         name,
         items
             .into_iter()
-            .map(|item| (group_of(&item), item))
+            .map(|item| {
+                let group = group_of(&item).or_else(|| (!apart).then(|| ANSWER.to_owned()));
+                (group, item)
+            })
             .collect(),
     )
+}
+
+/// The group of an item whose read names none: one answer's items are one
+/// page (a channel's history names its channel once, at the top, not on
+/// each message), so a code split across them is still read joined (the
+/// Reviewer-lead's P2 on #5070).
+pub const ANSWER: &str = "answer";
+
+/// Whether the service `name`'s items are each their own, never read
+/// joined however they come: Gmail's mails and Google Calendar's events.
+fn kept_apart(name: &str) -> bool {
+    ["gmail", "google_calendar"]
+        .iter()
+        .filter_map(|code| catalog::service(code))
+        .any(|service| service.name == name)
 }
 
 /// [`quoted`] with each item's group given ([`without_security`]).
@@ -1033,11 +1052,26 @@ mod tests {
         );
         assert_eq!(mails["quoted"][0]["text"], "Please verify the numbers");
         assert_eq!(mails["quoted"][1]["text"], "Room 1204 at noon");
+        // One answer's items with no group key are one page: a split code
+        // in a channel's history, its channel named once at the top, goes.
         let loose = quoted(
             "Slack",
-            vec![json!({"text":"Your code"}), json!({"text":"482913"})],
+            vec![
+                json!({"ts":"1.1","text":"Your verification code is"}),
+                json!({"ts":"1.2","text":"482913"}),
+            ],
         );
-        assert_eq!(loose["quoted"][1]["text"], "482913");
+        assert_eq!(texts(&loose), ["-", "-"], "{loose}");
+        // Calendar events with no group key are still each their own.
+        let events = quoted(
+            "Google Calendar",
+            vec![
+                json!({"summary":"Please verify the numbers"}),
+                json!({"summary":"Room 1204 at noon"}),
+            ],
+        );
+        assert_eq!(events["quoted"][0]["summary"], "Please verify the numbers");
+        assert_eq!(events["quoted"][1]["summary"], "Room 1204 at noon");
         // A calendar event asking to confirm, with its dates, is kept.
         let event = quoted(
             "Google Calendar",

@@ -370,8 +370,9 @@ hoặc `pin`; "code" (hoặc các từ trọn vẹn `mã`, `token`, `pin`,
 dạng mã ngay cạnh (`weak_code_near`: trong khoảng 80 byte, cùng một mệnh đề,
 không có `,`, `;`, `!`, `?`, xuống dòng hay hết câu ở giữa; một số mã không
 phải năm 1900 đến 2099, không phải giá tiền cạnh `$`, `€`, `£`, `¥`, `₫`,
-`đ`, `%`, `vnd` hay `usd`, không phải số thập phân như "1299.00", không được
-gắn nhãn bởi `#` hay một từ như `room`, `build`, `flight`, `order`, `door`,
+`đ`, `%`, `vnd` hay `usd`, không phải số thập phân như "1299.00", không phải
+giờ trong ngày (HHMM sau `at`, `by`, `from`, `until`, `till`, `before`,
+`after` hay `lúc`: "cuộc họp lúc 1430"), không được gắn nhãn bởi `#` hay một từ như `room`, `build`, `flight`, `order`, `door`,
 `phòng`; hoặc một từ chữ và số đổi giữa chữ cái và chữ số ít nhất hai lần,
 "A7B3C9" nhưng không phải "VN123" hay "10am"); "sign in", "log in", "login"
 hay "đăng nhập" cùng với một đường dẫn (`http://`, `https://`, `www.`) hay
@@ -401,8 +402,11 @@ câu trả lời của một tool MCP) theo mọi đoạn văn bản trong nó t
 (`reads::without_security`): một nhóm là thứ mà lần đọc cho biết chúng cùng
 thuộc về (`reads::group_of`: `channel`, `channel_id`, `thread_ts`,
 `threadId`, `thread_id`, trang hay khối `parent` của một khối Notion,
-`page_id`), và toàn bộ văn bản thuần của một câu trả lời MCP; các mục không
-có nhóm, như các thư hay sự kiện riêng biệt, không bao giờ được nối. Hai mục
+`page_id`); các mục mà lần đọc không nêu nhóm thì cùng một nhóm với phần
+còn lại của câu trả lời (lịch sử một kênh chỉ nêu kênh một lần ở đầu, không
+nêu ở từng tin nhắn: `reads::ANSWER`), cũng như toàn bộ văn bản thuần của
+một câu trả lời MCP; chỉ các thư Gmail và các sự kiện Google Calendar là
+riêng từng cái và không bao giờ được nối (`kept_apart`). Hai mục
 riêng thì ổn nhưng nối lại là nội dung bảo mật thì cả hai bị bỏ ra, hai đầu
 của ba mục cũng vậy khi chúng là như thế ("Your code", "is", "482913" giữ
 "is"); bên cạnh một nội dung bảo mật không có mã hay đường dẫn của riêng nó
@@ -694,8 +698,9 @@ sáu đoạn văn bản thường đã được review được giữ (một ng�
 đường, một phiên bản và bản build, một giá tiền, một chuyến bay, "please
 confirm by replying"); một mã cạnh "confirm" hay "enter" và một giá trị ngắn
 trên một path đăng nhập được phát hiện; chỉ các mục tạo nên một mã bị bỏ ra,
-trong một nhóm và qua ba mục, không bao giờ hai thư riêng biệt hay hai mục
-không có nhóm. `-p lamp-voice` (`services`,
+trong một nhóm và qua ba mục, không bao giờ hai thư riêng biệt hay hai sự
+kiện lịch; các mục không có khoá nhóm của một câu trả lời được đọc như một
+(P2 của Reviewer-lead trên #5070); "at 1430" được giữ như một giờ. `-p lamp-voice` (`services`,
 `tools`, `thread`, `made_skill`): công tắc cho ra cờ và thư mục, ba hàm được
 khai báo và định tuyến chỉ khi có công tắc và thư mục, luật đứng đầu, một câu
 gửi thuần và không gì khác ("do it" thì không bao giờ; "gởi", "gui di", "ừ,
