@@ -531,7 +531,25 @@ started once its answer is told:
   - **No "go on" from the lamp:** no request lets the person ask the lamp to
     go on with a task, so a task told is a task done, from the lamp's side.
 - **Read first, every time:** the close job reads the agent (`show`) just
-  before closing.
+  before closing (`Cli::observe_to_close`).
+  - **Its own bound:** that read is given `CLOSE_READ_TIMEOUT`, 45 s (no
+    more than one `launch_timeout`), not the 10 s `read_timeout` every other
+    read keeps. On a lamp on 3 Nov, `show` against the person's Mac took 16
+    to 39 s: every read before a close ran out at 10 s, and no harness was
+    closed, so they stayed open on the Mac.
+  - **One budget:** the read and `harness close` share `CLOSE_BUDGET`, 60 s;
+    the close is given what the read left (`Cli::close_within`), never more
+    than one `launch_timeout`. With nothing left it starts no process and
+    fails, code `close_no_time`. So the job lane is held no longer than one
+    launch, and a hand-over the person just said yes to waits behind a
+    close no longer than behind another launch.
+  - **Never skipped:** an earlier idle read (a held `wait`, `ps` or the read
+    that was told) never stands in for it. The person may have typed into
+    the harness since; only this read says it is still the told turn.
+  - **A read that fails is no idle agent:** its time run out, or any other
+    failure, closes nothing. The close fails with the read's code prefixed
+    `observe_` (`observe_timeout`), and is tried again like a failed close
+    (below).
   - **Still idle on the told turn** (the same answer to the same asked
     text): closed with `harness close --machine <id> <agent-id> --json`, by
     the agent's own id, never `--now`. Harness saves its screen and stops it,
@@ -551,11 +569,20 @@ started once its answer is told:
   covers working or waiting for the person (`WORKING`), changed while closing
   (`AGENT_CHANGED`) and gone alike, with only a message in the `--json`
   reply. So exit 1 is `failed`: tried again a minute later (`CLOSE_RETRY_MS`),
-  three times in all (`CLOSE_TRIES`), each try reading the agent first.
+  three times in all (`CLOSE_TRIES`), each try reading the agent first. A
+  read that fails or runs out (`observe_<code>`), a close that runs out
+  (`timeout`) and `close_no_time` are `failed` the same way. After the third
+  failed try the harness is left open, never asked again.
 - **Restarts:** a restart during a close leaves it `failed`, code `restart`,
   to be tried again the same way.
-- **The journal:** each close prints one line, `tasks: closing task N's
-  harness: …`, and `get_task` shows the task's `close`.
+- **The journal:** each close prints one line, and `get_task` shows the
+  task's `close` (its `state`, `tries` and `code`):
+  - `tasks: closing task N's harness: try T: Closed` (or `Gone`, `Left`,
+    `Refused`);
+  - `tasks: closing task N's harness: try T of 3 failed (CODE); tried again
+    in a minute, read first`;
+  - on the third: `… try 3 of 3 failed (CODE); giving up, the harness is
+    left open`.
 - **Reverting:** a `lamp-tasks` from before #1505 is `deny_unknown_fields`
   on its stored state, so it can't load a store with `close` or `closable` in
   it, nor a store with an observation `told` (written only with
@@ -576,13 +603,29 @@ started once its answer is told:
   - `a_turn_the_person_asked_or_a_task_from_before_the_switch_is_never_closed`;
   - `a_failed_close_is_tried_three_times_and_a_refused_one_never`;
   - `a_close_under_way_at_a_restart_is_tried_again`.
+- **`runtime::tests`:**
+  - `a_close_reads_first_and_closes_only_an_idle_agent_on_the_told_turn`
+    (the read before a close is its own, never the 10 s one; a failed read
+    closes nothing, `observe_<code>`; only idle on the told turn closes,
+    within what is left of `CLOSE_BUDGET`);
+  - `a_close_journal_line_names_its_try_and_the_give_up`.
 - **`tests/runtime.rs`, through the service:**
   - `a_harness_done_and_told_is_closed_once_by_the_service` (the person's
     own idle harness listed by `ps` beside it is never closed);
   - `without_close_told_no_harness_is_closed`;
-  - `a_harness_the_person_went_on_with_or_that_waits_for_them_is_left`.
+  - `a_harness_the_person_went_on_with_or_that_waits_for_them_is_left`;
+  - `a_show_slower_than_the_read_bound_still_ends_in_a_close` (every
+    ordinary read runs out and the harness is still closed; one the slow
+    read finds waiting for the person is left);
+  - `a_close_whose_read_runs_out_is_tried_again_read_first`;
+  - `a_close_whose_read_always_runs_out_gives_up_after_its_tries` (three
+    reads, a minute apart, nothing closed, then never again).
 - **`tests/harness.rs`, on the fixture CLI:**
-  `close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code`.
+  `close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code`;
+  `the_read_before_a_close_is_given_longer_than_any_other_read` (scaled
+  down: a `show` slower than `read_timeout` reads through before a close,
+  and one slower than the close's own bound still runs out);
+  `a_close_is_given_only_what_is_left_of_its_budget`.
 - **The voice's `coordinator::tests::say`, the turn's proof:**
   `news_heard_whole_is_handed_on_as_the_turn_ends`,
   `news_cut_short_is_never_handed_on`,
