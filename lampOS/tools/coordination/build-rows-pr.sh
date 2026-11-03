@@ -23,7 +23,8 @@ git -C $W status --short | grep -q . && { echo "$W has changes: stop"; exit 1; }
 git -C $W fetch -q origin +refs/heads/lamp-voice:refs/remotes/origin/lamp-voice || exit 1
 # 29 Oct 00:3x: the scratchpad's midnight sweep removed labels.json and gutted the rows worktree; refresh the labels each run.
 (cd $R && gh issue list -R autonomous-ai/lampOS --state all --limit 6000 --json number,labels -q 'map({key:(.number|tostring), value:[.labels[].name]})|from_entries') > $SP/labels.new && [[ -s $SP/labels.new ]] && mv $SP/labels.new $SP/labels.json
-$PYTHON -I $TOOLS_DIR/gen-build-rows.py $ROWS_SOURCE $SP/gen/build-rows.md $SP/labels.json || exit 1
+# 3 Nov 15:4x: the private names go in too, so a builder label that matches one is left out of the Owners column.
+$PYTHON -I $TOOLS_DIR/gen-build-rows.py $ROWS_SOURCE $SP/gen/build-rows.md $SP/labels.json $NAMES || exit 1
 git -C $W show origin/lamp-voice:lampOS/docs/build-rows.md > $SP/gen/build-rows.base.md 2>/dev/null || : > $SP/gen/build-rows.base.md
 if diff -q <(grep -v '^Written by' $SP/gen/build-rows.md) <(grep -v '^Written by' $SP/gen/build-rows.base.md) >/dev/null; then echo "unchanged"; exit 0; fi
 grep -niE "\\| You, |your report|$names" $SP/gen/build-rows.md && { echo "a name or an owner-addressed note: stop"; exit 1; }
