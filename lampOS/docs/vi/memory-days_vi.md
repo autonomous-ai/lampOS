@@ -208,6 +208,37 @@ phòng có `more`; với memory cũ không có `more`, khi hai phần cộng l�
 quả; và khi phần của căn phòng không được hỏi vì phần của người đó đã dùng hết
 hạn mức. Khi đó mô hình không được nói những ngày còn lại không có gì.
 
+## Lời sửa mới hơn xếp trước (`LAMP_MEMORY_NEWER_FIRST`)
+
+Khi bật `LAMP_MEMORY_NEWER_FIRST=on` (kế hoạch đưa ý tưởng của Tiers vào Days
+của người phụ trách trí nhớ, 3/11, phần P1; tắt nếu không đặt; ý tưởng phỏng
+theo cách memory-tiers thay thế bằng "bằng chứng mới hơn của chính chủ",
+[memory-tiers.md](../memory-tiers.md)), `search` hay `recall` của một lần
+truy xuất sẽ có thêm `"newer_first":true`. **Chưa nối cho đến P4: voice chưa
+gửi trường này, nên hôm nay bật công tắc không đổi gì**; chỉ kho trả lời nó.
+Trong các bản ghi truy vấn đã tìm được cho một người đã nhận ra, một câu mới
+hơn sửa một câu cũ hơn được xếp trước trong `search`, và câu cũ có
+`"earlier":true`; `recall` vẫn giữ thứ tự thời gian và chỉ thêm `earlier`.
+Với phạm vi của căn phòng (không có người), trường này bị bỏ qua và câu trả
+lời như khi không có nó: câu của căn phòng là của nhiều người nói, và câu của
+người này không bao giờ được đánh dấu câu của người khác là `earlier`
+(`days_recall::newer_first::room_scope_is_never_reordered`). Một câu sửa câu
+khác khi nó mới hơn, có một cụm báo hiệu sửa nguyên từ (`actually`, `no
+longer`, `not … anymore`, `changed to`, `moved to`, `now it's`/`now it is`,
+`instead`, `thật ra`, `không còn`, `đổi sang`, `chuyển sang`, `bây giờ là`,
+`thay vì`; chỉ tiếng Anh và tiếng Việt; `now` hay `giờ` đứng một mình, cũng
+là "giờ" đồng hồ, không phải báo hiệu) và nói về cùng một điều: có chung ít
+nhất hai từ đặc trưng của câu cũ (không tính từ báo hiệu) và chung tất cả
+trừ nhiều nhất một, giá trị đã đổi. Vì vậy "now I'm brewing jasmine tea for
+mom" không sửa "I drink jasmine tea", "7 giờ tôi uống trà nhài với mẹ" cũng
+không sửa "Tôi uống trà nhài mỗi sáng"
+(`search::newer_first_tests::bare_now_or_gio_marks_nothing`). Chỉ tính lời
+của chính người đó, không bao giờ tính lời đáp của đèn. Không bản ghi nào bị
+bỏ, vô hiệu hay thêm vào: vẫn các bản ghi đó, vẫn `more` đó, chỉ đổi thứ tự
+và cờ này. Khi tắt, trường không được gửi và mọi câu trả lời giống hệt từng
+byte như trước (`off_is_byte_identical`). Cần lamp-memory cùng bản build:
+memory cũ từ chối trường này.
+
 ## Ngày của một điều đã ghi nhớ trong ghi chú phiên
 
 Một ghi chú hay quan sát có ngày sự kiện (`event_days`) nay mang `on`
