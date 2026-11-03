@@ -37,6 +37,8 @@ impl Drop for Dir {
 }
 struct Fake {
     counts: Arc<Mutex<(usize, usize)>>,
+    /// Answer calls (1-based) that fail in transit.
+    failing: &'static [usize],
 }
 impl Provider for Fake {
     fn invoke(&mut self, call: &Call, _deadline: Instant) -> Result<Reply> {
@@ -48,7 +50,13 @@ impl Provider for Fake {
         };
         let content = match purpose {
             Purpose::Answer => {
-                self.counts.lock().unwrap().0 += 1;
+                let mut counts = self.counts.lock().unwrap();
+                counts.0 += 1;
+                if self.failing.contains(&counts.0) {
+                    return Err(lamp_memory_bench::Error::Transport(
+                        "chat connection or headers failed".into(),
+                    ));
+                }
                 json!({"answer":"I don't know","evidence_ids":[],"abstain":true})
             }
             Purpose::Judge => {
@@ -82,6 +90,7 @@ fn registered_month_runs_answering_judging_and_restore_without_any_scores() {
     let client = Client::new(
         Fake {
             counts: counts.clone(),
+            failing: &[],
         },
         Prices {
             source: "offline".into(),
@@ -143,4 +152,58 @@ fn registered_month_runs_answering_judging_and_restore_without_any_scores() {
             .len(),
         300
     );
+}
+
+/// The registered month's first multi-turn question after ten answer calls is
+/// q145, answer calls 64 to 66. An eleventh failure on its first turn must end
+/// the run before its followups call the model again.
+#[test]
+fn the_eleventh_failed_call_stops_before_another_answer_call() {
+    let fixture =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/memory-bench/development");
+    let corpus = files::read_corpus(&fixture).unwrap();
+    let dir = Dir::new();
+    let counts = Arc::new(Mutex::new((0, 0)));
+    let client = Client::new(
+        Fake {
+            counts: counts.clone(),
+            failing: &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 64],
+        },
+        Prices {
+            source: "offline".into(),
+            date: "2026-10-31".into(),
+            input_microusd_per_million: 1_000_000,
+            output_microusd_per_million: 1_000_000,
+        },
+        1_000_000,
+    )
+    .unwrap();
+    let mut worker = Worker::start(client).unwrap();
+    let revision = "a".repeat(40);
+    let mut runner = Runner::spawn(
+        std::path::Path::new(env!("CARGO_BIN_EXE_lamp-memory-bench")),
+        &["arm".into(), revision],
+        &dir.0,
+    )
+    .unwrap();
+    runner.execute(Request::new("init",Op::Init,json!({"run_id":"offline-limit","arm":"none","state_dir":dir.0,"owner_id":corpus.persona.id,"timezone":corpus.persona.timezone,"at_unix_ms":corpus.events[0].at_unix_ms,"config":{}})),&mut worker).unwrap();
+    let error = Trial {
+        corpus: &corpus,
+        observed: &corpus.events,
+        arm: "none",
+        mode: Mode::Live,
+        runner: &mut runner,
+        worker: &mut worker,
+    }
+    .run(|_, _| Ok(()))
+    .unwrap_err();
+    assert!(error.to_string().contains("failed in transit"), "{error}");
+    assert_eq!(counts.lock().unwrap().0, 64);
+    runner
+        .execute(Request::new("close", Op::Close, json!({})), &mut worker)
+        .unwrap();
+    drop(runner);
+    worker
+        .finish(Instant::now() + Duration::from_secs(5))
+        .unwrap();
 }
