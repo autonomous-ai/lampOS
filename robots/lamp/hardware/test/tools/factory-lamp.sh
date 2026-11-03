@@ -31,6 +31,12 @@
 # runs. Environment: LAMP_PASS (required), STEPS (steps.sh from lamp-voice),
 # STEPS_SHA (its sha256, insisted on), PROMPTS (from make-prompts.sh),
 # STATE (default ~/.factory-lamp), RESET=yes (selftest), GAZE, NUDGE_TARGET.
+#
+# JUMP=IP: the Mac's Wi-Fi stays on its internet and a bench OrangePi wired to
+# the Mac (at IP, same LAMP_PASS) joins each lamp's hotspot with its own
+# wlan0 (wpa_cli, nothing saved); every ssh and scp to the lamp goes through
+# it. `factory-lamp.sh jump-home` puts the jump's Wi-Fi back on its saved
+# network.
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -43,7 +49,16 @@ mkdir -p "$STATE/records"
 say() { echo "factory-lamp: $*"; }
 die() { echo "factory-lamp: FAILED: $*" >&2; exit 1; }
 usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
-[[ $MODE =~ ^(start|follow|selftest|collect)$ && $# -ge 1 ]] || usage
+[[ $MODE == jump-home || ( $MODE =~ ^(start|follow|selftest|collect)$ && $# -ge 1 ) ]] || usage
+JUMP=${JUMP:-}; JKH=$STATE/known_hosts_jump
+# Through the jump, sshpass answers its password and expect the lamp's;
+# ProxyCommand=none is a direct connection.
+PC=none PCJ=""
+[[ -n $JUMP ]] && PCJ="sshpass -p $PASS ssh -o UserKnownHostsFile=$JKH -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -W %h:%p orangepi@$JUMP"
+jump() {  # one root command on the jump
+  sshpass -p "$PASS" ssh -o UserKnownHostsFile="$JKH" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \
+    "orangepi@$JUMP" "echo $(printf %q "$PASS") | sudo -S -p '' bash -c $(printf %q "$1")" 2>/dev/null
+}
 if [[ $MODE == start || $MODE == selftest ]]; then
   [[ -f $STEPS ]] || die "no steps.sh at $STEPS"
   [[ -z ${STEPS_SHA:-} || $(shasum -a 256 "$STEPS" | cut -c1-64) == "$STEPS_SHA" ]] || die "steps.sh is not $STEPS_SHA"
@@ -53,10 +68,10 @@ fi
 # shipped lamp). HOST and KH name the lamp a call goes to.
 carried() { echo "echo $(printf '%s\n' "$1" | base64 | tr -d '\n') | base64 -d > /tmp/factory-lamp.sh && sudo -S -p SUDOPW: bash /tmp/factory-lamp.sh"; }
 ssh_once() {
-  P="$PASS" C="$(carried "$1")" H="$HOST" KH="$KH" expect <<'EOF' | tr -d '\r' | grep -vE "assword:|SUDOPW|^Warning: Permanently"
+  P="$PASS" C="$(carried "$1")" H="$HOST" KH="$KH" PC="$PC" expect <<'EOF' | tr -d '\r' | grep -vE "assword:|SUDOPW|^Warning: Permanently"
 set timeout 300
 log_user 1
-spawn -noecho ssh -o UserKnownHostsFile=$env(KH) -o StrictHostKeyChecking=accept-new -o PubkeyAuthentication=no -o ConnectTimeout=10 orangepi@$env(H) $env(C)
+spawn -noecho ssh -o UserKnownHostsFile=$env(KH) -o StrictHostKeyChecking=accept-new -o PubkeyAuthentication=no -o ConnectTimeout=10 -o ProxyCommand=$env(PC) orangepi@$env(H) $env(C)
 expect {
   -re "assword:" { send "$env(P)\r"; exp_continue }
   "SUDOPW:" { send "$env(P)\r"; exp_continue }
@@ -81,10 +96,10 @@ lamp() {
   return $rc
 }
 put() {
-  P="$PASS" F="$*" H="$HOST" KH="$KH" expect <<'EOF'
+  P="$PASS" F="$*" H="$HOST" KH="$KH" PC="$PC" expect <<'EOF'
 set timeout 300
 log_user 0
-eval spawn -noecho scp -q -o UserKnownHostsFile=$env(KH) -o StrictHostKeyChecking=accept-new -o PubkeyAuthentication=no $env(F) orangepi@$env(H):/tmp/
+eval spawn -noecho scp -q -o UserKnownHostsFile=$env(KH) -o StrictHostKeyChecking=accept-new -o PubkeyAuthentication=no [list -o ProxyCommand=$env(PC)] $env(F) orangepi@$env(H):/tmp/
 expect {
   -re "assword:" { send "$env(P)\r"; exp_continue }
   eof
@@ -107,6 +122,22 @@ kit() {
 }
 hotspot() {  # join lamp-ID's hotspot; HOST and KH for it
   local id=$1 ip=""
+  if [[ -n ${BRIDGE-} ]]; then
+    # The Mac already reaches the hotspot (an ESP32-S3 USB-Wi-Fi bridge on it).
+    HOST=192.168.100.1; KH=$STATE/known_hosts_lamp-$id; PC=none
+    for _ in $(seq 1 20); do nc -z -G 2 "$HOST" 22 2>/dev/null && return 0; sleep 2; done
+    return 1
+  fi
+  if [[ -n $JUMP ]]; then
+    # The jump's wlan0 onto the lamp's open hotspot, for this session only.
+    jump "wpa_cli -i wlan0 remove_network all >/dev/null; n=\$(wpa_cli -i wlan0 add_network | tail -1)
+      wpa_cli -i wlan0 set_network \$n ssid '\"lamp-$id\"' >/dev/null && wpa_cli -i wlan0 set_network \$n key_mgmt NONE >/dev/null &&
+      wpa_cli -i wlan0 select_network \$n >/dev/null
+      for _ in \$(seq 1 45); do ip -4 -br addr show wlan0 | grep -q ' 192\\.168\\.100\\.' && exit 0; sleep 1; done; exit 1" || return 1
+    HOST=192.168.100.1; KH=$STATE/known_hosts_lamp-$id; PC=$PCJ
+    for _ in $(seq 1 20); do jump "timeout 2 bash -c '</dev/tcp/192.168.100.1/22'" && return 0; sleep 2; done
+    return 1
+  fi
   route -n get default 2>/dev/null | grep -q 'interface: en0' && die "the default route is Wi-Fi: put Ethernet above Wi-Fi first"
   for _ in 1 2 3; do networksetup -setairportnetwork en0 "lamp-$id" >/dev/null 2>&1 && break; sleep 3; done
   for _ in $(seq 1 30); do ip=$(ipconfig getifaddr en0); [[ $ip == 192.168.100.* ]] && break; sleep 1; done
@@ -119,13 +150,16 @@ bench() {  # a set-up lamp on the bench network: an IP, or lamp-ID.local; HOST a
   local t=$1
   if [[ $t =~ ^[0-9.]+$ ]]; then HOST=$t
   else HOST=$(dscacheutil -q host -a name "lamp-$t.local" 2>/dev/null | awk '/ip_address/{print $2; exit}'); [[ -n $HOST ]] || return 1; fi
-  KH=$STATE/known_hosts_bench-$HOST
+  KH=$STATE/known_hosts_bench-$HOST; PC=none
   nc -z -G 3 "$HOST" 22 2>/dev/null
 }
 name() { lamp hostname | tail -1; }
 unit() { echo "systemctl reset-failed factory-run >/dev/null 2>&1; systemctl is-active -q factory-run && { echo ALREADY RUNNING; exit 3; }; $*"; }
 
 case $MODE in
+jump-home)
+  [[ -n $JUMP ]] || die "set JUMP to the jump's IP"
+  jump "wpa_cli -i wlan0 reconfigure" >/dev/null && say "the jump's Wi-Fi is back on its saved network" || die "wpa_cli reconfigure failed on $JUMP" ;;
 start)
   for id in "$@"; do
     [[ $id =~ ^[0-9a-f]{4}$ ]] || { say "$id: not a lamp ID"; continue; }

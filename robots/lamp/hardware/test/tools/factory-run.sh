@@ -125,10 +125,24 @@ fi
 
 # unset
 status "RUNNING checks"
-[[ -e /var/lib/lampos-setup/done ]] && fail "already set up: the unset run is for a lamp before the app setup"
+# SET_UP_OK=yes: a lamp set up from the app before its factory steps
+# (lamp-ee17): steps.sh stops what holds the touch lines itself; lamp-body,
+# failing without lamp.env, is stopped so the servo port is free.
+if [[ -e /var/lib/lampos-setup/done ]]; then
+  [[ ${SET_UP_OK:-} == yes ]] || fail "already set up: the unset run is for a lamp before the app setup (SET_UP_OK=yes runs it anyway)"
+  systemctl stop lamp-body; systemctl reset-failed lamp-body 2>/dev/null
+  rec "SET_UP_BEFORE_STEPS=yes"
+fi
 grep -q ^country_code /etc/hostapd/hostapd.conf && fail "old image (country_code in hostapd.conf)"
-v=$(cat /sys/bus/usb/devices/3-1.1.4/idVendor 2>/dev/null):$(cat /sys/bus/usb/devices/3-1.1.4/idProduct 2>/dev/null)
-[[ $v == 01da:5875 ]] && rec "CAMERA_4B=PASS 3-1.1.4 01da:5875" || fail "camera at 3-1.1.4 is [$v], not 01da:5875 (4b)"
+# The camera by its ids on any USB port: the product's eyes take it so since
+# #4074 (lamp-dbda, a63e and cb94 have it on 3-1.3.4, the rest on 3-1.1.4).
+cam=""; for d in /sys/bus/usb/devices/*; do
+  [[ $(cat "$d/idVendor" 2>/dev/null):$(cat "$d/idProduct" 2>/dev/null) == 01da:5875 ]] && { cam=${d##*/}; break; }
+done
+# /home/orangepi/NO_CAMERA_OK: test the rest of a lamp whose camera is out (recorded, not passed)
+if [[ -n $cam ]]; then rec "CAMERA_4B=PASS $cam 01da:5875"
+elif [[ -e /home/orangepi/NO_CAMERA_OK ]]; then rec "CAMERA_4B=FAIL no camera, rest tested anyway"; say "WARN no camera (4b): testing the rest"
+else fail "no camera 01da:5875 on any USB port (4b)"; fi
 systemctl cat lamp-update | grep -q lampos-stable && rec "UPDATE_CHANNEL_4F=PASS lampos-stable" || fail "lamp-update is not on lampos-stable (4f)"
 r=""; for u in bootstrap os-server hal; do systemctl is-active -q $u && r="$r $u"; done
 [[ -z $r ]] && rec "V1_UNITS_4G=PASS none running" || fail "V1 units running:$r (4g)"
@@ -168,7 +182,29 @@ status "RUNNING 4d gaze"
 grep -q -- --gaze "$ENV_FILE" || { cp -p "$ENV_FILE" "$ENV_FILE.before-4d" && sed -i "s/^\(BODY_POSES=\".*\)\"\$/\1 --gaze $GAZE\"/" "$ENV_FILE"; }
 grep -q -- "--gaze $GAZE" "$ENV_FILE" || fail "4d: --gaze $GAZE is not in lamp.env"
 jq -e '(.head_pads | length) >= 2 and (.head_rest | length) == (.head_pads | length)' "$PINS" >/dev/null || fail "the pins file has no head pads"
-rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4D=PASS $GAZE" \
+rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4D=PASS $GAZE"
+
+# The speaker's hardware level, kept across boots (75%, kyle-aus 3 Nov):
+# lamp-cmedia-speaker pins the C-Media "Speaker" at step 9 at every boot, so
+# alsactl store cannot hold a level. A drop-in replaces that pin with
+# SPEAKER_LEVEL and keeps the unit's other ExecStart lines (the first PCM
+# open that makes the softvol control). Delete the drop-in for the default.
+status "RUNNING speaker level"
+SPEAKER_LEVEL=${SPEAKER_LEVEL:-75%}
+SPK_UNIT=lamp-cmedia-speaker.service
+SPK_DROPIN=/etc/systemd/system/$SPK_UNIT.d/zz-factory-speaker.conf
+systemctl cat "$SPK_UNIT" >/dev/null 2>&1 || fail "no $SPK_UNIT: the speaker level cannot be kept"
+mkdir -p "${SPK_DROPIN%/*}"
+{ echo "# factory-run.sh: the speaker at $SPEAKER_LEVEL at every boot instead of the unit's pin"
+  echo "[Service]"; echo "ExecStart="
+  echo "ExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker $SPEAKER_LEVEL"
+  systemctl cat "$SPK_UNIT" | grep '^ExecStart=' | grep -v -e amixer -e '^ExecStart=$'
+} >"$SPK_DROPIN"
+systemctl daemon-reload
+systemctl restart "$SPK_UNIT" || fail "$SPK_UNIT failed with the speaker at $SPEAKER_LEVEL"
+spk=$(amixer -c device_cmedia sget Speaker | grep -o '\[[0-9]*%\]' | head -1 | tr -d '[]')
+[[ -n $spk ]] || fail "the speaker level cannot be read after setting $SPEAKER_LEVEL"
+rec "SPEAKER_LEVEL=$spk (asked $SPEAKER_LEVEL, $SPK_DROPIN)" \
     "RESULT_UNSET=PASS" "RESULT_UNSET_AT=$(date '+%F %T %z')"
 status "PASS unset"
 speak factory_all_done

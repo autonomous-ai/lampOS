@@ -306,13 +306,13 @@ async fn lines_past_silent(
     let leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
     let (seen_calls, seen_leases) = (calls.clone(), leases.clone());
     let runner: ScopedToolRunner = Arc::new(move |_, _, name: String, _, lease: ScopeLease| {
-        // Whose scope the call runs in, as the memory's route picks it: a
-        // `remember` on a one-face line is its person's
-        // (`ScopeLease::kept_by_one_face`), all else the lease's scope.
+        // Whose scope the call runs in first, as the memory's route picks
+        // it: a `remember` or single-item `forget` on a one-face line is
+        // its person's (`ScopeLease::reached_by_one_face`, the route's own
+        // decision), all else the lease's scope.
         seen_calls.lock().unwrap().push(
-            (name == crate::remember::REMEMBER)
-                .then(|| lease.kept_by_one_face())
-                .flatten()
+            lease
+                .reached_by_one_face(&name)
                 .or_else(|| lease.scope().unwrap().person().map(str::to_owned)),
         );
         Box::pin(async { json!({"ok":true}) })
@@ -1690,6 +1690,69 @@ async fn a_second_face_an_unknown_face_no_face_or_another_voice_is_as_before() {
     .await;
     assert_eq!(got.lease, Some(a));
     assert!(got.held, "carried, never memory's");
+}
+
+fn forget_coffee() -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "f1",
+                crate::remember::FORGET,
+                json!({"source_id": null}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Done."), Ok(ChatEvent::Done)],
+    ]
+}
+
+const FORGET_COFFEE: &str = "Lamp, forget my coffee.";
+
+/// Fourteen's forget FAIL on lamp-9adf (build 9699): A's face the one face
+/// in view, never seen speaking, and no other voice. "Forget my coffee"
+/// reaches A's scope, where A's `remember` on the same rule kept it, while
+/// the line is still told and read as the room's. A second face, a face the
+/// eyes don't know, no face, another voice, or the switch off: the room's
+/// only, never A's.
+#[tokio::test]
+async fn a_one_face_forget_reaches_what_its_keep_kept_and_nobody_elses() {
+    let a = crate::remember::person_id("A");
+    let got = one_face_line(
+        "one-face-forget-one",
+        FORGET_COFFEE,
+        forget_coffee(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a.clone())], "the forget reaches A's scope");
+    assert_eq!(got.lease, None, "told and read as the room's");
+    assert_eq!(got.told, Message::system("for None"), "no A context");
+    for (what, in_view, voice) in [
+        (
+            "forget-second-face",
+            vec![("f1", false), ("f2", false)],
+            Voice::One,
+        ),
+        ("forget-unknown-face", vec![("f2", false)], Voice::One),
+        ("forget-no-face", vec![], Voice::One),
+        (
+            "forget-voice-before",
+            vec![("f1", false)],
+            Voice::AnotherBefore,
+        ),
+        (
+            "forget-voice-in-it",
+            vec![("f1", false)],
+            Voice::AnotherInIt,
+        ),
+        ("forget-off", vec![("f1", false)], Voice::Off),
+    ] {
+        let got = one_face_line(what, FORGET_COFFEE, forget_coffee(), in_view, None, voice).await;
+        assert_eq!(got.calls, [None], "{what}: the room's only");
+        assert_eq!(got.lease, None, "{what}");
+    }
 }
 
 /// "Forget everything about me" on a line whose keep is theirs by one face

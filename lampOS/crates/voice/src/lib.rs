@@ -62,6 +62,7 @@ pub mod choreography;
 pub mod config;
 pub mod conversation_summary;
 pub mod cut_in_told;
+pub mod cut_in_wordless;
 pub mod diagnostic_control;
 pub mod diagnostics;
 pub mod early_words;
@@ -107,6 +108,9 @@ pub mod onboarding;
 pub(crate) mod open_at_start;
 pub mod options;
 pub mod others_answer;
+// Used by the Linux audio workers, and by tests anywhere (#4332).
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+pub(crate) mod peer_stop;
 #[cfg(target_os = "linux")]
 pub mod physical_privacy;
 #[cfg(any(target_os = "linux", test))]

@@ -11,7 +11,7 @@ use crate::{
 use std::{
     collections::{BTreeMap, VecDeque},
     os::fd::{BorrowedFd, OwnedFd},
-    sync::{Arc, Mutex, MutexGuard, PoisonError},
+    sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError},
     time::Duration,
 };
 
@@ -25,6 +25,8 @@ struct CaptureScript {
     faults: Vec<(&'static str, i32)>,
     /// How long the next read blocks before it returns.
     stall: Option<Duration>,
+    /// The next `configure` waits on this until the test lets it go.
+    held_configure: Option<HeldCall>,
     opens: u32,
     starts: u32,
     discards: u32,
@@ -77,6 +79,7 @@ impl CaptureControl {
             queued: VecDeque::new(),
             faults: Vec::new(),
             stall: None,
+            held_configure: None,
             opens: 0,
             starts: 0,
             discards: 0,
@@ -115,6 +118,14 @@ impl CaptureControl {
     pub fn stall_next_read(&self, duration: Duration) {
         self.script().stall = Some(duration);
     }
+    /// The next `configure` waits until the returned call is let go, as a
+    /// slow microphone open does: what is sent to the worker meanwhile
+    /// queues (#4332).
+    pub fn hold_next_configure(&self) -> HeldCall {
+        let held = HeldCall::default();
+        self.script().held_configure = Some(held.clone());
+        held
+    }
     pub fn queued(&self) -> usize {
         self.script().queued.len()
     }
@@ -127,6 +138,38 @@ impl CaptureControl {
     /// How often the device was waited on ([`CaptureDevice::wait`]).
     pub fn waits(&self) -> u64 {
         self.script().waits
+    }
+}
+
+/// A device call held by a test: [`HeldCall::reached`] says the call has
+/// begun, and it returns once [`HeldCall::release`] is called.
+#[derive(Clone, Default)]
+pub struct HeldCall(Arc<(Mutex<(bool, bool)>, Condvar)>);
+
+impl HeldCall {
+    /// Waits up to `at_most` for the call to begin; whether it has.
+    pub fn reached(&self, at_most: Duration) -> bool {
+        let (state, changed) = &*self.0;
+        let state = locked(state);
+        let (state, _) = changed
+            .wait_timeout_while(state, at_most, |(reached, _)| !*reached)
+            .unwrap_or_else(PoisonError::into_inner);
+        state.0
+    }
+    /// Lets the call return.
+    pub fn release(&self) {
+        let (state, changed) = &*self.0;
+        locked(state).1 = true;
+        changed.notify_all();
+    }
+    fn wait(&self) {
+        let (state, changed) = &*self.0;
+        let mut state = locked(state);
+        state.0 = true;
+        changed.notify_all();
+        while !state.1 {
+            state = changed.wait(state).unwrap_or_else(PoisonError::into_inner);
+        }
     }
 }
 
@@ -161,6 +204,10 @@ impl CaptureDevice for ScriptedCapture {
     }
 
     fn configure(&mut self, _config: CaptureConfig) -> Result<CaptureFormat, ConfigureError> {
+        let held = self.0.script().held_configure.take();
+        if let Some(held) = held {
+            held.wait();
+        }
         self.failing("configure").map_err(ConfigureError::Fault)?;
         let mut script = self.0.script();
         script.state = DeviceState::Prepared;

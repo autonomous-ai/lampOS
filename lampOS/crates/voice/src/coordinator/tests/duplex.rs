@@ -1061,6 +1061,37 @@ fn with_soft_starts_a_line_after_the_lamps_answer_keeps_its_300_ms() {
     assert_eq!(on.last(), off.last());
 }
 
+/// #4938: a bare "Stop." (about 0.45 s of speech) begun a second after the
+/// lamp's answer stopped sounding is let in as a line of its own, with or
+/// without soft starts, so the second route can answer it as a stop just
+/// after the answer (`spoken_stop::JUST_AFTER`). On lamp-06c1 on 2 Nov no
+/// request came for it 6 of 6: the lamp check said it over the answer,
+/// timed from a playback interval's retirement, not the turn's end
+/// (`tools/played/stop-lines.sh`).
+#[test]
+fn a_bare_stop_a_second_after_the_answer_is_let_in() {
+    for soft in [false, true] {
+        let mut h = Harness::keeping_first_words(true, 100);
+        h.soft_start = soft;
+        h.detector.keep_soft_starts(soft);
+        h.reply.as_mut().unwrap().pcm.clear();
+        h.blocks(50, 0.1, Some(evidence(0, OWN)));
+        for quiet in 1..=100 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        let stop = h.blocks(45, 0.95, Some(evidence(101, None)));
+        let accepted = stop
+            .iter()
+            .find_map(|tick| tick.accepted.as_ref())
+            .unwrap_or_else(|| panic!("the stop was not let in (soft starts {soft})"));
+        assert!(accepted.audio.windows(2).all(|pair| pair[1] == pair[0] + 1));
+        assert!(
+            h.events("duplex_yield").is_empty(),
+            "a line in the clear is no yield"
+        );
+    }
+}
+
 /// #4226: the Start of a line begun with a soft start says how long its
 /// sound began before its usual start, by when each block was read, for the
 /// second route to date the name at the line's start from; without soft

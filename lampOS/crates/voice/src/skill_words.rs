@@ -272,12 +272,6 @@ pub struct NewsWords {
     pub found: String,
     pub part_done: String,
     pub pull_request: String,
-    /// A skill made by voice, kept: `{who}`, `{when}`, `{name}`,
-    /// `{description}`, `{uses}`, and the voice's own `{ask}` and
-    /// `{put_on}`...
-    pub made: String,
-    /// ...or not: `{who}`, `{when}`, `{why}`, `{computer}`.
-    pub not_kept: String,
 }
 
 /// [`NewsWords::failed_folder`]'s words, built in.
@@ -358,8 +352,6 @@ impl NewsWords {
             found: "something was found".into(),
             part_done: "a part was done".into(),
             pull_request: "a pull request was opened".into(),
-            made: "News from work you handed over for the person. {who} {when} made the skill they asked for, \"{name}\": {description} It would use {uses}. Tell them in one or two short sentences what it would do and what it would use, then ask exactly: \"{ask}\" It is not on the lamp yet. Put it on only if they then say yes ({put_on}). No file names.".into(),
-            not_kept: "News from work you handed over for the person. {who} {when} made a skill for them, but the lamp can't keep it: {why}. Tell them so in one short sentence, and that the rest is on {computer}. No question.".into(),
         }
     }
 
@@ -452,24 +444,6 @@ impl NewsWords {
                 ("found", &self.found, &[]),
                 ("part_done", &self.part_done, &[]),
                 ("pull_request", &self.pull_request, &[]),
-                (
-                    "made",
-                    &self.made,
-                    &[
-                        "ask",
-                        "description",
-                        "name",
-                        "put_on",
-                        "uses",
-                        "when",
-                        "who",
-                    ],
-                ),
-                (
-                    "not_kept",
-                    &self.not_kept,
-                    &["computer", "when", "who", "why"],
-                ),
             ],
         )?;
         let note = |line: &str, given: &[(&str, &str)]| {
@@ -538,18 +512,6 @@ impl NewsWords {
                     "progress",
                     note(&self.progress, &[("signs", &signs), ("time", &time)]),
                 ),
-                (
-                    "made",
-                    note(
-                        &self.made,
-                        &[
-                            ("when", &when),
-                            ("ask", crate::made_skill::ASK_TO_PUT_ON),
-                            ("put_on", crate::made_skill::PUT_ON),
-                        ],
-                    ),
-                ),
-                ("not_kept", note(&self.not_kept, &[("when", &when)])),
             ],
         )?;
         Ok(self)

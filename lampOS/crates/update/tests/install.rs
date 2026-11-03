@@ -1427,6 +1427,30 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
+/// left the lamp quiet mid-story). The wordless cut-in's question stays
+/// off: the lamp's own echo commits as a cut-in with 0 words (7 of 15
+/// stories on lamp-06c1, 3 Nov, #4938), so it would answer its own voice.
+#[test]
+fn the_product_answers_a_stop_and_leaves_the_wordless_question_off() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_SPOKEN_STOP_ENDS=on"),
+        "the voice lacks LAMP_SPOKEN_STOP_ENDS"
+    );
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_CUT_IN_WORDLESS_ASKS=")),
+        "the voice sets LAMP_CUT_IN_WORDLESS_ASKS"
+    );
+}
+
 /// A thing the person already keeps, said again, is that kept thing, not a
 /// second one (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): on lamp-06c1 on 28 Oct
 /// the product unit, without it, kept "the meeting room is called orange"
@@ -1572,6 +1596,28 @@ fn the_product_keeps_a_keep_theirs_with_one_known_face_in_view() {
         "Environment=LAMP_PERSON_SCOPE_SEEN=on",
         "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
         "Environment=LAMP_JOIN_CUT_WORDS=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// Only faces of people at the desk count as people at the lamp
+/// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
+/// beside the owner held their name back on 51 of 79 turns as "more than one
+/// face in view". Beside the name by default and the one-face keep it
+/// acts on.
+#[test]
+fn the_product_counts_only_faces_at_the_desk() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_FACES_AT_DESK_ONLY=on",
+        "Environment=LAMP_PERSON_NAME_BY_DEFAULT=on",
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
