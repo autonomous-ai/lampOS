@@ -181,6 +181,16 @@ impl Entry {
         if code == "gmail" && !entry.oauth() && entry.account().is_empty() {
             return Err("Gmail needs the account's email");
         }
+        // A send-only Google sign-in is a token and its account, never an
+        // app password: Gmail can't tell its address without a read scope.
+        if code == "gmail-app" {
+            if !entry.oauth() {
+                return Err("Gmail's Google sign-in needs its access token");
+            }
+            if entry.account().is_empty() {
+                return Err("Gmail's Google sign-in needs the account's email");
+            }
+        }
         // An MCP link's address and header are checked before it is kept:
         // its token goes only to the service's own MCP host.
         if let Some(service) = catalog::service(code).filter(|service| service.mcp.is_some()) {
@@ -431,5 +441,28 @@ mod tests {
         assert!(Entry::from_set("gmail", &signed_in, 0).unwrap().oauth());
         assert!(!Entry::from_set("gmail", &gmail_data(), 0).unwrap().oauth());
         assert!(Entry::from_set("nothing", &gmail_data(), 0).is_err());
+        // A send-only sign-in: its token and its account, or nothing kept.
+        let app = json!({"auth_type":"oauth","access_token":"t","user_email":"me@home.test",
+                         "refresh_token":"r","expires_in":3599,"refresh":true,"client_id":"c"});
+        let kept = Entry::from_set("gmail-app", &app, 0).unwrap();
+        assert!(kept.oauth() && kept.refresh);
+        assert_eq!(kept.account(), "me@home.test");
+        let by_credentials =
+            json!({"auth_type":"oauth","access_token":"t","credentials":{"email":"me@home.test"}});
+        assert_eq!(
+            Entry::from_set("gmail-app", &by_credentials, 0)
+                .unwrap()
+                .account(),
+            "me@home.test"
+        );
+        for refused in [
+            json!({"auth_type":"oauth","access_token":"t"}),
+            json!({"auth_type":"pat","api_key":"pw","credentials":{"email":"me@home.test"}}),
+        ] {
+            assert!(
+                Entry::from_set("gmail-app", &refused, 0).is_err(),
+                "{refused}"
+            );
+        }
     }
 }

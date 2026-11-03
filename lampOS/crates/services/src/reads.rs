@@ -189,6 +189,7 @@ fn graphql(base: &str, query: &str, variables: Option<&Value>) -> Result<Plan, S
 /// What each service reads, by `what`, for the tools' description.
 pub const WHATS: &[(&str, &str)] = &[
     ("gmail", "recent {count}, search {query}, message {id}"),
+    ("gmail-app", "none, it only sends: reads use gmail"),
     (
         "google_calendar",
         "events {from, to, calendar, count}, calendars",
@@ -210,9 +211,22 @@ pub const WHATS: &[(&str, &str)] = &[
     ("facebook", "page, posts {count}"),
 ];
 
+/// What the lamp says to a read of `gmail-app`, a Google sign-in that
+/// may only send (its scopes hold no `gmail.readonly`).
+pub const GMAIL_APP_NO_READS: &str = "This Gmail link, made with Google sign-in, can only send mail. To read mail, link Gmail with an app password in the app: Skills, then Connectors.";
+
+/// Why `code` is never read, whether or not it is linked: `gmail-app`'s
+/// answer, so a read is refused before its token is looked at.
+pub fn never_read(code: &str) -> Option<&'static str> {
+    (code == "gmail-app").then_some(GMAIL_APP_NO_READS)
+}
+
 /// How `what` is read from `code`, for `entry`'s account, at `now`.
 pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, String> {
     let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
+    if let Some(why) = never_read(code) {
+        return Err(why.into());
+    }
     let what = text(args, "what").ok_or("what to read is needed")?;
     if code == "gmail" {
         return Ok(Plan::Mail(match what {
@@ -755,6 +769,31 @@ mod tests {
 
     fn entry() -> Entry {
         Entry::default()
+    }
+
+    #[test]
+    fn a_send_only_gmail_sign_in_reads_nothing() {
+        let signed_in = Entry {
+            connector: "gmail-app".into(),
+            auth_type: "oauth".into(),
+            access_token: "t".into(),
+            ..Entry::default()
+        };
+        for what in ["recent", "search", "message", "get", "anything"] {
+            let args = json!({"what": what, "query": "x", "id": "18a1", "path": "/gmail/v1/users/me/messages"});
+            assert_eq!(
+                plan("gmail-app", &args, &signed_in, 0),
+                Err(GMAIL_APP_NO_READS.to_owned())
+            );
+        }
+        assert_eq!(never_read("gmail-app"), Some(GMAIL_APP_NO_READS));
+        assert_eq!(never_read("gmail"), None);
+        // The tools' description says so, beside gmail's own reads.
+        assert!(
+            WHATS
+                .iter()
+                .any(|(code, whats)| *code == "gmail-app" && whats.contains("reads use gmail"))
+        );
     }
 
     fn http(plan: Plan) -> (Method, String, Option<Value>) {

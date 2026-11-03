@@ -162,6 +162,13 @@ mod tests {
                     .contains("amplitude: ")
             );
         }
+        // The send-only Google sign-in: a send like gmail's, and no read.
+        let (reads, writes) = (
+            tools[1]["description"].as_str().unwrap(),
+            tools[2]["description"].as_str().unwrap(),
+        );
+        assert!(reads.contains("gmail-app: none, it only sends: reads use gmail"));
+        assert!(writes.contains("gmail-app: send_mail {to, cc, subject, text}"));
         for tool in tools {
             let name = tool["name"].as_str().unwrap();
             assert!(name.len() <= 48);
