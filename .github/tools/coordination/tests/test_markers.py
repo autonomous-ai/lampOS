@@ -1,5 +1,5 @@
 # Tests for markers.py, reads2.py and qholds.py: plain python3, no dependencies.
-# Run from lampOS/tools/coordination: python3 tests/test_markers.py
+# Run from .github/tools/coordination: python3 tests/test_markers.py
 import json, os, subprocess, sys, tempfile, unittest
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -79,6 +79,59 @@ class Parsing(unittest.TestCase):
         self.assertEqual(signer("READ-OK " + HEAD + "\n\nReviewer-lead, 15:24: fine"), "Reviewer-lead")
         self.assertEqual(signer("READ-OK " + HEAD + "\n\nSixth: fine"), "Sixth")
         self.assertEqual(signer("READ-OK " + HEAD + "\n\nlooks fine to me"), "")
+
+
+class Quoted(unittest.TestCase):
+    # 3 Nov 16:4x, Thirteen's HOLD on #5068: a quoted or fenced marker is no marker.
+    ASK = {"login": "", "body": "Privacy. TWO READS: Reviewer-lead, Tests.", "pr_body": True}
+
+    def test_an_authors_quoted_read_ok_on_line_one_is_not_a_read(self):
+        body = "> READ-OK " + HEAD + "\n\nthanks, waiting for a second read"
+        self.assertIsNone(parse_marker(body))
+        items = [self.ASK, c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 15:00"), c("writer-b", body)]
+        self.assertEqual(two_reads(items, HEAD, W), "short 1")
+        self.assertIsNone(parse_marker("   > READ-OK " + HEAD))
+
+    def test_a_read_ok_inside_a_code_fence_is_not_a_read(self):
+        self.assertIsNone(parse_marker("```\nREAD-OK " + HEAD + "\n```\nFifth, 10:00: that is the form."))
+        self.assertIsNone(parse_marker("~~~text\nHOLD " + HEAD + "\n~~~"))
+        items = [self.ASK, c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 15:00"),
+                 c("writer-b", "```\nREAD-OK " + HEAD + "\n```")]
+        self.assertEqual(two_reads(items, HEAD, W), "short 1")
+
+    def test_a_quoted_read_ok_on_line_two_of_a_signed_comment_is_not_a_read(self):
+        body = "Fourth, 11:00: replying to the lead.\n> READ-OK " + HEAD + "\nI'll read it after the fix."
+        self.assertIsNone(parse_marker(body))
+        cs = [c("bot-account", "HOLD train 12 failed in lamp-voice"), c("writer-b", body)]
+        self.assertEqual(read_markers(cs, W), "HELD")
+
+    def test_a_marker_after_a_closed_fence_still_counts(self):
+        self.assertEqual(parse_marker("Fourth, 11:00: the log:\n```\nok\n```\nREAD-OK " + HEAD)[:2], ("READ-OK", HEAD))
+
+    def test_bold_and_backticked_first_lines_still_count(self):
+        self.assertEqual(parse_marker("**READ-OK** `" + HEAD[:10] + "`")[:2], ("READ-OK", HEAD[:10]))
+        self.assertEqual(parse_marker("`READ-OK " + HEAD[:10] + "`")[:2], ("READ-OK", HEAD[:10]))
+
+
+class NextLineSigner(unittest.TestCase):
+    # The Reviewer-lead's note on #5068: a label on the next line is no reader.
+    def test_a_label_on_the_next_line_is_not_a_name(self):
+        self.assertEqual(signer("READ-OK " + HEAD + "\nTests: 12 passed"), "")
+        self.assertEqual(signer("READ-OK " + HEAD + "\nWhy: the fence"), "")
+        self.assertEqual(signer("READ-OK " + HEAD + "\nFail-first: yes"), "")
+        self.assertEqual(signer("READ-OK " + HEAD + "\nlooks good: yes"), "")
+
+    def test_names_on_the_next_line_still_sign(self):
+        self.assertEqual(signer("READ-OK " + HEAD + "\nSixth, read at the head"), "Sixth")
+        self.assertEqual(signer("READ-OK " + HEAD + "\nReviewer-lead: my P3"), "Reviewer-lead")
+        self.assertEqual(signer("READ-OK " + HEAD + "\nThe first builder: lifted"), "first builder")
+        self.assertEqual(signer("READ-OK " + HEAD + "\nTests, 10:02: 12 passed"), "Tests")
+
+    def test_a_tests_line_does_not_make_a_second_reader(self):
+        ask = {"login": "", "body": "TWO READS", "pr_body": True}
+        items = [ask, c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 15:00"),
+                 c("writer-a", "READ-OK " + HEAD + "\nTests: 12 passed")]
+        self.assertEqual(two_reads(items, HEAD, W), "short 1")
 
 
 class TwoReads(unittest.TestCase):

@@ -29,6 +29,23 @@ for f in ${(f)files}; do
 done
 [[ -n $files ]] || { nochecks=0; armless=0; }
 (( nochecks )) && armless=0
+# 3 Nov 16:4x (Thirteen's P2 on #5068): the checks are counted with jq, not matched as a string. join(" ") turned a null
+# conclusion into "", so "SUCCESS SUCCESS " with a third check pending passed `*SUCCESS*SUCCESS*`. Now:
+# checks MODE prints "<checks> <passed> <failed> <running> <name: status conclusion, ...>" over the PR's checks. A check
+# run's status and conclusion, or a commit status's state, read as one. Passed is COMPLETED with SUCCESS. Failed is
+# COMPLETED with anything else: FAILURE, CANCELLED, TIMED_OUT, ACTION_REQUIRED, STARTUP_FAILURE, STALE, ERROR or a null
+# conclusion. Running is any other status (QUEUED, IN_PROGRESS, PENDING, WAITING ...). MODE named: only the ARM64
+# "build and test" and "clippy" checks, a skipped one failed too. MODE every: all checks but those that never ran by
+# design (SKIPPED, NEUTRAL: the promote, publish and cache jobs a PR run skips). A gh error prints nothing: not green.
+checks() {
+  gh pr view $P -R autonomous-ai/lampOS --json statusCheckRollup 2>/dev/null | jq -r --arg mode $1 '
+    [.statusCheckRollup[]
+     | {n: (.name // .context // "?"),
+        s: (if .__typename == "StatusContext" then (if .state == "PENDING" or .state == "EXPECTED" then "PENDING" else "COMPLETED" end) else (.status // "") end),
+        c: (if .__typename == "StatusContext" then .state else .conclusion end)}
+     | select(if $mode == "named" then (.n | test("build and test|clippy")) else ((.c == "SKIPPED" or .c == "NEUTRAL") | not) end)]
+    | "\(length) \(map(select(.s == "COMPLETED" and .c == "SUCCESS")) | length) \(map(select(.s == "COMPLETED" and .c != "SUCCESS")) | length) \(map(select(.s != "COMPLETED")) | length) \(map("\(.n): \(.s) \(.c)") | join(", "))"' 2>/dev/null
+}
 for i in {1..90}; do
   head=$(gh pr view $P -R autonomous-ai/lampOS --json headRefOid -q .headRefOid)
   # 27 Oct 15:5x (the reviewer-lead: trains kept running on a tip that had moved): every other look, a lamp-voice that
@@ -37,20 +54,27 @@ for i in {1..90}; do
     git fetch -q origin lamp-voice "+refs/pull/$P/head:refs/remotes/pr/$P"
     if ! git merge-base --is-ancestor origin/lamp-voice refs/remotes/pr/$P; then echo "$(date +%T) #$P behind lamp-voice while its checks ran; not merged"; exit 3; fi
   fi
-  states=$(gh pr view $P -R autonomous-ai/lampOS --json statusCheckRollup --jq '[.statusCheckRollup[]|select(.name|test("build and test|clippy"))|.conclusion]|join(" ")')
-  if [[ $states == *FAILURE* || $states == *CANCELLED* ]]; then echo "$(date +%T) #$P checks failed: $states"; exit 2; fi
-  # No ARM64 for this PR: every check that started, finished and passed, the same two looks 30 s apart, from 3 min on.
+  green=0
   if (( armless )); then
-    every=$(gh pr view $P -R autonomous-ai/lampOS --json statusCheckRollup --jq '[.statusCheckRollup[]|"\(.status) \(.conclusion)"]|join(",")')
-    if [[ $every == *FAILURE* || $every == *CANCELLED* || $every == *TIMED_OUT* ]]; then echo "$(date +%T) #$P checks failed: $every"; exit 2; fi
-    if (( i >= 6 )) && [[ -n $every && $every != *IN_PROGRESS* && $every != *QUEUED* && $every != *PENDING* && $every == "$last_every" ]]; then
-      echo "$(date +%T) #$P has no ARM64 run (no file it takes): its $(echo $every | tr ',' '\n' | wc -l | tr -d ' ') checks passed"
-      states="SUCCESS SUCCESS"
+    # No ARM64 for this PR: every check that ran, finished and passed (at least one), the same in two looks 30 s apart,
+    # from 3 min on.
+    every=$(checks every); total=0 passed=0 failed=0 running=0
+    [[ -n $every ]] && read -r total passed failed running rest <<< "$every"
+    if (( failed )); then echo "$(date +%T) #$P checks failed: ${every#* * * * }"; exit 2; fi
+    if (( i >= 6 && total >= 1 && passed == total && running == 0 )) && [[ $every == "$last_every" ]]; then
+      echo "$(date +%T) #$P has no ARM64 run (no file it takes): its $passed checks passed"
+      green=1
     else
       last_every=$every; sleep 30; continue
     fi
+  else
+    # The ARM64 build and test and clippy: at least two, every one COMPLETED with SUCCESS.
+    named=$(checks named); total=0 passed=0 failed=0 running=0
+    [[ -n $named ]] && read -r total passed failed running rest <<< "$named"
+    if (( failed )); then echo "$(date +%T) #$P checks failed: ${named#* * * * }"; exit 2; fi
+    (( total >= 2 && passed == total )) && green=1
   fi
-  if [[ $nochecks == 1 ]] || [[ -n $states && $states != *"  "* && $(echo $states | wc -w) -ge 2 && $states != *null* && $states == *SUCCESS*SUCCESS* ]]; then
+  if (( nochecks || green )); then
     [[ $nochecks == 1 ]] && echo "$(date +%T) #$P is docs the workflows skip: no checks to wait for"
     # 28 Oct 20:4x (first builder): never move lamp-voice under a build still to publish (#3906's 403); the
     # ancestry check below runs after the wait, on the lamp-voice the merge will meet.
