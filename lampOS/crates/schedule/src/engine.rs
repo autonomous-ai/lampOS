@@ -139,7 +139,7 @@ struct Item {
     pending: Option<Pending>,
     /// Who set it, as a memory person id (#4527's P2, (a)): optional stored
     /// metadata, so no `schema` bump. An item stored before it, or set with
-    /// nobody sure, has none and is the owner's line's ([`Asker::may_see`]).
+    /// nobody sure, has none and is the room's ([`Asker::may_see`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     person: Option<String>,
 }
