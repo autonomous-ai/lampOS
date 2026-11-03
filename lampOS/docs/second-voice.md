@@ -227,12 +227,13 @@ each line plays exactly as before.
 | The second route's down lines, and a look that never began | `second_provider::DOWN_LINE` ("Sorry, my thoughts are slow just now. Ask me again in a moment."), `DOWN_LINE_AGAIN`, `DOWN_LINE_CANNOT`; `COULD_NOT_LOOK` ("I couldn't get a good look.") | the down lines rendered by this route's voice after a turn and kept in memory (`LAMP_SECOND_DOWN_LINE`, on in the product); the look's said as the turn's text (`LAMP_SECOND_LOOK`, on) | rendered and said in the owner's words (`DownLine`'s language, read at start; `language::fixed_in`) |
 | The second route's answer to a stop said over it | `spoken_stop::LINE` ("Okay, I'll stop there.") | rendered by this route's voice and kept in the thread (`LAMP_SPOKEN_STOP_ENDS`, on) | the owner's words, rendered and kept in the thread (`language::fixed_in`); the stop itself is still heard by its English words (`spoken_stop::is_stop_request`) |
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
+| The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, nineteen today (`FIXED_LINES`), then the English two
+lines first, twenty today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -993,6 +994,52 @@ order is kept. A written turn is the same from the chat on.
   then, if needed, `no words again …; said "Sorry, …"`, so the played
   tests can count empty answers. Test:
   `an_empty_answer_to_a_line_said_by_name_is_asked_again_never_silence`.
+- **With `LAMP_ANSWER_ASK_AGAIN=on` an answer to the lamp's own question
+  never ends in silence from an empty reply** (off unless set; Queue #4710,
+  item 3). On lamp-29e7 on 30 Oct at 18:34 "Thin Place." after the lamp
+  asked a colour got an answer with no words, and the lamp said nothing for
+  150 s. With the switch, a spoken line heard right after the lamp's own
+  question in a conversation going on (`worker::lamp_just_asked`, the hook
+  a checked sound reads, `Engine::answering_the_lamp`; the worker installs
+  it when either switch is on), that is not a stop or "never mind" and
+  names no one else (`LAMP_TASKS_NAMED_ASK`), whose round gives no words
+  and calls nothing, with nothing said or called earlier in the turn (a
+  held forget's yes counts as a call), is answered "Sorry, could you say
+  that again?" (`second_provider::ANSWER_AGAIN_LINE`; in the owner's
+  language when one is chosen, "The fixed lines"). No second chat round is
+  asked, so it costs nothing on a turn that would otherwise be silent.
+  Never twice in a row: when the lamp's latest answer sent to the voice was
+  that line already, a second empty answer stays silent. A line by name
+  that `LAMP_NO_WORDS_AGAIN` answers stays its (asked once more, then its
+  sorry); a reminder, a written line and any other call end as before.
+  A `not_for_me` the model gives such an answer, as a call alone or as
+  words ("not for me", `LAMP_NOT_FOR_ME_WORDS` and `LAMP_DECLINE_SILENT`),
+  is said the same line in place of the decline when the person the lamp
+  asked said it (the first builder on Queue #4710):
+  `worker::asked_person_said`, the rule's reading as it judges the line
+  (`Engine::answering_the_asked_person`, installed with `--attention`):
+  the conversation's voice (`same_voice::SAME_FROM` or more against it,
+  read without using up the line's one judgement) or a face turned to the
+  lamp over it, and never a voice printed as another's
+  (`same_voice::DIFFERENT_BELOW`). Another person's line, one with neither
+  sign, or one after a stop stays declined, as does a decline after the
+  lamp's last words were that line already, or once some of the answer
+  was said. The worker says at start `a line answering the
+  lamp's own question, answered with no words and no call, is said a short
+  ask to hear it again, never twice in a row (LAMP_ANSWER_ASK_AGAIN)`; each
+  such turn's journal says `no words and no call for an answer to the
+  lamp's question; said "Sorry, could you say that again?"`, or `its last
+  words already asked again, so nothing is said`; a decline asked again
+  says `not_for_me on an answer to the lamp's question from the person it
+  asked; not taken, said "…"`. Tests:
+  `an_empty_answer_to_the_lamps_question_is_asked_again`,
+  `an_answer_outside_the_lamps_window_stays_silent`,
+  `a_stop_after_the_lamps_question_stays_silent`,
+  `a_not_for_me_to_the_lamps_question_from_the_asked_person_is_asked_again`,
+  `another_persons_not_for_me_stays_declined`,
+  `the_asked_person_is_the_same_voice_or_a_face_turned_to_the_lamp`,
+  `the_ask_again_is_never_said_twice_in_a_row`,
+  `the_ask_again_line_is_said_in_the_owners_language`.
 - **With `LAMP_SHORT_DONE=on` a light or volume ask that worked is
   answered with the call's own short line** (off unless set; #2877). On
   lamp-52e6 (Fifth's row 24, 22 Oct) the model still spoke about ten words

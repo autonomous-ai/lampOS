@@ -1694,6 +1694,8 @@ fn second_route_worker_environment(
         crate::second_provider::SHORT_DONE_ENVIRONMENT,
         // An empty answer to a line said by name asked again (#3704).
         crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
+        // An empty answer to the lamp's own question asked again (Queue #4710).
+        crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
@@ -1862,6 +1864,7 @@ mod tests {
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
+            crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
@@ -2520,6 +2523,7 @@ mod tests {
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
+                    || name == crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
@@ -2634,6 +2638,7 @@ mod tests {
                 "second",
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
+                    "LAMP_ANSWER_ASK_AGAIN=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
