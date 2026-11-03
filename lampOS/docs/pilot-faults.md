@@ -672,6 +672,38 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   Linux tests run on the ARM64 gate only. Not yet tried on a lamp's cold
   boots.
 
+- **A held turn's leases lapsed when its capture frames stopped.** On
+  lamp-e82d on 3 Nov, on stable lamp-voice, during the DeepSeek 503 outage,
+  the awake voice exited 1 on `privacy controller lease expired`: the ring's
+  and the speaker's authority lapsed within 13 ms of each other, then
+  `worker_exit_failed` (privacy, exit 1), and the run ended with status 1,
+  which the restart guard counts (#4332). From the code: while a turn is
+  held, every worker's lease is clipped to the input leases, the last kept
+  capture frame's read time + 100 ms, and the 20 ms renewals do not move
+  that until a newer frame is kept. Inferred from the journal: frames
+  stopped being kept about 0.29 s before the end of the failed turn, so
+  the clipped expiry froze and every lease lapsed before the lapsed
+  capture lease cut the turn; the privacy worker ending on a lapsed
+  granting lease is by design (fail-closed). The coordinator now cuts a
+  held turn as a capture gap once its lease ends within 40 ms
+  (`HELD_TURN_LEASE_MARGIN_US`), judged on the frames its last capture
+  drain kept, so a pass held up while frames keep coming cuts nothing,
+  and only once a frame has been kept, through the same cancel and publish a
+  lapsed capture lease takes, so the workers hold its revocation, a full
+  250 ms lease with no turn, before that expiry; it says so once per gap
+  (`lamp-voice: no capture frame kept for <N> ms while a turn is held: it
+  is cut 40 ms before its lease lapses, as a gap cuts it`). Nothing is
+  extended: the capture lease still ends at the last kept frame + 100 ms.
+  Unit tests: in the harness a 500 ms capture stall while the lamp answers
+  leaves no peer, the privacy peer included, holding a lapsed granting
+  lease at any step (before: all four peers held the turn's lease at its
+  expiry, 90 ms into the stall, as its revocation was only being sent),
+  nothing is heard after the last frame's lease, and
+  the reply is cut once as `capture_gap`; a pass held up 36 ms after its
+  drain while frames come 30 ms late, on time, cuts nothing (before: the
+  next pass cut it as `capture_gap`); the margin check is true only
+  for a held turn whose lease ends within 40 ms. Not yet tried on a lamp.
+
 - **A wall clock stepped by chrony during start-up.** On lamp-06c1, in 4 of
   4 cold boots, chrony stepped the wall clock by about +20 s some 46 s in,
   and the voice then said "privacy publisher unavailable" (the step read as
