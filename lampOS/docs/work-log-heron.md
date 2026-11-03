@@ -188,3 +188,10 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   two mutations caught (the room guard; two shared words, by
   `no_cue_keeps_fts_rank`); the whole lamp-memory suite, switches and
   notes pass on the Mac; CI green.
+- 15:29: Friday asked heron to read #5043 and #5064 (the memory side, for
+  Tests); yes at 15:33. 16:00: READ-OK on #5043 `e05764f95` with a P3:
+  the band's 600-byte and 30-fact bounds have no test (band = cap passes
+  all five; `profile` off fails one), a test suggested; lamp-memory gate
+  green on the Mac, CI green. Hour posted 15:59. #5064: voice lib run
+  shows `coordinator::motor` failures on this Mac, being compared with
+  lamp-voice without the PR before the read is posted.
