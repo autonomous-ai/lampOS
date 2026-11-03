@@ -231,12 +231,13 @@ each line plays exactly as before.
 | The second route's line when a line by name gets no words twice | `second_provider::NO_WORDS_LINE` ("Sorry, I lost my words there. Could you ask me again?") | said as the turn's text (`LAMP_NO_WORDS_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
 | The second route's line when a reply claims again an action no call made | `action_claim::NOT_DONE_LINE` ("Sorry, I didn't do that. Could you ask me again?") | said as the turn's text (`LAMP_ACTION_CLAIM_CHECKED`, on in the product, #5215) | the owner's words (`language::fixed_in`) |
 | The second route's line when an answer to the lamp's own question gets no words | `second_provider::ANSWER_AGAIN_LINE` ("Sorry, could you say that again?") | said as the turn's text (`LAMP_ANSWER_ASK_AGAIN`, off in the product) | the owner's words (`language::fixed_in`) |
+| The second route's word when each sentence of a reply was an offer to keep left out | `keep_quietly::GOT_IT` ("Got it.") | said as the turn's text (`LAMP_KEEP_QUIETLY`, on in the product, a known person's own scope) | the owner's words (`language::fixed_in`) |
 | The first stand's touch-only ask and its beat before moving | `first_stand::ASK_TOUCH_ONLY` ("I'd like to stretch for the first time. Rest your hand on my head when you're ready."), `GOING` ("Okay, here I go.") | asked of the say service as `text`, the model told to say the words | the model told the owner's words (the say service swaps a `text` that is a fixed line, `language::at_start`); in another language the first stand asks only this one, never the spoken yes (body.md, Fourth's finding on #4710) |
 
 The words are `language::FIXED_LINES`, one row per English line with its
 Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
-lines first, twenty-two today (`FIXED_LINES`), then the English two
+lines first, twenty-three today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its
 own thread, every line tried again until all are kept, first after a
 minute, then twice as long each time, at most hourly; a line that renders
@@ -6301,6 +6302,31 @@ same things without asking when: right only when the reply names no day,
 since a date recited unasked is what a machine does. It prints each arm's
 line counts, then `when named a day=N/M plain without a day=N/M`. It needs
 no actions catalog: it declares the voice's own functions.
+
+With `--keep` last (`probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+--keep [--keep-said]`, `second_provider/probe/keep_quietly.rs`,
+`LAMP_KEEP_QUIETLY`; two runs unless said) it asks only how often a day's
+talk offers to keep: one conversation of 21 made-up lines said in order
+(small talk, seven plain facts of the person's own, a line about someone
+else's health that must not be kept, a guest coming and going, a date said
+unclearly, and a second voice's plain fact said off camera while the owner
+is in view and not speaking, tagged `overheard`), each turn told the talk
+so far (its last 12 exchanges) and its calls answered as the store would
+(`remember` kept, or in `quiet` through the product's check,
+`keep_quietly::refusal`; `recall` finding nothing, the rest done), up to
+three rounds. Two arms: `before`, the words with the switch off; `quiet`,
+as a known person's own scope is told with the switch on
+(`keep_quietly::QUIET_NOTE` beside each line seen said by them), and the
+code's limit (`keep_quietly::Quiet`) over what is said, so the talk goes on
+from what the lamp would say. The `overheard` line is as the product treats
+a line its person was not seen saying: no note, no limit, and a `remember`
+not asked for is refused with `keep_quietly::NOT_SEEN`, so its `remember
+N (written M)` must show written 0. Facts kept count only written keeps.
+Then a fresh session whose snapshot is what `remember` kept
+asks six of the facts. One line a run (turns offering to keep, said and
+written, per tag; `remember` calls; facts kept; checks right), then each
+arm's totals. `--keep-said` also prints its answers to the made-up lines,
+to check the counts by hand. About 50 requests a run of each arm.
 
 Its first line says which way it asks, through the relay or on DeepSeek's
 own API, as the voice's start line does: never the URL. The probe only asks the model and

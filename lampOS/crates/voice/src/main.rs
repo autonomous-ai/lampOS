@@ -755,9 +755,29 @@ fn run() -> Result<()> {
                 lamp_voice::second_provider::probe::cut_in::run(Path::new(provider_config), Path::new(second_config), runs),
             )?;
         }
-        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when | --nightly]
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when | --nightly | --keep [--keep-said]]
         [command, provider_config, second_config, rest @ ..] if command == "probe-tools" => {
-            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly]");
+            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly | --keep [--keep-said]]");
+            let (rest, keep_said) = match rest {
+                [first @ .., last] if last == "--keep-said" => (first, true),
+                _ => (rest, false),
+            };
+            if let [first @ .., last] = rest
+                && last == "--keep"
+            {
+                let runs = match first {
+                    [] => 2,
+                    [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                    _ => return Err(usage().into()),
+                };
+                tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                    lamp_voice::second_provider::probe::keep_quietly::run(Path::new(provider_config), Path::new(second_config), runs, keep_said),
+                )?;
+                return Ok(());
+            }
+            if keep_said {
+                return Err(usage().into());
+            }
             let (rest, recall_only, when_only, nightly) = match rest {
                 [first @ .., last] if last == "--recall" => (first, true, false, false),
                 [first @ .., last] if last == "--when" => (first, false, true, false),

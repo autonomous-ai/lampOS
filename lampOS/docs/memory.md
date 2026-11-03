@@ -1071,6 +1071,108 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   round's words, so a normal turn's time is unchanged. Tests:
   `remember::doubted::tests`,
   `second_provider::tests::a_keep_its_own_round_doubts_is_not_run`.
+- **Plain facts are kept quietly, with few offers to keep**
+  (`LAMP_KEEP_QUIETLY=on`, the second route; off unless set, on in the
+  product unit since #5053). In lamp-06c1's long run of 30 Oct, 8 of the
+  first 23 turns asked or offered to keep something ("Want me to keep
+  that?", "I can keep that with the dinner, if you'd like.", "keep that
+  too?"), and a guest's arrival was asked about again and again. A person
+  doesn't ask leave to remember what a friend tells them (rule 8). All of
+  it holds **only in a known person's own scope** (`keep_quietly::own`: a
+  face the eyes know, not one held through a gap). The room's scope, an
+  unknown speaker's line and a written turn stay ask-first, exactly as with
+  the switch off, so a guest's, an unseen speaker's or the TV's line never
+  goes quietly into the room's memory (memory-design.md: "An unknown
+  visitor's statements do not become owner memory"). And the scope follows
+  the face in view, not who spoke: a partner speaking off camera while the
+  owner is seen is in the owner's scope. So it holds only for a line the
+  eyes saw that person's own face, and no other, saying
+  (`keep_quietly::seen_saying`, recorded by `keep_quietly::saw` from the
+  line's sight in `second_provider::spoken`, by `remember::speaker_of`'s
+  rule, the signal #5070 gates a service write on; it needs
+  `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on`, both on in
+  the product). A line the person wasn't seen saying (their face in view
+  but not speaking, another face or two seen speaking, no eyes) stays
+  ask-first: no note, no limit on offers, and a `remember` it didn't ask
+  for, that is no yes to the lamp's offer, writes nothing; the model is told
+  `keep_quietly::NOT_SEEN` (nothing was kept, it may be someone else's, ask
+  them first, once), and the journal gets one line with no words. With the
+  switch, in a known person's own scope, on a line seen said by them:
+  - **Words.** Beside the person's words the turn is told
+    `keep_quietly::QUIET_NOTE`: a plain, lasting fact about their own life
+    (a plan or a date, where they keep something) is kept by a `remember`
+    beside the answer, in their own words, without asking and without
+    saying so; never health, money or other people's private matters unless
+    they clearly ask (the rule `remember::OBSERVE_PROMPT` and this page's
+    observation pass already hold); never offer or ask to keep; a word
+    really unclear is asked about once, never again about the same thing.
+    `remember`'s own description is unchanged. A keep they asked for is
+    still said back, so a mishearing can be put right (N5's rule is kept).
+  - **A quiet keep is their heard words** (`keep_quietly::unheard`, in
+    `tools::run_call_with_scope`). A quiet keep is never said back, so the
+    person can't catch a word the model put in (20 Oct: "my favourite tea is
+    jasmine" kept as "My favorite food is jasmine"). A `remember` the line
+    didn't ask for (`remember::asked::asks_to_keep`), that is no yes to the
+    lamp's offer, is kept only when every key word of its sentence was heard
+    in the line (`remember::heard::heard_instead`, the same check as
+    `LAMP_MEMORY_KEEP_HEARD`, applied whether or not that switch is on);
+    otherwise nothing is written and the model is told to keep it again
+    only in their words. A line that took the keep back ("…, but don't save
+    that") keeps nothing. This only ever writes less.
+  - **Code.** Whatever the model writes, a sentence in which the lamp
+    offers or asks to keep (`keep_quietly::offers`: a question or "if you'd
+    like", "want me to", with "I" or "me" as the keeper of a keep word and
+    what it keeps; in Vietnamese "mình"/"tôi"/"em" with "nhớ"/"lưu"/"ghi"
+    and "nhé"/"nha"/"không"/"có muốn", with or without a question mark) is
+    said at most once a conversation; never about a thing an earlier offer
+    named (times and days such as "two", "tomorrow", "Friday" name no
+    thing); and never in an answer to small talk (a question, or a line with
+    under three words that aren't greetings or fillers; a line that asks to
+    keep, or one in Japanese, Chinese or Korean, is never small talk). Never
+    offers: the lamp asking what the person keeps ("Do you remember where
+    you put the keys?", "Where do you keep the spare key?"), a doubted
+    word's ask (`keep_quietly::clarifies`: "Lily or Lilly, which should I
+    note?", "Em có nhớ đúng là thứ Bảy không?"), the face's consent ("May I
+    remember your face…?"), a thing done ("I noted the timer…, just say
+    if you want it changed.") and the lamp saying it doesn't remember: a
+    negation between "I" and the keep word ("I can't remember her name, can
+    you tell me?", also "don't", "cannot", "didn't", "never", …), and in
+    Vietnamese "không"/"chưa"/"chẳng" right before the keep word ("Mình
+    không nhớ tên bạn ấy.") or "nhớ không nhầm"; there "không" asks only as
+    the sentence's last word. So such an answer to a question is said whole,
+    never cut to "Got it.". The rest of the answer is said. The journal
+    says "N offer(s) to keep not said: <why> (LAMP_KEEP_QUIETLY)", never
+    words.
+  - **Once a conversation** is counted per known person in
+    `keep_quietly::OFFERS`, in the voice process's memory: every offer said
+    in their scope, however many exchanges (the thread's 12-exchange window,
+    `thread::EXCHANGES`, doesn't bound it), until ten minutes with no answer
+    in their scope (`thread::REMEMBERED_FOR`); then the offers count as an
+    earlier conversation's, for "never about the same thing". At most 8
+    people and 8 offers each are held. A restart of the voice resets it, so
+    the first offer after a restart may be said again.
+  - **Never silence.** When every sentence of a reply was an offer left
+    out and nothing was said, the lamp says the answer with the offer taken
+    out ("Lily at two, want me to keep that?" says "Lily at two.") or "Got
+    it." (`keep_quietly::GOT_IT`, a fixed line in the owner's language).
+  - **Held keeps still ask.** A carried line's keep held for the person's
+    seen yes (#4508, `HELD_KEEP_ASKS`) is the code's own ask, so it's always
+    said.
+  - The code limit reads English and Vietnamese only. In Japanese, Chinese
+    or Korean no offer is found, so each is said; there the words alone
+    hold it.
+  - `probe-tools ... --keep` measures it on the real model: 21 made-up lines
+    of a day (small talk, seven plain facts of the person's own, someone
+    else's health, a guest coming and going, an unclear date, and a second
+    voice's plain fact said off camera with the owner in view and not
+    speaking, which must write nothing), each arm
+    counting turns that offer to keep (written and said), plain facts kept
+    by `remember`, and six of them asked in a fresh session
+    ([second-voice.md](second-voice.md)). The 3 Nov numbers on lamp-06c1
+    (offers 2/20 off, 0/20 on; facts kept 2/7 both) were measured before
+    these changes; a re-measure is owed. Tests: `keep_quietly::tests`,
+    `second_provider::probe::keep_quietly::tests`,
+    `thread::tests::lamp_words_for_parts_the_talk_going_on_from_the_ones_before`.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.

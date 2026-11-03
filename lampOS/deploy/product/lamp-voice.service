@@ -437,6 +437,12 @@ Environment=LAMP_CONVERSATION_SUMMARY=on
 # (build 8163, the product unit) "remember the meeting room is called orange" said again kept it twice (Friday's
 # run on #3504). A correction (`replaces`) always writes, and the room's scope is told as a first keep (#2176).
 Environment=LAMP_MEMORY_REMEMBER_ONCE=on
+# A known person's own plain facts are kept quietly, in their heard words, never health, money or others' private
+# matters unasked; the room's scope stays ask-first; an offer to keep is said at most once a conversation, never
+# twice about a thing and never on small talk (#5053): on lamp-06c1's long run of 30 Oct 8 of the first 23 turns
+# offered to keep. probe-tools --keep on lamp-06c1 through the relay (3 Nov, the first head): offers 2/20 off, 0/20
+# on; facts kept 2/7 both. A re-measure at the fixed head is owed.
+Environment=LAMP_KEEP_QUIETLY=on
 # What the room kept, and the earlier exchanges a turn is given, were said by whoever was in the room then, never
 # necessarily the one asking: on lamp-4ace on 26 Oct (lamp-voice 2a8273ef2's product unit, played), a fresh
 # session's "how do I take my coffee?", after a room's "I take my coffee black" kept by nobody, was answered as the
