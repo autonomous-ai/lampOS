@@ -12234,32 +12234,53 @@ fn conversation_with_gate_inner(
             && says.turn_start_waits(control_now_us)
         {
             let persons = |turn: u64| person_line.is_some_and(|(line, _)| line == turn);
+            // A conversation with the lamp, as the second route judges one
+            // going on (the thread's exchange with the lamp's words in it,
+            // `thread::GOING_ON_FOR`), a computer's turn still going on, or
+            // a person's answer in hand; never the room's speech, a line
+            // heard and held back, or a look the voice wanted (lamp-75c9,
+            // 3 Nov: the room's talk refused every turn).
+            let signs = [
+                ("a computer's turn", control_turns.going_on()),
+                (
+                    "the thread",
+                    crate::thread::THREAD
+                        .lock()
+                        .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
+                ),
+                (
+                    "a person's answer",
+                    reply
+                        .as_ref()
+                        .is_some_and(|current| persons(current.owner.turn())),
+                ),
+                ("its words in hand", reply.is_some()),
+                ("its speaker", speaker_pending.is_some()),
+                ("the provider's queue", !provider_queue.is_empty()),
+                ("a submission draining", submission_draining),
+            ];
             let refusal = crate::control_turn::refused(&crate::control_turn::StartNow {
                 muted: snapshot.microphone_permission() != Permission::Allowed,
                 paused,
-                // A conversation with the lamp, as an exact say reads it
-                // (`thread`'s exchange with the lamp's words in it), never
-                // the room's speech or a line heard and held back: in a
-                // busy office the person's talk to others refused every
-                // turn (lamp-75c9, 3 Nov).
-                conversation: control_turns.going_on()
-                    || crate::thread::THREAD
-                        .lock()
-                        .is_ok_and(|thread| thread.going_on(std::time::Instant::now()))
-                    || look_wanted.is_some()
-                    || reply
-                        .as_ref()
-                        .is_some_and(|current| persons(current.owner.turn())),
-                speaking: reply.is_some()
-                    || speaker_pending.is_some()
-                    || !provider_queue.is_empty()
-                    || submission_draining,
+                conversation: signs[..3].iter().any(|(_, on)| *on),
+                speaking: signs[3..].iter().any(|(_, on)| *on),
             });
             if let Some(why) = refusal {
                 if let Some((_, ticket)) = says.take_turn_start(control_now_us) {
+                    // Which signs refused it, never what was said.
+                    let by: Vec<&str> = signs
+                        .iter()
+                        .filter(|(_, on)| *on)
+                        .map(|(sign, _)| *sign)
+                        .collect();
                     eprintln!(
-                        "lamp-voice: the skill {}'s turn is refused: {why}",
-                        ticket.skill()
+                        "lamp-voice: the skill {}'s turn is refused: {why} (by {})",
+                        ticket.skill(),
+                        if by.is_empty() {
+                            "none".to_owned()
+                        } else {
+                            by.join(", ")
+                        }
                     );
                     ticket.answer(crate::say::Outcome::Refused(why.into()));
                 }
