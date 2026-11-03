@@ -602,7 +602,7 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
     };
     let task = json!({
         "type": "string",
-        "description": "The work, in the person's own words, complete enough to do without asking."
+        "description": "The work, in the person's own words. A short ask is enough: the agent works out the details."
     });
     let (start_description, start_parameters) = if choosing {
         let all = names(staff, "and");
@@ -3948,7 +3948,7 @@ pub(crate) mod tests {
                     "properties": {
                         "task": {
                             "type": "string",
-                            "description": "The work, in the person's own words, complete enough to do without asking."
+                            "description": "The work, in the person's own words. A short ask is enough: the agent works out the details."
                         }
                     },
                     "required": ["task"]

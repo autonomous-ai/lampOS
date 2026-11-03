@@ -1463,6 +1463,13 @@ of two functions:
   on the office computer. The voice reads `status` and sends `prepare` on the
   request socket with the target alias. Nothing runs. The model is told to
   say the task back in one short sentence and ask whether to start it.
+  Its `task` is "the person's own words. A short ask is enough: the agent
+  works out the details" (subdarren-P2). The earlier wording, "complete
+  enough to do without asking", let the model ask what a website should
+  have instead of calling. On lamp-c0a4 on 3 November, "ask Claude Code to
+  build a website that promotes tourism in Vietnam" called it 1 time in 3,
+  and the same ask with its sections named was called at once. The
+  read-back still guards a short ask: nothing starts before the yes.
 - `confirm_agent_task()`: the voice, not the model, decides whether it may.
   Only when a task is waiting, in a request after the one that prepared it,
   which the lamp heard rather than wrote itself (`attention::own_request()`), within two
