@@ -4,7 +4,8 @@
 # step on the lamp's speaker and keeps its results on the lamp, so the Mac
 # can leave for the next lamp at once.
 #
-#   factory-run.sh unset ID      lamp not set up: checks (r2, 4b, 4e–4g), the
+#   factory-run.sh unset ID      lamp not set up: checks (r2, 4b, 4e–4g, the
+#                                servos: servo-calib.py), the
 #                                head onto its stop (head-nudge.py), step 1
 #                                (the arm stand), every input in one window
 #                                (input-check.py: head pads, button, reset,
@@ -28,7 +29,8 @@
 # decides it.
 #
 # Needs in /home/orangepi: steps.sh, factory-voice.py, head-nudge.py,
-# input-check.py, ring-check.py; the prompts in /var/lib/lamp-test/prompts.
+# input-check.py, ring-check.py, servo-calib.py; the prompts in
+# /var/lib/lamp-test/prompts.
 # As root.
 set -uo pipefail
 
@@ -37,7 +39,7 @@ DIR=/var/lib/lamp-test; HOME_DIR=/home/orangepi
 REC=$DIR/factory.env; LOG=$DIR/factory-run.log; STATUS=$DIR/factory-run.status
 GAZE=${GAZE:-755,555}; NUDGE_TARGET=${NUDGE_TARGET:-2010}
 PINS=/etc/lampOS/controls/controls-pins.json; ENV_FILE=/etc/lampOS/body/lamp.env
-[[ $MODE == unset || $MODE == selftest || $MODE == note ]] && [[ $ID =~ ^[0-9a-f]{4}$ ]] || { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+[[ $MODE == unset || $MODE == selftest || $MODE == note ]] && [[ $ID =~ ^[0-9a-f]{4}$ ]] || { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 mkdir -p "$DIR"
 exec >>"$LOG" 2>&1
 cd "$HOME_DIR" || exit 2
@@ -132,6 +134,22 @@ v=$(cat /sys/bus/usb/devices/3-1.1.4/idVendor 2>/dev/null):$(cat /sys/bus/usb/de
 systemctl cat lamp-update | grep -q lampos-stable && rec "UPDATE_CHANNEL_4F=PASS lampos-stable" || fail "lamp-update is not on lampos-stable (4f)"
 r=""; for u in bootstrap os-server hal; do systemctl is-active -q $u && r="$r $u"; done
 [[ -z $r ]] && rec "V1_UNITS_4G=PASS none running" || fail "V1 units running:$r (4g)"
+
+# The servos' own settings before anything moves: servos V1 HAL never set
+# keep a maximum acceleration of 50, which the body's stand refuses, and
+# servos never calibrated by hand have no zero of their own, so the stand
+# can push the arm into the body (lamp-220c, 28 Oct). V1's settings are
+# stored here (nothing moves); a calibration needs a person at the lamp.
+servo_check() { out=$(python3 "$HOME_DIR/servo-calib.py" check 2>&1); rc=$?; echo "$out"; }
+servo_check
+if [[ $rc == 3 ]]; then
+  say "the servos lack V1's settings: storing them"
+  python3 "$HOME_DIR/servo-calib.py" configure || fail "the servos did not keep V1's settings (servo-calib.py configure)"
+  servo_check
+fi
+mapfile -t servos < <(sed -n 's/^RECORD //p' <<<"$out"); rec "${servos[@]}"
+[[ $rc == 4 ]] && fail "the servos were never calibrated: factory-lamp.sh calibrate $ID, with a person at the lamp"
+[[ $rc == 0 ]] || fail "the servos could not be checked (servo-calib.py check)"
 
 if ! grep -q ^BODY_POSES= "$ENV_FILE" 2>/dev/null; then
   status "RUNNING head rest"
