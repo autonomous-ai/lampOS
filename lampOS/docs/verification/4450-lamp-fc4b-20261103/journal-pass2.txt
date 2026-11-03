@@ -1,0 +1,102 @@
+# lamp-fc4b, lamp-voice journal, pass 2 (12:55–12:57 +07, the lamp's clock, +0.4 s against the Mac). Lines about requests; connection and token lines left out.
+12:55:28.425 lamp-voice second: request 30: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:55:31.752 lamp-voice second: request 30 at the line's end: settled=false, speech_final=true, finals cover 2860 of 3620 ms sent, pending=none, last final 477 ms before End, finalize answered in 307 ms to 3620 ms, results 3 with words, 1 without, words from=finalize
+12:55:31.753 lamp-voice second: request 30 heard 8 words, the last 308 ms after the line ended
+12:55:31.753 lamp-voice second: request 30: of its 8 words, 1 in the lamp's answer to request 27 so far
+12:55:31.753 lamp-voice second: request 30: no conversation going on: the line ran 3 s, it was last heard saying words, to their end, 418 s ago, it was never called, 0 lines left alone since it last spoke
+12:55:31.753 lamp-voice second: request 30: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:55:32.486 lamp-voice second: request 31 goes on from request 30: its 1500 ms of sound go first
+12:55:32.487 lamp-voice second: request 31: speech to text kept ready in 0 ms, 80 ms of the line's sound waiting
+12:55:34.843 lamp-voice second: request 31 at the line's end: settled=false, speech_final=true, finals cover 730 of 4120 ms sent, pending=interim 2200 ms after the last final, last final 1442 ms before End, finalize answered in 336 ms to 4120 ms, results 4 with words, 2 without, words from=finalize
+12:55:34.843 lamp-voice second: request 31 heard 7 words, the last 337 ms after the line ended
+12:55:34.844 lamp-voice second: request 31: of its 7 words, 0 in the lamp's answer to request 27 so far
+12:55:34.844 lamp-voice second: request 31: no conversation going on: the line ran 2 s, it was last heard saying words, to their end, 421 s ago, it was never called, 0 lines left alone since it last spoke
+12:55:34.844 lamp-voice second: request 31: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:55:37.128 lamp-voice second: request 32: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:55:39.453 lamp-voice second: request 32 at the line's end: settled=false, speech_final=false, finals cover none of 2640 ms sent, pending=interim 2000 ms after the last final, last final none, finalize answered in 286 ms to 2640 ms, results 3 with words, 0 without, words from=finalize
+12:55:39.454 lamp-voice second: request 32 heard 8 words, the last 287 ms after the line ended
+12:55:39.454 lamp-voice second: request 32: of its 8 words, 1 in the lamp's answer to request 27 so far
+12:55:39.454 lamp-voice second: request 32: no conversation going on: the line ran 2 s, it was last heard saying words, to their end, 425 s ago, it was never called, 0 lines left alone since it last spoke
+12:55:39.454 lamp-voice second: request 32: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:55:40.786 lamp-voice second: request 33: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:55:45.597 lamp-voice second: request 33 at the line's end: settled=false, speech_final=true, finals cover 4080 of 5140 ms sent, pending=none, last final 776 ms before End, finalize answered in 270 ms to 5100 ms, results 5 with words, 2 without, words from=finalize
+12:55:45.597 lamp-voice second: request 33 heard 10 words, the last 271 ms after the line ended
+12:55:45.597 lamp-voice second: request 33: of its 10 words, 2 in the lamp's answer to request 27 so far
+12:55:45.597 lamp-voice second: request 33: no conversation going on: the line ran 5 s, it was last heard saying words, to their end, 432 s ago, it was never called, 0 lines left alone since it last spoke
+12:55:45.597 lamp-voice second: request 33: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:56:01.022 lamp-voice second: request 34: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:56:07.411 lamp-voice second: request 35: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:56:10.372 lamp-voice second: request 35 at the line's end: settled=false, speech_final=false, finals cover none of 3300 ms sent, pending=interim 2140 ms after the last final, last final none, finalize answered in 259 ms to 3300 ms, results 3 with words, 0 without, words from=finalize
+12:56:10.372 lamp-voice second: request 35 heard 9 words, the last 260 ms after the line ended
+12:56:10.372 lamp-voice second: request 35: of its 9 words, 1 in the lamp's answer to request 27 so far
+12:56:10.374 lamp-voice second: request 35: no conversation going on: the line ran 3 s, it was last heard saying words, to their end, 456 s ago, it was never called, 0 lines left alone since it last spoke
+12:56:10.374 lamp-voice second: request 35: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:56:12.136 lamp-voice second: request 36: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:56:13.221 lamp-voice: request 36: unfinished words (joining) held its end 90 ms, more speech came: yes
+12:56:14.425 lamp-voice second: request 36 at the line's end: settled=false, speech_final=false, finals cover none of 2610 ms sent, pending=interim 1680 ms after the last final, last final none, finalize answered in 282 ms to 2610 ms, results 3 with words, 0 without, words from=finalize
+12:56:14.426 lamp-voice second: request 36 heard 7 words, the last 283 ms after the line ended
+12:56:14.426 lamp-voice second: request 36: of its 7 words, 0 in the lamp's answer to request 27 so far
+12:56:14.426 lamp-voice second: request 36: no conversation going on: the line ran 2 s, it was last heard saying words, to their end, 460 s ago, it was never called, 0 lines left alone since it last spoke
+12:56:14.426 lamp-voice second: request 36: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:56:14.814 lamp-voice second: request 37 goes on from request 36: its 1500 ms of sound go first
+12:56:14.814 lamp-voice second: request 37: speech to text kept ready in 0 ms, 80 ms of the line's sound waiting
+12:56:16.024 lamp-voice second: request 38: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:56:20.375 lamp-voice second: request 38 at the line's end: settled=false, speech_final=true, finals cover 4050 of 4550 ms sent, pending=none, last final 219 ms before End, finalize answered in 320 ms to 4550 ms, results 3 with words, 3 without, words from=finalize
+12:56:20.376 lamp-voice second: request 38 heard 7 words, the last 321 ms after the line ended
+12:56:20.376 lamp-voice second: request 38: of its 7 words, 1 in the lamp's answer to request 27 so far
+12:56:20.376 lamp-voice second: request 38: no conversation going on: the line ran 4 s, it was last heard saying words, to their end, 466 s ago, it was never called, 0 lines left alone since it last spoke
+12:56:20.376 lamp-voice second: request 38: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:56:20.974 lamp-voice second: request 39 goes on from request 38: its 1500 ms of sound go first
+12:56:20.975 lamp-voice second: request 39: speech to text kept ready in 0 ms, 80 ms of the line's sound waiting
+12:56:23.994 lamp-voice second: request 39 at the line's end: settled=false, speech_final=true, finals cover 990 of 4850 ms sent, pending=interim 2820 ms after the last final, last final 2072 ms before End, finalize answered in 267 ms to 4840 ms, results 4 with words, 1 without, words from=finalize
+12:56:23.994 lamp-voice second: request 39 heard 7 words, the last 268 ms after the line ended
+12:56:23.994 lamp-voice second: request 39: of its 7 words, 0 in the lamp's answer to request 27 so far
+12:56:23.996 lamp-voice second: request 39: no conversation going on: the line ran 3 s, it was last heard saying words, to their end, 470 s ago, it was never called, 0 lines left alone since it last spoke
+12:56:23.996 lamp-voice second: request 39: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:56:25.804 lamp-voice second: request 40: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:56:29.382 lamp-voice second: request 40 at the line's end: settled=false, speech_final=true, finals cover 2990 of 3970 ms sent, pending=none, last final 734 ms before End, finalize answered in 204 ms to 3970 ms, results 0 with words, 5 without, words from=finalize
+12:56:29.382 lamp-voice second: request 40 heard 0 words, the last 205 ms after the line ended
+12:56:30.989 lamp-voice second: request 41: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:56:33.900 lamp-voice second: request 41 at the line's end: settled=false, speech_final=true, finals cover 2670 of 3260 ms sent, pending=none, last final 294 ms before End, finalize answered in 252 ms to 3260 ms, results 1 with words, 2 without, words from=finalize
+12:56:33.900 lamp-voice second: request 41 heard 1 words, the last 252 ms after the line ended
+12:56:33.900 lamp-voice second: request 41: of its 1 words, 0 in the lamp's answer to request 27 so far
+12:56:33.903 lamp-voice second: request 41: no conversation going on: the line ran 3 s, it was last heard saying words, to their end, 480 s ago, it was never called, 0 lines left alone since it last spoke
+12:56:33.903 lamp-voice second: request 41: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:56:34.146 lamp-voice second: request 42 goes on from request 41: its 1500 ms of sound go first
+12:56:34.146 lamp-voice second: request 42: speech to text kept ready in 0 ms, 80 ms of the line's sound waiting
+12:56:36.904 lamp-voice second: request 42 at the line's end: settled=false, speech_final=true, finals cover 880 of 4490 ms sent, pending=interim 2360 ms after the last final, last final 1884 ms before End, finalize answered in 267 ms to 4490 ms, results 4 with words, 2 without, words from=finalize
+12:56:36.904 lamp-voice second: request 42 heard 1 words, the last 268 ms after the line ended
+12:56:36.904 lamp-voice second: request 42: of its 1 words, 0 in the lamp's answer to request 27 so far
+12:56:36.906 lamp-voice second: request 42: no conversation going on: the line ran 2 s, it was last heard saying words, to their end, 483 s ago, it was never called, 0 lines left alone since it last spoke
+12:56:36.906 lamp-voice second: request 42: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+12:56:47.081 lamp-voice second: request 43: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:56:50.901 lamp-voice second: request 43 at the line's end: settled=false, speech_final=true, finals cover 3000 of 4170 ms sent, pending=none, last final 775 ms before End, finalize answered in 251 ms to 4170 ms, results 4 with words, 2 without, words from=finalize
+12:56:50.901 lamp-voice second: request 43 heard 5 words, the last 251 ms after the line ended
+12:56:50.901 lamp-voice second: request 43: of its 5 words, 1 in the lamp's answer to request 27 so far
+12:56:50.904 lamp-voice second: request 43: no conversation going on: the line ran 4 s, it was last heard saying words, to their end, 497 s ago, it was never called, 0 lines left alone since it last spoke
+12:56:50.904 lamp-voice second: request 43: its name, heard in the room's sound, counts by: its words calling it (LAMP_NAME_SECOND_SIGN)
+12:56:50.904 lamp-voice second: request 43: lamp-name's hearing began 1417 ms into the line (299 ms of soft lead) (the newest 1417 ms); the line's start is up to 1300 ms
+12:56:50.904 lamp-voice second: request 43: its answer is played: its name was heard in the room's sound
+12:56:50.904 lamp-voice second: request 43: the model is told the lamp's name was heard
+12:56:51.896 lamp-voice second: request 43 chat round 1 first event in 994 ms
+12:56:52.047 lamp-voice second: request 43 first piece to the voice 1145 ms after the words were heard, 4 words
+12:56:52.047 lamp-voice second: request 43 speech tags: 0 given to the voice, 0 dropped (LAMP_SECOND_SPEECH_TAGS)
+12:56:52.430 lamp-voice second: request 43 first answer audio 1528 ms after the words were heard
+12:56:52.899 lamp-voice second: request 43 ElevenLabs: 2 of 2 pieces began, 1 on a reused connection, 38 chars; the first piece's first audio byte 382 ms after it went, the slowest 450 ms
+12:57:08.583 lamp-voice second: request 44: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:57:10.794 lamp-voice second: request 44 at the line's end: settled=false, speech_final=false, finals cover none of 2500 ms sent, pending=interim 2000 ms after the last final, last final none, finalize answered in 307 ms to 2500 ms, results 3 with words, 0 without, words from=finalize
+12:57:10.794 lamp-voice second: request 44 heard 7 words, the last 308 ms after the line ended
+12:57:10.794 lamp-voice second: request 44: of its 7 words, 1 in the lamp's answer to request 43 so far
+12:57:10.794 lamp-voice second: request 44: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+12:57:11.629 lamp-voice second: request 44 chat round 1 first event in 834 ms
+12:57:11.629 lamp-voice second: request 44 chat round 1 called not_for_me
+12:57:12.113 lamp-voice second: request 45: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+12:57:16.666 lamp-voice second: request 45 at the line's end: settled=false, speech_final=true, finals cover 4250 of 4870 ms sent, pending=none, last final 355 ms before End, finalize answered in 281 ms to 4870 ms, results 6 with words, 1 without, words from=finalize
+12:57:16.666 lamp-voice second: request 45 heard 8 words, the last 282 ms after the line ended
+12:57:16.666 lamp-voice second: request 45: of its 8 words, 0 in the lamp's answer to request 43 so far
+12:57:16.666 lamp-voice second: request 45: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+12:57:17.864 lamp-voice second: request 45 chat round 1 first event in 1197 ms
+12:57:18.000 lamp-voice second: request 45 first piece to the voice 1333 ms after the words were heard, 4 words
+12:57:18.103 lamp-voice second: request 45 speech tags: 0 given to the voice, 0 dropped (LAMP_SECOND_SPEECH_TAGS)
+12:57:18.490 lamp-voice second: request 45 first answer audio 1824 ms after the words were heard
+12:57:19.118 lamp-voice second: request 45 ElevenLabs: 3 of 3 pieces began, 2 on a reused connection, 65 chars; the first piece's first audio byte 489 ms after it went, the slowest 648 ms
