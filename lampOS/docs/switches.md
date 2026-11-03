@@ -595,7 +595,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_HARNESS_HOLD_UPDATES` | The lamp keeps the Harness version it was given and checks Harness is up after it starts. |
 | `LAMP_SECOND_SPEECH_SOCKET` | Nothing you'd notice: opens the speech connection early to try to start talking sooner. |
 | `LAMP_SECOND_SPEECH_SOCKET_MODEL` | Nothing you'd notice: picks the voice engine for the early speech connection, keeping one voice per answer. |
-| `LAMP_SECOND_CHAT_SECOND_TRY` | When a reply is slow to start, the lamp asks once more over a new connection, so fewer turns end with "my thoughts are slow". |
+| `LAMP_SECOND_CHAT_SECOND_TRY` | When a reply is slow to start, the lamp asks once more, so fewer turns end with "my thoughts are slow". |
 | `LAMP_CUT_IN_KEEPS_LISTENING` | The lamp still stops if you keep talking over it, even after two earlier pauses came to nothing. |
 | `LAMP_CUT_IN_NEAR_ASKER` | While answering you, the lamp no longer stops for quieter talk from farther back in the room. |
 | `LAMP_CUT_IN_OVER_BED` | After three ignored turns, only "stop", its name, a tap or the button stops it; needs stop words always on. |
