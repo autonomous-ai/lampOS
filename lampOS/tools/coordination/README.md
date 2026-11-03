@@ -11,14 +11,17 @@ Each script keeps its dated comments. They are the history of each rule.
 | Tool | What it does |
 |---|---|
 | `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back. It picks every eligible PR, cherry-picks its commits, pushes `first/train-N`, opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints what one round would carry and stops. |
-| `merge-when-green.sh PR` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
-| `still-eligible.sh PR...` | Used by the bot just before a merge. Fails if any carried PR is now held or unread. |
+| `merge-when-green.sh PR [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
+| `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
-| `markers.py [PR]` | Reads a PR's comments as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. |
-| `reads2.py HEAD_SHA` | Reads the PR body and comments as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. |
+| `markers.py [--writers FILE] [PR]` | Reads a PR's comments as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. |
+| `reads2.py [--writers FILE] HEAD_SHA` | Reads the PR body and comments as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. |
+| `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
+| `lib.sh` | Sourced by `train-bot.sh` and `still-eligible.sh`: the writers list and the fetches, each failing closed. |
+| `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
-| `gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON` | The generator `build-rows-pr.sh` calls. |
+| `gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON PRIVATE_NAMES` | The generator `build-rows-pr.sh` calls. |
 
 The review page itself (`build.py`) is not in this repo.
 It is written to the owner and holds private notes and photo paths.
@@ -37,9 +40,11 @@ Get a copy from the first builder and point `ROWS_SOURCE` at it.
 | `ROWS_SOURCE` | `$LAMP_COORD_STATE/review-page/build.py` | the review page |
 | `PRIVATE_NAMES` | `$LAMP_COORD_STATE/private-names.txt` | names the rows file must never hold |
 | `HOLDS_LIFTED` | `$LAMP_COORD_STATE/holds-lifted.tsv` | HOLDs lifted in words |
-| `PYTHON` | `python3` | running `markers.py`, `reads2.py`, `gen-build-rows.py` |
+| `PYTHON` | `python3` | running `markers.py`, `reads2.py`, `qholds.py`, `gen-build-rows.py` |
+| `LAMP_COORD_WRITERS` | none | the writers file for `markers.py`, `reads2.py` and `qholds.py` run by hand (the bot passes `--writers`) |
 
 `REPO_DIR`'s `origin` must be `autonomous-ai/lampOS`.
+`WORKTREE` must not be `REPO_DIR`, its top level or the repository's main worktree: the bot refuses to start.
 
 ## State
 
@@ -47,6 +52,7 @@ State never lives in the repo. It lives in `$LAMP_COORD_STATE`:
 
 - `train-bot.log`: the bot's log. `train-bot.out` and `train-bot.pid`: its output and process id, when started as below.
 - `train-bot.told`: what the bot has already said, so it says each thing once.
+- `train-bot.said`: fetch failures already logged; a line goes when that fetch works again.
 - `pr-trainN.md`: each train PR's body.
 - `train-first.txt`: PR numbers that go first, in that order.
 - `train-hold.txt`: PR numbers that sit out.
@@ -54,6 +60,13 @@ State never lives in the repo. It lives in `$LAMP_COORD_STATE`:
 - `holds-lifted.tsv`: HOLDs lifted in words. See `holds-lifted.tsv.example` for the format.
   Its keys hold account logins, so it stays out of the repo. Copy the first builder's file.
 - `private-names.txt`: one regex a line. See `private-names.txt.example`. `build-rows-pr.sh` stops without it.
+  `gen-build-rows.py` also leaves out of the Owners column any builder label a rule matches.
+  A `builder:*` label can read like a person's name: add a rule for it.
+- `writers.txt`: the logins with write access to the repo, fetched from its collaborators.
+  Its first line is `# fetched <epoch>`. It is fetched again when an hour old.
+- `writers-extra.txt`: logins the operator adds, one a line. Optional.
+- `writers-allowed.txt`: the two above together, the file the readers get.
+- `queue.jsonl`, `pr-comments.jsonl`, `pr-body.jsonl`: the bot's last fetches.
 - `asks-last`: the time of `asks-for-me.sh`'s last run.
 - `labels.json`, `gen/`: `build-rows-pr.sh`'s work files.
 
@@ -87,21 +100,53 @@ It says so on the Queue (#4710).
 
 ## Marker rules
 
-- A reader approves with a comment whose first line is `READ-OK <sha>`. A reader blocks with `HOLD <sha>`.
-  A marker later in the first 400 characters counts only with a commit right after it.
-  A marker that is quoted, in brackets, or named as a noun ("your HOLD …") does not count.
-- A READ-OK counts for the PR's head, or for a head with the same patch-id (a plain rebase).
-  The patch-id is taken with no context lines.
-- A HOLD is keyed on the account plus the reader's signature ("Sixth, 09:16", "Reviewer-lead:").
-  It stands until the same account and signature post a later READ-OK.
-- An unsigned HOLD stands until that account posts a READ-OK saying the HOLD is lifted or cleared.
-- The bot's own `HOLD train N` clears on any later READ-OK.
-- A comment on the Queue (#4710) whose first line is `HOLD <sha>` holds the PR whose head starts with that sha.
-  It stands until the same account posts a READ-OK on the PR saying the HOLD is lifted or cleared.
-- A HOLD closed in words but never cleared is lifted only by a row in `holds-lifted.tsv`.
+These are what `markers.py`, `reads2.py`, `qholds.py` and `train-bot.sh` do.
+
+**Accounts.** Only comments from logins with write access count: `writers.txt` plus `writers-extra.txt`.
+A READ-OK, a HOLD, lifting words, a TWO READS comment or a Queue HOLD from any other login is skipped.
+The PR body's TWO READS ask always counts.
+If the collaborators can't be fetched and `writers.txt` is an hour old or more, no PR is eligible (fail closed).
+A PR whose head is in another repository is never carried.
+
+**Fetches fail closed.** If a PR's head, comments or body can't be fetched, that PR is not eligible.
+If the Queue (#4710) can't be fetched, no PR is eligible that round.
+`still-eligible.sh` rechecks the markers, the Queue HOLDs and TWO READS just before a train merges.
+
+**Markers.**
+
+- A marker opens the comment: its first line is `READ-OK <sha>` or `HOLD <sha>` (bold and backticks allowed; a `#PR` may come before the sha).
+  A HOLD with no sha still holds. A READ-OK with no sha makes the PR not eligible.
+- A marker later in the first 400 characters counts only with a commit of 9 or more characters right after it.
+  It does not count when it is quoted (backticks or quotation marks), in brackets, after a possessive ("the Reviewer-lead's READ-OK …"),
+  or named as a noun ("your HOLD …", "the/that/this/their/for …").
+- The signature is the reader's name: "Sixth, 09:16" (an optional "The"), the name right after the marker's commit,
+  the name that opens the next line ("Sixth: …"), or the name that opens the comment with a colon.
+
+**What markers.py prints.**
+
+- The PR is eligible on its newest READ-OK when no HOLD stands.
+  A READ-OK counts for the PR's head, or for a head with the same patch-id (a plain rebase). The patch-id is taken with no context lines.
+- A signed HOLD is keyed on the login plus the signed name. It stands until the same login and name post a later READ-OK.
+  Words alone ("this clears my HOLD" in a comment that is not a READ-OK) never lift it.
+- An unsigned HOLD stands until that login posts a later READ-OK whose first 400 characters say the HOLD is lifted or cleared
+  ("HOLD lifted", "clears my HOLD", "lifts my 16:45 HOLD").
+- The bot's own `HOLD train N` clears on any writer's later READ-OK marker that names a commit. A quoted READ-OK does not clear it.
+- Any HOLD closed in words but never cleared by a READ-OK as above is lifted only by a row in `holds-lifted.tsv`.
   Post the reader's closing comment on the PR when you add the row.
-- `TWO READS` anywhere in the PR body, or as the first line of a comment, asks for two readers.
-  Then two different readers (account plus signature) need a READ-OK for the head.
+
+**Queue HOLDs.** A Queue (#4710) comment of the last 3 days whose first line is `HOLD <sha>` holds the PR whose head starts with that sha.
+It stands until the same login posts a later READ-OK marker on the PR whose first 400 characters say the HOLD is lifted or cleared
+(the same words as above; `**READ-OK**` counts).
+
+**TWO READS.** `TWO READS` anywhere in the PR body, or as the first line of a writer's comment, asks for two readers.
+Then two different people need a READ-OK marker for a commit the head starts with.
+A person is a login plus the name it signs, not a login alone.
+Several builders share one GitHub account, so counting logins would make a legitimate two-reader PR impossible.
+An unsigned READ-OK never adds a second person to a login: it merges into that login's signed reader,
+and a login whose READ-OKs on the head are all unsigned is one reader.
+
+**Trains.**
+
 - A PR whose own ARM64 run on its head is red sits out.
 - A PR stacked on another open PR sits out until that PR is on `lamp-voice`.
 - No merge commits: the bot cherry-picks with `--no-merges` and merges by rebase.

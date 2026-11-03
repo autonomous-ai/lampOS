@@ -1,8 +1,17 @@
-# gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON: lampOS/docs/build-rows.md from the review page's tables.
+# gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON PRIVATE_NAMES: lampOS/docs/build-rows.md from the review page's tables.
 import re, sys, json, datetime
 src = open(sys.argv[1]).read(); ns = {}
 exec(src[src.index("PROGRESS = ["):src.index("BRAIN_LOG = [")], ns)
 labels = json.load(open(sys.argv[3]))
+# 3 Nov 15:4x (the Reviewer-lead's P3 on #5068): a `builder:*` label can read like a person's name, and build-rows-pr.sh's
+# grep of the whole file can miss it inside a label. A label whose name any private-names.txt rule matches (one
+# extended regex a line, case-insensitive, # lines ignored) is left out of the Owners column. The file is required.
+try:
+    PRIVATE = [re.compile(l.strip(), re.I) for l in open(sys.argv[4]) if l.strip() and not l.lstrip().startswith("#")]
+except (IndexError, OSError, re.error) as e:
+    sys.exit(f"gen-build-rows: private names (argv[4]) unreadable: {e}")
+if not PRIVATE: sys.exit("gen-build-rows: no private names: stop")
+def private(label): return any(r.search(label) for r in PRIVATE)
 B, P = ns["BUILD"], ns["PROGRESS"]
 def first(note, n=220):
     note = re.sub(r"\s+", " ", note).strip()
@@ -38,8 +47,8 @@ def owners(refs, name=""):
     out = [o for key, given in OWNERS.items() if name.startswith(key) for o in given]
     for n in re.findall(r"#(\d+)", refs):
         for l in labels.get(n, []):
-            if l.startswith("builder:") and l[8:] not in out and l[8:] not in DOWN: out.append(l[8:])
-    return ", ".join(out) or "—"
+            if l.startswith("builder:") and l[8:] not in out and l[8:] not in DOWN and not private(l[8:]): out.append(l[8:])
+    return ", ".join(o for o in out if not private(o)) or "—"
 # The page is written to the owner; the repo is public and names roles only.
 PUBLIC = [
     (r"^You, ", "The owner, "),

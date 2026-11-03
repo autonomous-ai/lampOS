@@ -14,7 +14,9 @@
 #                     (default: ~/.lamp-coordination; never the repo)
 #   REPO_DIR          the checkout it fetches and reads crates in (default: the repo holding TOOLS_DIR)
 #   WORKTREE          the worktree trains are built in (default: $LAMP_COORD_STATE/wt-trainbot)
-#   PYTHON            the Python for markers.py and reads2.py (default: python3)
+#   PYTHON            the Python for markers.py, reads2.py and qholds.py (default: python3)
+#   Markers count only from logins with write access: $LAMP_COORD_STATE/writers.txt (fetched, an hour's cache) plus
+#   $LAMP_COORD_STATE/writers-extra.txt (lib.sh). A PR whose head is in another repository is never carried.
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"
 SP="${LAMP_COORD_STATE:-$HOME/.lamp-coordination}"; mkdir -p $SP || exit 1
 export TOOLS_DIR LAMP_COORD_STATE=$SP PYTHON="${PYTHON:-python3}"
@@ -23,38 +25,54 @@ export TOOLS_DIR LAMP_COORD_STATE=$SP PYTHON="${PYTHON:-python3}"
 # 29 Oct 00:3x: the scratchpad's midnight sweep gutted $SP/wt-trainbot (its .git link and old files), so the train
 # worktree lives outside any swept folder now ($WORKTREE).
 R="${REPO_DIR:-$(git -C $TOOLS_DIR rev-parse --show-toplevel)}"; REPO=autonomous-ai/lampOS; W="${WORKTREE:-$SP/wt-trainbot}"
+# 3 Nov 15:4x (the Reviewer-lead's P3 on #5068): the train worktree gets `checkout -f`, `clean -fdqx` and, on a failure,
+# `rm -rf`. Refuse a WORKTREE that is the checkout itself, its top level or the repository's main worktree.
+for x in $R $(git -C $R rev-parse --show-toplevel 2>/dev/null) "$(git -C $R worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"; do
+  [[ -n $x && ${W:A} == ${x:A} ]] && { echo "WORKTREE ($W) is the checkout $x: refusing to start" >&2; exit 1; }
+done
 LOG=$SP/train-bot.log; cd $R || exit 1
 say() { echo "$(date +%T) $*" | tee -a $LOG; }
 # 31 Oct 04:0x (Fourth, 03:23): with no context lines (-U0), so lamp-voice's own edits beside a hunk don't change the id; #4562
 # sat out trains 425-433 as the same patch by range-diff.
 patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1; git diff -U0 $b $1 -- . | git patch-id --stable | cut -d' ' -f1; }
 told=$SP/train-bot.told; touch $told
+# 3 Nov 15:4x: the fetches and the writers list are lib.sh's, shared with still-eligible.sh.
+source $TOOLS_DIR/lib.sh
+# once KEY MSG: say MSG the first time KEY fails, not every round; fine KEY forgets it, so a later failure is said again.
+# Kept in a file: eligible() runs in a subshell, so a variable wouldn't outlive the round.
+said=$SP/train-bot.said; touch $said
+once() { grep -qx -- "$1" $said || { say "$2" >&2; print -r -- "$1" >> $said; }; }
+fine() { grep -qx -- "$1" $said && { grep -vx -- "$1" $said > $said.new; mv $said.new $said; }; return 0; }
 eligible() {
-  local p head ok sha qh qt ql qs lifted held
-  # 3 Nov 09:4x: a HOLD posted on the Queue (#4710) whose first line is `HOLD <sha>` holds the PR whose head starts with
-  # that sha, until the same account posts a READ-OK on the PR, after it, saying the HOLD is lifted or cleared. Train 546
-  # took #5013 on Fourteen's READ-OK while Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
-  local -a qholds
-  qholds=(${(f)"$(gh api "repos/$REPO/issues/4710/comments?since=$(date -u -v-3d +%Y-%m-%dT%H:%M:%SZ)&per_page=100" --paginate \
-    --jq '.[]|select(.body|test("^HOLD [0-9a-f]{7,40}"))|"\(.created_at) \(.user.login) \(.body|capture("^HOLD (?<s>[0-9a-f]{7,40})").s)"' 2>/dev/null)"})
-  for p in $(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName --jq '.[]|select(.isDraft|not)|select(.headRefName|startswith("first/train-")|not)|.number'); do
-    head=$(gh pr view $p -R $REPO --json headRefOid -q .headRefOid)
-    held=""
-    for qh in $qholds; do
-      read qt ql qs <<< "$qh"
-      [[ $head == $qs* ]] || continue
-      lifted=$(gh api "repos/$REPO/issues/$p/comments?per_page=100" --paginate \
-        --jq '[.[]|select(.created_at>"'$qt'" and .user.login=="'$ql'" and (.body|test("^READ-OK")) and (.body|test("HOLD[^\\n]*(lifted|cleared)|lift(ed|s)? my";"i")))]|length' 2>/dev/null)
-      [[ ${lifted:-0} -gt 0 ]] || held=$qt
-    done
+  local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
+  # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
+  # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (#4710) and
+  # so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
+  wf=$(coord_writers) || { once writers "the writers list can't be fetched and its cache is an hour old: no PR is eligible"; return; }
+  fine writers
+  coord_queue $qf || { once queue "the Queue's (#4710) comments can't be fetched: no PR is eligible"; return; }
+  fine queue
+  # A PR whose head is in another repository is never carried (coord_head checks it again).
+  for p in $(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName,isCrossRepository --jq '.[]|select(.isDraft|not)|select(.isCrossRepository|not)|select(.headRefName|startswith("first/train-")|not)|.number'); do
+    head=$(coord_head $p) || { once head$p "#$p left out: its head can't be read, or is in another repository"; continue; }
+    coord_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
+    fine head$p; fine comments$p
+    # 3 Nov 09:4x: a HOLD posted on the Queue (#4710) whose first line is `HOLD <sha>` holds the PR whose head starts with
+    # that sha, until the same account posts a READ-OK on the PR, after it, saying the HOLD is lifted or cleared
+    # (qholds.py, with markers.py's marker and lifting words). Train 546 took #5013 on Fourteen's READ-OK while
+    # Seventh's "HOLD a13408fb8d…: lamp check pending" stood only on the Queue.
+    if ! held=$($PYTHON -I $TOOLS_DIR/qholds.py --writers $wf $head $qf < $cf); then
+      once qholds$p "#$p left out: qholds.py failed"; continue
+    fi
     if [[ -n $held ]]; then
       grep -qx "$p qhold $head" $told || { say "#$p left out: a HOLD on the Queue ($held) names head ${head:0:9}" >&2; echo "$p qhold $head" >> $told; }
       continue
     fi
     # markers.py reads the markers: a HOLD is keyed on the account plus the reader's signed name and stands until that
-    # same reader posts a later READ-OK (the bot's own "HOLD train N" clears on any later READ-OK, an unsigned HOLD only on
-    # that account's READ-OK saying the HOLD is lifted); the PR is eligible on its newest READ-OK when no HOLD stands.
-    ok=$(gh api "repos/$REPO/issues/$p/comments?per_page=100" --paginate --jq '.[]|{login:.user.login,body:.body}' 2>/dev/null | $PYTHON -I $TOOLS_DIR/markers.py $p)
+    # same reader posts a later READ-OK (the bot's own "HOLD train N" clears on any later READ-OK marker for a commit, an
+    # unsigned HOLD only on that account's READ-OK saying the HOLD is lifted); the PR is eligible on its newest READ-OK
+    # when no HOLD stands.
+    ok=$($PYTHON -I $TOOLS_DIR/markers.py --writers $wf $p < $cf)
     [[ $ok == READ-OK* ]] || continue
     sha=${ok#READ-OK }; [[ -n $sha ]] || continue
     git fetch -q origin "+refs/pull/$p/head:refs/remotes/pr/$p" 2>/dev/null
@@ -68,11 +86,16 @@ eligible() {
     fi
     # 31 Oct 03:1x: a PR whose comments ask "TWO READS" (privacy, safety, data loss) waits for READ-OKs on this head
     # from two different readers (reads2.py). #4633 and #4656 went in trains on one READ-OK where two were named.
-    two=$({ gh pr view $p -R $REPO --json body --jq '{login:"",body:.body,pr_body:true}' 2>/dev/null; gh api "repos/$REPO/issues/$p/comments?per_page=100" --paginate --jq '.[]|{login:.user.login,body:.body}' 2>/dev/null; } | $PYTHON -I $TOOLS_DIR/reads2.py $head)
+    # 3 Nov 15:4x: only "none" or "met N" carries it; a fetch or a reads2.py error leaves it out.
+    coord_body $p $bf || { once body$p "#$p left out: its body can't be fetched"; continue; }
+    fine body$p
+    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf $head)
     if [[ $two == short* ]]; then
       grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; echo "$p short $head" >> $told; }
       continue
     fi
+    [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }
+    fine reads2$p
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
     # at 14:17 before trains 407 and 408 carried it; both failed in lamp-update, and the bot held #4524 and #4530 instead.
     own=$(gh run list -R $REPO --workflow lampos-arm64.yml --commit $head -L 1 --json conclusion -q '.[0].conclusion' 2>/dev/null)
@@ -180,7 +203,8 @@ while true; do
   print -r -- "$body\n\nPart of #4710." > $SP/pr-train$n.md
   tp=$(gh pr create -R $REPO --base lamp-voice --head first/train-$n --title "lampOS: merge train $n: $refs" --body-file $SP/pr-train$n.md --label builder:first 2>&1 | grep -oE '[0-9]+$')
   say "train $n (#$tp): ${carried[*]} on $LV"
-  PRECHECK="${(q)TOOLS_DIR}/still-eligible.sh ${carried[*]}" $TOOLS_DIR/merge-when-green.sh $tp >> $LOG 2>&1; rc=$?
+  # 3 Nov 15:4x: the PRs to recheck go as arguments; merge-when-green.sh runs still-eligible.sh on them (no eval).
+  $TOOLS_DIR/merge-when-green.sh $tp --precheck $carried >> $LOG 2>&1; rc=$?
   if [[ $rc == 6 ]]; then
     # A carried PR was held while the train ran: it sits out, the rest go again on the same head at once.
     gh pr close $tp -R $REPO -c "Train bot: closed before merging, a carried PR was held while it ran (see the log line); the rest go again." >/dev/null
