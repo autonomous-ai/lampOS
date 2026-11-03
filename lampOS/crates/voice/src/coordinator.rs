@@ -7693,16 +7693,15 @@ fn conversation_with_gate_inner(
                 }
                 // A computer's turn ends with whatever ended the
                 // conversation: the person wins over it.
+                // Its computer ended the turn, or the person stopped the
+                // lamp: so ends the conversation ([`closes_conversation`]).
+                if closes_conversation(reason, muted)
+                    && let Ok(mut thread) = crate::thread::THREAD.lock()
+                {
+                    thread.close_conversation(Instant::now());
+                }
                 if !muted && reason == CONTROL_ENDED {
                     control_turns.ended_by_its_computer();
-                    // Its computer ended the turn: so ends the conversation.
-                    // The turn's exchange no longer keeps one going, and a
-                    // room line said next needs a name, a turn or a tap
-                    // (lamp-75c9 on 3 Nov: a room line 36 s after a cut
-                    // `turn.end` was answered as the conversation going on).
-                    if let Ok(mut thread) = crate::thread::THREAD.lock() {
-                        thread.close_conversation(Instant::now());
-                    }
                 } else {
                     control_turns.cancelled(if muted {
                         crate::control_turn::MUTED
@@ -13730,6 +13729,20 @@ fn tell_voice_of_turn(
 /// says so. While the person talks or a turn is under way it stays waiting
 /// (until its expiry); the keeper's pause or the privacy switch refuses it.
 /// The authority's new snapshot when it plays.
+/// Whether a cancel for `reason` ends the conversation, not only the turn
+/// in hand: a computer's `turn: "end"` (`CONTROL_ENDED`), and the person's
+/// own stop, the button's (`HAND_STOP`) or "stop" said over the lamp's voice
+/// (`SPOKEN_STOP`). The thread's exchanges then keep no conversation going,
+/// and a room line said next needs a name, a turn or a tap (lamp-75c9 on
+/// 3 Nov: a room line 36 s after a cut `turn.end` was answered as the
+/// conversation going on; the local leader's yes for the person's stop).
+/// A touch on the head while the lamp speaks (`HEAD_STOP`) and the voice's
+/// own cuts don't: a mute ends the whole conversation its own way.
+fn closes_conversation(reason: &str, muted: bool) -> bool {
+    use crate::receipt_history::{CONTROL_ENDED, HAND_STOP, SPOKEN_STOP};
+    !muted && [CONTROL_ENDED, HAND_STOP, SPOKEN_STOP].contains(&reason)
+}
+
 /// A provider input that is the lamp's own words (a written line or a
 /// reminder), not a person's line on its way: only these count as the lamp
 /// speaking when a computer's turn is asked.

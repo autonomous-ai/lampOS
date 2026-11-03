@@ -637,8 +637,11 @@ words. The end closes the conversation too (`Thread::close_conversation`,
 memory and summaries but keeps no conversation going, nor does the turn's
 own call, so the next room line needs the lamp's name, a turn or a tap to
 be answered (lamp-75c9 on 3 Nov: a room line 36 s after an end was
-answered as the conversation going on). The person's own stops leave the
-conversation as before. The person wins: the privacy switch, the button, sleep and "stop"
+answered as the conversation going on). The person's own stop closes it
+the same way, the button's Stop or "stop" said over the lamp's voice
+(`coordinator::closes_conversation`); a touch on the head while the lamp
+speaks, the voice's own cuts and a mute don't (a mute ends the whole
+conversation its own way). The person wins: the privacy switch, the button, sleep and "stop"
 end a computer's turn as any other.
 
 **A computer's mute for lamp-control** ([control.md](control.md), "Turns
