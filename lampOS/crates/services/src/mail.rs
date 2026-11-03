@@ -44,6 +44,9 @@ const MESSAGE_FETCH: usize = 65_536;
 /// How much of a text is kept, in characters.
 pub const PREVIEW_MOST: usize = 300;
 pub const TEXT_MOST: usize = 3_000;
+/// Said after a mail's preview when its whole text came past the lamp's
+/// 1 MB answer limit (`net::BODY_MOST`) and was cut, so it doesn't read.
+pub const TOO_LONG: &str = "(the rest of this mail is too long to read here)";
 /// What stands in for a security mail.
 pub const SECURITY_LEFT_OUT: &str = "a security mail, left out";
 /// What stands in for a security item of any other service.
