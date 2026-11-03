@@ -51,6 +51,11 @@ const FILE_MOST: u64 = 64 * 1_024;
 /// skill can be one; a core skill that says it is still core.
 pub const MADE_HERE: &str = "here";
 
+/// What a skill written in the app in its person's own words says beside
+/// `made: here` (`lamp_voice::made_skill::WRITTEN_MARK`, `written: app`):
+/// shown as written there, never as one from the Store.
+pub const WRITTEN_IN: &str = "app";
+
 /// The privacy switch's line, beside what a camera or microphone skill may
 /// use (the first builder's 17:21: "since that's what a person will ask").
 pub const PRIVACY: &str = "the privacy switch stops it";
@@ -351,6 +356,10 @@ pub struct Listed {
     /// Why not, in the lamp's words, when it does not; else null.
     pub why: Option<String>,
     pub may_use: Vec<Use>,
+    /// Written in the app in its person's own words ([`WRITTEN_IN`]), in
+    /// the "Made on this lamp" group; left out otherwise.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub written: bool,
 }
 
 /// `skills.list`'s reply: `{"version", "skills", "left_out"}`, the skills
@@ -667,6 +676,8 @@ fn row(
     };
     let can_turn_off =
         loads && lamp_skills::package::cannot_turn_off(&name, &permissions).is_none();
+    let written =
+        group == Group::MadeHere && front_field(&card, "written").as_deref() == Some(WRITTEN_IN);
     Listed {
         title: heading(&card).unwrap_or_else(|| name.clone()),
         description: cut(&description, DESCRIPTION_MOST),
@@ -682,6 +693,7 @@ fn row(
         loads,
         why,
         may_use: may_use(&permissions),
+        written,
         name,
     }
 }
@@ -987,6 +999,29 @@ pub mod tests {
         );
         assert_eq!(rows[2]["can_remove"], true);
         assert_eq!(rows[2]["title"], "Water the plant");
+        assert!(rows[2].get("written").is_none(), "{rows:?}");
+        // Written in the app: in the same group, marked written, never the
+        // Store's; `written: app` on a skill not made here marks nothing.
+        skill(
+            &places,
+            "study-mode",
+            "Study mode",
+            "made: here\nwritten: app\n",
+            "[permissions]\nbody = true",
+        );
+        skill(
+            &places,
+            "y-added",
+            "Added",
+            "written: app\n",
+            "[permissions]\nbody = true",
+        );
+        let rows = listed(&places);
+        let row = |name: &str| rows.iter().find(|row| row["name"] == name).unwrap().clone();
+        assert_eq!(row("study-mode")["group"], "made_here");
+        assert_eq!(row("study-mode")["written"], true);
+        assert_eq!(row("y-added")["group"], "installed");
+        assert!(row("y-added").get("written").is_none(), "{rows:?}");
     }
 
     /// A skill reading a pet on the head (#3997, Head pat) feels a touch,

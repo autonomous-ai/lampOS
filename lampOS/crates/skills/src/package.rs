@@ -1076,7 +1076,9 @@ pub fn install(skills: &Path, state: Option<&Path>, from: &Path) -> Result<Strin
 /// names with that hash in its index; its bytes are read once and hashed,
 /// and those same bytes are then read as a package, so what goes on is what
 /// the person said yes to. Its `skill.toml` is held again to a made skill's
-/// cap (`lamp_voice::made_skill::capped`: light, body, two topics) and its
+/// cap (`lamp_voice::made_skill::capped`: light, body, two topics), or a
+/// skill written in the app's (`lamp_voice::made_skill::written_capped`:
+/// one function whose answer is the person's instructions), and its
 /// `SKILL.md` must say `made: here`. Then it is installed as any package
 /// is, the folder waited for at most `wait`.
 pub fn install_made(
@@ -1164,7 +1166,7 @@ pub fn install_made_at(
             .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
             .unwrap_or_default()
     };
-    lamp_voice::made_skill::capped(&card("skill.toml"))
+    lamp_voice::made_skill::put_on_cap(&card("skill.toml"))
         .map_err(|refused| format!("not installed: {}", refused.0))?;
     if !made_here(&card("SKILL.md")) {
         return Err("not installed: its SKILL.md doesn't say it was made here".into());

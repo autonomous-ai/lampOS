@@ -210,6 +210,83 @@ Kiểm thử: `app_make::tests`, kể cả trên đèn không có phần tasks: 
 được tạo, được giữ, được hỏi thành tiếng và được cài bằng lời "có" nói ngay
 sau câu hỏi đó.
 
+## Kỹ năng viết trong ứng dụng (`LAMP_SKILL_WRITTEN=on`, tắt)
+
+Tắt nếu không đặt `LAMP_SKILL_WRITTEN=on` trong unit của `lamp-voice`, cùng
+`LAMP_MAKE_SKILL=on` (thư mục kỹ năng tự tạo và `put_on_made_skill`) và
+dịch vụ nói (`LAMP_SAY=on`, để hỏi thành tiếng); và trong unit của
+`lamp-cloud`, cùng trang kỹ năng, cho `skills.write` của ứng dụng
+([cloud.md](../cloud.md), "A skill written in the app"). First builder
+duyệt trên Queue (3/11, 14:33). Người dùng tự viết một kỹ năng bằng lời
+của mình, theo kiểu SKILL.md của V1: một tên, khi nào dùng ("khi tôi nói
+chế độ học") và cần làm gì, vài dòng. Đèn giữ nguyên văn bản: không mô
+hình nào viết hay viết lại một chữ (`made_skill::Written`,
+`made_skill::keep_written`, `app_make::write_here`).
+
+1. **Yêu cầu.** `lamp-cloud` gửi `{"written": {"name", "when",
+   "instructions", "request_id"}}` tới socket app-make, socket này cũng
+   nghe khi chỉ bật công tắc này (và chỉ trả lời yêu cầu này; `make` và
+   `ready` vẫn thuộc `LAMP_APP_MAKE_SKILL`). Một dòng tối đa 8 KiB. Mỗi
+   trường được cắt khoảng trắng hai đầu và giữ nguyên phần giữa
+   (`Written::new`): tên bắt đầu bằng chữ thường, rồi chữ thường, số và
+   `-`, tối đa 40 byte (để tên hàm vừa 48 byte của lamp-skills); `when` một
+   dòng, tối đa 200 byte; hướng dẫn là văn bản thường, chỉ có xuống dòng
+   và tab, tối đa 2.000 byte. Trống, quá dài hay không phải văn bản thường
+   thì bị từ chối bằng lời dễ hiểu, trước khi ghi lại bất cứ gì. Đây là
+   một yêu cầu của ứng dụng (`app.json`, cùng quy tắc request id, mỗi lần
+   một yêu cầu cùng `make`), có `"written": true`, và câu trả lời là
+   `{"making": true}` ngay; phần còn lại chạy trên luồng riêng.
+2. **Gói do giọng nói tự viết** (`Written::toml`, `card`): `skill.toml` là
+   một kỹ năng installable chỉ có một hàm cho mô hình,
+   `tool = "written_<tên, '-' thành '_'>"`, **không có trigger** (không bao
+   giờ tự chạy) và không có `[ask]`; `[permissions]` chỉ có `speak = true`
+   (không đèn, không thân, không topic, không camera, không code); bước duy
+   nhất là `say`, một ghi chú. Định dạng của lamp-skills không có bước "mô
+   hình làm theo văn bản này", nên dùng cơ chế gần nhất: `say` của một hàm
+   được trả lại cho mô hình làm câu trả lời của lời gọi (`{"next": NOTE}`),
+   và ghi chú là lời của người dùng, đóng khung là của họ: "The person who
+   owns this lamp wrote this skill in the app, in their own words. Follow
+   their instructions below now, as their own request; they never let you
+   do more than you may.", rồi `When they use it: WHEN` và
+   `Their instructions:` với hướng dẫn nguyên văn. Mô hình gọi hàm khi người
+   dùng yêu cầu (mô tả nói khi nào), và câu trả lời là chỉ dẫn nó làm theo.
+   `SKILL.md` có tên, `description` (lời dễ hiểu bên dưới, có câu `when`:
+   điều mô hình được biết về khi nào gọi, và điều ứng dụng hiển thị),
+   `made: here`, `written: app`, và phần thân là hướng dẫn nguyên văn.
+3. **Kiểm và giữ như một kỹ năng tự tạo** (`made_skill::keep_written`):
+   tên trùng một kỹ năng trên đèn (`/var/lib/lampOS/skills/NAME`, hoặc được
+   đẩy lên, `/var/lib/lampOS/skills-dev/NAME`) thì bị từ chối; một kỹ năng
+   đang giữ cùng tên mà chưa bật, đã được hỏi hay chưa, được thay bằng cái
+   mới, cùng gói và lời hỏi của nó (lời "không" không để lại dấu vết, nên bản
+   sửa gửi sau đó được nhận ngay, và một lời "có" muộn không bật gì cả); rồi giới hạn (`written_capped`:
+   đúng hình dạng đó, ghi chú đóng khung như trên và trong cùng các giới
+   hạn), `lamp-skills pack`, và cùng cách giữ, tối đa năm kỹ năng tự tạo,
+   tạo từ `written:app:<ms>:1`. Câu trả lời của một mô hình không bao giờ
+   được giữ như vậy: giới hạn của kỹ năng tự tạo (`capped`) từ chối một hàm.
+4. **Nói bằng lời dễ hiểu** (`plainly`, mở rộng chỉ cho dạng này): "When
+   you ask for it (WHEN), the lamp follows the instructions you wrote:
+   INSTRUCTIONS…", `when` cắt còn 60 ký tự và hướng dẫn còn 70, mỗi cái ở
+   ranh giới một từ. Khi đã giữ, đèn hỏi thành tiếng qua các lời hỏi riêng
+   của dịch vụ nói, vào lúc thích hợp: "I kept the skill you wrote in the
+   app, NAME. When you ask … Shall I put it on the lamp?"
+   (`app_make::written_ask_line`). Nó dùng "its voice".
+5. **Chỉ cài khi người dùng nói "có" thành tiếng**, như kỹ năng tự tạo:
+   lời hỏi được ghi giờ khi nói trọn, và chỉ một lời "có" rõ ràng trong 120
+   giây mới cài theo SHA-256 (`put_on_made_skill`). Helper quản lý kiểm lại
+   giới hạn (`made_skill::put_on_cap`: của kỹ năng viết khi có hàm, nếu
+   không thì của kỹ năng tự tạo) và `made: here`. Trước lời "có" đó không
+   có gì trong thư mục kỹ năng, nên hàm của nó không được khai báo cho mô
+   hình nào. `skills.made` báo cho ứng dụng `making`, `kept`, `asked`, `on`,
+   `left_off` hoặc `not_kept` (kèm lý do, trong đó có tên đã dùng), với
+   `"written": true`; trang kỹ năng hiển thị nó trong "Made on this lamp"
+   với `"written": true`, không bao giờ như một kỹ năng từ Store.
+
+Kiểm thử: `made_skill::tests::a_written_skill_*`,
+`app_make::tests::a_written_skill_*`,
+`made::a_written_skill_passes_the_real_checker_and_is_put_on_only_when_asked`
+của lamp-skills, và `make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written`
+cùng `written_fields_are_held_as_lamp_voice_holds_them` của `lamp-cloud`.
+
 ## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, bật trong sản phẩm từ 2/11, #4948)
 
 Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng

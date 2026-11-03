@@ -110,6 +110,10 @@ pub struct Real {
     /// with `LAMP_APP_MAKE_SKILL=on` and the skills page (#2813,
     /// `crate::make_skill`).
     pub make_skill: Option<PathBuf>,
+    /// lamp-voice's app-make socket, for a skill written in the owner's
+    /// app, with `LAMP_SKILL_WRITTEN=on` and the skills page
+    /// (`crate::make_skill::write`).
+    pub write_skill: Option<PathBuf>,
     /// The Skills Store's owner upload, for a made skill sent there
     /// (`LAMP_SKILLS_SHARE=on` with the skills page, fourteen-P13).
     pub share: Option<crate::share::Store>,
@@ -735,6 +739,10 @@ impl Lamp for Real {
         self.services.clone()
     }
 
+    fn write_skill(&self) -> Option<PathBuf> {
+        self.write_skill.clone()
+    }
+
     fn share(&self) -> Option<crate::share::Store> {
         self.share.clone()
     }
@@ -954,6 +962,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            write_skill: None,
             share: None,
             services: None,
             shutdown: None,
@@ -1034,6 +1043,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            write_skill: None,
             share: None,
             services: None,
             shutdown: None,
@@ -1122,6 +1132,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            write_skill: None,
             share: None,
             services: None,
             shutdown: None,
@@ -1224,6 +1235,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            write_skill: None,
             share: None,
             services: None,
             shutdown: None,

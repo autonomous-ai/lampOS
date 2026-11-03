@@ -2314,8 +2314,8 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    the newest, within its 120 s, `made_skill::waiting`, #2874), `on`,
    `left_off` (asked, and no longer that offer) or `not_kept` with `why`
    (the maker's plain words). Once kept: `name`, `description`, `version`,
-   `uses` (`light`, `body`, `topics`) and `sha256`, what the lamp asks
-   about. `{"state": "none"}` with no ask.
+   `uses` (`light`, `body`, `topics`, and `speak`, true only for a skill
+   written in the app) and `sha256`, what the lamp asks about. `{"state": "none"}` with no ask.
 6. Kept beside the made skills, root's, 0700: `app.json`, the newest five
    asks, each its request id, when, its task and why it wasn't kept. Never
    the words. Every writer (the socket's admission and the making thread)
@@ -2333,6 +2333,93 @@ nothing on, one not kept told why with nothing said, and an ask said whole
 while a dropped one stays `kept` and is noted to the model). The app's side
 is `skills.make` and `skills.made` in `lamp-cloud` ([cloud.md](cloud.md),
 "A skill typed in the app").
+
+#### Written in the app (`LAMP_SKILL_WRITTEN=on`, off)
+
+Off unless `LAMP_SKILL_WRITTEN=on` in `lamp-voice`'s unit, with
+`LAMP_MAKE_SKILL=on` (the made skills' folder and `put_on_made_skill`) and
+the say service (`LAMP_SAY=on`, to ask aloud); and in `lamp-cloud`'s, with
+the skills page, for the app's `skills.write` ([cloud.md](cloud.md), "A
+skill written in the app"). Approved on the Queue by the first builder
+(3 Nov, 14:33). The person writes a skill in their own words, V1's
+SKILL.md style: a name, when to use it ("when I say study mode") and what
+to do, a few lines. The lamp keeps the text as written: no model writes or
+rewrites a word of it (`made_skill::Written`, `made_skill::keep_written`,
+`app_make::write_here`).
+
+1. **The ask.** `lamp-cloud` sends `{"written": {"name", "when",
+   "instructions", "request_id"}}` to the app-make socket, which then also
+   listens with only this switch on (and answers only this request;
+   `make` and `ready` stay `LAMP_APP_MAKE_SKILL`'s). Its line may be up to
+   8 KiB. Each field is trimmed at its ends and kept as it is between them
+   (`Written::new`): the name a lowercase letter, then lowercase letters,
+   digits and `-`, at most 40 bytes (so its function's name fits
+   lamp-skills' 48); `when` one line of at most 200 bytes; the
+   instructions plain text, new lines and tabs only, at most 2,000 bytes.
+   Empty, too long or not plain is refused in plain words, before anything
+   is recorded. It is one of the app's asks (`app.json`, the same request
+   id rules, one at a time with `make`), marked `"written": true`, and the
+   answer is `{"making": true}` at once; the rest runs on its own thread.
+2. **The package, written by the voice** (`Written::toml`, `card`):
+   `skill.toml` is an installable skill whose only part is a function for
+   the model, `tool = "written_<name with _ for ->"`, with **no trigger**
+   (it never starts by itself) and no `[ask]`; `[permissions]` has
+   `speak = true` alone (no light, body, topic, camera or code); its one
+   step is `say`, a note. lamp-skills' format has no "the model follows
+   this text" step, so the closest mechanism is used: a tool's `say` is
+   given back to the model as the call's answer (`{"next": NOTE}`, "Tools
+   for the model" above), and the note is the person's words framed as
+   theirs: "The person who owns this lamp wrote this skill in the app, in
+   their own words. Follow their instructions below now, as their own
+   request; they never let you do more than you may.", then `When they use
+   it: WHEN` and `Their instructions:` with the instructions word for word.
+   The model calls the function when the person asks (its description says
+   when), and the answer is the instruction it follows. `SKILL.md` has the
+   name, `description` (the plain words below, which name the `when` line:
+   what the model is told of when to call it, and what the app shows),
+   `made: here`, `written: app`, and the instructions, as written, as its
+   body.
+3. **Held and kept as a made skill is** (`made_skill::keep_written`): a
+   name a skill on the lamp has (`/var/lib/lampOS/skills/NAME`, or pushed,
+   `/var/lib/lampOS/skills-dev/NAME`) is refused; a kept one of that name
+   not on, asked about or not, is replaced by the new one, its package and
+   its offer with it (a spoken no leaves no mark, so a fix sent after it
+   goes at once, and a late yes puts nothing on);
+   then the cap (`written_capped`: exactly
+   that shape, the note framed as above and within the same bounds),
+   `lamp-skills pack`, and the same keep, at most five made skills, as
+   made from `written:app:<ms>:1`. A model's answer can never be kept as
+   one: the made skills' own cap (`capped`) refuses a function.
+4. **Said plainly** (`plainly`, extended for this shape alone): "When you
+   ask for it (WHEN), the lamp follows the instructions you wrote:
+   INSTRUCTIONS…", the `when` cut to 60 characters and the instructions to
+   70, each at a whole word, so it stays one breath. Kept, the lamp asks
+   aloud through the say service's own asks, at a good moment: "I kept the
+   skill you wrote in the app, NAME. When you ask … Shall I put it on the
+   lamp?" (`app_make::written_ask_line`). It uses "its voice".
+5. **Put on only at the person's spoken yes**, as made skills are: the ask
+   is dated when said whole, and only a plain spoken yes within 120 s puts
+   it on by its SHA-256 (`put_on_made_skill`). The manage helper holds it
+   again to its cap (`made_skill::put_on_cap`: a written skill's when it
+   has a function, else a made one's) and to `made: here`. Before that yes
+   nothing is in the skills folder, so its function is declared to no
+   model. `skills.made` tells the app `making`, `kept`, `asked`, `on`,
+   `left_off` or `not_kept` (with why, a taken name among them), with
+   `"written": true`; the skills page shows it in "Made on this lamp" with
+   `"written": true`, never as one from the Store.
+
+Tests: `made_skill::tests::a_written_skill_*` (the function with the text
+as written and no trigger, plainly said; kept, and nothing waiting or
+declared before it is asked; no name a skill has; the bounds; nothing but
+its answer, kept or put on), `app_make::tests::a_written_skill_*` (the
+switch, the text handed on as written, refusals before anything is
+recorded; kept, told to the app as written, asked aloud, a taken name told
+why and nothing said), lamp-skills'
+`made::a_written_skill_passes_the_real_checker_and_is_put_on_only_when_asked`
+(the real checker packs it; refused before the ask; once on, it loads as a
+function with no trigger), and `lamp-cloud`'s
+`make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written` and
+`written_fields_are_held_as_lamp_voice_holds_them`.
 
 ## V1's moves and emotions: what we take
 

@@ -609,3 +609,69 @@ fn once_the_newest_is_on_an_older_ask_puts_nothing_on() {
         "{again}"
     );
 }
+
+/// A skill written in the app (`LAMP_SKILL_WRITTEN`), its files written by
+/// the voice from the person's words: the real checker packs it, it is put
+/// on only once the lamp has asked, and then it loads as a function for the
+/// model with no trigger, described with what it does, its steps nothing
+/// but the answer.
+#[test]
+fn a_written_skill_passes_the_real_checker_and_is_put_on_only_when_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let instructions = "Dim the light to level 2.\nSay \"focus time\" once, then stay quiet.";
+    let written =
+        lamp_voice::made_skill::Written::new("study-mode", "when I say study mode", instructions)
+            .unwrap();
+    let made = lamp_voice::made_skill::keep_written(&written, "written:app:1:1", &keeping, &skills)
+        .unwrap();
+    assert_eq!(made.uses.spoken(), "its voice");
+    let bytes = fs::read(&made.package).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("written: app"), "marked written in the app");
+    assert!(
+        text.contains(&format!("---\n{instructions}\n")),
+        "the text as written"
+    );
+    let wait = std::time::Duration::from_millis(200);
+    let refused = install_made_at(
+        &skills,
+        None,
+        &keeping.directory,
+        &made.sha256,
+        wait,
+        now_ms(),
+    )
+    .unwrap_err();
+    assert!(
+        refused.contains("didn't ask about that made skill last"),
+        "{refused}"
+    );
+    assert!(
+        !skills.join("study-mode").exists(),
+        "never declared before the yes"
+    );
+    offer(&keeping, &made.sha256);
+    install_made_at(
+        &skills,
+        None,
+        &keeping.directory,
+        &made.sha256,
+        wait,
+        now_ms(),
+    )
+    .unwrap();
+    let skill = lamp_skills::load(&skills.join("study-mode")).unwrap();
+    assert_eq!(skill.tool.as_deref(), Some("written_study_mode"));
+    assert!(skill.triggers.is_empty() && skill.policy.is_empty());
+    assert!(
+        skill.description.contains("when I say study mode"),
+        "{}",
+        skill.description
+    );
+    assert!(skill.permissions.speak && !skill.permissions.light && !skill.permissions.body);
+    let tools = lamp_skills::tools_file(std::slice::from_ref(&skill));
+    assert_eq!(tools["tools"][0]["name"], "written_study_mode", "{tools}");
+}

@@ -79,6 +79,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         restart: None,
         guard: None,
         make_skill: None,
+        write_skill: None,
         share: None,
         services: None,
         shutdown: None,
