@@ -109,6 +109,10 @@ pub(super) struct Harness {
     /// detector, as the session loop gives it with `LAMP_SOFT_START=on`
     /// ([`lamp_silent`]).
     pub(super) soft_start: bool,
+    /// From this capture sequence on, each block carries the next 160
+    /// samples of the recording in place of its sequence number, while the
+    /// recording lasts.
+    recording: Option<(u64, Vec<i16>)>,
 }
 
 impl Harness {
@@ -208,6 +212,7 @@ impl Harness {
             _clock: None,
             let_go: false,
             soft_start: false,
+            recording: None,
         }
     }
     pub(super) fn old(&self) -> TurnOwner {
@@ -290,7 +295,14 @@ impl Harness {
         let observation = ObservedAudio {
             sequence: self.sequence,
             captured_at_us: at,
-            samples: [self.sequence as i16; 160],
+            samples: self
+                .recording
+                .as_ref()
+                .and_then(|(from, samples)| {
+                    let at = usize::try_from(self.sequence.checked_sub(*from)?).ok()? * 160;
+                    samples.get(at..at + 160)?.try_into().ok()
+                })
+                .unwrap_or([self.sequence as i16; 160]),
         };
         self.reads.push(at);
         if yielded {
@@ -2025,6 +2037,193 @@ fn a_stop_word_heard_in_a_yield_commits_it_and_other_words_resume_it() {
     // No words: the deadline, 110 blocks from the yield.
     let (at, _, committed) = a_short_word_with(None);
     assert_eq!((at, committed), (110, false));
+}
+
+/// The product's voice unit, for what its stop words hear.
+const PRODUCT_UNIT: &str = include_str!("../../../../../deploy/product/lamp-voice.service");
+
+/// "Stop. Please stop talking.", 16 kHz mono s16le (`activity`'s fixture).
+fn stop_recording() -> Vec<i16> {
+    include_bytes!("../../../fixtures/piper-stop-16k.s16")
+        .chunks_exact(2)
+        .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+        .collect()
+}
+
+/// Speech-to-text that gives `words` once asked, and keeps every block it
+/// is handed and whether the yield's stream was forgotten.
+struct KeptEars {
+    words: &'static str,
+    asked: bool,
+    handed: std::sync::Arc<std::sync::Mutex<Vec<Vec<i16>>>>,
+    forgotten: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl crate::stop_words::Ears for KeptEars {
+    fn ready(&mut self) {}
+    fn hear(&mut self, _: u64, samples: &[i16]) {
+        self.handed.lock().unwrap().push(samples.to_vec());
+    }
+    fn finalize(&mut self) {
+        self.asked = true;
+    }
+    fn words(&mut self) -> Option<String> {
+        self.asked.then(|| self.words.to_owned())
+    }
+    fn forget(&mut self) {
+        self.asked = false;
+        self.forgotten
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+    fn rest(&mut self) {}
+}
+
+/// What one line said over a reply led to, with the product unit's stop
+/// words.
+struct OverTheReply {
+    h: Harness,
+    old: TurnOwner,
+    settled: Value,
+    /// Each block handed to the speech-to-text.
+    handed: Vec<Vec<i16>>,
+    forgotten: bool,
+}
+
+/// #5032 (b): the recording said over a reply as on lamp-06c1, Over the
+/// lamp but not plainly, then quiet (`duplex.rs`: Unknown, so neither Clear
+/// nor plain blocks), with the stop words the product unit sets up, the
+/// yield's words heard as `words`.
+fn said_over_a_reply_in_the_product(words: &'static str) -> OverTheReply {
+    let handed = std::sync::Arc::default();
+    let forgotten = std::sync::Arc::default();
+    let value = PRODUCT_UNIT
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("Environment=LAMP_STOP_WORDS="));
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.stop_words = match crate::stop_words::listen_for(value) {
+        crate::stop_words::Listen::Off => None,
+        crate::stop_words::Listen::InYields => {
+            Some(crate::stop_words::StopWords::new(Box::new(KeptEars {
+                words,
+                asked: false,
+                handed: std::sync::Arc::clone(&handed),
+                forgotten: std::sync::Arc::clone(&forgotten),
+            })))
+        }
+        crate::stop_words::Listen::Always => panic!("these are the yield's words, `heard`"),
+    };
+    let old = h.old();
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    h.recording = Some((h.sequence + 1, stop_recording()));
+    h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+    for quiet in 1..=29 {
+        h.block(0.1, Some(evidence(quiet, None)));
+    }
+    let mut settled = None;
+    for _ in 0..150 {
+        h.block(0.1, Some(evidence(40, None)));
+        settled = h
+            .events("duplex_commit")
+            .into_iter()
+            .chain(h.events("duplex_resume"))
+            .next();
+        if settled.is_some() {
+            break;
+        }
+    }
+    let handed = handed.lock().unwrap().clone();
+    OverTheReply {
+        h,
+        old,
+        settled: settled.expect("the yield never settled"),
+        handed,
+        forgotten: forgotten.load(std::sync::atomic::Ordering::Relaxed),
+    }
+}
+
+/// The request a commit hands the provider: each Audio's samples, in order.
+fn requested_audio(h: &Harness) -> Vec<Vec<i16>> {
+    h.provider_queue
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::Audio { samples, .. } => Some(samples.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// #5032 (b): with the product unit, a short "Stop." said over the lamp's
+/// answer commits its yield, and the reply ends with the stop as the new
+/// request (the provider answers it with the stop line,
+/// `LAMP_SPOKEN_STOP_ENDS`). Without `LAMP_STOP_WORDS=heard` the yield
+/// resumed: 9 of 9 spoken stops over the answer lost on lamp-06c1. Its
+/// words go no further than the judgement: the trace has their count only.
+#[test]
+fn the_product_hears_a_stop_said_over_its_answer() {
+    let over = said_over_a_reply_in_the_product("Stop.");
+    let h = &over.h;
+    assert_eq!(over.settled["kind"], "duplex_commit", "{}", over.settled);
+    assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+    assert_ne!(h.old(), over.old);
+    let judged = h.events("stop_words");
+    assert_eq!(judged.len(), 1, "{judged:?}");
+    assert_eq!(judged[0]["stop"], true);
+    assert_eq!(judged[0]["words"], 1);
+    assert!(matches!(
+        h.provider_queue.front(),
+        Some(ProviderInput::Start { .. })
+    ));
+    // What the speech-to-text heard is the yield's audio, the start of the
+    // request the commit sends anyway.
+    let requested = requested_audio(h);
+    assert!(!over.handed.is_empty());
+    assert_eq!(
+        requested[..over.handed.len()],
+        over.handed[..],
+        "the stop words heard more than the commit sends"
+    );
+}
+
+/// The first builder's condition on #5032 (b): words heard in a yield are
+/// used only to judge a stop. A line said over the answer that is not a stop
+/// resumes it: no request reaches the provider, so nothing of it reaches the
+/// model, the thread, memory or a note, which only a request is given; the
+/// trace holds only its count, never its words; the yield's stream is
+/// forgotten. And the product unit keeps no words or audio of the stop
+/// words anywhere (`LAMP_STOP_WORDS_AUDIO`, `LAMP_STOP_WORDS_COUNTS`,
+/// `LAMP_BACKCHANNEL_DEBUG` unset).
+#[test]
+fn the_product_uses_a_yields_words_only_to_judge_a_stop() {
+    // A made-up line with a secret in it.
+    let over = said_over_a_reply_in_the_product("Remember my code is 4321.");
+    let h = &over.h;
+    assert_eq!(over.settled["kind"], "duplex_resume", "{}", over.settled);
+    assert_eq!(h.old(), over.old);
+    assert!(h.events("turn_finished").is_empty());
+    assert!(h.events("duplex_commit").is_empty());
+    assert!(
+        h.provider_queue.is_empty(),
+        "a request: {:?}",
+        h.provider_queue
+    );
+    // It was heard and judged, as a count.
+    assert!(!over.handed.is_empty());
+    let judged = h.events("stop_words");
+    assert_eq!(judged.len(), 1, "{judged:?}");
+    assert_eq!(judged[0]["stop"], false);
+    assert_eq!(judged[0]["words"], 5);
+    let trace = serde_json::to_string(&h.trace.iter().collect::<Vec<_>>()).unwrap();
+    for word in ["4321", "code", "Remember"] {
+        assert!(!trace.contains(word), "{word} in the trace");
+    }
+    assert!(over.forgotten, "the yield's stream was kept");
+    for kept in [
+        crate::stop_words::AUDIO_ENVIRONMENT,
+        crate::stop_words::COUNTS_ENVIRONMENT,
+        crate::stop_words::BACKCHANNEL_DEBUG_ENVIRONMENT,
+    ] {
+        assert!(!PRODUCT_UNIT.contains(kept), "the product sets {kept}");
+    }
 }
 
 /// #2939, `LAMP_BACKCHANNEL_HOLDS=on`: a backchannel that would commit
