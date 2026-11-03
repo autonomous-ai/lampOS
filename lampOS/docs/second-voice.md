@@ -1818,7 +1818,8 @@ order is kept. A written turn is the same from the chat on.
   a spoken request is told so beside its words, with the tasks part on:
   without it, on lamp-4ace on 19 Oct, the yes was taken as a new
   hand-over, asked about again and never started.
-  With `LAMP_HISTORY_KEEPS_CALLS=on` the functions a turn ran are kept
+  With `LAMP_HISTORY_KEEPS_CALLS=on` the functions a turn ran with no
+  arguments (the light's and the volume's steps, on, off, mute) are kept
   with its exchange (`Thread::called`, `Engine::keeping_calls`), and the
   history tells such an exchange as a round with calls goes: the person's
   words, an assistant message with the calls (no arguments, ids
@@ -1835,7 +1836,14 @@ order is kept. A written turn is the same from the chat on.
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
   build would set the file aside, #1505): after a restart, earlier
-  exchanges are words only. Off, the history is as before, byte for byte.
+  exchanges are words only. A call that took arguments is never kept: it
+  is told with none, and would teach calling it bare (Fourteen's P3 on
+  #5018). At most 8 calls an exchange, each name once. With
+  `LAMP_CONVERSATION_ROOM_LINES_TOLD` on, a room exchange's calls reach a
+  person's history with its words. A chat that refuses round 1 (a status
+  not 429 or 5xx) with kept calls in the history is asked once more
+  without them, in words only (`without_kept_calls`, the Reviewer-lead's
+  P2 on #5018). Off, the history is as before, byte for byte.
 - **A tool call knows whether it was heard.** The engine passes `heard`
   to the tool runner: true in a spoken turn, false in a written one, as the
   Live route does, so a yes to prepared work cannot come in a turn the lamp

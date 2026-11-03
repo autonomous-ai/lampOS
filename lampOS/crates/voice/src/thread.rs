@@ -191,6 +191,10 @@ const LINES: usize = 8;
 /// The most functions kept for one exchange, and the most of a name.
 const CALLS: usize = 8;
 const NAME_BYTES: usize = 64;
+/// The start of a kept call's id ([`KeptCall::id`]), by which a chat that
+/// refuses them is asked again without them
+/// (`second_provider::without_kept_calls`).
+pub const KEPT_CALL_ID: &str = "kept-";
 
 impl Exchange {
     /// Its calls as [`Recent::calls`] gives them.
@@ -199,7 +203,7 @@ impl Exchange {
             .iter()
             .enumerate()
             .map(|(at, name)| KeptCall {
-                id: format!("kept-{}-{at}", self.request),
+                id: format!("{KEPT_CALL_ID}{}-{at}", self.request),
                 name: name.clone(),
             })
             .collect()

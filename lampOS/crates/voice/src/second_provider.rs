@@ -295,6 +295,29 @@ const NOT_FOR_ME: &str = "not_for_me";
 /// call as words ("Calling recall about Lily."): not said.
 pub(crate) const CALL_ALOUD_NOTE: &str = "(For you to know: your last reply only described a function call in words, and it was not said. Never say a function's name or that you are calling one: call the function itself, or answer in words.)";
 
+/// `history` (the messages before a turn's ask) without the calls kept from
+/// earlier turns (`LAMP_HISTORY_KEEPS_CALLS`): each kept call's assistant
+/// message and its result, and how many messages went; `None` when it holds
+/// none. A chat that refuses them in round 1 (a call given back with no
+/// thought signature, or naming a function not offered now) is asked once
+/// more without them, so a turn never ends "can't answer" for them (the
+/// Reviewer-lead's P2 on #5018).
+pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, usize)> {
+    let kept = |id: Option<&str>| id.is_some_and(|id| id.starts_with(crate::thread::KEPT_CALL_ID));
+    let is_kept = |message: &Message| {
+        (message.role == "tool" && kept(message.tool_call_id.as_deref()))
+            || (message.role == "assistant"
+                && !message.tool_calls.is_empty()
+                && message
+                    .tool_calls
+                    .iter()
+                    .all(|call| kept(call["id"].as_str())))
+    };
+    let without: Vec<Message> = history.iter().filter(|m| !is_kept(m)).cloned().collect();
+    let dropped = history.len() - without.len();
+    (dropped > 0).then_some((without, dropped))
+}
+
 /// Told before a round asked again after a reply that was only a step's
 /// own word with no call ("Louder.", lamp-52e6, 3 Nov): not said, and
 /// nothing changed.
@@ -9595,7 +9618,10 @@ async fn answer(
         if let Some(prepared) = &prepared {
             messages.clone_from(&prepared.messages);
         }
-        let asked_at = messages.len() - 1;
+        let mut asked_at = messages.len() - 1;
+        // Whether round 1 was asked again without the history's kept calls
+        // ([`without_kept_calls`]), once.
+        let mut kept_calls_dropped = false;
         // Round 1's bounds run from here, or from its one ask again after a
         // line lost on the network (`LAMP_RESEND_LOST_LINE`).
         let mut from = begun;
@@ -9772,6 +9798,25 @@ async fn answer(
                             "lamp-voice second: request {request} chat round {round} failed after {} ms: {error}",
                             began.elapsed().as_millis()
                         );
+                        // Refused with the history's kept calls in it: asked
+                        // once more without them, in words only.
+                        if first
+                            && round == 1
+                            && !kept_calls_dropped
+                            && let net::Error::Status(status) = &error
+                            && !passing(*status)
+                            && let Some((without, dropped)) =
+                                without_kept_calls(&messages[..asked_at])
+                        {
+                            eprintln!(
+                                "lamp-voice second: request {request} the chat refused the history's {dropped} kept call message(s) ({status}); asked again without them (LAMP_HISTORY_KEEPS_CALLS)"
+                            );
+                            messages.splice(..asked_at, without);
+                            asked_at -= dropped;
+                            kept_calls_dropped = true;
+                            refused = true;
+                            break;
+                        }
                         // Lost on the network before any word or call: asked
                         // once more if the link is back in time (#1722).
                         if first
@@ -10695,9 +10740,15 @@ async fn answer(
                 // What it did, for a later turn's history
                 // (`LAMP_HISTORY_KEEPS_CALLS`): never the call for the rest
                 // of the functions, which would give a later turn all of
-                // them (`worker::few_tools`).
+                // them (`worker::few_tools`), and only a call made with no
+                // arguments: a kept call is told with none, and one that
+                // took some ("light_colour", "set_reminder") would teach
+                // calling it bare (Fourteen's P3 on #5018). The light's and
+                // the volume's steps, the asks found answered in words, take
+                // none.
                 if did
                     && call.name != worker::MORE
+                    && call.args.as_object().is_none_or(serde_json::Map::is_empty)
                     && let Some(keep) = &shared.keeps_calls
                 {
                     keep(request, &call.name);
