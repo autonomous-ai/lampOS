@@ -1962,7 +1962,14 @@ pub fn owner_forgotten() {
 /// The owner kept at setup (`onboarding::owner_of`) while the eyes still
 /// know them ([`still_known`]), refreshed into [`owner_now`] every
 /// [`OWNER_EVERY`] on a thread of its own.
+/// Started once per process, however many parts ask for it (the by-default
+/// name and the connected services).
 pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    STARTED.call_once(|| keep_owner_fresh_now(file, socket));
+}
+
+fn keep_owner_fresh_now(file: Option<PathBuf>, socket: Option<PathBuf>) {
     std::thread::spawn(move || {
         loop {
             refresh_owner(file.as_deref(), socket.as_deref());
@@ -2326,6 +2333,13 @@ static FACES_LATELY: std::sync::Mutex<FacesLately> =
 // ponytail: polls `latest`, so a look between two reads can be missed; a
 // bus subscriber if that ever matters.
 pub fn keep_faces_counted(bus: lamp_bus::Bus) {
+    // Once per process: the by-default name and the connected services
+    // both count faces.
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    STARTED.call_once(|| keep_faces_counted_now(bus));
+}
+
+fn keep_faces_counted_now(bus: lamp_bus::Bus) {
     std::thread::spawn(move || {
         loop {
             if let Some((look, faces)) = bus

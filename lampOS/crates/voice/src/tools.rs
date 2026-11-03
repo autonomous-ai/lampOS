@@ -1642,6 +1642,17 @@ fn run_call_with_scope(
     if !scope_current(lease, request) {
         return ("nobody", (unavailable(), false));
     }
+    // Once a linked service's read answered in this request, nothing else
+    // in it runs but another read: a mail's or a page's words never become
+    // a keep, a reminder, an action, a skill or a write.
+    if crate::services::after_read(request)
+        && !(matches!(route, Route::Services(_)) && crate::services::reads_only(&call.name))
+    {
+        return (
+            "the services",
+            (json!({ "error": crate::services::AFTER_READ }), true),
+        );
+    }
     let deadline = ASK_DEADLINE;
     let result = match route {
         Route::Memory(socket, faces, reminders) => {
@@ -1976,7 +1987,7 @@ fn run_call_with_scope(
         }
         Route::Services(folder) => (
             "the services",
-            crate::services::run(folder, call, request, heard),
+            crate::services::run(folder, call, request, heard, lease),
         ),
         Route::Decline | Route::Clock | Route::ReportsState | Route::Sleep | Route::Nobody => {
             ("nobody", (unavailable(), false))
@@ -5696,40 +5707,114 @@ mod tests {
             name: name.into(),
             args,
         };
-        // A scheduled run (not heard) reads, marked as quoted data.
-        let (whom, (told, answered)) = run_call(
+        let scoped = |snapshot: crate::memory_scope::ScopeSnapshot, request: u64| {
+            crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                snapshot,
+            )
+        };
+        crate::known_faces::owner_for_test(Some(Some("Ann".into())));
+        // The owner's own heard line reads, marked as quoted data.
+        let owner = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_001);
+        let (whom, (told, answered)) = run_call_scoped(
             &services,
             &call(
                 crate::services::READ,
                 json!({"service":"gmail","what":"recent"}),
             ),
             4_710_001,
-            false,
+            true,
+            &owner.lease(),
         );
         assert_eq!(whom, "the services");
         assert!(answered);
         assert_eq!(told["items"][0]["from"], "Ann");
         assert_eq!(told["note"], crate::services::DATA_NOTE);
-        let (_, (told, _)) = run_call(
+        // After that read, nothing else in the same request runs: not a
+        // write, not a keep in memory, not another part's action.
+        let before = asked.lock().unwrap().len();
+        for (route, name) in [
+            (&services, crate::services::WRITE),
+            (
+                &Route::Memory(PathBuf::from("/missing-memory.sock"), None, None),
+                crate::remember::REMEMBER,
+            ),
+            (&Route::Executive(dir.clone()), "set_light"),
+        ] {
+            let (_, (told, _)) = run_call_scoped(
+                route,
+                &call(name, json!({"service":"gmail","action":"send","text":"x"})),
+                4_710_001,
+                true,
+                &owner.lease(),
+            );
+            assert_eq!(told["error"], crate::services::AFTER_READ, "{name}");
+        }
+        assert_eq!(asked.lock().unwrap().len(), before, "nothing was asked");
+        let (_, (told, _)) = run_call_scoped(
             &services,
             &call(crate::services::CONNECTED, json!({})),
-            4_710_002,
-            false,
+            4_710_001,
+            true,
+            &owner.lease(),
         );
-        assert_eq!(told["connected"][0]["code"], "gmail");
-        // A write not heard live, or a send not said: refused, never asked.
+        assert_eq!(told["connected"][0]["code"], "gmail", "another read runs");
+        // A guest's, an unknown face's, the room's, a line held by a gap, a
+        // line narrowed to the room, and no scope at all: refused, read and
+        // write alike, and the service is never asked.
         let before = asked.lock().unwrap().len();
+        let narrowed = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_010);
+        narrowed.lease().narrow_to_room();
+        let refused = [
+            scoped(crate::memory_scope::ScopeSnapshot::of("Bob"), 4_710_010),
+            scoped(crate::memory_scope::ScopeSnapshot::room(), 4_710_010),
+            scoped(
+                crate::memory_scope::ScopeSnapshot::held_of("Ann"),
+                4_710_010,
+            ),
+            narrowed,
+        ];
+        for scope in &refused {
+            for name in [crate::services::READ, crate::services::WRITE] {
+                let (_, (told, _)) = run_call_scoped(
+                    &services,
+                    &call(
+                        name,
+                        json!({"service":"gmail","action":"send","to":"a@b.c"}),
+                    ),
+                    4_710_010,
+                    true,
+                    &scope.lease(),
+                );
+                assert_eq!(told["error"], crate::services::OWNER_ONLY, "{name}");
+            }
+        }
         let (_, (told, _)) = run_call(
             &services,
-            &call(
-                crate::services::WRITE,
-                json!({"service":"gmail","action":"send","to":"a@b.c"}),
-            ),
-            4_710_003,
-            false,
+            &call(crate::services::READ, json!({"service":"gmail"})),
+            4_710_011,
+            true,
         );
-        assert_eq!(told["error"], crate::services::NOT_HEARD);
-        let (_, (told, _)) = run_call(
+        assert_eq!(told["error"], crate::services::OWNER_ONLY, "no scope");
+        // A scheduled run, not heard, reaches no service at all.
+        let scheduled = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_012);
+        for name in crate::services::NAMES {
+            let (_, (told, _)) = run_call_scoped(
+                &services,
+                &call(name, json!({"service":"gmail"})),
+                4_710_012,
+                false,
+                &scheduled.lease(),
+            );
+            assert_eq!(told["error"], crate::services::NOT_HEARD, "{name}");
+        }
+        // A send with nothing prepared: cancelled.
+        let send = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_004);
+        let (_, (told, _)) = run_call_scoped(
             &services,
             &call(
                 crate::services::WRITE,
@@ -5737,6 +5822,7 @@ mod tests {
             ),
             4_710_004,
             true,
+            &send.lease(),
         );
         assert_eq!(told["error"], crate::services::CANCELLED);
         assert_eq!(
@@ -5744,6 +5830,7 @@ mod tests {
             before,
             "the service was never asked"
         );
+        crate::known_faces::owner_for_test(None);
         // `use_skill`, a skill's way in, reaches only a skills' folder.
         let wrapped = Settings {
             use_skill: true,
