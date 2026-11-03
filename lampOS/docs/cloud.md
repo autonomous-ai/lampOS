@@ -1250,16 +1250,16 @@ voice never reaches the backend. An added field under `lamp-report/1`,
 within its 4 KiB). It has no switch of its own: it goes with the reports'
 three gates, and nothing is read without the person's yes.
 
-Only numbers, enums, booleans, dates and a Store package's SHA-256 (64
-lowercase hex, the id the Store's catalogue names it by). Never a skill's
-name, title, words or files, nor a made skill's SHA-256.
+Only numbers, enums, dates and a Store package's SHA-256 (64 lowercase hex,
+the id the Store's catalogue names it by). Never a skill's name, title,
+words or files, nor a made skill's SHA-256.
 
 ```json
 "skills": {
   "on": {"core": 12, "store": 2, "made_voice": 1},
   "kept_off": {"made_app": 1},
   "day": {
-    "date": "2026-11-03", "complete": true,
+    "date": "2026-11-03",
     "made_by_voice": {"kept": 2, "on": 1, "refused": 1, "left_off": 1},
     "runs": {"core": 40, "store": 9, "made_voice": 3},
     "store": {"<sha256 of one>": 7, "<sha256 of another>": 2},
@@ -1270,27 +1270,45 @@ name, title, words or files, nor a made skill's SHA-256.
 
 | Field | What | Read from |
 |---|---|---|
-| `on`, `kept_off` | skills on now, and kept on the lamp but not on (turned off, shipped off, an add-on with add-ons off, or one that does not load), by source | the skills folder with `lamp-skills`' own loader and its off file, as the skills page reads them |
-| `day.runs` | runs that UTC day, by source | `lamp-skills`' running totals, `runs.json` in its `--state-dir` (`skills.md`, "Runs, counted") |
+| `on`, `kept_off` | skills on now, and kept on the lamp but not on (turned off, shipped off, an add-on with add-ons off, or one that does not load), by source | the skills folder with `lamp-skills`' own loader and its off file, as the skills page reads them; a made skill's maker from its own card |
+| `day.runs` | runs that UTC day, by source | `lamp-skills`' running totals, `runs.json` in its `--state-dir` (`skills.md`, "Runs, counted"), made skills' by the maker on each card |
 | `day.store`, `day.store_rest` | the Store's runs that day by package SHA-256 (`installed_from`), the 50 most run, the rest summed | the same file |
 | `day.made_by_voice` | asks to make a skill by voice that day: `kept` (a made skill kept), `on` (put on by a spoken yes), `refused` (made nothing), `left_off` (asked about and not put on) | the voice's running totals (`counts.json` beside the made skills), asked on its app-make socket with `{"counts": {}}`, within 1 s |
 
-- **Sources** are map keys: `core`, `store` (the Skills Store), `made_voice`,
-  `made_app` (a made skill whose package an app's ask made, as the voice
-  says), `pushed` (by a paired computer) and `other` (put on from a folder
-  or a file). A key not there is 0, so a later source (`written`,
-  `uploaded`) is a new key under the same schema. So are the outcomes.
+- **Sources** are map keys: `core`, `store` (the Skills Store), `made_voice`
+  and `made_app` (made on this lamp, asked for by voice or in the owner's
+  app), `made_unknown` (made on this lamp before the maker was written on
+  its card), `pushed` (by a paired computer) and `other` (put on from a
+  folder or a file). A key not there is 0, so a later source (`uploaded`)
+  is a new key under the same schema. So are the outcomes.
+- **A made skill's maker is on its own card:** the voice writes `made_by:
+  voice` or `made_by: app` beside `made: here` in its `SKILL.md` when it
+  packs it, inside the package, so the SHA-256 and the spoken yes cover it
+  (`lamp_voice::made_skill::Maker`); a skill written in the app (`written:
+  app`) is the app's too. `lamp-skills` counts each run by the card it
+  loaded, and the report reads the same card, so neither asks the voice
+  and a skill's runs never move from one maker to the other. One made
+  before the marker says neither: `made_unknown`, never guessed. A shared
+  skill's package has the marker taken out with `made: here`.
 - **A day** is the change in the running totals between two readings, one
   at each health report, put on the UTC day of the later one (so a day's
   edge is within one health, 15 minutes). The first reading only begins the
   count, and a total that went down (a file begun again) counts from 0. The
   days are kept in the reports' own state (`reports/state.json`), at most 7,
   each with at most 64 Store packages apart.
-- **Sent:** each health carries the oldest day not yet acknowledged. A day
-  not over is sent as far as it has come (`complete: false`) and stays; one
-  over is let go when the broker acknowledges the report that carried it
-  whole, and the next day goes with the next health. A no deletes the days
-  with everything else, and a yes again begins the count anew.
+- **Sent only once over:** each health carries the oldest UTC day that is
+  over and not yet acknowledged, whole; today is never sent, so two reports
+  15 minutes apart never tell a run between them. A day is let go when the
+  broker acknowledges the report that carried it, and the next day goes
+  with the next health.
+- **A no** deletes the days with everything else, and asks the manage
+  helper (`{"forget_counts": {}}`, root's, which owns both files) to
+  delete `lamp-skills`' `runs.json` and the voice's `counts.json`, each
+  under its writers' lock; asked again every 10 s until it says done
+  (`reports/state.json` keeps that it is owed). Runs counted in a running
+  part's memory and not yet written (at most a minute's) begin the next
+  file. Nothing is sent without a yes, and a yes again begins the count
+  anew from its first reading.
 - **Within 4 KiB** (with room for the longest `id`): the Store list is cut
   first, the least run summed into `store_rest`, so the Store's total stays
   whole; with none left, the day is left out (and kept for the next
@@ -1298,17 +1316,21 @@ name, title, words or files, nor a made skill's SHA-256.
   (`the_skills_field_is_cut_to_the_report_limit`).
 - **Not read:** with no skills folder the field is left out; with no runs
   file there are no runs, and with no answer from the voice (its app-make
-  socket runs only with `LAMP_APP_MAKE_SKILL=on`) no asks and no
-  `made_app`: a made skill is counted as `made_voice`.
+  socket runs only with `LAMP_APP_MAKE_SKILL=on`) no asks. The made
+  skills' split does not depend on the voice
+  (`made_runs_split_by_the_card_whoever_answers`).
 - **Counting never waits:** a skill's run and a voice turn each add to an
   atomic in memory; a thread of their own writes the totals at most once a
   minute, so a restart loses at most a minute's counts. Reading happens only
   in `lamp-cloud`, at a health report.
 - **The canary** (`no_secret_planted_in_any_input_reaches_any_report`,
   with the skills now among its inputs, and
-  `no_secret_planted_in_the_skills_reaches_a_report`) plants names and words in a skill's name, title and off file, keys in the
-  runs' file and fields in the voice's answer, and finds none in the
-  report, while the counts are there.
+  `no_secret_planted_in_the_skills_reaches_a_report`) plants names and
+  words in a core, a Store, a folder, an app-made and an older made
+  skill's name, title, install record and off file, keys in the runs'
+  file and fields in the voice's answer, and finds none in the report,
+  while the counts are there. A pushed skill lives in the developer
+  folder, which the report never reads; its runs count by source alone.
 
 ### How often, and how it is sent
 

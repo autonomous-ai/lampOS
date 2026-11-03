@@ -603,6 +603,20 @@ fn ask_helper(
     }
 }
 
+/// The person's no to reports: the skills' run totals and the voice's
+/// made-skill counts deleted by the manage helper, which owns both
+/// (`{"forget_counts": {}}`, [`lamp_skills::package::asked`]). True once it
+/// says done; why not goes to the journal, and it is asked again later.
+pub fn forget_counts(socket: &Path) -> bool {
+    match ask_helper(socket, &json!({"forget_counts": {}}), ASK_TIMEOUT) {
+        Ok(_) => true,
+        Err(Asked::Refused(why) | Asked::Unanswered(why)) => {
+            eprintln!("lamp-cloud: the skills' counts not deleted yet: {why}");
+            false
+        }
+    }
+}
+
 /// A folder as the page shows it, loaded or not.
 fn row(
     folder: &Path,

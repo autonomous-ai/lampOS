@@ -6,21 +6,23 @@
 //!
 //! - **On, and kept but not on**, by [`Source`]: read from the skills folder
 //!   with `lamp-skills`' own loader and its off file, as the skills page
-//!   reads them.
+//!   reads them. A made skill's maker is the one on its own card
+//!   (`made_by`, [`lamp_skills::usage::made_by`]), so nothing else is asked.
 //! - **Runs**, by [`Source`], and by Store package: `lamp-skills`' running
-//!   totals ([`lamp_skills::usage::RUNS_FILE`] in its `--state-dir`).
+//!   totals ([`lamp_skills::usage::RUNS_FILE`] in its `--state-dir`), made
+//!   skills' split by the same card.
 //! - **Made-skill asks by voice**, by [`Outcome`]: the voice's running totals,
 //!   asked on its app-make socket (`{"counts": {}}`,
-//!   `lamp_voice::made_counts`), which also names the packages the app's
-//!   asks made, so a made skill is told as the voice's or the app's.
+//!   `lamp_voice::made_counts`).
 //!
 //! A day's counts are the change in the running totals between two
-//! readings, kept in [`Days`] in the reports' own state until the report
-//! that carries the day is acknowledged. The first reading only begins the
-//! count, so nothing from before it is put on one day; a total that went
-//! down (a file begun again) counts from 0.
+//! readings, kept in [`Days`] in the reports' own state, and sent only once
+//! the UTC day is over, until the report that carries it is acknowledged:
+//! never a day still going, so two reports never tell a run apart. The
+//! first reading only begins the count, so nothing from before it is put on
+//! one day; a total that went down (a file begun again) counts from 0.
 use lamp_skills::SkillKind;
-use lamp_skills::usage::Source as Found;
+use lamp_skills::usage::{Maker, Source as Found};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -55,6 +57,9 @@ pub enum Source {
     MadeVoice,
     /// Made on this lamp from the owner's app.
     MadeApp,
+    /// Made on this lamp before the maker was written on its card: by
+    /// voice or in the app, not known.
+    MadeUnknown,
     /// Pushed by a paired computer.
     Pushed,
     /// Any other installed skill (from a folder or a file).
@@ -62,11 +67,12 @@ pub enum Source {
 }
 
 impl Source {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::Core,
         Self::Store,
         Self::MadeVoice,
         Self::MadeApp,
+        Self::MadeUnknown,
         Self::Pushed,
         Self::Other,
     ];
@@ -77,6 +83,7 @@ impl Source {
             Self::Store => "store",
             Self::MadeVoice => "made_voice",
             Self::MadeApp => "made_app",
+            Self::MadeUnknown => "made_unknown",
             Self::Pushed => "pushed",
             Self::Other => "other",
         }
@@ -140,6 +147,9 @@ pub struct Places {
     pub runs: PathBuf,
     /// The voice's app-make socket.
     pub voice: PathBuf,
+    /// The manage helper's socket, which deletes the counts after a no
+    /// (`crate::skills::forget_counts`).
+    pub manage: PathBuf,
     /// Whether add-ons run here (`LAMP_ADDONS=on`): an add-on is not on
     /// without it.
     pub addons: bool,
@@ -154,6 +164,7 @@ impl Places {
             folder: page.folder,
             off: page.off,
             voice: crate::make_skill::SOCKET.into(),
+            manage: page.manage,
             addons: page.addons,
         }
     }
@@ -162,24 +173,15 @@ impl Places {
 /// A reading of `places`; `None` when the skills folder can't be read.
 pub fn read(places: &Places) -> Option<Reading> {
     fs::read_dir(&places.folder).ok()?;
-    let voice = ask_voice(&places.voice);
-    let app: BTreeSet<String> = voice
-        .as_ref()
-        .and_then(|told| told["app"].as_array())
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .filter(|sha256| lamp_skills::package::sha256_ok(sha256))
-        .map(str::to_owned)
-        .collect();
-    let made = |sha256: Option<&str>| match sha256 {
-        Some(sha256) if app.contains(sha256) => Source::MadeApp,
-        _ => Source::MadeVoice,
+    let made = |maker: Maker| match maker {
+        Maker::Voice => Source::MadeVoice,
+        Maker::App => Source::MadeApp,
+        Maker::Unknown => Source::MadeUnknown,
     };
     let of = |found: &Found| match found {
         Found::Core => Source::Core,
         Found::Store(_) => Source::Store,
-        Found::Made(sha256) => made(sha256.as_deref()),
+        Found::Made(maker) => made(*maker),
         Found::Pushed => Source::Pushed,
         Found::Other => Source::Other,
     };
@@ -196,13 +198,9 @@ pub fn read(places: &Places) -> Option<Reading> {
             // One that doesn't load is kept, and not on.
             Err(_) => {
                 let installed = lamp_skills::package::installed_from(&folder);
-                let source = match &installed {
-                    Some(installed) if installed.from_store => Source::Store,
-                    _ if lamp_skills::usage::made_here(&folder) => made(
-                        installed
-                            .as_ref()
-                            .map(|installed| installed.sha256.as_str()),
-                    ),
+                let source = match (&installed, lamp_skills::usage::made_by(&folder)) {
+                    (Some(installed), _) if installed.from_store => Source::Store,
+                    (_, Some(maker)) => made(maker),
                     _ => Source::Other,
                 };
                 (source, false)
@@ -215,30 +213,19 @@ pub fn read(places: &Places) -> Option<Reading> {
         };
         *counts.entry(source).or_default() += 1;
     }
-    reading.runs = lamp_skills::usage::read(&places.runs).map(|totals| {
-        let made_app: u64 = totals
-            .made_ids
-            .iter()
-            .filter(|(sha256, _)| app.contains(*sha256))
-            .map(|(_, runs)| *runs)
-            .sum();
-        let mut by_source = BTreeMap::new();
-        for (source, runs) in [
+    reading.runs = lamp_skills::usage::read(&places.runs).map(|totals| Runs {
+        by_source: BTreeMap::from([
             (Source::Core, totals.core),
             (Source::Store, totals.store),
-            (Source::MadeVoice, totals.made.saturating_sub(made_app)),
-            (Source::MadeApp, made_app.min(totals.made)),
+            (Source::MadeVoice, totals.made_voice),
+            (Source::MadeApp, totals.made_app),
+            (Source::MadeUnknown, totals.made_unknown),
             (Source::Pushed, totals.pushed),
             (Source::Other, totals.other),
-        ] {
-            by_source.insert(source, runs);
-        }
-        Runs {
-            by_source,
-            store: totals.store_ids,
-        }
+        ]),
+        store: totals.store_ids,
     });
-    reading.asks = voice.and_then(|told| {
+    reading.asks = ask_voice(&places.voice).and_then(|told| {
         let made = told.get("made_by_voice")?;
         Some(
             Outcome::ALL
@@ -287,14 +274,12 @@ pub struct Days {
     days: BTreeMap<u64, BTreeMap<String, u64>>,
 }
 
-/// One UTC day as a report carries it.
+/// One UTC day as a report carries it: only ever a day that is over, its
+/// counts whole.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Day {
     /// `YYYY-MM-DD`, UTC.
     pub date: String,
-    /// The day is over: these are its counts. A day not over is sent as
-    /// far as it has come, and again, whole, once it is.
-    pub complete: bool,
     /// Made-skill asks by voice; an outcome not there is 0.
     pub made_by_voice: BTreeMap<Outcome, u64>,
     /// Runs by source; a source not there is 0.
@@ -422,11 +407,14 @@ impl Days {
         self.days.retain(|day, _| *day >= oldest);
     }
 
-    /// The oldest day not yet acknowledged, as a report carries it, and the
-    /// day's number when it is over (so its acknowledgement lets it go).
-    pub fn oldest(&self, now_s: u64) -> Option<(Day, Option<u64>)> {
+    /// The oldest day that is over and not yet acknowledged, as a report
+    /// carries it, and its number (so its acknowledgement lets it go).
+    /// Today is never one: a day still going is kept, never sent.
+    pub fn oldest(&self, now_s: u64) -> Option<(Day, u64)> {
         let (number, counts) = self.days.iter().next()?;
-        let complete = *number < now_s / DAY_S;
+        if *number >= now_s / DAY_S {
+            return None;
+        }
         let mut store: Vec<(&str, u64)> = counts
             .iter()
             .filter_map(|(key, runs)| Some((key.strip_prefix("store/")?, *runs)))
@@ -441,7 +429,6 @@ impl Days {
         );
         let day = Day {
             date: date.get(..10).unwrap_or_default().to_owned(),
-            complete,
             made_by_voice: Outcome::ALL
                 .into_iter()
                 .filter_map(|outcome| {
@@ -463,10 +450,10 @@ impl Days {
                 .collect(),
             store_rest,
         };
-        Some((day, complete.then_some(*number)))
+        Some((day, *number))
     }
 
-    /// The report carrying `day`, whole and over, was acknowledged.
+    /// The report carrying `day` was acknowledged.
     pub fn acked(&mut self, day: u64) {
         self.days.remove(&day);
     }
@@ -501,28 +488,126 @@ mod tests {
         days.add(NOW, &reading(100, &[(&a, 40)], 7));
         assert_eq!(days.oldest(NOW), None);
         days.add(NOW + 60, &reading(103, &[(&a, 42)], 8));
-        let (day, over) = days.oldest(NOW + 60).unwrap();
-        assert_eq!(
-            (day.date.as_str(), day.complete, over),
-            ("2026-10-18", false, None)
-        );
-        assert_eq!(day.runs, BTreeMap::from([(Source::Core, 3)]));
-        assert_eq!(day.store, BTreeMap::from([(a.clone(), 2)]));
-        assert_eq!(day.made_by_voice, BTreeMap::from([(Outcome::Refused, 1)]));
+        // Today is never sent, however far it has come.
+        assert_eq!(days.oldest(NOW + 60), None);
         // A total begun again counts from 0; the next day is its own.
         days.add(NOW + DAY_S, &reading(2, &[(&a, 42)], 8));
         let (day, over) = days.oldest(NOW + DAY_S).unwrap();
-        assert!(day.complete);
-        days.acked(over.unwrap());
-        let (next, _) = days.oldest(NOW + DAY_S).unwrap();
-        assert_eq!(next.date, "2026-10-19");
-        assert_eq!(next.runs, BTreeMap::from([(Source::Core, 2)]));
+        assert_eq!(day.date, "2026-10-18");
+        assert_eq!(day.runs, BTreeMap::from([(Source::Core, 3)]));
+        assert_eq!(day.store, BTreeMap::from([(a.clone(), 2)]));
+        assert_eq!(day.made_by_voice, BTreeMap::from([(Outcome::Refused, 1)]));
+        days.acked(over);
+        assert_eq!(days.oldest(NOW + DAY_S), None);
         // A part not read keeps its count where it was.
         let mut quiet = reading(2, &[], 8);
         quiet.runs = None;
         days.add(NOW + DAY_S + 1, &quiet);
         days.add(NOW + DAY_S + 2, &reading(2, &[(&a, 43)], 8));
-        assert_eq!(days.oldest(NOW + DAY_S + 2).unwrap().0.store[&a], 1);
+        let (next, _) = days.oldest(NOW + 2 * DAY_S).unwrap();
+        assert_eq!(next.date, "2026-10-19");
+        assert_eq!(next.runs, BTreeMap::from([(Source::Core, 2)]));
+        assert_eq!(next.store[&a], 1);
+    }
+
+    /// Thirteen's HOLD on #5096: six skills made, the first in the app,
+    /// read before and after, with the voice answering and not. Each made
+    /// skill's maker is on its own card, so `run/made_app` and
+    /// `run/made_voice` change only by the runs between readings, whatever
+    /// the voice keeps or says; a card from before the marker is
+    /// `made_unknown`.
+    #[test]
+    fn made_runs_split_by_the_card_whoever_answers() {
+        use std::sync::atomic::Ordering;
+        let page = crate::skills::tests::places("made-split");
+        let runs = page.off.with_file_name(lamp_skills::usage::RUNS_FILE);
+        let silent = Places {
+            folder: page.folder.clone(),
+            off: page.off.clone(),
+            runs: runs.clone(),
+            // Nothing listens: the voice doesn't answer.
+            voice: page.off.with_file_name("none.sock"),
+            manage: page.manage.clone(),
+            addons: false,
+        };
+        let answering = Places {
+            voice: page.off.with_file_name("v.sock"),
+            ..silent.clone()
+        };
+        let listener = std::os::unix::net::UnixListener::bind(&answering.voice).unwrap();
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                let _ = BufReader::new(stream.try_clone().unwrap()).read_line(&mut line);
+                let reply =
+                    json!({"made_by_voice": {"kept": 5, "on": 5, "refused": 0, "left_off": 0}});
+                let _ = writeln!(stream, "{reply}");
+            }
+        });
+        let make = |name: &str, front: &str| {
+            crate::skills::tests::skill(&page, name, name, front, "[permissions]\nbody = true");
+        };
+        let counting = lamp_skills::usage::Counting::default();
+        let run = |name: &str, times: u64| {
+            for (folder, loaded) in lamp_skills::load_each(&page.folder) {
+                if let Ok(skill) = loaded
+                    && skill.name == name
+                {
+                    let source = lamp_skills::usage::source_of(&skill, &folder);
+                    counting.counter(source).fetch_add(times, Ordering::Relaxed);
+                }
+            }
+            counting.flush(&runs).unwrap();
+        };
+        let made = |reading: &Reading| {
+            let runs = reading.runs.as_ref().unwrap();
+            [Source::MadeApp, Source::MadeVoice, Source::MadeUnknown]
+                .map(|source| runs.by_source.get(&source).copied().unwrap_or_default())
+        };
+        make("first-app", "made: here\nmade_by: app\n");
+        make("from-before", "made: here\n");
+        run("first-app", 3);
+        run("from-before", 1);
+        let mut days = Days::default();
+        let before = read(&answering).unwrap();
+        assert_eq!(made(&before), [3, 0, 1]);
+        days.add(NOW, &before);
+        // Five more by voice: six made, the app's the oldest.
+        for n in 1..=5 {
+            let name = format!("voice-{n}");
+            make(&name, "made: here\nmade_by: voice\n");
+            run(&name, 1);
+        }
+        run("first-app", 2);
+        let after = read(&answering).unwrap();
+        assert_eq!(made(&after), [5, 5, 1]);
+        assert_eq!(
+            after.on,
+            BTreeMap::from([
+                (Source::MadeVoice, 5),
+                (Source::MadeApp, 1),
+                (Source::MadeUnknown, 1)
+            ])
+        );
+        days.add(NOW + 60, &after);
+        // The voice doesn't answer: the split is the same, only its asks
+        // unread.
+        run("first-app", 1);
+        let unanswered = read(&silent).unwrap();
+        assert_eq!(unanswered.asks, None);
+        assert_eq!(made(&unanswered), [6, 5, 1]);
+        assert_eq!(unanswered.on, after.on);
+        days.add(NOW + 120, &unanswered);
+        // And answering again: nothing moves back.
+        run("voice-5", 1);
+        let again = read(&answering).unwrap();
+        assert_eq!(made(&again), [6, 6, 1]);
+        days.add(NOW + 180, &again);
+        let (day, _) = days.oldest(NOW + DAY_S).unwrap();
+        assert_eq!(
+            day.runs,
+            BTreeMap::from([(Source::MadeVoice, 6), (Source::MadeApp, 3)])
+        );
     }
 
     #[test]
@@ -537,7 +622,7 @@ mod tests {
             .collect();
         days.add(NOW, &reading(0, &zero, 0));
         days.add(NOW + 1, &reading(0, &runs, 0));
-        let (mut day, _) = days.oldest(NOW + 1).unwrap();
+        let (mut day, _) = days.oldest(NOW + DAY_S).unwrap();
         assert_eq!(day.store.len(), STORE_MOST);
         // The ten least run, 1 to 10, summed.
         assert_eq!(day.store_rest, 55);

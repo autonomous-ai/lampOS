@@ -7,7 +7,8 @@
 //! agent never makes one (the first builder, 3 Nov, on the Queue).
 //!
 //! When the model's answer comes back, its two files are taken from it ([`files`]), held to
-//! what a made skill may use ([`capped`]), marked `made: here`, and checked
+//! what a made skill may use ([`capped`]), marked `made: here` and by its
+//! [`Maker`] (`made_by: voice` or `made_by: app`), and checked
 //! and packed by `lamp-skills pack` (#1698), the checker an install uses.
 //! The package is kept in the voice's own folder ([`DIRECTORY`], 0700, at
 //! most [`KEPT_MOST`]), with its SHA-256 and what it asks to use. The lamp
@@ -579,10 +580,47 @@ fn one(unit: &str) -> &'static str {
     }
 }
 
+/// Who asked for a made skill, written on its card as `made_by: <key>`
+/// beside `made: here` ([`MADE_BY`]), so `lamp-skills` counts its runs by
+/// maker from the card alone (`lamp_skills::usage`, the opt-in health
+/// report). An enum only: never a person's name or a word of the ask.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Maker {
+    /// Asked for by voice (`make_skill`).
+    Voice,
+    /// Asked for in the owner's app (`crate::app_make`).
+    App,
+}
+
+/// The card's key for [`Maker`], in `SKILL.md`'s front matter.
+pub const MADE_BY: &str = "made_by";
+
+impl Maker {
+    /// The maker of a skill kept as made from `from`: the app's when its
+    /// second part is `app` (`local:app:<ms>:1`, an app's ask made here; a
+    /// written one's `written:app:…` too), the voice's otherwise
+    /// (`local:<ms>`).
+    pub fn of(from: &str) -> Self {
+        match from.split(':').nth(1) {
+            Some("app") => Self::App,
+            _ => Self::Voice,
+        }
+    }
+
+    /// As the card says it.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Voice => "voice",
+            Self::App => "app",
+        }
+    }
+}
+
 /// A `SKILL.md`'s name, and the card marked `made: here` (`lamp-cloud`'s
-/// "Made on this lamp" group) with `description` ([`plainly`]'s) in place
-/// of the one written.
-fn card(text: &str, description: &str) -> Result<(String, String), Refused> {
+/// "Made on this lamp" group) and `made_by: <maker>` ([`Maker`]) with
+/// `description` ([`plainly`]'s) in place of the one written. A `made` or
+/// `made_by` line the model wrote is dropped: only the lamp says them.
+fn card(text: &str, description: &str, maker: Maker) -> Result<(String, String), Refused> {
     let unread = || Refused::new("its SKILL.md has no name and description");
     let rest = text.strip_prefix("---\n").ok_or_else(unread)?;
     let (front, body) = rest.split_once("\n---").ok_or_else(unread)?;
@@ -611,13 +649,20 @@ fn card(text: &str, description: &str) -> Result<(String, String), Refused> {
     for line in front.lines() {
         let continued = in_description && line.starts_with([' ', '\t']);
         in_description = continued || line.starts_with("description:");
-        if !in_description && !line.starts_with("made:") {
+        let marker = line
+            .split_once(':')
+            .is_some_and(|(key, _)| matches!(key.trim(), "made" | MADE_BY));
+        if !in_description && !marker {
             kept.push(line);
         }
     }
     let description = format!("description: \"{}\"", description.replace(['"', '\\'], "'"));
     kept.push(&description);
-    let marked = format!("---\n{}\nmade: here\n---{body}", kept.join("\n"));
+    let marked = format!(
+        "---\n{}\nmade: here\n{MADE_BY}: {}\n---{body}",
+        kept.join("\n"),
+        maker.key()
+    );
     Ok((name, marked))
 }
 
@@ -690,7 +735,11 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
         Some(what) => format!("{does} {}", left_out(what)),
         None => does,
     });
-    let (name, marked) = card(&files.card, said.as_deref().unwrap_or_default())?;
+    let (name, marked) = card(
+        &files.card,
+        said.as_deref().unwrap_or_default(),
+        Maker::of(from),
+    )?;
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
     // its check's words.
@@ -1407,35 +1456,62 @@ light = { dim = 1 }
         );
     }
 
-    /// The card's name, `made: here` in its front matter, once, and the
-    /// description given in place of the one written; a card without them,
-    /// or with a name that is not a skill's, is refused.
+    /// The card's name, `made: here` and its maker in its front matter,
+    /// once each, and the description given in place of the one written;
+    /// a card without them, or with a name that is not a skill's, is
+    /// refused. A maker the model wrote is not kept.
     #[test]
-    fn the_card_is_marked_made_here() {
+    fn the_card_is_marked_made_here_and_by_whom() {
         let said = "When the lamp goes quiet, it dims the light a step.";
-        let (name, marked) = card(CARD, said).unwrap();
+        let (name, marked) = card(CARD, said, Maker::Voice).unwrap();
         assert_eq!(name, "evening-dim");
         assert_eq!(marked.matches("made: here").count(), 1);
+        assert_eq!(marked.matches("made_by: voice\n").count(), 1);
         assert!(marked.starts_with("---\nname: evening-dim\n"));
         assert!(marked.ends_with("At ten it dims.\n"));
         assert_eq!(marked.matches("description:").count(), 1);
         assert!(marked.contains(&format!("description: \"{said}\"\n")));
         assert!(!marked.contains("10 pm"));
-        let quoted = card(CARD, "glows \"red\"").unwrap().1;
+        let quoted = card(CARD, "glows \"red\"", Maker::Voice).unwrap().1;
         assert!(quoted.contains("description: \"glows 'red'\"\n"));
-        let again = card(&CARD.replace("name:", "made: there\nname:"), said)
-            .unwrap()
-            .1;
+        let again = card(
+            &CARD.replace("name:", "made: there\nmade_by: voice\nname:"),
+            said,
+            Maker::App,
+        )
+        .unwrap()
+        .1;
         assert_eq!(again.matches("made:").count(), 1);
-        assert!(card("# No front matter\n", said).is_err());
-        assert!(card(&CARD.replace("evening-dim", "Evening Dim"), said).is_err());
+        assert_eq!(again.matches("made_by:").count(), 1);
+        assert!(again.contains("\nmade: here\nmade_by: app\n---"), "{again}");
+        assert!(card("# No front matter\n", said, Maker::Voice).is_err());
         assert!(
             card(
-                &CARD.replace("description: Dims the light a shade at 10 pm.\n", ""),
-                said
+                &CARD.replace("evening-dim", "Evening Dim"),
+                said,
+                Maker::Voice
             )
             .is_err()
         );
+        assert!(
+            card(
+                &CARD.replace("description: Dims the light a shade at 10 pm.\n", ""),
+                said,
+                Maker::Voice
+            )
+            .is_err()
+        );
+    }
+
+    /// The maker is the app's for an app's ask, made here or written there,
+    /// and the voice's for any other.
+    #[test]
+    fn the_maker_is_told_by_where_the_skill_was_made_from() {
+        assert_eq!(Maker::of("local:app:9:1"), Maker::App);
+        assert_eq!(Maker::of("written:app:9:1"), Maker::App);
+        assert_eq!(Maker::of("local:1800000000000"), Maker::Voice);
+        assert_eq!(Maker::of("local:application"), Maker::Voice);
+        assert_eq!(Maker::of("s:1:2"), Maker::Voice);
     }
 
     /// What a made skill does is said from its `skill.toml`, not the
@@ -1600,8 +1676,12 @@ body = { gesture = "nod" }
             "description: Dims the light a shade at 10 pm.\n",
             "description: >\n  Dims the light slowly\n  when you say good night.\nlicense: none\n",
         );
-        let (_, marked) =
-            card(&long, "When the lamp goes quiet, it dims the light a step.").unwrap();
+        let (_, marked) = card(
+            &long,
+            "When the lamp goes quiet, it dims the light a step.",
+            Maker::Voice,
+        )
+        .unwrap();
         assert!(!marked.contains("good night"), "{marked}");
         assert!(!marked.contains("slowly"), "{marked}");
         assert!(marked.contains("license: none\n"), "{marked}");
