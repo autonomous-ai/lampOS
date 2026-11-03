@@ -620,7 +620,7 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   - the cut-in test of a person speaking over one, unchanged.
 
 **Talk over the lamp's own line in a busy room isn't a cut-in
-(`LAMP_OWN_LINE_OVER_TALK=on`, #2602's design; off unless set).**
+(`LAMP_OWN_LINE_OVER_TALK=on`, #2602's design; on in the product since #4933).**
 - **The fault:** on lamp-a63e on 22 Oct a skill's say ended `dropped` as
   `user_interrupted` under office talk. `LAMP_OWN_LINE_KEEPS` keeps an own
   line only until it sounds; once it is audible, talk over it is a cut-in.

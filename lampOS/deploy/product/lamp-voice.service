@@ -175,6 +175,10 @@ Environment=LAMP_SECOND_SAID_ONCE=on
 Environment=LAMP_SECOND_SAY_WITH_CALL=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
+# Talk over the lamp's own line (a say, a reminder, news) in a busy room is let go and the line goes on; its name,
+# a turned face or a tap still stops it (#2602's design, #4933): on lamp-52e6 a talk-over say was spoken 3/3 (3 Nov),
+# dropped 5/5 with it off; name 2/2, face 3/3, quiet room 3/3 still cut it (2 Nov).
+Environment=LAMP_OWN_LINE_OVER_TALK=on
 # A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by
 # LAMP_SECOND_SPEECH_MODEL's eleven_v4_turbo (#2901): the owner's pick at lamp-52e6 on 28 Oct, first sound unchanged.
 Environment=LAMP_SECOND_SPEECH_TAGS=on
