@@ -2123,7 +2123,9 @@ fn publish<T: serde::Serialize>(out: &mut Publisher, value: &T, errors: &mut u64
 
 /// How the production adapter calls Harness: `serve`'s switches for it
 /// (`--harness-as-person`, `--folder-missing`, `--engines-ready`,
-/// `--route`, `--absolute-folder`), each [`CliConfig`]'s field of that name.
+/// `--route`, `--absolute-folder`), each [`CliConfig`]'s field of that
+/// name, and `--new-folder`, which keeps the folders seen in
+/// [`NEW_FOLDER_FILE`] of the tasks folder.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct HarnessSwitches {
     pub as_person: bool,
@@ -2131,7 +2133,12 @@ pub struct HarnessSwitches {
     pub engines_ready: bool,
     pub route: bool,
     pub absolute_folder: bool,
+    pub new_folder: bool,
 }
+
+/// The file in the tasks folder where `serve --new-folder` keeps the
+/// `~/harnesses/<name>` folders seen on each computer.
+pub const NEW_FOLDER_FILE: &str = "folders-seen.json";
 
 /// Production adapter. CLI configuration and environment are inspected only
 /// after the default-off check. Harness owns account/session provisioning.
@@ -2143,6 +2150,9 @@ pub fn serve<C: Clock>(
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
+    let new_folder = switches
+        .new_folder
+        .then(|| config.dir.join(NEW_FOLDER_FILE));
     // Only a program that is not there at all: one there and not fit to
     // run is refused as before.
     let absent = config.set_up_later.is_some()
@@ -2165,6 +2175,7 @@ pub fn serve<C: Clock>(
         cli.engines_ready = switches.engines_ready;
         cli.route = switches.route;
         cli.absolute_folder = switches.absolute_folder;
+        cli.new_folder = new_folder;
         Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
 }
