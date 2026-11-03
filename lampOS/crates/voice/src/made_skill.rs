@@ -88,6 +88,26 @@ pub const BRIEF_HEAD: &str = "Write one lamp skill (lampOS lamp-skills)";
 /// What comes before the person's request in the brief.
 const REQUEST_MARK: &str = "Request: ";
 
+/// What a request for a skill that reads mail or a calendar is told: a made
+/// skill never reaches a linked service, but the person can ask the lamp
+/// itself, and where the link is made.
+pub const NOT_A_SERVICE: &str = "A skill can't read your mail or calendar, but you can just ask \
+     me to read it once it's linked in the app: Skills, then Connectors.";
+/// Words that name a linked service ([`crate::services`]) in a request.
+const SERVICE_WORDS: [&str; 7] = [
+    "mail", "mails", "email", "emails", "gmail", "inbox", "calendar",
+];
+
+/// Whether a request names a linked service, as a whole word (any case;
+/// "e-mail" too), so a skill to make is never asked of the model for one.
+fn names_a_linked_service(request: &str) -> bool {
+    request
+        .to_lowercase()
+        .replace("e-mail", "email")
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|word| SERVICE_WORDS.contains(&word))
+}
+
 /// The brief: the format of a skill a lamp can make, what it may use, and
 /// the person's request, within 1,000 bytes. Nothing of
 /// the conversation but the request: the model passes it, in the person's
@@ -99,6 +119,9 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
     }
     if request.len() > MOST_REQUEST_BYTES {
         return Err("That is too long to ask for as one skill: say it more shortly.");
+    }
+    if names_a_linked_service(&request) {
+        return Err(NOT_A_SERVICE);
     }
     Ok(format!(
         "{BRIEF_HEAD} for the request at the end. Reply with exactly two fenced blocks, \
@@ -1306,6 +1329,25 @@ light = { dim = 1 }
         assert!(brief(&"x".repeat(MOST_REQUEST_BYTES + 1)).is_err());
         assert!(brief("  ").is_err());
         assert!(!is_brief("Write a poem about lamps"));
+    }
+
+    /// A skill asked to read mail or a calendar is never made: the person
+    /// is told a skill can't, that the lamp itself can, and where it is
+    /// linked; a word that only holds one of those is still a skill.
+    #[test]
+    fn a_skill_for_mail_or_a_calendar_points_to_asking_the_lamp() {
+        for request in [
+            "read my mail every morning",
+            "Glow blue when I get an E-mail",
+            "check my Gmail inbox",
+            "nod when my calendar has a meeting",
+        ] {
+            assert_eq!(brief(request), Err(NOT_A_SERVICE), "{request}");
+        }
+        assert!(NOT_A_SERVICE.contains("Connectors"));
+        for request in ["glow warm when the mailman comes", "dim the light at 10 pm"] {
+            assert!(brief(request).is_ok(), "{request}");
+        }
     }
 
     /// The answer's two files, each its own fenced block; another file, one

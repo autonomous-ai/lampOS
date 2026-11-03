@@ -179,10 +179,20 @@ pub struct Services<H, M> {
     pub desk: Desk,
 }
 
+/// What a call to a service not linked is told, after its name: and where
+/// the person links it, so the lamp says the way, not only the lack.
+pub const NOT_LINKED: &str =
+    "isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors.";
+
 /// Gmail's app password as IMAP and SMTP take it: Google shows it in
-/// groups of four with spaces, which are not part of it.
+/// groups of four with spaces, which are not part of it (a phone's copy
+/// may carry them as no-break spaces).
 fn app_password(entry: &Entry) -> String {
-    entry.token().replace(' ', "")
+    entry
+        .token()
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect()
 }
 
 impl<H: Http, M: Mail> Services<H, M> {
@@ -312,7 +322,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         let mut entry = self
             .store
             .load(service.code)
-            .ok_or_else(|| format!("{} isn't linked to this lamp", service.name))?;
+            .ok_or_else(|| format!("{} {NOT_LINKED}", service.name))?;
         let now = crate::now_secs();
         if entry.needs_refresh(now)
             && let Some(backend) = &self.backend
@@ -931,7 +941,10 @@ mod tests {
         let answer = run(services.tool(
             r#"{"op":"call","name":"service_read","args":{"service":"notion","what":"search"}}"#,
         ));
-        assert_eq!(answer["error"], "Notion isn't linked to this lamp");
+        assert_eq!(
+            answer["error"],
+            "Notion isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors."
+        );
         let connected = run(services.tool(r#"{"op":"call","name":"services_connected"}"#));
         assert!(!connected.to_string().contains("planted"));
         assert_eq!(connected["result"]["connected"][0]["service"], "gmail");
