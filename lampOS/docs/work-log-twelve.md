@@ -601,3 +601,11 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - Branch `twelve/cut-in-drop` (`83191ebc68`): with the switch on, a yield with at least 14 `Over` blocks in that window commits on stillness, unless the room is behind the asker or words are pending; the window restarts after each settled yield. Local gate green. Replies to Sixth on #3997 (c6535340790, c6536306120): the fixes compose; 4ace's wordless commit is rule (b).
 - 08:07–08:31 on lamp-c0a4 (9063 + local build, cloud on), off against on, 3 rounds each: stopped 3/3 both, answered 2/3 off and 3/3 on; no late yield in either arm, so no reproduction yet. Next: the question replayed quieter.
 - 08:2x: First moved #4625's 4ACE RUN sheet to me on c0a4 (c6536790085); taken (c6536828724). A local build of `7fa975266f` with `--hello-by-rule`, synthetic faces only.
+
+## 31 Oct to 3 Nov: #4625's sheet, a stop, #4175's privacy P3 landed
+
+- 31 Oct 08:35–10:18: #4625's sheet on lamp-c0a4, with a local build of `7fa975266f` and synthetic faces. At T0 a known face got `say_now` by rule, but "Morning." without the name (`skill_says` `told_who: false`). T0+21: `wait`, `guard=greeted_person`. B wasn't shown cleanly, since my synthetic photos scored close to A. My session then hit its weekly limit, and the lamp stayed on the sheet's drop-ins until 3 Nov.
+- 3 Nov 10:0x: c0a4 put back (welcome-back skill.toml, `/run` drop-ins, `/usr/local/lib/lamp-wb*`), and the lock released. Results posted on #4625 (c6594436839), with the missing name as a P2 for the first builder.
+- #4175, Reviewer-three's privacy P3 on #4534: #5028 (`fdfddb96c4`); a privacy change clears the held-line renewal and the remark marker. Local gate green (lib 4498/0/15). The Reviewer-lead's READ-OK, then NEXT TRAIN. It landed in train 550 as `a722bff422`.
+- 29e7 item 3, a misheard answer to the lamp's own question going silent: plan on #4710 (c6594466329). The first builder's yes adds a `not_for_me` from the person asked (c6594836127). Building `LAMP_ANSWER_ASK_AGAIN` on `twelve/answer-ask-again`.
+- #4705 stays a draft: the first builder's 4ace A/B on 1 Nov caught 2/3 real cut-ins against 1/3, but stopped its own story twice out of two tail tries. It stays off until a guard against the lamp's own tail exists (Sixth's #5032, the duplex echo, is near it).
