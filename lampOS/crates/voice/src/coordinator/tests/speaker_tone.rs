@@ -48,6 +48,7 @@ fn evidence(quiet: u8, capture_db: i16, residual_db: i16) -> EchoEvidence {
         residual_level: Level::from_tenths_of_db(residual_db * 10),
         echo: None,
         silent_at_echo: None,
+        echo_delay_blocks: None,
     }
 }
 

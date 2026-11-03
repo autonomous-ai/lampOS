@@ -118,6 +118,15 @@ pub const TAIL_DROP_TENTHS: u16 = 60;
 /// reviewer-lead's P1 on #5037).
 pub const TAIL_CANCELLED_TENTHS: i16 = 30;
 
+/// Capture blocks past the echo's delay ([`EchoEvidence::echo_delay_blocks`])
+/// for which a render that has gone quiet is still taken to be arriving at
+/// the microphone: 20 ms, the spread of the delay within a session once it
+/// settled, 167 ms to 183 ms on lamp-4ace and 168 ms to 180 ms on lamp-a0ae
+/// (`docs/duplex-listening.md`, what the lamps recorded first). Past the
+/// delay the render at the alignment is silent, and the tail is the
+/// lamp's own by [`TAIL_DROP_TENTHS`] or unjudged.
+pub const ECHO_DELAY_MARGIN_BLOCKS: u8 = 2;
+
 impl Hearing {
     /// Chosen on the development half of two recorded sessions and their
     /// synthetic overlaps; see `docs/duplex-listening.md`. The 300 ms is the
@@ -179,8 +188,23 @@ impl Hearing {
     /// plainly. On lamp-4ace the lamp's own voice, misjudged as a person,
     /// was still 30% to 75% explained by the render; a played "Stop." was
     /// under 10% for twenty blocks.
+    ///
+    /// Nor is a block plain while a render that has just gone quiet is
+    /// still arriving: from its first quiet block until the echo's delay and
+    /// [`ECHO_DELAY_MARGIN_BLOCKS`] have passed, the room still holds the
+    /// lamp's last syllables at a level the render under them has not
+    /// fallen from. On lamp-06c1 at 10:41 (#5032) a yield's eleven blocks
+    /// after it were that, `render_drop` under 3 dB and nothing explained,
+    /// and they committed it with nothing said. Such a block is still
+    /// [`Heard::Over`]: within a reply the render goes quiet between words,
+    /// and a person over that is still counted towards a yield.
     pub fn plain(&self, heard: Heard, evidence: &EchoEvidence) -> bool {
+        let arriving = evidence.render_quiet_blocks > 0
+            && evidence.echo_delay_blocks.is_some_and(|delay| {
+                evidence.render_quiet_blocks <= delay.saturating_add(ECHO_DELAY_MARGIN_BLOCKS)
+            });
         heard == Heard::Over
+            && !arriving
             && evidence
                 .echo
                 .is_some_and(|echo| echo.capture_explained <= self.plain_percent)
@@ -770,6 +794,7 @@ mod tests {
                 render_drop: 0,
             }),
             silent_at_echo: None,
+            echo_delay_blocks: None,
         }
     }
 
@@ -1048,7 +1073,13 @@ mod tests {
     /// Blocks read from their evidence as the voice reads them: each is
     /// (probability, evidence, count), the lamp with reply audio throughout.
     fn hear(blocks: &[(f32, EchoEvidence, usize)]) -> Vec<(usize, Step)> {
-        let mut interruption = Interruption::new(Confirmation::EVALUATED);
+        hear_with(&mut Interruption::new(Confirmation::EVALUATED), blocks)
+    }
+
+    fn hear_with(
+        interruption: &mut Interruption,
+        blocks: &[(f32, EchoEvidence, usize)],
+    ) -> Vec<(usize, Step)> {
         let mut steps = Vec::new();
         let mut index = 0;
         for &(probability, evidence, count) in blocks {
@@ -1140,7 +1171,8 @@ mod tests {
     /// `render_drop`, `capture_level` and `residual_level` letters, 3 dB a
     /// letter down from full scale, read at the letter's middle; a drop of
     /// `c` and on is 6 dB or more. After a late reply's own voice and
-    /// before 45 still blocks.
+    /// before 45 still blocks. The render is quiet from the yield on, its
+    /// echo [`ECHO_TRAIL_DELAY`] blocks behind it.
     fn trail(drops: &str, captures: &str, residuals: &str) -> Vec<(usize, Step)> {
         let mid = |letter: u8| Level::from_tenths_of_db(-(i16::from(letter - b'a') * 30 + 15));
         let mut blocks = vec![(0.9, evidence(0, Some((97, 10))), 130)];
@@ -1149,16 +1181,23 @@ mod tests {
                 .bytes()
                 .zip(captures.bytes())
                 .zip(residuals.bytes())
-                .map(|((drop, capture), residual)| {
+                .enumerate()
+                .map(|(index, ((drop, capture), residual))| {
                     let mut block = dropped(u16::from(drop - b'a') * 30 + 10);
                     block.capture_level = mid(capture);
                     block.residual_level = mid(residual);
+                    block.render_quiet_blocks = (index + 1).saturating_sub(LATE) as u8;
+                    block.echo_delay_blocks = Some(ECHO_TRAIL_DELAY);
                     (0.9, block, 1)
                 }),
         );
         blocks.push((0.1, evidence(30, None), 45));
         hear(&blocks)
     }
+
+    /// lamp-06c1's echo delay at 10:41 (#5032): after the yield the render
+    /// at its alignment held its level for twelve blocks, then was silent.
+    const ECHO_TRAIL_DELAY: u8 = 12;
 
     /// lamp-06c1's zero-word commits (#5032) that a fallen render explains,
     /// each as the drop, microphone and cancelled letters of its ten plain
@@ -1181,17 +1220,80 @@ mod tests {
     }
 
     /// lamp-06c1's 10:41 zero-word commit (#5032): the render never fell
-    /// 3 dB, so `render_drop` cannot tell its tail from a person. Open until
-    /// the echo's delay reaches `EchoEvidence` and the render counts as
-    /// quiet only once its echo has stopped arriving.
+    /// 3 dB, so `render_drop` cannot tell its tail from a person. The blocks
+    /// after the yield come while the render's echo is still arriving, so
+    /// none is plain: the yield's seven are all, and stillness resumes it.
     #[test]
-    #[ignore = "#5032: needs the echo delay in EchoEvidence"]
     fn lamp_06c1s_tail_under_a_level_render_commits_nothing() {
         let steps = trail("aaaaaaaaaa", "kkkjjjjjjj", "llkkkjjjjj");
-        assert!(
-            steps.iter().all(|(_, step)| *step != Step::Commit),
-            "{steps:?}"
+        let yielded = 130 + LATE - 1;
+        assert_eq!(
+            steps,
+            [(yielded, Step::Yield), (yielded + 3 + 40, Step::Resume)]
         );
+    }
+
+    /// A block `quiet` render blocks after the yield, the render's echo
+    /// [`ECHO_TRAIL_DELAY`] behind: while it is arriving the render at the
+    /// alignment holds its level and explains little of a person over it;
+    /// then it has fallen; from 300 ms the room is clear.
+    fn after_yield(probability: f32, quiet: u8) -> (f32, EchoEvidence, usize) {
+        let mut block = if quiet >= HEARING.clear_after_blocks {
+            evidence(quiet, None)
+        } else if quiet <= ECHO_TRAIL_DELAY {
+            dropped(0)
+        } else {
+            dropped(200)
+        };
+        block.render_quiet_blocks = quiet;
+        block.echo_delay_blocks = Some(ECHO_TRAIL_DELAY);
+        (probability, block, 1)
+    }
+
+    /// A "Wait" late in a reply: seven blocks over the sounding lamp, plain,
+    /// make it yield; `after` more of the word follow, then stillness.
+    fn wait(after: u8) -> Vec<(f32, EchoEvidence, usize)> {
+        let mut over = dropped(0);
+        over.echo_delay_blocks = Some(ECHO_TRAIL_DELAY);
+        let mut blocks = vec![(0.9, evidence(0, Some((97, 10))), 130), (0.9, over, LATE)];
+        blocks.extend((1..=after).map(|quiet| after_yield(0.9, quiet)));
+        blocks.extend((after + 1..after + 60).map(|quiet| after_yield(0.1, quiet.min(64))));
+        blocks
+    }
+
+    /// #5032's guard: a "Wait, what?" that goes on into the clear after the
+    /// yield still commits, at its sixth block in the clear.
+    #[test]
+    fn a_wait_that_goes_on_after_the_yield_still_commits() {
+        let yielded = 130 + LATE - 1;
+        assert_eq!(
+            hear(&wait(38)),
+            [(yielded, Step::Yield), (yielded + 35, Step::Commit)]
+        );
+    }
+
+    /// #5032's guard, and its cost: a short "Wait." ending 230 ms after the
+    /// yield never reaches the clear, and its blocks after the yield are
+    /// not plain while the render's echo arrives. Alone, stillness resumes
+    /// it (it committed before #5032: three plain blocks after the yield
+    /// made ten). With its words awaited (`LAMP_STOP_WORDS=heard`), the word
+    /// is not lost: as a stop word it commits at the next block.
+    #[test]
+    fn a_short_wait_right_after_the_yield_is_kept_by_its_words() {
+        let yielded = 130 + LATE - 1;
+        assert_eq!(
+            hear(&wait(23)),
+            [(yielded, Step::Yield), (yielded + 69, Step::Resume)]
+        );
+        let blocks = wait(23);
+        let mut stop = Interruption::new(Confirmation::EVALUATED);
+        let (before, rest) = blocks.split_at(2);
+        assert_eq!(hear_with(&mut stop, before), [(yielded, Step::Yield)]);
+        stop.await_words();
+        let (word, still) = rest.split_at(23 + 10);
+        assert_eq!(hear_with(&mut stop, word), []);
+        stop.words(true, false);
+        assert_eq!(hear_with(&mut stop, &still[..1]), [(0, Step::Commit)]);
     }
 
     #[test]

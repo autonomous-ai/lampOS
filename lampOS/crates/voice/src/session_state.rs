@@ -390,6 +390,7 @@ mod tests {
                 render_drop: 70,
             }),
             silent_at_echo: None,
+            echo_delay_blocks: None,
         }
     }
 
