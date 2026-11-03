@@ -1,10 +1,14 @@
-//! `LAMP_SECOND_CHAT_SECOND_TRY=on` (#4710): a turn's first chat round with
-//! nothing begun [`SECOND_TRY_AFTER`] after the words goes once more on a new
-//! connection, and whichever try begins first answers. The first stays open,
-//! so a slow answer still arrives; the other is dropped the moment one begins,
-//! so no word of it is read. Nothing else changes: the wait's sound, its limit
-//! and the slow line are the turn's own, and a round after a tool, or a look's,
-//! never gets one, since only before anything has run can nothing happen twice.
+//! `LAMP_SECOND_CHAT_SECOND_TRY=on` (#4710): a turn's first chat round with no
+//! response head [`SECOND_TRY_AFTER`] after the words goes once more on a new
+//! connection, and whichever try has the first event answers. A head with no
+//! event yet is a live connection and a slow answer, which is no case for a
+//! second request. The first stays open, so a slow answer still arrives; the
+//! other is dropped at the first event, so no word of it is read. Nothing else
+//! changes: the wait's sound, its limit and the slow line are the turn's own,
+//! and a round after a tool, or a look's, never gets one, since only before
+//! anything has run can nothing happen twice. Nor does one go with too little
+//! of the wait left to answer in ([`SECOND_TRY_ROOM`]), or when the first went
+//! only at its time.
 //!
 //! It is also the test of what a silent chat is. A second try that answers
 //! quickly says the first's kept connection was dead; one that can't open says
@@ -26,10 +30,15 @@ use tokio::time::Instant;
 /// Where the worker reads whether a first round goes twice: `on`, and nothing
 /// else.
 pub const CHAT_SECOND_TRY_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_SECOND_TRY";
-/// How long after the words a first round with nothing begun goes again: on
+/// How long after the words a first round with no response head goes again: on
 /// four lamps on 3 Nov, 5 of 143 first rounds passed 2 s, 1 passed 3 s, the
 /// slowest 3.8 s (Backend's 12:0x on #4710).
 pub const SECOND_TRY_AFTER: Duration = Duration::from_millis(2_500);
+/// How much of the round's wait must be left for a second try to go: a new
+/// connection and a first word need about this, or it only costs a request.
+/// With the wait's sound on the wait is 4.5 s, which leaves 2 s; with it off
+/// the wait is 3 s, which leaves 0.5 s, and none goes.
+pub const SECOND_TRY_ROOM: Duration = Duration::from_millis(1_500);
 
 /// Whether `value` turns [`CHAT_SECOND_TRY_ENVIRONMENT`] on.
 pub fn second_try_on(value: Option<&str>) -> bool {
@@ -106,6 +115,20 @@ impl Say {
     }
 }
 
+/// Why no second try goes at its time, if none should: the first went only then
+/// (`first_late`), so the two would go out together; the first's response head
+/// came, so its connection is alive; or `left` of the round's wait is too little
+/// to answer in. A first that has only been sent is the case the try is for.
+fn why_none(first: &Reach, first_late: bool, left: Duration) -> Option<String> {
+    if first_late {
+        return Some("the first went only then".to_owned());
+    }
+    if first.answer_has_begun() {
+        return Some("the first's answer has begun".to_owned());
+    }
+    (left < SECOND_TRY_ROOM).then(|| format!("only {} ms of the wait left", left.as_millis()))
+}
+
 /// A round's two tries, and the end's line. Dropped with the turn, however it
 /// ends: a second try that went is always told an end.
 pub(super) struct Tries {
@@ -127,6 +150,14 @@ impl Tries {
 
     fn ms(&self) -> u128 {
         self.from.elapsed().as_millis()
+    }
+
+    /// None goes, and `why`. The turn's own lines tell the rest.
+    fn none_goes(&self, why: &str) {
+        self.say.line(&format!(
+            ": none goes, {} ms after the words: {why}",
+            self.ms()
+        ));
     }
 
     fn going(&self, second: Arc<Reach>) {
@@ -219,14 +250,17 @@ impl Drop for Tries {
     }
 }
 
-/// `first`'s events, with one try more by `again` at `at` if none has begun by
-/// then. Whichever begins first is the stream's; the other is dropped there and
-/// then. An error before anything began is the stream's own while it is the
-/// only try; with two it waits for the other, and comes only if that fails too.
+/// `first`'s events, with one try more by `again` at `at` if it has no event and
+/// no response head by then, and enough of the wait is left before `ends`
+/// ([`why_none`]). Whichever has the first event is the stream's; the other is
+/// dropped there and then. An error before any event is the stream's own while
+/// it is the only try; with two it waits for the other, and comes only if that
+/// fails too.
 pub(super) fn race(
     first: Events,
     first_reach: Arc<Reach>,
     at: Instant,
+    ends: Instant,
     from: Instant,
     say: Say,
     again: impl FnOnce(Watch) -> Option<Events> + Send + 'static,
@@ -239,7 +273,7 @@ pub(super) fn race(
         failed: Mutex::new([None, None]),
         over: AtomicBool::new(false),
     });
-    let racing = stream::once(racing(first, at, again, tries.clone()))
+    let racing = stream::once(racing(first, at, ends, again, tries.clone()))
         .flat_map(|(head, rest)| stream::iter(head).chain(rest))
         .boxed();
     (racing, tries)
@@ -248,16 +282,27 @@ pub(super) fn race(
 async fn racing(
     mut first: Events,
     at: Instant,
+    ends: Instant,
     again: impl FnOnce(Watch) -> Option<Events>,
     tries: Arc<Tries>,
 ) -> (Option<net::Result<ChatEvent>>, Events) {
-    tokio::select! {
-        biased;
-        head = first.next() => return (head, first),
-        () = tokio::time::sleep_until(at) => {}
+    let first_late = Instant::now() >= at;
+    if !first_late {
+        tokio::select! {
+            biased;
+            head = first.next() => return (head, first),
+            () = tokio::time::sleep_until(at) => {}
+        }
+    }
+    // Read now, not from `at`: the wait's sound can hold this stream past its
+    // time, and it is what is left now that the try has to answer in.
+    let left = ends.saturating_duration_since(Instant::now());
+    if let Some(why) = why_none(&tries.first, first_late, left) {
+        tries.none_goes(&why);
+        return (first.next().await, first);
     }
     let say = tries.say.clone();
-    let watch = Watch::on_a_new_connection(Arc::new(move |opening| say.opening(opening)));
+    let watch = Watch::second_to(&tries.first, Arc::new(move |opening| say.opening(opening)));
     let reach = watch.reach();
     let Some(mut second) = again(watch) else {
         return (first.next().await, first);
@@ -337,6 +382,65 @@ mod tests {
         assert!(!may_go_twice(false, false, false), "off");
         assert!(!may_go_twice(true, true, false), "a look");
         assert!(!may_go_twice(true, false, true), "something ran");
+    }
+
+    #[test]
+    fn a_try_goes_only_while_the_first_has_no_head_and_the_wait_has_room() {
+        let first = Reach::default();
+        assert_eq!(why_none(&first, false, SECOND_TRY_ROOM), None);
+        assert_eq!(why_none(&first, false, Duration::from_secs(2)), None);
+        assert_eq!(
+            why_none(&first, false, Duration::from_millis(500)).as_deref(),
+            Some("only 500 ms of the wait left")
+        );
+        assert_eq!(
+            why_none(&first, true, Duration::from_secs(2)).as_deref(),
+            Some("the first went only then")
+        );
+    }
+
+    /// Setup took the whole of the time: the first goes only now, and a second
+    /// beside it would say nothing of a silent chat.
+    #[tokio::test(start_paused = true)]
+    async fn a_first_going_after_its_time_has_no_second_try() {
+        async fn run(setup: Duration) -> (bool, Vec<String>) {
+            let from = Instant::now();
+            tokio::time::advance(setup).await;
+            let journal: Arc<Mutex<Vec<String>>> = Arc::default();
+            let asked = Arc::new(AtomicBool::new(false));
+            let asking = asked.clone();
+            let (mut racing, _tries) = race(
+                stream::pending().boxed(),
+                Arc::default(),
+                from + SECOND_TRY_AFTER,
+                from + Duration::from_millis(4_500),
+                from,
+                Say::new(7).keeping(Some(journal.clone())),
+                move |_| {
+                    asking.store(true, Ordering::SeqCst);
+                    None
+                },
+            );
+            assert!(
+                tokio::time::timeout(Duration::from_secs(5), racing.next())
+                    .await
+                    .is_err()
+            );
+            let lines = journal.lock().unwrap().clone();
+            (asked.load(Ordering::SeqCst), lines)
+        }
+        let (asked, lines) = run(Duration::from_millis(2_700)).await;
+        assert!(!asked);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0].contains(
+                "request 7 second try: none goes, 2700 ms after the words: the first went only then"
+            ),
+            "{lines:?}"
+        );
+        let (asked, lines) = run(Duration::from_millis(1_000)).await;
+        assert!(asked, "a first out in time still gets its try");
+        assert!(lines.is_empty(), "{lines:?}");
     }
 
     /// A service's answer decides what the lamp says, whichever try had it.

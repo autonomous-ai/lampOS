@@ -840,6 +840,9 @@ Oct 19 20:31:30 lamp-4ace kernel: something else at 20:31:30
 Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: chat connection: kept, no new one opened for this request; the client's last answer or warm ended 20 s before
 Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: chat connection: new; no answer or warm has ended on this client
 Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try goes 2500 ms after the words, on a new connection; the first stays open, having reached sent, on a kept connection (LAMP_SECOND_CHAT_SECOND_TRY)
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: none goes, 2500 ms after the words: the first's answer has begun
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: none goes, 2500 ms after the words: only 500 ms of the wait left
+Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: none goes, 2700 ms after the words: the first went only then
 Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: its new connection opened in 180 ms
 Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: its new connection could not open, after 12 ms
 Oct 19 20:01:02 lamp-4ace lamp-voice[11]: lamp-voice second: request 7 second try: the first ended 3000 ms after the words (request failed); the second still waits
