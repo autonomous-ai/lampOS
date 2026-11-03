@@ -69,6 +69,15 @@ pub(crate) fn last_opened_for_test() -> u64 {
     LAST_OPENED.with(std::cell::Cell::get)
 }
 
+/// Whether a person's line in hand is an answer the lamp gives: something
+/// of an answer has sounded or come. Before that the second route has not
+/// decided the line was said to the lamp; a room line heard and then held
+/// back as said to nobody is no person's answer and no words of the
+/// lamp's (lamp-75c9, 3 Nov 17:51: such a line refused a computer's turn).
+pub fn answer_decided(had_audio: bool, sounded: bool) -> bool {
+    had_audio || sounded
+}
+
 /// What the lamp is doing as a turn start is read.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct StartNow {
@@ -327,6 +336,14 @@ impl ControlTurns {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_person_line_is_an_answer_in_hand_only_once_something_of_it_came() {
+        // Heard and still judged, or held back as said to nobody.
+        assert!(!answer_decided(false, false));
+        assert!(answer_decided(true, false));
+        assert!(answer_decided(false, true));
+    }
     use crate::say::ticket_for_test;
 
     const S: u64 = 1_000_000;
