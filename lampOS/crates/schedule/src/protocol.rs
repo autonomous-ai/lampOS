@@ -24,9 +24,11 @@ pub struct Guard {
 /// Who a voice line is, for whose reminders it hears and may change
 /// (Reviewer-three's after-merge P2 on #4527, the first builder's (a)): a
 /// reminder set by a person is theirs alone; one set with nobody sure (before
-/// this, or by an unknown face or the room) is the owner's line's only, as
-/// the typed setup name is (#4476). A request without one, the app's and the
-/// due reminder's own reads, sees every item, as before.
+/// this, or by an unknown face or the room) is the room's, heard and changed
+/// on every line (the first builder on #4710, 3 Nov 10:09: a guest, or an
+/// owner whose face never matches, set one and could not stop it). A request
+/// without one, the app's and the due reminder's own reads, sees every item,
+/// as before.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Asker {
@@ -40,12 +42,10 @@ pub struct Asker {
 }
 
 impl Asker {
-    /// Whether this line hears of, and may change, a reminder `set_by`.
+    /// Whether this line hears of, and may change, a reminder `set_by`: a
+    /// person's only on their own line, the room's (set by no one) on all.
     pub fn may_see(&self, set_by: Option<&str>) -> bool {
-        match set_by {
-            Some(person) => self.person.as_deref() == Some(person),
-            None => self.owner,
-        }
+        set_by.is_none_or(|person| self.person.as_deref() == Some(person))
     }
 }
 
