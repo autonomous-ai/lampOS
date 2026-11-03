@@ -175,6 +175,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let me = Identity {
@@ -283,6 +284,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let me = Identity {
@@ -437,6 +439,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let me = Identity {
@@ -556,6 +559,7 @@ fn face_remove_entirely_cancels_the_persons_reminders() {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let removed = answer(&mut real, "face.remove", &json!({"name": "Lan"}))
@@ -610,6 +614,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let me = Identity {
@@ -792,6 +797,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let me = Identity {
@@ -862,6 +868,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let me = Identity {
@@ -960,6 +967,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let me = Identity {
@@ -1048,6 +1056,7 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     let said = |real: &mut Real, kind: &str| answer(real, kind, &Value::Null).unwrap().unwrap();

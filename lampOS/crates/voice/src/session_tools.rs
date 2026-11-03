@@ -188,6 +188,13 @@ impl Watch {
                     .into_iter()
                     .map(|folder| folder.join(CATALOG_FILE)),
             )
+            // The connected services' folder too ([`crate::services`]).
+            .chain(
+                settings
+                    .services
+                    .iter()
+                    .map(|folder| folder.join(CATALOG_FILE)),
+            )
             .collect();
         if files.is_empty() {
             return None;

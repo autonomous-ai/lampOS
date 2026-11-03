@@ -1,0 +1,675 @@
+//! Writes, in two phases. A `service_write` without a `send_id` checks what
+//! was asked, keeps it in memory for two minutes and answers with its full
+//! read-back (the target, every recipient, who can see it, the whole text)
+//! and a random `send_id`; nothing is sent. The same `send_id` with
+//! `"said":"send"` sends exactly that write, once. Anything else, a second
+//! try or a late one, sends nothing. Off unless `LAMP_SERVICES_WRITE=on`.
+use crate::catalog::{self, FACEBOOK_VERSION, Method};
+use crate::mail::{self, Outgoing};
+use crate::reads::{self, page_id};
+use crate::store::Entry;
+use serde_json::{Value, json};
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
+
+/// How long a write waits for its "send".
+pub const HOLD: Duration = Duration::from_secs(120);
+/// The longest text a write carries, in characters.
+pub const TEXT_MOST: usize = 3_000;
+/// The longest subject or title.
+pub const TITLE_MOST: usize = 200;
+/// The most recipients one mail has.
+pub const RECIPIENTS_MOST: usize = 20;
+
+/// What a confirmed write does.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Action {
+    /// A mail through Gmail's SMTP.
+    Mail(Outgoing),
+    /// One HTTP call on the service's write list, before its token.
+    Http {
+        method: Method,
+        url: String,
+        body: Value,
+    },
+    /// One write tool of an MCP service, called with these arguments.
+    Mcp { tool: String, arguments: Value },
+}
+
+/// A write checked and read back, waiting for its "send".
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Pending {
+    pub service: &'static str,
+    pub action: Action,
+    pub read_back: String,
+}
+
+/// What each service writes, by `action`, for the tools' description.
+pub const ACTIONS: &[(&str, &str)] = &[
+    ("gmail", "send_mail {to, cc, subject, text}"),
+    (
+        "google_calendar",
+        "create_event {title, start, end, calendar, attendees, text}",
+    ),
+    (
+        "github",
+        "create_issue {repo, title, text}, comment {repo, number, text}",
+    ),
+    ("linear", "create_issue {team_id, title, text}"),
+    ("notion", "append_text {id, text}"),
+    ("asana", "create_task {project | workspace, title, text}"),
+    ("figma", "comment {id, text}"),
+    ("figma-api", "comment {id, text}"),
+    ("facebook", "page_post {text}"),
+];
+
+/// What an MCP service writes, for the tools' description.
+pub const MCP_ACTIONS: &str = "call {tool, arguments}";
+
+/// An MCP service's write, checked and read back: `tool` is the service's
+/// own listing of it, which is a write (`mcp::is_read` false).
+pub fn prepare_mcp(
+    service: &'static catalog::Service,
+    entry: &Entry,
+    tool: &Value,
+    arguments: Value,
+) -> Result<Pending, String> {
+    let name = tool
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or("the tool has no name")?;
+    if crate::mcp::is_read(service.code, tool) {
+        return Err(format!(
+            "{name} only reads: use service_read with what \"call\""
+        ));
+    }
+    Ok(Pending {
+        service: service.code,
+        read_back: crate::mcp::read_back(service, entry, tool, &arguments),
+        action: Action::Mcp {
+            tool: name.to_owned(),
+            arguments,
+        },
+    })
+}
+
+fn text<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
+    args.get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+}
+
+/// A text the person said, whole: bounded, its line breaks kept.
+fn body<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+    let body = text(args, key).ok_or_else(|| format!("the write needs its {key}"))?;
+    if body.chars().count() > TEXT_MOST
+        || body
+            .chars()
+            .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
+        return Err(format!("{key} is at most {TEXT_MOST} characters"));
+    }
+    Ok(body)
+}
+
+/// A one-line title or subject.
+fn title<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+    let title = text(args, key).ok_or_else(|| format!("the write needs its {key}"))?;
+    if title.chars().count() > TITLE_MOST || title.chars().any(char::is_control) {
+        return Err(format!(
+            "{key} is one line of at most {TITLE_MOST} characters"
+        ));
+    }
+    Ok(title)
+}
+
+/// An id that goes in a path.
+fn id<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+    let id = text(args, key).ok_or_else(|| format!("the write needs its {key}"))?;
+    if id.len() > 256 || id.chars().any(|c| c.is_control() || "/\\?#".contains(c)) {
+        return Err(format!("{key} is not an id"));
+    }
+    Ok(id)
+}
+
+/// Addresses given as a list or one comma-separated text, each checked.
+fn addresses(args: &Value, key: &str) -> Result<Vec<String>, String> {
+    let given: Vec<String> = match args.get(key) {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::String(text)) => text
+            .split(',')
+            .map(|one| one.trim().to_owned())
+            .filter(|one| !one.is_empty())
+            .collect(),
+        Some(Value::Array(list)) => list
+            .iter()
+            .map(|one| one.as_str().map(|one| one.trim().to_owned()))
+            .collect::<Option<_>>()
+            .ok_or_else(|| format!("{key} is a list of email addresses"))?,
+        Some(_) => return Err(format!("{key} is a list of email addresses")),
+    };
+    if let Some(bad) = given.iter().find(|one| !mail::address_ok(one)) {
+        return Err(format!("{bad:?} is not an email address"));
+    }
+    Ok(given)
+}
+
+fn time<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+    let time = text(args, key).ok_or_else(|| format!("the event needs its {key}"))?;
+    if time.len() > 40
+        || !time
+            .chars()
+            .all(|c| c.is_ascii_digit() || "TZ:+-.".contains(c))
+    {
+        return Err(format!("{key} is a time like 2026-11-03T09:00:00+07:00"));
+    }
+    Ok(time)
+}
+
+fn base(code: &str) -> Result<&'static str, String> {
+    catalog::service(code)
+        .and_then(|service| service.api)
+        .ok_or_else(|| "the lamp doesn't write to that service".into())
+}
+
+fn http(
+    code: &'static str,
+    method: Method,
+    segments: &[&str],
+    query: &[(&str, String)],
+    body: Value,
+    read_back: String,
+) -> Result<Pending, String> {
+    Ok(Pending {
+        service: code,
+        action: Action::Http {
+            method,
+            url: reads::url(base(code)?, segments, query)?,
+            body,
+        },
+        read_back,
+    })
+}
+
+/// A write checked and read back, or why not. `entry` is the linked
+/// account it is made as.
+pub fn prepare(code: &str, args: &Value, entry: &Entry) -> Result<Pending, String> {
+    let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
+    let code = service.code;
+    let action = text(args, "action").ok_or("the write needs its action")?;
+    if service.mcp.is_some() {
+        // Its tool is checked against the service's own list first.
+        return Err(format!("{code} writes: {MCP_ACTIONS}"));
+    }
+    match (code, action) {
+        ("gmail", "send_mail") => {
+            let to = addresses(args, "to")?;
+            let cc = addresses(args, "cc")?;
+            if to.is_empty() {
+                return Err("the mail needs at least one address in to".into());
+            }
+            if to.len() + cc.len() > RECIPIENTS_MOST {
+                return Err(format!("a mail goes to at most {RECIPIENTS_MOST} people"));
+            }
+            let subject = title(args, "subject")?;
+            let text = body(args, "text")?;
+            let copy = if cc.is_empty() {
+                String::new()
+            } else {
+                format!(", with a copy to {}", cc.join(", "))
+            };
+            Ok(Pending {
+                service: code,
+                read_back: format!(
+                    "Send an email from {} to {}{copy}. Subject: \"{subject}\". It says: \"{text}\". Only the people named get it.",
+                    entry.account(),
+                    to.join(", ")
+                ),
+                action: Action::Mail(Outgoing {
+                    to,
+                    cc,
+                    subject: subject.to_owned(),
+                    text: text.to_owned(),
+                }),
+            })
+        }
+        ("google_calendar", "create_event") => {
+            let calendar = text(args, "calendar").unwrap_or("primary");
+            if calendar.len() > 256 || calendar.contains(['/', '\\']) {
+                return Err("calendar is a calendar's id".into());
+            }
+            let name = title(args, "title")?;
+            let (start, end) = (time(args, "start")?, time(args, "end")?);
+            let attendees = addresses(args, "attendees")?;
+            if attendees.len() > RECIPIENTS_MOST {
+                return Err(format!("an event invites at most {RECIPIENTS_MOST} people"));
+            }
+            let notes = match text(args, "text") {
+                Some(_) => Some(body(args, "text")?),
+                None => None,
+            };
+            let mut event = json!({
+                "summary": name,
+                "start": {"dateTime": start},
+                "end": {"dateTime": end},
+            });
+            if let Some(notes) = notes {
+                event["description"] = json!(notes);
+            }
+            let mut query = Vec::new();
+            let mut invited = String::new();
+            if !attendees.is_empty() {
+                event["attendees"] = json!(
+                    attendees
+                        .iter()
+                        .map(|email| json!({"email": email}))
+                        .collect::<Vec<_>>()
+                );
+                query.push(("sendUpdates", "all".to_owned()));
+                invited = format!(
+                    ", inviting {} (each gets an invitation by email)",
+                    attendees.join(", ")
+                );
+            }
+            let noted = notes.map_or(String::new(), |notes| format!(" Notes: \"{notes}\"."));
+            http(
+                code,
+                Method::Post,
+                &["calendar", "v3", "calendars", calendar, "events"],
+                &query,
+                event,
+                format!(
+                    "Add an event to your Google Calendar ({calendar}): \"{name}\", from {start} to {end}{invited}.{noted} Seen by whoever your calendar is shared with{}.",
+                    if attendees.is_empty() {
+                        ""
+                    } else {
+                        " and the people invited"
+                    }
+                ),
+            )
+        }
+        ("github", "create_issue") => {
+            let (owner, name) = repo(args)?;
+            let (heading, text) = (title(args, "title")?, body(args, "text")?);
+            http(
+                code,
+                Method::Post,
+                &["repos", owner, name, "issues"],
+                &[],
+                json!({"title": heading, "body": text}),
+                format!(
+                    "Open a GitHub issue in {owner}/{name} titled \"{heading}\", saying: \"{text}\". Everyone who can see {owner}/{name} sees it; anyone at all if it is public."
+                ),
+            )
+        }
+        ("github", "comment") => {
+            let (owner, name) = repo(args)?;
+            let number = args
+                .get("number")
+                .and_then(Value::as_u64)
+                .filter(|number| *number > 0)
+                .ok_or("the comment needs the issue's number")?
+                .to_string();
+            let text = body(args, "text")?;
+            http(
+                code,
+                Method::Post,
+                &["repos", owner, name, "issues", &number, "comments"],
+                &[],
+                json!({"body": text}),
+                format!(
+                    "Comment on GitHub issue {owner}/{name}#{number}: \"{text}\". Everyone who can see {owner}/{name} sees it; anyone at all if it is public."
+                ),
+            )
+        }
+        ("linear", "create_issue") => {
+            let team = id(args, "team_id")?;
+            let (heading, text) = (title(args, "title")?, body(args, "text")?);
+            http(
+                code,
+                Method::Post,
+                &["graphql"],
+                &[],
+                json!({
+                    "query": "mutation($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier url } } }",
+                    "variables": {"input": {"teamId": team, "title": heading, "description": text}},
+                }),
+                format!(
+                    "Create a Linear issue in team {team} titled \"{heading}\", saying: \"{text}\". Your Linear workspace's members see it."
+                ),
+            )
+        }
+        ("notion", "append_text") => {
+            let page = id(args, "id")?;
+            let text = body(args, "text")?;
+            http(
+                code,
+                Method::Patch,
+                &["v1", "blocks", page, "children"],
+                &[],
+                json!({"children": [{
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": text}}]},
+                }]}),
+                format!(
+                    "Add to the Notion page {page}: \"{text}\". Whoever the page is shared with sees it; anyone at all if it is published."
+                ),
+            )
+        }
+        ("asana", "create_task") => {
+            let (heading, text) = (title(args, "title")?, body(args, "text")?);
+            let (data, place) = match args.get("project").and_then(Value::as_str) {
+                Some(_) => {
+                    let project = id(args, "project")?;
+                    (
+                        json!({"name": heading, "notes": text, "projects": [project]}),
+                        format!("project {project}"),
+                    )
+                }
+                None => {
+                    let workspace = id(args, "workspace")?;
+                    (
+                        json!({"name": heading, "notes": text, "workspace": workspace, "assignee": "me"}),
+                        format!("workspace {workspace}, assigned to you"),
+                    )
+                }
+            };
+            http(
+                code,
+                Method::Post,
+                &["api", "1.0", "tasks"],
+                &[],
+                json!({"data": data}),
+                format!(
+                    "Create an Asana task in {place} named \"{heading}\", with the notes: \"{text}\". Whoever shares that project or workspace sees it."
+                ),
+            )
+        }
+        ("figma" | "figma-api", "comment") => {
+            let file = id(args, "id")?;
+            let text = body(args, "text")?;
+            http(
+                code,
+                Method::Post,
+                &["v1", "files", file, "comments"],
+                &[],
+                json!({"message": text}),
+                format!(
+                    "Comment on the Figma file {file}: \"{text}\". Everyone with access to the file sees it."
+                ),
+            )
+        }
+        ("facebook", "page_post") => {
+            let page = page_id(entry);
+            if page == "me" {
+                return Err("the Facebook link names no Page".into());
+            }
+            let text = body(args, "text")?;
+            http(
+                code,
+                Method::Post,
+                &[FACEBOOK_VERSION, page, "feed"],
+                &[],
+                json!({"message": text}),
+                format!(
+                    "Post publicly on your Facebook Page {page}: \"{text}\". Anyone on Facebook can see it."
+                ),
+            )
+        }
+        _ => {
+            let actions = ACTIONS
+                .iter()
+                .find(|(service, _)| *service == code)
+                .map(|(_, actions)| *actions);
+            Err(match actions {
+                Some(actions) => format!("{code} writes: {actions}"),
+                None => format!("the lamp only reads {}", service.name),
+            })
+        }
+    }
+}
+
+fn repo(args: &Value) -> Result<(&str, &str), String> {
+    let repo = text(args, "repo").ok_or("the write needs its repo")?;
+    repo.split_once('/')
+        .filter(|(owner, name)| {
+            [owner, name].iter().all(|part| {
+                !part.is_empty()
+                    && part.len() <= 100
+                    && part
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+                    && **part != "."
+                    && **part != ".."
+            })
+        })
+        .ok_or_else(|| "repo is owner/name".into())
+}
+
+/// A random id: 16 bytes from the system's generator, as hex.
+pub fn random_id() -> String {
+    use ring::rand::SecureRandom;
+    let mut bytes = [0u8; 16];
+    // The system generator failing leaves zeros; the id is then still
+    // single-use and short-lived.
+    let _ = ring::rand::SystemRandom::new().fill(&mut bytes);
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// The one write waiting for its "send", with its id and when it was made.
+#[derive(Debug)]
+struct Held {
+    id: String,
+    pending: Pending,
+    made: Instant,
+}
+
+/// Where a write waits. One at a time: a new one replaces the one before.
+#[derive(Debug, Default)]
+pub struct Desk(Mutex<Option<Held>>);
+
+impl Desk {
+    /// Hold `pending` from `now`; its `send_id`.
+    pub fn hold(&self, pending: Pending, now: Instant) -> String {
+        let id = random_id();
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(Held {
+            id: id.clone(),
+            pending,
+            made: now,
+        });
+        id
+    }
+
+    /// The write `id` names, if it is the one waiting and still within
+    /// [`HOLD`] at `now`. Whatever is waiting is gone after: a write is
+    /// sent once, and a wrong or late id cancels it.
+    pub fn take(&self, id: &str, now: Instant) -> Option<Pending> {
+        let held = self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()?;
+        (held.id == id && now.saturating_duration_since(held.made) <= HOLD).then_some(held.pending)
+    }
+
+    /// Drop what is waiting: for `code` alone, or with `None` anything.
+    pub fn forget(&self, code: Option<&str>) {
+        let mut held = self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if code.is_none_or(|code| {
+            held.as_ref()
+                .is_some_and(|held| held.pending.service == code)
+        }) {
+            *held = None;
+        }
+    }
+
+    /// Whether a write is waiting.
+    pub fn waiting(&self) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gmail() -> Entry {
+        Entry::from_set(
+            "gmail",
+            &json!({"auth_type":"pat","api_key":"pw","credentials":{"email":"me@home.test"}}),
+            0,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_read_back_says_every_recipient_and_the_whole_text() {
+        let args = json!({
+            "action": "send_mail",
+            "to": ["mom@home.test", "dad@home.test"],
+            "cc": "sis@home.test",
+            "subject": "Dinner",
+            "text": "Home by 7.\nLove",
+        });
+        let pending = prepare("gmail", &args, &gmail()).unwrap();
+        for part in [
+            "me@home.test",
+            "mom@home.test, dad@home.test",
+            "sis@home.test",
+            "\"Dinner\"",
+            "Home by 7.\nLove",
+            "Only the people named",
+        ] {
+            assert!(pending.read_back.contains(part), "{part}");
+        }
+        let post = prepare(
+            "facebook",
+            &json!({"action":"page_post","text":"Open today"}),
+            &Entry {
+                credentials: [("page_id".to_owned(), "42".to_owned())].into(),
+                ..Entry::default()
+            },
+        )
+        .unwrap();
+        assert!(post.read_back.contains("publicly"));
+        let Action::Http { method, url, .. } = &post.action else {
+            panic!("http");
+        };
+        let (_, path) = crate::net::split(url).unwrap();
+        assert!(catalog::write_allowed("facebook", *method, &path));
+        // Each service's write lands on its own write list.
+        for (code, args) in [
+            (
+                "github",
+                json!({"action":"create_issue","repo":"o/r","title":"T","text":"B"}),
+            ),
+            (
+                "github",
+                json!({"action":"comment","repo":"o/r","number":4,"text":"B"}),
+            ),
+            (
+                "linear",
+                json!({"action":"create_issue","team_id":"t","title":"T","text":"B"}),
+            ),
+            (
+                "notion",
+                json!({"action":"append_text","id":"p","text":"B"}),
+            ),
+            (
+                "asana",
+                json!({"action":"create_task","workspace":"1","title":"T","text":"B"}),
+            ),
+            ("figma", json!({"action":"comment","id":"k","text":"B"})),
+            (
+                "google_calendar",
+                json!({"action":"create_event","title":"T","start":"2026-11-03T09:00:00Z","end":"2026-11-03T10:00:00Z","attendees":["a@b.co"]}),
+            ),
+        ] {
+            let pending = prepare(code, &args, &Entry::default()).unwrap();
+            let Action::Http { method, url, .. } = &pending.action else {
+                panic!("http");
+            };
+            let (host, path) = crate::net::split(url).unwrap();
+            assert!(catalog::host_allowed(code, &host), "{code}");
+            assert!(
+                catalog::write_allowed(code, *method, &path),
+                "{code} {path}"
+            );
+        }
+        for (code, args) in [
+            (
+                "gmail",
+                json!({"action":"send_mail","to":"not an address","subject":"s","text":"t"}),
+            ),
+            (
+                "gmail",
+                json!({"action":"send_mail","to":"a@b.co","subject":"s\r\nBcc: x@y.z","text":"t"}),
+            ),
+            (
+                "gmail",
+                json!({"action":"send_mail","to":"a@b.co\r\nRCPT TO:<x@y.z>","subject":"s","text":"t"}),
+            ),
+            ("google_drive", json!({"action":"delete","id":"x"})),
+            ("ahrefs", json!({"action":"anything"})),
+            (
+                "github",
+                json!({"action":"create_issue","repo":"../x","title":"T","text":"B"}),
+            ),
+            ("facebook", json!({"action":"page_post","text":"no page"})),
+        ] {
+            assert!(prepare(code, &args, &gmail()).is_err(), "{code} {args}");
+        }
+    }
+
+    #[test]
+    fn a_write_is_sent_once_within_two_minutes() {
+        let pending = prepare(
+            "gmail",
+            &json!({"action":"send_mail","to":"a@b.co","subject":"s","text":"t"}),
+            &gmail(),
+        )
+        .unwrap();
+        let desk = Desk::default();
+        let start = Instant::now();
+        let id = desk.hold(pending.clone(), start);
+        assert_eq!(id.len(), 32);
+        assert_eq!(
+            desk.take(&id, start + Duration::from_secs(5)),
+            Some(pending.clone())
+        );
+        // Once only.
+        assert_eq!(desk.take(&id, start + Duration::from_secs(6)), None);
+        // Late: gone.
+        let id = desk.hold(pending.clone(), start);
+        assert_eq!(desk.take(&id, start + HOLD + Duration::from_secs(1)), None);
+        // A wrong id cancels the one waiting.
+        let id = desk.hold(pending.clone(), start);
+        assert_eq!(desk.take("guess", start), None);
+        assert_eq!(desk.take(&id, start), None);
+        // A new write replaces the one before.
+        let first = desk.hold(pending.clone(), start);
+        let second = desk.hold(pending.clone(), start);
+        assert_ne!(first, second);
+        assert_eq!(desk.take(&first, start), None);
+        assert!(!desk.waiting());
+        // Removing a service forgets its write.
+        desk.hold(pending.clone(), start);
+        desk.forget(Some("github"));
+        assert!(desk.waiting());
+        desk.forget(Some("gmail"));
+        assert!(!desk.waiting());
+    }
+}

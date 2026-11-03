@@ -1150,6 +1150,17 @@ impl Thread {
         Some((lamp, now.saturating_duration_since(exchange.at)))
     }
 
+    /// The request of the newest exchange with the lamp's words, `request`'s
+    /// own left out: the lamp's turn just before it ([`crate::services`]).
+    pub fn answered_request_but(&self, request: u64) -> Option<u64> {
+        self.exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .map(|exchange| exchange.request)
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR

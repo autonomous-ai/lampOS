@@ -174,6 +174,12 @@ pub trait Lamp {
         None
     }
 
+    /// The person's own services linked from the app (`LAMP_SERVICES=on`,
+    /// Queue #4710, `crate::services`): there only with the switch.
+    fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
+        None
+    }
+
     /// Whether the app may read the lamp's software update
     /// (`LAMP_APP_UPDATE=on`, #2194, `crate::update`).
     fn update_page(&self) -> bool {
@@ -228,7 +234,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 46] = [
+pub const KINDS: [(&str, Switch); 48] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -279,6 +285,11 @@ pub const KINDS: [(&str, Switch); 46] = [
     ("update.check", |lamp| lamp.update_page()),
     ("system.reboot", |lamp| lamp.restarts()),
     ("system.shutdown", |lamp| lamp.shuts_down()),
+    // The person's own services (Queue #4710): `services` says
+    // `connector.set.<code>` and `connector.remove.<code>` are taken, and
+    // both rows wait for lamp-services' admin socket as well.
+    (crate::services::CAN, SERVICES),
+    (crate::services::LIST_KIND, SERVICES),
 ];
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
@@ -289,6 +300,8 @@ const SHARE: Switch = |lamp| lamp.skills().is_some() && lamp.share().is_some();
 const KEYS: Switch = |lamp| lamp.changes().is_some_and(|c| c.keys_on());
 const SETTINGS: Switch = |lamp| lamp.changes().is_some();
 const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
+/// The switch, and lamp-services there to ask.
+const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
 
 /// Whether this lamp answers `kind` now, by its row in [`KINDS`]: the one
 /// rule [`answer`] and `system.info`'s `can` both read (#2864), so the app
@@ -573,6 +586,19 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The lamp turned off from the app (#3697): asked of the same helper,
         // which answers first and runs `lamp-setup shutdown`; never here.
         "system.shutdown" if on(lamp, kind) => lamp.shut_down().map(Some),
+        // A service linked or unlinked from the app (Queue #4710): taken on
+        // the switch alone, answered `starting` now and its result later
+        // (`crate::services`); a set's connector is fetched from the backend,
+        // never carried here.
+        kind if crate::services::connector_kind(kind).is_some() && lamp.services().is_some() => {
+            let services = lamp.services().ok_or_else(|| not_here(kind))?;
+            services.start(kind)?;
+            Ok(None)
+        }
+        crate::services::LIST_KIND if lamp.services().is_some() => {
+            let services = lamp.services().ok_or_else(|| not_here(kind))?;
+            services.list().map(Some)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -634,6 +660,8 @@ pub mod tests {
         pub recovery: bool,
         /// What `reset` says (#2937).
         pub reset: Option<&'static str>,
+        /// The person's own services (Queue #4710), with their switch.
+        pub services: Option<std::sync::Arc<crate::services::Services>>,
     }
 
     impl Lamp for Fake {
@@ -730,6 +758,9 @@ pub mod tests {
         }
         fn update_page(&self) -> bool {
             self.update_page
+        }
+        fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
+            self.services.clone()
         }
         fn update_status(&self) -> Option<lamp_bus::Message> {
             self.update_bus
@@ -1275,6 +1306,17 @@ pub mod tests {
             ),
             ("restart", |f| f.restart = true, &["system.reboot"]),
             ("shutdown", |f| f.shutdown = true, &["system.shutdown"]),
+            (
+                // lamp-services' socket there: a folder that is.
+                "services",
+                |f| {
+                    f.services = Some(crate::services::tests::services(
+                        std::env::temp_dir(),
+                        Err("never fetched".into()),
+                    ))
+                },
+                &["services", "services.list"],
+            ),
         ];
         let always = [
             "system.info",

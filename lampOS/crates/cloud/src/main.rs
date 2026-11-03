@@ -178,6 +178,12 @@ fn main() -> ExitCode {
         )
     });
     let telling = login.as_ref().map(|login| (login.watch(), bus.clone()));
+    // The person's own services from the app (Queue #4710): only with
+    // LAMP_SERVICES=on; every token wiped once the lamp is signed out.
+    let services = lamp_cloud::services::Services::product(&account, &key);
+    let wiping = services
+        .clone()
+        .zip(login.as_ref().map(|login| login.watch()));
     let alerts_bus = bus.clone();
     let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     // A made skill sent to the Skills Store (fourteen-P13): only with
@@ -232,6 +238,7 @@ fn main() -> ExitCode {
             .then(lamp_cloud::make_skill::from_environment)
             .flatten(),
         share,
+        services,
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -280,6 +287,7 @@ fn main() -> ExitCode {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     runtime.block_on(async move {
@@ -334,8 +342,19 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
+        let mut said_wipes = |line: &str| say(line);
+        let wiping = async move {
+            match wiping {
+                Some((services, since)) => {
+                    lamp_cloud::services::wipe_when_signed_out(since, services, &mut said_wipes)
+                        .await
+                }
+                None => std::future::pending().await,
+            }
+        };
         tokio::select! {
             () = alerting => {}
+            () = wiping => {}
             () = pinging => {}
             () = staying => {}
             () = looks => {}

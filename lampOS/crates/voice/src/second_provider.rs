@@ -9541,19 +9541,46 @@ async fn run_tool(
         );
         return serde_json::json!({ "error": HELD_MEMORY_CALL });
     }
-    match (&shared.scoped_tools, scope) {
-        (Some(run), Some(scope)) => {
-            run(
-                request,
-                heard,
-                call.name.clone(),
-                call.args.clone(),
-                scope.clone(),
-            )
-            .await
+    let running = async {
+        match (&shared.scoped_tools, scope) {
+            (Some(run), Some(scope)) => {
+                run(
+                    request,
+                    heard,
+                    call.name.clone(),
+                    call.args.clone(),
+                    scope.clone(),
+                )
+                .await
+            }
+            (Some(_), None) => crate::tools::unavailable(),
+            (None, _) => (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await,
         }
-        (Some(_), None) => crate::tools::unavailable(),
-        (None, _) => (shared.tools)(request, heard, call.name.clone(), call.args.clone()).await,
+    };
+    // A connected service can take seconds to answer (a mail box, a web
+    // service): past the wait sound's time the person hears it, as for a
+    // slow chat, never a silence (`crate::services::DEADLINE`).
+    let cues = shared
+        .cues
+        .as_ref()
+        .filter(|_| heard && crate::services::is_tool(&call.name));
+    let Some(cues) = cues else {
+        return running.await;
+    };
+    tokio::pin!(running);
+    match tokio::time::timeout(shared.cue_after, &mut running).await {
+        Ok(told) => told,
+        Err(_) => {
+            if let Some(clip) = cues.next() {
+                eprintln!(
+                    "lamp-voice second: request {request} made a sound while {} had not answered",
+                    call.name
+                );
+                // A turn gone is told by the run's own answer below.
+                let _ = cue(shared, request, clip).await;
+            }
+            running.await
+        }
     }
 }
 
