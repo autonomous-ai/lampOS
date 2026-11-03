@@ -560,6 +560,19 @@ pub(crate) const NO_WORDS_AGAIN_NOTE: &str = "(For you to know: they called you 
 /// silence after its name.
 pub(crate) const NO_WORDS_LINE: &str = "Sorry, I lost my words there. Could you ask me again?";
 
+/// Where the worker reads whether a spoken line that answers the lamp's own
+/// question ([`Engine::answering_the_lamp`]), answered with no words and no
+/// call, is said [`ANSWER_AGAIN_LINE`] rather than left in silence
+/// ([`Engine::asking_again_for_answers`]): `on`, and nothing else. On
+/// lamp-29e7 on 30 Oct 18:34 "Thin Place." after the lamp asked a colour got
+/// an empty answer, and the lamp said nothing for 150 s (Queue #4710,
+/// item 3).
+pub const ANSWER_ASK_AGAIN_ENVIRONMENT: &str = "LAMP_ANSWER_ASK_AGAIN";
+
+/// What the lamp says when its own question's answer gets no words and no
+/// call ([`ANSWER_ASK_AGAIN_ENVIRONMENT`]): once, never twice in a row.
+pub(crate) const ANSWER_AGAIN_LINE: &str = "Sorry, could you say that again?";
+
 /// What a turn of short answers is said when its calls' own lines differ
 /// ("Brighter." with "Quieter."): one line, never two (#2877).
 pub(crate) const SHORT_DONE_TOGETHER: &str = "Done.";
@@ -1328,6 +1341,12 @@ struct Shared {
     say_at_once: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
+    /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
+    answer_again: bool,
+    /// Whether a request was judged said by the person the lamp asked:
+    /// their voice, or a face turned to the lamp
+    /// ([`Engine::answering_the_asked_person`]).
+    asked_person: Option<Busy>,
     /// The lamp's own written turns may begin as late as
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
@@ -3146,6 +3165,8 @@ impl Engine {
                 checking_line: false,
                 say_at_once: false,
                 no_words_again: false,
+                answer_again: false,
+                asked_person: None,
                 written_wait: false,
                 resend: None,
                 hearing: None,
@@ -4026,6 +4047,36 @@ impl Engine {
     pub fn asking_again_for_no_words(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.no_words_again = on;
+        }
+        self
+    }
+
+    /// `LAMP_ANSWER_ASK_AGAIN=on` ([`ANSWER_ASK_AGAIN_ENVIRONMENT`], Queue
+    /// #4710 item 3): a spoken line that answers the lamp's own question
+    /// ([`Self::answering_the_lamp`]), whose round gives no words and calls
+    /// nothing, with nothing said or called earlier in the turn, is said
+    /// [`ANSWER_AGAIN_LINE`], with no second chat round. Never a stop or
+    /// "never mind", a line naming someone else, a reminder or written
+    /// line, or when the lamp's last words were that line already; a line
+    /// by name [`Self::asking_again_for_no_words`] answers stays its.
+    /// Before any turn only.
+    pub fn asking_again_for_answers(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.answer_again = on;
+        }
+        self
+    }
+
+    /// With [`Self::asking_again_for_answers`], `from` says whether a line
+    /// was said by the person the lamp asked (the conversation's voice, or a
+    /// face turned to the lamp, and no other voice shown): a `not_for_me`
+    /// the model gives such an answer to the lamp's question, as a call or
+    /// as its words, is said [`ANSWER_AGAIN_LINE`] in place of the decline
+    /// (the first builder on Queue #4710). Without it, every decline is
+    /// taken. Before any turn only.
+    pub fn answering_the_asked_person(mut self, from: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.asked_person = Some(from);
         }
         self
     }
@@ -7679,6 +7730,46 @@ fn holding_while_joining(shared: &Shared, held: Carried) -> bool {
     true
 }
 
+/// A `not_for_me` (a call or its words) the model gave an answer to the
+/// lamp's question from the person it asked (`LAMP_ANSWER_ASK_AGAIN`, the
+/// first builder on Queue #4710): [`ANSWER_AGAIN_LINE`] said in place of
+/// the decline, unless something of the answer is already on its way, or
+/// the lamp's last words were that line ([`asked_again_last`]), when the
+/// decline is taken as before.
+async fn asked_again_for_a_decline(
+    queue: &mut Queue<'_>,
+    request: u64,
+    round: usize,
+) -> Result<(), Stop> {
+    let shared = queue.shared;
+    let again = shared.fixed(ANSWER_AGAIN_LINE);
+    if queue.started || asked_again_last(shared, again) {
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: not_for_me on an answer to the lamp's question from the person it asked; taken: {} (LAMP_ANSWER_ASK_AGAIN)",
+            if queue.started {
+                "some of the answer is already said"
+            } else {
+                "its last words already asked again"
+            }
+        );
+        return Err(Stop::Declined);
+    }
+    eprintln!(
+        "lamp-voice second: request {request} chat round {round}: not_for_me on an answer to the lamp's question from the person it asked; not taken, said \"{again}\" (LAMP_ANSWER_ASK_AGAIN)"
+    );
+    queue.push(again.to_owned()).await
+}
+
+/// Whether the lamp's latest answer sent to the voice ([`Shared::lamp_said`])
+/// was `again`, its ask to hear an answer again (`LAMP_ANSWER_ASK_AGAIN`):
+/// then it is not asked twice in a row.
+fn asked_again_last(shared: &Shared, again: &str) -> bool {
+    shared
+        .lamp_said
+        .lock()
+        .is_ok_and(|said| said.1.trim() == again.trim())
+}
+
 /// `carried` in flight, its request recorded as asked
 /// ([`Shared::asked_last`]).
 /// A finished chat round of `request` (its calls and their results), kept
@@ -9757,6 +9848,21 @@ async fn answer(
     // mind." is rightly answered with nothing (the Reviewer-lead's P2 on
     // #3712).
     let by_name = crate::attention::begins_with_the_name(&said) && !says_stop(&said);
+    // Whether an empty answer to the line may be said `ANSWER_AGAIN_LINE`
+    // (`LAMP_ANSWER_ASK_AGAIN`): a spoken line, not a stop or "never mind",
+    // naming no one else, right after the lamp's own question. Read once,
+    // as the line begins its chat.
+    let answers_the_lamp = shared.answer_again
+        && heard
+        && !says_stop(&said)
+        && named_ask.as_ref().is_none_or(|(named, _)| named.is_empty())
+        && shared.asked.as_ref().is_some_and(|asked| asked(request));
+    // And a decline of it, when the person the lamp asked said it.
+    let decline_asked_again = answers_the_lamp
+        && shared
+            .asked_person
+            .as_ref()
+            .is_some_and(|from| from(request));
     // The line's words, for whether it asks more than an answer at once
     // covers, and whether it asked for a reminder
     // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
@@ -10285,6 +10391,15 @@ async fn answer(
                                 match crate::not_speech::opens_not_for_me(held, false) {
                                     None => continue,
                                     Some(true) => {
+                                        if decline_asked_again
+                                            && !called_earlier
+                                            && !held_forget_ran
+                                        {
+                                            return asked_again_for_a_decline(
+                                                &mut queue, request, round,
+                                            )
+                                            .await;
+                                        }
                                         eprintln!(
                                             "lamp-voice second: request {request}: its reply opens with \"not for me\" on a line let out only as the conversation going on: taken as not_for_me, nothing said (LAMP_NOT_FOR_ME_WORDS)"
                                         );
@@ -10442,6 +10557,9 @@ async fn answer(
             // whole now, and said unless it is the decline.
             if let Some(held) = opening.take_if(|held| !held.is_empty()) {
                 if crate::not_speech::opens_not_for_me(&held, true) == Some(true) {
+                    if decline_asked_again && !called_earlier && !held_forget_ran {
+                        return asked_again_for_a_decline(&mut queue, request, round).await;
+                    }
                     eprintln!(
                         "lamp-voice second: request {request}: its reply is \"not for me\" on a line let out only as the conversation going on: taken as not_for_me, nothing said (LAMP_NOT_FOR_ME_WORDS)"
                     );
@@ -10471,6 +10589,9 @@ async fn answer(
                         );
                     }
                 } else if crate::not_speech::opens_not_for_me(&held, true) == Some(true) {
+                    if decline_asked_again && !called_earlier && !held_forget_ran {
+                        return asked_again_for_a_decline(&mut queue, request, round).await;
+                    }
                     eprintln!(
                         "lamp-voice second: request {request}: its reply is \"not for me\" on a line that may not be for the lamp: taken as not_for_me, nothing said (LAMP_DECLINE_SILENT)"
                     );
@@ -10600,6 +10721,15 @@ async fn answer(
                         .as_ref()
                         .is_some_and(|named| named(request));
                 if !named || std::mem::replace(&mut named_asked_again, true) {
+                    // The person the lamp asked, answering its question:
+                    // asked to say it again, not declined (Queue #4710).
+                    if decline_asked_again
+                        && first_calls
+                        && !held_forget_ran
+                        && calls.iter().all(|call| call.name == NOT_FOR_ME)
+                    {
+                        return asked_again_for_a_decline(&mut queue, request, round).await;
+                    }
                     return Err(Stop::Declined);
                 }
                 // Called by name while faced (#2191): the decline is not
@@ -10691,6 +10821,32 @@ async fn answer(
                     "lamp-voice second: request {request} chat round {round}: no words again for a line begun with the lamp's name; said \"{NO_WORDS_LINE}\" (LAMP_NO_WORDS_AGAIN)"
                 );
                 queue.push(shared.fixed(NO_WORDS_LINE).to_owned()).await?;
+                return Ok(());
+            }
+            // No words and no call, after nothing said or called in the
+            // turn, to a line answering the lamp's own question: the lamp
+            // asks once to hear it again rather than go quiet
+            // (`LAMP_ANSWER_ASK_AGAIN`; lamp-29e7, 30 Oct 18:34: "Thin
+            // Place." after it asked a colour, then 150 s of silence). Not
+            // twice in a row: its last words that line, it stays silent.
+            if calls.is_empty()
+                && answers_the_lamp
+                && !called_earlier
+                && !held_forget_ran
+                && !queue.started
+                && !text.chars().any(char::is_alphanumeric)
+            {
+                let again = shared.fixed(ANSWER_AGAIN_LINE);
+                if asked_again_last(shared, again) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: no words and no call for an answer to the lamp's question; its last words already asked again, so nothing is said (LAMP_ANSWER_ASK_AGAIN)"
+                    );
+                    return Ok(());
+                }
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: no words and no call for an answer to the lamp's question; said \"{again}\" (LAMP_ANSWER_ASK_AGAIN)"
+                );
+                queue.push(again.to_owned()).await?;
                 return Ok(());
             }
             if calls.is_empty() {

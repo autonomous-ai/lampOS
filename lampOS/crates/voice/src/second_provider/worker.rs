@@ -3267,6 +3267,20 @@ pub fn serve(
         );
     }
     engine = engine.asking_after_wordless_cut_ins(wordless_asks);
+    // An answer to the lamp's own question is never left in silence by an
+    // empty reply: the lamp asks to hear it again, once
+    // (`LAMP_ANSWER_ASK_AGAIN=on`, Queue #4710 item 3). It reads the
+    // lamp's question from the thread, as a checked sound does.
+    let answer_again = std::env::var(crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if answer_again {
+        eprintln!(
+            "lamp-voice second: a line answering the lamp's own question, answered with no words and no call, is said a short ask to hear it again, never twice in a row (LAMP_ANSWER_ASK_AGAIN)"
+        );
+    }
+    engine = engine.asking_again_for_answers(answer_again);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
@@ -3597,6 +3611,16 @@ pub fn serve(
                 heeding
                     .lock()
                     .is_ok_and(|heeding| heeding.judged_busy(request))
+            }));
+        }
+        // A decline of an answer to the lamp's own question from the
+        // person it asked is asked again (`LAMP_ANSWER_ASK_AGAIN`).
+        if answer_again {
+            let heeding = heeding.clone();
+            engine = engine.answering_the_asked_person(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.said_by_the_asked(request))
             }));
         }
         engine = heeding_switches(
@@ -4012,7 +4036,10 @@ pub fn serve(
             ),
         }
     }
-    if checked {
+    // Whether the lamp just asked: for a checked sound, and for an empty
+    // answer to its question (`LAMP_ANSWER_ASK_AGAIN`). A sound is only
+    // checked with sounds checked, so the hook alone changes no sound.
+    if checked || answer_again {
         let file = thread.clone();
         engine = engine.answering_the_lamp(Arc::new(move |request| {
             crate::thread::current(file.as_deref(), |thread| {
@@ -5489,6 +5516,9 @@ pub(crate) struct Heeding {
     /// The request judged last, if it began with the lamp's name said to a
     /// face turned to the lamp ([`named_to_a_face`]).
     named_faced: Option<u64>,
+    /// The request judged last, if the person the lamp asked said it
+    /// ([`asked_person_said`], `LAMP_ANSWER_ASK_AGAIN`).
+    asked_one: Option<u64>,
     /// `LAMP_GOING_ON_NOT_OWN=on` ([`Self::not_counting_own_answers`]).
     not_own: bool,
     /// With it: the lines let out only as the conversation going on since
@@ -5789,6 +5819,19 @@ pub(crate) fn named_to_a_face(
             && *at <= began_us.saturating_add(NAME_STARTS_WITHIN_US)
     });
     turned == Some(true) && (heard_named || crate::attention::begins_with_the_name(heard))
+}
+
+/// Whether a line was said by the person the lamp asked, from its voice's
+/// `likeness` to the conversation's (`Voices::likeness_so_far`) and whether
+/// a face was `turned` to the lamp over it (`LAMP_ANSWER_ASK_AGAIN`, the
+/// first builder on Queue #4710): the same voice
+/// ([`crate::same_voice::SAME_FROM`] or more), or a face turned to the lamp,
+/// and never a voice printed as another's
+/// ([`crate::same_voice::DIFFERENT_BELOW`]). Neither known: no.
+pub(crate) fn asked_person_said(likeness: Option<f32>, turned: Option<bool>) -> bool {
+    let another = likeness.is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW);
+    let same = likeness.is_some_and(|likeness| likeness >= crate::same_voice::SAME_FROM);
+    !another && (same || turned == Some(true))
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -6380,6 +6423,7 @@ impl Heeding {
             voice_ends_going_on: false,
             named_always: false,
             named_faced: None,
+            asked_one: None,
             not_own: false,
             chain: Vec::new(),
             said_until_free_us: None,
@@ -7299,6 +7343,12 @@ impl Heeding {
     /// a face turned to the lamp, with the switch.
     pub(crate) fn named_to_a_face(&self, request: u64) -> bool {
         self.named_faced == Some(request)
+    }
+
+    /// Whether `request` was judged said by the person the lamp asked
+    /// ([`asked_person_said`]).
+    pub(crate) fn said_by_the_asked(&self, request: u64) -> bool {
+        self.asked_one == Some(request)
     }
 
     /// A line in another voice than the conversation's is no part of it
@@ -8640,6 +8690,14 @@ impl Heeding {
         let named_faced =
             self.named_always && named_to_a_face(&signs.names, began_us, heard, signs.turned);
         self.named_faced = named_faced.then_some(request);
+        // Said by the person the lamp asked (`LAMP_ANSWER_ASK_AGAIN`): the
+        // conversation's voice, or a face turned to the lamp with no other
+        // voice heard. Read without using up the line's one judgement.
+        let likeness = self
+            .voices
+            .as_mut()
+            .and_then(|voices| voices.likeness_so_far(request));
+        self.asked_one = asked_person_said(likeness, signs.turned).then_some(request);
         attention.ended(request, ended_us);
         if self.cut_in == Some(request) {
             attention.ended_as_cut_in(request);
@@ -16904,6 +16962,25 @@ mod tests {
                 .is_some()
         );
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// `LAMP_ANSWER_ASK_AGAIN` (the first builder on Queue #4710): a line is
+    /// the asked person's by the same voice or a face turned to the lamp,
+    /// never in a voice printed as another's.
+    #[test]
+    fn the_asked_person_is_the_same_voice_or_a_face_turned_to_the_lamp() {
+        use crate::same_voice::{DIFFERENT_BELOW, SAME_FROM};
+        assert!(super::asked_person_said(Some(SAME_FROM), None));
+        assert!(super::asked_person_said(None, Some(true)));
+        assert!(super::asked_person_said(Some(0.5), Some(true)));
+        // Another voice, even with a face turned to the lamp; or nothing
+        // known.
+        assert!(!super::asked_person_said(
+            Some(DIFFERENT_BELOW - 0.01),
+            Some(true)
+        ));
+        assert!(!super::asked_person_said(Some(0.5), Some(false)));
+        assert!(!super::asked_person_said(None, None));
     }
 
     /// What the engine is told for a checked sound (17 October): the lamp's
