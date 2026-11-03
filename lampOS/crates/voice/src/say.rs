@@ -74,6 +74,12 @@
 //!   lamp, its speaker is busy or an answer is owed (never for the room's
 //!   speech nobody addresses to it), is refused paused or muted, and has no
 //!   quiet gap or one-in-30-s rarity. `spoken` means played whole, as a sound's.
+//! - **A paired computer's clip** (the local leader's 3 Nov, lamp-control's
+//!   `sound` of a clip it keeps): in place of the words, `clip` is the
+//!   absolute path of a WAV under lamp-control's clips folder
+//!   ([`CLIPS_ENVIRONMENT`]), read on the client's thread with a skill
+//!   sound's format and loudness checks and up to 30 s ([`read_clip`]), and
+//!   played as an exact line is, through [`may_play_exact`].
 //! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
 //!   fixed -20 dBFS default on the client's thread, without a file or model
 //!   request. It is a sound through the same queue, quiet, rarity, privacy
@@ -142,6 +148,12 @@ pub const SOUNDS_ENVIRONMENT: &str = "LAMP_SAY_SOUNDS";
 pub const DEFAULT_SOUNDS: &str = "/var/lib/lampOS/skills";
 /// At most one skill's sound this often: a living thing chimes rarely.
 pub const SOUND_EVERY_US: u64 = 30_000_000;
+/// lamp-control's folder of paired computers' clips, absolute: a clip is
+/// played only from under it.
+pub const CLIPS_ENVIRONMENT: &str = "LAMP_SAY_CLIPS";
+/// lamp-control's own (its state folder's `sounds`), when
+/// [`CLIPS_ENVIRONMENT`] is unset.
+pub const DEFAULT_CLIPS: &str = "/var/lib/lampos-control/sounds";
 /// The longest note or text: a written turn is at most 1,024 bytes, and a
 /// text goes with the words that tell the model to say it as it is.
 pub const MOST_WORDS_BYTES: usize = 900;
@@ -253,6 +265,11 @@ pub enum Words {
     /// An exact text's samples, played as the lamp's own line once the
     /// person isn't talking ([`may_play_exact`]).
     ExactSound(Vec<i16>),
+    /// A paired computer's own clip (docs/control.md, "Sounds"), by its
+    /// path under lamp-control's clips folder ([`CLIPS_ENVIRONMENT`]),
+    /// until the client's thread reads it ([`read_clip`]) into an
+    /// [`Self::ExactSound`]: played as an exact line is.
+    ClipAt(PathBuf),
 }
 
 impl Words {
@@ -269,7 +286,8 @@ impl Words {
             | Self::Cached(_)
             | Self::Sound(_)
             | Self::Exact(_)
-            | Self::ExactSound(_) => None,
+            | Self::ExactSound(_)
+            | Self::ClipAt(_) => None,
         }
     }
 }
@@ -365,6 +383,10 @@ struct Wire {
     invitation: Option<u64>,
     #[serde(default)]
     sound: Option<String>,
+    /// A paired computer's clip, by its absolute path under lamp-control's
+    /// clips folder ([`Words::ClipAt`]).
+    #[serde(default)]
+    clip: Option<String>,
     #[serde(default)]
     recording: Option<String>,
     #[serde(default)]
@@ -427,6 +449,9 @@ pub fn parse(line: &str) -> Result<Request, String> {
     parse_from(line, Caller::Other)
 }
 
+/// What a say asks for: one of these, and only one.
+const ONE_OF: &str = "exactly one of note, text, from, sound, clip, recording and cue";
+
 /// Read and check one request line from `caller`. The reason, if refused,
 /// names the field and never repeats what was asked.
 pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
@@ -449,10 +474,13 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             || wire.text.is_some()
             || wire.from.is_some()
             || wire.sound.is_some()
+            || wire.clip.is_some()
             || wire.recording.is_some()
             || wire.cue.is_some()
         {
-            return Err("exactly one of note, text, quoted, from, sound, recording and cue".into());
+            return Err(
+                "exactly one of note, text, quoted, from, sound, clip, recording and cue".into(),
+            );
         }
         if line.trim().is_empty()
             || line.len() > MOST_QUOTED_BYTES
@@ -487,40 +515,58 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             who: false,
         });
     }
-    let words = match (
-        wire.note,
-        wire.text,
-        wire.from,
-        wire.sound,
-        wire.recording,
-        wire.cue,
-    ) {
-        (Some(note), None, None, None, None, None) => Words::Note(note),
-        (None, Some(text), None, None, None, None) => Words::Text(text),
-        (None, None, Some(from), None, None, None) => Words::From(
-            Source::named(&from)
-                .ok_or_else(|| "from is schedule, tasks or onboarding".to_owned())?,
-        ),
-        (None, None, None, None, Some(name), None) => {
-            if !RECORDINGS.contains(&name.as_str()) {
-                return Err(format!("recording is one of {}", RECORDINGS.join(", ")));
-            }
-            if caller != Caller::WifiHelper {
-                return Err("recording is asked by the Wi-Fi helper only".into());
-            }
-            Words::Recording(name)
+    let words = if let Some(clip) = wire.clip {
+        if wire.note.is_some()
+            || wire.text.is_some()
+            || wire.from.is_some()
+            || wire.sound.is_some()
+            || wire.recording.is_some()
+            || wire.cue.is_some()
+        {
+            return Err(ONE_OF.into());
         }
-        (None, None, None, Some(sound), None, None) => {
-            if !sound.starts_with('/') || sound.len() > 1_024 || sound.chars().any(char::is_control)
-            {
-                return Err("sound is an absolute path of at most 1024 bytes".into());
+        if !clip.starts_with('/') || clip.len() > 1_024 || clip.chars().any(char::is_control) {
+            return Err("clip is an absolute path of at most 1024 bytes".into());
+        }
+        Words::ClipAt(PathBuf::from(clip))
+    } else {
+        match (
+            wire.note,
+            wire.text,
+            wire.from,
+            wire.sound,
+            wire.recording,
+            wire.cue,
+        ) {
+            (Some(note), None, None, None, None, None) => Words::Note(note),
+            (None, Some(text), None, None, None, None) => Words::Text(text),
+            (None, None, Some(from), None, None, None) => Words::From(
+                Source::named(&from)
+                    .ok_or_else(|| "from is schedule, tasks or onboarding".to_owned())?,
+            ),
+            (None, None, None, None, Some(name), None) => {
+                if !RECORDINGS.contains(&name.as_str()) {
+                    return Err(format!("recording is one of {}", RECORDINGS.join(", ")));
+                }
+                if caller != Caller::WifiHelper {
+                    return Err("recording is asked by the Wi-Fi helper only".into());
+                }
+                Words::Recording(name)
             }
-            Words::SoundAt(PathBuf::from(sound))
+            (None, None, None, Some(sound), None, None) => {
+                if !sound.starts_with('/')
+                    || sound.len() > 1_024
+                    || sound.chars().any(char::is_control)
+                {
+                    return Err("sound is an absolute path of at most 1024 bytes".into());
+                }
+                Words::SoundAt(PathBuf::from(sound))
+            }
+            (None, None, None, None, None, Some(Cue::Hum)) => {
+                Words::Sound(crate::head_cue::hum(crate::head_cue::DBFS))
+            }
+            _ => return Err(ONE_OF.into()),
         }
-        (None, None, None, None, None, Some(Cue::Hum)) => {
-            Words::Sound(crate::head_cue::hum(crate::head_cue::DBFS))
-        }
-        _ => return Err("exactly one of note, text, from, sound, recording and cue".into()),
     };
     if let Words::Note(said) | Words::Text(said) = &words
         && (said.trim().is_empty()
@@ -895,8 +941,10 @@ impl Says {
         };
         let sounds = std::env::var_os(SOUNDS_ENVIRONMENT)
             .map_or_else(|| PathBuf::from(DEFAULT_SOUNDS), PathBuf::from);
+        let clips = std::env::var_os(CLIPS_ENVIRONMENT)
+            .map_or_else(|| PathBuf::from(DEFAULT_CLIPS), PathBuf::from);
         let recordings = recordings.with_cache(tts_cache::from_environment());
-        match Self::serve(&path, group, &sounds, recordings) {
+        match Self::serve_with_clips(&path, group, &sounds, &clips, recordings) {
             Ok(says) => {
                 eprintln!("lamp-voice: the say service listens at {}", path.display());
                 Some(says)
@@ -920,10 +968,25 @@ impl Says {
         sounds: &Path,
         recordings: Recordings,
     ) -> io::Result<Self> {
+        Self::serve_with_clips(path, group, sounds, Path::new(DEFAULT_CLIPS), recordings)
+    }
+
+    /// [`Self::serve`], a paired computer's clip played only from under
+    /// `clips`.
+    pub fn serve_with_clips(
+        path: &Path,
+        group: Option<u32>,
+        sounds: &Path,
+        clips: &Path,
+        recordings: Recordings,
+    ) -> io::Result<Self> {
         let (listener, bound) = bind(path, group)?;
         let (ask, incoming) = mpsc::channel();
         let open = Arc::new(AtomicUsize::new(0));
-        let sounds: Arc<Path> = sounds.into();
+        let sounds = Arc::new(Folders {
+            sounds: sounds.to_owned(),
+            clips: clips.to_owned(),
+        });
         let recordings = Arc::new(recordings);
         let own = ask.clone();
         thread::Builder::new()
@@ -1185,6 +1248,7 @@ impl Says {
                     | Words::Sound(_)
                     | Words::Exact(_)
                     | Words::ExactSound(_)
+                    | Words::ClipAt(_)
             )
         })
     }
@@ -1455,7 +1519,7 @@ fn accept(
     listener: &UnixListener,
     ask: &mpsc::Sender<Asked>,
     open: &Arc<AtomicUsize>,
-    sounds: &Arc<Path>,
+    sounds: &Arc<Folders>,
     recordings: &Arc<Recordings>,
 ) {
     for stream in listener.incoming() {
@@ -1483,6 +1547,13 @@ fn accept(
     }
 }
 
+/// Where a file sound may be read from: a skill's under the skills folder,
+/// a paired computer's clip under lamp-control's.
+struct Folders {
+    sounds: PathBuf,
+    clips: PathBuf,
+}
+
 /// One client: its line, checked, handed to the voice, and the answer
 /// written back when it comes. A sound is read here, on the client's
 /// thread, and its samples handed on: a slow or strange file never holds
@@ -1490,7 +1561,7 @@ fn accept(
 fn serve_client(
     mut stream: UnixStream,
     ask: &mpsc::Sender<Asked>,
-    sounds: &Path,
+    folders: &Folders,
     recordings: &Recordings,
 ) {
     let outcome = match read_line_within(&stream, READ_WITHIN) {
@@ -1499,7 +1570,10 @@ fn serve_client(
             |mut request| {
                 match &request.words {
                     Words::SoundAt(path) => {
-                        request.words = Words::Sound(read_skill_sound(path, sounds)?);
+                        request.words = Words::Sound(read_skill_sound(path, &folders.sounds)?);
+                    }
+                    Words::ClipAt(path) => {
+                        request.words = Words::ExactSound(read_clip(path, &folders.clips)?);
                     }
                     Words::Recording(name) => {
                         request.words = Words::Sound(recordings.samples(name)?);
@@ -1710,6 +1784,33 @@ impl Recordings {
             None => Err("the recording is not there: no_directory".into()),
         }
     }
+}
+
+/// A paired computer's longest clip (the local leader's 3 Nov: 30 s).
+pub const CLIP_MOST_FRAMES: u32 = SOUND_RATE * 30;
+/// Its largest file, as [`SOUND_MOST_BYTES`] is counted.
+pub const CLIP_MOST_BYTES: u64 = 44 + 2 * CLIP_MOST_FRAMES as u64 + 4_096;
+
+/// A paired computer's clip asked for at `path`, read only when its real
+/// place, every link followed, is under lamp-control's clips folder
+/// `clips`; then held to a skill sound's checks, its format and its
+/// loudness (the speaker's and the ear's bound), with
+/// [`CLIP_MOST_FRAMES`] in place of a chime's 3 s. The reason never repeats
+/// the path.
+pub fn read_clip(path: &Path, clips: &Path) -> Result<Vec<i16>, String> {
+    let root = fs::canonicalize(clips).map_err(|_| "the clips folder is not there".to_owned())?;
+    let real = fs::canonicalize(path).map_err(|_| "not found".to_owned())?;
+    if !real.starts_with(&root) {
+        return Err("not a file of the clips folder".into());
+    }
+    decode_clip(&read_sound_bytes(&real, CLIP_MOST_BYTES)?)
+}
+
+/// A clip's checks of what the file holds: [`decode_sound`]'s, with
+/// [`CLIP_MOST_FRAMES`] in place of a chime's 3 s. lamp-control checks a
+/// clip at upload against these (`crates/control`'s `sounds`).
+pub fn decode_clip(bytes: &[u8]) -> Result<Vec<i16>, String> {
+    decode_sound_with_limit(bytes, CLIP_MOST_FRAMES)
 }
 
 /// A skill's sound is played at this rate, the speaker path's.
@@ -2310,6 +2411,127 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A paired computer's clip (docs/control.md, "Sounds"): asked by its
+    /// path under lamp-control's clips folder, read on the client's thread
+    /// with a skill sound's checks and 30 s in place of 3, and queued as an
+    /// exact line, never as a skill's sound or a turn for the model.
+    #[test]
+    fn a_clip_is_read_from_the_clips_folder_only_and_queued_as_an_exact_line() {
+        let asked =
+            parse(r#"{"skill":"control","clip":"/var/lib/lampos-control/sounds/c_1/a.wav","expires_in_ms":30000}"#)
+                .unwrap();
+        assert_eq!(
+            asked.words,
+            Words::ClipAt("/var/lib/lampos-control/sounds/c_1/a.wav".into())
+        );
+        assert_eq!(asked.words.turn(), None);
+        for (line, why) in [
+            (
+                r#"{"skill":"control","clip":"a.wav","expires_in_ms":1}"#,
+                "clip is an absolute path of at most 1024 bytes",
+            ),
+            (
+                r#"{"skill":"control","clip":"/a.wav","text":"Hi.","expires_in_ms":1}"#,
+                ONE_OF,
+            ),
+            (
+                r#"{"skill":"control","clip":"/a.wav","exact":true,"expires_in_ms":1}"#,
+                "exact goes only with text",
+            ),
+        ] {
+            assert_eq!(parse(line).unwrap_err(), why, "{line}");
+        }
+
+        let dir = socket_dir("clip");
+        let clips = dir.join("sounds").join("c_1");
+        fs::create_dir_all(&clips).unwrap();
+        let root = dir.join("sounds");
+        // 29 s, past a chime's 3 s and within a clip's 30.
+        let long = vec![1_000_i16; SOUND_RATE as usize * 29];
+        let file = fs::canonicalize(&clips).unwrap().join("a.wav");
+        fs::write(&file, wav(MONO, &long)).unwrap();
+        assert!(read_sound(&file).unwrap_err().starts_with("more than"));
+        assert_eq!(read_clip(&file, &root).unwrap(), long);
+        let over = clips.join("over.wav");
+        fs::write(
+            &over,
+            wav(MONO, &vec![0_i16; CLIP_MOST_FRAMES as usize + 1]),
+        )
+        .unwrap();
+        assert!(read_clip(&over, &root).unwrap_err().contains("frames"));
+        // The loudness cap holds for a clip as for a chime.
+        let loud = clips.join("loud.wav");
+        fs::write(&loud, wav(MONO, &vec![1_100_i16; 4_800])).unwrap();
+        assert_eq!(
+            read_clip(&loud, &root).unwrap_err(),
+            "louder than -30 dBFS RMS over 10 ms"
+        );
+        let outside = dir.join("outside.wav");
+        fs::write(&outside, wav(MONO, &long)).unwrap();
+        assert_eq!(
+            read_clip(&outside, &root).unwrap_err(),
+            "not a file of the clips folder"
+        );
+        let link = clips.join("link.wav");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+        assert_eq!(
+            read_clip(&link, &root).unwrap_err(),
+            "not a file of the clips folder"
+        );
+
+        // Through the socket: a skill's folder is not the clips folder.
+        let path = dir.join("say.sock");
+        let skills = dir.join("skills");
+        fs::create_dir_all(&skills).unwrap();
+        let mut says =
+            Says::serve_with_clips(&path, None, &skills, &root, Recordings::none()).unwrap();
+        assert_eq!(
+            exchange(
+                &path,
+                &format!(
+                    "{{\"skill\":\"control\",\"clip\":{:?},\"expires_in_ms\":30000}}\n",
+                    outside.display().to_string()
+                )
+            ),
+            format!(
+                "{}\n",
+                Outcome::Refused("not a file of the clips folder".into()).line()
+            )
+        );
+        let client = {
+            let (path, file) = (path.clone(), file.clone());
+            thread::spawn(move || {
+                exchange(
+                    &path,
+                    &format!(
+                        "{{\"skill\":\"control\",\"clip\":{:?},\"expires_in_ms\":30000}}\n",
+                        file.display().to_string()
+                    ),
+                )
+            })
+        };
+        let mut taken = None;
+        for _ in 0..400 {
+            says.poll(0);
+            assert!(says.take(0).is_none(), "a clip is no say for the model");
+            assert!(says.take_sound(0).is_none(), "a clip is no skill sound");
+            if let Some(one) = says.take_exact(0) {
+                taken = Some(one);
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        let (samples, ticket) = taken.expect("the clip reached the voice");
+        assert_eq!(samples, long);
+        ticket.answer(Outcome::Spoken);
+        assert_eq!(
+            client.join().unwrap(),
+            format!("{}\n", Outcome::Spoken.line())
+        );
+        drop(says);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// #1959: a recording the voice holds is asked by its name, by the
     /// Wi-Fi helper only, and never as a turn for the model.
     #[test]
@@ -2878,7 +3100,15 @@ mod tests {
         .unwrap();
         let (send, received) = mpsc::channel();
         let server = thread::spawn(move || {
-            serve_client(server, &send, Path::new("/unused"), &Recordings::none())
+            serve_client(
+                server,
+                &send,
+                &Folders {
+                    sounds: "/unused".into(),
+                    clips: "/unused".into(),
+                },
+                &Recordings::none(),
+            )
         });
         let one = received.recv_timeout(Duration::from_secs(2)).unwrap();
         assert!(one.read_at_us > deadline);
@@ -3140,7 +3370,7 @@ mod tests {
             ),
             (
                 r#"{"skill":"x","from":"tasks","note":"n","expires_in_ms":5}"#,
-                "exactly one of note, text, from, sound, recording and cue",
+                ONE_OF,
             ),
         ] {
             assert_eq!(parse(line).unwrap_err(), why, "{line}");
@@ -3580,13 +3810,7 @@ mod tests {
         );
         assert_eq!(
             exchange(&path, "{\"skill\":\"x\",\"expires_in_ms\":5}\n"),
-            format!(
-                "{}\n",
-                Outcome::Refused(
-                    "exactly one of note, text, from, sound, recording and cue".into()
-                )
-                .line()
-            )
+            format!("{}\n", Outcome::Refused(ONE_OF.into()).line())
         );
         let client = {
             let path = path.clone();

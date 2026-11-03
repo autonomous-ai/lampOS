@@ -13,7 +13,7 @@
 // certificate is made by `openssl` at start. It moves nothing, so it never
 // stands in for a lamp check.
 import { execFileSync } from 'node:child_process';
-import { X509Certificate, createPublicKey, randomBytes, verify } from 'node:crypto';
+import { X509Certificate, createHash, createPublicKey, randomBytes, verify } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { tmpdir } from 'node:os';
@@ -67,8 +67,44 @@ export const LIMITS = Object.freeze({
   hold_max_ms: 30_000,
   take_max_ms: 600_000,
   say_max_chars: 300,
+  sounds: {
+    rate_hz: 24_000,
+    clip_max_ms: 30_000,
+    clip_max_bytes: 1_444_140,
+    part_max_chars: 49_152,
+    parts_max: 64,
+    clips_max: 64,
+    store_max_bytes: 20_000_000,
+  },
   quiet_hours: { from: '22:00', to: '07:00' },
 });
+
+// A clip as sound.upload and sound.list say it, and why lamp-control would refuse one: its format and length (the
+// fake leaves the loudness cap to the lamp). A WAV's frames are read from its `fmt ` and `data` chunks.
+function clipOf(name, data) {
+  return { name, bytes: data.length, ms: Math.floor(((wavFrames(data)?.frames ?? 0) * 1000) / 24_000) };
+}
+
+function wavFrames(data) {
+  if (data.length < 12 || data.toString('ascii', 0, 4) !== 'RIFF' || data.toString('ascii', 8, 12) !== 'WAVE') return undefined;
+  let format;
+  for (let at = 12; at + 8 <= data.length;) {
+    const id = data.toString('ascii', at, at + 4);
+    const size = data.readUInt32LE(at + 4);
+    if (id === 'fmt ') format = { channels: data.readUInt16LE(at + 10), rate: data.readUInt32LE(at + 12), bits: data.readUInt16LE(at + 22) };
+    if (id === 'data') return format ? { format, frames: Math.floor(Math.min(size, data.length - at - 8) / 2) } : undefined;
+    at += 8 + size + (size % 2);
+  }
+  return undefined;
+}
+
+function clipRefusal(data) {
+  const read = wavFrames(data);
+  if (read === undefined) return 'not a WAV file';
+  if (read.format.channels !== 1 || read.format.bits !== 16 || read.format.rate !== 24_000) return 'not 16-bit mono PCM at 24000 Hz';
+  if (read.frames < 1 || read.frames > 24_000 * 30) return 'not 1 to 720000 frames (30 s at most)';
+  return undefined;
+}
 
 // A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs): head
 // pitch, head roll, base yaw, shoulder, elbow, in counts from rest and counts a
@@ -261,6 +297,10 @@ export class FakeLamp {
     // WebSocket pings from clients (their keepalive).
     this.pings = 0;
     this.leases = new Map();
+    // Each computer's clips, by name (`sound.upload`), and its upload in flight: as lamp-control's sounds.rs, without
+    // its loudness check.
+    this.clips = new Map();
+    this.uploads = new Map();
     this.subscribed = new Map();
     this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false },
       // Made-up readings, as lamp-control answers them; `setAir` changes the
@@ -470,7 +510,43 @@ export class FakeLamp {
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
-    return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'], 'camera.snapshot': ['camera'], 'camera.stream': ['camera'] }[op] ?? [];
+    const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove'];
+    return speak.includes(op) ? ['speak'] : { express: ['body', 'light'], light: ['light'], 'camera.snapshot': ['camera'], 'camera.stream': ['camera'] }[op] ?? [];
+  }
+
+  clipsOf(client) {
+    if (!this.clips.has(client)) this.clips.set(client, new Map());
+    return this.clips.get(client);
+  }
+
+  // One `sound.upload` part, as lamp-control's sounds.rs gathers it: in order from 0, the same clip, then checked and
+  // kept whole.
+  upload(ws, client, request) {
+    const { id } = request;
+    const key = JSON.stringify([request.name, request.sha256.toLowerCase(), request.size, request.parts]);
+    if (request.part === 0) this.uploads.set(client, { key, next: 0, chunks: [] });
+    const flight = this.uploads.get(client);
+    if (!flight || flight.key !== key || flight.next !== request.part) {
+      this.uploads.delete(client);
+      return this.refuse(ws, id, 'bad_request', 'part: out of order; send the upload again from 0');
+    }
+    flight.chunks.push(Buffer.from(request.data, 'base64'));
+    flight.next += 1;
+    if (flight.next < request.parts) return this.ok(ws, id, { got: flight.next });
+    this.uploads.delete(client);
+    const data = Buffer.concat(flight.chunks);
+    if (data.length !== request.size || createHash('sha256').update(data).digest('hex') !== request.sha256.toLowerCase()) {
+      return this.refuse(ws, id, 'bad_request', "sha256: not the clip's");
+    }
+    const why = clipRefusal(data);
+    if (why) return this.refuse(ws, id, 'bad_request', `clip: ${why}`);
+    const kept = [...this.clipsOf(client)].filter(([n]) => n !== request.name);
+    if (kept.length >= LIMITS.sounds.clips_max) return this.refuse(ws, id, 'refused', 'this computer keeps 64 clips already: remove one first');
+    if (kept.reduce((sum, [, d]) => sum + d.length, 0) + data.length > LIMITS.sounds.store_max_bytes) {
+      return this.refuse(ws, id, 'refused', "this computer's clips would take over 20000000 bytes: remove one first");
+    }
+    this.clipsOf(client).set(request.name, data);
+    return this.ok(ws, id, { sound: clipOf(request.name, data) });
   }
 
   op(ws, client, request) {
@@ -594,10 +670,23 @@ export class FakeLamp {
         // As lamp-control routes them: the body takes them, and no `done`
         // follows.
         return this.ok(ws, id, { to: 'body' });
+      case 'sound.upload':
+        return this.upload(ws, client, request);
+      case 'sound.list':
+        return this.ok(ws, id, { sounds: [...this.clipsOf(client)].sort(([a], [b]) => a.localeCompare(b)).map(([n, d]) => clipOf(n, d)) });
+      case 'sound.remove':
+        if (!this.clipsOf(client).delete(request.name)) {
+          return this.refuse(ws, id, 'refused', `no clip named ${request.name} on this lamp for this computer`);
+        }
+        return this.ok(ws, id, { removed: request.name });
       case 'say':
       case 'sound':
-        // As lamp-control: the voice takes it (a sound is its hum), and
-        // its `done` follows.
+        // As lamp-control: the voice takes it (a sound is its hum or one of
+        // the computer's clips), and its `done` follows.
+        if (op === 'sound' && request.name !== 'hum' && !this.clipsOf(client).has(request.name)) {
+          this.requests.pop();
+          return this.refuse(ws, id, 'refused', `no clip named ${request.name} on this lamp for this computer: sound.upload it first`);
+        }
         this.ok(ws, id, { to: 'voice' });
         if (this.autoDone) this.done(id);
         return undefined;

@@ -219,6 +219,9 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::Light { .. } => "light",
         Op::Say { .. } => "say",
         Op::Sound { .. } => "sound",
+        Op::SoundUpload { .. } => "sound.upload",
+        Op::SoundList {} => "sound.list",
+        Op::SoundRemove { .. } => "sound.remove",
         Op::Stop {} => "stop",
         Op::SkillPush { .. } => "skill.push",
         Op::SkillList {} => "skill.list",
@@ -238,7 +241,10 @@ pub fn went(op: &Op) -> &'static str {
         Op::Light { .. } => "the ring, by light/request",
         Op::Gesture { .. } | Op::Move { .. } => "the body, by mood.sock",
         Op::Express { .. } => "the body, by mood.sock, and the ring, by light/request",
-        Op::Say { .. } => "the voice, by say.sock",
+        Op::Say { .. } | Op::Sound { .. } => "the voice, by say.sock",
+        Op::SoundUpload { .. } | Op::SoundList {} | Op::SoundRemove { .. } => {
+            "the lamp's clips folder"
+        }
         Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. } => "the skill helper",
         Op::CameraSnapshot {} => "the eyes' newest frame, by sight.jpg",
         Op::CameraStream { .. } => "the eyes, by sight.jpg or their frames socket",
@@ -282,7 +288,13 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
                 ", exact"
             }
         ),
-        Op::Gesture { name } | Op::Play { name } | Op::Sound { name } => word(name),
+        Op::Gesture { name }
+        | Op::Play { name }
+        | Op::Sound { name }
+        | Op::SoundRemove { name } => word(name),
+        Op::SoundUpload {
+            name, part, parts, ..
+        } => format!("{}, part {part} of {parts}", word(name)),
         Op::Move { step_ms, frames } => format!("{} frames, step_ms {step_ms}", frames.len()),
         Op::Express { feeling, strength } => format!("{}, strength {strength:.2}", word(feeling)),
         Op::Light {

@@ -22,6 +22,7 @@ import importlib.metadata
 import os
 import socket
 import time
+from pathlib import Path
 from typing import Any, Literal
 
 from lampos import Lamp, LampError, schema
@@ -510,8 +511,9 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         @server.tool()
         async def lamp_say(text: str, rephrase: bool = False) -> str:
             """Say a short line in the lamp's own voice (300 characters at most), exactly as written, once
-            the person isn't talking; `rephrase` lets the lamp say it in its own words instead. It isn't said
-            while the lamp is in quiet hours or private."""
+            the person isn't talking; `rephrase` lets the lamp say it in its own words instead, which also
+            waits until the lamp isn't talking with someone, as before. It isn't said while the lamp is in
+            quiet hours or private."""
             if len(text) > 300:
                 raise ToolError("bad_request: at most 300 characters")
             await act("say", text=text, rephrase=True if rephrase else None)
@@ -519,12 +521,45 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_sound(name: str) -> str:
-            """Play a short sound by its name (lowercase letters, digits, - and _): `hum`, the lamp's
-            own short hum, is the only one in this release. Like `lamp_say`, not while the lamp is in
-            quiet hours, private or talking. A lamp that doesn't route sound yet says so, as the
-            tool's error."""
+            """Play a sound by its name (lowercase letters, digits, - and _): `hum`, the lamp's own
+            short hum, or one of this computer's clips (lamp_upload_sound). Like `lamp_say`, once the
+            person isn't talking, and not while the lamp is in quiet hours or private. A lamp that
+            doesn't route sound yet says so, as the tool's error."""
             await act("sound", name=name)
             return f"{name} played"
+
+        @server.tool()
+        async def lamp_upload_sound(name: str, path: str) -> dict:
+            """Keep a clip on the lamp as `name` (a lowercase letter, then lowercase letters, digits,
+            _ or -; never `hum`), to play with lamp_sound: the WAV file at `path` on this computer,
+            16-bit mono PCM at 24 kHz, up to 30 s, no sample past -12 dBFS and no 10 ms past -30 dBFS
+            RMS. It replaces a clip of the same name. The lamp checks it and says why it refuses one.
+            Each computer keeps up to 64 clips and 20 MB. Answers the clip: name, bytes, ms."""
+            try:
+                wav = Path(path).expanduser().read_bytes()
+            except OSError as error:
+                raise ToolError(f"bad_request: {path} can't be read: {error.strerror}") from error
+            try:
+                return await lamp.upload_sound(name, wav)
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_sounds() -> list:
+            """This computer's clips on the lamp: each its name, bytes and ms."""
+            try:
+                return await lamp.sounds()
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_remove_sound(name: str) -> str:
+            """Delete one of this computer's clips from the lamp."""
+            try:
+                await lamp.remove_sound(name)
+            except LampError as error:
+                raise refused(error) from error
+            return f"{name} removed"
 
     if allowed("camera"):
 

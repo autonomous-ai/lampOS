@@ -52,7 +52,9 @@ test('proofs name what they are for', async () => {
 test('every op has a call and every error code a class', () => {
   const plumbing = new Set(['pair', 'hello', 'subscribe', 'unsubscribe', 'get', 'lease.take', 'lease.renew', 'lease.release']);
   const call = (op) => op.replace(/\.(\w)/g, (_, c) => c.toUpperCase());
-  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[call(op)] === 'function', op);
+  // The clips' calls read as English, not as their ops.
+  const named = { 'sound.upload': 'uploadSound', 'sound.list': 'sounds', 'sound.remove': 'removeSound' };
+  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[named[op] ?? call(op)] === 'function', op);
   for (const code of schema.errorCodes) assert.equal(new byCode[code]('x').code, code);
   assert.equal(fromReply({ code: 'rate', why: 'x', retry_ms: 900 }).retryMs, 900);
   assert.ok(fromReply({ code: 'no_grant', why: 'x' }) instanceof byCode.no_grant);
@@ -992,4 +994,44 @@ test('a fast binary frame is its header and the JPEG as data', async () => {
   assert.equal(frame.ev, 'camera.frame');
   assert.equal(frame.width, 640);
   assert.deepEqual([...frame.data], [...jpeg]);
+});
+
+// A WAV of `seconds` at 16-bit mono 24 kHz, every sample `level`.
+function wav(seconds, level = 1_000) {
+  const frames = Math.round(24_000 * seconds);
+  const data = Buffer.alloc(44 + 2 * frames);
+  data.write('RIFF', 0, 'ascii');
+  data.writeUInt32LE(36 + 2 * frames, 4);
+  data.write('WAVEfmt ', 8, 'ascii');
+  data.writeUInt32LE(16, 16);
+  data.writeUInt16LE(1, 20);
+  data.writeUInt16LE(1, 22);
+  data.writeUInt32LE(24_000, 24);
+  data.writeUInt32LE(48_000, 28);
+  data.writeUInt16LE(2, 32);
+  data.writeUInt16LE(16, 34);
+  data.write('data', 36, 'ascii');
+  data.writeUInt32LE(2 * frames, 40);
+  for (let at = 0; at < frames; at += 1) data.writeInt16LE(level, 44 + 2 * at);
+  return data;
+}
+
+test('a clip is uploaded in parts, played, listed and removed', async () => {
+  await withLamp({ grants: ['speak'] }, async (lamp, fake) => {
+    // 2 s, about 96 KB: three parts of 36 KiB.
+    const clip = wav(2);
+    const kept = await lamp.uploadSound('chime', clip);
+    assert.deepEqual(kept, { name: 'chime', bytes: clip.length, ms: 2_000 });
+    const parts = fake.asked('sound.upload');
+    assert.deepEqual(parts.map((p) => p.part), [0, 1, 2]);
+    assert.ok(parts.every((p) => p.parts === 3 && p.data.length <= 49_152));
+    assert.deepEqual(await lamp.sounds(), [kept]);
+    await lamp.sound('chime');
+    await lamp.sound('hum');
+    assert.deepEqual(fake.asked('sound'), [{ name: 'chime' }, { name: 'hum' }]);
+    await lamp.removeSound('chime');
+    assert.deepEqual(await lamp.sounds(), []);
+    await assert.rejects(lamp.sound('chime'), /no clip named chime/);
+    await assert.rejects(lamp.uploadSound('bad', Buffer.from('not a wav')), /not a WAV/);
+  });
 });
