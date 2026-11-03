@@ -94,6 +94,10 @@ struct Lamp {
     /// Torque and a goal by itself may be written to any joint, as a body
     /// told to take hold does. Off, only to the shoulder or the elbow.
     may_take_hold: bool,
+    /// A goal written to a servo whose torque is off turns it back on, as
+    /// the real servos do (the Reviewer-lead's P1 on #5047). Off, a goal
+    /// leaves the torque as it is.
+    goal_turns_torque_on: bool,
     /// One servo acknowledges the next goal written to it by itself and
     /// keeps the goal it had.
     drops_goal: Option<usize>,
@@ -188,6 +192,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             arm_moves: false,
             overload_clears: 0,
             may_take_hold: false,
+            goal_turns_torque_on: false,
             drops_goal: None,
             deaf: None,
             mute: None,
@@ -440,7 +445,11 @@ impl Lamp {
                     let mut written = Vec::new();
                     for entry in parameters[2..].chunks(3) {
                         let goal = u16::from_le_bytes([entry[1], entry[2]]);
-                        self.servos[usize::from(entry[0]) - 1].goal = goal;
+                        let servo = &mut self.servos[usize::from(entry[0]) - 1];
+                        servo.goal = goal;
+                        if self.goal_turns_torque_on {
+                            servo.torque = 1;
+                        }
                         written.push((entry[0], goal));
                     }
                     self.goals.push(written);
@@ -470,6 +479,9 @@ impl Lamp {
                         (42, [low, high]) if arm_or_held => {
                             if !dropped {
                                 servo.goal = u16::from_le_bytes([*low, *high]);
+                                if self.goal_turns_torque_on {
+                                    servo.torque = 1;
+                                }
                             }
                         }
                         // Torque: the same, except off, which lets the
@@ -3084,6 +3096,7 @@ fn gesture_run(
                 held_by_test: false,
                 held: false,
                 aim: None,
+                limp: false,
                 unseat: false,
                 night: false,
                 night_woke: false,
@@ -3163,6 +3176,7 @@ fn expression_run_with(
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             unseat: false,
             night: false,
             night_woke: false,
@@ -3332,6 +3346,7 @@ fn speaking_run_with(
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             unseat: false,
             night: false,
             night_woke: false,
@@ -4044,6 +4059,7 @@ fn rest_glances_watched(
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             unseat: false,
             night: false,
             night_woke: false,
@@ -4467,6 +4483,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             unseat: false,
             night: false,
             night_woke: false,
@@ -4537,6 +4554,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             unseat: false,
             night: false,
             night_woke: false,
@@ -4625,6 +4643,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                limp: false,
                 unseat: false,
                 night: false,
                 night_woke: false,
@@ -5052,6 +5071,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     held_by_test: false,
                     held: false,
                     aim: None,
+                    limp: false,
                     unseat: false,
                     night: false,
                     night_woke: false,
@@ -5135,6 +5155,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                limp: false,
                 unseat: false,
                 night: false,
                 night_woke: false,
@@ -5225,6 +5246,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 held_by_test: false,
                 held: false,
                 aim: None,
+                limp: false,
                 unseat: false,
                 night: false,
                 night_woke: false,
@@ -8065,6 +8087,7 @@ fn called_run(
                 held_by_test: false,
                 held: false,
                 aim: None,
+                limp: false,
                 unseat: false,
                 night: false,
                 night_woke: false,
@@ -13055,6 +13078,7 @@ fn held_from_test_input_run(
                 held_by_test: held,
                 held: false,
                 aim: None,
+                limp: false,
                 ..Asked::default()
             };
             (asked, Priority::Skill)
@@ -13999,6 +14023,7 @@ fn unplug_never_attests_an_arm_stuck_away_from_its_fold() {
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -14030,6 +14055,7 @@ fn unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off() {
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -14069,6 +14095,7 @@ fn unplug_brings_a_base_looking_aside_home_before_it_attests() {
                     held_by_test: false,
                     held: false,
                     aim: None,
+                    limp: false,
                     ..Asked::default()
                 }
             }
@@ -14130,6 +14157,7 @@ fn unplug_ready_stays_ready_through_a_second_turn() {
                 held_by_test: false,
                 held: false,
                 aim: None,
+                limp: false,
                 seen: late.then_some(Seen {
                     face: Some(crate::gaze::Sight {
                         x: 0.8,
@@ -14185,6 +14213,7 @@ fn unplug_ready_survives_a_bad_read() {
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             ..Asked::default()
         },
         |glimpse| {
@@ -14324,6 +14353,7 @@ fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
             held_by_test: false,
             held: false,
             aim: None,
+            limp: false,
             ..Asked::default()
         },
         |glimpse| safe |= glimpse.unplug_safe,
@@ -14381,6 +14411,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                     held_by_test: false,
                     held: false,
                     aim: None,
+                    limp: false,
                     paused: paused && at >= Duration::from_secs(16),
                     stand_share: None,
                     pose: None,
@@ -16107,4 +16138,412 @@ fn a_lamp_not_standing_says_why_it_takes_no_pose() {
     let (posed, why) = unposed.last().copied().unwrap();
     assert_eq!(posed, None);
     assert_eq!(why, Some(POSE_NO_ARM));
+}
+
+/// Record from pose (`Asked::limp`, the lease's `limp`): held, base yaw's
+/// torque goes off, a hand turns the base 200 counts and its goal follows;
+/// let go of the limp, the base is taken back where it lies (torque on, its
+/// goal there), not pulled back to where it was. Nothing else loses torque.
+#[test]
+fn a_held_limp_base_turns_by_hand_and_is_taken_back_where_it_lies() {
+    limp_base_turned_by_hand(false);
+}
+
+/// The same, with the real servos' rule that a goal written to a joint
+/// whose torque is off turns it back on (the Reviewer-lead's P1 on
+/// #5047): the limp base is written no goal while it is limp, so it stays
+/// limp under the hand and follows it 200 counts.
+#[test]
+fn a_limp_base_is_written_no_goal_so_its_torque_stays_off_under_the_hand() {
+    limp_base_turned_by_hand(true);
+}
+
+/// Taken back while a hand still turns it (the Reviewer-lead's P2 on
+/// #5047): the base moves past `TAKE_HOLD_SLACK` as its torque comes on,
+/// and it is held where it got to; the run goes on, not let go on all five.
+#[test]
+fn a_limp_base_still_turned_when_taken_back_is_held_and_the_run_goes_on() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let base = Joint::BaseYaw.index();
+    lamp.may_take_hold = true;
+    lamp.goal_turns_torque_on = true;
+    // Turned 200 counts at 1,500 a second from just before the limp
+    // ends, so it is still moving while its torque comes on.
+    lamp.event = Some((Duration::from_millis(4_950), base, Event::Fall(200.0)));
+    let time = clock.time.clone();
+    let mut after = 0;
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let at = time.get();
+            Asked {
+                held: true,
+                limp: at >= Duration::from_secs(2) && at < Duration::from_secs(5),
+                ..Asked::default()
+            }
+        },
+        |glimpse| after = after.max(glimpse.step),
+    );
+    assert!(
+        !matches!(report.stop, Stop::Refused { .. }),
+        "the run went on: {:?}",
+        report.stop
+    );
+    // Steps went on well past the take-back at 5 s (a step is 20 ms).
+    assert!(after > 300, "{after}: {:?}", report.stop);
+    assert_eq!(lamp.servos[base].torque, 1, "held, torque on");
+}
+
+/// A limp base flagged by its own protection (a status bit, no surprise on
+/// a joint left as it is) is not taken back when its holder lets go: no
+/// torque and no goal is written to it after the flag, and it stays left
+/// (the local leader's P2 on #5047).
+#[test]
+fn a_limp_base_flagged_by_its_protection_is_not_taken_back() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let base = Joint::BaseYaw.index();
+    let yaw = Joint::BaseYaw.id();
+    lamp.may_take_hold = true;
+    lamp.goal_turns_torque_on = true;
+    let flagged_at = Duration::from_secs(3);
+    lamp.event = Some((flagged_at, base, Event::Flag(0x20)));
+    let time = clock.time.clone();
+    run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let at = time.get();
+            Asked {
+                held: true,
+                limp: at >= Duration::from_secs(2) && at < Duration::from_secs(5),
+                ..Asked::default()
+            }
+        },
+        |_| {},
+    );
+    let after: Vec<_> = lamp
+        .registers
+        .iter()
+        .zip(&lamp.register_times)
+        .filter(|((id, address, _), at)| {
+            *id == yaw && **at > flagged_at && matches!(address, 40 | 42)
+        })
+        .collect();
+    assert!(after.is_empty(), "written to the flagged base: {after:?}");
+    let goals: Vec<_> = lamp
+        .goals
+        .iter()
+        .zip(&lamp.goal_times)
+        .filter(|(goals, at)| **at > flagged_at && goals.iter().any(|(id, _)| *id == yaw))
+        .collect();
+    assert!(goals.is_empty(), "goals to the flagged base: {goals:?}");
+    assert_eq!(lamp.servos[base].torque, 0, "left as it is: torque off");
+}
+
+/// A hand rests on a standing lamp while its holder has the base limp (the
+/// Reviewer-lead's and Thirteen's P1 on #5047): the hand's let-go and its
+/// retake hold every joint again, but not the limp base, which is left as
+/// it is (`Bus::left`): no torque and no goal reaches it while it is limp,
+/// nothing is called an overload, and the run goes on.
+#[test]
+fn a_hand_resting_while_the_base_is_limp_never_retakes_the_base() {
+    let secs = Duration::from_secs_f32;
+    let (mut lamp, mut clock) = folded(secs(40.0));
+    lamp.may_take_hold = true;
+    lamp.arm_moves = true;
+    lamp.goal_turns_torque_on = true;
+    // Found standing, as `let_go_standing_turned`.
+    for (index, at) in [
+        (YAW, 2_035.0),
+        (1, 2_657.0),
+        (2, 2_602.0),
+        (ROLL, 2_035.0),
+        (PITCH, 1_772.0),
+    ] {
+        let servo = &mut lamp.servos[index];
+        (servo.position, servo.goal, servo.status) = (at, at as u16, 0);
+    }
+    // A hand on the base from 3 s to 6 s, pushing it under load.
+    lamp.hand = Some((secs(3.0), secs(6.0), YAW, 2_065.0));
+    lamp.strains = vec![(secs(3.0), secs(6.0), YAW, 600)];
+    let limits = Limits {
+        force: Some(600),
+        overload_release: false,
+        give_way: Some(GiveWay::Return),
+        limp: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let up = Standing::new(
+        [2_053, 2_069],
+        [1_772, 2_035, 2_035, 2_657, 2_602],
+        100,
+        5,
+        90,
+        [560, 560],
+    )
+    .unwrap();
+    let limp = secs(1.0)..secs(30.0);
+    let time = clock.time.clone();
+    let asked_limp = limp.clone();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some([1_771, 2_035, 2_035]),
+        Some(up),
+        None,
+        || Some((Mood::Resting, 0)),
+        move || Asked {
+            held: true,
+            limp: asked_limp.contains(&time.get()),
+            ..Asked::default()
+        },
+        |_| {},
+    );
+    assert!(
+        !matches!(report.stop, Stop::Overload { .. }),
+        "{:?}",
+        report.stop
+    );
+    let yaw = Joint::BaseYaw.id();
+    // From just after it went limp until it is taken back at 30 s: no
+    // torque on and no goal reaches the base, by register or by a sync goal.
+    // (The hand's let-go writes torque off to all five; on a limp base that
+    // changes nothing.)
+    let quiet = secs(1.2)..secs(29.9);
+    let written: Vec<_> = lamp
+        .registers
+        .iter()
+        .zip(&lamp.register_times)
+        .filter(|((id, address, data), at)| {
+            *id == yaw && quiet.contains(at) && (*address == 42 || (*address == 40 && data[0] == 1))
+        })
+        .collect();
+    assert!(
+        written.is_empty(),
+        "torque on or a goal to the limp base: {written:?}"
+    );
+    let goals: Vec<_> = lamp
+        .goals
+        .iter()
+        .zip(&lamp.goal_times)
+        .filter(|(goals, at)| quiet.contains(at) && goals.iter().any(|(id, _)| *id == yaw))
+        .collect();
+    assert!(goals.is_empty(), "goals to the limp base: {goals:?}");
+    // The hand's let-go happened, so its retake was tested (Thirteen's P3 on
+    // #5047: or the test passes with nothing tested).
+    assert!(
+        !report.released.is_empty(),
+        "no let-go: {:?}",
+        report.released_by_hand
+    );
+    // The run went on past the hand and the limp's end.
+    assert!(clock.time.get() >= secs(35.0), "{:?}", report.stop);
+}
+
+/// The wake after a hand's let-go leaves a limp base where a hand turned it
+/// (the Reviewer-lead's P1 on #5047, 12:36): the base, turned 200 counts
+/// while limp, is not driven home and not judged short of it, so the head,
+/// let go once for a hand on it, wakes and stays up. Without that, the wake
+/// failed its tracking on the base and the head slumped again every 15 s.
+#[test]
+fn a_limp_base_turned_by_hand_never_fails_the_wake_after_a_hands_let_go() {
+    let secs = Duration::from_secs_f32;
+    let (mut lamp, mut clock) = folded(secs(60.0));
+    lamp.may_take_hold = true;
+    lamp.arm_moves = true;
+    lamp.goal_turns_torque_on = true;
+    for (index, at) in [
+        (YAW, 2_035.0),
+        (1, 2_657.0),
+        (2, 2_602.0),
+        (ROLL, 2_035.0),
+        (PITCH, 1_772.0),
+    ] {
+        let servo = &mut lamp.servos[index];
+        (servo.position, servo.goal, servo.status) = (at, at as u16, 0);
+    }
+    // The base turned 200 counts by hand while limp; then a hand rests on
+    // the head, pressing it, from 5 s to 8 s.
+    lamp.event = Some((secs(2.0), YAW, Event::Push(200.0)));
+    lamp.hand = Some((secs(5.0), secs(8.0), PITCH, 1_700.0));
+    lamp.strains = vec![(secs(5.0), secs(8.0), PITCH, 900)];
+    let limits = Limits {
+        force: Some(600),
+        overload_release: false,
+        give_way: Some(GiveWay::Return),
+        limp: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let up = Standing::new(
+        [2_053, 2_069],
+        [1_772, 2_035, 2_035, 2_657, 2_602],
+        100,
+        5,
+        90,
+        [560, 560],
+    )
+    .unwrap();
+    let time = clock.time.clone();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some([1_771, 2_035, 2_035]),
+        Some(up),
+        None,
+        || Some((Mood::Resting, 0)),
+        move || Asked {
+            held: true,
+            limp: time.get() >= secs(1.0),
+            ..Asked::default()
+        },
+        |_| {},
+    );
+    assert!(
+        !matches!(report.stop, Stop::Overload { .. } | Stop::Tracking { .. }),
+        "{:?}",
+        report.stop
+    );
+    // The hand on the head tripped once (Thirteen's P3 on #5047: or the
+    // test passes with nothing tested), and the head was not let go again.
+    assert_eq!(
+        report.released_by_hand[0], 1,
+        "{:?}",
+        report.released_by_hand
+    );
+    assert!(
+        report.released.len() == 1,
+        "let go {} times, not once: {:?}",
+        report.released.len(),
+        report.released
+    );
+    assert!(
+        clock.time.get() >= secs(55.0),
+        "the run went on: {:?}",
+        report.stop
+    );
+    // The base stays where the hand left it, still limp.
+    let yaw = lamp.servos[YAW];
+    assert_eq!(yaw.torque, 0, "still limp");
+    assert!((yaw.position - 2_235.0).abs() <= 2.0, "{}", yaw.position);
+}
+
+fn limp_base_turned_by_hand(goal_turns_torque_on: bool) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let base = Joint::BaseYaw.index();
+    // Taking the base back writes its goal by itself, then torque on.
+    lamp.may_take_hold = true;
+    lamp.goal_turns_torque_on = goal_turns_torque_on;
+    lamp.event = Some((Duration::from_secs(3), base, Event::Push(200.0)));
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let at = time.get();
+            Asked {
+                held: true,
+                limp: at >= Duration::from_secs(2) && at < Duration::from_secs(5),
+                ..Asked::default()
+            }
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.goals[2], glimpse.positions[2])),
+    );
+    let torque: Vec<(u8, u8)> = lamp
+        .registers
+        .iter()
+        .filter(|(_, address, _)| *address == 40)
+        .map(|(id, _, bytes)| (*id, bytes[0]))
+        .collect();
+    let yaw = Joint::BaseYaw.id();
+    assert_eq!(
+        torque,
+        vec![(yaw, 0), (yaw, 1)],
+        "base yaw only, off then on: {torque:?}"
+    );
+    let at = |secs: f32| {
+        *seen
+            .iter()
+            .rfind(|step| step.0 < Duration::from_secs_f32(secs))
+            .unwrap()
+    };
+    // Turned by hand while limp: the goal follows the base.
+    let turned = at(4.5);
+    assert!(turned.2.abs_diff(HOME[2] + 200) <= 2, "{turned:?}");
+    assert!(turned.1.abs_diff(turned.2) <= 2, "{turned:?}");
+    // Taken back where it lies, not pulled back at once.
+    let taken = at(5.2);
+    assert!(taken.1.abs_diff(HOME[2] + 200) <= 30, "{taken:?}");
+    // While limp, no goal reaches the base: one would turn its torque back
+    // on under the hand (the Reviewer-lead's P1 on #5047).
+    let limp = Duration::from_millis(2_100)..Duration::from_millis(4_900);
+    let written: Vec<_> = lamp
+        .goals
+        .iter()
+        .zip(&lamp.goal_times)
+        .filter(|(_, at)| limp.contains(at))
+        .filter(|(goals, _)| goals.iter().any(|(id, _)| *id == yaw))
+        .collect();
+    assert!(written.is_empty(), "goals to the limp base: {written:?}");
+    if goal_turns_torque_on {
+        assert_eq!(lamp.servos[base].torque, 1, "taken back: torque on");
+    }
+}
+
+/// While its holder has the base limp, a gesture asked (a move or a nod
+/// from lamp-control, the voice or a skill) is dropped and said: played,
+/// it would be a no-op on the base, then a jerk when its torque came back.
+#[test]
+fn a_gesture_asked_while_the_base_is_limp_is_dropped_and_said() {
+    let mut asked = false;
+    let (report, fates, _) = skill_run(
+        6,
+        standing(100, 5),
+        gesture_limits(),
+        |lamp| lamp.may_take_hold = true,
+        || Some((Mood::Resting, 0)),
+        move |now| {
+            let due = !asked && now >= Duration::from_secs(2);
+            asked |= due;
+            Asked {
+                held: true,
+                limp: now >= Duration::from_secs(1),
+                gesture: due.then_some(&crate::clips::NOD),
+                ..Asked::default()
+            }
+        },
+    );
+    assert_eq!(report.gestures, 0, "{report:?}");
+    assert_eq!(fates, [("nod", "dropped: the base is limp")]);
 }
