@@ -292,7 +292,13 @@ heard line only, nothing kept.
   HTML entities read), 300 characters of it. `message {id}` (Gmail's own id
   a list gave: letters and digits, at most 64) gets it with `format=full`:
   its text from a plain part first, else HTML with its tags taken out, each
-  part decoded from base64url in its charset, up to 3,000 characters. A list
+  part decoded from base64url in its charset, up to 3,000 characters. A
+  mail whose `format=full` answer came cut at the 1 MB answer limit
+  (`net::BODY_MOST`) doesn't read: it is told by its `format=metadata`
+  headers and preview, then "(the rest of this mail is too long to read
+  here)" (`mail::TOO_LONG`). A mail a list named but whose get answers 404
+  (deleted since) is left out of that list's read; one asked for by its id
+  is still "Gmail has no such item". A list
   is at most 10 mails, newest first; nothing is marked read (a get changes
   no label). Each call is a web read (5 s to connect, 15 s each), 20 s for
   the whole read; the tokens are scrubbed from the decoded text too.

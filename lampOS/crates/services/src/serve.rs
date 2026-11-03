@@ -506,9 +506,28 @@ impl<H: Http, M: Mail> Services<H, M> {
                 ),
             };
             let mut items = Vec::new();
+            let gone = format!("{} has no such item", service.name);
             for id in ids {
-                let text = get(mail::api_message_url(&id, whole)?).await?;
-                items.extend(mail::api_item(&text, whole));
+                // A mail deleted between the list and its get is left out
+                // of a list's read, not the read's end (El's P3 on #5120).
+                let text = match get(mail::api_message_url(&id, whole)?).await {
+                    Err(why) if !whole && why == gone => continue,
+                    answer => answer?,
+                };
+                match mail::api_item(&text, whole) {
+                    Some(item) => items.push(item),
+                    // Past the 1 MB answer limit a whole mail is cut and
+                    // doesn't read: its headers and preview, and that the
+                    // rest is too long (El's P3 on #5120).
+                    None if whole => {
+                        let short = get(mail::api_message_url(&id, false)?).await?;
+                        if let Some(mut item) = mail::api_item(&short, false) {
+                            item.text = format!("{} {}", item.text, mail::TOO_LONG);
+                            items.push(item);
+                        }
+                    }
+                    None => {}
+                }
             }
             // A body comes in base64url, past `call`'s scrub: the tokens
             // are scrubbed again from what it says.
@@ -1429,7 +1448,22 @@ mod tests {
                 .unwrap_or("");
             match path.split('?').next().unwrap_or("") {
                 "profile" => reply(200, json!({"emailAddress":"me@work.test"})),
+                // A list naming a mail deleted since ("18a9": no such item).
+                "messages" if call.url.contains("q=gone") => {
+                    reply(200, json!({"messages":[{"id":"18a9"},{"id":"18a1"}]}))
+                }
                 "messages" => reply(200, json!({"messages":[{"id":"18a1"},{"id":"18a2"}]})),
+                // A mail whose whole text came cut at the 1 MB limit.
+                "messages/18aL" if call.url.contains("format=full") => Ok(Reply {
+                    status: 200,
+                    body: b"{\"id\":\"18aL\",\"payload\":{\"parts\":[{\"body\":{\"data\":\"QUFB"
+                        .to_vec(),
+                    ..Reply::default()
+                }),
+                "messages/18aL" => reply(
+                    200,
+                    api_mail("18aL", "Ann", "Long report", "The report is attached", ""),
+                ),
                 "messages/18a1" => reply(
                     200,
                     api_mail(
@@ -1516,6 +1550,38 @@ mod tests {
             calls[2]
                 .headers
                 .contains(&("authorization".into(), "Bearer planted-gmail-4710".into()))
+        );
+    }
+
+    /// El's P3s on #5120: a mail deleted between the list and its get is
+    /// left out of the list's read; a mail whose whole text was cut at the
+    /// 1 MB limit is told by its headers and preview, and that it is long.
+    #[test]
+    fn a_gmail_read_skips_a_deleted_mail_and_tells_a_cut_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), false);
+        run(services.admin(&oauth_gmail("planted-gmail-4710")));
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"search","query":"gone"}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let quoted = answer["result"]["quoted"].as_array().unwrap();
+        assert_eq!(quoted.len(), 1, "{answer}");
+        assert_eq!(quoted[0]["id"], "18a1");
+        // One mail asked for by its id that is gone is still told so.
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"message","id":"18a9"}),
+        )));
+        assert_eq!(answer["error"], "Gmail has no such item", "{answer}");
+        let answer = run(services.tool(&read_line(
+            json!({"service":"gmail","what":"message","id":"18aL"}),
+        )));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let item = &answer["result"]["quoted"][0];
+        assert_eq!(item["subject"], "Long report");
+        assert_eq!(
+            item["text"],
+            format!("The report is attached {}", mail::TOO_LONG)
         );
     }
 
