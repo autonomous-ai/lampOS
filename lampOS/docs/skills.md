@@ -2090,9 +2090,35 @@ happens:
        a later read moves an app's ask onto it, should the voice have
        stopped before it did. Claims are kept 24 h, longer than an answer
        is read for.
-     - Only a refusal by the check is repaired. A wrong format or a skill
-       asking for more than the light and the head is told not kept at
-       once, as is a repair whose hand-over fails.
+     - Only a refusal by the check is repaired, or by the plain words
+       below. A wrong format or a skill asking for more than the light and
+       the head is told not kept at once, as is a repair whose hand-over
+       fails.
+   - **Said plainly** (Mobile on #4710, 3 Nov). Once the check passes, the
+     lamp writes what the skill does from its `skill.toml`, never from the
+     model's description (`made_skill::plainly`): "When the lamp has been
+     quiet for a minute, between 22:00 and 22:30, it dims the light a
+     step, at most once an hour." That sentence is the card's description
+     in the package (`SKILL.md`'s, in place of the one written), in
+     `made.json`, in the app and in what the lamp says. A trigger with any
+     key but `topic`, `field`, `equals`, `for`, `cooldown`, `rearm` and
+     `during`, a trigger other than resting or someone being there or not,
+     or a step other than one light (`colour`, `level`, `for`, or `dim`
+     alone) or one gesture (`nod`, `curious`) is refused, and repaired
+     once as a check's refusal is (`PLAIN_ONLY`'s line). On lamp-0c89 the
+     lamp's model had kept "when someone says good night, dim the light
+     slowly over a minute" as any quiet minute from 22:00 to 22:30, under
+     its own description of what was asked.
+   - **What no skill can do.** An answer that begins `cannot:` with no
+     fenced block is told as not made, "a skill can't do that: " and the
+     model's reason, at most 120 characters (`made_skill::CANNOT`), and
+     nothing is kept. A line outside the blocks that begins `left out:`
+     (`made_skill::LEFT_OUT`) names what was asked and isn't in it; it is
+     said after what the skill does ("… it dims the light a step. Left
+     out: dimming slowly; it dims in one step"), at most 120 characters,
+     so a yes is to that too. Tests: `made_skill::tests::what_it_does_is_said_from_its_toml`,
+     `what_it_cant_say_is_refused_with_lines_for_a_repair`,
+     `a_cannot_answer_is_said_and_makes_nothing`.
      - Tests: `made_skill::tests::a_repairs_brief_carries_the_checks_lines_and_still_fits`,
        `a_failed_check_gives_its_lines_with_the_folder_replaced`, and
        `task_news::tests::a_made_skill_the_check_refuses_is_repaired_once`
@@ -2105,7 +2131,7 @@ happens:
    - the same hand-over read again gives back the kept one, not checked
      again.
 6. **Told, and asked.** The lamp says what it would do (the card's
-   description) and what it would use ("its light and whether it is
+   description, said plainly as above) and what it would use ("its light and whether it is
    talking"), then asks, word for word: "Shall I put it on the lamp?"
    - The files are never read out.
    - A skill not kept is told plainly why ("it asks to use more than the
@@ -2201,6 +2227,15 @@ Nothing above changes with the switch off.
    on someone being there) and told that a skill can't speak or keep time:
    on lamp-9adf on 2 Nov, before both, its first two skills were refused
    for a trigger field and a light step the check didn't know.
+   It is told too that a skill can't hear what is said: a request that
+   needs words or a sound heard, or anything else no made skill can sense
+   or do, is answered `cannot:` and why, never stood in for by something
+   else, and no time of day is added that the request didn't name. A
+   `cannot:` answer is whole as it is: it isn't asked again as one cut
+   short (`make_skill_local::tests::a_cannot_answer_is_asked_once_and_said_as_not_made`).
+   When part of a request can't be done ("dim slowly over a minute"), it
+   makes the rest and names the part in a `left out:` line
+   (`what_it_says_is_what_will_run_and_what_was_left_out`, #5041).
 4. Kept, the model is told its name, what it does and what it uses, and to
    ask "Shall I put it on the lamp?" in the same answer. It is not kept as
    asked then (the Reviewer-lead's P2 on #4914): only when a yes comes right

@@ -71,8 +71,17 @@ const PUT_ON_WAIT: Duration = Duration::from_secs(8);
 const PACK_WITHIN: Duration = Duration::from_secs(20);
 /// The most of either file taken from an answer.
 const MOST_FILE_BYTES: usize = 8 * 1024;
-/// The most of a description said.
-const MOST_DESCRIPTION_CHARS: usize = 200;
+/// The most of a description said: what it does, and what was left out.
+const MOST_DESCRIPTION_CHARS: usize = 300;
+/// How an answer begins that makes nothing: what was asked is more than a
+/// made skill can sense or do.
+pub const CANNOT: &str = "cannot:";
+/// The most of the model's reason said with it, or of what it left out.
+const MOST_CANNOT_CHARS: usize = 120;
+/// How a line outside the blocks begins that names what was asked and
+/// isn't in the skill ("left out: dimming slowly; it dims in one step"):
+/// said after what it does, so a yes is to what was left out too.
+pub const LEFT_OUT: &str = "left out:";
 /// The file that keeps what was made, in [`DIRECTORY`].
 pub const INDEX: &str = "made.json";
 
@@ -206,17 +215,37 @@ impl Refused {
 pub struct Files {
     pub toml: String,
     pub card: String,
+    /// What was asked and isn't in it, as the model's [`LEFT_OUT`] line
+    /// outside the blocks said it: told with what it does.
+    pub left_out: Option<String>,
 }
 
 /// The two files of the agent's answer: exactly one fenced block named
 /// `skill.toml` and one named `SKILL.md` (its info string's last word),
 /// and no other fenced block; each at most [`MOST_FILE_BYTES`].
 pub fn files(answer: &str) -> Result<Files, Refused> {
+    // The model's word that no made skill can do what was asked (it can't
+    // hear words said, say anything, or keep time by itself): said as
+    // that, never stood in for by something else.
+    if let Some(why) = answer.trim_start().strip_prefix(CANNOT)
+        && !answer.contains("```")
+    {
+        return Err(Refused::new(format!(
+            "a skill can't do that: {}",
+            cut_chars(why, MOST_CANNOT_CHARS)
+        )));
+    }
     let mut toml = None;
     let mut card = None;
+    let mut left_out = None;
     let mut lines = answer.lines();
     while let Some(line) = lines.next() {
         let Some(info) = line.trim_start().strip_prefix("```") else {
+            if let Some(what) = line.trim_start().strip_prefix(LEFT_OUT)
+                && !what.trim().is_empty()
+            {
+                left_out = Some(cut_chars(what, MOST_CANNOT_CHARS));
+            }
             continue;
         };
         let name = info.split_whitespace().last().unwrap_or_default();
@@ -246,7 +275,11 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
         }
     }
     match (toml, card) {
-        (Some(toml), Some(card)) => Ok(Files { toml, card }),
+        (Some(toml), Some(card)) => Ok(Files {
+            toml,
+            card,
+            left_out,
+        }),
         _ => Err(Refused::new("it didn't write both of a skill's files")),
     }
 }
@@ -360,9 +393,168 @@ pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
     Ok((version.to_owned(), uses))
 }
 
-/// A `SKILL.md`'s name and description, and the card marked `made: here`
-/// (`lamp-cloud`'s "Made on this lamp" group).
-fn card(text: &str) -> Result<(String, String, String), Refused> {
+/// What a made skill does, in plain words written from its `skill.toml`:
+/// when it runs and what it does then. This, never the model's own
+/// description, is the card's and what the lamp says before it asks to put
+/// it on (Mobile on #4710, 3 Nov: lamp-0c89 kept "when someone says good
+/// night, dim the light slowly over a minute" as any quiet minute from
+/// 22:00 to 22:30, under a description that said what was asked). A
+/// trigger or a step not put in plain words here is refused, so nothing is
+/// kept that the person can't be told.
+pub fn plainly(text: &str) -> Result<String, Refused> {
+    // Its lines go back to the model once, as the check's do.
+    let unsaid = || {
+        Refused(
+            "it does something the lamp can't say plainly".into(),
+            Some(PLAIN_ONLY.into()),
+        )
+    };
+    let table: toml::Table =
+        toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
+    let trigger = table
+        .get("trigger")
+        .and_then(|trigger| trigger.as_table())
+        .ok_or_else(unsaid)?;
+    let known = [
+        "topic", "field", "equals", "for", "cooldown", "rearm", "during",
+    ];
+    if trigger.keys().any(|key| !known.contains(&key.as_str())) {
+        return Err(unsaid());
+    }
+    let text_of = |key: &str| trigger.get(key).and_then(|value| value.as_str());
+    let lasting = match text_of("for") {
+        Some(lasting) => Some(spell(lasting).ok_or_else(unsaid)?),
+        None => None,
+    };
+    let topic = (text_of("topic"), text_of("field"), trigger.get("equals"));
+    let mut said = match (topic, lasting) {
+        ((Some("voice/state"), Some("state"), Some(state)), lasting)
+            if state.as_str() == Some("resting") =>
+        {
+            match lasting {
+                Some(lasting) => format!("When the lamp has been quiet for {lasting}"),
+                None => "When the lamp goes quiet".to_owned(),
+            }
+        }
+        ((Some("room/presence"), Some("someone"), Some(toml::Value::Boolean(true))), lasting) => {
+            match lasting {
+                Some(lasting) => format!("When someone has been at the desk for {lasting}"),
+                None => "When someone comes to the desk".to_owned(),
+            }
+        }
+        ((Some("room/presence"), Some("someone"), Some(toml::Value::Boolean(false))), lasting) => {
+            match lasting {
+                Some(lasting) => format!("When the desk has been empty for {lasting}"),
+                None => "When the desk is left".to_owned(),
+            }
+        }
+        _ => return Err(unsaid()),
+    };
+    if let Some(during) = trigger.get("during") {
+        let hour = |key: &str| during.get(key).and_then(|hour| hour.as_str());
+        let (Some(from), Some(to)) = (hour("from"), hour("to")) else {
+            return Err(unsaid());
+        };
+        said.push_str(&format!(", between {from} and {to}"));
+    }
+    let steps = table
+        .get("do")
+        .and_then(|steps| steps.as_array())
+        .filter(|steps| !steps.is_empty())
+        .ok_or_else(unsaid)?;
+    let steps = steps
+        .iter()
+        .map(|step| step_plainly(step).ok_or_else(unsaid))
+        .collect::<Result<Vec<_>, _>>()?;
+    said.push_str(&format!(", it {}", steps.join(", then ")));
+    if let Some(cooldown) = text_of("cooldown") {
+        let (count, unit) = duration(cooldown).ok_or_else(unsaid)?;
+        said.push_str(&match count {
+            1 => format!(", at most once {}", one(unit)),
+            _ => format!(", at most once every {count} {unit}s"),
+        });
+    }
+    said.push('.');
+    Ok(said)
+}
+
+/// What a repair is told when [`plainly`] refused.
+const PLAIN_ONLY: &str = "the trigger may have only topic, field, equals, for, cooldown, rearm \
+                          and during, and each [[do]] step only one light or one body gesture, \
+                          as the request names them";
+
+/// One `[[do]]` step in plain words: a light or a gesture, as the brief
+/// names them.
+fn step_plainly(step: &toml::Value) -> Option<String> {
+    let step = step.as_table().filter(|step| step.len() == 1)?;
+    if let Some(light) = step.get("light").and_then(|light| light.as_table()) {
+        if let Some(dim) = light.get("dim") {
+            return match (light.len(), dim.as_integer()?) {
+                (1, 1) => Some("dims the light a step".to_owned()),
+                (1, steps @ 2..) => Some(format!("dims the light {steps} steps")),
+                _ => None,
+            };
+        }
+        let known = ["colour", "level", "for"];
+        if light.keys().any(|key| !known.contains(&key.as_str())) {
+            return None;
+        }
+        let mut said = match light.get("colour") {
+            Some(colour) => format!("glows {}", colour.as_str()?),
+            None => "turns the light".to_owned(),
+        };
+        if let Some(level) = light.get("level") {
+            said.push_str(&format!(" at level {}", level.as_integer()?));
+        }
+        if let Some(lasting) = light.get("for") {
+            said.push_str(&format!(" for {}", spell(lasting.as_str()?)?));
+        }
+        return Some(said);
+    }
+    let body = step.get("body").and_then(|body| body.as_table())?;
+    match (
+        body.len(),
+        body.get("gesture").and_then(|gesture| gesture.as_str()),
+    ) {
+        (1, Some("nod")) => Some("nods".to_owned()),
+        (1, Some("curious")) => Some("looks up, curious".to_owned()),
+        _ => None,
+    }
+}
+
+/// A skill's duration, `"20s"`, `"1m"`, `"12h"`: its count and its unit.
+fn duration(text: &str) -> Option<(u64, &'static str)> {
+    let unit = match text.chars().last()? {
+        's' => "second",
+        'm' => "minute",
+        'h' => "hour",
+        _ => return None,
+    };
+    let count: u64 = text[..text.len() - 1].parse().ok()?;
+    (count > 0).then_some((count, unit))
+}
+
+/// `"a minute"`, `"20 seconds"`.
+fn spell(text: &str) -> Option<String> {
+    let (count, unit) = duration(text)?;
+    Some(match count {
+        1 => one(unit).to_owned(),
+        _ => format!("{count} {unit}s"),
+    })
+}
+
+fn one(unit: &str) -> &'static str {
+    match unit {
+        "second" => "a second",
+        "minute" => "a minute",
+        _ => "an hour",
+    }
+}
+
+/// A `SKILL.md`'s name, and the card marked `made: here` (`lamp-cloud`'s
+/// "Made on this lamp" group) with `description` ([`plainly`]'s) in place
+/// of the one written.
+fn card(text: &str, description: &str) -> Result<(String, String), Refused> {
     let unread = || Refused::new("its SKILL.md has no name and description");
     let rest = text.strip_prefix("---\n").ok_or_else(unread)?;
     let (front, body) = rest.split_once("\n---").ok_or_else(unread)?;
@@ -374,7 +566,9 @@ fn card(text: &str) -> Result<(String, String, String), Refused> {
         })
     };
     let name = field("name").ok_or_else(unread)?;
-    let description = field("description").ok_or_else(unread)?;
+    if field("description").is_none_or(|written| written.is_empty()) {
+        return Err(unread());
+    }
     if !(1..=64).contains(&name.len())
         || !name
             .bytes()
@@ -382,15 +576,17 @@ fn card(text: &str) -> Result<(String, String, String), Refused> {
     {
         return Err(Refused::new("its name isn't a skill's name"));
     }
-    if description.is_empty() {
-        return Err(unread());
-    }
-    let front: Vec<&str> = front
+    let mut front: Vec<String> = front
         .lines()
-        .filter(|line| !line.starts_with("made:"))
+        .filter(|line| !line.starts_with("made:") && !line.starts_with("description:"))
+        .map(str::to_owned)
         .collect();
+    front.push(format!(
+        "description: \"{}\"",
+        description.replace(['"', '\\'], "'")
+    ));
     let marked = format!("---\n{}\nmade: here\n---{body}", front.join("\n"));
-    Ok((name, description, marked))
+    Ok((name, marked))
 }
 
 /// Where made skills are kept, and the program that checks them.
@@ -450,7 +646,10 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
     }
     let files = files(answer)?;
     let (version, uses) = capped(&files.toml)?;
-    let (name, description, marked) = card(&files.card)?;
+    // Said only once the check has passed: its lines, which name the
+    // field, go to a repair before these do.
+    let said = plainly(&files.toml);
+    let (name, marked) = card(&files.card, said.as_deref().unwrap_or_default())?;
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
     // its check's words.
@@ -472,7 +671,11 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
     })()
     .map_err(unkept);
     let packed = made.and_then(|()| pack(&keeping.program, &folder, &out, &name));
-    let result = packed.and_then(|()| {
+    let said = said.map(|does| match &files.left_out {
+        Some(what) => format!("{does} Left out: {what}"),
+        None => does,
+    });
+    let result = packed.and(said).and_then(|description| {
         let package = format!("{name}-{version}.tar");
         let bytes = fs::read(out.join(&package)).map_err(unkept)?;
         let sha256 = hex(&Sha256::digest(&bytes));
@@ -1369,26 +1572,127 @@ light = { dim = 1 }
         );
     }
 
-    /// The card's name and description, and `made: here` in its front
-    /// matter, once; a card without them, or with a name that is not a
-    /// skill's, is refused.
+    /// The card's name, `made: here` in its front matter, once, and the
+    /// description given in place of the one written; a card without them,
+    /// or with a name that is not a skill's, is refused.
     #[test]
     fn the_card_is_marked_made_here() {
-        let (name, description, marked) = card(CARD).unwrap();
+        let said = "When the lamp goes quiet, it dims the light a step.";
+        let (name, marked) = card(CARD, said).unwrap();
         assert_eq!(name, "evening-dim");
-        assert_eq!(description, "Dims the light a shade at 10 pm.");
         assert_eq!(marked.matches("made: here").count(), 1);
         assert!(marked.starts_with("---\nname: evening-dim\n"));
         assert!(marked.ends_with("At ten it dims.\n"));
-        let again = card(&CARD.replace("name:", "made: there\nname:"))
+        assert_eq!(marked.matches("description:").count(), 1);
+        assert!(marked.contains(&format!("description: \"{said}\"\n")));
+        assert!(!marked.contains("10 pm"));
+        let quoted = card(CARD, "glows \"red\"").unwrap().1;
+        assert!(quoted.contains("description: \"glows 'red'\"\n"));
+        let again = card(&CARD.replace("name:", "made: there\nname:"), said)
             .unwrap()
-            .2;
+            .1;
         assert_eq!(again.matches("made:").count(), 1);
-        assert!(card("# No front matter\n").is_err());
-        assert!(card(&CARD.replace("evening-dim", "Evening Dim")).is_err());
+        assert!(card("# No front matter\n", said).is_err());
+        assert!(card(&CARD.replace("evening-dim", "Evening Dim"), said).is_err());
         assert!(
-            card(&CARD.replace("description: Dims the light a shade at 10 pm.\n", "")).is_err()
+            card(
+                &CARD.replace("description: Dims the light a shade at 10 pm.\n", ""),
+                said
+            )
+            .is_err()
         );
+    }
+
+    /// What a made skill does is said from its `skill.toml`, not the
+    /// model's words: lamp-0c89's "good night" skill (Mobile on #4710,
+    /// 3 Nov) is said as the quiet minute it is.
+    #[test]
+    fn what_it_does_is_said_from_its_toml() {
+        let good_night = TOML.replace(
+            "cooldown = \"12h\"\n",
+            "for = \"1m\"\ncooldown = \"1h\"\nrearm = \"ends\"\n",
+        );
+        assert_eq!(
+            plainly(&good_night).unwrap(),
+            "When the lamp has been quiet for a minute, between 22:00 and 22:30, it dims the \
+             light a step, at most once an hour."
+        );
+        assert_eq!(
+            plainly(TOML).unwrap(),
+            "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at \
+             most once every 12 hours."
+        );
+        let back = r#"[trigger]
+topic = "room/presence"
+field = "someone"
+equals = true
+for = "5s"
+cooldown = "1h"
+
+[[do]]
+light = { colour = "cyan", level = 3, for = "20s" }
+
+[[do]]
+body = { gesture = "nod" }
+"#;
+        assert_eq!(
+            plainly(back).unwrap(),
+            "When someone has been at the desk for 5 seconds, it glows cyan at level 3 for 20 \
+             seconds, then nods, at most once an hour."
+        );
+        let left = back
+            .replace(
+                "equals = true\nfor = \"5s\"\n",
+                "equals = false\nfor = \"10m\"\n",
+            )
+            .replace("gesture = \"nod\"", "gesture = \"curious\"");
+        assert!(plainly(&left).unwrap().starts_with(
+            "When the desk has been empty for 10 minutes, it glows cyan at level 3 for 20 \
+             seconds, then looks up, curious,"
+        ));
+    }
+
+    /// A trigger or a step it can't say is refused, with lines for a
+    /// repair: the person is never asked about something they weren't told.
+    #[test]
+    fn what_it_cant_say_is_refused_with_lines_for_a_repair() {
+        let refused = |toml: &str| match plainly(toml) {
+            Err(Refused(why, Some(lines))) => {
+                assert!(why.contains("can't say plainly"), "{why}");
+                assert_eq!(lines, PLAIN_ONLY);
+            }
+            other => panic!("{other:?}"),
+        };
+        refused(&TOML.replace("cooldown", "once_per_day = true\ncooldown"));
+        refused(&TOML.replace("equals = \"resting\"", "equals = \"talking\""));
+        refused(&TOML.replace("voice/state\"\nfield", "room/activity\"\nfield"));
+        refused(&TOML.replace("{ dim = 1 }", "{ dim = 1, for = \"1m\" }"));
+        refused(&TOML.replace("light = { dim = 1 }", "say = \"good night\""));
+        refused(&TOML.replace("[[do]]\nlight = { dim = 1 }\n", ""));
+        refused(&TOML.replace("cooldown = \"12h\"", "cooldown = \"1h30m\""));
+        refused(&TOML.replace(
+            "during = { from = \"22:00\", to = \"22:30\" }",
+            "during = {}",
+        ));
+    }
+
+    /// The model's `cannot:` is said as a skill that can't do that, and
+    /// nothing is kept; a `cannot:` with blocks is read as blocks.
+    #[test]
+    fn a_cannot_answer_is_said_and_makes_nothing() {
+        let Err(Refused(why, None)) =
+            files("cannot: a skill can't hear words like \"good night\".")
+        else {
+            panic!("a cannot answer is refused with no repair");
+        };
+        assert_eq!(
+            why,
+            "a skill can't do that: a skill can't hear words like \"good night\"."
+        );
+        let long = format!("cannot: {}", "x ".repeat(200));
+        assert!(files(&long).unwrap_err().0.chars().count() < 160);
+        let both = format!("cannot: no\n{}", answer(TOML, CARD));
+        assert!(files(&both).is_ok());
     }
 
     /// What the model is told: the skill's words, what it would use, and

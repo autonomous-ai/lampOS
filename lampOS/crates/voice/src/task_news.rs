@@ -3120,7 +3120,7 @@ mod tests {
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
         let request = "make me a skill that dims the light at 10 pm";
         let brief = crate::made_skill::brief(request).unwrap();
-        let answer = "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\ntopics = [\"voice/state\"]\nlight = true\n```\n```SKILL.md\n---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n# Evening dim\n```\n";
+        let answer = "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\ntopics = [\"voice/state\"]\nlight = true\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n[[do]]\nlight = { dim = 1 }\n```\n```SKILL.md\n---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n# Evening dim\n```\n";
         let socket = root.join("request.sock");
         let listener = UnixListener::bind(&socket).unwrap();
         let task_line = json!({"ok":true,"text":brief,
@@ -3153,7 +3153,7 @@ mod tests {
         let news = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
         assert_eq!(news.len(), 1);
         let told = &news[0].note;
-        assert!(told.contains("Claude Code just made the skill they asked for, \"evening-dim\": Dims the light a shade at 10 pm."), "{told}");
+        assert!(told.contains("Claude Code just made the skill they asked for, \"evening-dim\": When the lamp goes quiet, it dims the light a step."), "{told}");
         assert!(
             told.contains("It would use its light and whether it is talking."),
             "{told}"
@@ -3281,7 +3281,7 @@ mod tests {
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
         let answer = |name: &str| {
             format!(
-                "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\ntopics = [\"voice/state\"]\nlight = true\n```\n```SKILL.md\n---\nname: {name}\ndescription: Dims the light a shade at 10 pm.\n---\n# Evening dim\n```\n"
+                "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\ntopics = [\"voice/state\"]\nlight = true\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n[[do]]\nlight = {{ dim = 1 }}\n```\n```SKILL.md\n---\nname: {name}\ndescription: Dims the light a shade at 10 pm.\n---\n# Evening dim\n```\n"
             )
         };
         let request = "make me a skill that dims the light at 10 pm";
@@ -3569,7 +3569,7 @@ mod tests {
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
         let request = "make me a skill that dims the light at 10 pm";
         let brief = crate::made_skill::brief(request).unwrap();
-        let answer = "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nlight = true\n```\n```SKILL.md\n---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n```\n";
+        let answer = "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nlight = true\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n[[do]]\nlight = { dim = 1 }\n```\n```SKILL.md\n---\nname: evening-dim\ndescription: Dims the light a shade at 10 pm.\n---\n```\n";
         let socket = root.join("request.sock");
         let listener = UnixListener::bind(&socket).unwrap();
         let task_line = json!({"ok":true,"text":brief,"target":{"engine":"claude"},
