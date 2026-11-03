@@ -156,3 +156,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   13:12: Reviewer-lead READ-OK on #5044 `05409db98`, no findings (verdicts
   checked against the shipped journals; no words heard are in them).
   13:1x: NEXT TRAIN posted for #5044.
+- 13:26: the first builder: READ-OK on #5044 too, and yes to the next
+  piece: after2 on lamp-fc4b, read-only, on the first stable that carries
+  #5034 (promote 2); post whether d08 is then held. Heron waits for that
+  stable, then asks the person again before any ssh or sound.
