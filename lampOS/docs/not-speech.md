@@ -698,6 +698,21 @@ A call written as words is kept nowhere, on either route
   called the lamp by name to a face, #2191), and any other is asked once
   more, told to call the function (`CALL_ALOUD_NOTE`). Beside a call or
   other words, those go on. "Calling your sister is a good idea." is said.
+- The second route, a step's own word alone (`not_speech::step_word_alone`,
+  `STEP_WORDS`: "Brighter.", "Dimmer.", "Warmer.", "Cooler.", "Louder.",
+  "Quieter.", lamp-actions' own words after a step; lamp-52e6, 3 Nov, the
+  Core-verifier's run at 9582: 4 of 14 light and volume asks got only
+  "Louder.", "Brighter." or "Cooler." with no call, the word copied from
+  the thread's earlier turns, and nothing changed): a whole reply that is
+  only such a word, case and a closing '.' or '!' aside, is taken as the
+  narration above, held until the reply ends. With no call earlier in the
+  turn it is dropped: with nothing else in its round it is asked once more,
+  told that nothing changed and to call the function (`step_alone_note`),
+  and beside its call the call's own line says it once. After a real step
+  earlier in the turn it is the answer, and said. "Done." is no step's own
+  and is said; so are "Louder music helps me focus." and "Brighter.
+  Better?". A second word alone after the note is not said either, and the
+  turn ends in silence.
 
 ## Tests
 
