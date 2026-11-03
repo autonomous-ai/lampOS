@@ -2311,6 +2311,11 @@ struct Carried {
     /// The request that first tried a memory write for these words
     /// ([`WriteOwner`]), shared with a held line answering them again.
     memory_write_owner: WriteOwner,
+    /// The chat rounds its answer finished before it was cut, each call
+    /// with its result: a held line answering these words again goes on
+    /// from them, never searching again from nothing (#5026, lamp-0529,
+    /// 3 Nov: two searches and a page lost to a 0-word line).
+    rounds: Vec<Message>,
 }
 
 /// Which request first tried `remember`, `forget` or `forget_everything`
@@ -2386,6 +2391,7 @@ impl Carried {
             said_by,
             unchecked: Vec::new(),
             memory_write_owner: WriteOwner::default(),
+            rounds: Vec::new(),
         }
     }
 
@@ -6879,13 +6885,14 @@ async fn spoken(
             let refused = !empty && name_refused(&shared, request, &carried);
             // Only the carried words again keep their write's owner; joined
             // with new words, the line may ask for a write of its own.
-            let (words, said_by, parts, owner) = if empty || refused {
+            let (words, said_by, parts, owner, rounds) = if empty || refused {
                 unsay_carried(&shared, request, &carried);
                 (
                     carried.text(),
                     carried.said_by,
                     carried.parts.clone(),
                     carried.memory_write_owner.clone(),
+                    carried.rounds.clone(),
                 )
             } else {
                 // While the join waits for a print, the carried words are
@@ -6910,7 +6917,9 @@ async fn spoken(
                     return;
                 }
                 match joined {
-                    (joined, None, parts) => (joined, request, parts, WriteOwner::default()),
+                    (joined, None, parts) => {
+                        (joined, request, parts, WriteOwner::default(), Vec::new())
+                    }
                     (_, Some(carried), _) => {
                         unsay_carried(&shared, request, &carried);
                         (
@@ -6918,6 +6927,7 @@ async fn spoken(
                             carried.said_by,
                             carried.parts,
                             carried.memory_write_owner,
+                            carried.rounds,
                         )
                     }
                 }
@@ -6935,6 +6945,7 @@ async fn spoken(
                     said_by,
                     unchecked: Vec::new(),
                     memory_write_owner: owner.clone(),
+                    rounds,
                 },
             );
             let lease = scope.clone();
@@ -7224,6 +7235,7 @@ async fn spoken(
             said_by: request,
             unchecked: Vec::new(),
             memory_write_owner: memory_write_owner.clone(),
+            rounds: Vec::new(),
         },
     );
     if let Some(heard) = &shared.words_heard {
@@ -7322,6 +7334,35 @@ fn holding_while_joining(shared: &Shared, held: Carried) -> bool {
 
 /// `carried` in flight, its request recorded as asked
 /// ([`Shared::asked_last`]).
+/// A finished chat round of `request` (its calls and their results), kept
+/// with its words in flight so a held line answering them again goes on
+/// from it (#5026).
+fn carry_round(shared: &Shared, request: u64, round: &[Message]) {
+    if let Ok(mut in_flight) = shared.in_flight.lock()
+        && let Some(carried) = in_flight
+            .as_mut()
+            .filter(|carried| carried.request == request)
+    {
+        carried.rounds.extend_from_slice(round);
+    }
+}
+
+/// The finished rounds carried in with `request`'s words: a held line's,
+/// answering words cut short (#5026). None for words of its own.
+fn carried_rounds(shared: &Shared, request: u64) -> Vec<Message> {
+    shared
+        .in_flight
+        .lock()
+        .ok()
+        .and_then(|in_flight| {
+            in_flight
+                .as_ref()
+                .filter(|carried| carried.request == request)
+                .map(|carried| carried.rounds.clone())
+        })
+        .unwrap_or_default()
+}
+
 fn put_in_flight(shared: &Shared, carried: Carried) {
     if let Ok(mut asked) = shared.asked_last.lock() {
         *asked = Some(asked.map_or(carried.request, |last| last.max(carried.request)));
@@ -7416,8 +7457,10 @@ fn waiting_chain(request: u64, marks: &Marks, carried: &Carried, own: Part) -> C
         request,
         at: Instant::now(),
         said_by: request,
-        // New words, so a write of their own ([`WriteOwner`]).
+        // New words, so a write of their own ([`WriteOwner`]), and a
+        // question of their own to search for.
         memory_write_owner: WriteOwner::default(),
+        rounds: Vec::new(),
         ..chain
     }
 }
@@ -9571,6 +9614,16 @@ async fn answer(
             messages.clone_from(&prepared.messages);
         }
         let asked_at = messages.len() - 1;
+        // A held line answering cut words goes on from the rounds their
+        // answer finished (#5026).
+        let rounds = carried_rounds(shared, request);
+        if !rounds.is_empty() {
+            eprintln!(
+                "lamp-voice second: request {request} goes on from {} messages of the cut answer's finished rounds",
+                rounds.len()
+            );
+            messages.extend(rounds);
+        }
         // Round 1's bounds run from here, or from its one ask again after a
         // line lost on the network (`LAMP_RESEND_LOST_LINE`).
         let mut from = begun;
@@ -10334,6 +10387,7 @@ async fn answer(
                 );
                 queue.push(shared.fixed(CHECKING).to_owned()).await?;
             }
+            let round_at = messages.len();
             messages.push(Message::assistant_calls_with(
                 Some(text),
                 &calls,
@@ -10684,6 +10738,9 @@ async fn answer(
                     dispatched.store(true, Ordering::Relaxed);
                 }
             }
+            // Every call answered: the round goes with the words if a line
+            // cuts them now (#5026).
+            carry_round(shared, request, &messages[round_at..]);
             // Held: nothing more of the turn is said, as on the Live route,
             // where none of a held turn's sound is let out. What the model
             // said before its call may have gone out already: counted, for
