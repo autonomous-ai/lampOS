@@ -112,3 +112,103 @@ fn a_call_that_did_nothing_is_not_handed_on() {
 fn a_decline_is_not_handed_on() {
     assert!(handed_on(true, "and then she said no", vec![calling(&[NOT_FOR_ME])]).is_empty());
 }
+
+/// A call made with arguments is never handed on: a kept call is told with
+/// none, and would teach calling it bare (Fourteen's P3 on #5018). The
+/// step beside it, which takes none, is.
+#[test]
+fn a_call_with_arguments_is_not_handed_on() {
+    let rounds = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("c0", "light_colour", json!({"colour": "red"})),
+                call("c1", "light_dimmer", json!({})),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        saying("Red, and dimmer."),
+    ];
+    assert_eq!(
+        handed_on(true, "Make it red and dimmer.", rounds),
+        [(1, "light_dimmer".to_owned())]
+    );
+}
+
+/// An earlier turn as `worker::messages_told` gives it with one kept call.
+fn kept_history() -> Told {
+    let kept = net::ToolCall {
+        id: "kept-1-0".into(),
+        name: "volume_down".into(),
+        args: json!({}),
+        extra: None,
+    };
+    Told {
+        text: "SYSTEM".into(),
+        after: None,
+        history: vec![
+            Message::user("Lamp, you're a bit loud."),
+            Message::assistant_calls(None, std::slice::from_ref(&kept)),
+            Message::tool("kept-1-0", "(done earlier; its result was not kept)"),
+            Message::assistant("Quieter."),
+        ],
+    }
+}
+
+/// The Reviewer-lead's P2 on #5018: a chat that refuses round 1 (a 400,
+/// say a call given back with no thought signature) with kept calls in the
+/// history is asked once more without them, and its answer is said; the
+/// earlier turn's words stay. With no kept calls, the same 400 ends the
+/// turn as before, asked once.
+#[tokio::test]
+async fn a_chat_that_refuses_kept_calls_is_asked_again_without_them() {
+    for kept in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Lamp, quieter again.".into())].into()),
+            chats: Mutex::new(
+                [
+                    vec![Err(net::Error::Status(400))],
+                    vec![text("Sure."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let system: System = if kept {
+            Arc::new(kept_history)
+        } else {
+            Arc::new(|| "SYSTEM".to_owned().into())
+        };
+        let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(script.clone(), system, tools, Arc::new(Instant::now))
+            .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().clone();
+        if kept {
+            assert_eq!(asked.len(), 2, "{labels:?}");
+            assert!(
+                labels.iter().any(|label| label == "said:Sure."),
+                "{labels:?}"
+            );
+            let first = format!("{:?}", asked[0]);
+            let again = format!("{:?}", asked[1]);
+            assert!(first.contains("kept-1-0"), "{first}");
+            assert!(!again.contains("kept-1-0"), "{again}");
+            assert!(again.contains("Quieter."), "{again}");
+            assert_eq!(
+                asked[1].last(),
+                asked[0].last(),
+                "the line asked stays last"
+            );
+            assert_eq!(asked[1].len() + 2, asked[0].len());
+        } else {
+            assert_eq!(asked.len(), 1, "{labels:?}");
+            assert!(
+                !labels.iter().any(|label| label == "said:Sure."),
+                "{labels:?}"
+            );
+        }
+    }
+}
