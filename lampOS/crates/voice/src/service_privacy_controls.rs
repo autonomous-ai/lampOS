@@ -14,6 +14,7 @@ use crate::{
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{BootId, Controller, MonoTime, Permission};
 use std::{
+    collections::VecDeque,
     fmt, fs, io,
     os::unix::fs::FileTypeExt,
     path::Path,
@@ -382,6 +383,9 @@ struct Waiting {
     previous: Option<PrivacyState>,
     last_publish: Option<u64>,
     started: Instant,
+    /// The worker's events read just before a renewal is sent, in order,
+    /// for the next look to take first ([`Self::hold_queued`]).
+    held: VecDeque<io::Result<WorkerEvent>>,
 }
 
 impl Waiting {
@@ -399,6 +403,7 @@ impl Waiting {
             previous: None,
             last_publish: None,
             started: Instant::now(),
+            held: VecDeque::new(),
         })
     }
 
@@ -451,12 +456,11 @@ impl Waiting {
         self.renew(worker, indicator, PUBLISH_EVERY_US, Renewal::AfterGate)?;
         let mut empty = false;
         for _ in 0..16 {
-            match worker
-                .channels
-                .control
-                .receive::<WorkerEvent>()
-                .map_err(unavailable)?
-            {
+            let next = match self.held.pop_front() {
+                Some(held) => held.map(Some),
+                None => worker.channels.control.receive::<WorkerEvent>(),
+            };
+            match next.map_err(unavailable)? {
                 Some(WorkerEvent::Privacy {
                     acquired_at_us,
                     muted,
@@ -526,12 +530,18 @@ impl Waiting {
         {
             return Ok(());
         }
+        self.hold_queued(worker);
         let snapshot = self.controller.snapshot(MonoTime::from_micros(at))?;
         worker
             .channels
             .control
             .send(Control::Authority { snapshot })
-            .map_err(|error| unavailable(format!("{error} ({which})")))?;
+            .map_err(|error| {
+                unavailable(format!(
+                    "{} ({which})",
+                    own_fault(&self.held, worker, error)
+                ))
+            })?;
         if let Some(indicator) = indicator {
             let _ = indicator
                 .channels
@@ -541,6 +551,70 @@ impl Waiting {
         self.last_publish = Some(at);
         Ok(())
     }
+
+    /// Reads what the worker has queued, without blocking, before a renewal
+    /// is sent, and holds it for the next look, in order. On Linux a send
+    /// refused because the worker's socket is gone empties this socket's
+    /// own queue (af_unix `unix_dgram_disconnected`), so a worker's Fault
+    /// queued before it exited would be lost to [`own_fault`]: the PR's test
+    /// passed on macOS and failed on the ARM64 CI (#4332). At most 16 are
+    /// held; reading stops at an error or a Fault, which the look then
+    /// handles as it always did.
+    fn hold_queued(&mut self, worker: &mut Worker) {
+        if matches!(
+            self.held.back(),
+            Some(Err(_) | Ok(WorkerEvent::Fault { .. }))
+        ) {
+            return;
+        }
+        while self.held.len() < 16 {
+            match worker.channels.control.receive::<WorkerEvent>() {
+                Ok(None) => break,
+                Ok(Some(event)) => {
+                    let fault = matches!(event, WorkerEvent::Fault { .. });
+                    self.held.push_back(Ok(event));
+                    if fault {
+                        break;
+                    }
+                }
+                Err(error) => {
+                    self.held.push_back(Err(error));
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/// Why a refused send to the privacy worker was refused: a worker that
+/// ended on its own (an unreadable switch) sends its Fault, exits and unlinks
+/// its socket, so the send finds only the socket gone (lamp-06c1, cold boot
+/// 6, #4332). Its Fault, if already queued, is the reason; otherwise the
+/// socket's error is, as before. The control channel is only read here,
+/// without blocking: a refused send ends the wait closed, and nothing reads
+/// this worker's events after it (the cleanup reads only its exit), so the
+/// events passed over on the way to a Fault are not lost to later handling.
+fn own_fault(
+    held: &VecDeque<io::Result<WorkerEvent>>,
+    worker: &mut Worker,
+    refused: io::Error,
+) -> String {
+    // Held before the send: on Linux the refused send emptied the socket.
+    if let Some(code) = held.iter().find_map(|event| match event {
+        Ok(WorkerEvent::Fault { code }) => Some(code.clone()),
+        _ => None,
+    }) {
+        return code;
+    }
+    // Queued since (macOS keeps a refused sender's queue).
+    for _ in 0..16 {
+        match worker.channels.control.receive::<WorkerEvent>() {
+            Ok(Some(WorkerEvent::Fault { code })) => return code,
+            Ok(Some(_)) => {}
+            Ok(None) | Err(_) => break,
+        }
+    }
+    refused.to_string()
 }
 
 /// The privacy worker's own sockets in the wait's session directory, which
@@ -1696,5 +1770,47 @@ pub(crate) mod tests {
             "renewal after the gate",
             "the look's publish after its gate"
         );
+    }
+
+    /// A worker that ended on its own sent its Fault, exited and unlinked its
+    /// socket before the first authority: the refused renewal says the
+    /// worker's reason, not the socket's Connection refused (lamp-06c1, cold
+    /// boot 6, #4332).
+    #[test]
+    fn a_refused_renewal_says_the_workers_own_fault() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, mut peer, input) = Worker::cooperative_fixture(&directory.path, "privacy");
+        peer.control
+            .send(WorkerEvent::Fault {
+                code: "physical privacy source expired".into(),
+            })
+            .unwrap();
+        drop(peer);
+        drop(input);
+        let mut waiting = Waiting::new(new_boot().unwrap()).unwrap();
+        // A child another test forks may hold the peer's socket until its
+        // exec, so the first sends can still be taken (#1569).
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let error = loop {
+            waiting.last_publish = None;
+            match waiting.ready(&mut worker) {
+                Err(error) => break error,
+                Ok(()) => {
+                    assert!(Instant::now() < deadline, "no send was refused");
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            }
+        };
+        let _ = cleanup(&mut worker, None, &directory.path);
+        drop(worker);
+        let _ = fs::remove_dir(&directory.path);
+        assert!(is_unavailable(&*error), "{error}");
+        let said = error.to_string();
+        assert!(
+            said.contains("physical privacy source expired (renewal after Ready)"),
+            "{said}"
+        );
+        // Linux says Connection refused; macOS, Connection reset by peer.
+        assert!(!said.contains("Connection"), "{said}");
     }
 }
