@@ -539,11 +539,14 @@ for the Policy's decision as the executive's are, with
 service at all: a made skill's step that names a services function is never
 said plainly, and a made skill's own function of that name is refused
 (`made_skill::plainly`, `made_skill::capped`). A request to make a skill
-that names mail or a calendar ("mail", "email", "e-mail", "gmail", "inbox",
-"calendar", as a whole word) is never handed to the model: `made_skill::brief`
-answers it with `NOT_A_SERVICE`, "A skill can't read your mail or calendar,
-but you can just ask me to read it once it's linked in the app: Skills, then
-Connectors."
+that names any linked service (mail and a calendar: "mail", "email", "e-mail",
+"gmail", "inbox", "calendar"; a service's own name, as a whole word: Notion,
+Figma, GitHub, Asana, Ahrefs, Facebook, Slack, HubSpot, Amplitude, "gdrive";
+and "google drive", "linear app", "monday com" as phrases, since "drive",
+"linear" and "monday" are plain words too) is never handed to the model:
+`made_skill::brief` answers it with `NOT_A_SERVICE`, "A skill can't use your
+mail, calendar or other services, but you can just ask me once the service is
+linked in the app: Skills, then Connectors."
 
 A call to a service that isn't linked fails with "<Service> isn't linked to
 this lamp yet. It can be linked in the app: Skills, then Connectors."
