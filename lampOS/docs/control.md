@@ -593,8 +593,10 @@ listening. The person wins over each, as "Who wins" says.
   reply waits for the voice: `{"turn":"ended","started":18}` (the
   `turn.start` it ended) on `ended`; the voice's "not this computer's turn"
   is the same `busy`; anything else is `refused` with the voice's why. The
-  start's `done` follows (`dropped: ended by the computer`, or `finished`
-  if its answer had sounded).
+  start's `done` follows: `dropped: ended by the computer` if nothing of
+  its answer had sounded, or `cut_short`, "ended by this computer", if the
+  end cut an answer that had begun, so a developer can tell it from one
+  heard whole.
 - **`listen.set false`** opens one say socket connection for the computer
   and sends `{"skill":"control","listen":false}` on it; the reply waits for
   the voice's `muted`: `{"mute":"held"}`. The door keeps that connection,
