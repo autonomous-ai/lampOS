@@ -202,3 +202,10 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   failures seen under load (`coordinator::motor`, `termination`,
   `sign_in`) pass alone and the motor ones fail on lamp-voice without the
   PR too. CI green.
+- 16:30: stable moved to 9788 (carries #5034); lamp-fc4b not yet switched
+  at 16:46 (lamp-update rounds every 900 s, quiet wait). 16:27: Friday
+  asked for the memory side of #5052; yes at 16:32. 16:5x: HOLD on #5052
+  `28c649fd4`: the body is #5053's text, and the head conflicts with
+  lamp-voice (`days_protocol.rs`, memory-days.md, memory.md, #5049 in)
+  and with #5043; code read clean, `days_strength::` 4/4, three mutations
+  caught, lamp-memory suite green on its own base, no CI on the head yet.
