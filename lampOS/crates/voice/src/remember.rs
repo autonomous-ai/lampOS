@@ -1424,6 +1424,92 @@ pub fn switch_recall_v2(on: bool) -> bool {
     *RECALL_V2.get_or_init(|| on)
 }
 
+/// Only the exact value `on`, with the Days client: a search asks Days to
+/// put a newer correction ("actually", "now", "no longer") ahead of the
+/// older line it corrects, which comes back marked `earlier` (3 Nov
+/// Tiers-ideas plan, P1; idea adapted from memory-tiers,
+/// `tiers/recall-adapter`). Off, the request is as before. An older Days
+/// refuses the field, so upgrade the voice and the memory together.
+pub const NEWER_FIRST_ENVIRONMENT: &str = "LAMP_MEMORY_NEWER_FIRST";
+static NEWER_FIRST: OnceLock<bool> = OnceLock::new();
+
+/// Whether a search asks for newer corrections first
+/// ([`NEWER_FIRST_ENVIRONMENT`]).
+pub fn newer_first_on() -> bool {
+    NEWER_FIRST.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_newer_first(on: bool) -> bool {
+    *NEWER_FIRST.get_or_init(|| on)
+}
+
+/// Only the exact value `on`, with the Days client: a search and a session
+/// note ask Days to mark a line said as a maybe or a plan (`strength`), so
+/// the model does not take it as done or booked (3 Nov Tiers-ideas plan,
+/// P2; adapted from memory-tiers). Off, the requests are as before.
+pub const STRENGTH_ENVIRONMENT: &str = "LAMP_MEMORY_STRENGTH";
+static STRENGTH: OnceLock<bool> = OnceLock::new();
+
+/// Whether a search and a session note ask for strength
+/// ([`STRENGTH_ENVIRONMENT`]).
+pub fn strength_on() -> bool {
+    STRENGTH.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_strength(on: bool) -> bool {
+    *STRENGTH.get_or_init(|| on)
+}
+
+/// Only the exact value `on`, with the Days client: a session note keeps a
+/// band for the person's tastes and kept facts before promises and threads
+/// fill it, within the same cap and the same candidates (3 Nov Tiers-ideas
+/// plan, P3; the owner profile of memory-tiers). Off, the request is as
+/// before.
+pub const PROFILE_ENVIRONMENT: &str = "LAMP_MEMORY_PROFILE";
+static PROFILE: OnceLock<bool> = OnceLock::new();
+
+/// Whether a session note asks for the profile band
+/// ([`PROFILE_ENVIRONMENT`]).
+pub fn profile_on() -> bool {
+    PROFILE.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_profile(on: bool) -> bool {
+    *PROFILE.get_or_init(|| on)
+}
+
+/// What the Tiers-ideas switches add to a Days request, only for those that
+/// are on: `newer_first` and `strength` to a `search`, `strength` and
+/// `profile` to a `session_open`. Any other request, and every request
+/// with the switches off, is left as it was.
+fn tiers_ideas_fields(request: &mut Value, newer_first: bool, strength: bool, profile: bool) {
+    match request["op"].as_str() {
+        Some("search") => {
+            if newer_first {
+                request["newer_first"] = json!(true);
+            }
+            if strength {
+                request["strength"] = json!(true);
+            }
+        }
+        Some("session_open") => {
+            if strength {
+                request["strength"] = json!(true);
+            }
+            if profile {
+                request["profile"] = json!(true);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Only the exact value `on`, with the Days client (#2176 finding 14): an
 /// exchange is linked only to the kept things its own turn used, not to
 /// everything the session was shown, so a forget takes what was said about
@@ -4448,6 +4534,12 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
     switch_forget_all(days && std::env::var(FORGET_ALL_ENVIRONMENT).ok().as_deref() == Some("on"));
     // So does recall's second version (#2176).
     switch_recall_v2(days && std::env::var(RECALL_V2_ENVIRONMENT).ok().as_deref() == Some("on"));
+    // And the Tiers-ideas fields (3 Nov plan).
+    switch_newer_first(
+        days && std::env::var(NEWER_FIRST_ENVIRONMENT).ok().as_deref() == Some("on"),
+    );
+    switch_strength(days && std::env::var(STRENGTH_ENVIRONMENT).ok().as_deref() == Some("on"));
+    switch_profile(days && std::env::var(PROFILE_ENVIRONMENT).ok().as_deref() == Some("on"));
     switch_forget_about(
         days && std::env::var(FORGET_ABOUT_ENVIRONMENT).ok().as_deref() == Some("on"),
     );
@@ -5844,6 +5936,12 @@ pub struct DaysClient {
     forget_all: AtomicBool,
     /// [`recall_v2_on`], read when the client is made (#2176).
     recall_v2: AtomicBool,
+    /// [`newer_first_on`], read when the client is made.
+    newer_first: AtomicBool,
+    /// [`strength_on`], read when the client is made.
+    strength: AtomicBool,
+    /// [`profile_on`], read when the client is made.
+    profile: AtomicBool,
     /// [`REMEMBER_ONCE_ENVIRONMENT`], read when the client is made.
     remember_once: AtomicBool,
     /// [`forget_about_on`], read when the client is made (#2176).
@@ -7654,6 +7752,9 @@ impl DaysClient {
             ),
             forget_all: AtomicBool::new(forget_all_on()),
             recall_v2: AtomicBool::new(recall_v2_on()),
+            newer_first: AtomicBool::new(newer_first_on()),
+            strength: AtomicBool::new(strength_on()),
+            profile: AtomicBool::new(profile_on()),
             remember_once: AtomicBool::new(
                 std::env::var(REMEMBER_ONCE_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
@@ -8104,14 +8205,14 @@ impl DaysClient {
             close();
             return Err(NoteCause::Timeout);
         };
-        let answer = bounded_exchange(
-            &self.socket,
-            &for_person(
-                json!({"op":"session_open","session":name,"max_bytes":NOTE_BYTES}),
-                person,
-            ),
-            left,
+        let mut open = json!({"op":"session_open","session":name,"max_bytes":NOTE_BYTES});
+        tiers_ideas_fields(
+            &mut open,
+            false,
+            self.strength.load(Ordering::Acquire),
+            self.profile.load(Ordering::Acquire),
         );
+        let answer = bounded_exchange(&self.socket, &for_person(open, person), left);
         let scope = if person.is_some() {
             PERSON_SCOPE
         } else {
@@ -8452,6 +8553,14 @@ impl DaysClient {
         }
         if call.name == RECALL && request["query"].is_string() {
             request["op"] = json!("search");
+        }
+        if call.name == RECALL {
+            tiers_ideas_fields(
+                &mut request,
+                self.newer_first.load(Ordering::Acquire),
+                self.strength.load(Ordering::Acquire),
+                false,
+            );
         }
         // #2510 take #4: what a person changed, only when they ask about
         // their own past, in their own scope: never the room's, nor a line
@@ -15580,6 +15689,136 @@ mod tests {
         std::fs::remove_file(socket).unwrap();
     }
 
+    /// 3 Nov Tiers-ideas plan, P4: each switch adds only its own field,
+    /// only to the requests that take it; with all three off a request is
+    /// exactly as before.
+    #[test]
+    fn tiers_ideas_fields_are_sent_only_with_each_switch_on() {
+        let search = json!({"op":"search","query":"tea","day":null,"limit":6,"max_bytes":2400});
+        let open = json!({"op":"session_open","session":"s","max_bytes":NOTE_BYTES});
+        let recall = json!({"op":"recall","query":null,"day":"2026-10-12","limit":6});
+        let forget = json!({"op":"forget","id":3});
+        for request in [&search, &open, &recall, &forget] {
+            let mut off = request.clone();
+            tiers_ideas_fields(&mut off, false, false, false);
+            assert_eq!(&off, request, "off is byte-identical");
+            let mut on = request.clone();
+            tiers_ideas_fields(&mut on, true, true, true);
+            let added: Vec<_> = on
+                .as_object()
+                .unwrap()
+                .keys()
+                .filter(|k| request.get(k.as_str()).is_none())
+                .cloned()
+                .collect();
+            let expected: &[&str] = match request["op"].as_str() {
+                Some("search") => &["newer_first", "strength"],
+                Some("session_open") => &["profile", "strength"],
+                _ => &[],
+            };
+            assert_eq!(added, expected, "{request}");
+        }
+        for (newer_first, strength, profile) in [
+            (true, false, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
+            let mut s = search.clone();
+            tiers_ideas_fields(&mut s, newer_first, strength, profile);
+            assert_eq!(s.get("newer_first").is_some(), newer_first);
+            assert_eq!(s.get("strength").is_some(), strength);
+            assert!(s.get("profile").is_none());
+            let mut o = open.clone();
+            tiers_ideas_fields(&mut o, newer_first, strength, profile);
+            assert!(o.get("newer_first").is_none());
+            assert_eq!(o.get("strength").is_some(), strength);
+            assert_eq!(o.get("profile").is_some(), profile);
+        }
+    }
+
+    /// The client sends the fields with a recall's search when its
+    /// switches are on, never with a bare recall, and off asks exactly what
+    /// it did. The answers are fixed, so this does not depend on the
+    /// memory taking the fields.
+    #[test]
+    fn with_the_tiers_ideas_switches_recall_searches_carry_their_fields() {
+        let (socket, served) = memory("tiers-ideas-on", 2, |_| json!({"ok":true,"entries":[]}));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.newer_first.store(true, Ordering::Release);
+        client.strength.store(true, Ordering::Release);
+        client.profile.store(true, Ordering::Release);
+        let run = |args| client.run_at(&call(RECALL, args), FIRST_READ, NOW, Some(&EAST), None);
+        run(json!({"about":"tea"}));
+        run(json!({"days_ago":1}));
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[0],
+            json!({"op":"search","query":"tea","day":null,"limit":6,"max_bytes":2400,"newer_first":true,"strength":true})
+        );
+        assert_eq!(
+            read[1],
+            json!({"op":"recall","query":null,"day":"2026-10-12","limit":6,"max_bytes":2400})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        let (socket, served) = memory("tiers-ideas-off", 1, |_| json!({"ok":true,"entries":[]}));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        assert!(!client.newer_first.load(Ordering::Acquire));
+        assert!(!client.strength.load(Ordering::Acquire));
+        assert!(!client.profile.load(Ordering::Acquire));
+        client.run_at(
+            &call(RECALL, json!({"about":"tea"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            None,
+        );
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[0],
+            json!({"op":"search","query":"tea","day":null,"limit":6,"max_bytes":2400})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// A session note's open carries `strength` and `profile` only with
+    /// their switches on; off, the open is as before.
+    #[test]
+    fn with_the_tiers_ideas_switches_a_session_open_carries_its_fields() {
+        for (strength, profile) in [(false, false), (true, false), (false, true), (true, true)] {
+            let socket = std::env::temp_dir().join(format!(
+                "lamp-tiers-open-{}-{strength}-{profile}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let client = resumes_test_client(socket.clone(), false);
+            client.newer_first.store(true, Ordering::Release);
+            client.strength.store(strength, Ordering::Release);
+            client.profile.store(profile, Ordering::Release);
+            std::thread::scope(|threads| {
+                let client = &client;
+                let asking = threads.spawn(move || {
+                    client.session_note_within(1, None, false, FIRST_READ, true);
+                });
+                let (held, request) = session_note_request(&listener);
+                drop(held);
+                asking.join().unwrap();
+                let mut expected = json!({"op":"session_open","session":request["session"],"max_bytes":NOTE_BYTES});
+                if strength {
+                    expected["strength"] = json!(true);
+                }
+                if profile {
+                    expected["profile"] = json!(true);
+                }
+                assert_eq!(request, expected);
+            });
+            std::fs::remove_file(socket).unwrap();
+        }
+    }
+
     /// #2176, `LAMP_MEMORY_RECALL_V2`: recall asks the memory's second
     /// version, with a span of days when the model gives one ("last week"
     /// is 7 to 1, at most 14 days); the function says so. Off, the same
@@ -16936,6 +17175,9 @@ mod tests {
             known: Mutex::new(None),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
+            newer_first: AtomicBool::new(false),
+            strength: AtomicBool::new(false),
+            profile: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
@@ -21832,6 +22074,9 @@ mod tests {
             known: Mutex::new(None),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
+            newer_first: AtomicBool::new(false),
+            strength: AtomicBool::new(false),
+            profile: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
@@ -22062,6 +22307,9 @@ mod tests {
             room_sounds: PathBuf::from("/unused-no-io"),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
+            newer_first: AtomicBool::new(false),
+            strength: AtomicBool::new(false),
+            profile: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
@@ -22540,6 +22788,9 @@ mod tests {
             room_sounds: PathBuf::from("/unused-no-io"),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
+            newer_first: AtomicBool::new(false),
+            strength: AtomicBool::new(false),
+            profile: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
             replaces: AtomicBool::new(false),
             forget_about: AtomicBool::new(false),
