@@ -566,11 +566,14 @@ dịch vụ được giữ chờ quyết định của Policy như các lệnh c
 chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
 không bao giờ được nói thẳng ra, và một hàm riêng cùng tên của kỹ năng tự tạo
 bị từ chối (`made_skill::plainly`, `made_skill::capped`). Một yêu cầu tạo
-kỹ năng có nêu thư hay lịch ("mail", "email", "e-mail", "gmail", "inbox",
-"calendar", là một từ nguyên vẹn) không bao giờ được giao cho mô hình:
-`made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "A skill can't read your
-mail or calendar, but you can just ask me to read it once it's linked in the
-app: Skills, then Connectors."
+kỹ năng có nêu bất kỳ dịch vụ liên kết nào (thư và lịch: "mail", "email",
+"e-mail", "gmail", "inbox", "calendar"; tên riêng của dịch vụ, là một từ
+nguyên vẹn: Notion, Figma, GitHub, Asana, Ahrefs, Facebook, Slack, HubSpot,
+Amplitude, "gdrive"; và "google drive", "linear app", "monday com" dưới dạng
+cụm từ, vì "drive", "linear" và "monday" cũng là từ thường) không bao giờ được
+giao cho mô hình: `made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "A skill
+can't use your mail, calendar or other services, but you can just ask me once
+the service is linked in the app: Skills, then Connectors."
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
 to this lamp yet. It can be linked in the app: Skills, then Connectors."
