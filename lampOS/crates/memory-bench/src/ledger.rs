@@ -4,7 +4,7 @@ use crate::{
     protocol::{MAX_FRAME_BYTES, valid_id},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, value::RawValue};
 use std::{
     fs::{self, DirBuilder, File, OpenOptions},
     io::{BufRead, BufReader, Write},
@@ -71,10 +71,28 @@ pub struct Entry {
     pub data: Value,
     pub hash: String,
 }
-fn digest(sequence: u64, previous: &str, kind: &str, data: &Value) -> Result<String> {
-    Ok(hash(&serde_json::to_vec(&(
-        sequence, previous, kind, data,
-    ))?))
+/// The chain hashes `[sequence,"previous","kind",data]` with `data` as the
+/// bytes written to the row, so a row never has to survive a float parse and
+/// re-serialization to verify. These are the same bytes `serde_json::to_vec`
+/// gives for the tuple, so earlier ledgers still verify.
+fn digest(sequence: u64, previous: &str, kind: &str, data: &RawValue) -> Result<String> {
+    let mut bytes = serde_json::to_vec(&(sequence, previous, kind))?;
+    bytes.pop();
+    bytes.push(b',');
+    bytes.extend_from_slice(data.get().as_bytes());
+    bytes.push(b']');
+    Ok(hash(&bytes))
+}
+/// A row as written and read back: `data` stays the exact text that was hashed.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct StoredEntry<'a> {
+    sequence: u64,
+    previous_hash: String,
+    kind: String,
+    #[serde(borrow)]
+    data: &'a RawValue,
+    hash: String,
 }
 pub struct Ledger {
     file: File,
@@ -116,12 +134,14 @@ impl Ledger {
         if self.finished || !valid_id(kind) || !data.is_object() {
             return Err(invalid("invalid ledger append or already finished"));
         }
-        let digest = digest(self.next, &self.previous, kind, &data)?;
-        let entry = Entry {
+        let written = serde_json::value::to_raw_value(&data)?;
+        let digest = digest(self.next, &self.previous, kind, &written)?;
+        // The row carries the very bytes that were hashed.
+        let entry = StoredEntry {
             sequence: self.next,
             previous_hash: self.previous.clone(),
             kind: kind.into(),
-            data,
+            data: &written,
             hash: digest.clone(),
         };
         let mut bytes = serde_json::to_vec(&entry)?;
@@ -171,7 +191,7 @@ pub fn verify(path: &Path) -> Result<Verification> {
         if count > MAX_FRAME_BYTES || line.last() != Some(&b'\n') {
             return Err(invalid("truncated or oversized ledger row"));
         }
-        let entry: Entry = serde_json::from_slice(&line)?;
+        let entry: StoredEntry = serde_json::from_slice(&line)?;
         if terminal.is_some()
             || entry.sequence != sequence
             || entry.previous_hash != previous
@@ -180,14 +200,16 @@ pub fn verify(path: &Path) -> Result<Verification> {
                     entry.sequence,
                     &entry.previous_hash,
                     &entry.kind,
-                    &entry.data,
+                    entry.data,
                 )?
         {
             return Err(invalid("broken ledger chain or rows after terminal state"));
         }
         if sequence == 0
             && (entry.kind != "started"
-                || entry.data.get("manifest_hash").and_then(Value::as_str)
+                || serde_json::from_str::<Value>(entry.data.get())?
+                    .get("manifest_hash")
+                    .and_then(Value::as_str)
                     != Some(previous.as_str()))
         {
             return Err(invalid("ledger does not begin with its manifest"));

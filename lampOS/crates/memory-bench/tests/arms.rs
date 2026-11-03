@@ -4,7 +4,7 @@ use lamp_memory_bench::{
     partial::Partial,
     protocol::*,
 };
-use serde_json::json;
+use serde_json::{Value, json};
 use std::{
     fs,
     os::unix::fs::DirBuilderExt,
@@ -60,7 +60,13 @@ fn query() -> Query {
 #[test]
 fn basic_full_history_is_observed_only_and_fails_instead_of_truncating() {
     let d = Dir::new();
-    let mut a = Basic::open(BasicKind::FullHistory, "owner-a".into(), &d.0).unwrap();
+    let mut a = Basic::open(
+        BasicKind::FullHistory,
+        "owner-a".into(),
+        "Asia/Ho_Chi_Minh",
+        &d.0,
+    )
+    .unwrap();
     a.ingest(event("one", "My tea is jasmine.")).unwrap();
     let mut visitor = event("two", "My tea is cocoa.");
     visitor.person = Person::Visitor;
@@ -69,6 +75,9 @@ fn basic_full_history_is_observed_only_and_fails_instead_of_truncating() {
     assert_eq!(r.source_ids, ["one"]);
     assert!(r.context.contains("jasmine"));
     assert!(!r.context.contains("cocoa"));
+    // Each event with its local day as the voice says it, never the epoch.
+    assert!(r.context.contains("\"when\":\"today, "), "{}", r.context);
+    assert!(!r.context.contains("at_unix_ms"));
     let mut small = query();
     small.max_context_bytes = 1;
     assert!(matches!(
@@ -82,7 +91,13 @@ fn basic_full_history_is_observed_only_and_fails_instead_of_truncating() {
 #[test]
 fn forget_probe_restores_history_and_keyed_guards_without_plaintext_fingerprints() {
     let d = Dir::new();
-    let mut a = Basic::open(BasicKind::FullHistory, "owner-a".into(), &d.0).unwrap();
+    let mut a = Basic::open(
+        BasicKind::FullHistory,
+        "owner-a".into(),
+        "Asia/Ho_Chi_Minh",
+        &d.0,
+    )
+    .unwrap();
     a.ingest(event("one", "My locker code is amber comet."))
         .unwrap();
     let before = fs::read(d.0.join("history.json")).unwrap();
@@ -109,7 +124,13 @@ fn forget_probe_restores_history_and_keyed_guards_without_plaintext_fingerprints
 #[test]
 fn full_history_appends_each_ingest_and_keeps_the_snapshot_until_a_forget() {
     let d = Dir::new();
-    let mut a = Basic::open(BasicKind::FullHistory, "owner-a".into(), &d.0).unwrap();
+    let mut a = Basic::open(
+        BasicKind::FullHistory,
+        "owner-a".into(),
+        "Asia/Ho_Chi_Minh",
+        &d.0,
+    )
+    .unwrap();
     let snapshot = fs::read(d.0.join("history.json")).unwrap();
     a.ingest(event("one", "My tea is jasmine.")).unwrap();
     a.ingest(event("two", "My bike is blue.")).unwrap();
@@ -129,7 +150,7 @@ fn full_history_appends_each_ingest_and_keeps_the_snapshot_until_a_forget() {
 #[test]
 fn no_memory_does_not_keep_dialogue() {
     let d = Dir::new();
-    let mut a = Basic::open(BasicKind::None, "owner-a".into(), &d.0).unwrap();
+    let mut a = Basic::open(BasicKind::None, "owner-a".into(), "Asia/Ho_Chi_Minh", &d.0).unwrap();
     a.ingest(event("one", "My tea is jasmine.")).unwrap();
     assert!(a.recall(query()).unwrap().context.is_empty());
     assert!(
@@ -152,7 +173,22 @@ fn partial_uses_real_store_and_discards_probe_copy() {
     })
     .unwrap();
     a.ingest(event("one", "My tea is jasmine.")).unwrap();
-    assert!(a.recall(query()).unwrap().context.contains("jasmine"));
+    let context = a.recall(query()).unwrap().context;
+    assert!(context.contains("jasmine"));
+    // The voice's recall shape with the local day, never the store's epoch.
+    let entries: Value = serde_json::from_str(&context).unwrap();
+    let today = "today, ";
+    assert!(
+        entries[0]["when"].as_str().unwrap().starts_with(today),
+        "{context}"
+    );
+    assert_eq!(entries[0]["heard"], "My tea is jasmine.");
+    assert_eq!(entries[0]["source_record_id"], "one");
+    assert!(!context.contains("at_unix_ms") && !context.contains(&NOW.to_string()));
+    let mut later = query();
+    later.at_unix_ms = NOW + 3 * 86_400_000;
+    let context = a.recall(later).unwrap().context;
+    assert!(context.contains("\"when\":\"3 days ago, "), "{context}");
     let db = d.0.join("main/memory-days.sqlite3");
     let before = hash(&fs::read(&db).unwrap());
     a.begin_probe("q1", NOW).unwrap();
@@ -182,6 +218,85 @@ fn partial_uses_real_store_and_discards_probe_copy() {
     assert_eq!(
         a.inspect("owner-a").unwrap()["retained_record_ids"],
         json!([])
+    );
+}
+#[test]
+fn partial_next_sends_the_tiers_ideas_switches_and_today_sends_none() {
+    use lamp_memory_bench::partial::{search_request, session_open_request};
+    let next = search_request("owner-a", "tea", 2048, true);
+    assert_eq!(next["newer_first"], true);
+    assert_eq!(next["strength"], true);
+    assert!(next.get("profile").is_none(), "profile is session_open's");
+    let next = session_open_request("owner-a", "s", 1200, true);
+    assert_eq!(next["strength"], true);
+    assert_eq!(next["profile"], true);
+    assert!(next.get("newer_first").is_none(), "newer_first is search's");
+    // Today's setup: the exact requests it sent before the next setup.
+    assert_eq!(
+        search_request("owner-a", "tea", 2048, false),
+        json!({"op":"search","person":"owner-a","query":"tea","limit":8,"max_bytes":2048,"history":false,"recall_v2":false})
+    );
+    assert_eq!(
+        session_open_request("owner-a", "s", 1200, false),
+        json!({"op":"session_open","person":"owner-a","session":"s","max_bytes":1200})
+    );
+}
+#[test]
+fn partial_recall_tells_strength_and_the_day_as_the_voice_does_and_never_earlier() {
+    use lamp_memory_bench::{partial::recall_entry, when::zone};
+    // 2030-04-07 18:00 in Ho Chi Minh City; each entry was said a day before.
+    let now = 1_901_790_000_000;
+    let at = now - 86_400_000;
+    let z = zone("Asia/Ho_Chi_Minh").unwrap();
+    let past_plan = recall_entry(
+        &json!({"id":1,"kind":"kept","at_unix_ms":at,"text":"dentist","on":"2030-04-05","strength":"plan","earlier":true}),
+        now,
+        &z,
+    )
+    .unwrap();
+    assert_eq!(
+        past_plan,
+        json!({"when":"yesterday, Saturday 6 April","asked_to_remember":"dentist","event_on":"2030-04-05","event_status":"past","today":"2030-04-07","strength":"plan: said as a plan for that day; whether it happened is not known"})
+    );
+    let maybe = recall_entry(
+        &json!({"id":2,"kind":"kept","at_unix_ms":at,"text":"pottery","on":"2030-04-10","strength":"maybe"}),
+        now,
+        &z,
+    )
+    .unwrap();
+    assert_eq!(maybe["event_status"], "upcoming");
+    assert_eq!(
+        maybe["strength"],
+        "maybe: said as a maybe; not known to be decided or booked"
+    );
+    let on_today = recall_entry(
+        &json!({"id":3,"kind":"kept","at_unix_ms":at,"text":"call mum","on":"2030-04-07"}),
+        now,
+        &z,
+    )
+    .unwrap();
+    assert_eq!(on_today["event_status"], "today");
+    assert!(on_today.get("strength").is_none());
+    // A label the voice doesn't tell is dropped, and `earlier` never shows.
+    let exchange = recall_entry(
+        &json!({"id":4,"kind":"exchange","at_unix_ms":at,"heard":"tea?","said":"Green.","strength":"said","earlier":true,"on":"2030-04-05"}),
+        now,
+        &z,
+    )
+    .unwrap();
+    assert_eq!(
+        exchange,
+        json!({"when":"yesterday, Saturday 6 April","heard":"tea?","you_said":"Green."})
+    );
+    let other = recall_entry(
+        &json!({"id":5,"kind":"note","at_unix_ms":at,"text":"x","strength":"firm","earlier":true}),
+        now,
+        &z,
+    )
+    .unwrap();
+    assert_eq!(
+        other,
+        json!({"when":"yesterday, Saturday 6 April","kind":"note","text":"x"})
     );
 }
 #[test]
@@ -219,7 +334,13 @@ fn reference_processes_pass_the_same_twelve_operation_contract() {
 #[test]
 fn full_history_diagnostic_usage_survives_probe_restoration() {
     let d = Dir::new();
-    let mut a = Basic::open(BasicKind::FullHistory, "owner-a".into(), &d.0).unwrap();
+    let mut a = Basic::open(
+        BasicKind::FullHistory,
+        "owner-a".into(),
+        "Asia/Ho_Chi_Minh",
+        &d.0,
+    )
+    .unwrap();
     a.ingest(event("a", "My notebook is blue.")).unwrap();
     a.begin_probe("q1", NOW).unwrap();
     a.recall(query()).unwrap();
