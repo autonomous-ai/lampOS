@@ -149,6 +149,7 @@ const PARTS: &[&str] = &[
     "lamp-records",
     "lamp-schedule",
     "lamp-selftest",
+    "lamp-services",
     "lamp-setup",
     "lamp-setup-change",
     "lamp-setup-keys",
