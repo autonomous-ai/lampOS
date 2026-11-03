@@ -172,3 +172,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   (`/etc/sudoers.d/90-orangepi`, their own command, 14:54) so heron can
   set and remove the drop-in itself. 14:54: proposed on #4710 in the
   hour post, start at 15:09 unless the first builder says no.
+- 14:56: the first builder named heron the second privacy reader on
+  #4525 and the second reader on #5049 (for Tests). 15:04: the drop-in
+  run withdrawn at the person's word ("wait for promote 2"), posted on
+  #4710; the lamp untouched. 15:1x: READ-OK on #4525 `25e3581a3` (grants
+  opt-in at pairing, gating by `needs`, `device` keeps five numbers and
+  drops wifi, air and device go on while private as presence does; gate
+  clean on the Mac; `door`'s hand test fails here with and without the PR,
+  a macOS socket-path length, ARM64 CI green). A tag `lampos-lamp-voice-9736`
+  the person saw is the ARM64 build of this log's own push at 14:55, not
+  a stable.
