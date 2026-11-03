@@ -19,7 +19,8 @@
 //!
 //! A day's counts are the change in the running totals between two
 //! readings, kept in [`Days`] in the reports' own state, and sent only once
-//! the UTC day is over, until the report that carries it is acknowledged:
+//! the lamp's local day is over (its own zone, `/etc/localtime`, which setup
+//! sets from the phone's; UTC when that can't be read), until the report that carries it is acknowledged:
 //! never a day still going, so two reports never tell a run apart. The
 //! first reading only begins the count, so nothing from before it is put on
 //! one day; a total that went down (a file begun again) counts from 0.
@@ -140,6 +141,11 @@ pub struct Reading {
     /// are (the backend counts no app make); `None` when the voice did not
     /// answer, or is one from before it counted them.
     pub app_asks: Option<BTreeMap<Outcome, u64>>,
+    /// The lamp's zone, minutes east of UTC, at the reading: a day is the
+    /// lamp's own local day, so a skill made at 06:30 in Hanoi is that
+    /// day's, not the day before's (the owner, 3 Nov). 0 (UTC) when the
+    /// zone can't be read.
+    pub offset_minutes: i32,
 }
 
 /// Where the lamp's skills and their counts are read.
@@ -159,6 +165,11 @@ pub struct Places {
     /// Whether add-ons run here (`LAMP_ADDONS=on`): an add-on is not on
     /// without it.
     pub addons: bool,
+    /// The system's zone files (`/etc/localtime`, `/etc/timezone`), read at
+    /// each reading with `lamp_local_time`, so a zone setup changes counts
+    /// from the next one.
+    pub localtime: PathBuf,
+    pub timezone: PathBuf,
 }
 
 impl Places {
@@ -172,12 +183,32 @@ impl Places {
             voice: crate::make_skill::SOCKET.into(),
             manage: page.manage,
             addons: page.addons,
+            localtime: lamp_local_time::SYSTEM_LOCALTIME.into(),
+            timezone: lamp_local_time::SYSTEM_TIMEZONE.into(),
         }
     }
 }
 
-/// A reading of `places`; `None` when the skills folder can't be read.
-pub fn read(places: &Places) -> Option<Reading> {
+/// Minutes east of UTC at `now_s` in the zone `places` names; 0 (UTC) when
+/// it can't be read.
+fn offset_minutes(places: &Places, now_s: u64) -> i32 {
+    lamp_local_time::SystemZone::open(&places.localtime, &places.timezone)
+        .map(|zone| {
+            lamp_local_time::LocalTime::System(zone).offset_minutes_at(now_s.saturating_mul(1_000))
+        })
+        .unwrap_or_default()
+}
+
+/// The lamp's local day at `now_s`, `offset_minutes` east of UTC, in days
+/// since 1970-01-01.
+fn local_day(now_s: u64, offset_minutes: i32) -> u64 {
+    let local = i64::try_from(now_s).unwrap_or(i64::MAX) + i64::from(offset_minutes) * 60;
+    u64::try_from(local.div_euclid(DAY_S as i64)).unwrap_or_default()
+}
+
+/// A reading of `places` at `now_s`; `None` when the skills folder can't
+/// be read.
+pub fn read(places: &Places, now_s: u64) -> Option<Reading> {
     fs::read_dir(&places.folder).ok()?;
     let made = |maker: Maker| match maker {
         Maker::Voice => Source::MadeVoice,
@@ -192,7 +223,10 @@ pub fn read(places: &Places) -> Option<Reading> {
         Found::Other => Source::Other,
     };
     let off = off_names(&places.off);
-    let mut reading = Reading::default();
+    let mut reading = Reading {
+        offset_minutes: offset_minutes(places, now_s),
+        ..Reading::default()
+    };
     for (folder, loaded) in lamp_skills::load_each(&places.folder) {
         let (source, on) = match &loaded {
             Ok(skill) => (
@@ -281,15 +315,19 @@ pub struct Days {
     /// The kinds of total read once at least: `run`, `store`, `ask`,
     /// `app_ask`.
     begun: BTreeSet<String>,
-    /// By UTC day (days since 1970), the counts not yet acknowledged.
+    /// By the lamp's local day (days since 1970), the counts not yet
+    /// acknowledged.
     days: BTreeMap<u64, BTreeMap<String, u64>>,
+    /// The zone at the last reading, minutes east of UTC: whether a day is
+    /// over is judged by it.
+    offset_minutes: i32,
 }
 
-/// One UTC day as a report carries it: only ever a day that is over, its
-/// counts whole.
+/// One of the lamp's local days as a report carries it: only ever a day
+/// that is over, its counts whole.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Day {
-    /// `YYYY-MM-DD`, UTC.
+    /// `YYYY-MM-DD`, the lamp's local date.
     pub date: String,
     /// Made-skill asks by voice; an outcome not there is 0.
     pub made_by_voice: BTreeMap<Outcome, u64>,
@@ -386,9 +424,11 @@ fn totals(reading: &Reading) -> Vec<(&'static str, BTreeMap<String, u64>)> {
 }
 
 impl Days {
-    /// The change since the last reading put on `now_s`'s UTC day.
+    /// The change since the last reading put on `now_s`'s local day, in
+    /// the zone the reading was taken in.
     pub fn add(&mut self, now_s: u64, reading: &Reading) {
-        let today = now_s / DAY_S;
+        self.offset_minutes = reading.offset_minutes;
+        let today = local_day(now_s, self.offset_minutes);
         for (kind, now) in totals(reading) {
             let prefix = format!("{kind}/");
             if self.begun.insert(kind.to_owned()) {
@@ -428,7 +468,7 @@ impl Days {
     /// Today is never one: a day still going is kept, never sent.
     pub fn oldest(&self, now_s: u64) -> Option<(Day, u64)> {
         let (number, counts) = self.days.iter().next()?;
-        if *number >= now_s / DAY_S {
+        if *number >= local_day(now_s, self.offset_minutes) {
             return None;
         }
         let mut store: Vec<(&str, u64)> = counts
@@ -500,6 +540,7 @@ mod tests {
             // The app's asks move with the voice's, kept rather than
             // refused, so the two never mix.
             app_asks: Some(BTreeMap::from([(Outcome::Kept, refused)])),
+            offset_minutes: 0,
         }
     }
 
@@ -534,6 +575,43 @@ mod tests {
         assert_eq!(next.store[&a], 1);
     }
 
+    /// A day is the lamp's own: at +7, 20:00 UTC is already the next
+    /// date, and that date is over only at the lamp's midnight.
+    #[test]
+    fn a_day_is_the_lamps_local_day() {
+        let at_seven = |core| Reading {
+            offset_minutes: 7 * 60,
+            ..reading(core, &[], 0)
+        };
+        let evening = NOW + 16 * 3_600; // 2026-10-18T20:00Z, 03:00 the 19th at +7
+        let mut days = Days::default();
+        days.add(evening, &at_seven(100));
+        days.add(evening + 60, &at_seven(104));
+        // 23:00 the 19th at +7: the day is still going.
+        assert_eq!(days.oldest(evening + 20 * 3_600), None);
+        // 00:30 the 20th at +7, still the 19th in UTC: it is over.
+        let (day, _) = days.oldest(evening + 21 * 3_600 + 1_800).unwrap();
+        assert_eq!(day.date, "2026-10-19");
+        assert_eq!(day.runs, BTreeMap::from([(Source::Core, 4)]));
+    }
+
+    /// The zone is the system's; a lamp whose zone can't be read counts
+    /// by UTC.
+    #[test]
+    fn the_offset_is_the_systems_zone_or_utc() {
+        let folder = tempfile::tempdir().unwrap();
+        let places = |name: &str| Places {
+            localtime: folder.path().join(name),
+            timezone: folder.path().join("timezone"),
+            ..Places::product()
+        };
+        assert_eq!(offset_minutes(&places("none"), NOW), 0);
+        let (_, zone) = jiff_tzdb::get("Asia/Ho_Chi_Minh").unwrap();
+        fs::write(folder.path().join("localtime"), zone).unwrap();
+        fs::write(folder.path().join("timezone"), "Asia/Ho_Chi_Minh\n").unwrap();
+        assert_eq!(offset_minutes(&places("localtime"), NOW), 7 * 60);
+    }
+
     /// Thirteen's HOLD on #5096: six skills made, the first in the app,
     /// read before and after, with the voice answering and not. Each made
     /// skill's maker is on its own card, so `run/made_app` and
@@ -553,6 +631,9 @@ mod tests {
             voice: page.off.with_file_name("none.sock"),
             manage: page.manage.clone(),
             addons: false,
+            // No zone here: the day is UTC.
+            localtime: page.off.with_file_name("no-localtime"),
+            timezone: page.off.with_file_name("no-timezone"),
         };
         let answering = Places {
             voice: page.off.with_file_name("v.sock"),
@@ -593,7 +674,7 @@ mod tests {
         run("first-app", 3);
         run("from-before", 1);
         let mut days = Days::default();
-        let before = read(&answering).unwrap();
+        let before = read(&answering, NOW).unwrap();
         assert_eq!(made(&before), [3, 0, 1]);
         days.add(NOW, &before);
         // Five more by voice: six made, the app's the oldest.
@@ -603,7 +684,7 @@ mod tests {
             run(&name, 1);
         }
         run("first-app", 2);
-        let after = read(&answering).unwrap();
+        let after = read(&answering, NOW).unwrap();
         assert_eq!(made(&after), [5, 5, 1]);
         assert_eq!(
             after.on,
@@ -617,14 +698,14 @@ mod tests {
         // The voice doesn't answer: the split is the same, only its asks
         // unread.
         run("first-app", 1);
-        let unanswered = read(&silent).unwrap();
+        let unanswered = read(&silent, NOW).unwrap();
         assert_eq!(unanswered.asks, None);
         assert_eq!(made(&unanswered), [6, 5, 1]);
         assert_eq!(unanswered.on, after.on);
         days.add(NOW + 120, &unanswered);
         // And answering again: nothing moves back.
         run("voice-5", 1);
-        let again = read(&answering).unwrap();
+        let again = read(&answering, NOW).unwrap();
         assert_eq!(made(&again), [6, 6, 1]);
         days.add(NOW + 180, &again);
         let (day, _) = days.oldest(NOW + DAY_S).unwrap();
