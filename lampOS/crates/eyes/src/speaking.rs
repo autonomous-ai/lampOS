@@ -89,6 +89,19 @@ pub const LEAST_HELD_PAIRS_YES: usize = 4;
 pub const WINDOW_US: u64 = 2_000_000;
 /// The looks a window needs before it says anything.
 pub const LEAST_LOOKS: usize = 5;
+/// A window whose looks are on average further apart than this, in
+/// microseconds, is a slow lamp's: a throttled lamp-a0ae (416 MHz at 95
+/// degrees, #5015) looked 400 to 1300 ms apart, so 2 s held three or four
+/// looks and every read was `unknown`. Following a face the eyes look every
+/// 250 to 350 ms, under it.
+pub const SLOW_LOOK_US: u64 = 400_000;
+/// The looks a slow window ([`SLOW_LOOK_US`]) the mesh read on every look
+/// needs, instead of [`LEAST_LOOKS`]. Its `yes` is scored over at least
+/// [`LEAST_HELD_PAIRS_YES`] pairs, as a window with pairs left out is, so
+/// one jumpy pair of its two cannot carry it; `no` stands on its own pairs.
+/// A corners-only window keeps [`LEAST_LOOKS`]: the corners' jitter needs
+/// the five (`margins`).
+pub const SLOW_LEAST_LOOKS: usize = 3;
 /// Eyes closer than this, in the detector's pixels, have mouth corners whose
 /// jitter is as large as the lips' movement. A window the mesh read on every
 /// look counts it in the pixels the mesh saw ([`Mouths::set_mesh_scale`]):
@@ -474,6 +487,11 @@ impl Mouths {
             LEAST_EYES_PX
         };
         let small = mean_eyes < least_eyes;
+        // A meshed window of slow looks is judged from fewer (#5015).
+        let slow = all_meshed
+            && looks.len() >= 2
+            && (looks[looks.len() - 1].0 - looks[0].0) / (looks.len() as u64 - 1) > SLOW_LOOK_US;
+        let least_looks = if slow { SLOW_LEAST_LOOKS } else { LEAST_LOOKS };
         if let Some(detail) = diagnostic.as_deref_mut() {
             detail.eyes_px = Some(eyes);
             detail.window_mean_eyes_px = Some(mean_eyes);
@@ -493,7 +511,7 @@ impl Mouths {
             Some(Reason::Small)
         } else if outliers > MOST_OUTLIERS {
             Some(Reason::Outliers)
-        } else if looks.len() < LEAST_LOOKS {
+        } else if looks.len() < least_looks {
             Some(Reason::TooFewLooks)
         } else {
             None
@@ -562,6 +580,8 @@ impl Mouths {
             // still one, and every window with the switch off, is judged as
             // before.
             let dropped = held.len() < pairs.len();
+            // A slow window under LEAST_LOOKS is held to the same `yes`.
+            let short = looks.len() < LEAST_LOOKS;
             if dropped && held.len() < LEAST_HELD_PAIRS {
                 if let Some(detail) = diagnostic {
                     detail.reason = Reason::FewSteadyPairs;
@@ -579,14 +599,19 @@ impl Mouths {
             // 0.011 over four, #4585). `no` stands on the held pairs; a
             // window between the two is `unknown`.
             let whole = (squares / held.len().max(LEAST_HELD_PAIRS_YES) as f32).sqrt();
+            let strict = dropped || short;
             let state =
-                if !dropped && score >= MESH_SPEAKING_AT || dropped && whole >= MESH_SPEAKING_AT {
+                if strict && whole >= MESH_SPEAKING_AT || !strict && score >= MESH_SPEAKING_AT {
                     SpeakingState::Yes
                 } else if score < MESH_SPEAKING_AT {
                     SpeakingState::No
                 } else {
                     if let Some(detail) = diagnostic {
-                        detail.reason = Reason::FewSteadyPairs;
+                        detail.reason = if dropped {
+                            Reason::FewSteadyPairs
+                        } else {
+                            Reason::TooFewLooks
+                        };
                     }
                     return UNKNOWN;
                 };
@@ -808,6 +833,59 @@ mod tests {
             SpeakingState::Yes,
             "talking",
         );
+    }
+
+    /// #5015: a throttled lamp (lamp-a0ae at 416 MHz and 95 degrees) looks
+    /// 450 to 700 ms apart, and 600 to 1300 ms around its person's turns, so
+    /// a 2 s window holds three or four looks, under `LEAST_LOOKS`. With the
+    /// mesh read on every look a talking face is still read speaking, and a
+    /// still one not; by the corners alone both stay `unknown`.
+    #[test]
+    fn a_talking_face_seen_by_a_throttled_lamp_is_speaking() {
+        let slow = Scene {
+            pace: (450_000, 700_000),
+            ..STILL
+        };
+        // The mesh's `mouth_open` look by look, as in
+        // `with_the_mesh_the_inner_lips_decide`.
+        let meshed = |talk: bool, seed: u64| -> Vec<SpeakingState> {
+            let (mut mouths, mut noise) = (Mouths::default(), Noise(seed));
+            let scene = Scene { talk, ..slow };
+            let (mut at, mut look) = (0u64, 0.0f32);
+            let mut said = Vec::new();
+            while at < 12_000_000 {
+                let t = at as f32 / 1e6;
+                let seen = marks(&scene, t, &mut noise);
+                let open = if talk {
+                    0.04 + 0.03 * (look * 1.7).sin()
+                } else {
+                    0.01 + 0.003 * (noise.uniform() - 0.5)
+                };
+                let judged = mouths.judge(1, &seen, facing::yaw_deg(&seen), Some(open), at);
+                if at >= WINDOW_US {
+                    said.push(judged.state);
+                }
+                look += 1.0;
+                at += slow.pace.0 + ((slow.pace.1 - slow.pace.0) as f32 * noise.uniform()) as u64;
+            }
+            said
+        };
+        for (talk, state) in [(true, SpeakingState::Yes), (false, SpeakingState::No)] {
+            let said: Vec<_> = (1..=5).flat_map(|seed| meshed(talk, seed)).collect();
+            let right = said.iter().filter(|said| **said == state).count() as f32;
+            assert!(
+                right / said.len() as f32 >= 0.9,
+                "meshed, talking {talk}: {state:?} in {right} of {} looks",
+                said.len()
+            );
+            if !talk {
+                assert!(!said.contains(&SpeakingState::Yes), "{said:?}");
+            }
+        }
+        // By the corners alone, the slow window is never judged.
+        for talk in [false, true] {
+            assert_eq!(share(Scene { talk, ..slow }, SpeakingState::Unknown), 1.0);
+        }
     }
 
     #[test]

@@ -2540,6 +2540,15 @@ with the known face's id the eyes keep beside the known file
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
   window, under the 5 the score needs, so in practice `unknown` (below).
+  A window the mesh read on every look whose looks average more than
+  400 ms apart (`SLOW_LOOK_US`; a throttled lamp-a0ae looked 400 to 1300 ms
+  apart, #5015) is judged from 3 looks (`SLOW_LEAST_LOOKS`), its `yes`
+  scored over at least 4 pairs as a window with pairs left out is, so one
+  jumpy pair cannot carry it (between `yes` and `no` it is `unknown`,
+  `too_few_looks`). A corners-only window keeps 5. Offline, at 450 to
+  700 ms a look, a meshed talking face reads `yes` and a still one `no` in
+  at least 90% of looks (a still one never `yes`), against 7 of 89 talking
+  looks `yes` before; the corners stay `unknown`.
 - **How fast it answers** (looks every 250 to 350 ms): `yes` on the first
   look after talking starts (0.06 to 0.18 s), and held 1.3 to 1.8 s after
   it stops, the 2 s window emptying.
