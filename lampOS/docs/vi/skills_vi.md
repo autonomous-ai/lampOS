@@ -58,13 +58,38 @@ Diễn ra như sau:
      ngay. Chỉ lỗi của bước kiểm tra
      được sửa; sai định dạng hay xin dùng nhiều hơn đèn và đầu thì được nói
      là không giữ ngay.
+   - **Nói rõ** (Mobile trên #4710, 3/11). Khi bước kiểm tra đã qua, đèn tự
+     viết kỹ năng làm gì từ `skill.toml`, không bao giờ lấy mô tả của mô
+     hình (`made_skill::plainly`): "When the lamp has been quiet for a
+     minute, between 22:00 and 22:30, it dims the light a step, at most
+     once an hour." Câu đó là mô tả của thẻ trong gói (thay mô tả trong
+     `SKILL.md`), trong `made.json`, trên ứng dụng và trong lời đèn nói.
+     Trigger có khóa nào ngoài `topic`, `field`, `equals`, `for`,
+     `cooldown`, `rearm` và `during`, trigger khác "đèn nghỉ" hoặc "có/không
+     có người", hay bước khác một lệnh đèn (`colour`, `level`, `for`, hoặc
+     chỉ `dim`) hoặc một cử chỉ (`nod`, `curious`) đều bị từ chối, và được
+     sửa một lần như lỗi của bước kiểm tra. Trên lamp-0c89, mô hình của đèn
+     đã giữ "when someone says good night, dim the light slowly over a
+     minute" thành bất kỳ phút yên lặng nào từ 22:00 đến 22:30, dưới mô tả
+     của chính nó về điều được yêu cầu.
+   - **Điều không kỹ năng nào làm được.** Câu trả lời bắt đầu bằng
+     `cannot:` và không có khối nào được nói là không tạo được, "a skill
+     can't do that: " cùng lý do của mô hình (tối đa 120 ký tự,
+     `made_skill::CANNOT`), và không giữ gì. Với `LAMP_MAKE_SKILL_LOCAL=on`,
+     mô hình của đèn được dặn trả lời như vậy khi yêu cầu cần nghe lời nói
+     hay âm thanh, không bao giờ thay bằng thứ khác, và không thêm giờ
+     trong ngày mà yêu cầu không nêu. Khi một phần của yêu cầu không làm
+     được ("dim slowly over a minute"), mô hình làm phần còn lại và thêm
+     một dòng ngoài các khối bắt đầu bằng `left out:`
+     (`made_skill::LEFT_OUT`); đèn nói dòng đó sau câu kỹ năng làm gì (tối
+     đa 120 ký tự), nên lời "có" cũng là đồng ý với phần bị bỏ (#5041).
 5. **Giữ lại, không cài.** Gói nằm trong thư mục riêng của giọng nói,
    `/var/lib/lampOS/voice/made-skills` (0700, người dùng của giọng nói):
    - giữ tối đa 5, cái cũ nhất bị bỏ cùng gói của nó;
    - mỗi cái được giữ cùng SHA-256 và những gì nó xin dùng (`made.json`);
    - cùng một việc giao được đọc lại thì trả về cái đã giữ, không kiểm tra
      lại.
-6. **Nói ra, và hỏi.** Đèn nói kỹ năng sẽ làm gì (mô tả trong thẻ), sẽ
+6. **Nói ra, và hỏi.** Đèn nói kỹ năng sẽ làm gì (mô tả trong thẻ, được nói rõ như trên), sẽ
    dùng gì ("đèn của nó và việc nó có đang nói hay không"), rồi hỏi đúng
    từng chữ: "Shall I put it on the lamp?"
    - Các tệp không bao giờ được đọc ra.

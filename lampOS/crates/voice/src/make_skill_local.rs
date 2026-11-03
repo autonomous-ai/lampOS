@@ -75,13 +75,19 @@ When someone is back at the lamp, it glows cyan for a moment.
 /// What the model is told it is, before the brief: the format, and a whole
 /// skill the lamp's check takes.
 fn system() -> String {
+    let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
     format!(
         "You write skills for a lamp. Answer exactly as the request says, with the two fenced \
          blocks and nothing else. Use only the keys and values the request names, written as \
          in this skill, which the lamp's check takes:\n\n{EXAMPLE}\n\nA skill can't speak \
          or keep time by itself: a reminder at a time or every so often is the lamp's own \
          timer, not a skill. Make what the request asks with the light or the head, on the \
-         lamp's resting or someone being there."
+         lamp's resting or someone being there. A skill can't hear what is said: a request \
+         that needs words or a sound heard, or anything else a skill here can't sense or do, \
+         is answered with one line, {cannot} and why, and no blocks. Never stand something \
+         else in for it, and add no time of day the request didn't name. When a part of the \
+         request can't be done with these (dimming slowly, over a minute), make the rest and \
+         add one line after the blocks: {left_out} what was left out, in a few words."
     )
 }
 
@@ -141,7 +147,8 @@ pub async fn written(chat: &Chat, brief: &str) -> net::Result<String> {
     // An answer whose last fence never closed was cut short too (17:48:
     // "its answer was cut off"): asked once more, as a broken stream.
     let once = write_once(chat, brief).await.and_then(|text| {
-        if fences_closed(&text) {
+        // A `cannot:` answer is whole with no fence at all.
+        if fences_closed(&text) || text.trim_start().starts_with(made_skill::CANNOT) {
             Ok(text)
         } else {
             Err(net::Error::Protocol(CUT))
@@ -673,6 +680,60 @@ light = { dim = 1 }
         let said = format!("It dims the light at ten. {}", made_skill::ASK_TO_PUT_ON);
         assert!(made_skill::asked_in_answer(&keeping.directory, &said, ago, NOW).unwrap());
         assert_eq!(waiting(&keeping.directory).unwrap().0, "evening-dim");
+        assert_eq!(served.join().unwrap(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A request no made skill can do (lamp-0c89's "when someone says good
+    /// night", Mobile on #4710, 3 Nov): the model is told to answer
+    /// `cannot:`, and that answer is asked once, never again as a cut one,
+    /// and said as not made; nothing is kept.
+    #[test]
+    fn a_cannot_answer_is_asked_once_and_said_as_not_made() {
+        assert!(system().contains("cannot: and why"));
+        assert!(system().contains("add no time of day the request didn't name"));
+        let (root, keeping) = keeping("cannot");
+        let (url, served) = service(vec![(
+            200,
+            "cannot: a skill can't hear what is said.".to_owned(),
+        )]);
+        let told = make(
+            "when someone says good night, dim the light slowly over a minute",
+            &keeping,
+            chat_at(url),
+            NOW,
+        );
+        assert_eq!(
+            told["error"],
+            "the skill couldn't be made: a skill can't do that: a skill can't hear what is said.",
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert!(untold(&keeping.directory, NOW).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// What the model is told it kept says what will run, from its
+    /// `skill.toml`, never the model's description; and what was asked and
+    /// left out is said with it (#5041: lamp-0c89's "good night" skill,
+    /// kept as a quiet minute, told as what was asked).
+    #[test]
+    fn what_it_says_is_what_will_run_and_what_was_left_out() {
+        assert!(system().contains("left out: what was left out"));
+        let (root, keeping) = keeping("plainly");
+        let answer = format!(
+            "{}\nleft out: dimming slowly; it dims in one step\n",
+            good()
+        );
+        let (url, served) = service(vec![(200, answer)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(
+            told["description"],
+            "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at \
+             most once every 12 hours. Left out: dimming slowly; it dims in one step",
+            "{told}"
+        );
+        assert!(!told.to_string().contains("10 pm"), "{told}");
         assert_eq!(served.join().unwrap(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }
