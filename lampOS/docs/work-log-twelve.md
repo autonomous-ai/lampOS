@@ -618,3 +618,10 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #4175: still owes the 3+3 re-check, now on lamp-c0a4 (the first builder, c6598017786), once SubDarren frees the lamp.
 - #4226 step (c): no new code. The carried-sound fix is on lamp-voice (`193f88c862`), and the late hearings still had the name. A 3+3 plan for `LAMP_NAME_START_USUAL` and three questions are on #4226 (c6597638085).
 - Reads: #5063 (SubDarren's harness recorder), READ-OK with six P3s. #4970 after merge (`aca8bdc92b`), second privacy READ-OK with two P3s.
+
+## 3 Nov, evening: #4175 closed on the 3+3, reads
+
+- #4175's 3+3 on lamp-c0a4 (19:42–20:10, busy_day as the first builder gave it, played from the Mac in synthetic voices, cloud on): `LAMP_REMARK_ABOUT_IT`, `LAMP_REMARK_GLANCE` and `LAMP_NAME_REPEAT_NOT_A_CALL` all on against all off, alternating, 3 rounds each, 0 provider failures. Desk lines held 10/12 on both arms; talk answered 11/18 on against 9/18 off; d09 held 6/6, so no remark and no glance. Posted on #4175 (c6604799437). c0a4 restored, lock released. The stand-in stays in my scratch folder (Python, not under `lampOS/`).
+- The first builder closed #4175 on it: the three switches stay off. #5125 records the run in their switches.md rows (docs only). The caller's lines after desk talk losing the conversation's tie (c04–c06, held 13 of 18 on both arms) is proposal #5124, to be compared with Seventh's #5110 before anything is built.
+- Reads: #5117 (lamp-tasks journal lines): HOLD on a P2, a failed `new` or `reply` could journal Harness's own words; fixed at `4a020820f9`, READ-OK. #5121 (`--new-folder`): READ-OK with two P3s. #5073 (`LAMP_OWNER_PLACE` on in the product): second READ-OK, no findings, restated on the head's full sha after my first post named a wrong one.
+- Next: #5061 once it is placed with me.
