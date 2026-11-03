@@ -6,6 +6,11 @@
 # (lamp-voice.service: services_connected, service_read, service_write). Not socket-activated like
 # lamp-setup-keys: a write waits here, in memory, for its spoken "send" (2 min, once).
 # Reads only unless LAMP_SERVICES_WRITE=on (a drop-in). A token is never journalled.
+# The product unit (lampOS/docs/install.md). Off unless set: a drop-in turns it on,
+#   [Service]
+#   Environment=LAMP_SERVICES=on
+# with the same line in lamp-cloud.service and lamp-voice.service. Off, it exits at once with no
+# socket opened, and stays inactive.
 [Unit]
 Description=lampOS linked services (lamp-services)
 PartOf=lampos.target
@@ -31,7 +36,7 @@ UMask=0077
 # through the backend (POST <base>/connector/refresh-token), nothing else. Missing: no refresh.
 LoadCredential=account:/etc/lampOS/setup/backend.json
 LoadCredential=key:/etc/lampOS/voice/credential
-ExecStart=/opt/lampOS/services/current/lamp-services --enable --store /var/lib/lampos-services --run /run/lampos-services
+ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

@@ -7,8 +7,8 @@ publish.workspace = true
 
 # The person's linked services on the lamp (Queue #4710):
 # V1's token connectors, their tokens in a root-only store, read through an
-# allow-list and written only on a spoken "send". Off unless started with
-# --enable.
+# allow-list and written only on a spoken "send". Off unless LAMP_SERVICES=on
+# (or --enable).
 [[bin]]
 name = "lamp-services"
 path = "src/main.rs"

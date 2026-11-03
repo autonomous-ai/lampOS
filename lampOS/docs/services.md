@@ -85,7 +85,7 @@ connected apps.
 
 | Switch | Read by | Off (the default) |
 |---|---|---|
-| `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`) and `lamp-voice` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none |
+| `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -93,14 +93,15 @@ the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
 `lamp-voice` ("Who can use them", below): with either off every write is
 refused and every read is brief.
 
-`lamp-services` itself reads no switch for reads: it opens no socket unless
-started with `--enable`, which its unit passes, so with the switch off it is
-closed by not being installed. `deploy/product/lamp-services.service` is not
-yet in `lamp-update install`'s list (`install.rs`'s left-out units, with the
-keeper's restart helper and the own keys' helper), so no lamp gets it until
-its lamp check; it is enabled by hand with the switch. `LAMP_SERVICES_WRITE`
-is set in a drop-in on `lamp-services.service`. Neither switch is set by any
-product unit ([switches.md](switches.md)).
+`lamp-services.service` is in `lamp-update install`'s list and enabled on
+every lamp, as `lamp-addons.service` is, but `lamp-services` opens no socket
+unless `LAMP_SERVICES=on` is in its environment (or it is started with
+`--enable`, which its unit does not pass): off, it says one line and exits 0
+at once, so the unit stays inactive and is not restarted. The switch is set
+by a drop-in on each of the three units, `lamp-services.service`,
+`lamp-cloud.service` and `lamp-voice.service`, and so is
+`LAMP_SERVICES_WRITE`, on `lamp-services.service`. Neither switch is set by
+any product unit ([switches.md](switches.md)).
 
 ## The three parts and their sockets
 
@@ -635,7 +636,7 @@ sound, as a slow chat does.
 - **The MCP hosts are to be confirmed with Backend2**: that the backend's
   `mcp_url` for Slack, monday.com, HubSpot and Amplitude is on the pinned
   hosts above; a link on any other is refused.
-- `lamp-services.service` is not in `lamp-update install`'s list, and none of
+- `lamp-services.service` is installed but off on every lamp, and none of
   this has run on a lamp: the cgroup checks under the real sockets, the IMAP
   and SMTP exchanges with Gmail, the backend's `get-message` and refresh, and
   each service's own API.
@@ -686,5 +687,5 @@ heard line reaching a service (a guest, the room, a held or narrowed line,
 no scope and a scheduled run refused, read and write), nothing else run
 after a read in the same request, a read cut to who and what about with
 others maybe here, a read's words kept nowhere in the thread or the
-summary, a made skill never reaching a service. `-p lamp-update` (the unit named left out,
-the reset plan's hash) and `-p lamp-setup` (`tests/it/reset.rs`).
+summary, a made skill never reaching a service. `-p lamp-update` (the unit installed with no `LAMP_SERVICES` line and no
+`--enable`, the reset plan's hash) and `-p lamp-setup` (`tests/it/reset.rs`).
