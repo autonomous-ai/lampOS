@@ -2019,12 +2019,13 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   `EnvironmentFile=`, so a round that writes it restarts lamp-cloud. A
   build carrying it asks for updater 10 (`manifest::STORE_ENV_UPDATER`):
   an older updater refuses its path, and so does an older
-  `lamp-update-back`, for the whole manifest. So a round that would write
-  settings from such a build, while this lamp's settings writer is not the
+  `lamp-update-back`, for the whole manifest. So a round that applies and
+  would write settings from such a build, while this lamp's settings writer is not the
   lamp-update that runs (its refresh, below, failed or was put back),
   waits and says so: `build N carries /etc/lampOS/skills/store.env, and
   this lamp's settings writer is older than this lamp-update: waiting for
-  it to be refreshed`. The drop-in `store.conf` stays install's alone.
+  it to be refreshed`. A dry round (`check`, a climbed updater's confirm)
+  writes nothing and never waits for it. The drop-in `store.conf` stays install's alone.
 - **Root, small.** At the switch, after the journal and normally before any
   unit, link or model moves (the paired head-pins exception is below), the round stages `apply/request.json` and the
   build's envelope in its records and starts `lamp-update-apply.service`

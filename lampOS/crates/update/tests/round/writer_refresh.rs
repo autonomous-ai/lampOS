@@ -278,3 +278,84 @@ fn a_new_writer_whose_first_apply_fails_is_put_back_after_that_apply() {
     assert!(refreshed.is_some() && put_back.is_some(), "{:?}", lamp.said);
     assert!(refreshed < put_back);
 }
+
+/// A far jump (#3689's climb meeting the Store's switch file): a lamp on an
+/// older updater, whose writer is that updater, meets first a build that
+/// needs updater 10 and writes `store.env` (install's off, the build's on).
+/// The climbed updater confirms by its dry round, which writes nothing and
+/// so is never held for the writer; the next round, which applies,
+/// refreshes the writer to it and switches to the build. From the 7071
+/// image's updater (5) and the 9497 image's (9).
+#[test]
+fn an_updater_climbed_to_a_build_writing_store_env_confirms_then_refreshes_the_writer_and_switches()
+{
+    for from in [5, manifest::STORE_ENV_UPDATER - 1] {
+        far_jump_from(from);
+    }
+}
+
+fn far_jump_from(updater: u64) {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = updater;
+    lamp.config.settings = true;
+    let first = lamp.own_build();
+    let back = lamp.root.join(BACK.trim_start_matches('/'));
+    fs::create_dir_all(back.parent().unwrap()).unwrap();
+    fs::write(&back, "lamp-update 1").unwrap();
+    let off = lamp.read(manifest::STORE_ENV);
+    let on = "LAMP_SKILLS_STORE=on\n";
+    assert_ne!(off, on);
+    let (root, records) = (lamp.root.clone(), lamp.records());
+    let key = lamp.config.key;
+    lamp.systemd.applier = Some(Box::new(move || {
+        apply::run(&root, &records, &key, &mut |_| Ok(()), &mut |_| {})
+    }));
+    let mut build = product_build_with_updater(&mut lamp, 2, "lamp-update 10");
+    build.settings = vec![Setting::new(manifest::STORE_ENV, on)];
+    needing(&mut lamp, build, manifest::STORE_ENV_UPDATER);
+    let ten = sha("lamp-update 10");
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: manifest::STORE_ENV_UPDATER,
+            from: first,
+            to: ten.clone()
+        },
+        "from updater {updater}: {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(BACK), "lamp-update 1");
+
+    // Updater 10 runs: its writer is still the older updater.
+    lamp.config.updater = manifest::STORE_ENV_UPDATER;
+    lamp.config.writer_from = Some(writer_swap::Running::new(b"lamp-update 10".to_vec()));
+    let (root, records) = (lamp.root.clone(), lamp.records());
+    lamp.systemd.writer = Some(Box::new(move || {
+        writer_swap::refresh(
+            &root,
+            &records,
+            b"lamp-update 10",
+            &lamp_update::records::unix_ms,
+            &mut |path: &Path| Ok(fixed_copy::answer(&sha256_hex(&fs::read(path).unwrap()))),
+        )
+        .map(|_| ())
+    }));
+    assert_eq!(
+        lamp.confirm(&ten),
+        own::Confirm::Confirmed,
+        "from updater {updater}: {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(BACK), "lamp-update 1");
+
+    assert_eq!(
+        lamp.round(),
+        Outcome::Switched(2),
+        "from updater {updater}: {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(BACK), "lamp-update 10");
+    assert_eq!(lamp.read(manifest::STORE_ENV), on);
+    assert_eq!(lamp.own_build(), ten);
+}
