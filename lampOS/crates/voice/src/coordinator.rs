@@ -12237,15 +12237,19 @@ fn conversation_with_gate_inner(
             let refusal = crate::control_turn::refused(&crate::control_turn::StartNow {
                 muted: snapshot.microphone_permission() != Permission::Allowed,
                 paused,
+                // A conversation with the lamp, as an exact say reads it
+                // (`thread`'s exchange with the lamp's words in it), never
+                // the room's speech or a line heard and held back: in a
+                // busy office the person's talk to others refused every
+                // turn (lamp-75c9, 3 Nov).
                 conversation: control_turns.going_on()
-                    || admission.owns_stream()
+                    || crate::thread::THREAD
+                        .lock()
+                        .is_ok_and(|thread| thread.going_on(std::time::Instant::now()))
                     || look_wanted.is_some()
                     || reply
                         .as_ref()
-                        .is_some_and(|current| persons(current.owner.turn()))
-                    || person_line.is_some_and(|(_, at_us)| {
-                        control_now_us.saturating_sub(at_us) < crate::say::QUIET_US
-                    }),
+                        .is_some_and(|current| persons(current.owner.turn())),
                 speaking: reply.is_some()
                     || speaker_pending.is_some()
                     || !provider_queue.is_empty()

@@ -427,6 +427,8 @@ pub fn ask_answered(
             made_skill::offered(directory, sha256, now_unix_ms)
         }
         crate::say::Answer::Done(_) => Ok(()),
+        // Only a computer's turn begins this way, never an ask's line.
+        crate::say::Answer::BegunTurn { .. } => Ok(()),
     }
 }
 
