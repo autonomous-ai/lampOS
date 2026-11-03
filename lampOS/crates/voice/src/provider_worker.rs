@@ -15273,6 +15273,7 @@ pub(crate) mod tests {
     /// task is idle, and the wait for it is read on Tokio's time.
     #[tokio::test(start_paused = true)]
     async fn resumed_question_survives_a_silent_service_and_the_assumption_is_reported() {
+        let _clock = logical_clock();
         // The person continues after the endpointer cut the question. The
         // service says nothing about the cut-off request for the whole bound.
         for reporting in [Reporting::Legacy, Reporting::Typed] {
