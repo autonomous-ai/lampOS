@@ -468,7 +468,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   and the person's words in this turn are a plain send. Otherwise the model
   is told `CANCELLED`, "Not sent, and cancelled: I send only on a plain
   "send" said to me right after I read the message back. Say it was not
-  sent."
+  sent." The journal names each check that failed ("a send cancelled: …"), and
+  every refusal the words it gave.
 - **The read-back must have been heard in full.** The lamp's words must hold
   every word of the `read_back` in order (letters and digits, lower case, an
   address's "at" and "dot" said or written alike; more words around it, such

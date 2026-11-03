@@ -495,7 +495,9 @@ only reads …").
   bị và 30 s (`SEND_WITHIN`) kể từ khi đèn nói lời cuối của nó; và lời của
   người đó trong lượt này là một câu gửi thuần. Nếu không, mô hình được báo
   `CANCELLED`, "Not sent, and cancelled: I send only on a plain "send" said
-  to me right after I read the message back. Say it was not sent."
+  to me right after I read the message back. Say it was not sent." Journal
+  ghi tên từng điều kiện không đạt ("a send cancelled: …"), và mỗi lần từ
+  chối ghi kèm lời đã báo.
 - **Phần đọc lại phải được nghe trọn.** Lời của đèn phải chứa mọi từ của
   `read_back` theo đúng thứ tự (chữ cái và chữ số, viết thường, "at" và "dot"
   của một địa chỉ nói hay viết đều như nhau; thêm lời xung quanh, như "Shall
