@@ -834,6 +834,97 @@ Shown in tests only (`owner_voice::tests`,
 `lamp-voice.service` sets `LAMP_SAME_VOICE_FOR=services` since 4 November
 ("For the services only", above); played check: see the PR's Lamp check.
 
+## One way only: the voice confirms (4 November)
+
+The memory owner's decision (4 Nov, 01:1x): CAM++ is used one way only,
+as a sign that confirms a line is the known person's, never as one that
+ends, holds or splits a conversation. `LAMP_SAME_VOICE_CONFIRMS=on`, beside
+`LAMP_SAME_VOICE_MODEL`, on the second route only (the coordinator reads it
+and passes `--same-voice-confirms BAR` after the model's path):
+
+- **Their own voice, in RAM only** (`same_voice::OwnerVoice`). Nothing on
+  the lamp stores an enrolled voice print, so the known person's voice is
+  the prints of the first 4 lines (`OWNER_PRINTS`) whose speaking face was
+  theirs alone, their known face the one face in view through the line
+  (`SpeakingFaces::one_face_in_view`). No line is judged until 3 of them
+  are kept (`OWNER_LEAST_PRINTS`): one short print against another is too
+  loose to tell them from another voice. A line the voice confirmed is never
+  learnt from, so the voice never vouches for itself. Another known person
+  starts it afresh, and so does a restart of the voice. Nothing is written.
+- **A confirm.** A line admitted as the known person's that no face was seen
+  speaking, their known face the one face in view through it, whose print
+  scores the bar or over against their kept prints, is taken as seen said
+  by them: the faces seen speaking it become their face
+  (`second_provider::confirmed_by_voice`). Every check after reads it so:
+  its keeps and reads (`speaking_faces::not_theirs`), the late look's
+  keeper, and the "seen saying" checks of `LAMP_PERSON_SCOPE_ONE_FACE`.
+  It is never done for a face not in view, another face, or two faces.
+- **The bar** is `LAMP_SAME_VOICE_CONFIRM_BAR`, a number over 0 and at most
+  1, else 0.45 (`CONFIRM_BAR`), against the mean of their kept prints, each
+  of unit length. Set against Mac voices only, on lamp-06c1 (4 Nov, 20:48,
+  `drafts/memory-architecture/campp-voices/owner2/bar-20261104.md`): 5
+  segments of the memory owner's voice on the lamp's mic and 112 clips of
+  14 Mac `say` voices through its speaker, printed on the lamp's CPU (the
+  same prints as the Mac's, cosine 1.0000):
+
+  | Cut | Measure | Cosine |
+  |---|---|---|
+  | full | owner print (mean of 3) vs left-out segment | 0.72 / med 0.79 / 0.87 |
+  | full | owner print vs Mac voices | max 0.29 (med 0.05) |
+  | full | owner segment pairs | 0.59 / med 0.74 / 0.79 |
+  | full | single owner segment vs Mac clip | max 0.28 |
+  | 1.8 s | owner segment pairs | 0.29 / med 0.50 / 0.63 |
+  | 1.8 s | owner print (mean of 3) vs left-out segment | 0.47 / med 0.64 / 0.70 |
+  | 1.8 s | owner print vs Mac voices | max 0.28 (med 0.07) |
+  | 1.8 s | single owner segment vs Mac clip | max 0.31 |
+
+  At the 1.8 s cut the owner's mean-of-3 floor (0.47) is over every other
+  voice (0.28), so 0.45 confirms their short lines; the earlier 0.70
+  confirmed almost none. A single 1.8 s pair falls to 0.29, at the others'
+  0.31, so the bar holds only against a mean of 3 or more. The confirm has
+  no different-voice veto: a score under the bar does nothing. Not
+  measured: a real relative's voice, more than one owner. A similar voice
+  is not kept apart (Thirteen, 5 Nov, #5154: two similar synthetic voices,
+  both male, middle-aged British English, played through lamp-c0a4's
+  speaker and taken on its mic, one as the owner on a mean of 3 and one as
+  the "relative"): the relative's lines were wrongly confirmed as the
+  owner's on 4 of 5 at the full cut and 3 of 5 at the 1.8 s cut, where the
+  owner's lowest (0.43) is under the relative's highest (0.57), so no bar
+  separates them. The switch stays off until a real related pair (two
+  people of one home, on a lamp mic) is measured, beside the eyes-and-model
+  run below.
+  Before, from Friday's Mac matrix (4 Nov, clean files with no speaker, room
+  or mic, `drafts/memory-architecture/campp-mac-matrix.md`): other voices
+  reached 0.62 on long lines and 0.53 on short ones against a mean of 3,
+  and the bar was 0.70. The highest of 3 instead of the mean confirmed 76%
+  of long lines against the mean's 89% at 0.70.
+- **Prints come from tract only.** onnxruntime 1.23.2 on the Mac gives a
+  different print for the same input (cosine 0.02 to tract's), and breaks
+  down past about 200 frames, so tests and tools must print with
+  `crates/same-voice` (tract), as the lamp does.
+- **Under the bar, nothing.** With the switch on, the check's voices judge
+  nothing (`Voices::confirming_only`): no likeness at a verdict, no late
+  other voice, no cosine of two lines or to the asker, and no print for
+  any other rule (the same-speaker carry, joined cut-ins, the memory that
+  follows a face). So no score ends a conversation, holds a line or marks
+  another voice, and none joins or carries one either. The Live route,
+  which has no confirm, starts no check at all with the switch on.
+- **The services' voice checks fail closed.** `services::judging_voices`
+  reads the same voices (`kept_voices()`), so under `confirming_only` its
+  `VoiceAsk::Alike`, `VoiceAsk::Conversation` and `VoiceAsk::Owner` all
+  return None: with `--same-voice-for-services` and a service linked, a
+  send has no voice cosine and is refused, a read is never in full, and
+  `owner_voice::offer` learns nothing. That is no worse than without the
+  model, but turning the switch on removes those positive checks.
+
+Off, nothing changes: no flag is passed and the voices judge as above.
+Shown in tests only (`a_high_match_with_their_face_in_view_is_seen_said_by_them`,
+`a_high_match_with_no_face_in_view_does_nothing`, `a_low_match_does_nothing`,
+`a_low_match_confirming_only_ends_and_holds_nothing`,
+`the_switch_off_changes_nothing`, `the_confirm_bar_is_read_from_the_environment`).
+`lamp-same-voice` and the model are not in the product build yet, so no
+product lamp can turn it on.
+
 ## Not shown
 
 - **People.** Every voice was synthetic and played from one loudspeaker.
