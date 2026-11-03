@@ -42,6 +42,10 @@ pub const OPEN_FOR_US: u64 = 8_000_000;
 pub const NOBODY_SPOKE: &str = "nobody spoke";
 /// Why a turn its computer ended is dropped, when nothing was answered.
 pub const ENDED_BY_COMPUTER: &str = "ended by the computer";
+/// Why a turn whose answer had begun to sound is ended by its own
+/// computer's `turn: "end"`: its answer was cut, and the door says it
+/// `cut_short`, so a developer can tell it from one heard whole.
+pub const CUT_BY_ITS_COMPUTER: &str = "ended by this computer";
 /// Why an end that names no turn of a computer's going on is refused.
 pub const NOT_THIS_TURN: &str = "not this computer's turn";
 /// Why a turn is refused while the microphone is not allowed.
@@ -368,9 +372,27 @@ impl ControlTurns {
         self.turn.as_ref().is_some_and(|turn| turn.id == id)
     }
 
-    /// The conversation was ended for `why`, by the person, the voice or
-    /// the turn's computer: the turn ends with it, answered `spoken` if its
-    /// answer had sounded, else `dropped` with why.
+    /// The turn's own computer ended it (`turn: "end"`): its answer cut if
+    /// it had begun to sound ([`CUT_BY_ITS_COMPUTER`], `cut_short` at the
+    /// door), else `dropped` [`ENDED_BY_COMPUTER`].
+    pub fn ended_by_its_computer(&mut self) {
+        let Some(mut turn) = self.turn.take() else {
+            return;
+        };
+        let sounded = matches!(turn.phase, Phase::Grown { sounded: true, .. });
+        turn.tell(Outcome::Dropped(
+            if sounded {
+                CUT_BY_ITS_COMPUTER
+            } else {
+                ENDED_BY_COMPUTER
+            }
+            .to_owned(),
+        ));
+    }
+
+    /// The conversation was ended for `why`, by the person or the voice:
+    /// the turn ends with it, answered `spoken` if its answer had sounded,
+    /// else `dropped` with why.
     pub fn cancelled(&mut self, why: &str) {
         let Some(mut turn) = self.turn.take() else {
             return;
@@ -465,6 +487,25 @@ mod tests {
         turns.tick(40 * S, None, false, true);
         assert!(!turns.going_on());
         assert!(!turns.ends(id));
+    }
+
+    /// Its own computer's `turn: "end"` cutting an answer that had begun to
+    /// sound is told as cut (`cut_short` at the door), never `spoken`
+    /// (lamp-75c9, 3 Nov 20:22: a story cut by `turn.end` said `finished`).
+    #[test]
+    fn its_own_computers_end_cutting_its_answer_is_told_as_cut() {
+        let mut turns = ControlTurns::default();
+        let (asker, answered) = ticket_for_test("control");
+        turns.open(asker, 10 * S);
+        let _ = answers(&answered);
+        assert!(turns.admitted(7, 11 * S));
+        turns.tick(13 * S, Some((7, true)), true, false);
+        turns.ended_by_its_computer();
+        assert_eq!(
+            answers(&answered),
+            vec![Answer::Done(Outcome::Dropped(CUT_BY_ITS_COMPUTER.into()))]
+        );
+        assert!(!turns.going_on());
     }
 
     /// The local leader's condition (3 Nov): a person's answer to a line of
@@ -612,7 +653,7 @@ mod tests {
         assert!(!turns.ends(id + 1));
         assert!(turns.ends(id));
         // Ended by its computer before anyone spoke.
-        turns.cancelled(ENDED_BY_COMPUTER);
+        turns.ended_by_its_computer();
         assert_eq!(
             answers(&answered),
             vec![Answer::Done(Outcome::Dropped(ENDED_BY_COMPUTER.into()))]

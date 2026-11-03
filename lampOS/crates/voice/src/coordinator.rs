@@ -7695,13 +7695,15 @@ fn conversation_with_gate_inner(
                 }
                 // A computer's turn ends with whatever ended the
                 // conversation: the person wins over it.
-                control_turns.cancelled(if muted {
-                    crate::control_turn::MUTED
-                } else if reason == CONTROL_ENDED {
-                    crate::control_turn::ENDED_BY_COMPUTER
+                if !muted && reason == CONTROL_ENDED {
+                    control_turns.ended_by_its_computer();
                 } else {
-                    reason
-                });
+                    control_turns.cancelled(if muted {
+                        crate::control_turn::MUTED
+                    } else {
+                        reason
+                    });
+                }
                 if let Some(ended) = control_end.take() {
                     ended.answer(crate::say::Outcome::Ended);
                 }
