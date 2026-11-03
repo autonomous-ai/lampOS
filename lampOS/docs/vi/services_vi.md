@@ -208,14 +208,15 @@ Danh mục là `crates/services/src/catalog.rs`; việc đọc là `reads.rs`
 (`WHATS`), việc ghi là `writes.rs` (`ACTIONS`). Một token chỉ đi đến các host
 trong hàng của nó, hoặc một subdomain của một host đó (host MCP thì chính xác,
 không subdomain): `OFFICIAL_HOSTS` của V1
-(`skills/connectors/scripts/connector.py`), trừ của Gmail, và của Google
-Calendar và Drive, được giới hạn ở `www.googleapis.com`, host Google duy nhất
-mà việc đọc và ghi của chúng dùng (việc làm mới đi đến backend của đèn, không
-bao giờ đến Google).
+(`skills/connectors/scripts/connector.py`), trừ của Gmail (các host IMAP và
+SMTP cho mật khẩu ứng dụng, `gmail.googleapis.com` cho đăng nhập Google), và
+của Google Calendar và Drive, được giới hạn ở `www.googleapis.com`, host
+Google duy nhất mà việc đọc và ghi của chúng dùng (việc làm mới đi đến
+backend của đèn, không bao giờ đến Google).
 
 | Code | Tên | Host | Đọc (`what`) | Ghi (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (mật khẩu ứng dụng); `gmail.googleapis.com` (đăng nhập Google) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}`, `calendars` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | không có |
 | `notion` | Notion | `api.notion.com` | `search {query, count}`, `page {id}` | `append_text {id, text}` |
@@ -244,26 +245,37 @@ của V1 đặt tên; cả hai đều được nhận biết. Facebook được 
 `X-Figma-Token`. Một liên kết OAuth (`expires_in` hoặc `expires_at`, nếu
 không có: một giờ kể từ bây giờ) có thể mang một `refresh_token` và
 `refresh: true`; một khoá tĩnh (`pat`, hoặc một `api_key` không có access
-token) không cho thời hạn thì không bao giờ hết hạn. Gmail cần email của tài
-khoản; một lần ghi lên Facebook cần `credentials.page_id` (việc đọc thì lùi
-về `me`).
+token) không cho thời hạn thì không bao giờ hết hạn. Mật khẩu ứng dụng Gmail
+cần email của tài khoản (của một đăng nhập Google thì được đọc từ Gmail ở
+`set` khi liên kết không có); một lần ghi lên Facebook cần
+`credentials.page_id` (việc đọc thì lùi về `me`).
 
-## Gmail: IMAP và SMTP với mật khẩu ứng dụng
+## Gmail: mật khẩu ứng dụng qua IMAP và SMTP, hoặc đăng nhập Google qua API của nó
 
-V1 liệt kê `googleapis.com` cho Gmail, mà REST API của nó từ chối mật khẩu
-ứng dụng; trên đèn Gmail chỉ là IMAP và SMTP (`crates/services/src/mail.rs`),
-nên token của nó chỉ đi đến hai host đó.
+Một liên kết Gmail là một trong hai loại (`crates/services/src/mail.rs`),
+phân biệt bằng chính liên kết: một **mật khẩu ứng dụng** (`auth_type: "pat"`,
+hoặc không có access token) chỉ được dùng qua IMAP và SMTP, và một **đăng
+nhập Google** (một liên kết OAuth: có `access_token`, `auth_type` không phải
+`pat`) chỉ qua REST API của Gmail. Một tài khoản Google Workspace thường không
+tạo được mật khẩu ứng dụng ("The setting you are looking for is not available
+for your account"), nên nó liên kết bằng đăng nhập, như Google Calendar. Mỗi
+thông tin xác thực chỉ đi đến các host của riêng nó: mật khẩu ứng dụng không
+bao giờ đến `gmail.googleapis.com`, nơi từ chối nó, và token của đăng nhập
+không bao giờ đến IMAP hay SMTP. Cả hai loại giữ mọi luật dưới đây: cùng câu
+trả lời `service_read` và giới hạn, thư bảo mật bị bỏ ra, chỉ ghi khi có câu
+"send" nói ra cùng `LAMP_SERVICES_WRITE`, chỉ câu nghe được của chủ, không
+giữ gì.
 
-- **Liên kết:** `auth_type: "pat"`, mật khẩu ứng dụng trong `api_key` (hoặc
-  `access_token`), email của tài khoản trong `credentials.email`. Nó không
-  hết hạn hay làm mới. Google hiện mật khẩu thành các nhóm bốn ký tự có dấu
-  cách; mọi khoảng trắng (bản chép từ điện thoại có thể mang dấu cách không
-  ngắt dòng) được bỏ đi trước khi dùng.
+**Mật khẩu ứng dụng:**
+
+- **Liên kết:** mật khẩu ứng dụng trong `api_key` (hoặc `access_token`),
+  email của tài khoản trong `credentials.email`. Nó không hết hạn hay làm mới.
+  Google hiện mật khẩu thành các nhóm bốn ký tự có dấu cách; mọi khoảng trắng
+  (bản chép từ điện thoại có thể mang dấu cách không ngắt dòng) được bỏ đi
+  trước khi dùng.
 - **Ở `set`:** một lệnh IMAP `LOGIN` được thử trước. Bị từ chối: `failure` với
   "Gmail refused the app password"; không kết nối được: "Gmail couldn't be
-  reached"; dù trường hợp nào cũng không gì được lưu. Một liên kết Gmail OAuth
-  thất bại ở đây theo cùng cách, vì access token của nó không phải mật khẩu
-  IMAP.
+  reached"; dù trường hợp nào cũng không gì được lưu.
 - **Đọc:** IMAP qua TLS đến `imap.gmail.com:993`: `LOGIN`, `EXAMINE INBOX`
   (hộp thư mở ở chế độ chỉ-đọc), `UID SEARCH` (các từ của `search` là cú pháp
   riêng của Gmail, `X-GM-RAW`), `UID FETCH` lấy From, Subject, Date và phần
@@ -278,6 +290,43 @@ nên token của nó chỉ đi đến hai host đó.
   khoản đó.
 - Mật khẩu chỉ nằm trong các dòng `LOGIN` và `AUTH`. Một lỗi được nói bằng
   một trong hai câu ở trên, không bao giờ kèm điều máy chủ đã nói.
+
+**Đăng nhập Google:**
+
+- **Liên kết:** access token, `expires_in` (hoặc `expires_at`) của nó, và một
+  `refresh_token` với `refresh: true`, cùng dạng như của Google Calendar. Tài
+  khoản là `user_email` (nếu không thì `credentials.email`); một liên kết
+  không có cả hai lấy địa chỉ mà profile của Gmail đưa ra ở `set`, và một
+  liên kết vẫn không có địa chỉ thì bị từ chối ("Gmail needs the account's
+  email").
+- **Ở `set`:** `GET https://gmail.googleapis.com/gmail/v1/users/me/profile`
+  (`users.getProfile`) với `Authorization: Bearer`. 401 hoặc 403: `failure`
+  với "Google refused the Gmail sign-in"; mọi lỗi khác: "Gmail couldn't be
+  reached"; dù trường hợp nào cũng không gì được lưu. Khi thành công,
+  `scopes` trong câu trả lời là của liên kết, như backend đã đưa.
+- **Đọc** (`users.messages.list` và `users.messages.get`, mỗi cái nằm trong
+  danh sách đọc): `recent` và `search` liệt kê hộp thư đến
+  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`, `search`
+  thêm `q=<words>`, cú pháp tìm kiếm riêng của Gmail), rồi lấy từng thư với
+  `format=metadata` (From, Subject, Date) và đoạn xem trước ngắn của Gmail
+  (các thực thể HTML được đọc), 300 ký tự của nó. `message {id}` (id riêng
+  của Gmail mà một danh sách đưa ra: chữ và số, tối đa 64) lấy thư với
+  `format=full`: nội dung từ phần văn bản thuần trước, nếu không thì từ HTML
+  đã bỏ thẻ, mỗi phần được giải mã từ base64url theo charset của nó, đến
+  3,000 ký tự. Một danh sách tối đa 10 thư, mới nhất trước; không gì bị đánh
+  dấu đã đọc (một lần lấy không đổi nhãn nào). Mỗi lệnh gọi là một lần đọc
+  web (5 s để kết nối, 15 s mỗi lệnh), 20 s cho cả lần đọc; các token cũng
+  được xoá khỏi nội dung đã giải mã.
+- **Ghi:** khi có câu "send" nói ra, một `POST
+  /gmail/v1/users/me/messages/send` (`users.messages.send`, route duy nhất
+  trong danh sách ghi của nó) với `{"raw": <base64url>}`: cùng thư văn bản
+  thuần mà SMTP gửi, từ chính tài khoản đó.
+- **Scope** nó cần từ Google: `gmail.readonly` cho profile, danh sách (có
+  `q`) và từng lần lấy, và `gmail.send` cho một lần gửi (`gmail.modify` hoặc
+  `https://mail.google.com/` bao cả hai). IMAP không được dùng vì nó chỉ nhận
+  `https://mail.google.com/`. Một token thiếu scope mà lệnh gọi cần nhận 403:
+  "Gmail refused the lamp's link: it may need linking again in the app".
+- **Làm mới:** qua backend, như mọi liên kết OAuth ([Làm mới](#làm-mới)).
 
 ## Dịch vụ MCP
 
@@ -597,6 +646,9 @@ https), và khoá là thông tin xác thực của giọng nói, cả hai do uni
 chúng thì journal ghi "no backend link: OAuth links are used until they
 expire, never renewed".
 
+Đăng nhập Google của Gmail được gia hạn cùng cách, như của Google Calendar
+(`connector: "gmail"`); mật khẩu ứng dụng của nó thì không bao giờ.
+
 Việc này xảy ra trước một lần đọc hoặc ghi, khi liên kết cho phép (`refresh`
 là true và có refresh token), có hạn, và còn dưới 600 s (`connectorRefreshSkew`
 của V1). Một phản hồi 200 có `access_token` và `expires_in` lớn hơn 0 thì được
@@ -619,8 +671,8 @@ khoản và khoá của đèn ([cloud.md](../cloud.md), "A person's linked servi
 Câu trả lời theo dạng của V1, `{"type":"data","kind":"connector.set.<code>",
 "status":"starting|success|failure","data":{...},"error":...}`. Một `set` hoặc
 `remove` chạy trên luồng riêng, tối đa 4 cùng lúc (vượt quá thì `failure`
-"the lamp's services are busy: try again in a moment"), chờ 30 s (việc đăng
-nhập Gmail nằm trong đó); kết quả của nó đi ra ở tick kế tiếp và được gửi lại
+"the lamp's services are busy: try again in a moment"), chờ 30 s (việc kiểm
+tra Gmail, một lần đăng nhập IMAP hoặc một lần đọc profile, nằm trong đó); kết quả của nó đi ra ở tick kế tiếp và được gửi lại
 nếu kết nối mất trước khi broker ack. Lỗi bằng lời thường: "not a service this
 lamp knows" (một code không nằm trong 15 code, ngay lập tức), "the lamp's
 services are not running", "the lamp's services did not answer in time",
@@ -688,8 +740,9 @@ chờ thì phát âm thanh đó, như một cuộc trò chuyện chậm.
   trên; một liên kết trên host khác bị từ chối.
 - `lamp-services.service` đã được cài nhưng tắt trên mọi đèn, và chưa phần
   nào ở đây chạy trên một đèn: các kiểm tra cgroup dưới socket
-  thật, các trao đổi IMAP và SMTP với Gmail, `get-message` và làm mới của
-  backend, và API riêng của từng dịch vụ.
+  thật, các trao đổi IMAP và SMTP với Gmail, REST API của Gmail với một đăng
+  nhập Google (và các scope mà đăng nhập Gmail của backend yêu cầu),
+  `get-message` và làm mới của backend, và API riêng của từng dịch vụ.
 
 ## Kiểm thử
 
@@ -699,7 +752,13 @@ code không bao giờ là một đường dẫn, gỡ và xoá; không bí mật
 (không port, user, fragment hay host giả mạo), đọc chỉ trong danh sách cho
 phép, ghi chỉ trong danh sách ghi; mọi mutation GraphQL bị từ chối; IMAP của
 Gmail chỉ-đọc (`EXAMINE`, `BODY.PEEK`) và SMTP một thư sau `AUTH`; `set`
-không giữ gì khi đăng nhập Gmail bị từ chối; thư bảo mật được phát hiện và bỏ
+không giữ gì khi đăng nhập Gmail bị từ chối; một đăng nhập Google của Gmail
+được kiểm tra ở `set` bằng profile của nó (bị từ chối, không kết nối được,
+tài khoản lấy từ đó), được đọc qua REST API (danh sách hộp thư đến, metadata
+của từng thư, một thư trọn vẹn từ phần văn bản thuần, token của nó bị xoá,
+thư bảo mật bị bỏ ra, một id không phải của Gmail không bao giờ được gửi),
+được gia hạn qua backend, được gửi qua API chỉ khi có câu "send" nói ra, và
+mật khẩu ứng dụng không bao giờ được gửi đến API; thư bảo mật được phát hiện và bỏ
 trọn; câu trả lời được trích dẫn và dưới mức trần của giọng nói; một lần ghi
 bị từ chối khi tắt, được đọc lại đầy đủ và gửi một lần trong hai phút; luật
 đọc/ghi MCP, host được ghim của nó, một liên kết trên host khác không bao giờ

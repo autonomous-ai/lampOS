@@ -28,7 +28,8 @@ pub enum Plan {
         url: String,
         body: Option<Value>,
     },
-    /// Gmail over IMAP.
+    /// Gmail: over IMAP with an app password, its REST API with a Google
+    /// sign-in.
     Mail(MailAsk),
 }
 
@@ -217,11 +218,19 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
         return Ok(Plan::Mail(match what {
             "recent" => MailAsk::Recent(count(args)),
             "search" => MailAsk::Search(words(args, "query", what)?.to_owned(), count(args)),
-            "message" => MailAsk::Message(
-                needed(args, "id", what)?
-                    .parse()
-                    .map_err(|_| "a mail's id is the number a list gave")?,
-            ),
+            // A UID over IMAP; Gmail's own id with a Google sign-in.
+            "message" => {
+                let id = needed(args, "id", what)?;
+                let fits = if entry.oauth() {
+                    mail::api_id_ok(id)
+                } else {
+                    id.parse::<u32>().is_ok()
+                };
+                if !fits {
+                    return Err("a mail's id is the one a list gave".into());
+                }
+                MailAsk::Message(id.to_owned())
+            }
             _ => return Err(unknown(code)),
         }));
     }
