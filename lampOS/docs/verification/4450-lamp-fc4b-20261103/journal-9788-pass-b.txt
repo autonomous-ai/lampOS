@@ -1,0 +1,36 @@
+# lamp-fc4b, lamp-voice journal, stable 9788, after2 pass b (16:5x +07, the lamp's clock, +0.35 s against the Mac). Lines about requests and the chat service; connection and token lines left out.
+16:52:24.501 lamp-voice second: request 15 first piece to the voice 66667 ms after the words were heard, 4 words
+16:52:24.501 lamp-voice second: request 15 speech tags: 0 given to the voice, 0 dropped (LAMP_SECOND_SPEECH_TAGS)
+16:52:25.254 lamp-voice second: request 15 first answer audio 67419 ms after the words were heard
+16:52:25.679 lamp-voice second: request 15 ElevenLabs: 2 of 2 pieces began, 0 on a reused connection, 36 chars; the first piece's first audio byte 752 ms after it went, the slowest 752 ms
+16:52:29.051 lamp-voice second: request 16: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+16:52:32.097 lamp-voice second: request 16 at the line's end: settled=false, speech_final=true, finals cover 2470 of 3510 ms sent, pending=none, last final 437 ms before End, finalize answered in 373 ms to 3480 ms, results 3 with words, 2 without, words from=finalize
+16:52:32.097 lamp-voice second: request 16 heard 5 words, the last 374 ms after the line ended
+16:52:32.097 lamp-voice second: request 16: of its 5 words, 0 in the lamp's answer to request 15 so far
+16:52:32.099 lamp-voice second: request 16: its answer is played: the text shows it was called
+16:52:33.586 lamp-voice second: request 16 chat round 1 first event in 1488 ms
+16:52:50.047 lamp-voice second: request 16: ended before its answer: a newer line began; its words wait for that line's verdict
+16:52:50.049 lamp-voice second: request 17: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+16:52:52.086 lamp-voice: request 17: unfinished words (joining) held its end 130 ms, more speech came: no
+16:52:52.961 lamp-voice second: request 17 at the line's end: settled=false, speech_final=false, finals cover none of 2640 ms sent, pending=interim 2000 ms after the last final, last final none, finalize answered in 872 ms to 2630 ms, results 3 with words, 0 without, words from=finalize
+16:52:52.961 lamp-voice second: request 17 heard 7 words, the last 873 ms after the line ended
+16:52:52.961 lamp-voice second: request 17: of its 7 words, 2 in request 16's words it cut short, 1 in the lamp's answer to request 15 so far
+16:52:52.961 lamp-voice second: request 17: its answer is held back: a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp
+16:52:52.962 lamp-voice second: request 17: not joined with request 16's words, cut short by it: begun 18324 ms after its end, past 3000 ms (LAMP_JOIN_CUT_WORDS)
+16:52:52.962 lamp-voice second: request 17: the words answered in its place had none of their answers played; those answers are not kept as the lamp's words (1 requests, LAMP_JOIN_CUT_WORDS)
+16:52:52.962 lamp-voice second: request 17 is held, so request 16's words, cut short by it, are answered in its place
+16:52:54.462 lamp-voice second: request 17 made a sound while its chat had not begun in 1501 ms
+16:52:54.469 lamp-voice second: request 17: ended before its answer: a newer line began; its words wait for that line's verdict
+16:52:54.469 lamp-voice second: request 17: 0 of its answer's 0 words were played, 0 ms of it, before it was cut; request 18 is asked with only those as the lamp's
+16:52:54.469 lamp-voice second: request 18 began over only request 17's wait sound: taken as begun in the clear
+16:52:54.471 lamp-voice second: request 18: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+16:52:58.235 lamp-voice second: request 18 at the line's end: settled=false, speech_final=true, finals cover 3950 of 4860 ms sent, pending=none, last final 482 ms before End, finalize answered in 345 ms to 4860 ms, results 5 with words, 1 without, words from=finalize
+16:52:58.235 lamp-voice second: request 18 heard 8 words, the last 345 ms after the line ended
+16:52:58.235 lamp-voice second: request 18: of its 8 words, 0 in request 17's words it cut short, 0 in the lamp's answer to request 15 so far
+16:52:58.236 lamp-voice second: request 18: its answer is held back: a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp
+16:52:58.236 lamp-voice second: request 18: not joined with request 17's words, cut short by it: its words were said in request 16, answered in a held line's place (LAMP_JOIN_CUT_WORDS)
+16:52:58.236 lamp-voice second: request 18: the words answered in its place had none of their answers played; those answers are not kept as the lamp's words (2 requests, LAMP_JOIN_CUT_WORDS)
+16:52:58.236 lamp-voice second: request 18 is held, so request 17's words, cut short by it, are answered in its place
+16:52:59.664 lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+16:52:59.664 lamp-voice second: request 18 chat round 1 failed after 1428 ms: service answered HTTP 503
+16:52:59.879 lamp-voice second: request 18 said its thoughts are slow
