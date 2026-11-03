@@ -38,13 +38,20 @@ pub struct Policy {
     pub repetitions: u32,
     pub fixtures: BTreeMap<String, Fixture>,
     pub adapters: BTreeMap<String, Adapter>,
-    /// A one-run look at four setups, never a registered result. Omitted when
+    /// A one-run look at three setups, never a registered result. Omitted when
     /// false, so registered policy hashes are unchanged by this field.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub preliminary: bool,
 }
-/// Setups of the preliminary run, in their registered relative order.
-pub const PRELIMINARY_ORDER: [&str; 4] = ["none", "full_history", "lampos_today_partial", "tiers"];
+/// Setups of the preliminary run, in their registered relative order. Full
+/// history is left out (3 Nov plan change): runs 2, 3 and 5 gave it 0.84,
+/// 0.80 and 0.83 at 95% of each run's cost.
+pub const PRELIMINARY_ORDER: [&str; 3] = ["none", "lampos_today_partial", "tiers"];
+/// The other preliminary order (the memory owner's Tiers-ideas plan, 3 Nov,
+/// P4b): today's partial against it with the Days switches on. Tiers is not
+/// rerun. Either order is admitted, so earlier campaigns still read.
+pub const PRELIMINARY_NEXT_ORDER: [&str; 3] =
+    ["none", "lampos_today_partial", crate::partial::NEXT];
 /// Written on every preliminary manifest, result and report.
 pub const PRELIMINARY_LABEL: &str =
     "preliminary: one run, development month, not the registered score";
@@ -91,7 +98,16 @@ impl Policy {
             return Err(invalid("invalid or stale public live policy"));
         }
         let month: Vec<_> = if self.preliminary {
-            PRELIMINARY_ORDER.map(str::to_owned).to_vec()
+            let next = PRELIMINARY_NEXT_ORDER.map(str::to_owned).to_vec();
+            if self
+                .fixtures
+                .values()
+                .all(|f| f.setup_order.as_slice() == next.as_slice())
+            {
+                next
+            } else {
+                PRELIMINARY_ORDER.map(str::to_owned).to_vec()
+            }
         } else {
             ["none", "full_history", "lampos_today_partial"]
                 .into_iter()
@@ -147,7 +163,12 @@ impl Policy {
                 return Err(invalid("invalid adapter pin or allowance"));
             }
         }
-        let full = &self.adapters["tiers"];
+        // The next preliminary order runs no Tiers setup; every other order
+        // admits `tiers`.
+        let Some(full) = self.adapters.get("tiers") else {
+            self.planned_microusd()?;
+            return Ok(());
+        };
         for name in files::ARMS {
             let Some(other) = self.adapters.get(name) else {
                 continue;
