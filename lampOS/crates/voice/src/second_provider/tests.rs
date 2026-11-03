@@ -1668,6 +1668,264 @@ async fn no_words_twice_is_said_in_the_owners_language() {
     assert_eq!(spoken, [&words], "{out:?}");
 }
 
+/// Queue #4710 item 3, `LAMP_ANSWER_ASK_AGAIN=on`: an engine whose lamp
+/// has just asked something when `asked` says so, each of `lines` heard in
+/// turn and answered by its chat rounds `rounds`: each turn's said lines,
+/// and how many chat rounds were asked in all.
+async fn ask_again_turns(
+    on: bool,
+    asked: bool,
+    lines: &[&str],
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+    configure: impl FnOnce(Engine) -> Engine,
+) -> (Vec<Vec<String>>, usize) {
+    let script = Arc::new(Script {
+        heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
+        chats: Mutex::new(rounds.into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = configure(
+        engine
+            .asking_again_for_answers(on)
+            .answering_the_lamp(Arc::new(move |_| asked)),
+    );
+    let mut said = Vec::new();
+    for request in 1..=lines.len() as u64 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        let out = turn(&mut engine).await;
+        assert_eq!(out.last().map(String::as_str), Some("complete"), "{out:?}");
+        said.push(
+            out.into_iter()
+                .filter(|label| label.starts_with("said:"))
+                .collect(),
+        );
+        engine.retire_through(request);
+    }
+    let asked_rounds = script.asked.lock().unwrap().len();
+    (said, asked_rounds)
+}
+
+/// Queue #4710 item 3 (lamp-29e7, 30 Oct 18:34): "Thin Place." after the
+/// lamp asked a colour got an empty answer, and the lamp said nothing for
+/// 150 s. With `LAMP_ANSWER_ASK_AGAIN=on` it says [`ANSWER_AGAIN_LINE`],
+/// with no second chat round; without the switch it stays silent as found.
+/// A line by name `LAMP_NO_WORDS_AGAIN` answers stays its: asked once more.
+#[tokio::test]
+async fn an_empty_answer_to_the_lamps_question_is_asked_again() {
+    let empty = || vec![Ok(ChatEvent::Done)];
+    let again = format!("said:{ANSWER_AGAIN_LINE}");
+    let (said, rounds) = ask_again_turns(true, true, &["Thin Place."], vec![empty()], |e| e).await;
+    assert_eq!(said, [vec![again.clone()]]);
+    assert_eq!(rounds, 1);
+    let (said, rounds) = ask_again_turns(false, true, &["Thin Place."], vec![empty()], |e| e).await;
+    assert_eq!(said, [Vec::<String>::new()]);
+    assert_eq!(rounds, 1);
+    // By name, with `LAMP_NO_WORDS_AGAIN` on too: asked once more, and its
+    // answer said, never the ask again.
+    let (said, rounds) = ask_again_turns(
+        true,
+        true,
+        &["Lamp, blue."],
+        vec![empty(), vec![text("Blue it is."), Ok(ChatEvent::Done)]],
+        |e| e.asking_again_for_no_words(true),
+    )
+    .await;
+    assert_eq!(said, [vec!["said:Blue it is.".to_owned()]]);
+    assert_eq!(rounds, 2);
+    // By name with `LAMP_NO_WORDS_AGAIN` off: this switch's line.
+    let (said, _) = ask_again_turns(true, true, &["Lamp, blue."], vec![empty()], |e| e).await;
+    assert_eq!(said, [vec![again]]);
+}
+
+/// `LAMP_ANSWER_ASK_AGAIN=on`: an empty answer to a line not right after
+/// the lamp's own question, or a turn that called anything, stays silent.
+#[tokio::test]
+async fn an_answer_outside_the_lamps_window_stays_silent() {
+    let (said, rounds) = ask_again_turns(
+        true,
+        false,
+        &["Thin Place."],
+        vec![vec![Ok(ChatEvent::Done)]],
+        |e| e,
+    )
+    .await;
+    assert_eq!(said, [Vec::<String>::new()]);
+    assert_eq!(rounds, 1);
+    let timer = vec![
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "set_timer",
+            json!({"minutes": 5}),
+        )])),
+        Ok(ChatEvent::Done),
+    ];
+    let (said, rounds) = ask_again_turns(
+        true,
+        true,
+        &["Five minutes."],
+        vec![timer, vec![Ok(ChatEvent::Done)]],
+        |e| e,
+    )
+    .await;
+    assert_eq!(said, [Vec::<String>::new()]);
+    assert_eq!(rounds, 2);
+}
+
+/// `LAMP_ANSWER_ASK_AGAIN=on`: "never mind" or a stop to the lamp's question
+/// is rightly answered with nothing, and a line naming someone else
+/// (`LAMP_TASKS_NAMED_ASK`) was not for the lamp to hear again.
+#[tokio::test]
+async fn a_stop_after_the_lamps_question_stays_silent() {
+    for line in ["Never mind.", "Lamp, stop.", "Hold on."] {
+        let (said, _) =
+            ask_again_turns(true, true, &[line], vec![vec![Ok(ChatEvent::Done)]], |e| e).await;
+        assert_eq!(said, [Vec::<String>::new()], "{line}");
+        // Its `not_for_me` stays the decline, from the person asked too.
+        let outs = declined_answers(true, &[line]).await;
+        assert!(
+            !outs[0].iter().any(|label| label.starts_with("said:")),
+            "{line}: {:?}",
+            outs[0]
+        );
+    }
+    let (said, _) = ask_again_turns(
+        true,
+        true,
+        &["Minh, it's blue."],
+        vec![vec![Ok(ChatEvent::Done)]],
+        |e| e.asking_by_name(Arc::new(|_| vec!["Minh"])),
+    )
+    .await;
+    assert_eq!(said, [Vec::<String>::new()]);
+}
+
+/// Each of `lines`, heard after the lamp's question, answered with a
+/// `not_for_me` call, with `asked_person` saying whether the person the lamp
+/// asked said it: each turn's outputs.
+async fn declined_answers(asked_person: bool, lines: &[&str]) -> Vec<Vec<String>> {
+    let declined = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                NOT_FOR_ME,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
+        chats: Mutex::new(lines.iter().map(|_| declined()).collect()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine
+        .asking_again_for_answers(true)
+        .answering_the_lamp(Arc::new(|_| true))
+        .answering_the_asked_person(Arc::new(move |_| asked_person));
+    let mut outs = Vec::new();
+    for request in 1..=lines.len() as u64 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        outs.push(turn(&mut engine).await);
+        engine.retire_through(request);
+    }
+    outs
+}
+
+/// The first builder on Queue #4710: with `LAMP_ANSWER_ASK_AGAIN=on`, a
+/// `not_for_me` the model gives an answer to the lamp's own question from
+/// the person it asked (the same voice, or a face turned to the lamp) is
+/// said [`ANSWER_AGAIN_LINE`] in place of the decline; once, a second
+/// decline right after it taken as before.
+#[tokio::test]
+async fn a_not_for_me_to_the_lamps_question_from_the_asked_person_is_asked_again() {
+    let outs = declined_answers(true, &["Thin Place.", "Thin Place."]).await;
+    let said = |out: &Vec<String>| -> Vec<String> {
+        out.iter()
+            .filter(|label| label.starts_with("said:"))
+            .cloned()
+            .collect()
+    };
+    assert_eq!(
+        said(&outs[0]),
+        [format!("said:{ANSWER_AGAIN_LINE}")],
+        "{:?}",
+        outs[0]
+    );
+    assert_eq!(outs[0].last().map(String::as_str), Some("complete"));
+    assert!(said(&outs[1]).is_empty(), "{:?}", outs[1]);
+}
+
+/// `LAMP_ANSWER_ASK_AGAIN=on`: a `not_for_me` to a line after the lamp's
+/// question that the person it asked did not say (another voice, no face
+/// turned to the lamp) stays the decline, nothing said.
+#[tokio::test]
+async fn another_persons_not_for_me_stays_declined() {
+    let outs = declined_answers(false, &["Thin Place."]).await;
+    assert!(
+        !outs[0].iter().any(|label| label.starts_with("said:")),
+        "{:?}",
+        outs[0]
+    );
+}
+
+/// `LAMP_ANSWER_ASK_AGAIN=on`: the lamp asks to hear an answer again once;
+/// a second empty answer right after its ask stays silent, and after the
+/// lamp has said something else it may ask again.
+#[tokio::test]
+async fn the_ask_again_is_never_said_twice_in_a_row() {
+    let empty = || vec![Ok(ChatEvent::Done)];
+    let again = format!("said:{ANSWER_AGAIN_LINE}");
+    let (said, rounds) = ask_again_turns(
+        true,
+        true,
+        &["Thin Place.", "Thin Place.", "Teal?", "Thin Place."],
+        vec![
+            empty(),
+            empty(),
+            vec![text("Teal or blue?"), Ok(ChatEvent::Done)],
+            empty(),
+        ],
+        |e| e,
+    )
+    .await;
+    assert_eq!(
+        said,
+        [
+            vec![again.clone()],
+            vec![],
+            vec!["said:Teal or blue?".to_owned()],
+            vec![again],
+        ]
+    );
+    assert_eq!(rounds, 4);
+}
+
+/// `LAMP_ANSWER_ASK_AGAIN=on`: with an owner's language, the ask again is in
+/// it, never English (#4473).
+#[tokio::test]
+async fn the_ask_again_line_is_said_in_the_owners_language() {
+    use crate::language::{Language, fixed_in};
+    let (said, _) = ask_again_turns(
+        true,
+        true,
+        &["Thin Place."],
+        vec![vec![Ok(ChatEvent::Done)]],
+        |e| e.in_language(Some(Language::Vietnamese)),
+    )
+    .await;
+    let words = format!(
+        "said:{}",
+        fixed_in(Some(Language::Vietnamese), ANSWER_AGAIN_LINE)
+    );
+    assert_eq!(said, [vec![words]]);
+}
+
 /// Words the heed judges not said to the lamp end the turn after them,
 /// with no chat asked; it is given the microphone's times of the line's
 /// first and last packets (#1014).
