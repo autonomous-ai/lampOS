@@ -1329,8 +1329,10 @@ impl Run<'_, '_> {
                 // (`manifest::STORE_ENV_UPDATER`): an older lamp-update-back
                 // refuses the whole manifest for it, and the switch would be
                 // put back. The build waits until this round's refresh made
-                // the writer this lamp-update.
-                if !these.is_empty()
+                // the writer this lamp-update. Only in a round that applies: a
+                // dry one (a climbed updater's confirm) writes nothing.
+                if self.config.apply
+                    && !these.is_empty()
                     && manifest
                         .settings
                         .iter()
