@@ -1819,7 +1819,8 @@ order is kept. A written turn is the same from the chat on.
   a spoken request is told so beside its words, with the tasks part on:
   without it, on lamp-4ace on 19 Oct, the yes was taken as a new
   hand-over, asked about again and never started.
-  With `LAMP_HISTORY_KEEPS_CALLS=on` the functions a turn ran with no
+  With `LAMP_HISTORY_KEEPS_CALLS=on` (on in the product since 3 Nov) the
+  functions a turn ran with no
   arguments (the light's and the volume's steps, on, off, mute) are kept
   with its exchange (`Thread::called`, `Engine::keeping_calls`), and the
   history tells such an exchange as a round with calls goes: the person's
