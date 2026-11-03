@@ -2387,6 +2387,68 @@ On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `sea
 - **Tests:** in `remember::tests`, `a_vietnamese_kept_thing_is_found_with_or_without_its_accents`, `english_hit_words_are_as_before_but_the_memorys_common_words`, `vietnamese_function_words_alone_are_never_a_hit`, `unaccented_function_words_find_no_accented_kept_thing`, `search_common_is_the_memorys_own_list` (the voice's mirror of `search::COMMON` held to the memory's own source), `the_journal_line_counts_what_was_told_and_never_says_it` and `the_hits_switch_is_off_unless_exactly_on`.
 - **With `LAMP_SECOND_SCOPED_CONTEXT`:** the scope is the request's own lease, as its context is told: the person admitted with the line, or the room's once another face was seen speaking it (`speaking_faces`), never the sticky session's person. A revoked request is asked nothing. Tested in `a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs` (hits asked for the room, A, the room).
 
+### The nightly pass (`LAMP_MEMORY_NIGHTLY=on`, extraction plan C, step B)
+
+The memory owner's extraction plan C, step B (3 Nov): a nightly model pass
+that fills Days with episodes, facts, profile lines and what is ahead (and,
+each behind its own switch, patterns and feelings), from what a known
+person said in a day. lamp-memory has no network, so the voice runs the
+night (`nightly.rs`), its night runner adapted from the Tiers night (#5000,
+credited) and ported to Days. Days checks each item alone: a bad item is
+dropped and counted, the good ones are kept (where Tiers threw the whole
+night away).
+
+- **When:** 03:00 to 06:00 local, after 20 minutes with nothing heard and
+  no line handed on (`nightly::stir`), with the privacy slide open and told
+  within the last second (`nightly::privacy`). One thread of its own,
+  looking every minute; nothing on a reply's path.
+- **Who:** only a known person's own scope (`p-` and 16 hex,
+  `lamp_msgs::known::is_person_id`), never the room, a rules scope or a
+  guest. At each minute's look after someone spoke or a line was handed
+  on, the person the eyes know at the lamp (`known_faces`) is noted for
+  that day (the memory's writer runs in the route workers, not the night's
+  process); a day before today, within 3 days, at most 32 person-days
+  held, in memory only. Days itself gives only that person's own records
+  with their own words.
+- **What is sent:** `nightly_prepare {person, day, after_id}`; the
+  prepared `input` goes to the relay's DeepSeek (thinking off, the client
+  the voice's replies use) as quoted data after the prompt in
+  `nightly_prompt.rs` (the contract's lenient schema; only what the person
+  said; point at record ids, never quote; empty is fine; no guesses about
+  health or feelings unless stated); the reply, read as one JSON object, goes
+  back as `nightly_apply {person, job, patterns, feelings, proposal}`. A day
+  with `more:true` is asked again after its last record id.
+- **Switches passed through:** `patterns` is `true` only with
+  `LAMP_MEMORY_NIGHTLY_PATTERNS=on`, `feelings` only with
+  `LAMP_MEMORY_NIGHTLY_FEELINGS=on`; off, the prompt names neither and Days
+  drops them (`off`).
+- **Bounds:** at most 16 calls, 1 MiB of prompt and reply and 200k tokens a
+  night (the relay's `usage`, else a token a byte; a call whose reserve
+  does not fit is not made), 60 s a call, a reply at most 60 KiB, and an
+  apply line within Days' 64 KiB (else an empty proposal).
+- **Yielding:** speech heard, a line handed on, or the slide closing drops
+  the call in flight within 20 ms and applies nothing; the day is asked
+  again after the next quiet. A timeout or an unread reply is applied as an
+  empty proposal, which closes the job with nothing kept, so nothing is
+  retried in a loop. A refused prepare lets that day go.
+- **The journal:** one line a step, `nightly: applied, accepted N (kind n,
+  …), dropped N (…), reasons …; tonight C of 16 calls, …`: counts per kind
+  and drop reason only, never a word of the day, the proposal or a
+  person's id.
+- **Probe:** `lamp-voice probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+  --nightly` runs one pass for a made-up person on a made-up day (12 lines)
+  through the relay. With `LAMP_NIGHTLY_MEMORY` naming a lamp-memory binary
+  with the nightly ops, it starts that binary on a fresh folder of its own
+  (never the lamp's memory), writes the day and prints Days' accepted and
+  dropped counts per kind and the reasons; without it, the model's proposed
+  counts per kind.
+- **Tests:** `nightly::tests` (the hours, quiet and slide; people and days;
+  batches; the call, byte and token caps and a new night; speech and the
+  slide during a call; a timeout and an unread reply; the switches passed
+  through; counts-only journal) and `nightly_prompt::tests`, against fixed
+  Days answers as the contract has them (the memory side is a separate
+  pull request).
+
 ### Each person's own (#764)
 
 When the voice has eyes that remember faces (`LAMP_EYES_WHO_SOCKET`, the

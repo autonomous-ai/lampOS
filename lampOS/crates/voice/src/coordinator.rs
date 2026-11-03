@@ -6321,6 +6321,10 @@ fn conversation_with_gate_inner(
     #[cfg(not(test))]
     if lifetime.continuous() {
         crate::app_make::start_from_environment(says.as_ref().map(|says| says.own_asks()));
+        // The memory's nightly pass through the relay, with
+        // LAMP_MEMORY_NIGHTLY=on (`nightly`): idle, at night, with the slide
+        // open; never said.
+        crate::nightly::start_from_environment();
     }
     leases.keep(rig, owner, &mut stalls)?;
     // The level under which sound is not speech, which may follow the room;
@@ -13264,6 +13268,11 @@ fn observe_prospective_heard(
         ));
     }
     let activity = detector.push_heard(observation, probability, own);
+    // Speech heard stops the memory's nightly pass at once
+    // (`LAMP_MEMORY_NIGHTLY`); off, one load.
+    if !matches!(activity, Activity::Quiet | Activity::Fault(_)) {
+        crate::nightly::stir();
+    }
     let ended = matches!(activity, Activity::End(_));
     Ok((admission.observe(activity, context, at_us)?, ended))
 }
