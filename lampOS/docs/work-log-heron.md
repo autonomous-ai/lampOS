@@ -164,3 +164,11 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   commit as `9a977cb47`). #4450 stays `status:taken` by heron for the
   after2 replay on the first stable with #5034; stable is still 9724.
   Hour posted 13:55.
+- 14:1x–14:54: stable still 9724; the person asked for the after2 run now.
+  Read: 9724 carries `held`'s code (`0d534ea22` is in `31ef524311`), #5034
+  adds only the unit line, so a `/run` drop-in with
+  `LAMP_UNTIED_GOING_ON=held` on 9724 is the promoted voice without an
+  install. The person chose to give the lamp's user passwordless sudo
+  (`/etc/sudoers.d/90-orangepi`, their own command, 14:54) so heron can
+  set and remove the drop-in itself. 14:54: proposed on #4710 in the
+  hour post, start at 15:09 unless the first builder says no.
