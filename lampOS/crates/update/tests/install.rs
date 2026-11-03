@@ -2511,6 +2511,30 @@ fn the_tasks_part_closes_the_harness_a_told_task_started() {
     assert!(exec.contains(" --harness-as-person "), "{exec}");
 }
 
+/// #1676, from lamp-c0a4 on 3 Nov: after `harness-on`, with no targets file
+/// written yet, the product's tasks part failed at every start (`No such file
+/// or directory`) until systemd gave up. It starts with no targets
+/// (`--set-up-later`) and writes them from the person's machines with Claude
+/// Code once signed in (`--targets-from-machines claude`).
+#[test]
+fn the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines() {
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    let exec = section(tasks, "Service")
+        .into_iter()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(exec.contains(" --set-up-later "), "{exec}");
+    assert!(exec.contains(" --targets-from-machines claude "), "{exec}");
+    assert!(
+        exec.contains(" --targets /var/lib/lampos-tasks/targets.json "),
+        "{exec}"
+    );
+}
+
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
 /// lamp), the tasks part is skipped by its unit's condition rather than
 /// failing ten times; the install says Harness is missing.
