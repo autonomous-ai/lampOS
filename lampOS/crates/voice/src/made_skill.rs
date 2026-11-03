@@ -35,7 +35,8 @@ pub const MAKE: &str = "make_skill";
 /// The most of the person's request carried in the brief: the brief and it
 /// fit in 1,000 bytes.
 pub const MOST_REQUEST_BYTES: usize = 180;
-/// At most this many made skills are kept; the oldest is let go.
+/// At most this many made skills are kept; the oldest not on is let go,
+/// and one on never is.
 pub const KEPT_MOST: usize = 5;
 /// Where the product keeps them: the voice's own, 0700.
 pub const DIRECTORY: &str = "/var/lib/lampOS/voice/made-skills";
@@ -1013,9 +1014,16 @@ fn kept(directory: &Path, from: &str) -> Option<Made> {
 /// Keep `made` in the index, as made from `from`, and let the oldest
 /// go past [`KEPT_MOST`], their packages with them. Written whole beside
 /// it and moved over it.
+///
+/// One entry a skill: the same bytes, or the same name not on, are
+/// replaced, its `on` kept, never listed twice (lamp-9adf, 3 Nov 16:15: a
+/// skill made twice listed twice pushed out a skill that was on).
+/// Eviction lets go the oldest that is not on, never the one just kept;
+/// with every other one on, all are kept, past the cap. A package another
+/// entry still names stays.
 fn remember(directory: &Path, from: &str, made: &Made) -> io::Result<()> {
     let mut entries = index(directory);
-    entries.push(json!({
+    let mut entry = json!({
         "from": from,
         "name": made.name,
         "version": made.version,
@@ -1026,12 +1034,37 @@ fn remember(directory: &Path, from: &str, made: &Made) -> io::Result<()> {
         "at_unix_ms": SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_or(0, |since| since.as_millis() as u64),
-    }));
+    });
+    let mut gone = Vec::new();
+    entries.retain(|old| {
+        let same = old["sha256"] == made.sha256.as_str()
+            || (old["name"] == made.name.as_str() && old["on"] != true);
+        if same {
+            // The same bytes on the lamp stay on.
+            if old["on"] == true {
+                entry["on"] = json!(true);
+            }
+            gone.push(old.clone());
+        }
+        !same
+    });
+    entries.push(entry);
     while entries.len() > KEPT_MOST {
-        let oldest = entries.remove(0);
-        if let Some(package) = oldest["package"]
+        // The newest, just kept, is never let go.
+        let newest = entries.len() - 1;
+        let Some(oldest) = entries[..newest]
+            .iter()
+            .position(|entry| entry["on"] != true)
+        else {
+            break;
+        };
+        gone.push(entries.remove(oldest));
+    }
+    for old in gone {
+        if let Some(package) = old["package"]
             .as_str()
             .filter(|name| !name.is_empty() && !name.contains('/') && !name.starts_with('.'))
+            .filter(|name| entries.iter().all(|entry| entry["package"] != *name))
         {
             let _ = fs::remove_file(directory.join(package));
         }
@@ -1857,6 +1890,155 @@ body = { gesture = "nod" }
         assert_eq!(kept.unwrap_err().0, "it doesn't pass the lamp's check");
         assert!(began.elapsed() < PACK_WITHIN, "{:?}", began.elapsed());
         assert!(index(&keeping.directory).is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A made skill `name` whose package's bytes are `sha`'s, its package
+    /// in `directory` as `keep` moves it in.
+    fn made_as(directory: &Path, name: &str, sha: char) -> Made {
+        let sha256 = sha.to_string().repeat(64);
+        let package = directory.join(format!("{name}-1.0.0-{}.tar", &sha256[..12]));
+        fs::write(&package, format!("tar of {name}")).unwrap();
+        Made {
+            name: name.into(),
+            version: "1.0.0".into(),
+            sha256,
+            description: "d".into(),
+            uses: Uses {
+                light: true,
+                body: false,
+                topics: vec!["room/presence".into()],
+            },
+            package,
+        }
+    }
+
+    /// An index entry of `name`, its package `package` there, on or not.
+    fn entry_of(directory: &Path, name: &str, sha: char, package: &str, on: bool) -> Value {
+        fs::write(directory.join(package), format!("tar of {name}")).unwrap();
+        let mut entry = json!({"name": name, "sha256": sha.to_string().repeat(64),
+            "package": package, "from": format!("local:{sha}"), "at_unix_ms": 1});
+        if on {
+            entry["on"] = json!(true);
+        }
+        entry
+    }
+
+    fn names(directory: &Path) -> Vec<String> {
+        index(directory)
+            .iter()
+            .map(|entry| entry["name"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    /// The same bytes kept twice are one entry, the newest ask's, still
+    /// found by its `from`; one on stays on. The same name not on, with
+    /// other bytes, takes the old one's place, its package with it; the
+    /// same name on stays beside the new one.
+    #[test]
+    fn a_skill_kept_twice_is_one_entry() {
+        let dir = scratch("made-once");
+        let made = made_as(&dir, "water", 'a');
+        remember(&dir, "local:1", &made).unwrap();
+        remember(&dir, "local:2", &made).unwrap();
+        assert_eq!(names(&dir), ["water"]);
+        assert_eq!(kept(&dir, "local:2").unwrap().sha256, made.sha256);
+        assert!(kept(&dir, "local:1").is_none());
+        assert!(made.package.is_file());
+        let other = made_as(&dir, "water", 'b');
+        remember(&dir, "local:3", &other).unwrap();
+        assert_eq!(names(&dir), ["water"]);
+        assert_eq!(index(&dir)[0]["sha256"], other.sha256);
+        assert!(!made.package.exists() && other.package.is_file());
+        // On, its bytes kept again stay on; another of its name sits beside.
+        let mut entries = index(&dir);
+        entries[0]["on"] = json!(true);
+        write_index(&dir, &entries).unwrap();
+        remember(&dir, "local:4", &other).unwrap();
+        assert_eq!(index(&dir).len(), 1);
+        assert_eq!(index(&dir)[0]["on"], true);
+        let third = made_as(&dir, "water", 'c');
+        remember(&dir, "local:5", &third).unwrap();
+        assert_eq!(names(&dir), ["water", "water"]);
+        assert!(other.package.is_file() && third.package.is_file());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Past [`KEPT_MOST`], the oldest not on is let go, and a package
+    /// another entry still names stays. With every other one on, all stay.
+    #[test]
+    fn letting_go_skips_skills_on_and_packages_still_named() {
+        let dir = scratch("made-evict");
+        write_index(
+            &dir,
+            &[
+                entry_of(&dir, "on-one", '1', "on-one.tar", true),
+                entry_of(&dir, "shared-a", '2', "shared.tar", false),
+                entry_of(&dir, "three", '3', "three.tar", false),
+                entry_of(&dir, "shared-b", '4', "shared.tar", false),
+                entry_of(&dir, "five", '5', "five.tar", false),
+            ],
+        )
+        .unwrap();
+        remember(&dir, "local:6", &made_as(&dir, "six", '6')).unwrap();
+        assert_eq!(names(&dir), ["on-one", "three", "shared-b", "five", "six"]);
+        assert!(dir.join("on-one.tar").is_file());
+        assert!(dir.join("shared.tar").is_file());
+        remember(&dir, "local:7", &made_as(&dir, "seven", '7')).unwrap();
+        assert!(!dir.join("three.tar").exists());
+        // All on: kept, past the cap.
+        let mut entries = index(&dir);
+        for entry in &mut entries {
+            entry["on"] = json!(true);
+        }
+        write_index(&dir, &entries).unwrap();
+        let eighth = made_as(&dir, "eight", '8');
+        remember(&dir, "local:8", &eighth).unwrap();
+        assert_eq!(index(&dir).len(), KEPT_MOST + 1);
+        assert!(eighth.package.is_file());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// lamp-9adf, 3 Nov 16:15: with `glow-yellow-on-return` on, the same
+    /// skill kept again and again, and others after it, never let its
+    /// package go.
+    #[test]
+    fn a_skill_on_keeps_its_package_however_often_others_are_kept() {
+        let dir = scratch("made-9adf");
+        write_index(
+            &dir,
+            &[
+                entry_of(&dir, "glow-yellow-on-return", 'y', "glow-yellow.tar", true),
+                entry_of(&dir, "evening-dim", 'e', "evening-dim.tar", false),
+                entry_of(&dir, "morning-glow", 'm', "morning-glow.tar", false),
+                entry_of(&dir, "nod-hello", 'n', "nod-hello.tar", false),
+            ],
+        )
+        .unwrap();
+        let water = made_as(&dir, "water-on-return", 'w');
+        for at in 0..4 {
+            remember(&dir, &format!("local:{at}"), &water).unwrap();
+        }
+        for (at, sha) in ['p', 'q', 'r'].into_iter().enumerate() {
+            remember(
+                &dir,
+                &format!("app:{at}"),
+                &made_as(&dir, &format!("more-{at}"), sha),
+            )
+            .unwrap();
+        }
+        let kept = index(&dir);
+        assert!(kept.len() <= KEPT_MOST, "{kept:?}");
+        assert_eq!(kept[0]["name"], "glow-yellow-on-return");
+        assert_eq!(kept[0]["on"], true);
+        assert!(dir.join("glow-yellow.tar").is_file());
+        assert_eq!(
+            kept.iter()
+                .filter(|entry| entry["name"] == "water-on-return")
+                .count(),
+            1,
+            "{kept:?}"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
