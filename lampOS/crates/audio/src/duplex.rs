@@ -1136,26 +1136,43 @@ mod tests {
         );
     }
 
-    /// One trail of lamp-06c1's (#5032): the `render_drop` letter of each
-    /// plain block, 3 dB a letter, `c` and on 6 dB or more, after a late
-    /// reply's own voice and before 45 still blocks.
-    fn trail(drops: &str) -> Vec<(usize, Step)> {
+    /// One trail of lamp-06c1's (#5032): for each plain block its
+    /// `render_drop`, `capture_level` and `residual_level` letters, 3 dB a
+    /// letter down from full scale, read at the letter's middle; a drop of
+    /// `c` and on is 6 dB or more. After a late reply's own voice and
+    /// before 45 still blocks.
+    fn trail(drops: &str, captures: &str, residuals: &str) -> Vec<(usize, Step)> {
+        let mid = |letter: u8| Level::from_tenths_of_db(-(i16::from(letter - b'a') * 30 + 15));
         let mut blocks = vec![(0.9, evidence(0, Some((97, 10))), 130)];
         blocks.extend(
             drops
                 .bytes()
-                .map(|letter| (0.9, dropped(u16::from(letter - b'a') * 30 + 10), 1)),
+                .zip(captures.bytes())
+                .zip(residuals.bytes())
+                .map(|((drop, capture), residual)| {
+                    let mut block = dropped(u16::from(drop - b'a') * 30 + 10);
+                    block.capture_level = mid(capture);
+                    block.residual_level = mid(residual);
+                    (0.9, block, 1)
+                }),
         );
         blocks.push((0.1, evidence(30, None), 45));
         hear(&blocks)
     }
 
-    /// lamp-06c1's zero-word commits (#5032) that a fallen render explains.
-    /// Only the ten plain blocks of each are known, not the full trail.
+    /// lamp-06c1's zero-word commits (#5032) that a fallen render explains,
+    /// each as the drop, microphone and cancelled letters of its ten plain
+    /// blocks from the device's trails. Only those ten are known, not the
+    /// full trail.
     #[test]
     fn lamp_06c1s_tails_under_a_fallen_render_commit_nothing() {
-        for drops in ["bbbaaaabdh", "bbcccbcbbb", "bcdhlpttrj", "abdfggfdaa"] {
-            let steps = trail(drops);
+        for (drops, captures, residuals) in [
+            ("bbbaaaabdh", "hhhhhhhhhi", "jiiiiiiiii"),
+            ("bbcccbcbbb", "jjjiiiiiii", "kkjjiiiiii"),
+            ("bcdhlpttrj", "ihhggggfff", "jihhhggggf"),
+            ("abdfggfdaa", "iihhhhhggg", "lkkkjiihhg"),
+        ] {
+            let steps = trail(drops, captures, residuals);
             assert!(
                 steps.iter().all(|(_, step)| *step != Step::Commit),
                 "{drops}: {steps:?}"
@@ -1170,7 +1187,7 @@ mod tests {
     #[test]
     #[ignore = "#5032: needs the echo delay in EchoEvidence"]
     fn lamp_06c1s_tail_under_a_level_render_commits_nothing() {
-        let steps = trail("aaaaaaaaaa");
+        let steps = trail("aaaaaaaaaa", "kkkjjjjjjj", "llkkkjjjjj");
         assert!(
             steps.iter().all(|(_, step)| *step != Step::Commit),
             "{steps:?}"
