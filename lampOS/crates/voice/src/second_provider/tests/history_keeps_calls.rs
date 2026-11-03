@@ -24,6 +24,18 @@ fn handed_on(
     heard: &str,
     rounds: Vec<Vec<net::Result<ChatEvent>>>,
 ) -> Vec<(u64, String)> {
+    handed_on_with(on, heard, rounds)
+        .into_iter()
+        .map(|(request, name, _)| (request, name))
+        .collect()
+}
+
+/// [`handed_on`], each with the arguments it is told with.
+fn handed_on_with(
+    on: bool,
+    heard: &str,
+    rounds: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Vec<(u64, String, Value)> {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(rounds.into()),
@@ -33,7 +45,7 @@ fn handed_on(
         let answer = told(&name);
         Box::pin(async move { answer })
     });
-    let kept: Arc<Mutex<Vec<(u64, String)>>> = Arc::default();
+    let kept: Arc<Mutex<Vec<(u64, String, Value)>>> = Arc::default();
     let keep = kept.clone();
     let mut engine = Engine::with_clock(
         script,
@@ -43,8 +55,10 @@ fn handed_on(
     )
     .announcing(false)
     .keeping_calls_by(on.then(|| -> CallsKept {
-        Arc::new(move |request, name: &str| {
-            keep.lock().unwrap().push((request, name.to_owned()));
+        Arc::new(move |request, name: &str, args: &Value| {
+            keep.lock()
+                .unwrap()
+                .push((request, name.to_owned(), args.clone()));
         })
     }));
     tokio::runtime::Builder::new_current_thread()
@@ -113,11 +127,13 @@ fn a_decline_is_not_handed_on() {
     assert!(handed_on(true, "and then she said no", vec![calling(&[NOT_FOR_ME])]).is_empty());
 }
 
-/// A call made with arguments is never handed on: a kept call is told with
-/// none, and would teach calling it bare (Fourteen's P3 on #5018). The
-/// step beside it, which takes none, is.
+/// #5045(a), lamp-52e6 at 9730: "Make the light red." answered "Done."
+/// with no call, after earlier colour turns were told as words alone. A
+/// light or volume call is handed on with its own arguments, so a later
+/// turn is told the colour it set; the step beside it, which takes none,
+/// with none.
 #[test]
-fn a_call_with_arguments_is_not_handed_on() {
+fn a_light_call_is_handed_on_with_its_arguments() {
     let rounds = vec![
         vec![
             Ok(ChatEvent::ToolCalls(vec![
@@ -129,8 +145,78 @@ fn a_call_with_arguments_is_not_handed_on() {
         saying("Red, and dimmer."),
     ];
     assert_eq!(
-        handed_on(true, "Make it red and dimmer.", rounds),
-        [(1, "light_dimmer".to_owned())]
+        handed_on_with(true, "Make it red and dimmer.", rounds),
+        [
+            (1, "light_colour".to_owned(), json!({"colour": "red"})),
+            (1, "light_dimmer".to_owned(), json!({})),
+        ]
+    );
+}
+
+/// Any other function's call made with arguments is never handed on: a
+/// keep's or a reminder's are the person's own words, never told again as
+/// a call, and told bare they would teach calling it bare (Fourteen's P3
+/// on #5018). The step beside it is.
+#[test]
+fn another_call_with_arguments_is_not_handed_on() {
+    let rounds = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("c0", "remember", json!({"fact": "They like it warm."})),
+                call(
+                    "c1",
+                    "set_reminder",
+                    json!({"what": "tea", "in_minutes": 5}),
+                ),
+                call("c2", "light_warmer", json!({})),
+                call("c3", "light_dimmer", json!({})),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        saying("Done."),
+    ];
+    assert_eq!(
+        handed_on_with(
+            true,
+            "Remember I like it warm, tea in five, dimmer.",
+            rounds
+        ),
+        [(1, "light_dimmer".to_owned(), json!({}))]
+    );
+}
+
+/// A light call whose arguments pass `thread::KEPT_ARGS_BYTES` as compact
+/// JSON is never kept with them: one whose function takes none is kept
+/// bare, one whose function takes some (`light_colour`) is not kept, as
+/// told bare it would teach calling it bare. At the bound, it is kept
+/// whole.
+#[test]
+fn a_light_call_past_the_arguments_bound_is_kept_bare_only_if_it_takes_none() {
+    let over = |bytes: usize| {
+        let padding = "x".repeat(bytes - r#"{"colour":""}"#.len());
+        let args = json!({ "colour": padding });
+        assert_eq!(args.to_string().len(), bytes);
+        args
+    };
+    let at = over(crate::thread::KEPT_ARGS_BYTES);
+    let past = over(crate::thread::KEPT_ARGS_BYTES + 1);
+    let rounds = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("c0", "light_colour", past.clone()),
+                call("c1", "light_brighter", past),
+                call("c2", "volume_up", at.clone()),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        saying("Done."),
+    ];
+    assert_eq!(
+        handed_on_with(true, "Brighter and louder.", rounds),
+        [
+            (1, "light_brighter".to_owned(), json!({})),
+            (1, "volume_up".to_owned(), at),
+        ]
     );
 }
 

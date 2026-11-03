@@ -123,11 +123,16 @@ struct Exchange {
     /// The note the lamp was given in writing for it, when it began the
     /// turn itself (a written request): not words anyone said.
     written: Option<String>,
-    /// The functions its turn ran, in the order they ran, once each
-    /// ([`Thread::called`]). Never kept in the file (#1505): a thread read
-    /// back tells its exchanges in words only, as before.
-    calls: Vec<String>,
+    /// The functions its turn ran, with the arguments each is told with, in
+    /// the order they ran, once each ([`Thread::called`]). Never kept in the
+    /// file (#1505): a thread read back tells its exchanges in words only,
+    /// as before.
+    calls: Vec<Called>,
 }
+
+/// One function a turn ran ([`Thread::called`]): its name, and the
+/// arguments it is told with, an empty object for none.
+type Called = (String, serde_json::Value);
 
 /// A completed exchange, preserving the scope bound when its response began.
 /// This is journal attribution, not request-admission identity authorization.
@@ -183,7 +188,7 @@ pub struct Thread {
     /// The functions requests ran before the lamp said any words of theirs
     /// ([`Self::called`]), the newest [`LINES`] requests': each goes to its
     /// exchange when it opens.
-    calling: VecDeque<(u64, Vec<String>)>,
+    calling: VecDeque<(u64, Vec<Called>)>,
     /// The newest [`LINES`] requests a connected service's read answered
     /// in ([`Self::private_for`]): their lamp's words are never kept.
     private: VecDeque<u64>,
@@ -199,6 +204,10 @@ const LINES: usize = 8;
 /// The most functions kept for one exchange, and the most of a name.
 const CALLS: usize = 8;
 const NAME_BYTES: usize = 64;
+/// The most a kept call's arguments take, as compact JSON
+/// ([`KeptCall::args`]); a call with more is kept as the voice's second
+/// route decides (`second_provider::kept_args`), never with them.
+pub const KEPT_ARGS_BYTES: usize = 256;
 /// The start of a kept call's id ([`KeptCall::id`]), by which a chat that
 /// refuses them is asked again without them
 /// (`second_provider::without_kept_calls`).
@@ -210,9 +219,10 @@ impl Exchange {
         self.calls
             .iter()
             .enumerate()
-            .map(|(at, name)| KeptCall {
+            .map(|(at, (name, args))| KeptCall {
                 id: format!("{KEPT_CALL_ID}{}-{at}", self.request),
                 name: name.clone(),
+                args: args.clone(),
             })
             .collect()
     }
@@ -253,13 +263,15 @@ pub struct Recent {
     pub calls: Vec<KeptCall>,
 }
 
-/// A function an exchange's turn ran ([`Recent::calls`]): its name, and an
-/// id of its own for the chat's messages, `kept-<request>-<n>`, the same
-/// at every turn it is told.
+/// A function an exchange's turn ran ([`Recent::calls`]): its name, the
+/// arguments it ran with as they are told (an empty object for none), and
+/// an id of its own for the chat's messages, `kept-<request>-<n>`, the
+/// same at every turn it is told.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeptCall {
     pub id: String,
     pub name: String,
+    pub args: serde_json::Value,
 }
 
 /// A scope's exchanges due for its running summary ([`Thread::summary_due`]).
@@ -889,21 +901,27 @@ impl Thread {
         }
     }
 
-    /// Request `request`'s turn ran function `name`, and it was not refused
-    /// (`LAMP_HISTORY_KEEPS_CALLS`, `Engine::keeping_calls`): kept with
-    /// the request's exchange, so a later turn is told the call with the
-    /// lamp's words ([`Recent::calls`]). A call that comes before any of
+    /// Request `request`'s turn ran function `name` with `args` (an empty
+    /// object for none), and it was not refused (`LAMP_HISTORY_KEEPS_CALLS`,
+    /// `Engine::keeping_calls`): kept with the request's exchange, so a
+    /// later turn is told the call, with those arguments, and the lamp's
+    /// words ([`Recent::calls`]). Arguments past [`KEPT_ARGS_BYTES`] are
+    /// never kept, nor the call with them. A call that comes before any of
     /// the lamp's words waits for its exchange to open, wherever
     /// [`Self::lamp_for`] files it; a request that never says a kept word
     /// (one whose words are not kept, a gone scope's, a silent one) is
     /// never told, nor are its calls.
-    pub fn called(&mut self, request: u64, name: &str) {
-        if name.is_empty() || name.len() > NAME_BYTES {
+    pub fn called(&mut self, request: u64, name: &str, args: &serde_json::Value) {
+        if name.is_empty() || name.len() > NAME_BYTES || args.to_string().len() > KEPT_ARGS_BYTES {
             return;
         }
-        let keep = |calls: &mut Vec<String>| {
-            if calls.len() < CALLS && !calls.iter().any(|called| called == name) {
-                calls.push(name.to_owned());
+        let keep = |calls: &mut Vec<Called>| {
+            if calls.len() < CALLS
+                && !calls
+                    .iter()
+                    .any(|(called, with)| called == name && with == args)
+            {
+                calls.push((name.to_owned(), args.clone()));
             }
         };
         if let Some(exchange) = self
@@ -3974,14 +3992,14 @@ mod tests {
         let now = Instant::now();
         let mut thread = Thread::new();
         thread.person("Lamp, you're a bit loud.", true, now);
-        thread.called(1, "volume_down");
-        thread.called(1, "volume_down");
+        thread.called(1, "volume_down", &serde_json::json!({}));
+        thread.called(1, "volume_down", &serde_json::json!({}));
         thread.lamp(1, "Turning myself down a step.", now);
-        thread.called(1, "light_dimmer");
+        thread.called(1, "light_dimmer", &serde_json::json!({}));
         thread.person("Thanks.", true, now);
         thread.lamp(2, "Any time.", now);
         // Ran, but the lamp said nothing for it: no exchange to tell.
-        thread.called(3, "light_brighter");
+        thread.called(3, "light_brighter", &serde_json::json!({}));
         let recent = thread.recent(now, REMEMBERED_FOR, EXCHANGES);
         assert_eq!(recent.len(), 2);
         assert_eq!(
@@ -3991,13 +4009,44 @@ mod tests {
         assert_eq!(recent[0].lamp, "Turning myself down a step.");
         assert!(recent[1].calls.is_empty(), "a turn that called nothing");
         // A call waiting for its words is gone with a forget.
-        thread.called(4, "volume_up");
+        thread.called(4, "volume_up", &serde_json::json!({}));
         thread.forget();
         thread.person("Louder.", true, now);
         thread.lamp(4, "Louder it is.", now);
         let recent = thread.recent(now, REMEMBERED_FOR, EXCHANGES);
         assert_eq!(recent.len(), 1);
         assert!(recent[0].calls.is_empty(), "{recent:?}");
+    }
+
+    /// #5045(a): a call is kept with the arguments it ran with, the same
+    /// function with others kept beside it, the same twice once; arguments
+    /// past [`KEPT_ARGS_BYTES`] are never kept, nor the call with them.
+    #[test]
+    fn the_functions_a_turn_ran_are_kept_with_their_arguments() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        let red = serde_json::json!({"colour": "red"});
+        let blue = serde_json::json!({"colour": "blue"});
+        let past = serde_json::json!({"colour": "x".repeat(KEPT_ARGS_BYTES)});
+        thread.person("Red, then blue.", true, now);
+        thread.called(1, "light_colour", &red);
+        thread.called(1, "light_colour", &red);
+        thread.called(1, "light_colour", &blue);
+        thread.called(1, "light_colour", &past);
+        thread.lamp(1, "Done.", now);
+        let recent = thread.recent(now, REMEMBERED_FOR, EXCHANGES);
+        let kept: Vec<_> = recent[0]
+            .calls
+            .iter()
+            .map(|call| (call.id.as_str(), call.name.as_str(), &call.args))
+            .collect();
+        assert_eq!(
+            kept,
+            [
+                ("kept-1-0", "light_colour", &red),
+                ("kept-1-1", "light_colour", &blue)
+            ]
+        );
     }
 
     /// The calls go with the exchange where its words were kept: a turn of
@@ -4009,7 +4058,7 @@ mod tests {
         let a = crate::remember::person_id("A");
         let b = crate::remember::person_id("B");
         let mut thread = Thread::new();
-        thread.called(1, "light_warmer");
+        thread.called(1, "light_warmer", &serde_json::json!({}));
         thread.person("Warmer, please.", true, now);
         thread.lamp_for(1, "Warmer it is.", now, Some(&a));
         let theirs = thread.recent_for(Some(&a), now, REMEMBERED_FOR, EXCHANGES);
@@ -4025,7 +4074,7 @@ mod tests {
                 .is_empty()
         );
         thread.count_only(Some(2));
-        thread.called(2, "light_brighter");
+        thread.called(2, "light_brighter", &serde_json::json!({}));
         thread.lamp_for(2, "Say: the quick brown fox.", now, Some(&a));
         thread.count_only(None);
         let theirs = thread.recent_for(Some(&a), now, REMEMBERED_FOR, EXCHANGES);
@@ -4042,10 +4091,12 @@ mod tests {
         let wall = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
         let mut thread = Thread::new();
         thread.person("Lamp, you're a bit loud.", true, now);
-        thread.called(1, "volume_down");
+        thread.called(1, "volume_down", &serde_json::json!({}));
+        thread.called(1, "light_colour", &serde_json::json!({"colour": "red"}));
         thread.lamp(1, "Turning myself down a step.", now);
         let text = thread.save(now, wall).unwrap();
         assert!(!text.contains("volume_down"), "{text}");
+        assert!(!text.contains("colour"), "{text}");
         assert!(!text.contains("calls"), "{text}");
         let read = Thread::read(&text, now, wall).unwrap();
         let recent = read.recent(now, REMEMBERED_FOR, EXCHANGES);

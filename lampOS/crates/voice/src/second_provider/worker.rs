@@ -11210,9 +11210,10 @@ pub(crate) const KEPT_CALL_RESULT: &str = "(done earlier; its result was not kep
 
 /// [`messages`], with `cut` told right after the lamp's words when given.
 /// With `keeps_calls`, an exchange whose turn ran functions has them before
-/// the lamp's words: an assistant message with the calls (no arguments, no
-/// words), each call's result as [`KEPT_CALL_RESULT`], as a chat round with
-/// calls goes. The person's words, or the note, stay first.
+/// the lamp's words: an assistant message with the calls (each with the
+/// arguments it was kept with, `second_provider::kept_args`; no words),
+/// each call's result as [`KEPT_CALL_RESULT`], as a chat round with calls
+/// goes. The person's words, or the note, stay first.
 fn messages_marked(
     exchange: crate::thread::Recent,
     cut: Option<&str>,
@@ -11240,7 +11241,7 @@ fn messages_marked(
             .map(|call| crate::second_provider::net::ToolCall {
                 id: call.id,
                 name: call.name,
-                args: serde_json::json!({}),
+                args: call.args,
                 extra: None,
             })
             .collect();
@@ -19271,6 +19272,7 @@ mod tests {
             calls: vec![crate::thread::KeptCall {
                 id: "kept-7-0".into(),
                 name: "volume_down".into(),
+                args: serde_json::json!({}),
             }],
             ..crate::thread::Recent::default()
         };
@@ -19315,6 +19317,55 @@ mod tests {
         );
     }
 
+    /// #5045(a): a kept light call is told with the arguments it ran with,
+    /// as the chat's own call went, never bare: a colour turn kept as
+    /// `light_colour {"colour":"red"}`, so a later colour ask is answered
+    /// with a call, not "Done." alone.
+    #[test]
+    fn a_kept_call_is_told_with_its_arguments() {
+        let red = || crate::thread::Recent {
+            person: "Make the light red.".into(),
+            lamp: "Done.".into(),
+            calls: vec![crate::thread::KeptCall {
+                id: "kept-3-0".into(),
+                name: "light_colour".into(),
+                args: serde_json::json!({"colour": "red"}),
+            }],
+            ..crate::thread::Recent::default()
+        };
+        let told = messages_marked(red(), None, true);
+        assert_eq!(
+            told,
+            [
+                Message::user("Make the light red."),
+                Message::assistant_calls(
+                    None,
+                    &[crate::second_provider::net::ToolCall {
+                        id: "kept-3-0".into(),
+                        name: "light_colour".into(),
+                        args: serde_json::json!({"colour": "red"}),
+                        extra: None,
+                    }]
+                ),
+                Message::tool("kept-3-0", KEPT_CALL_RESULT),
+                Message::assistant("Done."),
+            ]
+        );
+        assert_ne!(
+            told[1],
+            Message::assistant_calls(
+                None,
+                &[crate::second_provider::net::ToolCall {
+                    id: "kept-3-0".into(),
+                    name: "light_colour".into(),
+                    args: serde_json::json!({}),
+                    extra: None,
+                }]
+            ),
+            "never bare"
+        );
+    }
+
     /// The same through the thread and the worker's history: a turn that
     /// ran `volume_down` is told with its call to the next turn of its own
     /// scope, never another's.
@@ -19327,7 +19378,7 @@ mod tests {
             let mut thread = crate::thread::THREAD.lock().unwrap();
             thread.forget();
             thread.person("Lamp, you're a bit loud.", true, now);
-            thread.called(1, "volume_down");
+            thread.called(1, "volume_down", &serde_json::json!({}));
             thread.lamp_for(1, "Turning myself down a step.", now, Some(&a));
         }
         let history = |whose: Option<&str>, keeps_calls: bool| -> Vec<Message> {
