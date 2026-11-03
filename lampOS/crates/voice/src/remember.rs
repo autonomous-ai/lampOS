@@ -1843,6 +1843,28 @@ pub(crate) const RECALL_NOT_FOR: &str = "Not for what you still see of this talk
 /// of its 1,024 bytes (`recall_is_a_valid_function_under_every_switch`).
 pub const RECALL_WHEN: &str = ", without times; the day only if asked when.";
 
+/// What a found line's `strength` (the memory owner's Tiers-ideas plan, 3
+/// Nov, P2; `LAMP_MEMORY_STRENGTH` asks the memory for it) tells the model:
+/// how the line sounded when it was said, never how things stand now
+/// (Thirteen's P2 on #5052: an old plan told "not done yet" reads as "you
+/// haven't been"). `past` is a line whose `event_status` is past: whether
+/// it happened is not known. Told on the line itself, not in recall's
+/// description. A line as said, and an answer from a memory not asked, has
+/// none.
+pub(crate) fn strength_told(label: &str, past: bool) -> Option<&'static str> {
+    match (label, past) {
+        ("maybe", false) => Some("maybe: said as a maybe; not known to be decided or booked"),
+        ("maybe", true) => {
+            Some("maybe: said as a maybe for that day; whether it happened is not known")
+        }
+        ("plan", false) => Some("plan: said as a plan; not known to be done"),
+        ("plan", true) => {
+            Some("plan: said as a plan for that day; whether it happened is not known")
+        }
+        _ => None,
+    }
+}
+
 /// The recall function; with its second version ([`RECALL_V2_ENVIRONMENT`])
 /// it also takes a span of days.
 fn recall_tool(second: bool) -> Tool {
@@ -9934,6 +9956,16 @@ fn days_answer(
             item["event_status"] = json!(status);
             item["today"] = json!(day_name(today));
         }
+        // A plan or a maybe is told as it was said, and on a past day as not
+        // known to have happened (the Tiers-ideas plan, P2). Only a memory
+        // asked for `strength` labels a line.
+        let past = item["event_status"] == "past";
+        if let Some(told) = entry["strength"]
+            .as_str()
+            .and_then(|label| strength_told(label, past))
+        {
+            item["strength"] = json!(told);
+        }
         found.push(item);
     }
     let mut told = json!({"found":found,"untrusted":true,"scope":ROOM_SCOPE});
@@ -12161,6 +12193,88 @@ mod tests {
         );
         assert_eq!(keep_claim("Đã ghi nhận."), Some(KeepClaim::Soft));
         assert_eq!(keep_claim("Got it, thanks."), None);
+    }
+
+    /// The Tiers-ideas plan, P2: a found line the memory labels a maybe or
+    /// a plan is told as it was said, never as how things stand now; a line
+    /// without a label, or with one it doesn't know, is told as before.
+    #[test]
+    fn a_maybe_or_plan_line_is_told_as_said() {
+        let entry = |strength: Option<&str>| {
+            let mut entry = json!({"id":5,"kind":"exchange","at_unix_ms":NOW,"heard":"Maybe I will learn pottery","said":"Nice."});
+            if let Some(strength) = strength {
+                entry["strength"] = json!(strength);
+            }
+            entry
+        };
+        let told = |strength| {
+            days_answer(
+                &json!({"ok":true,"entries":[entry(strength)]}),
+                NOW,
+                Some(&EAST),
+                None,
+            )
+            .unwrap()
+            .0["found"][0]
+                .clone()
+        };
+        assert_eq!(
+            told(Some("maybe"))["strength"],
+            "maybe: said as a maybe; not known to be decided or booked"
+        );
+        assert_eq!(
+            told(Some("plan"))["strength"],
+            "plan: said as a plan; not known to be done"
+        );
+        assert!(told(Some("sure")).get("strength").is_none());
+        assert_eq!(told(None), {
+            let mut plain = told(Some("said"));
+            plain.as_object_mut().unwrap().remove("strength");
+            plain
+        });
+        assert!(told(None).get("strength").is_none());
+    }
+
+    /// Thirteen's P2 on #5052: a plan kept two weeks ago for a day that has
+    /// passed gets both fields, and its strength never says it is not done,
+    /// only that whether it happened is not known. The same plan for a day
+    /// still to come is told as said.
+    #[test]
+    fn a_past_plan_is_not_told_as_not_done() {
+        let told = |on: &str, strength: &str| {
+            let entry = json!({"id":7,"kind":"kept","at_unix_ms":NOW - 14 * 86_400_000,"text":"I will go to the dentist on Friday","on":on,"strength":strength});
+            days_answer(
+                &json!({"ok":true,"entries":[entry]}),
+                NOW,
+                Some(&EAST),
+                None,
+            )
+            .unwrap()
+            .0["found"][0]
+                .clone()
+        };
+        let past = told("2026-10-09", "plan");
+        assert_eq!(past["event_status"], "past");
+        assert_eq!(
+            past["strength"],
+            "plan: said as a plan for that day; whether it happened is not known"
+        );
+        let maybe = told("2026-10-09", "maybe");
+        assert_eq!(maybe["event_status"], "past");
+        assert_eq!(
+            maybe["strength"],
+            "maybe: said as a maybe for that day; whether it happened is not known"
+        );
+        let upcoming = told("2026-10-16", "plan");
+        assert_eq!(upcoming["event_status"], "upcoming");
+        assert_eq!(
+            upcoming["strength"],
+            "plan: said as a plan; not known to be done"
+        );
+        for found in [&past, &maybe, &upcoming] {
+            assert!(!found["strength"].as_str().unwrap().contains("not done"));
+            assert!(!found["strength"].as_str().unwrap().contains("yet"));
+        }
     }
 
     /// Reviewer-two's P2 on #3625: `recall` stays a valid function, its

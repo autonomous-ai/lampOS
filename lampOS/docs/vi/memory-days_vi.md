@@ -622,3 +622,30 @@ socket, cờ hay công tắc riêng.
 Giới hạn (reviewer-three): khôi phục bị từ chối sau bất kỳ lệnh quên nào kể từ
 điểm lưu, nên không gì đã quên quay lại; hết giờ hay huỷ không bao giờ cho một
 điểm lưu. Một đầu dò là một góc nhìn cho mỗi tiến trình.
+
+## Đã nói, dự định hay có lẽ (`LAMP_MEMORY_STRENGTH`)
+
+Theo kế hoạch đưa ý tưởng của Tiers vào Days của người phụ trách trí nhớ
+(3/11, P2; phỏng theo `Strength`, `combine` và `constrained_by_words` của
+memory-tiers, xem [memory-tiers.md](../memory-tiers.md)). Khi bật (chỉ giá trị
+`on`, chỉ với Days; mặc định tắt), `search`, `recall` và `session_open` của
+giọng nói mang `"strength":true`, và mỗi dòng trong câu trả lời mà chính lời
+của nó là một dự định hay một điều chưa chắc sẽ có `"strength":"plan"` hoặc
+`"strength":"maybe"`; một dòng đã nói như sự thật thì không có trường này.
+Nhãn được tính khi đọc, từ lời của dòng (lời đã nghe của một lượt hội thoại,
+không bao giờ lời của đèn), và không lưu ở đâu: không đổi schema, không
+migration, không hết hạn, không gọi model. Chưa chắc: "maybe", "might",
+"not decided", "not booked", "có lẽ", "chưa quyết", "chưa chắc", "không chắc",
+"chưa đặt". Dự định: "will", "going to", "plan", "định" (trừ "quyết định",
+"ổn định"…), "dự định", "kế hoạch". Chỉ là danh sách từ tiếng Anh và tiếng
+Việt: nhãn chỉ làm một dòng yếu hơn "đã nói", không bao giờ bỏ dòng nào, và
+một câu hỏi hay một phủ định không bao giờ làm nó mạnh hơn. Ghi chú phiên có
+nhãn vẫn trong giới hạn 1.200 byte: nếu vượt, các điều cuối cùng bị bỏ cùng
+id của chúng. Giọng nói nói với model dòng đó đã được nói thế nào, không phải
+bây giờ ra sao: một điều chưa chắc là "maybe: said as a maybe; not known to
+be decided or booked" và một dự định là "plan: said as a plan; not known to
+be done". Với dòng có `event_status` là past, nó nói "said as a plan (hoặc a
+maybe) for that day; whether it happened is not known". Khi tắt, mọi
+yêu cầu và câu trả lời giống hệt từng byte như trước
+(`days_strength::off_is_byte_identical`). Memory cũ từ chối trường này, nên
+cập nhật cả hai cùng lúc.
