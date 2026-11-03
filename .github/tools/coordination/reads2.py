@@ -1,5 +1,5 @@
 # reads2.py (31 Oct 03:1x, first builder): whether a PR asked for two reads is met, read from its comments as JSON lines
-# {login, body} on stdin. argv: [--writers FILE] PR-head-sha. A comment whose first line is "TWO READS" (bold allowed) asks
+# {login, body} on stdin. argv: [--writers FILE] HEAD [EARLIER_HEAD...]. A comment whose first line is "TWO READS" (bold allowed) asks
 # for two; then two different readers must each have a READ-OK marker for a commit the head starts with. Prints "none"
 # (not asked), "met N" or "short N". #4633 (23:37) and #4656 (02:58) went in trains on one READ-OK where two had been
 # named, since the train bot read only the newest READ-OK.
@@ -14,14 +14,20 @@
 # counting distinct logins would make a legitimate two-reader PR impossible. An unsigned READ-OK never adds a second
 # person to a login: it merges into that login's signed reader(s), and a login whose READ-OKs on the head are all
 # unsigned is one reader. (A restate whose signature the parser misses filed as a second reader before.)
+#
+# 4 Nov 04:1x: a READ-OK on an earlier head with the same patch (a plain rebase; the caller passes those heads, lib.sh's
+# coord_same_patch) counts as one on the head, as it does for one read. #5043's two reads were on e05764f95b; rebased
+# to 91ccaf30bb, the same patch, it sat out "short 0" from 00:42.
 import json, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from markers import parse_marker, signer, writers_from_args, is_writer
 
 
-def two_reads(items, head, writers):
-    """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. Returns "none", "met N" or "short N"."""
+def two_reads(items, heads, writers):
+    """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. heads: the head sha, or a list of it
+    and earlier heads with the same patch. Returns "none", "met N" or "short N"."""
+    heads = [heads] if isinstance(heads, str) else list(heads)
     asked = False; signed = {}; unsigned = set()
     for c in items:
         body = c["body"].lstrip()
@@ -35,7 +41,7 @@ def two_reads(items, head, writers):
         if re.match(r"\**TWO READS\b", body):
             asked = True
         mk = parse_marker(body)
-        if not mk or mk[0] != "READ-OK" or not mk[1] or not head.startswith(mk[1]):
+        if not mk or mk[0] != "READ-OK" or not mk[1] or not any(h.startswith(mk[1]) for h in heads):
             continue
         login = c["login"].lower(); name = signer(body).lower()
         if name: signed.setdefault(login, set()).add(name)
@@ -47,7 +53,7 @@ def two_reads(items, head, writers):
 def main():
     writers, args = writers_from_args(sys.argv[1:], "reads2")
     items = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(two_reads(items, args[0], writers))
+    print(two_reads(items, args, writers))
 
 
 if __name__ == "__main__":

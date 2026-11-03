@@ -167,6 +167,13 @@ class TwoReads(unittest.TestCase):
                  c("writer-b", "READ-OK " + OTHER + "\n\nHeron, 15:10")]
         self.assertEqual(two_reads(items, HEAD, W), "short 1")
 
+    def test_a_read_on_a_same_patch_earlier_head_counts(self):
+        # 4 Nov: #5043's two reads were on e05764f95b, rebased to 91ccaf30bb with the same patch.
+        items = [self.ASK, c("writer-a", "READ-OK " + OTHER[:10] + "\n\nReviewer-lead, 15:41"),
+                 c("writer-b", "READ-OK " + OTHER[:10] + "\n\nHeron, 16:00")]
+        self.assertEqual(two_reads(items, [HEAD, OTHER], W), "met 2")
+        self.assertEqual(two_reads(items, HEAD, W), "short 0")
+
     def test_ask_from_a_non_writer_comment_is_ignored(self):
         self.assertEqual(two_reads([c("stranger", "TWO READS"), c("writer-a", "READ-OK " + HEAD)], HEAD, W), "none")
 
