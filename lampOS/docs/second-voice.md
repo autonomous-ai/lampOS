@@ -3457,8 +3457,14 @@ after a take-over, but now for every turn:
   is this?") and they don't call the lamp; their unplayed answers leave the
   thread as a joined line's do (#3945, attention.md). On lamp-4ace on 19 Oct at 15:56 the weather
   and a race result were searched, then ended by the owner's next line,
-  which was held, and were never said. Words answered again may still be
-  searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
+  which was held, and were never said. The chat rounds the cut answer
+  finished, each call with its result, go with its words, and a held line
+  answering them only goes on from them: `request M goes on from K messages
+  of the cut answer's finished rounds`. A round still waiting on a call is
+  not carried. Words joined with new ones start again (#5026, lamp-0529,
+  3 Nov: a search, a page and a second search were lost to a 0-word line,
+  and the answer came from the model's memory). Words answered again may
+  still be searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
   build 6963: one "remember my favourite planet is Saturn" was kept three
   times, by two empty held lines answering it again): the first request to
   try `remember`, `forget` or `forget_everything` for a line's words owns
