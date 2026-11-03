@@ -709,6 +709,13 @@ pub const CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT: &str =
 /// before.
 pub const CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT: &str = "LAMP_CONVERSATION_ROOM_LINES_TOLD";
 
+/// The functions a turn ran are kept with its exchange in the thread, and a
+/// later turn's chat is told them before the lamp's words of that turn
+/// (`worker::HISTORY_KEEPS_CALLS`, [`Engine::keeping_calls`]): an earlier
+/// action is not shown to the model as an ask answered in words alone.
+/// `on`, and nothing else; off, the history is the words only, as before.
+pub const HISTORY_KEEPS_CALLS_ENVIRONMENT: &str = "LAMP_HISTORY_KEEPS_CALLS";
+
 /// [`CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT`] on, with the carry and
 /// the scope by sight it acts beside.
 pub(crate) fn carries_past_silent_from_environment() -> bool {
@@ -1537,6 +1544,9 @@ struct Shared {
     /// face seen speaking it, keeps for them while this reads `false`, its
     /// reads the room's. None, off.
     one_face: Option<Arc<AtomicBool>>,
+    /// Each function a turn ran and nothing refused, handed on by request
+    /// (`LAMP_HISTORY_KEEPS_CALLS`, [`Engine::keeping_calls`]); none, off.
+    keeps_calls: Option<CallsKept>,
 }
 
 /// [`Shared::past_silent`]: whether the conversation going on has shown
@@ -1549,6 +1559,10 @@ pub(crate) type AnotherVoice = Arc<dyn Fn() -> bool + Send + Sync>;
 /// [`Shared::carries`]: the known person whose conversation is going on as a
 /// request is heard ([`crate::thread::Thread::going_on_with`]).
 pub(crate) type GoingOnWith = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+
+/// [`Shared::keeps_calls`]: request `request`'s turn ran function `name`
+/// ([`crate::thread::Thread::called`]).
+pub(crate) type CallsKept = Arc<dyn Fn(u64, &str) + Send + Sync>;
 
 /// A carry's sign that nobody else is in the talk, beside no face seen
 /// speaking the line (#4339): with [`Shared::past_silent`]
@@ -2989,6 +3003,7 @@ impl Engine {
                 carried_saves: false,
                 past_silent: None,
                 one_face: None,
+                keeps_calls: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -3317,6 +3332,29 @@ impl Engine {
     pub fn scoping_by_one_face(mut self, another_voice: Arc<AtomicBool>) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.one_face = Some(another_voice);
+        self
+    }
+
+    /// The functions a turn runs are kept with its exchange in this
+    /// process's thread (`LAMP_HISTORY_KEEPS_CALLS=on`,
+    /// [`crate::thread::Thread::called`]), for a later turn's history. Only
+    /// a call that ran and did not answer with an error or a keep not kept:
+    /// never one declined, held, refused, or of a reminder or an add-on's
+    /// quoted line, which are never run.
+    pub fn keeping_calls(self, on: bool) -> Self {
+        self.keeping_calls_by(on.then(|| -> CallsKept {
+            Arc::new(|request: u64, name: &str| {
+                if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                    thread.called(request, name);
+                }
+            })
+        }))
+    }
+
+    /// [`Self::keeping_calls`] with `kept` given each call; none, off.
+    pub(crate) fn keeping_calls_by(mut self, kept: Option<CallsKept>) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.keeps_calls = kept;
         self
     }
 
@@ -10649,12 +10687,20 @@ async fn answer(
                 // in a later round, "I've saved that for five", is no false
                 // keep (reviewer-three and the reviewer-lead on #3628). A
                 // recall reads, and keeps nothing.
-                if call.name != crate::remember::RECALL
-                    && answer.told["remembered"] != false
-                    && answer.told.get("error").is_none()
-                {
+                let did = answer.told["remembered"] != false && answer.told.get("error").is_none();
+                if call.name != crate::remember::RECALL && did {
                     kept_now = true;
                     remember_ran |= call.name == crate::remember::REMEMBER;
+                }
+                // What it did, for a later turn's history
+                // (`LAMP_HISTORY_KEEPS_CALLS`): never the call for the rest
+                // of the functions, which would give a later turn all of
+                // them (`worker::few_tools`).
+                if did
+                    && call.name != worker::MORE
+                    && let Some(keep) = &shared.keeps_calls
+                {
+                    keep(request, &call.name);
                 }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {

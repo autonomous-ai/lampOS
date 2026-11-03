@@ -2837,6 +2837,17 @@ pub fn serve(
         );
         ROOM_LINES_TOLD.store(true, std::sync::atomic::Ordering::Release);
     }
+    // An earlier turn's calls are told before its words, so an action is
+    // not learned as words alone (`LAMP_HISTORY_KEEPS_CALLS=on`).
+    let keeps_calls = std::env::var(crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT)
+        .is_ok_and(|value| value == "on");
+    if keeps_calls {
+        eprintln!(
+            "lamp-voice second: the functions an earlier turn ran are told with its words in the chat's history (LAMP_HISTORY_KEEPS_CALLS)"
+        );
+        HISTORY_KEEPS_CALLS.store(true, std::sync::atomic::Ordering::Release);
+    }
+    engine = engine.keeping_calls(keeps_calls);
     if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
         .is_ok_and(|value| value == "on")
     {
@@ -10976,12 +10987,43 @@ pub(super) fn keep_heard(
 /// has its words marked [`SAID_IN_THE_ROOM`], or with none, a note before
 /// the lamp's.
 fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
-    let cut = crate::cut_in_told::cut_here(exchange.cut);
-    messages_marked(exchange, cut)
+    messages_told(
+        exchange,
+        HISTORY_KEEPS_CALLS.load(std::sync::atomic::Ordering::Acquire),
+    )
 }
 
+/// [`messages`], with the functions its turn ran told before the lamp's
+/// words when `keeps_calls` ([`HISTORY_KEEPS_CALLS`]).
+fn messages_told(exchange: crate::thread::Recent, keeps_calls: bool) -> Vec<Message> {
+    let cut = crate::cut_in_told::cut_here(exchange.cut);
+    messages_marked(exchange, cut, keeps_calls)
+}
+
+/// `LAMP_HISTORY_KEEPS_CALLS=on`, set once as the worker starts ([`serve`]):
+/// an earlier turn that ran functions is told as it went, its calls and
+/// then its words ([`messages_marked`]), not as words alone. Lamp build 9699:
+/// "Lamp, you're a bit loud." answered "Turning myself down a step." with no
+/// `volume_down` call, 4 of 14 action lines, and nothing changed; the
+/// history the model copied showed every earlier action as an ask answered
+/// in words only.
+pub(crate) static HISTORY_KEEPS_CALLS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// What a kept call is answered in the history: its result was not kept,
+/// and nothing in it is made up.
+pub(crate) const KEPT_CALL_RESULT: &str = "(done earlier; its result was not kept)";
+
 /// [`messages`], with `cut` told right after the lamp's words when given.
-fn messages_marked(exchange: crate::thread::Recent, cut: Option<&str>) -> Vec<Message> {
+/// With `keeps_calls`, an exchange whose turn ran functions has them before
+/// the lamp's words: an assistant message with the calls (no arguments, no
+/// words), each call's result as [`KEPT_CALL_RESULT`], as a chat round with
+/// calls goes. The person's words, or the note, stay first.
+fn messages_marked(
+    exchange: crate::thread::Recent,
+    cut: Option<&str>,
+    keeps_calls: bool,
+) -> Vec<Message> {
     let mut messages = Vec::with_capacity(3);
     if let Some(written) = exchange.written {
         messages.push(Message::system(format!(
@@ -10996,6 +11038,24 @@ fn messages_marked(exchange: crate::thread::Recent, cut: Option<&str>) -> Vec<Me
         }));
     } else if exchange.room {
         messages.push(Message::system(SAID_IN_THE_ROOM.to_owned()));
+    }
+    if keeps_calls && !exchange.calls.is_empty() {
+        let calls: Vec<crate::second_provider::net::ToolCall> = exchange
+            .calls
+            .into_iter()
+            .map(|call| crate::second_provider::net::ToolCall {
+                id: call.id,
+                name: call.name,
+                args: serde_json::json!({}),
+                extra: None,
+            })
+            .collect();
+        messages.push(Message::assistant_calls(None, &calls));
+        messages.extend(
+            calls
+                .into_iter()
+                .map(|call| Message::tool(call.id, KEPT_CALL_RESULT)),
+        );
     }
     messages.push(Message::assistant(exchange.lamp));
     // A cut answer kept as heard, marked where it stopped, so "go on" picks
@@ -18796,6 +18856,7 @@ mod tests {
             lamp: "ORCHID.".into(),
             room: false,
             cut: false,
+            calls: Vec::new(),
         });
         assert_eq!(
             written,
@@ -18812,6 +18873,7 @@ mod tests {
             lamp: "Hello.".into(),
             room: false,
             cut: false,
+            calls: Vec::new(),
         });
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
     }
@@ -18924,10 +18986,11 @@ mod tests {
             ),
             room: false,
             cut,
+            calls: Vec::new(),
         };
         let here = crate::cut_in_told::CUT_HERE;
         assert_eq!(
-            messages_marked(story(true), Some(here)),
+            messages_marked(story(true), Some(here), false),
             [
                 Message::user("Tell me a story."),
                 Message::assistant(format!(
@@ -18937,9 +19000,113 @@ mod tests {
                 Message::system(here),
             ]
         );
-        assert_eq!(messages_marked(story(true), None).len(), 2);
+        assert_eq!(messages_marked(story(true), None, false).len(), 2);
         // Off by default: the switch sets it as the worker starts.
         assert_eq!(crate::cut_in_told::cut_here(false), None);
+    }
+
+    /// `LAMP_HISTORY_KEEPS_CALLS` (lamp build 9699: "Lamp, you're a bit
+    /// loud." answered "Turning myself down a step." with no call, 4 of 14
+    /// action lines): an earlier turn that called a function is told as it
+    /// went, the call, its result as not kept, then the lamp's words, so
+    /// the next turn does not learn to answer an action in words alone. Off,
+    /// and for a turn that called nothing, as before.
+    #[test]
+    fn an_earlier_turns_calls_are_told_before_its_words_with_the_switch() {
+        let quieter = || crate::thread::Recent {
+            person: "Lamp, you're a bit loud.".into(),
+            lamp: "Turning myself down a step.".into(),
+            calls: vec![crate::thread::KeptCall {
+                id: "kept-7-0".into(),
+                name: "volume_down".into(),
+            }],
+            ..crate::thread::Recent::default()
+        };
+        assert_eq!(
+            messages_marked(quieter(), None, true),
+            [
+                Message::user("Lamp, you're a bit loud."),
+                Message::assistant_calls(
+                    None,
+                    &[crate::second_provider::net::ToolCall {
+                        id: "kept-7-0".into(),
+                        name: "volume_down".into(),
+                        args: serde_json::json!({}),
+                        extra: None,
+                    }]
+                ),
+                Message::tool("kept-7-0", KEPT_CALL_RESULT),
+                Message::assistant("Turning myself down a step."),
+            ]
+        );
+        assert_eq!(
+            messages_marked(quieter(), None, false),
+            [
+                Message::user("Lamp, you're a bit loud."),
+                Message::assistant("Turning myself down a step."),
+            ],
+            "off: words only, as before"
+        );
+        let plain = || crate::thread::Recent {
+            person: "Hi.".into(),
+            lamp: "Hello.".into(),
+            ..crate::thread::Recent::default()
+        };
+        assert_eq!(
+            messages_marked(plain(), None, true),
+            messages_marked(plain(), None, false),
+            "a turn that called nothing"
+        );
+        assert_eq!(
+            messages_marked(plain(), None, true),
+            [Message::user("Hi."), Message::assistant("Hello.")]
+        );
+    }
+
+    /// The same through the thread and the worker's history: a turn that
+    /// ran `volume_down` is told with its call to the next turn of its own
+    /// scope, never another's.
+    #[test]
+    fn a_kept_call_reaches_the_next_turns_history_in_its_own_scope_only() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person("Lamp, you're a bit loud.", true, now);
+            thread.called(1, "volume_down");
+            thread.lamp_for(1, "Turning myself down a step.", now, Some(&a));
+        }
+        let history = |whose: Option<&str>, keeps_calls: bool| -> Vec<Message> {
+            let recent = crate::thread::THREAD.lock().unwrap().recent_for(
+                whose,
+                now,
+                HISTORY_WITHIN,
+                HISTORY_EXCHANGES,
+            );
+            recent
+                .into_iter()
+                .flat_map(|exchange| messages_told(exchange, keeps_calls))
+                .collect()
+        };
+        let theirs = history(Some(&a), true);
+        assert_eq!(theirs.len(), 4, "{theirs:?}");
+        assert_eq!(
+            theirs[1].tool_calls[0]["function"]["name"],
+            serde_json::json!("volume_down")
+        );
+        assert_eq!(theirs[2].role, "tool");
+        assert_eq!(theirs[2].tool_call_id.as_deref(), Some("kept-1-0"));
+        assert_eq!(
+            history(Some(&a), false),
+            [
+                Message::user("Lamp, you're a bit loud."),
+                Message::assistant("Turning myself down a step."),
+            ]
+        );
+        assert!(history(None, true).is_empty(), "never the room's");
+        crate::thread::THREAD.lock().unwrap().forget();
     }
 
     /// The reviewer-lead on #2675: an add-on's quoted line, and the lamp's
