@@ -49,16 +49,22 @@ can see who is asking.", and nothing is called, for reads and writes alike. A re
 lamp's own, a text) is told `NOT_HEARD` and nothing is called either, so
 under privacy, with the microphone off, no service is fetched.
 
-The face says who is at the lamp; it doesn't say who spoke (a partner off
-camera speaks in the owner's lease). So, even for the owner, a read is said
-in full only on the second route, while the eyes count one face in view
+The face in view says who is at the lamp; it doesn't say who spoke (a
+partner off camera speaks in the owner's lease). So a line counts as the
+owner's for a write or a full read only on positive evidence: the owner's
+face seen speaking through it (`speaking_faces::line_seen`, the known face
+alone seen saying it by `remember::speaker_of`, and no other face seen
+saying it; `services::seen_saying_owner`), which needs
+`LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on`; with either off,
+or the owner off camera, it never counts. Even then, a read is said in full
+only on the second route, while the eyes count one face in view
 (`known_faces::most_faces_lately`, counted whenever `LAMP_SERVICES=on` there)
 and the line is in the conversation's voice
 (`same_voice::Voices::likeness_so_far` at `same_voice::SAME_FROM`, 0.70, or
 over; `services::read_in_full`). The services ask the second route's
 same-voice check through `services::judging_voices`, waiting up to 800 ms
-for a print. With more faces, no count, another voice or no print (the
-camera off, a line under the print's 1.5 s, and always on the Live route,
+for a print. With the owner not seen saying it, more faces, no count,
+another voice or no print (the camera off, a line under the print's 1.5 s, and always on the Live route,
 which has no prints), the answer keeps only each item's `id`, `from`,
 `subject`, `title`, `name`, `summary`, `date`, `start` and `end`, an item
 that is only text becomes "an item", and the model is told
@@ -81,6 +87,11 @@ connected apps.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`) and `lamp-voice` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none |
 | `LAMP_SERVICES_WRITE=on` | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
+
+A write, and a read said in full, also need the owner's face seen speaking
+the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
+`lamp-voice` ("Who can use them", below): with either off every write is
+refused and every read is brief.
 
 `lamp-services` itself reads no switch for reads: it opens no socket unless
 started with `--enable`, which its unit passes, so with the switch off it is
@@ -329,27 +340,47 @@ password`, `new sign-in`, `security alert`, `suspicious`, `unusual sign-in`,
 without accents, `mã xác minh`, `mã xác thực`, `mã otp`, `mã đăng nhập`,
 `mã bảo mật`, `mật khẩu`, `đặt lại mật khẩu`, `đăng nhập`, … 59 in all), one
 of the whole words `otp`, `2fa`, `mfa` or `pin`; "code" (or the whole words
-`mã`, `token`, `pin`, `enter`, `confirm`, `confirmation`, `verify`,
-`verification`, `nhập`, `xác nhận`) within 200 bytes of a code; "sign in",
-"log in", "login" or "đăng nhập" with a link (`http://`, `https://`, `www.`)
-or a code number anywhere; or a sign-in link: one with `magic`, `verify`,
-`login`, `signin`, `auth`, `confirm`, `reset` or `otp` as a word of its path
-or query, or, beside "click", "link", "tap", "nhấn" or "bấm", a query value
-of 24 or more opaque characters. A code is a code number, 4 to 8 digits
+`mã`, `token`, `pin`, `verification`) within 200 bytes of a code; the whole
+words `enter`, `confirm`, `confirmation`, `verify`, `nhập`, `xác nhận` with
+a code-shaped token next to them (`weak_code_near`: within 80 bytes, in the
+same clause, no `,`, `;`, `!`, `?`, line end or sentence end between; a code
+number that is not a year 1900 to 2099, a price beside `$`, `€`, `£`, `¥`,
+`₫`, `đ`, `%`, `vnd` or `usd`, a decimal like "1299.00", or labelled by `#`
+or a word such as `room`, `build`, `flight`, `order`, `door`, `phòng`; or a
+letters-and-digits word that changes between letters and digits at least
+twice, "A7B3C9" but not "VN123" or "10am"); "sign in", "log in", "login" or
+"đăng nhập" with a link (`http://`, `https://`, `www.`) or a code number
+anywhere; or a sign-in link: one with `magic`, `verify`, `login`, `signin`,
+`auth`, `confirm`, `reset` or `otp` as a word of its path or query, a
+hyphenated word's part too ("/verify-email?t=x"), whatever the length of its
+values, or, beside "click", "link", "tap", "nhấn" or "bấm", a query value of
+24 or more opaque characters. A code is a code number, 4 to 8 digits
 standing alone, unbroken or in groups split by one space, dash or dot, or a
 dash between spaces ("482913", "482 913", "482-913", "482.913", "482 - 913",
-"4 8 2 9 1 3"), or a word of 4 to 8 ASCII letters and digits with both in
-it ("F7K2Q"). Text is read composed (Unicode NFC, the `unicode-normalization`
+"4 8 2 9 1 3"), never a date (4-2-2 or 2-2-4 digits split by dashes or
+dots, "2026-11-04"), or a word of 4 to 8 ASCII letters and digits with both
+in it ("F7K2Q"). So "Confirm attendance for 4 Nov 2026", "Enter via door B,
+1600 Amphitheatre", "Release v1.2.3 build 4521: please verify", "Confirm
+your order of $1299.00", "Flight VN123 confirmation" and "Please confirm by
+replying" are kept. Text is read composed (Unicode NFC, the `unicode-normalization`
 crate), so Vietnamese typed with combining accents matches. It errs on
 hiding: a discount code or a postal code near a number is left out too.
 
 Every read's items are checked (`reads::quoted`): a mail by its sender,
 subject and text, any other item (a Slack message, a Notion page, a Drive
 file, a calendar event, a GitHub or Linear item, each piece of an MCP tool's
-answer) by every text in it, alone and joined with the next item, so a code
-split across two Notion blocks, two Slack messages or two pieces of an MCP
-answer ("Your verification code is", then "482913") is caught; when the two
-together are a security one, both are left out. One left out is returned
+answer) by every text in it but its `id` and `parent`. Items of one group
+are also read with the next two (`reads::without_security`): a group is
+what the read says they share (`reads::group_of`: `channel`, `channel_id`,
+`thread_ts`, `threadId`, `thread_id`, a Notion block's `parent` page or
+block, `page_id`), and all the plain text of one MCP answer; items with
+none, such as separate mails or events, are never joined. Two items fine
+alone that are a security text joined are both left out, and so are the
+two ends of three when they are ("Your code", "is", "482913" keeps "is");
+beside a security text with no code or link of its own ("Your verification
+code is"), an item with a code number, a letters-and-digits code or a link
+within two is left out too. Only those go: "Lunch at noon?", "Code:
+482913", "Dinner at 7?" keeps the first and the last. One left out is returned
 only as the words "a security mail, left out" in Gmail, "a security message,
 left out" in any other service, nothing of it kept. The model is also
 told in every function's description never to read out a one-time code, a
@@ -397,15 +428,21 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   again on the lamp's other voice.", and nothing is prepared or sent. A
   route is the second when its worker gave the services its same-voice check
   (`services::judging_voices`); the Live process never does.
+- **Prepared only for the owner seen saying it.** A `service_write` without
+  `send_id` whose line the owner's face was not seen saying ("Who can use
+  them", above) is told `NOT_SEEN_SAYING`, "Not done: I write for the lamp's
+  owner only when I see them say it. Say so in a few words, and ask them to
+  face the lamp and ask again.", and nothing is prepared.
 - **`said` is the voice's.** It is taken out of every call the model makes,
   and not offered in the function's parameters.
 - **Prepare:** a `service_write` without `send_id` is passed on, any waiting
   write forgotten first. When the answer has a `read_back` and a `send_id`,
   that id is kept with the request it came in, the read-back, and the
   owner who asked, and the model is told "Nothing is sent yet. Say read_back
-  in full, word for word, leaving nothing out, then ask whether to send it.
-  Send only if their next words are "send"."; an id with no read-back is
-  dropped and never sent.
+  in full, word for word, leaving nothing out, then ask them to say "go
+  ahead and send it" (in Vietnamese "ừ, gửi đi giúp tôi") to send it. Send
+  only if their next words are that."; an id with no read-back is dropped
+  and never sent.
 - **What the lamp said of it:** every word the lamp says in that request
   after the write is prepared is kept with it, as said, on both routes
   (`thread::Thread::lamp_for` → `services::lamp_said`).
@@ -436,13 +473,21 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   Say it was not sent, and that they can ask again." A refused send forgets
   the id either way.
 - **The voice that said "send" is the one that asked.** The send line's
-  print and the prepare line's are compared (`same_voice::Voices::alike`);
-  under `same_voice::SAME_FROM` (0.70), or either print unknown, the model
-  is told `OTHER_VOICE`, "Not sent, and cancelled: I send only when the
-  voice saying "send" is the one that asked for it. Say it was not sent." A
-  print is made only of a line of 1.5 s of speech or more begun with the lamp
-  quiet (`same_voice::LEAST_SAMPLES`), so a bare "send" often has none and is
-  refused: "Yes, go ahead and send it" is likelier to pass.
+  print and the prepare line's are compared (`same_voice::Voices::alike`).
+  A known other voice (both prints there, alike under
+  `same_voice::SAME_FROM`, 0.70) or another face seen saying the send line
+  cancels it: the model is told `OTHER_VOICE`, "Not sent, and cancelled: I
+  send only when the voice saying "send" is the one that asked for it. Say
+  it was not sent." A print is made only of a line of 1.5 s of speech or
+  more begun with the lamp quiet (`same_voice::LEAST_SAMPLES`), so a bare
+  "send" often has none: then the write is kept (its 2 minutes and 30 s
+  still running) and the model is told `NO_PRINT_YET`, "Not sent yet: I
+  couldn't hear whose voice that was.", with the next step "Ask them, in the
+  conversation's language, to say "go ahead and send it" (in Vietnamese "ừ,
+  gửi đi giúp tôi"), and nothing else. …". The lamp's words in that request
+  are no other request's, and the person's next line may send, held to
+  every rule above with that request as the lamp's turn before it. A second
+  line with no print cancels it as `OTHER_VOICE`.
 - **Any later turn forgets it:** a second line begun by anyone, the lamp
   speaking in a second other request, or a services call with no `send_id`
   in another request drops the waiting write.
@@ -455,9 +500,10 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `vâng`, `dạ`, `ừ`, `có`
   taken off both ends, and what is left exactly one of `send`, `send it`,
   `send that`, `send the message`, `send the email`, `go ahead and send it`,
-  `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`: each has
-  "send", "gửi", "gởi" or "gui" in it. So "Yes,
-  send it." and "Vâng, gửi đi" send; "do it", "don't send it", "send it to
+  `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`,
+  `gửi đi giúp tôi`, `gui di giup toi`: each has "send", "gửi", "gởi" or
+  "gui" in it. So "Yes, send it.", "Vâng, gửi đi" and "Ừ, gửi đi giúp tôi"
+  send; "do it", "don't send it", "send it to
   Bo instead", "đừng gửi" and "no" don't.
 
 ### After a read
@@ -573,9 +619,10 @@ sound, as a slow chat does.
 - **The voice does not say the read-back itself**: the model says it, and
   the voice checks the lamp's words held it whole and were not cut or said
   over before it lets a "send" through.
-- **No send on the Live route**, and a short "send" with no voice print is
-  refused on the second route: a lower print bar for a send line, or another
-  sign of who spoke, is not designed yet.
+- **No send on the Live route**, and on the second route a "send" too short
+  for a voice print is asked again once, then cancelled: a lower print bar
+  for a send line is not designed yet. With the speaking-face switches off,
+  or the owner off camera, nothing is written and every read is brief.
 - **The Live route has no wait sound** for a slow services call; only the
   second route makes one.
 - **Ahrefs has no sign-in** in the app yet, so it can't be linked, though
@@ -611,13 +658,22 @@ GitHub, Notion or calendar item left out, a code split across two Notion
 blocks, Slack messages or MCP pieces left out with both, the Gmail and other
 labels, and each Vietnamese (combining accents too), split-digit (space,
 dash, dot, spaced dash), letters-and-digits, enter/confirm, sign-in,
-sign-in-link, far-from-"code" and new-password shape found. `-p lamp-voice` (`services`, `tools`,
+sign-in-link, far-from-"code" and new-password shape found; the six
+reviewed ordinary texts kept (a date, a door and street, a version and
+build, a price, a flight, "please confirm by replying"); a code next to
+"confirm" or "enter" and a short value on a sign-in path found; only the
+items making a code left out, within a group and across three, never two
+separate mails or two items with no group. `-p lamp-voice` (`services`, `tools`,
 `thread`, `made_skill`): the switch giving the flag and folder, the three
 declared and routed only with the switch and the folder, the rule first, a
-plain send and nothing else ("do it" never; "gởi", "gui di" do), a send in
-another voice or with an unknown print refused, the Live route never
-preparing or sending, a read in full only alone and in the conversation's
-voice, a line begun over the read-back marking it cut, a send refused and forgotten
+plain send and nothing else ("do it" never; "gởi", "gui di", "ừ, gửi đi
+giúp tôi" do), a send in a known other voice or seen from another face
+cancelled, a send with no print keeping the write and asking once more (the
+longer line sending, a second with no print cancelling), a write prepared
+only when the owner is seen saying it (an off-camera voice refused), the Live
+route never preparing or sending, a read in full only alone, seen saying it
+and in the conversation's voice (an off-camera voice brief), a line begun
+over the read-back marking it cut, a send refused and forgotten
 unless every rule holds, a send after a read-back not said in full or said
 over refused, any later line or turn forgetting the write, only the owner's
 heard line reaching a service (a guest, the room, a held or narrowed line,
