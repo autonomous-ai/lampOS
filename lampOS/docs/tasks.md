@@ -828,8 +828,13 @@ A home lamp gets Harness, its sign-in and the person's computers after the
 tasks part is installed. Without the switch, the part stops at start with
 no `targets.json` or no program at `--harness`, and systemd restarts it
 again and again, saying nothing useful. `lamp-tasks serve --set-up-later`
-(off unless set; no unit sets it yet) lets it run, and says why hand-overs
-are off:
+(off unless set; set in the product unit, `deploy/product/lamp-tasks.service`,
+with `--targets-from-machines claude`, since 3 Nov) lets it run, and says why
+hand-overs are off. On lamp-c0a4 on 3 Nov, without it, `lamp-update
+harness-on` left the part failing at every start (`tasks: No such file or
+directory (os error 2)`) until systemd stopped restarting it. The product
+unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
+(`crates/update/tests/install.rs`):
 
 - **No targets file:** the part starts with no target. Every `prepare` is
   refused with `target`, as for an alias it doesn't have, and
@@ -878,7 +883,9 @@ are off:
   starts, stops and reports as before.
 
 - **Targets written from the person's machines** (`--targets-from-machines
-  ENGINE`, only with `--set-up-later`; off unless set, #1676 B6 step 3).
+  ENGINE`, only with `--set-up-later`; off unless set, #1676 B6 step 3; the
+  product unit sets `--targets-from-machines claude`, so each of the
+  person's computers is a target for Claude Code).
   While Harness is signed in (`signed_in` `yes`, not `offline`), every five
   looks (five minutes on a lamp, after everything else on the Harness
   worker), the part runs `harness machines --json` and writes
