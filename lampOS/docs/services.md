@@ -578,7 +578,10 @@ true and a refresh token), expires, and has under 600 s left (V1's
 over 0 is kept (the lifetime capped at 10 days; a new refresh token
 replaces the old); anything else leaves the link as it was. A link past its
 time is refused: "the link to <Service> has expired: link it again in the
-app".
+app". The journal says why a link was not renewed ("<code>'s link not
+renewed: …", with the backend's status, or "has expired and it has no
+refresh token" / "it is not marked to be renewed"), never a token or the
+answer.
 
 ## The app's kinds
 

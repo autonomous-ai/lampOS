@@ -324,15 +324,36 @@ impl<H: Http, M: Mail> Services<H, M> {
             .load(service.code)
             .ok_or_else(|| format!("{} {NOT_LINKED}", service.name))?;
         let now = crate::now_secs();
-        if entry.needs_refresh(now)
-            && let Some(backend) = &self.backend
-            && let Ok(reply) = self.http.send(backend.call(&entry)).await
-            && let Ok(next) = crate::refresh::apply(&entry, &reply, now)
-        {
-            if self.store.keep(&next).is_err() {
-                eprintln!("lamp-services: {}'s renewed link not kept", service.code);
+        if entry.needs_refresh(now) {
+            // Why a link near its end was not renewed, for the journal, in
+            // words that hold nothing of the link or the backend's answer.
+            let renewed = match &self.backend {
+                None => Err("no backend known to renew it".to_owned()),
+                Some(backend) => match self.http.send(backend.call(&entry)).await {
+                    Err(_) => Err("the backend couldn't be reached".to_owned()),
+                    Ok(reply) => crate::refresh::apply(&entry, &reply, now)
+                        .map_err(|why| format!("{why} (status {})", reply.status)),
+                },
+            };
+            match renewed {
+                Ok(next) => {
+                    if self.store.keep(&next).is_err() {
+                        eprintln!("lamp-services: {}'s renewed link not kept", service.code);
+                    }
+                    entry = next;
+                }
+                Err(why) => eprintln!("lamp-services: {}'s link not renewed: {why}", service.code),
             }
-            entry = next;
+        } else if entry.expired(now) {
+            let why = if entry.refresh_token.is_empty() {
+                "it has no refresh token"
+            } else {
+                "it is not marked to be renewed"
+            };
+            eprintln!(
+                "lamp-services: {}'s link has expired and {why}",
+                service.code
+            );
         }
         if entry.expired(now) {
             return Err(format!(
