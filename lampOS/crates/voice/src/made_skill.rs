@@ -1561,6 +1561,23 @@ body = { gesture = "nod" }
         ));
     }
 
+    /// A made skill never reaches a connected service ([`crate::services`]):
+    /// a step that names one is never said plainly, and a function of its
+    /// own is refused, so it can't read, still less write.
+    #[test]
+    fn a_made_skill_never_reaches_a_connected_service() {
+        for step in [
+            "service_write = { service = \"gmail\", action = \"send\" }",
+            "service_read = { service = \"gmail\", what = \"recent\" }",
+            "call = { name = \"service_write\" }",
+        ] {
+            let toml = TOML.replace("light = { dim = 1 }", step);
+            assert!(plainly(&toml).is_err(), "{step}");
+        }
+        let with_tool = format!("{TOML}\n[tool]\nname = \"service_write\"\n");
+        assert!(capped(&with_tool).is_err());
+    }
+
     /// The model's `cannot:` is said as a skill that can't do that, and
     /// nothing is kept; a `cannot:` with blocks is read as blocks.
     #[test]
