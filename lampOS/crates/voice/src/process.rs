@@ -1056,6 +1056,18 @@ fn worker_command(
             role,
             var(crate::remember::RECALL_V2_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_newer_first_worker_environment(
+            role,
+            var(crate::remember::NEWER_FIRST_ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_strength_worker_environment(
+            role,
+            var(crate::remember::STRENGTH_ENVIRONMENT).as_deref(),
+        ))
+        .envs(memory_profile_worker_environment(
+            role,
+            var(crate::remember::PROFILE_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_early_words_worker_environment(
             role,
             var(crate::early_words::ENVIRONMENT).as_deref(),
@@ -1319,6 +1331,33 @@ fn memory_recall_v2_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::RECALL_V2_ENVIRONMENT, "on"))
+}
+
+// The Tiers-ideas fields (3 Nov plan), each passed the same narrow way: the
+// exact `on`, to the two routes that recall and open a session note through
+// the Days client (each reads it in `remember::start`).
+fn memory_newer_first_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::NEWER_FIRST_ENVIRONMENT, "on"))
+}
+
+fn memory_strength_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::STRENGTH_ENVIRONMENT, "on"))
+}
+
+fn memory_profile_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::PROFILE_ENVIRONMENT, "on"))
 }
 
 // A remember of what is kept already (#2176), passed the same narrow way:
@@ -2271,6 +2310,22 @@ mod tests {
                         "LAMP_MEMORY_RECALL_V2",
                         ["provider", "second"].as_slice(),
                     ),
+                    // And the Tiers-ideas fields (3 Nov plan).
+                    (
+                        memory_newer_first_worker_environment,
+                        "LAMP_MEMORY_NEWER_FIRST",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    (
+                        memory_strength_worker_environment,
+                        "LAMP_MEMORY_STRENGTH",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    (
+                        memory_profile_worker_environment,
+                        "LAMP_MEMORY_PROFILE",
+                        ["provider", "second"].as_slice(),
+                    ),
                     // So does keeping a fact as heard (#2176).
                     (
                         memory_keep_heard_worker_environment,
@@ -2593,6 +2648,9 @@ mod tests {
                     crate::conversation_summary::ENVIRONMENT,
                     crate::second_provider::worker::REOPEN_QUIET_ENVIRONMENT,
                     crate::remember::RECALL_V2_ENVIRONMENT,
+                    crate::remember::NEWER_FIRST_ENVIRONMENT,
+                    crate::remember::STRENGTH_ENVIRONMENT,
+                    crate::remember::PROFILE_ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
@@ -2778,7 +2836,9 @@ mod tests {
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
+                    "LAMP_MEMORY_NEWER_FIRST=on",
                     "LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
+                    "LAMP_MEMORY_PROFILE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_REPLACES=on",
@@ -2786,6 +2846,7 @@ mod tests {
                     "LAMP_MEMORY_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_STABLE_ID=on",
+                    "LAMP_MEMORY_STRENGTH=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
@@ -2833,8 +2894,10 @@ mod tests {
                     "LAMP_MEMORY_KEEP_ASKED=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
+                    "LAMP_MEMORY_NEWER_FIRST=on",
                     "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
+                    "LAMP_MEMORY_PROFILE=on",
                     "LAMP_MEMORY_RECALL_V2=on",
                     "LAMP_MEMORY_REMEMBER_ONCE=on",
                     "LAMP_MEMORY_REOPEN_QUIET=on",
@@ -2844,6 +2907,7 @@ mod tests {
                     "LAMP_MEMORY_ROOM_SPEAKER=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_STABLE_ID=on",
+                    "LAMP_MEMORY_STRENGTH=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAMES_RECORD_TOLD=on",

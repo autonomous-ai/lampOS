@@ -1769,7 +1769,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     (`newer_correction_ranks_first`, `no_cue_keeps_fts_rank`,
     `other_person_never_reordered_in`, `room_scope_is_never_reordered`,
     `off_is_byte_identical`) and
-    `search::newer_first_tests`. The voice sends the field with P4.
+    `search::newer_first_tests`. The voice sends the field on a recall's search (P4, below).
 
 - **Said, plan or maybe** (the memory owner's Tiers-ideas plan, 3 Nov, P2,
   `LAMP_MEMORY_STRENGTH=on`, with the Days client only; off unless set).
@@ -1791,8 +1791,20 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     byte for byte the same) and
     `remember::tests::a_maybe_or_plan_line_is_told_as_said` (what the model
     is told) and `a_past_plan_is_not_told_as_not_done` (a past `on` gets
-    both fields, never "not done"). The voice sends `strength` from `LAMP_MEMORY_STRENGTH` in the
-    plan's P4.
+    both fields, never "not done"). The voice sends `strength` from `LAMP_MEMORY_STRENGTH`
+    (P4, below).
+
+- **Tiers' ideas in Days** (3 November plan; credit memory-tiers.md,
+  Tiers). Three voice switches, each off unless exactly `on`, with the Days
+  client only, each sending one request field only when on (with all three
+  off, every request is as before; memory-days.md has the fields):
+  - `LAMP_MEMORY_NEWER_FIRST`: a recall's search asks for a newer correction
+    ahead of the older line it corrects (`newer_first`).
+  - `LAMP_MEMORY_STRENGTH`: a recall's search and the session note ask for a
+    maybe or a plan to be marked as such (`strength`).
+  - `LAMP_MEMORY_PROFILE`: the session note keeps a band for tastes and kept
+    facts before promises and threads (`profile`).
+  An older lamp-memory refuses the fields, so upgrade both together.
 
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
   client only; off unless set; both voice routes; on in the product unit
