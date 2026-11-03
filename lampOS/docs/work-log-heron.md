@@ -152,3 +152,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   on #4450 and #4710; PR #5044 (`heron/4450-lamp-fc4b-replay`, head
   `05409db98`, docs only, one read asked of the first builder or the
   Reviewer-lead).
+- 13:05: the first builder: heron's #5034 read stands for train 553.
+  13:12: Reviewer-lead READ-OK on #5044 `05409db98`, no findings (verdicts
+  checked against the shipped journals; no words heard are in them).
+  13:1x: NEXT TRAIN posted for #5044.
