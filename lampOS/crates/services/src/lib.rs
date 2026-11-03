@@ -10,7 +10,7 @@
 //! (`tools.json` and `call.sock`), which only `lamp-voice.service` may call.
 //! Reads go through an allow-list per service; writes are behind their own
 //! switch (`LAMP_SERVICES_WRITE=on`) and two phases: a full read-back first,
-//! then the one send it names. Off unless started with `--enable`.
+//! then the one send it names. Off unless `LAMP_SERVICES=on` (or `--enable`).
 pub mod catalog;
 pub mod mail;
 pub mod mcp;
@@ -22,8 +22,8 @@ pub mod store;
 pub mod tools;
 pub mod writes;
 
-/// The switch for reads, on the voice and lamp-cloud (this program is
-/// closed by `--enable` and its unit instead).
+/// The switch for the linked services, on the voice, lamp-cloud and this
+/// program: each is off unless `on` (this program also with `--enable`).
 pub const ENVIRONMENT: &str = "LAMP_SERVICES";
 /// The switch for writes, read by this program: off unless `on`.
 pub const WRITE_ENVIRONMENT: &str = "LAMP_SERVICES_WRITE";

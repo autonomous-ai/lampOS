@@ -1,9 +1,12 @@
-//! `lamp-services --enable [--store DIR] [--run DIR]`: the person's linked
+//! `lamp-services [--enable] [--store DIR] [--run DIR]`: the person's linked
 //! services, on the admin socket (`<run>/admin.sock`, lamp-cloud only) and
-//! the voice's tools folder (`<run>/tools/`, lamp-voice only). Without
-//! `--enable` it opens no socket and exits: its unit passes it.
+//! the voice's tools folder (`<run>/tools/`, lamp-voice only). Off unless
+//! `LAMP_SERVICES=on` (a drop-in on its unit, as in lamp-cloud's and the
+//! voice's) or `--enable`: off, it opens no socket and exits at once, so its
+//! unit stays inactive.
 use lamp_services::{
-    WRITE_ENVIRONMENT, mail::Gmail, net::Https, on, refresh::Backend, serve, store, tools,
+    ENVIRONMENT, WRITE_ENVIRONMENT, mail::Gmail, net::Https, on, refresh::Backend, serve, store,
+    tools,
 };
 use std::{
     fs, io,
@@ -13,7 +16,8 @@ use std::{
     sync::Arc,
 };
 
-const USAGE: &str = "usage: lamp-services --enable [--store DIR] [--run DIR]";
+const USAGE: &str =
+    "usage: lamp-services [--enable] [--store DIR] [--run DIR] (LAMP_SERVICES=on is --enable)";
 
 fn say(line: &str) {
     eprintln!("lamp-services: {line}");
@@ -33,7 +37,7 @@ fn bind(path: &Path) -> io::Result<UnixListener> {
 }
 
 fn main() -> ExitCode {
-    let mut enable = false;
+    let mut enable = on(std::env::var(ENVIRONMENT).ok().as_deref());
     let mut store = PathBuf::from(store::DIR);
     let mut run = PathBuf::from("/run/lampos-services");
     let mut args = std::env::args().skip(1);
@@ -58,7 +62,7 @@ fn main() -> ExitCode {
         }
     }
     if !enable {
-        say("off: started without --enable; no socket opened");
+        say("off: LAMP_SERVICES=on or --enable starts it; no socket opened");
         return ExitCode::SUCCESS;
     }
     // The backend, for refresh only, as lamp-cloud reads it.
