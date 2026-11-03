@@ -192,6 +192,9 @@ pub struct Thread {
     /// The newest [`LINES`] requests a connected service's read answered
     /// in ([`Self::private_for`]): their lamp's words are never kept.
     private: VecDeque<u64>,
+    /// When the conversation was last closed ([`Self::close_conversation`]):
+    /// exchanges opened at or before it no longer keep one going.
+    closed_at: Option<Instant>,
 }
 
 /// What stands for the lamp's words in a request a connected service's
@@ -362,6 +365,7 @@ impl Thread {
             lines: VecDeque::new(),
             calling: VecDeque::new(),
             private: VecDeque::new(),
+            closed_at: None,
         }
     }
 
@@ -507,7 +511,7 @@ impl Thread {
             std::mem::take(&mut self.admitted),
             self.note.take(),
         );
-        let (count_only, quoted) = (self.count_only, self.quoted);
+        let (count_only, quoted, closed_at) = (self.count_only, self.quoted, self.closed_at);
         let marks: Vec<_> = self
             .exchanges
             .iter()
@@ -541,6 +545,9 @@ impl Thread {
         // The sentence in hand stays out of a thread read meanwhile.
         self.count_only = count_only;
         self.quoted = quoted;
+        // The close is this process's too: a thread read back keeps it, so
+        // the exchanges before it stay out of a conversation going on.
+        self.closed_at = closed_at;
         self.held = Some(at);
         took
     }
@@ -1124,6 +1131,27 @@ impl Thread {
         .then(|| person.to_owned())
     }
 
+    /// A paired computer ended its turn (`turn: "end"`): the conversation
+    /// is over at `now`. The exchanges opened at or before it are kept (for
+    /// memory, the journal and summaries) but no longer count for
+    /// [`Self::going_on`], [`Self::going_on_with`] or
+    /// [`Self::said_last_ago_but`]: the next room line needs a name, a turn
+    /// or a tap. An exchange opened after it counts as before.
+    pub fn close_conversation(&mut self, now: Instant) {
+        self.closed_at = Some(self.closed_at.map_or(now, |closed| closed.max(now)));
+    }
+
+    /// When the conversation was last closed ([`Self::close_conversation`]).
+    pub fn closed_at(&self) -> Option<Instant> {
+        self.closed_at
+    }
+
+    /// Whether `exchange` may keep a conversation going: it opened after
+    /// the last close, if any.
+    fn after_close(&self, exchange: &Exchange) -> bool {
+        self.closed_at.is_none_or(|closed| exchange.at > closed)
+    }
+
     /// Whether the lamp said something to someone so lately that a
     /// conversation may still be going on.
     /// How long ago the lamp last said words in the thread's exchanges, as
@@ -1140,6 +1168,7 @@ impl Thread {
             .iter()
             .filter(|exchange| !but.contains(&exchange.request))
             .filter(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .filter(|exchange| self.after_close(exchange))
             .map(|exchange| now.saturating_duration_since(exchange.at))
             .min()
     }
@@ -1156,6 +1185,7 @@ impl Thread {
             .filter(|exchange| exchange.request != request)
             .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric) || exchange.unheard)
             .filter(|exchange| now.saturating_duration_since(exchange.at) <= GOING_ON_FOR)
+            .filter(|exchange| self.after_close(exchange))
             .and_then(|exchange| exchange.whose.clone())
     }
 
@@ -1213,6 +1243,7 @@ impl Thread {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
                 && exchange.lamp.chars().any(char::is_alphanumeric)
+                && self.after_close(exchange)
         })
     }
 
@@ -4113,5 +4144,56 @@ mod tests {
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].lamp, "Louder it is.");
         assert!(recent[0].calls.is_empty());
+    }
+
+    /// A computer's `turn.end` closes the conversation: the exchanges
+    /// before it keep none going and give no `said_last_ago`, though they
+    /// are kept; one opened after it counts again; the close survives a
+    /// thread read back from the file.
+    #[test]
+    fn a_closed_conversation_is_over_until_the_lamp_speaks_again() {
+        let now = Instant::now();
+        let wall = SystemTime::now();
+        let at = |s: u64| now + Duration::from_secs(s);
+        let mut thread = Thread::new();
+        thread.person("What is the weather?", true, now);
+        thread.lamp_for(1, "Sunny all day.", now, None);
+        assert!(thread.going_on(at(5)));
+        assert!(thread.going_on_with(2, at(5)).is_none(), "the room's");
+        assert_eq!(thread.said_last_ago(at(5)), Some(Duration::from_secs(5)));
+        assert_eq!(thread.closed_at(), None);
+        thread.close_conversation(at(2));
+        assert_eq!(thread.closed_at(), Some(at(2)));
+        assert!(!thread.going_on(at(5)), "closed");
+        assert_eq!(thread.said_last_ago(at(5)), None);
+        assert_eq!(thread.said_last_ago_but(at(5), &[]), None);
+        // The exchange itself is kept for memory, the journal and summaries.
+        assert_eq!(thread.recent(at(5), REMEMBERED_FOR, EXCHANGES).len(), 1);
+        // An earlier close never moves the mark back.
+        thread.close_conversation(at(1));
+        assert_eq!(thread.closed_at(), Some(at(2)));
+        // Saved and read back by this process: the close stays, written to
+        // no file.
+        let directory = std::env::temp_dir().join(format!(
+            "lamp-voice-thread-closed-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("thread.json");
+        let text = thread.save(at(3), wall).unwrap();
+        assert!(!text.contains("closed"), "{text}");
+        std::thread::sleep(Duration::from_millis(30));
+        let mut other = Thread::load(&text, at(3), wall);
+        other.lamp_for(9, "Another route's line.", at(1), None);
+        write_file(&path, &other.save(at(3), wall).unwrap()).unwrap();
+        assert!(thread.reload(&path, at(3), wall));
+        assert_eq!(thread.closed_at(), Some(at(2)));
+        assert!(!thread.going_on(at(5)), "still closed after the reload");
+        std::fs::remove_dir_all(&directory).unwrap();
+        // An exchange opened after the close counts as before.
+        thread.lamp_for(3, "Anything else?", at(10), None);
+        assert!(thread.going_on(at(12)));
+        assert_eq!(thread.said_last_ago(at(12)), Some(Duration::from_secs(2)));
     }
 }

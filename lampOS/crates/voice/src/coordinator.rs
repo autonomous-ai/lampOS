@@ -7695,6 +7695,14 @@ fn conversation_with_gate_inner(
                 // conversation: the person wins over it.
                 if !muted && reason == CONTROL_ENDED {
                     control_turns.ended_by_its_computer();
+                    // Its computer ended the turn: so ends the conversation.
+                    // The turn's exchange no longer keeps one going, and a
+                    // room line said next needs a name, a turn or a tap
+                    // (lamp-75c9 on 3 Nov: a room line 36 s after a cut
+                    // `turn.end` was answered as the conversation going on).
+                    if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                        thread.close_conversation(Instant::now());
+                    }
                 } else {
                     control_turns.cancelled(if muted {
                         crate::control_turn::MUTED
