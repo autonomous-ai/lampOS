@@ -8154,6 +8154,109 @@ async fn words_cut_short_by_a_held_line_are_answered_in_its_place() {
     );
 }
 
+/// #5026, lamp-0529 3 Nov 09:52: a question already answered on the web
+/// searched, fetched a page and searched again, and a 0-word line (room
+/// noise) cut it before any words. The held line answered it again in a
+/// fresh chat with its words alone: no search results, and no search, so
+/// it was said from the model's memory. Now the rounds the cut turn
+/// finished go with its words.
+#[tokio::test]
+async fn a_cut_turns_finished_search_rounds_go_with_its_words_into_the_held_lines_answer() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Who won the Ballon d'Or?".to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "web_search",
+                        json!({"query": "Ballon d'Or winner"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        "fetch_page",
+                        json!({"url": "https://example.com/ballon"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("The Player One won it."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (fetching, fetched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, name, _| {
+        let fetching = fetching.clone();
+        Box::pin(async move {
+            if name == "fetch_page" {
+                let _ = fetching.send(());
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+            json!({"results": ["The Player One won the Ballon d'Or."]})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    // Until round 1's search is answered and round 2's fetch is under way.
+    loop {
+        if fetched.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    // A line of room noise begins, cuts the turn, and hears no words.
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the held line's turn ends");
+        if let ProviderOutput::TurnComplete { request: 2, .. } = event {
+            break;
+        }
+    }
+    let asked = script.asked.lock().unwrap();
+    let again = asked.last().unwrap();
+    let words = again
+        .iter()
+        .position(|message| message == &Message::user("Who won the Ballon d'Or?"))
+        .expect("the words cut short are asked again");
+    let carried = &again[words + 1..];
+    assert!(
+        carried
+            .first()
+            .is_some_and(|message| message.tool_calls.len() == 1),
+        "round 1's search call follows the words: {carried:?}"
+    );
+    assert_eq!(
+        carried
+            .get(1)
+            .and_then(|message| message.tool_call_id.as_deref()),
+        Some("c1"),
+        "and its result: {carried:?}"
+    );
+    assert!(
+        carried
+            .iter()
+            .all(|message| message.tool_call_id.as_deref() != Some("c2")),
+        "a round cut before its results is not carried: {carried:?}"
+    );
+}
+
 /// One line's words (`said`, its call `first`), cut while their answer
 /// waits after that call, then answered again by an empty held line whose
 /// model calls `remember`. With `gap`, the first line is held only by a
