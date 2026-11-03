@@ -1,0 +1,8 @@
+# holds-lifted.tsv: HOLDs their own reader closed in words but never cleared with a READ-OK.
+# The real file is state, not code (its keys hold account logins): keep it at $LAMP_COORD_STATE/holds-lifted.tsv
+# (or point $HOLDS_LIFTED at it). Never commit it. Lines starting with # are ignored.
+# One HOLD a line, tab-separated, at least four fields:
+#   PR  key  commit-prefix  link-to-the-reader's-closing-comment  [note]
+# key is what markers.py keys the HOLD on: <login>/<signed name, lowercase>, or <login>/unsigned#<comment index>.
+# Example (tabs between fields):
+# 1234	some-login/reviewer-two	0123abcd9	https://github.com/autonomous-ai/lampOS/pull/1234#issuecomment-1	lifted by the first builder
