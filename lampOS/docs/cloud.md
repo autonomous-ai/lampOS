@@ -115,7 +115,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.share`/`skills.shared`/`skills.unshare`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.share`/`skills.shared`/`skills.unshare`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
@@ -150,6 +150,7 @@ lamp says so.
 | `system.shutdown` | with `LAMP_SHUTDOWN=on` (#3697, "The lamp turned off from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"shutting_down": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). `data` is not read. Once taken, asked again within 60 s (`lamp::YES_KEPT`) it is answered the same `success` and the helper is not asked again; after that the helper is asked again. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters), `language.set` (`{"language": "en" \| "vi" \| "ja" \| "zh" \| "ko"}`, #4473) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}`, `{"name"}` or `{"language"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
+| `connector.set.<code>`, `connector.remove.<code>`, `services.list` | with `LAMP_SERVICES=on` (Queue #4710, "A person's linked services" below, [services.md](services.md)): a service of the person's linked or unlinked, by V1's codes (`gmail`, `google_calendar`, `google_drive`, `notion`, `figma-api`, `figma`, `github`, `linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`, `amplitude`); a set's data fetched from the backend, never carried. `starting` at once, then `success` with `{"connector", "scopes"}` (a remove `{"connector"}`) or `failure` with why; `services.list` is `{"connected": [{"code", "account", "expired"}]}`. `can` says `services` for the `connector.*` kinds. Without the switch, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### News for the phone, unasked (`messages/out`)
@@ -1579,7 +1580,10 @@ it no count is kept, no topic is said and no field is added.
   while it lasts; the journal says it once. The voice says the kept line and stops
   sending turns ([failure-notices.md](failure-notices.md), "Signed out"). The ping
   goes on every 15 s: it is how the lamp finds it is accepted again.
-- **Nothing is wiped and setup isn't reset.** The lamp's one record of it is
+- **Setup isn't reset, and nothing is wiped but the linked services' tokens.**
+  With `LAMP_SERVICES=on` as well, `lamp-cloud` asks `lamp-services` to wipe
+  every token once a spell, again every 30 s while that fails ("A person's
+  linked services" below). The lamp's one record of the spell is
   `signed-out.json` in its state folder: a short fingerprint of the login (never
   the login) and the spell's start, so a restart goes on with the same spell.
 - **It ends** when a ping is accepted, or at a start with a different login: a
@@ -1810,6 +1814,36 @@ and nowhere else: never a reply, an error or a journal line. **The backend
 passes the key through to the lamp and never stores or logs it** (the
 backend's side, to be confirmed by them). The rest is in
 [own-keys.md](own-keys.md).
+
+## A person's linked services (Queue #4710, `connector.*`, `services.list`)
+
+Off unless `LAMP_SERVICES=on` beside `LAMP_CLOUD=on`, with the account's base
+and the lamp's key. `lamp-cloud` keeps no token: it hands one JSON line to
+root's `lamp-services` on `/run/lampos-services/admin.sock` (in the unit's
+`ReadWritePaths=`), which answers only a peer in `lamp-cloud.service` at
+`/lampos.slice/lampos-parts.slice/`, by its cgroup.
+
+- **`connector.set.<code>`** is V1's "privacy" type: the message carries no
+  token. `lamp-cloud` fetches the link's data from
+  `GET <base>/devices/get-message?kind=connector.set.<code>` with the lamp's
+  key (V1's `privacy_fetch.go`, 30 s, no redirect), checks it names the same
+  `connector` and an `auth_type`, and hands it to `{"op":"set"}`. The data
+  goes into that line and nowhere else: never a reply, an error, a journal
+  line or a `Debug`.
+- **`connector.remove.<code>`** asks `{"op":"remove"}`; **`services.list`**
+  asks `{"op":"list"}` inline and passes on each service's `code`, `account`
+  and `expired` alone.
+- A set or a remove is `starting` at once and its `success` or `failure`
+  comes on a later tick, from a thread of its own (at most 4 at once, each
+  waited on 30 s), said again if the connection drops before the broker's
+  ack. A code not among the 15 known is refused at once.
+- `can` lists `services` and `services.list` only while the switch is on and
+  the admin socket is there.
+- **Signed out** (`LAMP_SIGNED_OUT=on` too): every token wiped once a spell
+  with `{"op":"wipe"}`.
+
+The services, their reads and writes, the voice's functions and its send
+gate are in [services.md](services.md).
 
 ## Not yet known, for the backend (#1396)
 
