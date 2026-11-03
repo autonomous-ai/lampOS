@@ -238,6 +238,20 @@ one second of waiting past one read stale before the microphone is first
 allowed (`PRIVACY_START_STALE_US`) counts from its loop's start, after the
 prologue, with the gate closed until then.
 
+While a turn is held, the controller clips every worker's lease to the input
+leases: the last kept capture frame's read time + 100 ms. Renewing it does not
+move that expiry until a newer frame is kept, so when frames stop, a lease
+that grants the microphone would lapse at the workers, and the privacy
+worker would end on it, as it must. The coordinator therefore cuts a held
+turn as a capture gap once its lease ends within 40 ms
+(`HELD_TURN_LEASE_MARGIN_US` in `coordinator.rs`, #4332), judged on the
+frames its last capture drain kept, so a slow pass with frames waiting cuts
+nothing, through the same
+cancel and publish a lapsed capture lease already took, so the workers hold
+its revocation, a lease of the full 250 ms with no turn, before that expiry.
+Nothing is extended: the capture lease still ends at the last kept frame +
+100 ms, and nothing is heard after it until a fresh frame is kept.
+
 A privacy worker that does not stop within the wait's 300 ms grace is killed,
 and a killed worker cannot unlink its own sockets. Once it is reaped, the
 wait's cleanup removes its `privacy.c.w` and `privacy.d.w`, each only while

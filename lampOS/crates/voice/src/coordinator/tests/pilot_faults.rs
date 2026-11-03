@@ -131,6 +131,10 @@ enum Act {
     Pause,
     /// The keeper resumes it.
     Resume,
+    /// From now on each capture frame is delivered 30 ms after it is read,
+    /// as a capture with buffering and echo work behind it: on time, but
+    /// each kept frame already 30 ms old.
+    CaptureLag,
 }
 
 /// How the speaker peer behaves.
@@ -282,6 +286,34 @@ struct Seen {
     fresh_mute_queued_at_us: Option<u64>,
     /// Actual host time immediately before sending SIGTERM, never policy time.
     sigterm_sent_at: Option<Instant>,
+    /// Each step at which a peer held authority that had lapsed while it
+    /// still granted something (#4332): role, when, its expiry and owner.
+    /// A real privacy worker ends the voice on such a lease.
+    lapsed_grants: Vec<(&'static str, u64, u64, Option<u64>)>,
+    /// Each step at which a peer held authority ready to listen.
+    listening_held: Vec<(&'static str, u64)>,
+}
+
+/// What a peer's held authority is at this step (#4332): a lapsed lease
+/// that still grants anything, which a real worker ends on, and whether
+/// it lets the microphone be heard.
+fn note_held(seen: &Mutex<Seen>, role: &'static str, snapshot: Option<Snapshot>) {
+    let Some(snapshot) = snapshot else {
+        return;
+    };
+    let at = monotonic_us();
+    let mut seen = seen.lock().unwrap();
+    if at >= snapshot.expires_at().as_micros() && !crate::privacy_bus::denied_only(snapshot) {
+        seen.lapsed_grants.push((
+            role,
+            at,
+            snapshot.expires_at().as_micros(),
+            snapshot.owner().map(|owner| owner.turn()),
+        ));
+    }
+    if snapshot.listening_ready(MonoTime::from_micros(at)) {
+        seen.listening_held.push((role, at));
+    }
 }
 
 /// Packet, privacy and policy timestamps use the scenario clock.
@@ -611,6 +643,8 @@ struct Peers {
     capture: Option<CaptureSchedule>,
     capture_silent: bool,
     capture_stalled_until: Option<Instant>,
+    /// How long after its read a frame is delivered (`Act::CaptureLag`).
+    capture_lag_us: u64,
     capture_epoch: u64,
     capture_reopen: bool,
     camera: Option<BootId>,
@@ -669,6 +703,7 @@ impl Peers {
                 }
             }
             Act::CaptureSilent => self.capture_silent = true,
+            Act::CaptureLag => self.capture_lag_us = 30_000,
             Act::CaptureStall => {
                 // The device keeps its own 10 ms schedule (CaptureSchedule);
                 // what it read while the worker was held up comes after.
@@ -838,6 +873,8 @@ impl Peers {
             }
             return Ok(());
         }
+        // As the privacy peer: held as this step's time comes, and after.
+        note_held(&self.seen, role, self.peers[index].snapshot);
         for _ in 0..16 {
             match self.peers[index].channels.control.receive::<Control>() {
                 Ok(Some(Control::Authority { snapshot })) => {
@@ -879,6 +916,7 @@ impl Peers {
                 Ok(None) | Err(_) => break,
             }
         }
+        note_held(&self.seen, role, self.peers[index].snapshot);
         match role {
             "capture"
                 if self.capture.is_some()
@@ -894,8 +932,11 @@ impl Peers {
                 // Frames follow a fixed 10 ms schedule, like a capture device.
                 for _ in 0..64 {
                     let attempted_at_us = monotonic_us();
-                    let Some((frame, at)) =
-                        self.capture.as_mut().unwrap().next_due(attempted_at_us)
+                    let Some((frame, at)) = self
+                        .capture
+                        .as_mut()
+                        .unwrap()
+                        .next_due(attempted_at_us.saturating_sub(self.capture_lag_us))
                     else {
                         break;
                     };
@@ -1302,6 +1343,11 @@ struct PrivacyPeer {
 
 impl PrivacyPeer {
     fn tick(&mut self, deadline: Option<Instant>) -> io::Result<()> {
+        // What it holds as this step's time comes, before reading what
+        // was sent at it: a renewal must come before the lease lapses.
+        if !self.peer.stopped {
+            note_held(&self.seen, "privacy", self.peer.snapshot);
+        }
         for _ in 0..16 {
             if self.peer.stopped {
                 break;
@@ -1309,11 +1355,18 @@ impl PrivacyPeer {
             let Ok(Some(control)) = self.peer.channels.control.receive::<Control>() else {
                 break;
             };
-            if matches!(control, Control::Stop) {
-                self.peer.stopped = true;
-                self.peer.close_input(deadline)?;
-                self.seen.lock().unwrap().stopped.push("privacy");
+            match control {
+                Control::Stop => {
+                    self.peer.stopped = true;
+                    self.peer.close_input(deadline)?;
+                    self.seen.lock().unwrap().stopped.push("privacy");
+                }
+                Control::Authority { snapshot } => self.peer.snapshot = Some(snapshot),
+                _ => {}
             }
+        }
+        if !self.peer.stopped {
+            note_held(&self.seen, "privacy", self.peer.snapshot);
         }
         let silent = self.start == PrivacyStart::StaleThenSilent && self.sent > 0;
         if !self.peer.stopped && !silent && crate::scenario_clock::instant() >= self.next {
@@ -1501,6 +1554,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         capture: None,
         capture_silent: false,
         capture_stalled_until: None,
+        capture_lag_us: 0,
         capture_epoch: 1,
         capture_reopen: false,
         camera: camera_boot,
@@ -1969,6 +2023,89 @@ fn a_stall_while_the_lamp_answers_cuts_the_reply_and_the_voice_goes_on() {
     let cancels = run.events("hand_control_cancel");
     assert_eq!(cancels.len(), 1, "{cancels:?}");
     assert_eq!(cancels[0]["reason"], "capture_gap");
+}
+
+/// lamp-e82d, 3 Nov (#4332): capture frames stopped while the lamp held a
+/// turn, and every worker's lease, clipped to the last kept frame + 100 ms,
+/// lapsed before the turn was cut; the privacy worker ended on it and the
+/// voice with it. The held turn is withdrawn before its lease lapses: at
+/// every step each peer holds authority that is current or grants nothing,
+/// and nothing listens once the last kept frame's lease is over.
+#[test]
+fn a_held_turn_whose_frames_stop_is_withdrawn_before_any_lease_lapses() {
+    let _one = one_session();
+    let run = run(Script {
+        actions: vec![
+            (When::Accepted(3), Act::CaptureStall),
+            (When::Block(400), Act::Mute),
+        ],
+        ..Script::question(Answer::Hold(40))
+    });
+    run.assert_invariants();
+    assert!(is_mute(&run.result), "{:?}", run.result);
+    let stalled_at = run.fired_at(Act::CaptureStall);
+    let muted_at = run.fired_at(Act::Mute);
+    let lapsed: Vec<_> = run
+        .seen
+        .lapsed_grants
+        .iter()
+        .filter(|(_, at, ..)| *at < muted_at)
+        .collect();
+    assert!(
+        lapsed.is_empty(),
+        "a worker held a lapsed lease that grants (role, at, expires, owner), stall at {stalled_at}: {lapsed:?}"
+    );
+    // Never extended: from the last kept frame's lease end until frames
+    // read after the 500 ms stall come back, nothing is heard.
+    let listening: Vec<_> = run
+        .seen
+        .listening_held
+        .iter()
+        .filter(|(_, at)| (stalled_at + INPUT_LEASE_US..stalled_at + 400_000).contains(at))
+        .collect();
+    assert!(listening.is_empty(), "{listening:?}");
+    let cancels = run.events("hand_control_cancel");
+    assert_eq!(cancels.len(), 1, "{cancels:?}");
+    assert_eq!(cancels[0]["reason"], "capture_gap");
+}
+
+/// Sixth on #5104 (#4332): a coordinator pass held up while the capture's
+/// frames keep coming on time is no gap. Each frame comes 30 ms after its
+/// read, and one pass is held up 36 ms after its drain, inside the 50 ms
+/// privacy freshness: the newest kept frame is then over 60 ms old at the
+/// next pass's start, but newer ones are waiting, and that pass keeps them,
+/// each under 100 ms old. The lamp's answer goes on: only a capture that
+/// stopped cuts a held turn ahead of its lease, never a slow pass.
+#[test]
+fn a_held_turn_is_not_cut_by_a_slow_pass_while_frames_come_on_time() {
+    let _one = one_session();
+    TEST_PASS_HELD_STEPS.with(|steps| steps.set(18));
+    TEST_PASS_HELD.with(|held| held.set(0));
+    let run = run(Script {
+        actions: vec![
+            (When::Block(5), Act::CaptureLag),
+            (When::Block(300), Act::Mute),
+        ],
+        ..Script::question(Answer::Hold(40))
+    });
+    TEST_PASS_HELD_STEPS.with(|steps| steps.set(0));
+    run.assert_invariants();
+    assert!(is_mute(&run.result), "{:?}", run.result);
+    assert_eq!(
+        TEST_PASS_HELD.with(std::cell::Cell::get),
+        18,
+        "the pass held up"
+    );
+    let cancels = run.events("hand_control_cancel");
+    assert!(cancels.is_empty(), "a slow pass cut the turn: {cancels:?}");
+    let muted_at = run.fired_at(Act::Mute);
+    let lapsed: Vec<_> = run
+        .seen
+        .lapsed_grants
+        .iter()
+        .filter(|(_, at, ..)| *at < muted_at)
+        .collect();
+    assert!(lapsed.is_empty(), "{lapsed:?}");
 }
 
 /// An XRun closes and reopens the microphone within 50 ms, inside a

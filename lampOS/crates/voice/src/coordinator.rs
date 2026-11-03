@@ -132,6 +132,20 @@ fn session_instant() -> Instant {
 /// (#784). The lease itself still lapses at `INPUT_LEASE_US`, so nothing is
 /// retained or admitted while the capture is stalled.
 const CAPTURE_GAP_US: u64 = 1_500_000;
+/// How long before a held turn's lease lapses the coordinator cuts that
+/// turn as a capture gap (#4332). While a turn is held every worker's lease
+/// is clipped to the input leases, the last kept frame's read time +
+/// `INPUT_LEASE_US`, and renewing it does not move that until a newer frame
+/// is kept. On lamp-e82d frames stopped being kept during a turn, every
+/// lease lapsed before the turn was cut, and the privacy worker ended on its
+/// lapsed granting lease (fail-closed, as it must) and the voice with it.
+/// Cut this much early, the revocation reaches the workers as authority
+/// withdrawn, never lapsed: 40 ms is two 20 ms publish ticks, so it is
+/// published at least ~35 ms ahead even at the coordinator's slowest 5 ms
+/// pass. It cuts only a turn whose newest kept frame is 60 ms old, six
+/// 10 ms blocks with none kept; nothing is extended, and the microphone
+/// still closes when the last frame's lease ends.
+const HELD_TURN_LEASE_MARGIN_US: u64 = 40_000;
 /// How long a just-asked lamp keeps the floor from the next voice in a busy
 /// room while its answer has not begun. Answers begin 1.0 to 1.5 s after the
 /// question ends.
@@ -5275,6 +5289,12 @@ thread_local! {
     static TEST_PROLOGUE_STEPS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// And how many it took in all.
     static TEST_PROLOGUE_STEPPED: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// A loop test's slow pass (#4332, Sixth on #5104): the first pass
+    /// whose reply has had audio is held up this many 2 ms scenario steps
+    /// at its end, after its capture drain, its peers read at each.
+    static TEST_PASS_HELD_STEPS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// And how many it was held up.
+    static TEST_PASS_HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// A loop test's `LAMP_UNCLEAR_HUM=on` (#1421), as `TEST_FULL_LOOK`.
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_PRIVACY_GAP_RIDE=on` (#2602), as `TEST_FULL_LOOK`.
@@ -5878,6 +5898,10 @@ fn conversation_with_gate_inner(
     let mut kept_through_gap = false;
     // This gap has already cancelled what it cut: once per gap.
     let mut gap_cancelled = false;
+    // After the last capture drain, a held turn's lease ended within
+    // `HELD_TURN_LEASE_MARGIN_US`, the frames there drained (#4332). Only a
+    // drain keeps a frame, so it holds until the next drain.
+    let mut lease_end_drained = false;
     let mut last_publish = 0;
     let mut last_health = 0;
     let mut last_hand_health = 0;
@@ -7297,10 +7321,31 @@ fn conversation_with_gate_inner(
         // A gap is a turn boundary, whether someone was speaking or the lamp
         // was answering: what it cut is abandoned, never carried over it
         // (#784). Once per gap: the explicit close, or the lease lapsing.
+        // A held turn whose lease ends within the margin, no newer frame
+        // kept, is cut here as a gap before that lease lapses (#4332): the
+        // workers then hold its revocation, not a lapsed grant. As the
+        // lapse's cut, only once a frame has been kept: only a kept frame
+        // sets the input leases a turn's lease is clipped to. It was found
+        // ending after the last capture drain (`lease_end_drained`), so a
+        // pass held up while frames kept coming cuts nothing: this pass's
+        // drain keeps them (Sixth on #5104).
+        let lease_ending = lease_end_drained
+            && last_capture.is_some()
+            && !gap_cancelled
+            && held_turn_lease_ending(owner.snapshot(now())?);
+        if lease_ending {
+            capture_gap.cut = true;
+            eprintln!(
+                "lamp-voice: no capture frame kept for {} ms while a turn is held: it is cut {} ms before its lease lapses, as a gap cuts it",
+                last_capture.map_or(0, |at| monotonic_us().saturating_sub(at) / 1_000),
+                HELD_TURN_LEASE_MARGIN_US / 1_000,
+            );
+        }
         let gap_cut = (std::mem::take(&mut gap_cut_utterance)
             || last_capture.is_some_and(|at| {
                 (INPUT_LEASE_US..CAPTURE_GAP_US).contains(&monotonic_us().saturating_sub(at))
-            }))
+            })
+            || lease_ending)
             && !gap_cancelled;
         let cut_question = !admission.idle_for_reminder();
         let muted = observation.as_ref().is_some_and(|seen| seen.muted);
@@ -10741,6 +10786,11 @@ fn conversation_with_gate_inner(
                 }
             }
         }
+        // Read on the frames just drained (#4332): the next pass cuts the
+        // turn only if no newer one is kept by then.
+        lease_end_drained = last_capture.is_some()
+            && !gap_cancelled
+            && held_turn_lease_ending(owner.snapshot(now())?);
         if retention_expired(last_capture, frames_from_us, monotonic_us()) {
             return Err(io::Error::other("microphone retention heartbeat expired").into());
         }
@@ -12690,6 +12740,17 @@ fn conversation_with_gate_inner(
             last_hand_health = clock;
         }
         flush_cues(trace, cues);
+        // A test's slow pass (#4332): held up after its capture drain, the
+        // frames meanwhile come on time and wait for the next pass.
+        #[cfg(test)]
+        if TEST_PASS_HELD_STEPS.with(std::cell::Cell::get) > 0
+            && reply.as_ref().is_some_and(|current| current.had_audio)
+        {
+            for _ in 0..TEST_PASS_HELD_STEPS.with(|steps| steps.replace(0)) {
+                crate::scenario_clock::step(crate::scenario_clock::Phase::Run)?;
+                TEST_PASS_HELD.with(|held| held.set(held.get() + 1));
+            }
+        }
         #[cfg(test)]
         if crate::scenario_clock::is_active() {
             continue;
@@ -15420,6 +15481,19 @@ fn drain_capture_control(
     Ok(closed)
 }
 
+/// Whether `snapshot` holds a turn whose lease, clipped to the input
+/// leases, ends within [`HELD_TURN_LEASE_MARGIN_US`] of its issue (#4332).
+/// A held turn's lease has not lapsed: the controller revokes the turn
+/// when an input lease does.
+fn held_turn_lease_ending(snapshot: Snapshot) -> bool {
+    snapshot.owner().is_some()
+        && snapshot.expires_at().as_micros()
+            <= snapshot
+                .issued_at()
+                .as_micros()
+                .saturating_add(HELD_TURN_LEASE_MARGIN_US)
+}
+
 /// Frames dropped since the capture last delivered one on time.
 #[derive(Default)]
 struct CaptureGap {
@@ -15427,6 +15501,10 @@ struct CaptureGap {
     /// The worker closed the microphone: the next frame on time, of a new
     /// epoch that counts from 1 again, ends a gap however short it was.
     closed: bool,
+    /// A held turn was cut before its lease lapsed (#4332): the next frame
+    /// on time ends that gap however short it was, so the next gap cuts
+    /// again.
+    cut: bool,
 }
 
 /// A capture gap that has just ended, for one journal line.
@@ -15453,10 +15531,11 @@ impl CaptureGap {
     /// gap has just ended.
     fn ended(&mut self, previous: Option<u64>, read_at: u64) -> Option<EndedGap> {
         let stalled_us = previous.map_or(0, |at| read_at.saturating_sub(at));
-        if stalled_us < INPUT_LEASE_US && self.dropped == 0 && !self.closed {
+        if stalled_us < INPUT_LEASE_US && self.dropped == 0 && !self.closed && !self.cut {
             return None;
         }
         self.closed = false;
+        self.cut = false;
         let dropped = std::mem::take(&mut self.dropped);
         Some(EndedGap {
             stalled_us,
@@ -15780,6 +15859,42 @@ fn handle_playback_gap(
 
 #[cfg(test)]
 mod tests {
+    /// #4332: only a held turn whose lease, clipped to the last kept
+    /// frame's, ends within the margin is cut ahead of it; with no turn the
+    /// lease is the full 250 ms and nothing is cut.
+    #[test]
+    fn a_held_turn_is_cut_only_once_its_lease_ends_within_the_margin() {
+        use lamp_turn_owner::{
+            AdmissionState, AdmittedInput, CaptureState, Controller, MonoTime, Permission,
+        };
+        let at = MonoTime::from_micros;
+        let mut owner = Controller::new(super::new_boot().unwrap(), at(1_000_000));
+        owner
+            .set_microphone_permission(at(1_000_000), Permission::Allowed)
+            .unwrap();
+        // One frame kept, read at 1.0 s: its leases end at 1.1 s.
+        let until = at(1_000_000 + super::INPUT_LEASE_US);
+        owner
+            .set_capture(at(1_000_000), CaptureState::RetainingUntil(until))
+            .unwrap();
+        owner
+            .set_admission(at(1_000_000), AdmissionState::OpenUntil(until))
+            .unwrap();
+        let idle = owner.snapshot(at(1_000_000)).unwrap();
+        assert!(!super::held_turn_lease_ending(idle), "no turn held");
+        owner.admit(at(1_000_000), AdmittedInput::NewTurn).unwrap();
+        let fresh = owner.snapshot(at(1_059_000)).unwrap();
+        assert_eq!(fresh.expires_at(), until, "clipped to the frame's lease");
+        assert!(!super::held_turn_lease_ending(fresh), "41 ms left");
+        let ending = owner.snapshot(at(1_060_000)).unwrap();
+        assert!(ending.owner().is_some());
+        assert!(super::held_turn_lease_ending(ending), "40 ms left");
+        // At the expiry the controller has revoked the turn itself.
+        let lapsed = owner.snapshot(until).unwrap();
+        assert!(lapsed.owner().is_none());
+        assert!(!super::held_turn_lease_ending(lapsed));
+    }
+
     /// The soft start's lead is read from when its blocks were read, held
     /// to what they hold: 30 blocks read 10 ms apart are 300 ms, and the
     /// same blocks read late after a stall, bunched at the end, are still
