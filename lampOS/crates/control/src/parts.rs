@@ -776,6 +776,10 @@ impl Lamp {
 /// The voice's why for a computer's turn ended by the person beginning to
 /// talk with the lamp in its window (`lamp_voice::control_turn::PERSON_TALKING`).
 const PERSON_TALKING: &str = "the person is talking";
+/// The voice's whys a turn's `done` gives as `cut_short`, not `dropped`:
+/// the person began talking in its window, or its own computer's
+/// `turn.end` cut its answer (`lamp_voice::control_turn::CUT_BY_ITS_COMPUTER`).
+const CUT_SHORT_WHYS: [&str; 2] = [PERSON_TALKING, "ended by this computer"];
 
 /// The say socket's outcome, past the `begun` event, in the protocol's
 /// words (`done.how`: `finished`, `cut_short`, `dropped`; the Reviewer-lead's
@@ -807,8 +811,13 @@ fn outcome_with(
         // A computer's turn ended because the person began talking with
         // the lamp in its window: the person wins, and the turn was cut
         // short, not dropped.
-        if word == "dropped" && said["why"].as_str() == Some(PERSON_TALKING) {
-            return ("cut_short", Some(PERSON_TALKING.to_owned()));
+        // So is one whose answer its own computer cut with `turn.end`.
+        if let Some(why) = said["why"]
+            .as_str()
+            .filter(|why| CUT_SHORT_WHYS.contains(why))
+            && word == "dropped"
+        {
+            return ("cut_short", Some(why.to_owned()));
         }
         let why = match said["why"].as_str() {
             Some(why) => format!("{word}: {why}"),
@@ -1603,6 +1612,12 @@ mod tests {
                 r#"{"outcome":"dropped","why":"the person is talking"}"#,
                 "cut_short",
                 Some("the person is talking"),
+            ),
+            // Its answer cut by its own computer's turn.end.
+            (
+                r#"{"outcome":"dropped","why":"ended by this computer"}"#,
+                "cut_short",
+                Some("ended by this computer"),
             ),
         ] {
             assert_eq!(

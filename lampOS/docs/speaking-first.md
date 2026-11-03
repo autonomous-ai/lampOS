@@ -616,7 +616,10 @@ not the voice's. Then:
   unused, `"not answered"` when the line was not answered,
   `"the person is talking"` when the lamp's answer to a line of the
   person's own (begun before the window) begins to sound while the window
-  is open (the person wins; the door says it `cut_short`), or the voice's
+  is open (the person wins; the door says it `cut_short`), `"ended by the
+  computer"` or, its answer already sounding, `"ended by this computer"`
+  (`cut_short` at the door) when its own computer's `turn: "end"` ends it,
+  or the voice's
   why (`the lamp is muted`, `hand_stop`, `spoken_stop`, …).
 - The journal says one line as a turn opens: the skill and the turn's id,
   and the turn it continues if any, never a word heard.
