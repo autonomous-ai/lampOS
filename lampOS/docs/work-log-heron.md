@@ -225,3 +225,5 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   section pushed as `cc63be548`, re-mark asked. Friday: DeepSeek's 503
   "too busy" stopped their bench too; the clean after2 run waits for the
   service, retry from 17:40.
+- 17:22: Reviewer-lead re-marked READ-OK on #5091 `cc63be548`. 17:25:
+  NEXT TRAIN posted for it.
