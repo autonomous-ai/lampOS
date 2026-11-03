@@ -1815,3 +1815,60 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
         }
     }
 }
+
+/// One line by A, their face `f1` seen speaking it, with
+/// [`Engine::keeping_sight_for_services`] as `on`: what is kept of who said
+/// it, read after the turn.
+async fn services_sight(on: bool, request: u64) -> Option<crate::speaking_faces::LineSeen> {
+    let what = if on { "services-on" } else { "services-off" };
+    let eyes = Arc::new(SpeakingFaces::default());
+    let path = known_file(what, &eyes);
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, add lunch to my calendar.".to_owned())].into()),
+        chats: Mutex::new([vec![text("Done."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let cache = Arc::new(FaceCache::default());
+    let runner: ScopedToolRunner = Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) }));
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([43; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|_: &ScopeLease| Told::from("SYSTEM".to_owned()))),
+        )
+        .seeing_who_speaks(eyes.clone(), path.clone())
+        .scoping_by_sight(true)
+        .keeping_sight_for_services(on)
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    let done = Arc::new(AtomicBool::new(false));
+    let feeder = feed(eyes, true, BOOT, done.clone());
+    engine.submit(start(request));
+    engine.submit(audio(request, 1));
+    tokio::time::sleep(Duration::from_millis(40)).await;
+    engine.submit(end(request));
+    turn(&mut engine).await;
+    done.store(true, Ordering::Release);
+    feeder.join().unwrap();
+    clean(&path);
+    crate::speaking_faces::line_seen(request)
+}
+
+/// With `LAMP_SERVICES`, a line A was seen saying is kept as theirs for its
+/// services write, without `LAMP_MEMORY_ROOM_SPEAKER` (lamp-9adf, 3 Nov:
+/// every calendar write refused as not seen said); without it, nothing.
+#[tokio::test]
+async fn a_line_seen_said_by_its_person_is_kept_for_a_services_write() {
+    let kept = services_sight(true, 5_126_301).await;
+    assert_eq!(
+        crate::remember::speaker_of(kept.as_ref()),
+        Some(crate::remember::person_id("A"))
+    );
+    assert!(services_sight(false, 5_126_302).await.is_none());
+}
