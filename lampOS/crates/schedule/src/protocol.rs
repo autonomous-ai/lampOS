@@ -68,7 +68,10 @@ pub enum Request {
     /// `bad_request`, and the caller lists without it.
     ///
     /// With `asker`, only the items that line may see ([`Asker::may_see`]),
-    /// and `not_yet_due`, how many of those are set and not yet due.
+    /// and `not_yet_due`, how many of those are set and not yet due, and
+    /// `hidden`, how many it may not see (`pending_only`'s filter kept): for
+    /// the room's line (no `person`) only, a count and nothing else of them;
+    /// 0 on a person's line.
     ///
     /// Its first page (`after_id` 0, not `pending_only`) also has `said`:
     /// the one-time reminders and timers already said that the line may

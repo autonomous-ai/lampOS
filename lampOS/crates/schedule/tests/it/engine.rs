@@ -1404,6 +1404,48 @@ fn each_line_lists_only_the_reminders_it_set_and_every_line_hears_the_rooms() {
     assert_eq!(page["not_yet_due"], 2);
 }
 
+/// The memory owner's option 2 (4 Nov, 29e7's "only call your dad"): the
+/// room's line is told how many it may not see, a count and nothing of them;
+/// a person's line counts none.
+#[test]
+fn the_rooms_line_is_told_only_how_many_belong_to_someone() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    set_by(&mut e, &at, "Call your mom", Some(ANN));
+    set_by(&mut e, &at, "Call your dad", None);
+    let page = |e: &mut Engine<Disk>, asker: Asker| {
+        e.answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+                asker: Some(asker),
+            },
+            &at,
+        )
+        .unwrap()
+    };
+    let room = page(&mut e, asker(None, false));
+    assert_eq!(room["items"].as_array().unwrap().len(), 1);
+    assert_eq!(room["hidden"], 1);
+    let text = room.to_string();
+    assert!(!text.contains("mom") && !text.contains(ANN), "{text}");
+    assert_eq!(page(&mut e, asker(Some(ANN), false))["hidden"], 0);
+    // No asker, the app's: every item, and no count.
+    let all = e
+        .answer(
+            Request::ListSet {
+                after_id: 0,
+                limit: 8,
+                pending_only: false,
+                asker: None,
+            },
+            &at,
+        )
+        .unwrap();
+    assert!(all.get("hidden").is_none());
+}
+
 /// The first builder on #4710 (3 Nov 10:09), from lamp-9adf: "remind me to
 /// drink water every day at five" set with nobody known in view, then "stop
 /// reminding me to drink water" a few seconds later found nothing. A

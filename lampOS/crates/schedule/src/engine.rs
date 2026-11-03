@@ -1093,6 +1093,21 @@ impl<P: Persistence> Engine<P> {
                             .filter(|i| i.pending.is_none() && visible(Some(asker), i))
                             .count()
                     );
+                    // How many the room's line may not see, a person's own
+                    // (the memory owner's option 2, 4 Nov, 29e7): a count,
+                    // never their text, time or whose, so its list is never
+                    // told as the whole one. A person's line counts none.
+                    body["hidden"] = json!(if asker.person.is_none() {
+                        self.state
+                            .items
+                            .iter()
+                            .filter(|i| {
+                                (!pending_only || i.pending.is_some()) && !visible(Some(asker), i)
+                            })
+                            .count()
+                    } else {
+                        0
+                    });
                 }
                 if with_set {
                     // The time it was read at, beside each item's

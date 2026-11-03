@@ -157,8 +157,14 @@ is what is due now and not yet said. Such a list also reads one `Status`,
 within the same deadline, and when items are set and not yet due it carries
 `not_yet_due` (how many, in all) and a `next` telling the model to list again
 without it before saying none are set (#1595; [schedule.md](schedule.md)).
-Every `pending_only` page keeps room for the two. No label is silently cut
-to fit a page.
+Every `pending_only` page keeps room for the two. With
+`LAMP_REMINDERS_HIDDEN_COUNT=on`, a list asked by the room's line (no
+person) that left out reminders or timers as someone's own carries `hidden`
+(how many, a count only) and `hidden_note`
+(`lamp_actions::schedule::HIDDEN`): never call the list complete or say none
+are set, never guess what they are, and say that many more belong to
+someone ([schedule.md](schedule.md)); such a page keeps room for the two.
+No label is silently cut to fit a page.
 
 Each accepted model call gets one bounded adapter attempt. The 1,250 ms
 absolute deadline covers all status/get/mutation hops, nonblocking socket
