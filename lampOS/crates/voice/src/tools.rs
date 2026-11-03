@@ -5812,18 +5812,17 @@ mod tests {
             );
             assert_eq!(told["error"], crate::services::NOT_HEARD, "{name}");
         }
-        // A send with nothing prepared: cancelled.
+        // On the Live route (no voice judge), no write is prepared or sent.
         let send = scoped(crate::memory_scope::ScopeSnapshot::of("Ann"), 4_710_004);
-        let (_, (told, _)) = run_call_scoped(
-            &services,
-            &call(
-                crate::services::WRITE,
-                json!({"service":"gmail","send_id":"s1","said":"send"}),
-            ),
-            4_710_004,
-            true,
-            &send.lease(),
+        let write = call(
+            crate::services::WRITE,
+            json!({"service":"gmail","send_id":"s1","said":"send"}),
         );
+        let (_, (told, _)) = run_call_scoped(&services, &write, 4_710_004, true, &send.lease());
+        assert_eq!(told["error"], crate::services::NO_SEND_HERE);
+        // On the second route, a send with nothing prepared: cancelled.
+        crate::services::judging_voices(std::sync::Arc::new(|_| Some(0.9)));
+        let (_, (told, _)) = run_call_scoped(&services, &write, 4_710_004, true, &send.lease());
         assert_eq!(told["error"], crate::services::CANCELLED);
         assert_eq!(
             asked.lock().unwrap().len(),
