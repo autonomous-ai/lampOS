@@ -66,7 +66,9 @@ vậy một câu chỉ được tính là của chủ đèn cho một lần ghi 
 `LAMP_EYES_SPEAKING=on`; khi một trong hai tắt, hay chủ đèn ở ngoài khung
 hình, câu đó không bao giờ được tính. Kết quả đọc đó được giữ cho câu ngay khi
 câu được nhận vào phạm vi của chủ đèn, trước khi cuộc trò chuyện bắt đầu, mỗi
-khi `LAMP_SERVICES=on` (`Engine::keeping_sight_for_services`), bất kể
+khi `LAMP_SERVICES=on` (`Engine::keeping_sight_for_services`; worker của
+tuyến thứ hai biết điều đó qua thư mục dịch vụ nó được giao, `--services-dir`,
+không qua môi trường của chính nó), bất kể
 `LAMP_MEMORY_ROOM_SPEAKER` ra sao. Ngay cả khi đó, một lần đọc chỉ được nói
 đầy đủ trên tuyến thứ hai, khi mắt đếm
 được đúng một khuôn mặt trong tầm nhìn (`known_faces::most_faces_lately`,
