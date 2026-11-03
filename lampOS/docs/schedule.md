@@ -813,6 +813,23 @@ dropping the field (its items then are no one's: the room's, heard on every line
   room's, never a person's. Its `not_yet_due` is the line's
   own count, told beside a `pending_only` list in place of `Status`'
   whole-store one.
+- **The room's line is told how many it may not see** (the memory owner's
+  option 2, 4 Nov). On 29e7 on 3 Nov, "what reminders do I have?" read as
+  the room's got "only call your dad", the person's own "call your mom" left
+  out, and the person heard memory forget it. `list_set` with an `asker`
+  also has `hidden`: for a line with no `person`, how many items it may not
+  see (with `pending_only`, of those due); 0 on a person's line. A count
+  only, never their text, time or whose. With `LAMP_REMINDERS_HIDDEN_COUNT=on`
+  (the product's `lamp-actions.service`), `list_reminders` passes a count
+  above 0 on as `hidden`, with `hidden_note` (`lamp_actions::schedule::HIDDEN`):
+  never call the list all that is set, or say none are, never guess what
+  they are, and say that many more belong to someone, to ask again where
+  their face can be seen. The empty list too: none of the room's, so many
+  someone's. Off, the tool's reply is the one before, byte for byte. Tests:
+  `the_rooms_line_is_told_only_how_many_belong_to_someone`
+  (`tests/it/engine.rs`) and
+  `the_rooms_list_tells_only_how_many_belong_to_someone_with_the_switch_on`
+  (`crates/actions/tests/it/schedule.rs`).
 - **A timer set with nobody sure is the room's** (option 1 on #4656's
   after-merge P2), as every item set by no one now is (below). Every line
   hears, cancels and snoozes a timer set as no one's, of any length; the

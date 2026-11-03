@@ -27,7 +27,21 @@ pub const EVERY_SWITCH: &str = "LAMP_SCHEDULE_EVERY";
 pub fn every_from_environment() -> bool {
     std::env::var_os(EVERY_SWITCH).as_deref() == Some(OsStr::new("on"))
 }
+/// `on`: a list asked by the room's line (no person) also tells how many
+/// reminders and timers it left out as someone's own, a count only, with
+/// [`HIDDEN`] (the memory owner's option 2, 4 Nov, 29e7's "only call your
+/// dad"). Off, the list is exactly what it was.
+pub const HIDDEN_SWITCH: &str = "LAMP_REMINDERS_HIDDEN_COUNT";
+
+/// Whether [`HIDDEN_SWITCH`] is `on` in this process's environment.
+pub fn hidden_from_environment() -> bool {
+    std::env::var_os(HIDDEN_SWITCH).as_deref() == Some(OsStr::new("on"))
+}
 pub const DEADLINE: Duration = Duration::from_millis(1250);
+/// Told beside a list that left out `hidden` reminders or timers as
+/// someone's own ([`HIDDEN_SWITCH`]): never told as the whole list, and
+/// nothing of them guessed.
+pub const HIDDEN: &str = "hidden: how many more reminders or timers are set that belong to someone, left out of this list. Never call this list all that is set, or say none are set, and never guess what they are, when, or whose. Say there are that many more that belong to someone, and if they are theirs, to ask again where you can see their face.";
 /// Told beside a list asked `pending_only` that left out items set but not
 /// yet due (#1595).
 pub const NOT_YET_DUE: &str = "Timers or reminders are set that are not due yet, so they are not in this list. List again without pending_only before saying none are set, or to find one to cancel.";
@@ -171,6 +185,8 @@ pub struct Adapter {
     deadline: Duration,
     /// [`EVERY_SWITCH`]: `repeat_reminder` takes `interval`.
     every: bool,
+    /// [`HIDDEN_SWITCH`]: the room's list tells how many it left out.
+    hidden: bool,
 }
 
 impl Adapter {
@@ -180,12 +196,19 @@ impl Adapter {
             socket,
             deadline: DEADLINE,
             every: every_from_environment(),
+            hidden: hidden_from_environment(),
         })
     }
 
     /// The same adapter with [`EVERY_SWITCH`] taken as `every`, for a test.
     pub fn with_every(mut self, every: bool) -> Self {
         self.every = every;
+        self
+    }
+
+    /// The same adapter with [`HIDDEN_SWITCH`] taken as `hidden`, for a test.
+    pub fn with_hidden(mut self, hidden: bool) -> Self {
+        self.hidden = hidden;
         self
     }
 
@@ -381,7 +404,16 @@ impl Adapter {
                     Err(refusal) => return Err(refused(&refusal, false)),
                 }
             };
-            let mut listed = page(&reply, after_id, pending_only, set_times)?;
+            // How many the room's line left out as someone's own, with
+            // the switch on: a Schedule without the count tells none.
+            let hidden = reply["hidden"]
+                .as_u64()
+                .filter(|_| self.hidden && asker.is_some());
+            let mut listed = page(&reply, after_id, pending_only, set_times, hidden.is_some())?;
+            if let Some(hidden) = hidden.filter(|hidden| *hidden > 0) {
+                listed["hidden"] = json!(hidden);
+                listed["hidden_note"] = json!(HIDDEN);
+            }
             // A line's own count of what is set and not yet due, from the
             // same reply, never the whole store's (#4527's P2).
             // An older Schedule's reply has none: the owner's line, the only
@@ -1137,11 +1169,25 @@ fn item(value: &Value) -> Result<Item, Failure> {
     }
     Ok(item)
 }
+/// Room kept in a probe for what is added after the page: the count of what
+/// is not yet due (#1595), and of what is someone's own ([`HIDDEN`]).
+fn reserve(probe: &mut Value, pending_only: bool, hidden: bool) {
+    if pending_only {
+        probe["not_yet_due"] = json!(u64::MAX);
+        probe["next"] = json!(NOT_YET_DUE);
+    }
+    if hidden {
+        probe["hidden"] = json!(u64::MAX);
+        probe["hidden_note"] = json!(HIDDEN);
+    }
+}
+
 fn page(
     reply: &Value,
     after_id: u64,
     pending_only: bool,
     set_times: bool,
+    hidden: bool,
 ) -> Result<Value, Failure> {
     let values = reply["items"]
         .as_array()
@@ -1175,11 +1221,7 @@ fn page(
     for value in &checked {
         items.push(value.clone());
         let mut probe = json!({"items":items,"next_after_id":u64::MAX,"pending_only":pending_only,"complete":false});
-        if pending_only {
-            // Room kept for the count of what is not yet due (#1595).
-            probe["not_yet_due"] = json!(u64::MAX);
-            probe["next"] = json!(NOT_YET_DUE);
-        }
+        reserve(&mut probe, pending_only, hidden);
         if probe.to_string().len() > MAX_RESULT_BYTES {
             items.pop();
             break;
@@ -1195,7 +1237,7 @@ fn page(
     };
     let mut listed = json!({"items":items,"next_after_id":next,"pending_only":pending_only,"complete":next.is_none()});
     if set_times && let Some(said) = reply.get("said") {
-        said_recently(&mut listed, said, pending_only)?;
+        said_recently(&mut listed, said, pending_only, hidden)?;
     }
     Ok(listed)
 }
@@ -1204,7 +1246,12 @@ fn page(
 /// model is told them: newest first, each with when it was due and said,
 /// as a day and a local `HH:MM`, whether on time, and whether it waits for
 /// an answer; as many as fit, with `said_complete` false when some don't.
-fn said_recently(listed: &mut Value, said: &Value, pending_only: bool) -> Result<(), Failure> {
+fn said_recently(
+    listed: &mut Value,
+    said: &Value,
+    pending_only: bool,
+    hidden: bool,
+) -> Result<(), Failure> {
     let said = said
         .as_array()
         .filter(|said| said.len() <= lamp_schedule::engine::SAID_KEPT)
@@ -1249,10 +1296,7 @@ fn said_recently(listed: &mut Value, said: &Value, pending_only: bool) -> Result
         let mut probe = listed.clone();
         probe["said_recently"] = json!(kept);
         probe["said_complete"] = json!(false);
-        if pending_only {
-            probe["not_yet_due"] = json!(u64::MAX);
-            probe["next"] = json!(NOT_YET_DUE);
-        }
+        reserve(&mut probe, pending_only, hidden);
         if probe.to_string().len() > MAX_RESULT_BYTES {
             kept.pop();
             break;
