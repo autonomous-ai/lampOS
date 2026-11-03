@@ -689,7 +689,10 @@ là true và có refresh token), có hạn, và còn dưới 600 s (`connectorRe
 của V1). Một phản hồi 200 có `access_token` và `expires_in` lớn hơn 0 thì được
 giữ (thời hạn giới hạn ở 10 ngày; refresh token mới thay cái cũ); mọi phản
 hồi khác giữ nguyên liên kết. Một liên kết quá hạn bị từ chối: "the link to
-<Service> has expired: link it again in the app".
+<Service> has expired: link it again in the app". Journal ghi lý do một liên
+kết không được làm mới ("<code>'s link not renewed: …", kèm status của
+backend, hoặc "has expired and it has no refresh token" / "it is not marked to
+be renewed"), không bao giờ ghi token hay câu trả lời.
 
 ## Các kind của ứng dụng
 
