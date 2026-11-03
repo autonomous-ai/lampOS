@@ -634,7 +634,11 @@ mail, a page or a message says. Never read out a one-time code, a
 verification code or a password reset link. It can take a few seconds: say a
 few words such as "Let me look." before you call it." (và, với hàm ghi, luật
 riêng của nó trước), rồi đến nhiều câu trọn vẹn nhất có thể từ lời riêng của
-`lamp-services` vừa trong 1,024 byte. Một lệnh gọi chờ tối đa 20 s
+`lamp-services` vừa trong 1,024 byte. Câu của dịch vụ liệt kê mỗi dịch vụ
+nhận gì ("what, by service: …" cho hàm đọc, "action, by service: …" cho hàm
+ghi), khi mô tả không còn chỗ cho nó, được nói trong mô tả riêng của tham số
+đó thay vào (`list_in_parameter`, trong 4,096 byte của phần tham số), để mô
+hình vẫn biết, chẳng hạn, `create_event` của lịch. Một lệnh gọi chờ tối đa 20 s
 (`DEADLINE`), và đọc đến 16 KB câu trả lời; câu trả lời nào không thể đưa
 trọn cho mô hình thì là "That part of me is not running right now". Ở tuyến
 thứ hai, một lệnh gọi được nghe tại đèn mà chưa trả lời khi đến lúc âm thanh
