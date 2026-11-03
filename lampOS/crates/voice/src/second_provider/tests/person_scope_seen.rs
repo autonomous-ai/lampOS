@@ -305,18 +305,26 @@ async fn lines_past_silent(
     let calls: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
     let leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
     let (seen_calls, seen_leases) = (calls.clone(), leases.clone());
-    let runner: ScopedToolRunner = Arc::new(move |_, _, name: String, _, lease: ScopeLease| {
-        // Whose scope the call runs in first, as the memory's route picks
-        // it: a `remember` or single-item `forget` on a one-face line is
-        // its person's (`ScopeLease::reached_by_one_face`, the route's own
-        // decision), all else the lease's scope.
-        seen_calls.lock().unwrap().push(
+    let runner: ScopedToolRunner =
+        Arc::new(move |_, _, name: String, _, lease: ScopeLease| {
+            // Whose scope the call runs in first, as the memory's route picks
+            // it: a `remember` or single-item `forget` on a one-face line is
+            // its person's (`ScopeLease::reached_by_one_face`, the route's own
+            // decision), all else the lease's scope. A `list_reminders` is
+            // whose reminders the Schedule is asked for, as the route's caller
+            // tells it with `LAMP_ONE_FACE_REMINDERS` on.
+            seen_calls.lock().unwrap().push(if name == "list_reminders" {
+            crate::tools::schedule_whose::caller_among(Some(&lease), &name, &[], true)["asker"]
+                ["person"]
+                .as_str()
+                .map(str::to_owned)
+        } else {
             lease
                 .reached_by_one_face(&name)
-                .or_else(|| lease.scope().unwrap().person().map(str::to_owned)),
-        );
-        Box::pin(async { json!({"ok":true}) })
-    });
+                .or_else(|| lease.scope().unwrap().person().map(str::to_owned))
+        });
+            Box::pin(async { json!({"ok":true}) })
+        });
     // The lease each context was told for: a held line asks memory nothing,
     // so it never reaches `remembering` below.
     let told_leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
@@ -1690,6 +1698,68 @@ async fn a_second_face_an_unknown_face_no_face_or_another_voice_is_as_before() {
     .await;
     assert_eq!(got.lease, Some(a));
     assert!(got.held, "carried, never memory's");
+}
+
+fn list_reminders() -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "l1",
+                "list_reminders",
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![text("Call your mom, tomorrow."), Ok(ChatEvent::Done)],
+    ]
+}
+
+/// lamp-29e7 (3 Nov, `LAMP_ONE_FACE_REMINDERS`): A's face the one face in
+/// every look, never read speaking, no other voice. "What reminders do I
+/// have?" asks the Schedule for A's own (and the room's) while the line is
+/// still told and read as the room's. A second face, a face the eyes don't
+/// know, no face, another voice before it or in it, or the one-face rule
+/// off: the room's, as before.
+#[tokio::test]
+async fn a_one_face_line_asks_for_its_persons_own_reminders_and_nobody_elses() {
+    const ASKED: &str = "Lamp, what reminders do I have?";
+    let a = crate::remember::person_id("A");
+    let got = one_face_line(
+        "one-face-reminders",
+        ASKED,
+        list_reminders(),
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a)], "A's own reminders");
+    assert_eq!(got.lease, None, "told and read as the room's");
+    assert_eq!(got.told, Message::system("for None"), "no A context");
+    for (what, in_view, voice) in [
+        (
+            "reminders-second-face",
+            vec![("f1", false), ("f2", false)],
+            Voice::One,
+        ),
+        ("reminders-unknown-face", vec![("f2", false)], Voice::One),
+        ("reminders-no-face", vec![], Voice::One),
+        (
+            "reminders-voice-before",
+            vec![("f1", false)],
+            Voice::AnotherBefore,
+        ),
+        (
+            "reminders-voice-in-it",
+            vec![("f1", false)],
+            Voice::AnotherInIt,
+        ),
+        ("reminders-off", vec![("f1", false)], Voice::Off),
+    ] {
+        let got = one_face_line(what, ASKED, list_reminders(), in_view, None, voice).await;
+        assert_eq!(got.calls, [None], "{what}: the room's reminders only");
+        assert_eq!(got.lease, None, "{what}");
+    }
 }
 
 fn forget_coffee() -> Vec<Vec<net::Result<ChatEvent>>> {

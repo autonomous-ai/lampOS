@@ -4596,6 +4596,22 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   prepares (Second's P2 on #3437). Cost: the owner's own lines lose the
   early start too, even when their face is seen speaking (reviewer-three's
   P3 on #3437).
+- **A one-face line hears its person's own reminders**
+  (`LAMP_ONE_FACE_REMINDERS=on`, on in the product, the memory owner's call
+  on 4 Nov; with `LAMP_PERSON_SCOPE_ONE_FACE`). On a line whose keep is a
+  known person's by the one-face rule (`ScopeLease::kept_by_one_face`: their
+  face the one face in view, none seen speaking it, no other voice heard, or
+  named late on the same rule), `list_reminders`, `cancel_reminder` and
+  `snooze_reminder` ask the Schedule as that person
+  (`tools::schedule_whose::caller`), so they hear and change their own
+  reminders and the room's, never another person's; memory's reads and
+  every set call's asker stay the room's. On lamp-29e7 on 3 Nov the person's
+  face was alone in 17 of 17 looks, read speaking in 0, and "What reminders
+  do I have?" left out their own. A second face, an unknown face, another
+  voice, a line narrowed after, or either switch off: the room's, as before.
+  Known risk, accepted by the memory owner on 4 Nov: a voice not seen saying
+  it, with the person's face alone in view, hears their reminders and may
+  cancel or snooze them ([schedule.md](schedule.md), [switches.md](switches.md)).
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted

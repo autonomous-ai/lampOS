@@ -559,6 +559,21 @@ nhiều nhất tám điều, và không quên gì khi có nhiều hơn), không 
 (không gì được đọc lại cho giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
 hình có thể chứa lời người khác nói ngoài khung hình.
 
+**Lời nhắc của họ trên câu như vậy** (`LAMP_ONE_FACE_REMINDERS=on`, bật trong
+bản sản phẩm, quyết định của người phụ trách ký ức ngày 4/11): việc ghi nhớ
+của câu cũng quyết định việc đọc lời nhắc. `list_reminders`, `cancel_reminder`
+và `snooze_reminder` hỏi Schedule với tư cách người mà việc ghi nhớ thuộc về
+(`ScopeLease::kept_by_one_face`, `tools::schedule_whose`), nên họ nghe được lời
+nhắc của chính mình và của căn phòng (`Asker::may_see`), không bao giờ của người
+khác. Trên lamp-29e7 ngày 3/11, mặt người ấy là mặt duy nhất trong 17/17 lần
+nhìn, đọc là đang nói 0 lần, và «What reminders do I have?» bỏ sót lời nhắc của
+chính họ. Không gì khác được mở rộng: `recall`, gợi ý, ghi chú và ngữ cảnh vẫn
+là của căn phòng như trên; có mặt thứ hai, mặt lạ, giọng khác, bị thu hẹp sau
+đó, hoặc tắt một trong hai công tắc thì câu vẫn là của căn phòng. Rủi ro đã
+biết, được người phụ trách ký ức chấp nhận ngày 4/11: một giọng không được thấy
+nói, khi chỉ có mặt người ấy trong khung hình, nghe được lời nhắc của họ và có
+thể huỷ hoặc hoãn chúng.
+
 ## Đầu dò của bộ đo (#4748)
 
 Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của
