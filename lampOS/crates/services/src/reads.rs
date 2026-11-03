@@ -536,14 +536,43 @@ pub fn about(name: &str) -> String {
     )
 }
 
+/// Every text in `value`, its keys aside, one per line: what a security
+/// check reads of an item.
+fn texts_of(value: &Value, out: &mut String) {
+    match value {
+        Value::String(text) => {
+            out.push_str(text);
+            out.push('\n');
+        }
+        Value::Array(items) => items.iter().for_each(|item| texts_of(item, out)),
+        Value::Object(object) => object.values().for_each(|item| texts_of(item, out)),
+        _ => {}
+    }
+}
+
+/// `item`, or [`mail::SECURITY_LEFT_OUT`] in its place when any text in it
+/// is a security one ([`mail::is_security_mail`]): a one-time code, a
+/// sign-in link or a password reset in a chat message, a page, a file's
+/// name or an event is never quoted, whatever the service.
+fn unless_security(item: Value) -> Value {
+    let mut said = String::new();
+    texts_of(&item, &mut said);
+    if mail::is_security_mail("", "", &said) {
+        json!(mail::SECURITY_LEFT_OUT)
+    } else {
+        item
+    }
+}
+
 /// Items wrapped as quoted data from `name`, as many as fit in
 /// [`RESULT_MOST`] (each made smaller first if need be), and how many were
-/// left out.
+/// left out. Every item is checked for security text first
+/// ([`unless_security`]), for every service.
 pub fn quoted(name: &str, items: Vec<Value>) -> Value {
     let mut result = json!({"source": name, "about": about(name), "quoted": []});
     let total = items.len();
     let mut kept = 0;
-    for item in items {
+    for item in items.into_iter().map(unless_security) {
         for most in [600, 200, 60] {
             let small = compact(&item, most, 0);
             result["quoted"]
@@ -743,6 +772,35 @@ mod tests {
             r#"{"results":[{"id":"b","object":"block","paragraph":{"rich_text":[{"plain_text":"Hi"},{"plain_text":"there"}]}}]}"#,
         );
         assert_eq!(notion[0]["text"], "Hi there");
+    }
+
+    #[test]
+    fn a_code_in_any_services_item_is_left_out() {
+        for (code, body) in [
+            (
+                "slack",
+                r#"{"messages":[{"text":"Your verification code is 482913"}],"items":[{"text":"Your verification code is 482913","user":"U1"},{"text":"Lunch at noon?","user":"U2"}]}"#,
+            ),
+            (
+                "github",
+                r#"[{"title":"Login","body":"Your verification code is 482913"},{"title":"Fix the build","body":"It fails on arm"}]"#,
+            ),
+            (
+                "notion",
+                r#"{"results":[{"id":"p","object":"block","paragraph":{"rich_text":[{"plain_text":"Your verification code is 482913"}]}},{"id":"q","object":"block","paragraph":{"rich_text":[{"plain_text":"Groceries"}]}}]}"#,
+            ),
+        ] {
+            let quoted = quoted("Service", items(code, body));
+            let text = quoted.to_string();
+            assert!(!text.contains("482913"), "{code}: {text}");
+            assert!(text.contains(mail::SECURITY_LEFT_OUT), "{code}: {text}");
+            assert_eq!(quoted["quoted"].as_array().unwrap().len(), 2, "{code}");
+        }
+        let calendar = quoted(
+            "Google Calendar",
+            vec![json!({"summary":"Dentist","description":"Mã xác minh: 482 913"})],
+        );
+        assert_eq!(calendar["quoted"][0], mail::SECURITY_LEFT_OUT);
     }
 
     #[test]

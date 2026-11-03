@@ -78,7 +78,7 @@ pub const SERVICES: &[Service] = &[
     Service {
         code: "google_calendar",
         name: "Google Calendar",
-        hosts: &["googleapis.com"],
+        hosts: &["www.googleapis.com"],
         api: Some("https://www.googleapis.com"),
         graphql: false,
         reads: &[
@@ -92,7 +92,7 @@ pub const SERVICES: &[Service] = &[
     Service {
         code: "google_drive",
         name: "Google Drive",
-        hosts: &["googleapis.com"],
+        hosts: &["www.googleapis.com"],
         api: Some("https://www.googleapis.com"),
         graphql: false,
         reads: &[

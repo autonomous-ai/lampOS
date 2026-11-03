@@ -2404,6 +2404,19 @@ pub fn serve(
             crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
             bus
         });
+    // The connected services are the owner's only, and read in full only
+    // with them alone in view (`crate::services`): the owner and the faces
+    // counted, whatever the by-default name's switch.
+    if std::env::var(crate::services::ENVIRONMENT).ok().as_deref() == Some("on") {
+        if let Some(bus) = files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+        {
+            crate::known_faces::keep_faces_counted(bus);
+        }
+        crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
+    }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
     let told_for = memory_context_carried(

@@ -469,8 +469,9 @@ fn set(fetch: &dyn Fetch, socket: &Path, kind: &str, code: &str) -> Result<Optio
     Ok(Some(json!({"connector": code, "scopes": scopes})))
 }
 
-/// Wipes every token once the lamp is signed out (`LAMP_SIGNED_OUT`,
-/// `crate::signed_out`): the lamp was removed from its account. Tried again
+/// Wipes every token once the lamp is signed out (`crate::signed_out`,
+/// watched whenever `LAMP_SERVICES=on`, whatever `LAMP_SIGNED_OUT` says):
+/// the lamp was removed from its account. Tried again
 /// every [`WIPE_AGAIN`] while it fails and the lamp stays signed out; once
 /// more after each new spell. Never returns while `since` is open.
 pub async fn wipe_when_signed_out(
