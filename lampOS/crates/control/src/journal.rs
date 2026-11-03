@@ -222,6 +222,9 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SoundUpload { .. } => "sound.upload",
         Op::SoundList {} => "sound.list",
         Op::SoundRemove { .. } => "sound.remove",
+        Op::TurnStart { .. } => "turn.start",
+        Op::TurnEnd {} => "turn.end",
+        Op::ListenSet { .. } => "listen.set",
         Op::Stop {} => "stop",
         Op::SkillPush { .. } => "skill.push",
         Op::SkillList {} => "skill.list",
@@ -241,7 +244,11 @@ pub fn went(op: &Op) -> &'static str {
         Op::Light { .. } => "the ring, by light/request",
         Op::Gesture { .. } | Op::Move { .. } => "the body, by mood.sock",
         Op::Express { .. } => "the body, by mood.sock, and the ring, by light/request",
-        Op::Say { .. } | Op::Sound { .. } => "the voice, by say.sock",
+        Op::Say { .. }
+        | Op::Sound { .. }
+        | Op::TurnStart { .. }
+        | Op::TurnEnd {}
+        | Op::ListenSet { .. } => "the voice, by say.sock",
         Op::SoundUpload { .. } | Op::SoundList {} | Op::SoundRemove { .. } => {
             "the lamp's clips folder"
         }
@@ -288,6 +295,11 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
                 ", exact"
             }
         ),
+        // A turn's prompt as a say's text: its length and tag, never its
+        // words.
+        Op::TurnStart { prompt: Some(text) } => said(text),
+        Op::TurnStart { prompt: None } => "no prompt".to_owned(),
+        Op::ListenSet { on } => format!("on {on}"),
         Op::Gesture { name }
         | Op::Play { name }
         | Op::Sound { name }
