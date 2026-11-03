@@ -979,6 +979,19 @@ fn serve(
             Err(error) => eprintln!("lamp-skills: the skills turned off not read: {error}"),
         }
     }
+    // Each run counted by where its skill came from, added to the state
+    // folder's totals at most once a minute, for lamp-cloud's opt-in health
+    // report to read (`lamp_skills::usage`, `docs/cloud.md`).
+    let counting = options.state.as_deref().and_then(|state| {
+        let counting = lamp_skills::usage::Counting::default();
+        match counting.keep_in(state) {
+            Ok(()) => Some(counting),
+            Err(error) => {
+                eprintln!("lamp-skills: skill runs not counted: {error}");
+                None
+            }
+        }
+    });
     if let Some(path) = &options.daily_state {
         match lamp_skills::daily::Journal::open(path) {
             Ok(journal) => engine = engine.with_daily_journal(journal),
@@ -1022,6 +1035,7 @@ fn serve(
         trust_clock: options.trust_clock,
         clock_waiting: Cell::new(false),
         rest_client,
+        runs: RefCell::default(),
         permissions: RefCell::new(HashMap::new()),
         unplug: RefCell::default(),
         looks: RefCell::new(HashMap::new()),
@@ -1220,6 +1234,16 @@ fn serve(
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
+                if let Some(counting) = &counting {
+                    *runner.runs.borrow_mut() = skills
+                        .iter()
+                        .map(|skill| {
+                            let source =
+                                lamp_skills::usage::source_of(skill, &dir.join(&skill.name));
+                            (skill.name.clone(), counting.counter(source))
+                        })
+                        .collect();
+                }
                 let (unplug, said) = lamp_skills::unplug_words(&skills);
                 for line in said.into_iter().chain(lamp_skills::yield_notes(&skills)) {
                     eprintln!("lamp-skills: {line}");
@@ -1646,6 +1670,10 @@ struct Runner {
     /// One diagnostic per missing-trust interval, only for enabled schedules.
     clock_waiting: Cell<bool>,
     rest_client: Option<lamp_skills::routine::Client>,
+    /// By skill, the counter its runs are counted on, as of the last load
+    /// (`lamp_skills::usage`): an atomic, so a run takes no lock and writes
+    /// no file. Empty without `--state-dir`: nothing is counted.
+    runs: RefCell<HashMap<String, Arc<std::sync::atomic::AtomicU64>>>,
     /// By skill, what each loaded skill may use, as of the last load: a
     /// skill not loaded may use nothing.
     permissions: RefCell<HashMap<String, Permissions>>,
@@ -2326,6 +2354,11 @@ fn start(
             },
         );
         return made_rx;
+    }
+    // Counted once it is under way, for the opt-in health report's skill
+    // runs (`lamp_skills::usage`): one atomic add, nothing waited on.
+    if let Some(runs) = runner.runs.borrow().get(&skill) {
+        runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
     // An add-on's run proposes, and nothing else: written for the judge at
     // once, on this thread, as it holds no output to wait on.
@@ -5059,6 +5092,7 @@ mod tests {
             trust_clock: false,
             clock_waiting: Cell::new(false),
             rest_client: None,
+            runs: RefCell::default(),
             permissions: RefCell::new(HashMap::from([(
                 "prepare-unplug".to_owned(),
                 unplug_grants(),
@@ -5409,6 +5443,7 @@ mod tests {
                     trust_clock: false,
                     clock_waiting: Cell::new(false),
                     rest_client: Some(rest_client),
+                    runs: RefCell::default(),
                     permissions: RefCell::new(HashMap::from([
                         (
                             "test".into(),
@@ -5487,6 +5522,7 @@ mod tests {
             trust_clock: false,
             clock_waiting: Cell::new(false),
             rest_client: None,
+            runs: RefCell::default(),
             permissions: RefCell::new(HashMap::from([(
                 "dance".to_owned(),
                 Permissions {

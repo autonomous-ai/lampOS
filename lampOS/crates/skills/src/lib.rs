@@ -29,6 +29,7 @@ pub mod package;
 pub mod requested_audio;
 pub mod routine;
 pub mod unplug;
+pub mod usage;
 pub mod visits;
 pub mod watch;
 
