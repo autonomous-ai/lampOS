@@ -594,6 +594,39 @@ pub fn gate(
             .is_some_and(|at| now.saturating_duration_since(at) <= SEND_WITHIN)
         && turn.words.is_some_and(says_send);
     if !timely {
+        // Which of the checks above failed, for the journal: a "send"
+        // cancelled otherwise says nothing of why (lamp-9adf, 3 Nov).
+        let late = |at: Option<Instant>, within: Duration| {
+            at.is_none_or(|at| now.saturating_duration_since(at) > within)
+        };
+        let why: Vec<&str> = [
+            (kept.send_id != send_id, "another send_id"),
+            (kept.request == request, "in the read-back's own request"),
+            (
+                !(turn.previous == Some(kept.request)
+                    || (kept.asked_again.is_some() && turn.previous == kept.asked_again)),
+                "not the line right after the read-back",
+            ),
+            (
+                kept.other.is_some_and(|other| other != request),
+                "the lamp answered another line between",
+            ),
+            (kept.lines > 1, "more than one line since"),
+            (kept.person != owner, "another person"),
+            (late(Some(kept.at), PENDING_FOR), "prepared too long ago"),
+            (
+                late(kept.spoken_at, SEND_WITHIN),
+                "the read-back not said, or said too long ago",
+            ),
+            (!turn.words.is_some_and(says_send), "not a plain send"),
+        ]
+        .into_iter()
+        .filter_map(|(failed, why)| failed.then_some(why))
+        .collect();
+        eprintln!(
+            "lamp-voice: request {request}: a send cancelled: {}",
+            why.join("; ")
+        );
         return Err(json!({ "error": CANCELLED }));
     }
     if kept.cut || !read_back_said(&kept.read_back, &kept.spoken) {
@@ -886,8 +919,9 @@ pub fn run(
         Ok(call) => call,
         Err(told) => {
             eprintln!(
-                "lamp-voice: request {request} asked for {}; refused by the voice",
-                call.name
+                "lamp-voice: request {request} asked for {}; refused by the voice: {}",
+                call.name,
+                told["error"].as_str().unwrap_or_default()
             );
             return (told, true);
         }
