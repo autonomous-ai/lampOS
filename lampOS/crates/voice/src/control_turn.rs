@@ -76,10 +76,11 @@ pub struct StartNow {
     pub muted: bool,
     /// The keeper's pause.
     pub paused: bool,
-    /// Someone talks with the lamp: a conversation with it going on (the
-    /// thread's exchange with the lamp's words in it), a person's answer in
-    /// hand, a look they asked for, or a computer's turn still going on.
-    /// Never the room's speech or a line heard and held back.
+    /// Someone talks with the lamp: a conversation with it going on as the
+    /// second route judges one (the thread's exchange with the lamp's words
+    /// in it, within `thread::GOING_ON_FOR`), a person's answer in hand, or
+    /// a computer's turn still going on. Never the room's speech, a line
+    /// heard and held back, or a look the voice wanted.
     pub conversation: bool,
     /// The lamp's own words or sounds are in hand or playing.
     pub speaking: bool,
