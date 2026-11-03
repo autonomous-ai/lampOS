@@ -1417,3 +1417,87 @@ fn the_signed_out_line_counts_as_said_only_once_it_played() {
     state.note_delivery(&own, 1);
     assert!(!state.owed());
 }
+
+/// A turn the provider failed (a 503, #4332) once what it played has
+/// drained: `played` audio of its own (an answer cut off, or the down line),
+/// and the second route's `DownLineSaid` first when `down_line`.
+fn failed_after(played: bool, down_line: bool) -> Option<Reply> {
+    let (mut owner, mut current, _) = active_reply();
+    owner
+        .playback_ended(now(), current.playback.take().unwrap())
+        .unwrap();
+    current.pcm.clear();
+    current.had_audio = played;
+    current.cloud.started = played;
+    let request = current.owner.turn();
+    let mut reply = Some(current);
+    let mut cloud = CloudAvailability::default();
+    if down_line {
+        observe_provider_output(
+            &mut cloud,
+            &mut reply,
+            &ProviderOutput::DownLineSaid { request },
+        )
+        .unwrap();
+    }
+    observe_provider_output(
+        &mut cloud,
+        &mut reply,
+        &ProviderOutput::TurnFailed {
+            request,
+            stage: if played {
+                FailedStage::Responding
+            } else {
+                FailedStage::AwaitingResponse
+            },
+            reason: Fault::ServerUnavailable,
+        },
+    )
+    .unwrap();
+    reply
+}
+
+/// lamp-e82d (#4332): a 503 said "my thoughts are slow" and then, once that
+/// had drained, `turn_lost` too, two lines for one failed turn. The down
+/// line told the person it broke: no `turn_lost` over it.
+#[test]
+fn a_failed_turn_that_said_its_thoughts_are_slow_says_no_turn_lost_over_it() {
+    let mut trace = SessionState::default();
+    let mut down = failed_after(true, true);
+    select_failure_notice(&FailureNotices::synthetic(), &mut down, &None, &mut trace).unwrap();
+    assert!(
+        matches!(down.as_ref().unwrap().notice, NoticeDelivery::Unselected),
+        "the down line was the turn's one failure line"
+    );
+    assert!(down.as_ref().unwrap().notice.settled());
+    assert!(!trace.iter().any(|e| e["kind"] == "failure_notice_selected"));
+}
+
+/// The key is the down line, never `had_audio` (#4332): part of an answer
+/// played, then it broke, and nothing told the person so.
+#[test]
+fn a_failed_turn_cut_off_mid_answer_still_says_turn_lost() {
+    let mut cut = failed_after(true, false);
+    select_failure_notice(
+        &FailureNotices::synthetic(),
+        &mut cut,
+        &None,
+        &mut SessionState::default(),
+    )
+    .unwrap();
+    assert!(selected(&cut, lamp_audio::notice::NoticeKind::TurnLost));
+}
+
+/// A failed turn with nothing played says `turn_lost`, as before (#4332).
+#[test]
+fn a_failed_turn_with_nothing_played_still_says_turn_lost() {
+    let mut silent = failed_after(false, false);
+    select_failure_notice(
+        &FailureNotices::synthetic(),
+        &mut silent,
+        &None,
+        &mut SessionState::default(),
+    )
+    .unwrap();
+    assert!(selected(&silent, lamp_audio::notice::NoticeKind::TurnLost));
+}

@@ -553,7 +553,10 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   most once a minute, since asking again won't mend it and the slow line
   would promise it would (the Reviewer-lead's P3 on #3771); its journal:
   `said it can't answer just now`. The journal: `said its thoughts are slow`,
-  and `(again, the shorter line)` for the second. The three lines are
+  and `(again, the shorter line)` for the second. Once the slow line (either one)
+  has been handed over, the route sends `DownLineSaid` for the request,
+  before its `TurnFailed`, and the coordinator then says no `turn_lost` over
+  it (#4332, failure-notices.md): one failure line a turn. The three lines are
   rendered together, each until it is kept: one whose render failed is asked
   again after the next turn, and until the short one is kept the long one is
   said in its place, never silence (Third's P2 on #3771). With an owner's

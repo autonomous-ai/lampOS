@@ -419,6 +419,20 @@ another playback occurrence under the same owner, never another model request.
 Its attempted latch is set before transport dispatch. A failed or ambiguous
 send is not retried. No worker or cue queue is added.
 
+One failure line a turn (#4332). When the second route has already said its
+down line for the failed request ("Sorry, my thoughts are slow just now. Ask
+me again in a moment.", or the shorter "Still slow, sorry.", second-voice.md),
+it tells the coordinator so with `DownLineSaid`, after the line's audio and
+before the turn's `TurnFailed`, and `select_failure_notice_in` selects no
+`turn_lost` for that turn: the person was already told it broke. Before, on
+lamp-e82d, a 503 said the slow line and, 1.83 s after `provider_turn_failed`
+and right after `speech_queue_drained`, `turn_lost` too. Only that line is
+the key, not whether the turn had audio: a turn that played part of its
+answer and then failed mid-sentence still says `turn_lost`, since nothing
+told the person it broke, and so does a turn with nothing played. The route's
+"Sorry, I can't answer just now." (`DOWN_LINE_CANNOT`) sends no
+`DownLineSaid`.
+
 `failure_notice_selected`, `failure_notice_attempted`,
 `failure_notice_first_write` and `failure_notice_final_sample_retired` describe
 local notice delivery. Selection grants no output authority; ALSA acceptance

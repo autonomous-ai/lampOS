@@ -5954,7 +5954,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
-        | ProviderOutput::OwnWordsSaid { request } => Some(*request),
+        | ProviderOutput::OwnWordsSaid { request }
+        | ProviderOutput::DownLineSaid { request } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }
@@ -5974,6 +5975,11 @@ async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop
         let (clip, again) = clip;
         cue(shared, request, clip).await?;
         down.said(again);
+        // The person was told it broke: a failure of this turn owes no
+        // `turn_lost` over it (#4332). After its audio, before its end.
+        if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+            return Err(Stop::Gone);
+        }
         eprintln!(
             "lamp-voice second: request {request} said its thoughts are slow{}",
             if again {

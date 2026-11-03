@@ -5771,6 +5771,56 @@ async fn a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one(
     );
 }
 
+/// #4332 (lamp-e82d): a 503 that says the slow line tells the coordinator
+/// so, after the line's audio and before the turn's failure, so it says no
+/// `turn_lost` over it; "I can't answer just now" and a silent failure (the
+/// line off) tell it nothing.
+#[tokio::test(start_paused = true)]
+async fn a_refusal_that_says_the_down_line_tells_the_coordinator_before_it_fails() {
+    async fn turn(on: bool, status: u16) -> Vec<String> {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
+            chats: Mutex::new([vec![Err(net::Error::Status(status))]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.saying_when_down(on);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let mut sent = Vec::new();
+        loop {
+            match engine.next().await {
+                ProviderOutput::Audio { samples, .. } => sent.push(format!("audio:{}", samples[0])),
+                ProviderOutput::DownLineSaid { request: 1 } => sent.push("down".into()),
+                ProviderOutput::TurnFailed { .. } => {
+                    sent.push("failed".into());
+                    return sent;
+                }
+                ProviderOutput::TurnComplete { .. } => {
+                    sent.push("complete".into());
+                    return sent;
+                }
+                _ => {}
+            }
+        }
+    }
+    let line = format!("audio:{}", DOWN_LINE.len());
+    let slow = turn(true, 503).await;
+    let at = |event: &str| slow.iter().rposition(|sent| sent == event);
+    assert!(
+        at(&line) < at("down") && at("down") < at("failed") && at(&line).is_some(),
+        "{slow:?}"
+    );
+    for (on, status) in [(true, 401), (false, 503)] {
+        let other = turn(on, status).await;
+        assert!(
+            !other.iter().any(|sent| sent == "down") && other.last().is_some_and(|e| e == "failed"),
+            "{on} {status}: {other:?}"
+        );
+    }
+}
+
 /// Third's P2 on #3771: the long line renders but the short one doesn't
 /// (its speech gave nothing). Within the minute the lamp says the long line
 /// again rather than nothing, and the short one is asked again after each
