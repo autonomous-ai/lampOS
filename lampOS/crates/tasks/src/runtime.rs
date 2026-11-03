@@ -2123,13 +2123,14 @@ fn publish<T: serde::Serialize>(out: &mut Publisher, value: &T, errors: &mut u64
 
 /// How the production adapter calls Harness: `serve`'s switches for it
 /// (`--harness-as-person`, `--folder-missing`, `--engines-ready`,
-/// `--route`), each [`CliConfig`]'s field of that name.
+/// `--route`, `--absolute-folder`), each [`CliConfig`]'s field of that name.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct HarnessSwitches {
     pub as_person: bool,
     pub folder_missing: bool,
     pub engines_ready: bool,
     pub route: bool,
+    pub absolute_folder: bool,
 }
 
 /// Production adapter. CLI configuration and environment are inspected only
@@ -2163,6 +2164,7 @@ pub fn serve<C: Clock>(
         cli.folder_missing = switches.folder_missing;
         cli.engines_ready = switches.engines_ready;
         cli.route = switches.route;
+        cli.absolute_folder = switches.absolute_folder;
         Cli::new(cli, session.into()).map(|cli| Production::Cli(Box::new(cli)))
     })
 }

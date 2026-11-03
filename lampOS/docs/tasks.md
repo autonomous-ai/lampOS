@@ -316,6 +316,32 @@ and has to be made there first. Without it, and for every other failed
 `new`, the task stays `uncertain` with `new_failed`, and the lamp says the
 work may not have started.
 
+**`serve --absolute-folder`** (P4 step 1, off unless set): a `~/…` folder
+is sent as that computer's absolute folder once its home is known. Harness's
+CLI (0.5.28, `harness new`) resolves a `~/…` folder for another machine by
+asking that machine for its home (`fs_list_dir` over the machine link)
+before it asks for the agent; an absolute folder is sent as it is, so it
+saves that round trip through the relay. Harness gives no home in
+`machines --json`, so the lamp learns it from the hand-overs themselves:
+a `new` that started in a `~/REST` folder whose `--json` reply says the
+agent works in `HOME/REST` (`agent.project.cwd`), for that machine and
+`ok`, teaches `HOME` for that computer, kept while the part runs (no file;
+the first hand-over after a restart goes as `~/…`). Only a plain absolute
+home is taken: `/` first, no empty, `.` or `..` part, no `~` or control
+character, the whole folder within 512 bytes. Each later `~/…` target on
+that computer is then sent as `HOME/REST`. A `new` sent in a learned home
+that fails forgets it, so the next goes as `~/…` again; nothing is asked
+twice. The target, the stored launch and the person's yes keep the `~/…`
+words: only the argument to `new` changes, as with a taken name above. An
+absolute target and a project name are sent as they are, switch or not.
+Without the switch, every folder goes as the target names it, as before.
+For measuring it, each `new` says how long it took and how its folder was
+sent, never the folder: `tasks: lamp-task-N: new answered in MS ms, the
+folder sent KIND`, KIND one of `home-relative (~/), so Harness asks the
+computer for its home`, `absolute, from the computer's home learned
+earlier`, `absolute, as the target names it`, `as a project name` or `none
+(a cloud agent)`.
+
 **`serve --engines-ready`** (openharness#1788, off unless set): before
 `new`, right after the `machines --json` preflight, the computer is asked
 about the named engine alone, `harness machines engines MACHINE --engine

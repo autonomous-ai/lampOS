@@ -360,7 +360,7 @@ impl Target {
             };
         }
         let folder = self.project.starts_with('/') || self.project.starts_with("~/");
-        let maximum = if folder { 512 } else { 128 };
+        let maximum = if folder { MOST_FOLDER_BYTES } else { 128 };
         if self.project.is_empty()
             || self.project.len() > maximum
             || self.project.trim() != self.project
@@ -425,6 +425,14 @@ pub struct CliConfig {
     /// [`Cli::route_first`]). Off unless set (`serve --route`): `new`, as
     /// before.
     pub route: bool,
+    /// A `~/…` target folder is sent as the absolute folder on that
+    /// computer once its home is known, learned from the folder an earlier
+    /// `new` there reports it started in ([`Cli::folder_of`], P4 step 1).
+    /// Harness asks the computer for its home on each `~/…` folder
+    /// (`fs_list_dir`, one more round trip through the relay); an absolute
+    /// one is sent as it is. Off unless set (`serve --absolute-folder`): the
+    /// folder is sent as the target names it, as before.
+    pub absolute_folder: bool,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -445,6 +453,7 @@ impl CliConfig {
             folder_missing: false,
             engines_ready: false,
             route: false,
+            absolute_folder: false,
             journal: None,
         }
     }
@@ -462,6 +471,10 @@ pub struct Cli {
     executable: ExecutableIdentity,
     /// Each computer's answer for each engine (`serve --engines-ready`).
     ready: Mutex<Kept>,
+    /// Each computer's home folder, by machine id, as its own `new` reply
+    /// showed it (`serve --absolute-folder`). Kept while the part runs; a
+    /// `new` in it that fails forgets it, and `~/…` is sent again.
+    homes: Mutex<BTreeMap<String, String>>,
 }
 
 fn invalid(code: &'static str) -> io::Error {
@@ -563,6 +576,7 @@ impl Cli {
             poisoned: AtomicBool::new(false),
             executable,
             ready: Mutex::new(BTreeMap::new()),
+            homes: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -639,8 +653,9 @@ impl Cli {
             launch.target.machine_id.clone().into(),
         ];
         // A cloud agent is given no folder (openharness#1444).
-        let project_at = (!launch.target.engine.cloud()).then(|| {
-            args.push(launch.target.project.clone().into());
+        let folder = (!launch.target.engine.cloud()).then(|| self.folder_of(&launch.target));
+        let project_at = folder.as_ref().map(|folder| {
+            args.push(folder.sent.clone().into());
             args.len() - 1
         });
         args.extend(["--name".into(), launch.name.clone().into()]);
@@ -669,8 +684,23 @@ impl Cli {
             return routed;
         }
         let until = began + self.config.launch_timeout;
+        let asked = Instant::now();
         let mut reply = self.run(&args, until.saturating_duration_since(Instant::now()));
         seen.took(&reply);
+        // How long `new` took, and how its folder was sent, never the
+        // folder itself (a home folder names the person): P4's before and
+        // after, on one build.
+        eprintln!(
+            "tasks: {}: new answered in {} ms, the folder sent {}",
+            launch.name,
+            asked.elapsed().as_millis(),
+            folder
+                .as_ref()
+                .map_or("none (a cloud agent)", |folder| folder.kind),
+        );
+        if let Some(folder) = &folder {
+            self.learn_home(&launch.target, folder, &reply);
+        }
         // A bare name gets its folder, `~/harnesses/<name>`, from Harness on
         // the first `new`, and every later `new` on that name is refused
         // for it, before anything starts (Harness 0.4.55; Mobile on
@@ -842,6 +872,74 @@ impl Cli {
             }
             Ok(reply) => uncertain(reply_refusal(&reply.stdout)),
             Err(error) => uncertain(error.code),
+        }
+    }
+
+    /// The folder `new` is sent for `target` (`serve --absolute-folder`,
+    /// P4 step 1). Harness's CLI resolves a `~/…` folder for another
+    /// machine by asking that machine for its home (`fs_list_dir`) before
+    /// `agent_create`, one more round trip through the relay; an absolute
+    /// folder is sent as it is (Harness 0.5.28, `harness new`). So once a
+    /// computer's home is known ([`Cli::learn_home`]), its `~/…` target is
+    /// sent as that home's folder. Otherwise, and with the switch off, the
+    /// target's own words, as before.
+    fn folder_of(&self, target: &Target) -> SentFolder {
+        let project = &target.project;
+        let Some(rest) = project.strip_prefix("~/") else {
+            return SentFolder {
+                sent: project.clone(),
+                kind: if project.starts_with('/') {
+                    "absolute, as the target names it"
+                } else {
+                    "as a project name"
+                },
+                learned: false,
+            };
+        };
+        let home_relative = SentFolder {
+            sent: project.clone(),
+            kind: "home-relative (~/), so Harness asks the computer for its home",
+            learned: false,
+        };
+        if !self.config.absolute_folder {
+            return home_relative;
+        }
+        let homes = self.homes.lock().unwrap_or_else(|e| e.into_inner());
+        match homes.get(&target.machine_id) {
+            Some(home) if home.len() + 1 + rest.len() <= MOST_FOLDER_BYTES => SentFolder {
+                sent: format!("{home}/{rest}"),
+                kind: "absolute, from the computer's home learned earlier",
+                learned: true,
+            },
+            _ => home_relative,
+        }
+    }
+
+    /// Learns `target`'s computer's home from a `new` that started in its
+    /// `~/…` folder: the folder the reply says the agent works in
+    /// (`agent.project.cwd`), less the target's words after `~/`. Only
+    /// with `serve --absolute-folder`, only from a reply that is `ok` for
+    /// that machine, and only a plain absolute home. A failed `new` sent
+    /// in a learned home forgets it, so the next one goes as `~/…` again:
+    /// a home that moved costs one hand-over, never every one.
+    fn learn_home(&self, target: &Target, folder: &SentFolder, reply: &Result<Reply, RunError>) {
+        if !self.config.absolute_folder {
+            return;
+        }
+        let Some(rest) = target.project.strip_prefix("~/") else {
+            return;
+        };
+        let mut homes = self.homes.lock().unwrap_or_else(|e| e.into_inner());
+        let succeeded = matches!(reply, Ok(reply) if reply.success);
+        if !succeeded {
+            if folder.learned {
+                homes.remove(&target.machine_id);
+            }
+            return;
+        }
+        let Ok(reply) = reply else { return };
+        if let Some(home) = home_of(&reply.stdout, &target.machine_id, rest) {
+            homes.insert(target.machine_id.clone(), home);
         }
     }
 
@@ -1645,6 +1743,56 @@ fn machines(bytes: &[u8], target: &str) -> Result<(), &'static str> {
     } else {
         Err("machine_unavailable")
     }
+}
+
+/// The folder `new` is sent ([`Cli::folder_of`]): the words, how they
+/// were chosen for the dispatch's timing line, and whether they come from
+/// a learned home.
+struct SentFolder {
+    sent: String,
+    kind: &'static str,
+    learned: bool,
+}
+
+/// The longest folder a target names ([`Target::validate`]).
+const MOST_FOLDER_BYTES: usize = 512;
+
+/// The computer's home from a successful `new --json` reply for `machine`
+/// whose agent works in the `~/REST` folder: `agent.project.cwd` with
+/// `/REST` taken off its end. Only a plain absolute home: `/` first, no
+/// empty, `.` or `..` part, no control character, no `~`, and the whole
+/// within [`MOST_FOLDER_BYTES`]. Anything else, or no such field, is none.
+fn home_of(bytes: &[u8], machine: &str, rest: &str) -> Option<String> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Started {
+        ok: bool,
+        machine_id: Option<String>,
+        agent: Option<Agent>,
+    }
+    #[derive(Deserialize)]
+    struct Agent {
+        project: Option<Project>,
+    }
+    #[derive(Deserialize)]
+    struct Project {
+        cwd: Option<String>,
+    }
+    let reply: Started = serde_json::from_slice(bytes).ok()?;
+    if !reply.ok || reply.machine_id.as_deref() != Some(machine) || rest.is_empty() {
+        return None;
+    }
+    let cwd = reply.agent?.project?.cwd?;
+    let home = cwd.strip_suffix(rest)?.strip_suffix('/')?;
+    let plain = home.len() > 1
+        && cwd.len() <= MOST_FOLDER_BYTES
+        && home.strip_prefix('/').is_some_and(|parts| {
+            parts
+                .split('/')
+                .all(|part| !matches!(part, "" | "." | ".."))
+        })
+        && !home.chars().any(|c| c.is_control() || c == '~');
+    plain.then(|| home.to_owned())
 }
 
 #[derive(Deserialize)]
