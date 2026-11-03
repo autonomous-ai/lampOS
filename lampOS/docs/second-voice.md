@@ -4082,7 +4082,9 @@ after a take-over, but now for every turn:
     (`Heeding::verdict`, `held_in_conversation_us`), never more than
     `HELD_KEEPS_FOR` (90 s) after the lamp's own last words, however many
     are held. Forgetting the thread's words, or a new person at the lamp,
-    leaves nothing for it to renew;
+    leaves nothing for it to renew. Closing or reopening privacy also
+    clears the held-line renewal and the previous-remark marker, so neither
+    carries across it (`privacy_change_ends_a_held_remarks_conversation_renewal`);
   - the line right after a held remark, let out only as the conversation
     going on, not found in the conversation's own voice, answering no
     question of the lamp's and asking it nothing (`remarks::asks_in` by
