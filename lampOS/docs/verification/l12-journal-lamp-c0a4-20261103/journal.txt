@@ -1,0 +1,10 @@
+# lamp-tasks journal on <lamp>, 2026-11-03 (times +07), test build 76ddad7ab3
+# every 'tasks: harness' line from install to restore, plus the dispatch, progress and wait lines of task 28
+18:39:07 lamp-tasks[694175]: tasks: harness machines: exit=0 ms=2102 out=903 listed=2
+18:39:13 lamp-tasks[694175]: tasks: harness new: machine=5d53993e exit=0 ms=5593 out=1445 state=ok id=28a48734
+18:39:13 lamp-tasks[694175]: tasks: lamp-2a33798c980233dcdb820f85a04c5b78: dispatch accepted (exit 0, 7.7 s)
+18:39:17 lamp-tasks[694175]: tasks: harness ps: machine=5d53993e exit=0 ms=4023 out=5974 listed=11 states=idle:6,unknown:5
+18:39:17 lamp-tasks[694175]: tasks: progress read of <mac-machine-id> in 4027 ms: 11 listed; task 28 unknown, first read
+18:39:30 lamp-tasks[694175]: tasks: harness wait: machine=5d53993e agents=1 exit=0 ms=16983 out=325 listed=1 states=idle:1 ids=28a48734
+18:39:30 lamp-tasks[694175]: tasks: wait on <mac-machine-id> came back after 16986 ms: task 28 idle
+18:39:34 lamp-tasks[694175]: tasks: harness show: machine=5d53993e agent=28a48734 exit=0 ms=3486 out=408 state=idle tools=0 id=28a48734
