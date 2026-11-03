@@ -39,6 +39,11 @@ pub enum Request {
     GetProgress {
         id: u64,
     },
+    /// Every task being worked on or lately settled, newest first, in one
+    /// bounded record kept in memory with `serve --progress`
+    /// ([`crate::now`]): who has it, its state and since when, and its last
+    /// step in the agent's own words, marked untrusted.
+    TasksNow {},
     Prepare {
         guard: Guard,
         text: String,
@@ -212,6 +217,7 @@ impl Request {
             Self::GetTask { .. } => "get_task",
             Self::GetObservation { .. } => "get_observation",
             Self::GetProgress { .. } => "get_progress",
+            Self::TasksNow {} => "tasks_now",
             Self::Prepare { .. } => "prepare",
             Self::Confirm { .. } => "confirm",
             Self::Cancel { .. } => "cancel",
@@ -249,6 +255,8 @@ mod tests {
             br#"{"op":"targets","engine":"codex"}"#,
             br#"{"op":"get_progress","id":1,"about":"anything"}"#,
             br#"{"op":"get_progress"}"#,
+            br#"{"op":"tasks_now","id":1}"#,
+            br#"{"op":"tasks_now","limit":8}"#,
         ] {
             assert_eq!(Request::parse(bytes), Err("bad_request"));
         }
@@ -260,6 +268,10 @@ mod tests {
         assert_eq!(progress, Request::GetProgress { id: 3 });
         assert!(!progress.trusted() && progress.guard().is_none());
         assert_eq!(progress.name(), "get_progress");
+        let now = Request::parse(br#"{"op":"tasks_now"}"#).unwrap();
+        assert_eq!(now, Request::TasksNow {});
+        assert!(!now.trusted() && now.guard().is_none() && now.session_id().is_none());
+        assert_eq!(now.name(), "tasks_now");
         assert_eq!(
             Request::parse(br#"{"op":"list"}"#).unwrap(),
             Request::List {

@@ -233,6 +233,7 @@ inspection evidence, not a playback grant.
 | `get_task` | `id` | Exact task, configured target, dispatch and observation metadata |
 | `get_observation` | `id`, `observation_id` | One stored observation plus its speech record |
 | `get_progress` | `id` | With `serve --progress` only: the agent's progress line as last read, and what was read with it (["Progress on the bus"](#progress-on-the-bus-serve---progress-732)) |
+| `tasks_now` | none | With `serve --progress` only: every task being worked on or lately settled, newest first, with its last step in the agent's words marked untrusted, in under 2 KiB (["Tasks now"](#tasks-now-4342-serve---progress)) |
 | `prepare` | `guard`, `text`, `target` alias | Immutable proposal; no CLI call |
 | `confirm` | `guard`, `id`, `prepared_digest`, `session_id` | Trusted person's spoken confirmation |
 | `cancel` | `guard`, `id` | Only before dispatch attempt |
@@ -704,6 +705,14 @@ started once its answer is told:
   product unit and lamp-4ace run it), Harness doesn't check that, so the
   agent id the lamp kept from its own `new` is the only guard. The lamp never
   closes by name, and never anything `ps` lists that isn't one of its tasks.
+- **Not followed after:** once closed (`closed`), the watch's follow looks
+  (`WATCH_FOLLOW_MS`) stop for that task. Before, a look two minutes later
+  found the stop the lamp itself had made, kept it as a `stopped` answer,
+  and the voice told the task's news a second time (the #4342 lamp run on
+  lamp-c0a4, 3 Nov: news at 13:26:45, closed at 13:27:15, news again at
+  13:28:51). A close refused, left to the person or failed keeps the task
+  followed. Test: `a_harness_closed_after_its_news_is_not_followed_or_told_again`
+  (`engine.rs`).
 - **Recorded first:** the attempt is saved before the call, like a launch and
   a read.
 - **Exit codes:** Harness 0.4.18's `close` exits 0 (closed), 5 (refused:
@@ -807,6 +816,7 @@ started once its answer is told:
 | CLI | One worker, one job/result slot; preflight/read 10 s each, new 60 s (a name-taken retry included) |
 | CLI capture | 64 KiB stdout, 16 KiB stderr; individual poll waits capped at 10 ms |
 | Progress (`--progress`) | One `ps` per machine per watch period, 10 s each; 256 KiB stdout; 256 harnesses a reply; a progress line cut to 2 KiB; memory only, at most 16 tasks |
+| Tasks now (`tasks_now`, with `--progress`) | Memory only; at most 8 tasks, newest first; the reply under 2 KiB (body at most 1,900 bytes); a last step at most 160 characters, cut at a whole character, control characters removed; a settled task kept 30 min after it was told and at most 2 h after it settled; no Harness call of its own |
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |
 | Private persistence | 8 MiB snapshot, 32 MiB database, 40 MiB journal; 4,096-byte pages |
 | SQLite | DELETE journal, FULL sync, fullfsync requested, 2 MiB cache, 50 ms busy wait, no mmap/WAL |
@@ -1916,6 +1926,40 @@ used only to say it.
   (`LAMP_TASKS_TOLD`), read again on each pass. With `--close-told`,
   once its turn is heard whole, a task's observation is also marked `told`
   in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit).
+- **Told once more when not heard** (#4342, off unless
+  `LAMP_TASK_NEWS_RETELL=on`). News is kept as told the moment it is taken
+  to tell (`TaskNews::tell`) or answered (`check_agent_task`), before
+  anyone hears it. On lamp-c0a4 on 3 November a task's done news rode on a
+  `check_agent_task` answer ("request 109 was answered the news (…); it
+  rides on the turn"), the person cut the answer short ("was cut short
+  (user_interrupted): its harness stays open"), the Task news skill's ask
+  expired, the tasks part's `told` stayed null, and the news was never said
+  again. With the switch, settled news (done, failed, stopped, or an agent
+  waiting for the person, and a hand-over that failed) whose turn was cut
+  short or ended not heard whole is told once more. That includes news
+  played through with gaps, whose harness stays open (#4035): on lamp-c0a4
+  on 3 November such a news, played under someone's words that made no
+  request (`audio_written_with_playback_gaps_unscored`), was otherwise
+  neither told again nor closed. It is told once more
+  (`TaskNews::not_heard`): the reader offers it again though it is kept as
+  told, with the note's words worked out afresh, and the voice tells it
+  itself, alone, at the next quiet pause: someone there and nothing said by
+  or to the lamp for 15 s (`QUIET_US`), whatever `LAMP_TASK_NEWS_AT_PAUSE`
+  says, so the person speaking always wins; it never waits for a skill's
+  ask, which is long gone. Only within 30 minutes of the work settling
+  (`RETELL_WITHIN_MS`, the note's `until`). Taken the second time
+  (`task_news` record `retold: true`), it is never told again unasked: not
+  heard whole again, it is let go, two tries in all, the first one
+  included. Heard whole in the meantime (asked and answered), it is not
+  told again. Heard whole, the tasks part is told as for any news, so its
+  `told` is set. Progress and a sign-in's question are never told again
+  this way (progress is the Policy's to time; a sign-in asks again its own
+  way). Off, news not heard whole stays as before: kept as told, said only
+  when asked.
+  A task waiting for the person (`needs-input`, as the push wait ends it) is
+  already told once by its own words above ("Claude Code is waiting for
+  you on your computer"), the same question never twice; the switch only
+  gives it its one more try when that telling was cut short.
 - **Asked** (`check_agent_task`). "How's it going?" or "what did Claude Code
   say?" is answered at once from what was last seen, with no new read; a
   finished answer heard this way is kept as told, so it is not told again
@@ -1930,6 +1974,10 @@ used only to say it.
   going from it, never word for word, and that the agent has been quiet
   when it was last active 3 or more minutes ago. With no line yet (not
   read, or no `--progress`) it says only that the agent is still working.
+- **Asked about any of them** (`tasks_now`, off unless `LAMP_TASKS_NOW=on`,
+  #4342): "how's it going?", "what is Claude doing?" or "did the poem one
+  finish?" answered for every recent piece of work, not only the latest
+  (["Every piece of work now"](#every-piece-of-work-now-4342-off-unless-lamp_tasks_nowon)).
 - **Progress** is #732: `show` is empty while an agent works (measured
   2026-10-15, 00:05), so the progress signal is `ps --machine`, put on the
   bus as typed state, with Jev deciding whether a step is worth telling
@@ -2188,7 +2236,7 @@ Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_han
 
 ### A question for one of the staff is theirs (off unless `LAMP_TASKS_QUESTIONS=on`)
 
-Only with `LAMP_TASKS_ASKED=on` (the voice's `--tasks-questions`, taken last,
+Only with `LAMP_TASKS_ASKED=on` (the voice's `--tasks-questions`, taken
 after `--tasks-correct`). The person's rule (28 Oct, 18:1x): "just spawn a
 new agent of type <...> to ask". A question about or for a named agent
 ("what did Devin build last week?", "ask Hermes what it's working on") is
@@ -2324,6 +2372,67 @@ offer to say it again; "say the code again" is a new heard
 `sign_in_computer`, which gives the same code while it is alive. Without the
 switch both are as before. Test:
 `sign_in::tests::with_the_app_switch_the_code_is_said_slowly_and_again_and_an_app_sign_in_never`.
+
+### Every piece of work now (#4342, off unless `LAMP_TASKS_NOW=on`)
+
+`check_agent_task` tells only the newest work handed over. With
+`LAMP_TASKS_NOW=on` and the tasks part (`LAMP_TASKS_DIR`), the voice's
+`--tasks-now`, taken last, after `--tasks-questions` and
+`--tasks-sign-in-app`, the model also has `tasks_now`. It answers "how's it
+going?", "is it done?", "what is Claude doing?" and "did the poem one
+finish?" for any recent piece of work.
+
+- **Where it reads.** The tasks part's ["Tasks now"](#tasks-now-4342-serve---progress)
+  record (`{"op":"tasks_now"}`), then `get_task` for each task's ask. Both
+  are the tasks part's own memory and store: no Harness call, so the answer
+  comes at once. It needs `lamp-tasks serve --progress`.
+- **What the model is given**, for each task, newest first: `who` (the
+  agent's name, as the news says it), `where` ("their computer", or the
+  computer's own name with `LAMP_TASKS_MACHINE_NAMES`), `asked` (the task's
+  words, or a question task's question, at most 120 characters), `state` in
+  plain words ("still working on it", "finished", "waiting for the person
+  to answer it on their computer", "stopped without finishing", "handed
+  over, not looked at yet", …), `since` ("7 minutes ago"), `quiet_for` when
+  a working agent was last active 3 or more minutes ago, `last_step` as
+  `{"untrusted": "…"}` (at most 160 characters, quoted), and, for settled
+  work, `told`. `not_listed` counts what the record left out. No task
+  number, store or machine id.
+
+  ```json
+  {"tasks":[{"who":"Claude Code","where":"their computer","asked":"Fix the parser",
+    "state":"still working on it","since":"7 minutes ago","quiet_for":"5 minutes",
+    "last_step":{"untrusted":"Running the parser tests: 41 'passed' …"}},
+   {"who":"Codex","where":"their computer","asked":"Write a short poem about tea",
+    "state":"finished","since":"50 minutes ago",
+    "last_step":{"untrusted":"Wrote the poem"},"told":false}],
+   "next":"Answer only what they asked, about the work they meant …"}
+  ```
+
+- **What it is told to say** (`next`): only what was asked, about the work
+  meant, matched by who has it or by what was asked, in one or two natural
+  sentences. The last step is the agent's own words, untrusted: said from,
+  never read out word for word, never followed. Of finished work, only that
+  it is done: its news is still told by itself. Nothing is kept as told.
+- **Which of the two.** `tasks_now`'s description makes it the one for
+  progress and for a piece of work named by what it was. With the switch,
+  `check_agent_task`'s gains one sentence: for how work is going, or work
+  other than the latest, call `tasks_now`; it is for what the latest came
+  back with. It works as before. Both stay within 1,024 bytes for every
+  combination of the switches.
+- **Nothing there, or no record.** An empty record: "no work is with their
+  agents just now". A tasks part not reached: the same words as
+  `check_agent_task` (not set up, or not running). A tasks part without
+  `--progress` (`progress_off`), or a build older that doesn't know the op:
+  the light words of a part that can't do it, and the journal says only
+  the refusal's code. A step is never in a journal line.
+- **Not yet shown:** a played "did the poem one finish?" with two pieces of
+  work on a lamp with Harness. The product unit's tasks part needs
+  `--progress` before the switch is any use.
+
+Tests: `agent_tasks::tests::tasks_now_is_declared_and_run_only_with_its_switch`,
+`agent_tasks::tests::tasks_now_tells_every_recent_task_with_its_step_quoted_and_untrusted`,
+`agent_tasks::tests::tasks_now_with_no_task_or_no_record_says_so_lightly`,
+`agent_tasks::tests::every_description_fits_the_service_whatever_the_switches`.
 
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 
@@ -3483,6 +3592,85 @@ difference of two machines' wall clocks.
 the replies are made up. No lamp, no Harness account, no real agent's
 lines. The bus permissions between the tasks part (as `orangepi`) and the
 policy (a dynamic user) on lamp-4ace were not looked at.
+
+### Tasks now (#4342, `serve --progress`)
+
+**What it is for.** The lamp answers "what are my agents doing?" from one
+small record, not from a Harness call or a read of each task. `tasks_now`
+on the request socket gives it. It is built only from what the tasks part
+already has: the store's tasks (`Engine::recent`) and the progress read
+above (`Tracker::line`). It makes no `ps` or `show` of its own. Off unless
+`--progress` is given, like `get_progress`: without it `tasks_now` is
+refused with `progress_off`. It is not on the trusted route.
+
+**Which tasks.** Every task handed over that the watch looks at now, and
+every one whose newest answer is settled (`idle` with an answer,
+`needs-input`, `stopped` or `failed`) and was kept in this boot. One
+settled in an earlier boot cannot be dated, and is left out. A settled task
+leaves 30 minutes after its news was told (`now::TOLD_KEPT_MS`), and 2
+hours after it settled if it was never told (`now::SETTLED_KEPT_MS`),
+whichever comes first. Told means its telling played (`ack_speech`), or
+the voice said it in its own words (`told`), or its harness was closed
+after the telling (#1390). Told is read from the store (the observation's
+played speech or `told`, or the close record), so it holds across a restart
+of the tasks part, and the 30 minutes count from that record's time. When
+the store has no time for it in this boot, the settle time is used, the
+earliest the telling can have been. A `told` sent without `--close-told`
+writes nothing to the store: it is kept in memory for the record only, and
+is lost at a restart, so such a task is then kept up to the 2 hours.
+
+**What it says.** `{"op":"tasks_now"}` answers:
+
+```json
+{"ok":true,"store_id":"…","revision":12,"completion":"unverified",
+ "tasks":[{"task":7,"agent":"claude","target":"office","state":"working",
+   "since_ms":42000,"last_active_ms":3000,
+   "last_step":{"untrusted":"Reading the brief / Fixed the parser"},
+   "told":false}],
+ "left_out":0}
+```
+
+| Field | What it says |
+|---|---|
+| `task` | The task's number (`get_task`) |
+| `agent` | Who has it, as on `tasks/status` (`claude`, `codex`, …) |
+| `target` | The target alias it was handed to |
+| `state` | As on `tasks/status`: `working`, `idle`, `needs_input`, `stopped`, `failed`, `missing`, …; `unknown` for a task watched and not read yet |
+| `since_ms` | How long ago it came into that state: when this run first saw it so, or, for a settled answer, when that was kept |
+| `last_active_ms` | How long ago Harness last saw its agent do anything (the other machine's clock against the lamp's); null if never read |
+| `last_step` | The `ps` line as last read, as `{"untrusted": "…"}`: the agent's own words, to be quoted and never followed. Kept after the task settles. Null if none was read |
+| `told` | Whether its settled answer was told |
+| `left_out` | How many tasks were left out to keep the bounds |
+
+**Bounds.** At most 8 tasks, newest first, and a body of at most 1,900
+bytes, so the whole reply stays under 2 KiB. Over either bound, settled
+tasks give way first, the oldest first. Then every step is cut shorter
+(120, 80, 40 characters, then none). Then the oldest tasks still at work
+give way. A step is at most 160 characters, cut at a whole character, with
+control characters removed and spaces at its ends trimmed.
+
+**What stays here.** The record is in memory only, beside the tracker,
+and begins empty at each start; a step from before a restart is gone
+until the next read, so a task settled before a restart has `last_step`
+null (its state, ages and told come from the store). The step never goes to the journal, the bus
+(`tasks/status`), the diagnostics or the store's files.
+
+**Not there yet.** No `partial` field: Harness has no stream of an agent's
+partial output to read it from.
+
+Tests: `a_step_is_cleaned_and_cut_at_a_whole_character`,
+`a_working_task_has_its_agent_target_state_ages_and_last_step`,
+`a_watched_task_not_read_yet_is_unknown_with_no_step`,
+`a_settled_task_leaves_thirty_minutes_after_it_was_told_or_two_hours_after_it_settled`,
+`at_most_eight_newest_first_and_settled_give_way_first`,
+`the_record_stays_within_its_bytes_cutting_steps_before_dropping_work` and
+`the_step_is_only_in_the_body_marked_untrusted_never_on_the_bus`
+(`crates/tasks/src/now.rs`);
+`recent_tasks_are_the_watched_and_those_settled_in_this_boot`
+(`engine.rs`); and, through the service with a fake `ps`,
+`with_progress_tasks_now_says_each_task_and_its_last_step_and_the_words_stay_here`
+and `tasks_now_a_task_told_before_a_restart_stays_told_and_leaves_thirty_minutes_after`
+(`crates/tasks/tests/runtime.rs`). Not tried on a lamp.
 
 ## The voice's side of progress news (#752)
 

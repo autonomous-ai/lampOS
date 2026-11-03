@@ -1311,6 +1311,142 @@ fn without_progress_nothing_is_listed_the_topic_is_untouched_and_the_report_is_a
         s.ask(json!({"op":"get_progress","id":prepared["id"]}))["error"],
         "progress_off"
     );
+    assert_eq!(s.ask(json!({"op":"tasks_now"}))["error"], "progress_off");
+}
+
+/// The coordinator's lamp run on #4342: a task told before a restart of
+/// the tasks part is told after it too, from the store, and leaves 30
+/// minutes after its telling, not 2 hours after it settled. Its last step
+/// is gone with the memory it was in.
+#[test]
+fn tasks_now_a_task_told_before_a_restart_stays_told_and_leaves_thirty_minutes_after() {
+    let mut s = Running::with(false, true);
+    *s.counts.about.lock().unwrap() = Some("Reading the brief".into());
+    let id = handed(&s);
+    let observation = read(&s, &id);
+    tell(&s, &id, observation);
+    assert_eq!(s.ask(json!({"op":"tasks_now"}))["tasks"][0]["told"], true);
+    s.stop();
+    s.start();
+    let again = s.ask(json!({"op":"tasks_now"}));
+    let task = &again["tasks"][0];
+    assert_eq!(
+        (&task["task"], &task["told"]),
+        (&id, &json!(true)),
+        "{again}"
+    );
+    assert_eq!(task["state"], "needs_input");
+    assert_eq!(task["last_step"], Value::Null);
+    // Thirty minutes after the telling, by the boot clock, across another
+    // restart: gone, well before the two hours.
+    s.stop();
+    s.clock.0.lock().unwrap().monotonic_ms += lamp_tasks::now::TOLD_KEPT_MS;
+    s.start();
+    let gone = s.ask(json!({"op":"tasks_now"}));
+    assert_eq!(gone["tasks"], json!([]), "{gone}");
+}
+
+/// Every file under `dir`, read whole, for words that must not be there.
+fn files_hold(dir: &std::path::Path, words: &str) -> bool {
+    fs::read_dir(dir).unwrap().any(|entry| {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            files_hold(&path, words)
+        } else {
+            fs::read(&path).is_ok_and(|bytes| {
+                bytes
+                    .windows(words.len())
+                    .any(|window| window == words.as_bytes())
+            })
+        }
+    })
+}
+
+/// #4342: `tasks_now` answers, from the progress read already made and the
+/// store, who has each task, its state and since when, and its last step in
+/// the agent's words, marked untrusted, in a reply under 2 KiB. The step
+/// outlives the watch: kept once the task settles, and the task is marked
+/// told once its news is. The words are never on the bus, in the
+/// diagnostics or in the store's files. No `ps` of its own.
+#[test]
+fn with_progress_tasks_now_says_each_task_and_its_last_step_and_the_words_stay_here() {
+    let s = Running::with(false, true);
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let mut watch = bus
+        .subscribe_typed(TaskStatus::TOPIC, "tasks_test", TaskStatus::TYPE)
+        .unwrap();
+    // Nothing handed over: an empty record.
+    let empty = s.ask(json!({"op":"tasks_now"}));
+    assert_eq!(empty["ok"], true, "{empty}");
+    assert_eq!(empty["tasks"], json!([]));
+    assert_eq!(empty["left_out"], 0);
+    *s.counts.about.lock().unwrap() = Some("Reading the brief".into());
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    let id = prepared["id"].as_u64().unwrap();
+    // The fake `ps` is read at once; then the record has it.
+    let start = Instant::now();
+    let reply = loop {
+        let reply = s.ask(json!({"op":"tasks_now"}));
+        if reply["tasks"][0]["state"] == "working" {
+            break reply;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "{reply}");
+        thread::sleep(Duration::from_millis(10));
+    };
+    assert!(serde_json::to_vec(&reply).unwrap().len() <= 2_048);
+    assert_eq!(reply["store_id"], s.status()["store_id"]);
+    let task = &reply["tasks"][0];
+    assert_eq!(
+        (
+            &task["task"],
+            &task["agent"],
+            &task["target"],
+            &task["last_step"],
+            &task["told"]
+        ),
+        (
+            &json!(id),
+            &json!("codex"),
+            &json!("coding"),
+            &json!({"untrusted":"Reading the brief"}),
+            &json!(false)
+        ),
+        "{reply}"
+    );
+    assert!(
+        task["since_ms"].is_u64() && task["last_active_ms"].is_u64(),
+        "{task}"
+    );
+    let listings = s.counts.listings.load(Ordering::SeqCst);
+    // Settled (the agent asks the person): it leaves the watch, and the
+    // step read before is kept.
+    let observation = read(&s, &prepared["id"]);
+    let asked = s.ask(json!({"op":"tasks_now"}));
+    assert_eq!(asked["tasks"][0]["state"], "needs_input", "{asked}");
+    assert_eq!(
+        asked["tasks"][0]["last_step"]["untrusted"],
+        "Reading the brief"
+    );
+    assert_eq!(asked["tasks"][0]["told"], false);
+    // Told: marked so.
+    tell(&s, &prepared["id"], observation);
+    assert_eq!(s.ask(json!({"op":"tasks_now"}))["tasks"][0]["told"], true);
+    // `tasks_now` runs no `ps` of its own.
+    assert_eq!(s.counts.listings.load(Ordering::SeqCst), listings);
+    // The words stay here: not on the bus (`next_status` looks), not in
+    // the diagnostics, not in the store's files.
+    let _ = next_status(&mut watch);
+    let mut diagnostic = bus
+        .subscribe_typed(Diagnostic::TOPIC, "tasks_test", Diagnostic::TYPE)
+        .unwrap();
+    let message = loop {
+        if let Some(message) = diagnostic.recv(Duration::from_secs(3)).unwrap() {
+            break message;
+        }
+    };
+    assert!(!String::from_utf8_lossy(&message.payload).contains("Reading the brief"));
+    assert!(!files_hold(&s.config.dir, "Reading the brief"));
 }
 
 /// #560: with `--push-wait`, Harness's own `wait` is held on the agents the
