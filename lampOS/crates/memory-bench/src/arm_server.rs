@@ -37,13 +37,21 @@ pub fn serve<R: BufRead, W: Write>(reader: &mut R, writer: &mut W, revision: &st
                     return Err(invalid("reference arm has no configuration switches"));
                 }
                 arm = Some(match init.arm.as_str() {
-                    "none" => Box::new(Basic::open(BasicKind::None, init.owner_id.clone(), path)?),
+                    "none" => Box::new(Basic::open(
+                        BasicKind::None,
+                        init.owner_id.clone(),
+                        &init.timezone,
+                        path,
+                    )?),
                     "full_history" => Box::new(Basic::open(
                         BasicKind::FullHistory,
                         init.owner_id.clone(),
+                        &init.timezone,
                         path,
                     )?),
-                    "lampos_today_partial" => Box::new(Partial::open(&init)?),
+                    "lampos_today_partial" | crate::partial::NEXT => {
+                        Box::new(Partial::open(&init)?)
+                    }
                     _ => {
                         return Err(Error::Unsupported(
                             "unknown reference arm; complete current-product baseline unavailable"

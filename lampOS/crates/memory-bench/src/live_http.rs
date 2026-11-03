@@ -225,6 +225,18 @@ impl Http {
         Ok(bytes)
     }
 }
+/// A failure in transit: no reply to score, but nothing wrong with the run.
+fn transport(message: &str) -> crate::Error {
+    crate::Error::Transport(message.into())
+}
+/// An overloaded or failing relay (429, 5xx) is transient; a refused request
+/// (other 4xx) is the bench's own and stops the run.
+fn unaccepted(status: Option<u16>) -> crate::Error {
+    match status {
+        Some(429 | 500..=599) => transport("chat service unavailable"),
+        _ => invalid("chat service refused request"),
+    }
+}
 pub(crate) fn save(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .create_new(true)
@@ -274,8 +286,8 @@ impl Provider for Http {
                         .send(),
                 )
                 .await
-                .map_err(|_| invalid("chat headers deadline expired"))?
-                .map_err(|_| invalid("chat connection or headers failed"))?;
+                .map_err(|_| transport("chat headers deadline expired"))?
+                .map_err(|_| transport("chat connection or headers failed"))?;
                 status = Some(response.status().as_u16());
                 let accepted = response.status().is_success();
                 let event_stream = response
@@ -287,11 +299,16 @@ impl Provider for Http {
                             .next()
                             .is_some_and(|s| s.trim().eq_ignore_ascii_case("text/event-stream"))
                     });
-                while let Some(chunk) = response
-                    .chunk()
-                    .await
-                    .map_err(|_| invalid("chat response transport failed"))?
-                {
+                // A refusal whose body is cut short is still a refusal: the
+                // status already arrived, so the failed read must not turn it
+                // into a transient failure the run would score and pass over.
+                while let Some(chunk) = response.chunk().await.map_err(|_| {
+                    if accepted {
+                        transport("chat response transport failed")
+                    } else {
+                        unaccepted(status)
+                    }
+                })? {
                     let remaining = MAX_WIRE - raw.len();
                     raw.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
                     if chunk.len() > remaining {
@@ -302,12 +319,12 @@ impl Provider for Http {
                     }
                 }
                 if !accepted {
-                    return Err(invalid("chat service refused request"));
+                    return Err(unaccepted(status));
                 }
                 if !event_stream {
                     return Err(invalid("chat response is not an event stream"));
                 }
-                Err(invalid("chat stream ended before terminal marker"))
+                Err(transport("chat stream ended before terminal marker"))
             })
             .await
             .map_err(|_| invalid("chat absolute deadline expired"))?
