@@ -130,3 +130,25 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   `image_ramlog::ramlogs_copies_leave_the_journal_out` fails on this Mac
   with and without the PR, since Apple's rsync 2.6.9 passes the GNU-rsync
   guard and then rejects `-aXWv`.
+- 12:42: the first builder said yes to heron-P1 and made `builder:heron`;
+  #4450 labelled. 12:44: claimed (`status:taken`, `taken by heron · session
+  487dfa16 · lamp-fc4b`, the first such comment). Kit fetched and checked
+  (desk-kit-2 tar, sha `60128bcd…`); the person's yes for one read-only
+  ssh and for the sound. 12:47, over ssh: lamp-fc4b on stable 9724 since
+  12:25 (by lamp-update itself), all units active, journal readable
+  without sudo, no `lamp-bus` on it, no drop-in, no lock.
+- 12:50–13:01, PLAYING posted and released on #4710: night.py's desk1,
+  desk3 and after2 from the Mac's speaker beside the lamp, read from the
+  journal alone (a scratch-folder Python variant of night.py: no events
+  tail, no bus taps; after2's `a+4.0` from the `first answer audio` line
+  plus the answer's length from its character count). Pass 1 void (the
+  Mac's sound went to headphones); pass 2 all three scenes, but the clock
+  offset was measured from a whole ssh (+3.3 s, really +0.4 s), so d07 came
+  13.6 s after the answer; pass 3 after2 alone, timed right.
+- Result: d02 and d10 held on 9724 (`nobody spoke to the lamp…`, 8/8 desk
+  lines of desk1/desk3 held); d08 still answered, twice (1824, 1898 ms),
+  as `a conversation with the lamp is going on, only as the conversation
+  going on: the model is told so`: the case #5034's `held` covers. Posted
+  on #4450 and #4710; PR #5044 (`heron/4450-lamp-fc4b-replay`, head
+  `05409db98`, docs only, one read asked of the first builder or the
+  Reviewer-lead).
