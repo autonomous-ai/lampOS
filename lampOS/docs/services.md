@@ -234,7 +234,8 @@ its token goes to those two hosts alone.
 - **The link:** `auth_type: "pat"`, the app password in `api_key` (or
   `access_token`), the account's email in `credentials.email`. It doesn't
   expire or refresh. Google shows the password in groups of four with spaces;
-  the spaces are taken out before it is used.
+  all whitespace (a phone's copy may carry no-break spaces) is taken out
+  before it is used.
 - **At `set`:** an IMAP `LOGIN` is tried first. Refused: `failure` with "Gmail
   refused the app password"; unreachable: "Gmail couldn't be reached"; either
   way nothing is kept. An OAuth Gmail link fails here the same way, as its
@@ -537,7 +538,17 @@ for the Policy's decision as the executive's are, with
 `LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Made skills reach no
 service at all: a made skill's step that names a services function is never
 said plainly, and a made skill's own function of that name is refused
-(`made_skill::plainly`, `made_skill::capped`).
+(`made_skill::plainly`, `made_skill::capped`). A request to make a skill
+that names mail or a calendar ("mail", "email", "e-mail", "gmail", "inbox",
+"calendar", as a whole word) is never handed to the model: `made_skill::brief`
+answers it with `NOT_A_SERVICE`, "A skill can't read your mail or calendar,
+but you can just ask me to read it once it's linked in the app: Skills, then
+Connectors."
+
+A call to a service that isn't linked fails with "<Service> isn't linked to
+this lamp yet. It can be linked in the app: Skills, then Connectors."
+(`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
+isn't.
 
 ## Refresh
 
