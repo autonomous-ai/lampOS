@@ -191,7 +191,9 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
             } else {
                 RULE.to_owned()
             };
-            tool.description = within_description(&rule, tool.description.trim());
+            let own = tool.description.trim().to_owned();
+            tool.description = within_description(&rule, &own);
+            list_in_parameter(&mut tool, &own);
             if tool.name == WRITE
                 && let Some(properties) = tool
                     .parameters
@@ -208,6 +210,51 @@ pub fn tools(folder: &Path) -> Vec<Tool> {
 
 /// The link's most for a description.
 const MOST_DESCRIPTION_BYTES: usize = 1_024;
+
+/// The link's most for a function's parameters, as JSON text.
+const MOST_PARAMETERS_BYTES: usize = lamp_gemini::MAX_TOOL_JSON_BYTES;
+
+/// What, by service, a function takes (`what` for [`READ`], `action` for
+/// [`WRITE`]): the service's sentence that begins "<parameter>, by
+/// service:". When the description had no room for it, it is told on that
+/// parameter instead, so the model still knows a calendar's `create_event`
+/// (on lamp-9adf on 2026-11-03 it was cut, and the lamp said it could only
+/// read a calendar). Left as it was if the parameters would pass their most.
+fn list_in_parameter(tool: &mut Tool, own: &str) {
+    let Some(list) = own
+        .split_inclusive(". ")
+        .map(str::trim)
+        .find(|sentence| sentence.contains(", by service:"))
+    else {
+        return;
+    };
+    if tool.description.contains(list) {
+        return;
+    }
+    let Some(name) = list.split(',').next() else {
+        return;
+    };
+    let Some(parameters) = tool.parameters.as_mut() else {
+        return;
+    };
+    let before = parameters.clone();
+    let Some(parameter) = parameters
+        .get_mut("properties")
+        .and_then(|properties| properties.get_mut(name))
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    let said = parameter
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    parameter.insert("description".into(), json!(format!("{said} {list}").trim()));
+    if parameters.to_string().len() > MOST_PARAMETERS_BYTES {
+        *parameters = before;
+    }
+}
 
 /// `rule`, then as many whole sentences of `own` as fit within
 /// [`MOST_DESCRIPTION_BYTES`]: the rule is never the part cut.
@@ -944,6 +991,50 @@ mod tests {
         assert!(said.len() <= MOST_DESCRIPTION_BYTES);
         assert!(said.ends_with("Read mail."));
         assert_eq!(within_description(RULE, ""), RULE);
+    }
+
+    /// A service's "action, by service:" list the description had no room
+    /// for is told on the `action` parameter, so the model still knows a
+    /// calendar's `create_event`; one that fits stays where it was.
+    #[test]
+    fn a_by_service_list_cut_from_the_description_is_told_on_its_parameter() {
+        let list = "action, by service: gmail: send_mail {to, text}; \
+                    google_calendar: create_event {title, start, end}.";
+        let own = format!("{} {list}", "Send something. ".repeat(60));
+        let mut tool = Tool {
+            name: WRITE.into(),
+            description: within_description(WRITE_RULE, own.trim()),
+            parameters: Some(json!({"type": "object", "properties": {
+                "action": {"type": "string", "description": "What to do, as listed for the service."}
+            }})),
+            silent: false,
+        };
+        assert!(!tool.description.contains("create_event"));
+        list_in_parameter(&mut tool, own.trim());
+        let action = tool.parameters.as_ref().unwrap()["properties"]["action"]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            action,
+            format!("What to do, as listed for the service. {list}")
+        );
+        // Room for it: the description keeps it and the parameter is as it was.
+        let short = format!("Send something. {list}");
+        let mut fits = Tool {
+            name: WRITE.into(),
+            description: within_description(WRITE_RULE, &short),
+            parameters: Some(json!({"type": "object", "properties": {
+                "action": {"type": "string", "description": "What to do."}
+            }})),
+            silent: false,
+        };
+        list_in_parameter(&mut fits, &short);
+        assert!(fits.description.contains("create_event"));
+        assert_eq!(
+            fits.parameters.unwrap()["properties"]["action"]["description"],
+            "What to do."
+        );
     }
 
     #[test]
