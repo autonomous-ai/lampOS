@@ -253,6 +253,21 @@ October)». Không có điều nào có ngày thì ghi chú giữ nguyên như t
 1.200 byte của ghi chú không đổi và tính cả `on`; mỗi điều có ngày tốn khoảng
 18–23 byte, câu giải thích khoảng 130 byte, chỉ khi có điều có ngày.
 
+## Dải sở thích trong ghi chú phiên (`profile`, `LAMP_MEMORY_PROFILE`)
+
+Với `profile:true` trong `session_open` (công tắc `LAMP_MEMORY_PROFILE` của
+voice, mặc định tắt; kế hoạch ý tưởng Tiers của người phụ trách bộ nhớ, 3/11,
+ý tưởng hồ sơ chủ nhân của [memory-tiers](../memory-tiers.md) (Tiers), đã điều
+chỉnh), ghi chú được điền hai lượt. Trước hết là sở thích và các điều đã giữ,
+mới nhất trước, trong tối đa 600 byte và 30 điều (`PROFILE_BYTES`,
+`PROFILE_FACTS`). Sau đó là lời hứa, chuyện đang dở và phần còn lại, như khi
+không có nó, trong phần còn lại của cùng giới hạn 1.200 byte. Trước đây một
+người có nhiều chuyện đang dở bị đẩy hết sở thích và thói quen ra khỏi ghi
+chú. Cùng ứng viên, cùng người, cùng giới hạn, các điều được viết theo cùng
+thứ tự: không giữ, nói hay đọc thêm gì, không gọi mô hình, không di chuyển dữ
+liệu. Không có trường này, ghi chú giống hệt trước, từng byte. Memory cũ từ
+chối trường này (`deny_unknown_fields`).
+
 ## Ghi chú cuộc trò chuyện (`talk_note`, `LAMP_CONVERSATION_SUMMARY`)
 
 Khi bật `LAMP_CONVERSATION_SUMMARY` (chỉ tuyến thứ hai, bật trong unit sản

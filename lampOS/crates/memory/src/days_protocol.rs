@@ -103,6 +103,12 @@ enum Extra {
         session: String,
         #[serde(default)]
         max_bytes: Option<u64>,
+        /// The voice's `LAMP_MEMORY_PROFILE` (the memory owner's
+        /// Tiers-ideas plan, 3 Nov): preferences and kept facts are given
+        /// their band of the note first (`Days::session_open_with`).
+        /// Without it, as before.
+        #[serde(default)]
+        profile: bool,
     },
     SessionClose {
         #[serde(default)]
@@ -596,8 +602,9 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             person,
             session,
             max_bytes,
+            profile,
         } => {
-            json!({"ok":true,"snapshot":store.session_open(&one(person)?,&session,max_bytes.unwrap_or(1200).min(1200) as usize)?})
+            json!({"ok":true,"snapshot":store.session_open_with(&one(person)?,&session,max_bytes.unwrap_or(1200).min(1200) as usize,profile)?})
         }
         Extra::SessionClose { person, session } => {
             store.session_close(&one(person)?, &session)?;
