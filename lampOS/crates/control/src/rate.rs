@@ -46,7 +46,8 @@ impl Class {
                 Some(Self::Motion)
             }
             Op::Light { .. } => Some(Self::Light),
-            Op::Say { .. } | Op::Sound { .. } => Some(Self::Say),
+            // A turn speaks, or opens the lamp to be spoken to: a say's.
+            Op::Say { .. } | Op::Sound { .. } | Op::TurnStart { .. } => Some(Self::Say),
             Op::Express { .. } => Some(Self::Express),
             _ => None,
         }

@@ -246,6 +246,31 @@ impl Shared {
         });
     }
 
+    /// A reply the part gives later (the voice's to a `turn.end` or a
+    /// `listen.set`), waited for off the door's lock and the runtime's
+    /// thread; it goes to `outbox`, the asking connection's, and the
+    /// journal says how it ended.
+    fn answer_later(
+        self: &Arc<Self>,
+        later: crate::session::Later,
+        outbox: mpsc::WeakUnboundedSender<Value>,
+    ) {
+        let shared = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let (client, op) = (later.client.clone(), later.op);
+            let reply = later.reply();
+            let now = shared.now_us();
+            shared
+                .door
+                .lock()
+                .expect("door")
+                .journal_answer(&client, op, &reply, now);
+            if let Some(outbox) = outbox.upgrade() {
+                let _ = outbox.send(reply);
+            }
+        });
+    }
+
     /// The door's pairing changes for the manage helper (a computer's
     /// pushed skills off, or held to new grants), sent in order by one
     /// thread; each answer said in the journal, as nobody waits for it.
@@ -936,6 +961,9 @@ async fn connection<S>(
                     if let Some(ask) = outcome.ask.take() {
                         shared.ask_helper(ask, answers.clone());
                     }
+                    if let Some(later) = outcome.later.take() {
+                        shared.answer_later(later, answers.clone());
+                    }
                     // A pairing that changed a computer's grants.
                     shared.tell_helper();
                     let mut gone = false;
@@ -1009,7 +1037,7 @@ async fn connection<S>(
             .values()
             .any(|open| open.client.as_deref() == Some(client));
         if !still_open {
-            shared.parts.lock().expect("parts").stop(client, now);
+            shared.parts.lock().expect("parts").gone(client, now);
         }
     }
     shared.tell(changes);
@@ -1067,9 +1095,10 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
         shared.tell(revoked.changes);
         // Its pushed skills off (not deleted), whether or not it had any.
         shared.tell_helper();
-        // What it asked for that still goes stops, as its `stop` would.
+        // What it asked for that still goes stops, as its `stop` would, and
+        // its mute is let go.
         if revoked.was {
-            shared.parts.lock().expect("parts").stop(client, now);
+            shared.parts.lock().expect("parts").gone(client, now);
         }
         // In effect now either way; a failed save is said, since a restart
         // before a save succeeds would bring the key back.

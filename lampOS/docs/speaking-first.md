@@ -544,8 +544,8 @@ part of [Bedtime and Morning's lamp comparison](bedtime-morning.md).
 listening"; `crates/voice/src/control_turn.rs`): the skill `control` alone
 (`say::TURN_SKILL`; any other, root's helpers too, is refused `turn is
 lamp-control's only`) may ask the voice to open a conversation turn, or to
-end one it opened. The door does not serve these yet; this is the voice's
-side.
+end one it opened. The door serves them as `turn.start` and `turn.end`
+(`crates/control/src/parts.rs`); this is the voice's side.
 
     {"skill": "control", "turn": "start", "expires_in_ms": 10000}
     {"skill": "control", "turn": "start", "text": "Shall we go over today's list?", "expires_in_ms": 10000}
@@ -615,7 +615,9 @@ end a computer's turn as any other.
 and listening", `listen.set`; `crates/voice/src/control_mute.rs`): the
 skill `control` alone (any other is refused `listen is lamp-control's
 only`), with nothing else in its line, not even an expiry (`listen goes
-alone`). The door does not serve it yet; this is the voice's side.
+alone`). The door serves it as `listen.set`, holding one connection for
+each computer and closing it when the computer goes; this is the voice's
+side.
 
     {"skill": "control", "listen": false}
     {"skill": "control", "listen": true}
