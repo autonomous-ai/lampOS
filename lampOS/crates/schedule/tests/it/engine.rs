@@ -1360,11 +1360,11 @@ fn listed(engine: &mut Engine<Disk>, at: &ClockSample, asker: Option<Asker>) -> 
 }
 
 /// #4527's P2, the first builder's (a): each reminder keeps who set it; a
-/// line hears only its own, and one set with nobody sure only on the
-/// owner's line. A request with no asker (the app, the due reminder's own
-/// reads) sees them all.
+/// line hears only its own, and one set with nobody sure is the room's,
+/// heard on every line (the first builder on #4710, 3 Nov 10:09). A request
+/// with no asker (the app, the due reminder's own reads) sees them all.
 #[test]
-fn each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_person_ones() {
+fn each_line_lists_only_the_reminders_it_set_and_every_line_hears_the_rooms() {
     let at = now(0);
     let mut e = open(Disk::default(), &at);
     set_by(&mut e, &at, "Ann's pills", Some(ANN));
@@ -1372,19 +1372,22 @@ fn each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_per
     set_by(&mut e, &at, "Water the plant", None);
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), false))),
-        ["Ann's pills"]
+        ["Ann's pills", "Water the plant"]
     );
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(BO), false))),
-        ["Bo's call"]
+        ["Bo's call", "Water the plant"]
     );
-    // The owner is Ann: hers and the no-person one, never Bo's.
+    // The owner is Ann: hers and the room's, never Bo's.
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), true))),
         ["Ann's pills", "Water the plant"]
     );
-    // An unknown face, or the room's line: nothing of anyone's.
-    assert!(listed(&mut e, &at, Some(asker(None, false))).is_empty());
+    // An unknown face, or the room's line: the room's, nothing of anyone's.
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(None, false))),
+        ["Water the plant"]
+    );
     assert_eq!(listed(&mut e, &at, None).len(), 3);
     // Its count of what is set and not yet due is the line's own.
     let page = e
@@ -1398,7 +1401,44 @@ fn each_line_lists_only_the_reminders_it_set_and_the_owner_also_hears_the_no_per
             &at,
         )
         .unwrap();
-    assert_eq!(page["not_yet_due"], 1);
+    assert_eq!(page["not_yet_due"], 2);
+}
+
+/// The first builder on #4710 (3 Nov 10:09), from lamp-9adf: "remind me to
+/// drink water every day at five" set with nobody known in view, then "stop
+/// reminding me to drink water" a few seconds later found nothing. A
+/// reminder set while nobody known is in view is the room's: anyone in the
+/// room hears it listed and stops it by voice; a known person's stays theirs.
+#[test]
+fn the_room_line_that_set_a_reminder_hears_and_cancels_it_and_never_a_persons() {
+    let at = now(0);
+    let mut e = open(Disk::default(), &at);
+    let ann = set_by(&mut e, &at, "Ann's pills", Some(ANN));
+    let water = set_by(&mut e, &at, "Drink water", None);
+    let room = asker(None, false);
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Drink water"]);
+    let refused = e
+        .answer(
+            Request::Cancel {
+                guard: guard(&e),
+                id: ann,
+                asker: Some(room.clone()),
+            },
+            &at,
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, "not_found");
+    e.answer(
+        Request::Cancel {
+            guard: guard(&e),
+            id: water,
+            asker: Some(room.clone()),
+        },
+        &at,
+    )
+    .unwrap();
+    assert!(listed(&mut e, &at, Some(room)).is_empty());
+    assert_eq!(listed(&mut e, &at, None), ["Ann's pills"]);
 }
 
 #[test]
@@ -1407,11 +1447,7 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
     let mut e = open(Disk::default(), &at);
     let ann = set_by(&mut e, &at, "Ann's pills", Some(ANN));
     let room = set_by(&mut e, &at, "Water the plant", None);
-    for (id, guest) in [
-        (ann, asker(Some(BO), false)),
-        (ann, asker(None, false)),
-        (room, asker(Some(BO), false)),
-    ] {
+    for (id, guest) in [(ann, asker(Some(BO), false)), (ann, asker(None, false))] {
         let refused = e
             .answer(
                 Request::Cancel {
@@ -1441,7 +1477,7 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
         .unwrap_err();
     assert_eq!(refused.code, "not_found");
     assert_eq!(listed(&mut e, &due_at, None).len(), 2);
-    // Ann snoozes her own, and the owner cancels the no-person one.
+    // Ann snoozes her own, and the owner cancels the room's.
     e.answer(
         Request::Snooze {
             guard: guard(&e),
@@ -1465,13 +1501,13 @@ fn a_cancel_or_snooze_by_another_persons_id_is_not_found_and_changes_nothing() {
     assert_eq!(listed(&mut e, &due_at, None), ["Ann's pills"]);
 }
 
-/// The room's timers (option 1 on #4656's after-merge P2, bounded by
-/// Reviewer-three's P1 and Third's line on #4668): a line with no face
-/// seen, at the stove, hears and cancels a timer set by nobody for two hours
-/// at most. It never hears a person's timer, a reminder, or a relative
-/// reminder set further out, a person's or nobody's.
+/// The room's timers (option 1 on #4656's after-merge P2), and since the
+/// first builder on #4710 (3 Nov 10:09) the room's reminders too: a line with
+/// no face seen, at the stove, hears and cancels a timer or reminder set by
+/// nobody, short or long. It never hears a person's timer, reminder, or
+/// relative reminder.
 #[test]
-fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one() {
+fn the_room_hears_every_one_set_by_nobody_and_never_a_persons() {
     let at = now(0);
     let mut e = open(Disk::default(), &at);
     let weeks = || When::After {
@@ -1486,16 +1522,22 @@ fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one(
     set_when(&mut e, &at, "Roast", None, When::After { seconds: 7_200 });
     set_when(&mut e, &at, "Bread", None, When::After { seconds: 7_201 });
     let room = asker(None, false);
-    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Pasta", "Roast"]);
-    assert_eq!(
-        listed(&mut e, &at, Some(asker(Some(BO), false))),
-        ["Pasta", "Roast"]
-    );
+    let nobodys = ["Pasta", "Renew the visa", "Roast", "Bread"];
+    assert_eq!(listed(&mut e, &at, Some(room.clone())), nobodys);
+    assert_eq!(listed(&mut e, &at, Some(asker(Some(BO), false))), nobodys);
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), false))),
-        ["Pasta", "Tea", "Ann's pills", "Ann's prescription", "Roast"]
+        [
+            "Pasta",
+            "Tea",
+            "Ann's pills",
+            "Ann's prescription",
+            "Renew the visa",
+            "Roast",
+            "Bread"
+        ]
     );
-    // The owner's line hears every one set by nobody, as before.
+    // The owner's line hears every one set by nobody, as every line does.
     assert_eq!(
         listed(&mut e, &at, Some(asker(None, true))),
         ["Pasta", "Renew the visa", "Roast", "Bread"]
@@ -1514,7 +1556,10 @@ fn the_room_hears_a_short_timer_set_by_nobody_and_never_a_persons_or_a_long_one(
         assert_eq!(cancel(&mut e, id).unwrap_err().code, "not_found", "{id}");
     }
     cancel(&mut e, pasta).unwrap();
-    assert_eq!(listed(&mut e, &at, Some(room.clone())), ["Roast"]);
+    assert_eq!(
+        listed(&mut e, &at, Some(room.clone())),
+        ["Renew the visa", "Roast", "Bread"]
+    );
     // A person's timer keeps its setter: Ann's forget takes it with hers.
     let forgot = e
         .answer(
@@ -1565,9 +1610,14 @@ fn a_persons_forget_cancels_every_reminder_they_set_and_survives_a_reopen() {
     drop(e);
     let mut e = open(disk, &at);
     assert_eq!(listed(&mut e, &at, None), ["Bo's call", "Water the plant"]);
+    // Bo hears his own and the room's, never Ann's (gone) or another's.
     assert_eq!(
         listed(&mut e, &at, Some(asker(Some(BO), false))),
-        ["Bo's call"]
+        ["Bo's call", "Water the plant"]
+    );
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(ANN), false))),
+        ["Water the plant"]
     );
 }
 
@@ -1586,10 +1636,19 @@ fn a_store_from_before_setters_loads_with_every_item_no_persons_and_keeps_the_se
     assert!(stored["items"][0].get("person").is_none());
     assert_eq!(stored["items"][1]["person"], ANN);
     let mut e = open(disk, &at);
+    // One with no setter is the room's: every line hears it; Ann's only hers.
     assert_eq!(listed(&mut e, &at, Some(asker(None, true))), ["Call Maria"]);
     assert_eq!(
+        listed(&mut e, &at, Some(asker(None, false))),
+        ["Call Maria"]
+    );
+    assert_eq!(
+        listed(&mut e, &at, Some(asker(Some(BO), false))),
+        ["Call Maria"]
+    );
+    assert_eq!(
         listed(&mut e, &at, Some(asker(Some(ANN), false))),
-        ["Ann's pills"]
+        ["Call Maria", "Ann's pills"]
     );
     // A setter that is not a person id is refused, never stored.
     let refused = e
@@ -1857,7 +1916,7 @@ fn one_said_on_time_is_kept_as_said_on_time_and_waits_for_nothing() {
 }
 
 #[test]
-fn a_line_hears_only_its_own_said_ones_and_a_forget_takes_theirs() {
+fn a_line_hears_its_own_and_the_rooms_said_ones_and_a_forget_takes_theirs() {
     let at = now(0);
     let disk = Disk::default();
     let mut e = open(disk.clone(), &at);
@@ -1876,7 +1935,7 @@ fn a_line_hears_only_its_own_said_ones_and_a_forget_takes_theirs() {
         When::After { seconds: 3 * 3_600 },
     );
     set_by(&mut e, &at, "Water the plant", None);
-    // The room's timer: every line hears it.
+    // The room's reminder and timer: every line hears them.
     timer_by(&mut e, &at, "Pasta", None);
     ack_all(&mut e, &now(4 * HOUR));
     let at = now(4 * HOUR);
@@ -1885,13 +1944,13 @@ fn a_line_hears_only_its_own_said_ones_and_a_forget_takes_theirs() {
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
     ann.sort();
-    assert_eq!(ann, ["Ann's pills", "Pasta"]);
+    assert_eq!(ann, ["Ann's pills", "Pasta", "Water the plant"]);
     let mut bo = texts_of(&said_of(&mut e, &at, BO))
         .iter()
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
     bo.sort();
-    assert_eq!(bo, ["Bo's call", "Pasta"]);
+    assert_eq!(bo, ["Bo's call", "Pasta", "Water the plant"]);
     let mut owner = texts_of(&said(&mut e, &at, Some(asker(None, true))))
         .iter()
         .map(|s| s.to_string())
@@ -1900,10 +1959,12 @@ fn a_line_hears_only_its_own_said_ones_and_a_forget_takes_theirs() {
     assert_eq!(owner, ["Pasta", "Water the plant"]);
     assert_eq!(said(&mut e, &at, None).len(), 4);
     // An unknown voice hears only the room's.
-    assert_eq!(
-        texts_of(&said(&mut e, &at, Some(asker(None, false)))),
-        ["Pasta"]
-    );
+    let mut room = texts_of(&said(&mut e, &at, Some(asker(None, false))))
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    room.sort();
+    assert_eq!(room, ["Pasta", "Water the plant"]);
     e.answer(
         Request::Forget {
             guard: guard(&e),
@@ -1912,7 +1973,12 @@ fn a_line_hears_only_its_own_said_ones_and_a_forget_takes_theirs() {
         &at,
     )
     .unwrap();
-    assert_eq!(texts_of(&said_of(&mut e, &at, ANN)), ["Pasta"]);
+    let mut ann = texts_of(&said_of(&mut e, &at, ANN))
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    ann.sort();
+    assert_eq!(ann, ["Pasta", "Water the plant"]);
     assert_eq!(said(&mut e, &at, None).len(), 3);
     drop(e);
     let stored = String::from_utf8(disk.0.lock().unwrap().bytes.clone().unwrap()).unwrap();
