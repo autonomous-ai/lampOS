@@ -20,10 +20,7 @@ topic = "voice/state"
 field = "state"
 equals = "resting"
 cooldown = "12h"
-
-[quiet]
-from = "22:30"
-to = "22:00"
+during = { from = "22:00", to = "22:30" }
 
 [ask]
 policy = "nudge"
@@ -86,7 +83,12 @@ fn a_skill_made_by_voice_is_checked_packed_and_kept() {
         (made.name.as_str(), made.version.as_str()),
         ("evening-dim", "1.0.0")
     );
-    assert_eq!(made.description, "Dims the light a shade at 10 pm.");
+    // Said from its skill.toml, not the card's words (#5041).
+    assert_eq!(
+        made.description,
+        "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at most \
+         once every 12 hours."
+    );
     assert_eq!(made.uses.spoken(), "its light and whether it is talking");
     let bytes = fs::read(&made.package).unwrap();
     let sha: String = Sha256::digest(&bytes)
