@@ -102,6 +102,9 @@ Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
 Environment=LAMP_SECOND_DOWN_LINE=on
 Environment=LAMP_SECOND_WAIT_CUE=on
 Environment=LAMP_SECOND_LOOK=on
+# A skill's look on this route (Look for things, in the Skills Store): without it the lamp says it will look and never
+# does. On lamp-9adf on 3 Nov "can you find my glasses?" looked five places and said what it saw at each (#4710).
+Environment=LAMP_SECOND_SKILL_LOOK=on
 # Each turn told and kept for the person (or the room) admitted with its request, not the session's owner: the lead's
 # decision of 21 Oct on #1711, after the two-person run on lamp-52e6 (11 of 12, nothing crossed; #1895, #2233).
 Environment=LAMP_SECOND_SCOPED_CONTEXT=on
