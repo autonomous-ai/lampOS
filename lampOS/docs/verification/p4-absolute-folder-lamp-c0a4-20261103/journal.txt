@@ -1,0 +1,16 @@
+Nov 03 18:15:07.877566 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 18:15:07.911839 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 18:15:33.419771 <lamp> lamp-tasks[683619]: tasks: lamp-fbcaebe0b350e2487b93ee228929ab93: new answered in 4990 ms, the folder sent home-relative (~/), so Harness asks the computer for its home
+Nov 03 18:15:33.419771 <lamp> lamp-tasks[683619]: tasks: lamp-fbcaebe0b350e2487b93ee228929ab93: dispatch accepted (exit 0, 7.2 s)
+Nov 03 18:16:20.538018 <lamp> lamp-tasks[683619]: tasks: lamp-753a7da0c92b5cde69398d2ccc4e268d: new answered in 5353 ms, the folder sent home-relative (~/), so Harness asks the computer for its home
+Nov 03 18:16:20.538018 <lamp> lamp-tasks[683619]: tasks: lamp-753a7da0c92b5cde69398d2ccc4e268d: dispatch accepted (exit 0, 7.9 s)
+Nov 03 18:17:03.727116 <lamp> lamp-tasks[683619]: tasks: lamp-b8c0d973bdfc6b379045bde075010280: new answered in 4792 ms, the folder sent home-relative (~/), so Harness asks the computer for its home
+Nov 03 18:17:03.727116 <lamp> lamp-tasks[683619]: tasks: lamp-b8c0d973bdfc6b379045bde075010280: dispatch accepted (exit 0, 7.2 s)
+Nov 03 18:20:27.676228 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 18:20:27.766633 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 18:20:54.841546 <lamp> lamp-tasks[686447]: tasks: lamp-51c37e6997f9593cdae07ccdf43eeded: new answered in 5338 ms, the folder sent home-relative (~/), so Harness asks the computer for its home
+Nov 03 18:20:54.841546 <lamp> lamp-tasks[686447]: tasks: lamp-51c37e6997f9593cdae07ccdf43eeded: dispatch accepted (exit 0, 7.5 s)
+Nov 03 18:21:38.742497 <lamp> lamp-tasks[686447]: tasks: lamp-ef1c40d6aa6d860280c78e1d282772e6: new answered in 4204 ms, the folder sent absolute, from the computer's home learned earlier
+Nov 03 18:21:38.743098 <lamp> lamp-tasks[686447]: tasks: lamp-ef1c40d6aa6d860280c78e1d282772e6: dispatch accepted (exit 0, 6.5 s)
+Nov 03 18:22:20.573507 <lamp> lamp-tasks[686447]: tasks: lamp-502953aedec4b99a5a68b19642bc7063: new answered in 3753 ms, the folder sent absolute, from the computer's home learned earlier
+Nov 03 18:22:20.575085 <lamp> lamp-tasks[686447]: tasks: lamp-502953aedec4b99a5a68b19642bc7063: dispatch accepted (exit 0, 6.0 s)
