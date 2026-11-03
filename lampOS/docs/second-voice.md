@@ -4439,8 +4439,9 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   went to (#3699). A face the eyes say `follows` a lost passing id (their
   `LAMP_FACE_KNOWN_HOLD=on` and `LAMP_FACE_REFOUND=on`, #4885, eyes.md "The
   followed id") is that face, but only on the eyes' word as of the line's
-  end: each link said in their looks up to it, kept as a chain as the eyes
-  keep it, so a face re-found twice in a line (`f15` to `f16` to `f17`,
+  end: each link said in their looks up to it, kept as a chain (longer
+  than the eyes, which drop a link 1.5 s after the old id was lost: the
+  voice keeps it for the 30 s of looks it keeps unless a look cuts it), so a face re-found twice in a line (`f15` to `f16` to `f17`,
   the eyes saying only the last hop by its end; lamp-52e6, #4966) is one
   face, and each link ended by a later look, its old id in view again or
   its new id in view without the link said (`Looks::links_at`, the
