@@ -90,7 +90,7 @@ ProtectSystem=strict
 # app's photos, for the eyes, with LAMP_PHOTO_FACES=on (docs/cloud.md; made by lampos.conf at boot);
 # lamp-skills' call socket, for guard mode from the app with LAMP_GUARD_FROM_APP=on (#2562); and
 # lamp-voice's app-make socket, for a skill typed in the app with LAMP_APP_MAKE_SKILL=on (#2813).
-ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make
+ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services
 ProtectHome=yes
 PrivateTmp=yes
 # No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,

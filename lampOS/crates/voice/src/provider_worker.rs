@@ -3735,6 +3735,7 @@ impl ToolDesk {
                 && matches!(
                     crate::tools::route(&self.settings, &call.name),
                     Route::Executive(_)
+                        | Route::Services(_)
                         | Route::UseSkill(_)
                         | Route::Schedule(_)
                         | Route::Memory(..)
@@ -3911,6 +3912,7 @@ impl ToolDesk {
                 );
             }
             route @ (Route::Executive(_)
+            | Route::Services(_)
             | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(..)
@@ -3925,6 +3927,7 @@ impl ToolDesk {
                 self.run(provider, lineage, call, route, called_us, memory, false);
             }
             Route::Executive(_)
+            | Route::Services(_)
             | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(..)

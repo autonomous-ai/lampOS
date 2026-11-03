@@ -17,6 +17,7 @@ pub mod photos;
 pub mod ping;
 pub mod reports;
 pub mod schedule;
+pub mod services;
 pub mod settings;
 pub mod share;
 pub mod signed_out;

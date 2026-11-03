@@ -77,6 +77,10 @@ const NOT_PASSED: &[(&str, &str)] = &[
         "the coordinator's, given as an argument",
     ),
     ("LAMP_CLOCK", "the coordinator's, given as an argument"),
+    (
+        "LAMP_SERVICES",
+        "the coordinator's, given as --services-dir",
+    ),
     // The onboarding steps this lamp offers (#3769), as `setup_step` names them.
     (
         "LAMP_PRIVACY_CONTROLS",
