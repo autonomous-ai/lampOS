@@ -30,6 +30,7 @@ impl Scratch {
             utc_offset_minutes: 0,
             zone: None,
             memory_days: days,
+            taste_rules: false,
             bus_root: bus.then(|| self.0.join("b")),
             forget: None,
         }

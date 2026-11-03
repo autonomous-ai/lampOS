@@ -200,6 +200,10 @@ pub struct Days {
     /// time whose line is never written (lost, or the memory restarted in
     /// between) is never told. The oldest goes past [`SAID_PENDING`].
     said_pending: std::collections::VecDeque<(i64, u64)>,
+    /// `--taste-rules` (plan C, step A): a known person's stated tastes
+    /// are kept as observations inside each exchange's write
+    /// ([`crate::taste_rules`]). Off unless [`Self::enable_taste_rules`].
+    taste_rules: bool,
     _held: File,
 }
 
@@ -269,6 +273,7 @@ impl Days {
             now,
             set_aside,
             said_pending: std::collections::VecDeque::new(),
+            taste_rules: false,
             _held: held,
         };
         this.import()?;
@@ -397,6 +402,30 @@ impl Days {
         }
         File::open(&self.dir)?.sync_all()?;
         Ok(())
+    }
+
+    /// Switches the taste rules on (`--taste-rules`): their side table is
+    /// made now, so a store that never had them on is unchanged.
+    pub fn enable_taste_rules(&mut self) -> Result<()> {
+        self.db.execute_batch(crate::taste_rules::TABLE)?;
+        self.taste_rules = true;
+        Ok(())
+    }
+
+    /// The kind a rule-kept observation carries (`preference` or
+    /// `dislike`), or none.
+    pub fn taste_kind(&self, person: &Person, id: u64) -> Result<Option<String>> {
+        if !self.taste_rules {
+            return Ok(None);
+        }
+        Ok(self
+            .db
+            .query_row(
+                "SELECT t.kind FROM tastes t JOIN entries e ON e.rid=t.rid WHERE e.person=?1 AND e.id=?2",
+                params![person.as_str(), id],
+                |r| r.get(0),
+            )
+            .optional()?)
     }
 
     pub fn maintain(&mut self, now: u64) -> Result<u64> {
@@ -797,7 +826,7 @@ impl Days {
                 "the timestamp is outside 1970 through 9999",
             ));
         }
-        let tx = self.db.transaction()?;
+        let mut tx = self.db.transaction()?;
         ensure_person(&tx, person)?;
         validate_sources(&tx, person, sources, false)?;
         // Rules are the person's own, in the scope beside theirs, and only
@@ -891,6 +920,10 @@ impl Days {
                     params![rid, scope.as_str(), rule],
                 )?;
             }
+        }
+        // A known person's stated tastes, in this write (`--taste-rules`).
+        if self.taste_rules && text.is_empty() {
+            crate::taste_rules::observe(&mut tx, person, id, at, heard, &self.local, self.now);
         }
         tx.commit()?;
         self.said_pending.retain(|(rid, _)| !said.contains(rid));
@@ -2591,7 +2624,7 @@ fn speaker_of<'a>(person: &Person, speaker: Option<&'a str>) -> Result<Option<&'
 
 /// What two kept things are compared by (#2176): NFC, lower case, white
 /// space trimmed and collapsed, and punctuation at the end dropped.
-fn same_text(text: &str) -> String {
+pub(crate) fn same_text(text: &str) -> String {
     let lower: String = text.nfc().flat_map(char::to_lowercase).nfc().collect();
     let words = lower.split_whitespace().collect::<Vec<_>>().join(" ");
     words
@@ -2757,7 +2790,7 @@ fn ensure_person(db: &Connection, person: &Person) -> Result<()> {
     )?;
     Ok(())
 }
-fn next_id(db: &Connection, person: &Person) -> Result<u64> {
+pub(crate) fn next_id(db: &Connection, person: &Person) -> Result<u64> {
     let count: u64 = db.query_row(
         "SELECT count(*) FROM entries WHERE person=?",
         [person.as_str()],
@@ -2847,7 +2880,12 @@ fn validate_sources(db: &Connection, person: &Person, ids: &[u64], required: boo
     }
     Ok(())
 }
-fn insert_record(db: &Connection, r: &Record, local: &LocalTime, used: u64) -> Result<()> {
+pub(crate) fn insert_record(
+    db: &Connection,
+    r: &Record,
+    local: &LocalTime,
+    used: u64,
+) -> Result<()> {
     let day = Day::at(r.at_unix_ms, local)
         .ok_or_else(|| Error::new("bad_time", "the timestamp is outside 1970 through 9999"))?
         .to_string();

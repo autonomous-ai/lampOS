@@ -61,6 +61,7 @@ mod tests {
                 utc_offset_minutes: 0,
                 zone: None,
                 memory_days: false,
+                taste_rules: false,
                 bus_root: None,
                 forget: None,
             }))
@@ -83,6 +84,7 @@ mod tests {
                 utc_offset_minutes: 420,
                 zone: None,
                 memory_days: false,
+                taste_rules: false,
                 bus_root: None,
                 forget: None,
             }))
@@ -144,6 +146,25 @@ mod tests {
             .is_err()
         );
         assert!(arguments(&["--memory-days", "--help"]).is_err());
+    }
+
+    /// Plan C, step A: `--taste-rules` is off unless given, needs
+    /// `--memory-days`, and is said in the start line only when on.
+    #[test]
+    fn taste_rules_are_off_unless_given_with_memory_days() {
+        let base = ["--dir", "/m", "--socket", "/s", "--memory-days"];
+        assert!(!arguments(&base).unwrap().unwrap().taste_rules);
+        let on = arguments(&[&base[..], &["--taste-rules"]].concat())
+            .unwrap()
+            .unwrap();
+        assert!(on.taste_rules);
+        assert_eq!(
+            days_start_line(&on),
+            "started memory_days=true taste_rules=on; the model adapter is not configured"
+        );
+        assert!(arguments(&["--dir", "/m", "--socket", "/s", "--taste-rules"]).is_err());
+        assert!(arguments(&[&base[..], &["--taste-rules", "--taste-rules"]].concat()).is_err());
+        assert!(arguments(&["--taste-rules", "--help"]).is_err());
     }
 
     #[test]

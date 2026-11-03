@@ -36,13 +36,22 @@ value to the provider role; the complete gate remains pending. Its Mac client
 timings are in [the task 29 evidence](verification/memory-voice-host-20261014/README.md).
 See [the client contract and played scenes](memory-days.md#opt-in-voice-client-task-29).
 
+`--taste-rules` (with `--memory-days`, off unless given; plan C, step A,
+3 Nov) keeps a known person's plainly stated likes, dislikes and
+favourites about everyday things ("I love coffee", "tôi ghét sầu riêng") as
+observations in their own words, linked to the line, by code rules inside
+the write, with no model. Never health, diet, medicine, money or another
+person, never the lamp's words, the room's, a question or a maybe; a
+forget of the line or the observation takes both. See
+[memory-days.md](memory-days.md#tastes-kept-by-rule---taste-rules-plan-c-step-a).
+
 ## The process
 
 Its own process, so that the lamp talks on, without recalling earlier days,
 when this one has stopped, hung or crashed. Others ask over a Unix stream
 socket and never read its files.
 
-    lamp-memory --dir ABSOLUTE_DIR --socket ABSOLUTE_SOCKET_PATH [--keep-days N] [--utc-offset-minutes M | --zone system|NAME] [--memory-days] [--bus-root ABSOLUTE_DIR]
+    lamp-memory --dir ABSOLUTE_DIR --socket ABSOLUTE_SOCKET_PATH [--keep-days N] [--utc-offset-minutes M | --zone system|NAME] [--memory-days [--taste-rules]] [--bus-root ABSOLUTE_DIR]
 
 `--dir` is made with mode 0700 if missing, `--socket` with mode 0600, and a
 socket file nobody answers on is replaced. A relative path, an unknown option
