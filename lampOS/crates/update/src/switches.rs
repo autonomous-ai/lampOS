@@ -339,6 +339,24 @@ mod tests {
             .find(|(name, _)| *name == "lamp-addons.service")
             .unwrap();
         assert!(!switches(addons).iter().any(|name| name == "LAMP_ADDONS"));
+        // Linked services (Queue #4710): installed, and off the same way;
+        // the unit passes no `--enable`, which would start it regardless.
+        let (_, services) = crate::install::PRODUCT
+            .iter()
+            .find(|(name, _)| *name == "lamp-services.service")
+            .unwrap();
+        assert!(
+            !switches(services)
+                .iter()
+                .any(|name| name == "LAMP_SERVICES")
+        );
+        assert!(
+            services
+                .lines()
+                .filter(|line| line.starts_with("ExecStart="))
+                .all(|line| !line.contains("--enable")),
+            "{services}"
+        );
     }
 
     #[test]
