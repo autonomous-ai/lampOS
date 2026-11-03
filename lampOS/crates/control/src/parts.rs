@@ -739,6 +739,10 @@ impl Lamp {
     }
 }
 
+/// The voice's why for a computer's turn ended by the person beginning to
+/// talk with the lamp in its window (`lamp_voice::control_turn::PERSON_TALKING`).
+const PERSON_TALKING: &str = "the person is talking";
+
 /// The say socket's outcome, past the `begun` event, in the protocol's
 /// words (`done.how`: `finished`, `cut_short`, `dropped`; the Reviewer-lead's
 /// and harness-reviewer's P2 on #3805): `spoken` is `finished`; `dropped`,
@@ -765,6 +769,12 @@ fn outcome_with(
         let word = said["outcome"].as_str().unwrap_or("failed");
         if word == "spoken" {
             return ("finished", None);
+        }
+        // A computer's turn ended because the person began talking with
+        // the lamp in its window: the person wins, and the turn was cut
+        // short, not dropped.
+        if word == "dropped" && said["why"].as_str() == Some(PERSON_TALKING) {
+            return ("cut_short", Some(PERSON_TALKING.to_owned()));
         }
         let why = match said["why"].as_str() {
             Some(why) => format!("{word}: {why}"),
@@ -1553,6 +1563,13 @@ mod tests {
                 Some("refused: private"),
             ),
             ("", "dropped", Some("the voice gave no outcome")),
+            // A computer's turn ended by the person beginning to talk with
+            // the lamp in its window: cut short, the person wins.
+            (
+                r#"{"outcome":"dropped","why":"the person is talking"}"#,
+                "cut_short",
+                Some("the person is talking"),
+            ),
         ] {
             assert_eq!(
                 outcome(BufReader::new(line.as_bytes())),

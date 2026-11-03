@@ -595,7 +595,10 @@ not the voice's. Then:
   the turn's id, unique for the voice's life. Then `{"outcome":"spoken"}`
   once the person spoke and the lamp's answer sounded (heard whole or cut),
   `{"outcome":"dropped","why":"nobody spoke"}` when the window passes
-  unused, `"not answered"` when the line was not answered, or the voice's
+  unused, `"not answered"` when the line was not answered,
+  `"the person is talking"` when the lamp's answer to a line of the
+  person's own (begun before the window) begins to sound while the window
+  is open (the person wins; the door says it `cut_short`), or the voice's
   why (`the lamp is muted`, `hand_stop`, `spoken_stop`, …).
 - The journal says one line as a turn opens: the skill and the turn's id,
   never a word heard.
