@@ -1144,6 +1144,47 @@ order is kept. A written turn is the same from the chat on.
   the path had already dropped, though the cause isn't shown; this switch
   is the test of it. A line whose connection the pool has let go opens a new
   one, a TLS handshake before its first word (its cost not measured here).
+- **With `LAMP_SECOND_CHAT_SECOND_TRY=on` a first round with nothing begun
+  2.5 s after the words goes once more** (off unless set;
+  `second_try::SECOND_TRY_AFTER`, #4710): the same request, on a new
+  connection that no other request shares. The first stays open, whichever
+  begins first answers, and the other is dropped the moment one begins, so no
+  word of it is read and its answer's line is never written. A failure on one
+  try leaves the turn to the other; both failing end the turn as one failure,
+  and a line lost on the network is then not asked a third time. At most one in
+  a turn; never a look, nor a round after anything has run (a held forget, or
+  rounds carried from a cut answer), nor once the turn's scope is revoked: only
+  before anything has run can nothing happen twice. The wait's sound, the turn's
+  limit and the slow line stay as they are. It costs one extra chat request in
+  those turns, counted to the lamp's use; a first try that also ran to its end
+  counts too. The journal:
+  - On every chat request, with the switch on or off: `chat connection: kept, no
+    new one opened for this request; the client's last answer or warm ended S s
+    before`, or `chat connection: new; …`. New or kept is what the client's
+    connector shows at the moment the request goes. The seconds are since this
+    client's last answer or warm ended, which a kept connection has been idle
+    since as the pool hands back the one it had last. Neither says whether a
+    kept connection still leads anywhere.
+  - When it goes: `request R second try goes N ms after the words, on a new
+    connection; the first stays open, having reached W`.
+  - Its connection: `request R second try: its new connection opened in N ms`,
+    or `could not open, after N ms`. One still opening when the turn ends is told
+    only by the end's line.
+  - One try ending while the other waits: `request R second try: the first ended
+    N ms after the words (why); the second still waits`.
+  - The end: `request R second try: the second answered, its first event N ms
+    after the words; the first was dropped, having reached W`; or `neither
+    answered in N ms; the first reached W, the second reached W`.
+  - W is `answer begun` (the response's head came, no word or call yet), `sent,
+    on a kept connection` or `sent, on a new connection` (handed to an open
+    connection, which says nothing of whether it got anywhere), or `nothing, its
+    new connection not open`, with `, then failed: why` if it failed.
+
+  It is also the test of what a silent chat is. A second try that answers quickly
+  says the kept connection was dead; one that can't open says the lamp's network
+  was down; one that opens and stays silent says the wait is further along. These
+  lines say `second try`, never `chat round`, so `lamp-voice-eval` counts a turn
+  as it did. Tests only so far; not run on a lamp.
   With the chat's warm also on, the warm comes from 20 s idle
   (`WARM_AFTER_KEPT`) rather than 60 s, counted from the last request; it
   may still reuse a pooled connection, and may still be opening when a short

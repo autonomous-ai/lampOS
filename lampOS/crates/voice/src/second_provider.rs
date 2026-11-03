@@ -67,10 +67,12 @@ pub mod net;
 mod own_echo;
 pub mod policy;
 pub mod probe;
+mod second_try;
 mod services;
 pub mod speech_tags;
 pub mod worker;
 
+pub use second_try::{CHAT_SECOND_TRY_ENVIRONMENT, ChatTold, SECOND_TRY_AFTER, second_try_on};
 pub use services::{
     CHAT_WARM_ENVIRONMENT, Listener, Net, RELAY_ROUTES_ENVIRONMENT, Routable,
     SPEECH_SOCKET_ENVIRONMENT, SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
@@ -1401,6 +1403,12 @@ struct Shared {
     /// The lamp's own written turns may begin as late as
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
+    /// With `LAMP_SECOND_CHAT_SECOND_TRY=on`: how long after the words a first
+    /// round with nothing begun goes once more ([`Engine::trying_the_chat_twice`]).
+    second_try: Option<Duration>,
+    /// A test's copy of each second-try journal line.
+    #[cfg(test)]
+    second_try_journal: Option<Arc<Mutex<Vec<String>>>>,
     /// [`Engine::resending`]: a spoken line whose chat was lost on the
     /// network is asked once more when the link is back.
     resend: Option<LinkBack>,
@@ -3400,6 +3408,9 @@ impl Engine {
                 answer_again: false,
                 asked_person: None,
                 written_wait: false,
+                second_try: None,
+                #[cfg(test)]
+                second_try_journal: None,
                 resend: None,
                 hearing: None,
                 line_heard: None,
@@ -4438,6 +4449,26 @@ impl Engine {
     pub fn waiting_for_written(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.written_wait = on;
+        }
+        self
+    }
+
+    /// `LAMP_SECOND_CHAT_SECOND_TRY=on` (#4710): `after` the words, a turn's
+    /// first round with nothing begun goes once more on a new connection, and
+    /// whichever try begins first answers ([`second_try`]). Not a look, and not
+    /// a round that follows something already run. The wait's sound, its limit
+    /// and the slow line stay as they are. Before any turn only.
+    pub fn trying_the_chat_twice(mut self, after: Option<Duration>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.second_try = after;
+        }
+        self
+    }
+
+    #[cfg(test)]
+    fn keeping_second_try_journal(mut self, journal: Arc<Mutex<Vec<String>>>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.second_try_journal = Some(journal);
         }
         self
     }
@@ -9011,6 +9042,8 @@ struct Prepared {
     events: mpsc::UnboundedReceiver<net::Result<ChatEvent>>,
     at: Instant,
     task: Option<JoinHandle<()>>,
+    /// How far it got, with `LAMP_SECOND_CHAT_SECOND_TRY`, for round 1's line.
+    reach: Option<Arc<net::Reach>>,
 }
 
 impl Drop for Prepared {
@@ -9037,7 +9070,9 @@ impl Prepared {
         let mut messages = told(shared, scope).messages();
         messages.extend(notes.iter().cloned().map(Message::system));
         messages.push(Message::user(words.clone()));
-        let mut chat = chat_for(shared, scope, messages.clone());
+        let watch = shared.second_try.map(|_| net::Watch::default());
+        let reach = watch.as_ref().map(net::Watch::reach);
+        let mut chat = chat_watching(shared, scope, messages.clone(), watch);
         let (kept, events) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
             while let Some(event) = chat.next().await {
@@ -9054,6 +9089,7 @@ impl Prepared {
             events,
             at: Instant::now(),
             task: Some(task),
+            reach,
         }
     }
 
@@ -10021,6 +10057,29 @@ fn chat_for(
     match withheld(scope) {
         [] => shared.services.chat(messages),
         without => shared.services.chat_without(messages, without),
+    }
+}
+
+/// [`chat_for`], saying how far it gets to `watch` when given.
+fn chat_watching(
+    shared: &Shared,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    messages: Vec<Message>,
+    watch: Option<net::Watch>,
+) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+    match watch {
+        None => chat_for(shared, scope, messages),
+        Some(watch) => shared
+            .services
+            .chat_watched(messages, told_for(scope), watch),
+    }
+}
+
+/// How [`chat_for`] tells a chat its functions.
+fn told_for(scope: Option<&crate::memory_scope::ScopeLease>) -> ChatTold {
+    match withheld(scope) {
+        [] => ChatTold::Every,
+        without => ChatTold::Without(without),
     }
 }
 
@@ -11116,6 +11175,15 @@ async fn answer(
         // is told one went unsaid beside other calls.
         let mut action_claim_asked = false;
         let mut action_claim_note: Option<crate::action_claim::Claim> = None;
+        // `LAMP_SECOND_CHAT_SECOND_TRY`: not for a look, nor once a held forget
+        // ran or rounds were carried from a cut answer.
+        let may_go_twice = second_try::may_go_twice(
+            shared.second_try.is_some(),
+            looking || seeing,
+            !rounds.is_empty() || ran_tool.load(Ordering::Relaxed),
+        );
+        // Round 1's two tries, once the second has gone.
+        let mut tries: Option<Arc<second_try::Tries>> = None;
         if !rounds.is_empty() {
             eprintln!(
                 "lamp-voice second: request {request} goes on from {} messages of the cut answer's finished rounds",
@@ -11183,19 +11251,55 @@ async fn answer(
             }
             round += 1;
             let mut refused = false;
+            // At most one second try in a turn, whatever round 1 is asked again.
+            let watch =
+                (may_go_twice && round == 1 && !tries.as_ref().is_some_and(|tries| tries.went()))
+                    .then(net::Watch::default);
+            let mut first_reach = watch.as_ref().map(net::Watch::reach);
+            let told = if quoted {
+                ChatTold::Only(&[])
+            } else {
+                told_for(scope.as_ref())
+            };
             let mut stream = match prepared.take() {
                 // A quoted line's every round declares no function at all.
-                _ if quoted => shared.services.chat_only(messages.clone(), &[]),
+                _ if quoted => match watch.clone() {
+                    Some(watch) => shared.services.chat_watched(messages.clone(), told, watch),
+                    None => shared.services.chat_only(messages.clone(), &[]),
+                },
                 Some(prepared) if round == 1 => {
                     if let Some(noted) = tools_noted
                         && let Ok(mut noted) = noted.lock()
                     {
                         noted.prepared = true;
                     }
+                    if watch.is_some() {
+                        first_reach.clone_from(&prepared.reach);
+                    }
                     prepared.into_events()
                 }
-                _ => chat_for(shared, scope.as_ref(), messages.clone()),
+                _ => chat_watching(shared, scope.as_ref(), messages.clone(), watch.clone()),
             };
+            if let (Some(after), Some(first_reach)) = (shared.second_try, first_reach) {
+                let services = shared.services.clone();
+                let again = messages.clone();
+                // A scope revoked while the first waits (the camera closed, a
+                // face gone) is not asked with what was read for it: as at
+                // every other request, so at this one.
+                let lease = scope.clone();
+                let say = second_try::Say::new(request);
+                #[cfg(test)]
+                let say = say.keeping(shared.second_try_journal.clone());
+                let (racing, kept) =
+                    second_try::race(stream, first_reach, from + after, from, say, move |watch| {
+                        if lease.as_ref().is_some_and(|lease| !lease.is_current()) {
+                            return None;
+                        }
+                        services.chat_second_try(again, told, watch)
+                    });
+                stream = racing;
+                tries = Some(kept);
+            }
             let mut first = true;
             let mut split = Sentences::default();
             let mut text = String::new();
@@ -11300,6 +11404,9 @@ async fn answer(
                                 "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the onboarding line's own words are said",
                                 began.elapsed().as_millis()
                             );
+                            if let Some(tries) = &tries {
+                                tries.neither();
+                            }
                             shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
                             queue.push(fixed.take().unwrap_or_default()).await?;
                             return Ok(());
@@ -11309,6 +11416,9 @@ async fn answer(
                                 "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the turn ends unanswered",
                                 began.elapsed().as_millis()
                             );
+                            if let Some(tries) = &tries {
+                                tries.neither();
+                            }
                             say_down(shared, request, heard).await?;
                             return Err(Stop::GaveUp);
                         }
@@ -11361,6 +11471,7 @@ async fn answer(
                             && round == 1
                             && !resent
                             && heard
+                            && !tries.as_ref().is_some_and(|tries| tries.went())
                             && let Some(back) = &shared.resend
                             && link::lost(&fault(&error))
                         {
