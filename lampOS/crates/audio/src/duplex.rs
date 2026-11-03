@@ -95,13 +95,28 @@ pub struct Hearing {
 /// How far the render at the echo's alignment has fallen under its own
 /// peak over the last 150 ms ([`EchoMatch::render_drop`]), in tenths of a
 /// decibel, from which a block is the tail of a word the lamp just stopped
-/// and so its own: 6 dB (`docs/duplex-listening.md`, the render strings).
+/// and so its own, with [`TAIL_CANCELLED_TENTHS`]: 6 dB
+/// (`docs/duplex-listening.md`, the render strings).
 /// Without it that tail, barely explained by a render that has gone quiet,
 /// read as a person over the lamp, plainly, and a late yield it made
 /// committed with nothing said (#5032).
 ///
 /// [`EchoMatch::render_drop`]: crate::evidence::EchoMatch::render_drop
 pub const TAIL_DROP_TENTHS: u16 = 60;
+
+/// How far, in tenths of a decibel, the cancelled signal must be under the
+/// microphone's before cancellation (`residual_level` against
+/// `capture_level`, both over 120 ms) for a block under a fallen render to
+/// be the lamp's own tail: 3 dB, the canceller took at least half of what
+/// reached the microphone, so most of it was the lamp's. The canceller
+/// takes a median 52 dB of the lamp's voice on lamp-4ace and lamp-a0ae
+/// (`docs/duplex-listening.md`), its room's ringing with it; a person it
+/// cannot fit to the render, and one 9 dB over the echo leaves at least
+/// 88% of the microphone, 0.6 dB under it. Without it the 150 ms peak also falls 6 dB
+/// in the dips between the lamp's syllables, and a person over those dips
+/// was the lamp's own there, so a short "Stop." never yielded (the
+/// reviewer-lead's P1 on #5037).
+pub const TAIL_CANCELLED_TENTHS: i16 = 30;
 
 impl Hearing {
     /// Chosen on the development half of two recorded sessions and their
@@ -141,8 +156,15 @@ impl Hearing {
             // sets the age to zero.
             Some(echo) if echo.alignment_age_blocks > self.fresh_blocks => Heard::Unknown,
             // A word's tail ringing on in the room, the render under it
-            // fallen from its peak: the lamp's own, not a person (#5032).
-            Some(echo) if echo.render_drop >= TAIL_DROP_TENTHS => Heard::Own,
+            // fallen from its peak and the canceller taking most of the
+            // microphone: the lamp's own, not a person (#5032).
+            Some(echo)
+                if echo.render_drop >= TAIL_DROP_TENTHS
+                    && evidence.residual_level.tenths_of_db()
+                        <= evidence.capture_level.tenths_of_db() - TAIL_CANCELLED_TENTHS =>
+            {
+                Heard::Own
+            }
             Some(echo)
                 if echo.capture_explained <= self.explained_percent
                     && echo.residual_playback_floor <= self.floor_percent =>
@@ -456,7 +478,8 @@ impl Interruption {
     /// do, and stillness counts only the plain blocks of the run that made
     /// the yield, not those after it: once the lamp has yielded, the render
     /// is silent and its own tail can be heard as a person, plainly, where
-    /// the render under it has not fallen [`TAIL_DROP_TENTHS`]. Without
+    /// the render under it has not fallen [`TAIL_DROP_TENTHS`] (with
+    /// [`TAIL_CANCELLED_TENTHS`] cancelled). Without
     /// `busy`, or off, nothing changes: a late yield's seven onset blocks
     /// never reach `plain_blocks`, so a quiet room needs the blocks after.
     /// Set before each block.
