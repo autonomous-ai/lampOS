@@ -195,8 +195,13 @@ SPK_UNIT=lamp-cmedia-speaker.service
 SPK_DROPIN=/etc/systemd/system/$SPK_UNIT.d/zz-factory-speaker.conf
 systemctl cat "$SPK_UNIT" >/dev/null 2>&1 || fail "no $SPK_UNIT: the speaker level cannot be kept"
 mkdir -p "${SPK_DROPIN%/*}"
+# At boot the unit can run before udev names the card device_cmedia
+# ("Invalid card number", lamp-b626 3 Nov: the level stayed at the card's
+# power-on 46%), so it waits up to 15 s for the name first.
 { echo "# factory-run.sh: the speaker at $SPEAKER_LEVEL at every boot instead of the unit's pin"
-  echo "[Service]"; echo "ExecStart="
+  echo "[Service]"
+  echo 'ExecStartPre=/bin/sh -c "for i in $(seq 30); do [ -e /proc/asound/device_cmedia ] && exit 0; sleep 0.5; done; exit 0"'
+  echo "ExecStart="
   echo "ExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker $SPEAKER_LEVEL"
   systemctl cat "$SPK_UNIT" | grep '^ExecStart=' | grep -v -e amixer -e '^ExecStart=$'
 } >"$SPK_DROPIN"
