@@ -9863,6 +9863,11 @@ async fn answer(
             .asked_person
             .as_ref()
             .is_some_and(|from| from(request));
+    // Whether a decline is asked again now: nothing yet called or forgotten
+    // in the turn (each `not_for_me` site reads this one rule).
+    let ask_again_instead = |called_earlier: bool, held_forget_ran: bool| {
+        decline_asked_again && !called_earlier && !held_forget_ran
+    };
     // The line's words, for whether it asks more than an answer at once
     // covers, and whether it asked for a reminder
     // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
@@ -10391,10 +10396,7 @@ async fn answer(
                                 match crate::not_speech::opens_not_for_me(held, false) {
                                     None => continue,
                                     Some(true) => {
-                                        if decline_asked_again
-                                            && !called_earlier
-                                            && !held_forget_ran
-                                        {
+                                        if ask_again_instead(called_earlier, held_forget_ran) {
                                             return asked_again_for_a_decline(
                                                 &mut queue, request, round,
                                             )
@@ -10557,7 +10559,7 @@ async fn answer(
             // whole now, and said unless it is the decline.
             if let Some(held) = opening.take_if(|held| !held.is_empty()) {
                 if crate::not_speech::opens_not_for_me(&held, true) == Some(true) {
-                    if decline_asked_again && !called_earlier && !held_forget_ran {
+                    if ask_again_instead(called_earlier, held_forget_ran) {
                         return asked_again_for_a_decline(&mut queue, request, round).await;
                     }
                     eprintln!(
@@ -10589,7 +10591,7 @@ async fn answer(
                         );
                     }
                 } else if crate::not_speech::opens_not_for_me(&held, true) == Some(true) {
-                    if decline_asked_again && !called_earlier && !held_forget_ran {
+                    if ask_again_instead(called_earlier, held_forget_ran) {
                         return asked_again_for_a_decline(&mut queue, request, round).await;
                     }
                     eprintln!(
@@ -10723,9 +10725,7 @@ async fn answer(
                 if !named || std::mem::replace(&mut named_asked_again, true) {
                     // The person the lamp asked, answering its question:
                     // asked to say it again, not declined (Queue #4710).
-                    if decline_asked_again
-                        && first_calls
-                        && !held_forget_ran
+                    if ask_again_instead(!first_calls, held_forget_ran)
                         && calls.iter().all(|call| call.name == NOT_FOR_ME)
                     {
                         return asked_again_for_a_decline(&mut queue, request, round).await;
