@@ -195,3 +195,10 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   green on the Mac, CI green. Hour posted 15:59. #5064: voice lib run
   shows `coordinator::motor` failures on this Mac, being compared with
   lamp-voice without the PR before the read is posted.
+- 16:2x: READ-OK on #5064 `e2657988d` (Friday, the voice sends the
+  Tiers-ideas fields): fields only where each switch says, read once with
+  the Days client, worker pass and census updated; merge order after
+  #5049, #5052, #5043 noted. Voice lib 4540 pass on the Mac; the
+  failures seen under load (`coordinator::motor`, `termination`,
+  `sign_in`) pass alone and the motor ones fail on lamp-voice without the
+  PR too. CI green.
