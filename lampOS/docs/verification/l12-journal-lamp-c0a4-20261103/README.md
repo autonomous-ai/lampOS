@@ -1,10 +1,15 @@
 # L12 journal: one line per Harness call, on `<lamp>` (2026-11-03)
 
-PR #5092: lamp-tasks writes one `tasks: harness VERB: …` journal line per
+PR #5117 (first opened as #5092): lamp-tasks writes one `tasks: harness VERB: …` journal line per
 Harness CLI call, with the verb, 8-character ids, exit, ms, stdout bytes and
 the parsed state, and never the words.
 
 ## Build
+
+The lamp run used #5092's build, from before the review fixes on #5117
+(`message` and `creationId` journaled only for a successful `new` or
+`reply`). Those fixes change only what a failed `new` or `reply` would say,
+and none failed here, so the lines below are what #5117 writes too.
 
 - `76ddad7ab3` (branch `subdarren/l12-journal`), local Docker ARM64 build,
   sha256 `1405469faa925008e72fcac172afe0f17b4e19e0baf1fdbd157c3f36462d8b5f`.

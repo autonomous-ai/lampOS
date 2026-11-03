@@ -2424,7 +2424,8 @@ fn error_code(value: &str) -> &str {
 /// Harness's own log: `tasks: harness VERB: [machine=M] [agent=A |
 /// agents=N] exit=CODE ms=T [out=B] [what stdout said]`. Ids are their
 /// first [`ID_CHARS`] only ([`short_id`]), and only from where the adapter
-/// put them: nothing after `--`, which is the ask or a reply's words. From
+/// put them, never from the ask (`--task` of a `new`, after `--` of a
+/// `reply`). From
 /// stdout only typed things ([`said_of_stdout`]). Never the ask, a
 /// question, an answer, a name or Harness's words.
 fn call_line(args: &[OsString], result: &Result<Reply, RunError>, took: Duration) -> String {
@@ -2476,7 +2477,7 @@ fn call_line(args: &[OsString], result: &Result<Reply, RunError>, took: Duration
                 .code
                 .map_or_else(|| "killed".to_owned(), |code| code.to_string());
             line.push_str(&format!(" exit={exit} ms={ms} out={}", reply.stdout.len()));
-            line.push_str(&said_of_stdout(verb, &reply.stdout));
+            line.push_str(&said_of_stdout(verb, &reply.stdout, reply.success));
         }
         // `timeout`, `cancelled`, `stdout_limit`, `spawn_failed` …: the
         // adapter's own code, never Harness's words.
@@ -2490,10 +2491,12 @@ fn call_line(args: &[OsString], result: &Result<Reply, RunError>, took: Duration
 /// or `ok`'s; `error=` Harness's code; `tools=` the agent's tool count;
 /// `listed=` how many harnesses or machines, with `states=` how many in each
 /// state; and the ids it gave, `id=` the agent's (`agent.id` of `new`, `id`
-/// of `show`, `reply`, `route`), `creation=` a pending `new`'s, `message=`
-/// a `reply`'s or a route's sent message's, and `ids=` those a `wait` came
-/// back for. Never an `ask`, `answer`, `about`, `name` or `reason`.
-fn said_of_stdout(verb: &str, bytes: &[u8]) -> String {
+/// of `show`, `reply`, `route`), `ids=` those a `wait` came back for, and
+/// only when a `new` or `reply` exited 0 with `ok: true` (`exited_ok`), no
+/// error and no failed state, `creation=` a pending `new`'s and `message=`
+/// a `reply`'s sent message's. Never an `ask`, `answer`, `about`, `name`,
+/// `reason`, or a `message` that is Harness's words.
+fn said_of_stdout(verb: &str, bytes: &[u8], exited_ok: bool) -> String {
     let mut said = String::new();
     // `machines --json` is one JSON line a machine.
     if verb == "machines" {
@@ -2579,12 +2582,17 @@ fn said_of_stdout(verb: &str, bytes: &[u8]) -> String {
         said.push_str(&format!(" id={}", short_id(id)));
     }
     // `creationId` and `message` are ids only in a successful `new` or
-    // `reply`: elsewhere, and in any failure, `message` is Harness's own
-    // words (a failed `close` puts only them there), never journaled.
-    let answered_ids = matches!(verb, "new" | "reply")
-        && reply["ok"] != false
+    // `reply`: exit 0, `ok: true`, no error and a state other than failed.
+    // Elsewhere, and in any failure, `message` is Harness's own words (a
+    // failed `close` or an `Unauthorized` puts only them there), never
+    // journaled.
+    let answered_ids = exited_ok
+        && matches!(verb, "new" | "reply")
+        && reply["ok"] == true
         && reply["error"].is_null()
-        && reply["sent"]["error"].is_null();
+        && reply["sent"]["error"].is_null()
+        && reply["state"] != "failed"
+        && reply["sent"]["state"] != "failed";
     if answered_ids {
         if let Some(id) = reply["creationId"].as_str().filter(|id| token(id, 96)) {
             said.push_str(&format!(" creation={}", short_id(id)));
