@@ -2925,13 +2925,22 @@ pub fn peer_asker() -> Option<Asker> {
     None
 }
 
+/// [`asked`]'s `forget_counts`: both files deleted, or why not.
+fn forget_counts(state: &Path, made: &Path) -> Result<String, String> {
+    crate::usage::forget(state).map_err(|error| format!("the runs counted: {error}"))?;
+    lamp_voice::made_counts::forget(made)
+        .map_err(|error| format!("the made skills counted: {error}"))?;
+    Ok("the skills' counts are deleted".to_owned())
+}
+
 /// The most bytes of a request to [`asked`].
 pub const ASKED_MOST: u64 = 4_096;
 
 /// What the manage helper says of a line that is no request.
 pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
     {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
-    {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME} or {\"camera_off\": NAME}";
+    {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME}, {\"camera_off\": NAME} \
+    or {\"forget_counts\": {}}";
 
 /// One request to the manage helper, read from `input`, done in `skills`,
 /// and answered on `output` in one line: `{"done": WHAT}` or
@@ -2957,7 +2966,12 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 /// - `{"camera": NAME}` or `{"camera_off": NAME}`, the owner's yes to the
 ///   skill seeing the camera's picture given or taken back in the app
 ///   (#3504's piece C), kept in `state` by [`camera`]; the Store installs
-///   a package that asks the camera only once it is given.
+///   a package that asks the camera only once it is given;
+/// - `{"forget_counts": {}}`, the person's no to reports (`lamp-cloud`'s
+///   health report, "Skills, counted"): the skills' run totals in `state`
+///   ([`crate::usage::forget`]) and the voice's made-skill counts in `made`
+///   (`lamp_voice::made_counts::forget`) deleted, each under its writers'
+///   lock.
 ///
 /// Each waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
 /// shorter only in a test) for the folder, then refuses with [`BUSY`]
@@ -3027,6 +3041,8 @@ pub fn asked(
                     _ => Err(NOT_A_REQUEST.to_owned()),
                 }
             }
+            // The person's no to reports: the skills' counts deleted.
+            _ if only("forget_counts").is_some() => forget_counts(state, made),
             // The owner's yes to the camera's picture, given or taken back.
             _ if only("camera").or(only("camera_off")).is_some() => {
                 match (only("camera"), only("camera_off")) {
@@ -3146,6 +3162,39 @@ pub fn list(skills: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The person's no to reports: the manage helper deletes the skills'
+    /// run totals and the voice's made-skill counts, and says so.
+    #[test]
+    fn forget_counts_deletes_both_counts() {
+        let root = std::env::temp_dir().join(format!("forget-counts-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (skills, made, state) = (root.join("skills"), root.join("made"), root.join("state"));
+        for dir in [&skills, &made, &state] {
+            fs::create_dir_all(dir).unwrap();
+        }
+        let runs = state.join(crate::usage::RUNS_FILE);
+        let counts = made.join(lamp_voice::made_counts::FILE);
+        fs::write(&runs, r#"{"version":1,"core":4}"#).unwrap();
+        fs::write(&counts, r#"{"kept":2}"#).unwrap();
+        let mut answer = Vec::new();
+        let done = asked(
+            &skills,
+            &made,
+            &state,
+            Duration::from_secs(1),
+            None,
+            None,
+            &b"{\"forget_counts\": {}}\n"[..],
+            &mut answer,
+        )
+        .unwrap();
+        let answer = String::from_utf8(answer).unwrap();
+        assert!(done, "{answer}");
+        assert!(answer.contains("\"done\""), "{answer}");
+        assert!(!runs.exists() && !counts.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
 
     /// The reviewer's P3 on #2429: each asker's cgroup is where its product
     /// unit's `Slice=` puts it (systemd nests a dashed slice under each of

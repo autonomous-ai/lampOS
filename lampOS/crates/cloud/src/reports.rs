@@ -1042,6 +1042,10 @@ struct Kept {
     crashes: VecDeque<u64>,
     /// Skills, counted: each day's counts until acknowledged.
     skills: skills::Days,
+    /// A no was given and the parts' own skill counts (`lamp-skills`' runs,
+    /// the voice's made-skill asks) are not yet deleted: asked of the
+    /// manage helper until it says done ([`step`]).
+    forget_skill_counts: bool,
 }
 
 /// The reports' engine: what waits, the counts and the bounds. Nothing in
@@ -1407,8 +1411,10 @@ impl Reports {
             let _ = fs::remove_file(self.places.queue.join(format!("{seq}.json")));
         }
         self.error_since.clear();
-        // The days' counts are deleted too, and begun again on a yes.
+        // The days' counts are deleted too, and begun again on a yes; the
+        // parts' running totals are asked to be deleted ([`step`]).
         self.kept.skills = skills::Days::default();
+        self.kept.forget_skill_counts = true;
         let report = self.report(now_s, None, &Seen::default(), Body::Stopped);
         self.put(report);
     }
@@ -1522,7 +1528,7 @@ impl Reports {
         if let Some(reading) = &seen.skills {
             self.kept.skills.add(now_s, reading);
             let day = self.kept.skills.oldest(now_s);
-            skill_day = day.as_ref().and_then(|(_, over)| *over);
+            skill_day = day.as_ref().map(|(_, number)| *number);
             body.skills = Some(skills::SkillsBody {
                 on: reading.on.clone(),
                 kept_off: reading.kept_off.clone(),
@@ -1851,6 +1857,11 @@ pub trait Sources {
     fn skills(&mut self) -> Option<skills::Reading> {
         None
     }
+    /// The parts' own skill counts deleted, after a no ([`skills`]): true
+    /// once done, or when there is nothing to delete.
+    fn forget_skill_counts(&mut self) -> bool {
+        true
+    }
     /// Whether the voice is resting (not in a turn); true when unknown.
     fn voice_resting(&mut self) -> bool;
     /// Asks taken from `reports/request` since the last look.
@@ -1913,6 +1924,15 @@ pub fn step(
     }
     if now >= timing.next_notes {
         timing.next_notes = now + NOTES_EVERY;
+        // After a no, the parts' skill counts deleted: asked again each
+        // round until done.
+        if shared.with(|reports| reports.kept.forget_skill_counts) && sources.forget_skill_counts()
+        {
+            shared.with(|reports| {
+                reports.kept.forget_skill_counts = false;
+                reports.keep();
+            });
+        }
         put |= shared.with(|reports| {
             let mut put = false;
             for note in reports.new_notes() {
@@ -2071,6 +2091,13 @@ impl Sources for Lamp {
     /// Read at a health report only, with the person's yes.
     fn skills(&mut self) -> Option<skills::Reading> {
         skills::read(self.skills.as_ref()?)
+    }
+
+    /// Asked of the manage helper, which owns both files.
+    fn forget_skill_counts(&mut self) -> bool {
+        self.skills
+            .as_ref()
+            .is_none_or(|places| crate::skills::forget_counts(&places.manage))
     }
 
     /// Only with the self-update switch on, asked of systemd within
@@ -2884,8 +2911,12 @@ pub(crate) mod tests {
         reports
             .kept
             .skills
-            .add(NOW - 60, &skills::read(&skill_places).unwrap());
+            .add(NOW - 86_400, &skills::read(&skill_places).unwrap());
         fs::write(&skill_places.runs, runs_file(9, 7).to_string()).unwrap();
+        reports
+            .kept
+            .skills
+            .add(NOW - 86_340, &skills::read(&skill_places).unwrap());
         let mut seen = planted();
         seen.skills = skills::read(&skill_places);
         reports.health(NOW, build.as_ref(), &seen).unwrap();
@@ -2909,8 +2940,11 @@ pub(crate) mod tests {
     }
 
     /// A skills folder with secrets in names, words, the runs' file and the
-    /// voice's answer, as `skills::read` finds them; `runs` the totals'
-    /// file's contents.
+    /// voice's answer, as `skills::read` finds them: a core skill, a Store
+    /// package, one put on from a folder, one made in the app and one made
+    /// before the maker was written on its card, off. A pushed skill lives
+    /// in the developer folder, which the report never reads: its runs are
+    /// planted in the totals. `runs` the totals' file's contents.
     fn planted_skills(name: &str, runs: &Value) -> skills::Places {
         let page = crate::skills::tests::places(name);
         crate::skills::tests::skill(
@@ -2925,6 +2959,35 @@ pub(crate) mod tests {
             "alice-s3cret",
             "Alice: remind me at 192.168.1.42",
             "made: here\n",
+            "[permissions]\nbody = true",
+        );
+        crate::skills::tests::skill(
+            &page,
+            "alice-app-s3cret",
+            "Alice: remind me in the app",
+            "made: here\nmade_by: app\n",
+            "[permissions]\nbody = true",
+        );
+        crate::skills::tests::skill(
+            &page,
+            "alice-store-s3cret",
+            "Alice's Store skill at HomeWiFi-5G",
+            "",
+            "version = \"1.0.0\"\n[permissions]\nbody = true",
+        );
+        fs::write(
+            page.folder.join("alice-store-s3cret").join(".package.json"),
+            json!({"sha256": "c".repeat(64), "from_store": true,
+                   "manifest": {"format": 1, "name": "alice-store-s3cret",
+                                "version": "1.0.0", "files": []}})
+            .to_string(),
+        )
+        .unwrap();
+        crate::skills::tests::skill(
+            &page,
+            "alice-folder-s3cret",
+            "Alice: put on from a folder",
+            "",
             "[permissions]\nbody = true",
         );
         fs::write(&page.off, "alice-s3cret\n").unwrap();
@@ -2954,12 +3017,16 @@ pub(crate) mod tests {
             off: page.off,
             runs: runs_file,
             voice,
+            manage: page.manage,
             addons: false,
         }
     }
 
+    /// The totals' file: `store` runs for each source but core and the
+    /// voice's made skills, and a key that is a secret.
     fn runs_file(core: u64, store: u64) -> Value {
-        json!({"version": 1, "core": core, "store": store, "made": 1,
+        json!({"version": 1, "core": core, "store": store, "made_voice": 1,
+               "made_app": store, "made_unknown": 1, "pushed": store, "other": store,
                "store_ids": {"Alice": store, "a".repeat(64): store},
                "made_ids": {"b".repeat(64): 1, "HomeWiFi-5G": 1}})
     }
@@ -2974,33 +3041,43 @@ pub(crate) mod tests {
         let mut reports = Reports::open(places);
         let skill_places = planted_skills("canary", &runs_file(5, 3));
         let first = skills::read(&skill_places).unwrap();
-        reports.kept.skills.add(NOW - 60, &first);
+        reports.kept.skills.add(NOW - 86_400, &first);
         fs::write(&skill_places.runs, runs_file(9, 7).to_string()).unwrap();
+        let second = skills::read(&skill_places).unwrap();
+        reports.kept.skills.add(NOW - 86_340, &second);
         let mut seen = planted();
         seen.skills = skills::read(&skill_places);
         reports.health(NOW, None, &seen).unwrap();
         let bytes: Vec<String> = reports.due(ID).into_iter().map(|(_, b)| b).collect();
         let sent: Value = serde_json::from_str(&bytes[0]).unwrap();
+        let store_sha = "c".repeat(64);
         assert_eq!(
             sent["skills"],
             json!({
-                "on": {"core": 1},
-                "kept_off": {"made_voice": 1},
-                "day": {"date": "2026-10-18", "complete": false,
-                        "made_by_voice": {}, "runs": {"core": 4, "store": 4},
+                "on": {"core": 1, "store": 1, "made_app": 1, "other": 1},
+                "kept_off": {"made_unknown": 1},
+                "day": {"date": "2026-10-17",
+                        "made_by_voice": {}, "runs": {"core": 4, "store": 4, "made_app": 4,
+                                                      "pushed": 4, "other": 4},
                         "store": {"a".repeat(64): 4}, "store_rest": 0}
             }),
             "{sent}"
         );
-        for secret in SECRETS.iter().chain(&["alice", "Stretch", "made_ids"]) {
+        for secret in
+            SECRETS
+                .iter()
+                .chain(&["alice", "Stretch", "made_ids", "folder", store_sha.as_str()])
+        {
             assert!(!bytes[0].contains(secret), "{secret} in {}", bytes[0]);
         }
     }
 
-    /// A day goes on the acknowledgement of the report that carried it
-    /// whole, the next one goes after it, and a no deletes the counts.
+    /// Today is never sent, however many reports go while it lasts: a day
+    /// goes once it is over, again until the report that carried it is
+    /// acknowledged, and then the next; a no deletes the counts and asks
+    /// for the parts' own to be deleted.
     #[test]
-    fn a_skills_day_goes_on_its_ack_and_a_no_deletes_the_counts() {
+    fn a_skills_day_goes_once_over_until_its_ack_and_a_no_deletes_the_counts() {
         let places = places("skill-days");
         yes(&places);
         let mut reports = Reports::open(places);
@@ -3026,34 +3103,39 @@ pub(crate) mod tests {
         let (seq, day) = health(&mut reports, NOW, 10);
         assert_eq!(day, Value::Null);
         reports.acked(seq);
-        let (seq, day) = health(&mut reports, NOW + 60, 12);
-        assert_eq!(
-            (&day["complete"], &day["runs"]["core"]),
-            (&json!(false), &json!(2))
-        );
-        // A day not over stays after its ack, and grows.
-        reports.acked(seq);
+        // Runs today, and reports 15 minutes apart: today is never sent, so
+        // no two reports tell a run between them.
+        for (n, core) in [12, 13, 13].into_iter().enumerate() {
+            let (seq, day) = health(&mut reports, NOW + 900 * (n as u64 + 1), core);
+            assert_eq!(day, Value::Null, "report {n}");
+            reports.acked(seq);
+        }
+        // Over: the day whole, with no `complete` (every day sent is).
         let (seq, day) = health(&mut reports, NOW + 86_400, 15);
         assert_eq!(
-            (&day["date"], &day["complete"]),
-            (&json!("2026-10-18"), &json!(true))
+            day,
+            json!({"date": "2026-10-18", "made_by_voice": {}, "runs": {"core": 3},
+                   "store": {}, "store_rest": 0})
         );
-        assert_eq!(day["runs"]["core"], 2);
         // Not acknowledged: the same day again.
         reports.unhand(None);
         let again = sent(&mut reports)[0]["skills"]["day"].clone();
-        assert_eq!(again["date"], "2026-10-18");
+        assert_eq!(again, day);
         reports.acked(seq);
+        // Acknowledged: the next day waits until it is over.
         let (seq, day) = health(&mut reports, NOW + 86_401, 15);
+        assert_eq!(day, Value::Null);
+        reports.acked(seq);
+        let (_, day) = health(&mut reports, NOW + 2 * 86_400, 16);
         assert_eq!(
             (&day["date"], &day["runs"]["core"]),
-            (&json!("2026-10-19"), &json!(3))
+            (&json!("2026-10-19"), &json!(2))
         );
-        // A day not over is kept after its ack; a no deletes it.
-        reports.acked(seq);
-        assert!(reports.kept.skills.oldest(NOW + 86_401).is_some());
-        reports.stop(NOW + 86_402, false).unwrap();
+        // A no deletes the days and asks for the parts' counts deleted.
+        assert!(!reports.kept.forget_skill_counts);
+        reports.stop(NOW + 2 * 86_400 + 1, false).unwrap();
         assert_eq!(reports.kept.skills, skills::Days::default());
+        assert!(reports.kept.forget_skill_counts);
     }
 
     /// At the limit: a day with more Store packages than fit is cut to
@@ -3077,7 +3159,12 @@ pub(crate) mod tests {
             }),
             ..skills::Reading::default()
         };
-        reports.kept.skills.add(NOW - 60, &reading(&|_| 0));
+        // Yesterday's runs, sent today.
+        reports.kept.skills.add(NOW - 86_460, &reading(&|_| 0));
+        reports
+            .kept
+            .skills
+            .add(NOW - 86_400, &reading(&|n| n as u64 + 1));
         let mut seen = planted();
         seen.skills = Some(reading(&|n| n as u64 + 1));
         reports.health(NOW, None, &seen).unwrap();
@@ -3122,9 +3209,10 @@ pub(crate) mod tests {
         .unwrap()
         .len();
         // Each "voice" adds 8 bytes: room for `skills` without its day
-        // (about 55 bytes), not with it (about 100 more).
+        // (about 55 bytes), not with it (about 95 more).
         let room = MOST_BYTES - ID_ROOM - base - 90;
         missing.extend(vec!["voice".to_owned(); room / 8]);
+        reports.kept.skills.add(NOW, &reading(&|n| n as u64 + 2));
         full.skills = Some(reading(&|n| n as u64 + 2));
         reports.health(NOW + 86_400, None, &full).unwrap();
         let bytes = reports.due(&id).remove(0).1;

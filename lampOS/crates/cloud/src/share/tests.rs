@@ -156,7 +156,13 @@ fn only_a_made_skill_that_is_on_can_be_shared() {
 #[test]
 fn the_package_is_the_skills_own_files_and_not_made_here_on_another_lamp() {
     let places = places("share-pack");
-    skill(&places, "water", "Water", "made: here\n", MADE);
+    skill(
+        &places,
+        "water",
+        "Water",
+        "made: here\nmade_by: app\n",
+        MADE,
+    );
     fs::write(places.folder.join("water/.package.json"), "{}").unwrap();
     let scratch = scratch("pack");
     let (file_name, tar) = pack(&places.folder.join("water"), &scratch).unwrap();
@@ -171,6 +177,7 @@ fn the_package_is_the_skills_own_files_and_not_made_here_on_another_lamp() {
     assert_eq!(files, ["SKILL.md", "skill.toml"]);
     let card = String::from_utf8(package.files["SKILL.md"].clone()).unwrap();
     assert!(!card.contains("made:"), "{card}");
+    assert!(!card.contains("made_by"), "{card}");
     assert!(card.contains("name: water"), "{card}");
     // Nothing is left behind, and the lamp's own folder is untouched.
     assert_eq!(fs::read_dir(&scratch).unwrap().count(), 0);

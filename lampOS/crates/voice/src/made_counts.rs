@@ -18,9 +18,15 @@
 //!   the next ask in the same process. A voice turn never waits on a file.
 //!
 //! The four are running totals; `lamp-cloud` makes a day's counts from two
-//! readings. Every writer holds [`LOCK`], so the worker's flush and the
-//! socket's read never undo each other.
-use crate::{app_make, made_skill};
+//! readings. Every writer holds [`LOCK`], so the worker's flush, the
+//! socket's read and [`forget`] never undo each other. When the person says
+//! no to reports, the manage helper deletes [`FILE`] ([`forget`], asked by
+//! `lamp-cloud`): the count begins again from nothing.
+//!
+//! Whether a made skill is the app's or the voice's is on its own card
+//! (`made_by`, [`made_skill::Maker`]), where `lamp-skills` reads it: this
+//! file and its answer name no package.
+use crate::made_skill;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -69,9 +75,11 @@ pub struct Seen {
     pub left_off: Vec<String>,
 }
 
-/// Whether a made skill's `from` is an app's ask (`local:app:…`).
+/// Whether a made skill's `from` is an app's ask (`local:app:…`, or a
+/// written one's `written:app:…`): [`made_skill::Maker::of`], as its card
+/// says it.
 pub fn is_app(from: &str) -> bool {
-    from.starts_with(app_make::LOCAL_STORE)
+    made_skill::Maker::of(from) == made_skill::Maker::App
 }
 
 /// One ask by voice that made nothing, counted: an atomic add, and the
@@ -98,6 +106,27 @@ pub fn refused(directory: &Path) {
     if spawned.is_err() {
         // Tried again at the next refused ask.
         *place = None;
+    }
+}
+
+/// The person said no to reports: [`FILE`] deleted under [`LOCK`] (by the
+/// manage helper, root, as the voice is). Refused asks counted in a running
+/// voice's memory and not yet written (at most [`FLUSH_EVERY`]'s) begin the
+/// next file; none is ever sent without a yes, and a yes's first reading
+/// only begins the count. A folder that isn't there has nothing to forget.
+pub fn forget(directory: &Path) -> io::Result<()> {
+    if !directory.is_dir() {
+        return Ok(());
+    }
+    let lock = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(directory.join(LOCK))?;
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
+    match fs::remove_file(directory.join(FILE)) {
+        Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
+        _ => Ok(()),
     }
 }
 
@@ -157,34 +186,18 @@ fn once(total: &mut u64, seen: &mut Vec<String>, sha256: &str) {
 
 /// The socket's `counts` (`crate::app_make`): the index read for what
 /// became of the skills made by voice, added to [`FILE`], and told as
-/// `{"made_by_voice": {"kept", "on", "refused", "left_off"}, "app":
-/// [SHA-256, ...]}`, the running totals and the packages the app's asks
-/// made (so `lamp-cloud` tells a made skill on the lamp by voice from one
-/// by the app). Only numbers and SHA-256s, each checked as 64 lowercase
-/// hex; never a name or a word.
+/// `{"made_by_voice": {"kept", "on", "refused", "left_off"}}`, the running
+/// totals. Only numbers; never a name, a word or a package.
 pub fn counts(directory: &Path, now_unix_ms: u64) -> Value {
     let entries = made_skill::entries(directory);
     let waiting = made_skill::waiting(directory, now_unix_ms).map(|(_, sha256)| sha256);
-    let app_tasks: Vec<String> = app_make::asked_tasks(directory);
-    let from_app = |entry: &Value| {
-        entry["from"].as_str().is_some_and(|from| {
-            is_app(from)
-                || app_tasks
-                    .iter()
-                    .any(|task| from.starts_with(&format!("{task}:")))
-        })
-    };
+    let from_app = |entry: &Value| entry["from"].as_str().is_some_and(is_app);
     let sha_of = |entry: &Value| {
         entry["sha256"]
             .as_str()
             .filter(|sha256| sha256_ok(sha256))
             .map(str::to_owned)
     };
-    let app: Vec<String> = entries
-        .iter()
-        .filter(|entry| from_app(entry))
-        .filter_map(sha_of)
-        .collect();
     let read = locked(directory, |totals| {
         for entry in entries.iter().filter(|entry| !from_app(entry)) {
             let Some(sha256) = sha_of(entry) else {
@@ -207,7 +220,7 @@ pub fn counts(directory: &Path, now_unix_ms: u64) -> Value {
         })
     });
     match read {
-        Ok(made) => json!({"made_by_voice": made, "app": app}),
+        Ok(made) => json!({"made_by_voice": made}),
         Err(error) => {
             eprintln!("lamp-voice: made-skill counts not read: {error}");
             json!({"refused": "the counts can't be read now"})
@@ -257,12 +270,14 @@ mod tests {
                 json!({"on": true, "offered_at_unix_ms": now - 5_000}),
             ),
             entry("local:3", 'c', json!({"offered_at_unix_ms": now - 600_000})),
-            // An app's ask: never in the voice's counts, but told as the app's.
+            // An app's ask, made here or written there: never in the
+            // voice's counts.
             entry(
                 "local:app:9:1",
                 'd',
                 json!({"on": true, "offered_at_unix_ms": now - 9_000}),
             ),
+            entry("written:app:8:1", 'f', json!({"on": true})),
             // The offer a yes would put on now: not left off yet.
             entry("local:4", 'e', json!({"offered_at_unix_ms": now - 1_000})),
         ];
@@ -278,7 +293,7 @@ mod tests {
             (&json!(4), &json!(1), &json!(1)),
             "{told}"
         );
-        assert_eq!(told["app"], json!(["d".repeat(64)]));
+        assert_eq!(told.get("app"), None, "{told}");
         // Asked again: nothing counted twice.
         let again = counts(&dir, now);
         for count in ["kept", "on", "left_off"] {
@@ -308,6 +323,10 @@ mod tests {
             told["made_by_voice"]["refused"].as_u64().unwrap() >= 2,
             "{told}"
         );
-        assert_eq!(told["app"], json!([]));
+        // A no forgets the file; the next read begins again.
+        forget(&dir).unwrap();
+        assert!(!dir.join(FILE).exists());
+        forget(&dir).unwrap();
+        forget(&dir.join("none")).unwrap();
     }
 }

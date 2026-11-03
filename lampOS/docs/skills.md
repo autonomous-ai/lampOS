@@ -438,18 +438,25 @@ skills".)
   `cloud.md`, "Skills, counted"; `lamp_skills::usage`). With `--state-dir`,
   each run is counted where it starts against its skill's source: core, the
   Skills Store (by the package's SHA-256, from its `installed_from`), made
-  here (`made: here`, by its package's SHA-256 when it has one), pushed by a
-  paired computer, or other. The source is found at each load; a run adds
-  one to an atomic, with no lock and no file on its way. A thread of its own
-  adds what was counted to `DIR/runs.json` at most once a minute (written
-  whole beside it and moved over it, 0600), so a restart loses at most a
+  here by its maker as its own card says it (`made: here` with `made_by:
+  voice` or `made_by: app`, or `written: app`, a skill written in the app;
+  one made before the marker says neither and is `made_unknown`, never
+  guessed: `usage::made_by`), pushed by a paired computer, or other. The
+  source is found at each load; a run adds one to an atomic, with no lock
+  and no file on its way. A thread of its own adds what was counted to
+  `DIR/runs.json` at most once a minute (written whole beside it and moved
+  over it, 0600, under a lock on `DIR`), so a restart loses at most a
   minute's runs. The file is running totals since it began: `{"version": 1,
-  "core", "store", "made", "pushed", "other", "store_ids", "made_ids"}`, the
-  two maps by SHA-256, at most 256 each, the smallest let go past that; no
-  skill's name, words or files. One that can't be read is begun again
-  (`lamp-cloud` reads a smaller total as a new beginning). No new switch:
-  `lamp-cloud` reads it only with the reports' gates and the person's yes.
-  Tests: `usage::tests`.
+  "core", "store", "made_voice", "made_app", "made_unknown", "pushed",
+  "other", "store_ids"}`, the Store's map by SHA-256, at most 256, the
+  smallest let go past that; no skill's name, words or files, nor a made
+  skill's SHA-256. One that can't be read is begun again (`lamp-cloud`
+  reads a smaller total as a new beginning). The manage helper's
+  `{"forget_counts": {}}` (asked by `lamp-cloud` at the person's no to
+  reports) deletes it under the same lock (`usage::forget`), and the
+  voice's `counts.json` with it. No new switch: `lamp-cloud` reads it only
+  with the reports' gates and the person's yes. Tests: `usage::tests`,
+  `package::tests::forget_counts_deletes_both_counts`.
 - It loads every folder in `--dir` (`/var/lib/lampOS/skills`), looks at the
   folder every two seconds, and loads them all again when a file other
   than a test changed. Cooldowns are kept across a reload.
@@ -2088,7 +2095,12 @@ gone ([switches.md](switches.md)). What happens:
    - speaking, messages, the look and any other topic are refused.
    Widening this is the lead's call.
 5. **Checked.** The card is marked `made: here` (`lamp-cloud`'s "Made on
-   this lamp" group). Then `lamp-skills pack` (#1698) checks the folder:
+   this lamp" group) and by its maker, `made_by: voice` or `made_by: app`
+   (`made_skill::Maker`, from what it is kept as made from: an app's ask's
+   `local:app:…` is the app's), inside the package, so its SHA-256 and the
+   yes cover it; a `made` or `made_by` line the model wrote is dropped. The
+   opt-in health report counts a made skill by this marker
+   (`cloud.md`, "Skills, counted"). Then `lamp-skills pack` (#1698) checks the folder:
    every check a load makes, its permissions among them, and the package
    read back as an install reads one. A skill that does more than it
    declares is refused there. When it fails, the voice's journal has the
@@ -2306,15 +2318,18 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    "Make a skill" shows on the switch alone.
    `{"counts": {}}` (#4710): what became of the skills made by voice, as
    running totals, `{"made_by_voice": {"kept", "on", "refused",
-   "left_off"}, "app": [SHA-256, ...]}`, for `lamp-cloud`'s opt-in health
+   "left_off"}}`, for `lamp-cloud`'s opt-in health
    report (`cloud.md`, "Skills, counted"; `made_counts::counts`). `kept`,
    `on` and `left_off` are read from the made skills' index, each skill
    counted once by its SHA-256; `refused`, an ask by voice that made
    nothing, is counted on an atomic where it is told and written at most
    once a minute by a thread of its own, so a voice turn never waits on a
-   file. Kept in `counts.json` beside the made skills, numbers and SHA-256s
-   only. `app` names the packages the app's asks made, so `lamp-cloud` tells
-   a made skill as the voice's or the app's. Tests: `made_counts::tests`.
+   file. Kept in `counts.json` beside the made skills, numbers and the
+   counted skills' SHA-256s only, never sent; an app's ask (`from`
+   `local:app:…` or `written:app:…`) is not in them. Which maker a made
+   skill on the lamp has is on its card, so the answer names no package.
+   Deleted, under its lock, by the manage helper's `forget_counts` at the
+   person's no (`made_counts::forget`). Tests: `made_counts::tests`.
 4. **Told aloud.** Kept, the lamp says aloud, through the say service's own
    asks at a good moment within an hour (`app_make::ask_line`, `say_ask`):
    "I made the skill you typed in the app." with what it does, then exactly

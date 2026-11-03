@@ -1,16 +1,18 @@
 //! How often skills run, by where each came from, for `lamp-cloud`'s opt-in
 //! health report (`docs/cloud.md`, "Skills, counted"; the owner's ask on
 //! #4710, 3 Nov). Numbers only: a run is counted against its skill's
-//! [`Source`], and a Store or made skill's package by its SHA-256 (the id
-//! the Store's catalogue names it by, and lamp-cloud's to tell a made
-//! skill's maker), never its name, words or files.
+//! [`Source`], a made skill's by its [`Maker`] as its card says it, and a
+//! Store package's by its SHA-256 (the id the Store's catalogue names it
+//! by), never its name, words or files.
 //!
 //! A run is counted where it starts (`main.rs`'s `start`), on an atomic in
 //! memory: no lock and no file on a run's way. A thread of its own adds what
 //! was counted to [`RUNS_FILE`] in the part's `--state-dir` at most every
 //! [`FLUSH_EVERY`], so a restart loses at most that much. The file is
 //! running totals; `lamp-cloud`, the same user, reads it when it builds a
-//! report, and makes a day's counts from two readings.
+//! report, and makes a day's counts from two readings. When the person
+//! says no to reports, the manage helper deletes it ([`forget`], asked by
+//! `lamp-cloud`): the count begins again from nothing.
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -25,7 +27,7 @@ use std::time::Duration;
 pub const RUNS_FILE: &str = "runs.json";
 /// The most often what was counted is written.
 pub const FLUSH_EVERY: Duration = Duration::from_secs(60);
-/// The most packages kept by SHA-256 in each of the file's two maps; past
+/// The most Store packages kept by SHA-256 in the file; past
 /// it the smallest totals are let go (a skill long removed, most likely).
 pub const MOST_IDS: usize = 256;
 /// The most bytes of [`RUNS_FILE`] read.
@@ -34,22 +36,35 @@ const MOST_BYTES: u64 = 128 * 1024;
 pub const VERSION: u64 = 1;
 
 /// Where a skill came from, as far as this part can tell: a core skill, a
-/// package from the Skills Store, a skill made on this lamp (`made: here`;
-/// by voice or in the app is the voice's to say, by the package's SHA-256),
-/// one a paired computer pushed, or any other installable (put on from a
-/// folder or a file).
+/// package from the Skills Store, a skill made on this lamp (`made: here`)
+/// by its [`Maker`], one a paired computer pushed, or any other installable
+/// (put on from a folder or a file).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Source {
     Core,
     Store(String),
-    Made(Option<String>),
+    Made(Maker),
     Pushed,
     Other,
 }
 
+/// Who asked for a skill made on this lamp, as its card's front matter
+/// says it: `made_by: voice` or `made_by: app`, written when the voice
+/// packs it (`lamp_voice::made_skill::Maker`), inside the package, so its
+/// SHA-256 and the spoken yes cover it. A skill written in the app (`written:
+/// app`) is the app's too. A card that says neither was made before the
+/// maker was written on it: `Unknown`, never guessed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Maker {
+    Voice,
+    App,
+    Unknown,
+}
+
 /// `skill`'s source, from its folder in the skills folder: its kind, who
 /// pushed it, its install record ([`crate::package::installed_from`]) and
-/// its card's `made: here`. A SHA-256 is kept only as 64 lowercase hex.
+/// its card's `made: here` and maker ([`made_by`]). A SHA-256 is kept only
+/// as 64 lowercase hex.
 pub fn source_of(skill: &crate::Skill, folder: &Path) -> Source {
     if skill.kind == crate::SkillKind::Core {
         return Source::Core;
@@ -57,85 +72,92 @@ pub fn source_of(skill: &crate::Skill, folder: &Path) -> Source {
     if skill.pushed_by.is_some() {
         return Source::Pushed;
     }
-    let installed = crate::package::installed_from(folder);
-    if let Some(installed) = &installed
+    if let Some(installed) = crate::package::installed_from(folder)
         && installed.from_store
     {
-        return Source::Store(installed.sha256.clone());
+        return Source::Store(installed.sha256);
     }
-    if made_here(folder) {
-        return Source::Made(installed.map(|installed| installed.sha256));
+    match made_by(folder) {
+        Some(maker) => Source::Made(maker),
+        None => Source::Other,
     }
-    Source::Other
 }
 
-/// Whether a skill folder's `SKILL.md` says `made: here` in its front matter.
-pub fn made_here(folder: &Path) -> bool {
+/// A skill folder's maker, when its `SKILL.md` says `made: here` in its
+/// front matter: `made_by: voice` or `made_by: app` ([`Maker`]), or
+/// `written: app` (a skill written in the app); [`Maker::Unknown`] when it
+/// says none of them. `None` for a skill not made here.
+pub fn made_by(folder: &Path) -> Option<Maker> {
     let mut card = String::new();
-    let read = fs::File::open(folder.join("SKILL.md"))
-        .and_then(|file| file.take(64 * 1024).read_to_string(&mut card));
-    read.is_ok()
-        && card
-            .strip_prefix("---\n")
-            .and_then(|rest| rest.split_once("\n---"))
-            .is_some_and(|(front, _)| front.lines().any(|line| line.trim() == "made: here"))
+    fs::File::open(folder.join("SKILL.md"))
+        .and_then(|file| file.take(64 * 1024).read_to_string(&mut card))
+        .ok()?;
+    let (front, _) = card.strip_prefix("---\n")?.split_once("\n---")?;
+    let field = |key: &str| {
+        front.lines().find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            (name.trim() == key).then(|| value.trim())
+        })
+    };
+    if field("made") != Some("here") {
+        return None;
+    }
+    Some(match (field("made_by"), field("written")) {
+        (Some("voice"), _) => Maker::Voice,
+        (Some("app"), _) | (None, Some("app")) => Maker::App,
+        _ => Maker::Unknown,
+    })
 }
 
-/// [`RUNS_FILE`]: runs since the file began, by source, and by package for
-/// the Store's and made skills.
+/// [`RUNS_FILE`]: runs since the file began, by source, made skills by
+/// their [`Maker`], and by package for the Store's.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Totals {
     pub version: u64,
     pub core: u64,
     pub store: u64,
-    pub made: u64,
+    pub made_voice: u64,
+    pub made_app: u64,
+    /// Made here before the maker was written on the card.
+    pub made_unknown: u64,
     pub pushed: u64,
     pub other: u64,
     /// By the Store package's SHA-256.
     pub store_ids: BTreeMap<String, u64>,
-    /// By the made skill's package SHA-256; a made skill with no install
-    /// record is counted in `made` only.
-    pub made_ids: BTreeMap<String, u64>,
 }
 
 impl Totals {
     /// `runs` more for `source`.
     pub fn add(&mut self, source: &Source, runs: u64) {
-        let id = |ids: &mut BTreeMap<String, u64>, sha256: &str| {
-            if crate::package::sha256_ok(sha256) {
-                let total = ids.entry(sha256.to_owned()).or_default();
-                *total = total.saturating_add(runs);
-            }
-        };
-        match source {
-            Source::Core => self.core = self.core.saturating_add(runs),
+        let total = match source {
+            Source::Core => &mut self.core,
             Source::Store(sha256) => {
-                self.store = self.store.saturating_add(runs);
-                id(&mut self.store_ids, sha256);
-            }
-            Source::Made(sha256) => {
-                self.made = self.made.saturating_add(runs);
-                if let Some(sha256) = sha256 {
-                    id(&mut self.made_ids, sha256);
+                if crate::package::sha256_ok(sha256) {
+                    let total = self.store_ids.entry(sha256.to_owned()).or_default();
+                    *total = total.saturating_add(runs);
                 }
+                &mut self.store
             }
-            Source::Pushed => self.pushed = self.pushed.saturating_add(runs),
-            Source::Other => self.other = self.other.saturating_add(runs),
-        }
+            Source::Made(Maker::Voice) => &mut self.made_voice,
+            Source::Made(Maker::App) => &mut self.made_app,
+            Source::Made(Maker::Unknown) => &mut self.made_unknown,
+            Source::Pushed => &mut self.pushed,
+            Source::Other => &mut self.other,
+        };
+        *total = total.saturating_add(runs);
     }
 
-    /// Each map at most [`MOST_IDS`], the largest totals kept, and any key
+    /// The Store's map at most [`MOST_IDS`], the largest totals kept, and any key
     /// that is not a SHA-256 dropped.
     fn bounded(&mut self) {
-        for ids in [&mut self.store_ids, &mut self.made_ids] {
-            ids.retain(|id, _| crate::package::sha256_ok(id));
-            if ids.len() > MOST_IDS {
-                let mut by_runs: Vec<(String, u64)> = std::mem::take(ids).into_iter().collect();
-                by_runs.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                by_runs.truncate(MOST_IDS);
-                *ids = by_runs.into_iter().collect();
-            }
+        let ids = &mut self.store_ids;
+        ids.retain(|id, _| crate::package::sha256_ok(id));
+        if ids.len() > MOST_IDS {
+            let mut by_runs: Vec<(String, u64)> = std::mem::take(ids).into_iter().collect();
+            by_runs.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+            by_runs.truncate(MOST_IDS);
+            *ids = by_runs.into_iter().collect();
         }
     }
 }
@@ -189,6 +211,9 @@ impl Counting {
             return Ok(());
         }
         let written = (|| {
+            // The folder held across the read and the write, so a
+            // [`forget`] between them is never undone.
+            let _held = held(path)?;
             // A file that can't be read is begun again: lamp-cloud reads a
             // smaller total as a new beginning.
             let mut totals = read(path).unwrap_or_default();
@@ -241,6 +266,30 @@ impl Counting {
     }
 }
 
+/// `path`'s folder, locked: what every writer of [`RUNS_FILE`] holds
+/// across its read and write (`lamp-skills` as its user, the manage helper
+/// as root), released when the file returned is dropped.
+fn held(path: &Path) -> io::Result<fs::File> {
+    let folder = fs::File::open(path.parent().unwrap_or(Path::new(".")))?;
+    folder.lock()?;
+    Ok(folder)
+}
+
+/// The person said no to reports: `state`'s [`RUNS_FILE`] deleted, under
+/// the folder's lock, by the manage helper (`lamp-cloud` asks it, as it
+/// cannot write `lamp-skills`' state). Runs counted in the running part's
+/// memory and not yet written (at most [`FLUSH_EVERY`]'s) begin the next
+/// file; none is ever sent without a yes, and a yes's first reading only
+/// begins the count.
+pub fn forget(state: &Path) -> io::Result<()> {
+    let path = state.join(RUNS_FILE);
+    let _held = held(&path)?;
+    match fs::remove_file(&path) {
+        Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
+        _ => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,29 +307,37 @@ mod tests {
         let path = dir.join(RUNS_FILE);
         let counting = Counting::default();
         let store = "a".repeat(64);
-        let made = "b".repeat(64);
         let core = counting.counter(Source::Core);
         let from_store = counting.counter(Source::Store(store.clone()));
-        let made_here = counting.counter(Source::Made(Some(made.clone())));
+        let by_app = counting.counter(Source::Made(Maker::App));
+        let by_voice = counting.counter(Source::Made(Maker::Voice));
+        let unknown = counting.counter(Source::Made(Maker::Unknown));
         // A key that isn't a SHA-256 counts by source only.
         let odd = counting.counter(Source::Store("Ann's skill".into()));
         for _ in 0..3 {
             core.fetch_add(1, Ordering::Relaxed);
         }
         from_store.fetch_add(2, Ordering::Relaxed);
-        made_here.fetch_add(1, Ordering::Relaxed);
+        by_app.fetch_add(2, Ordering::Relaxed);
+        by_voice.fetch_add(1, Ordering::Relaxed);
+        unknown.fetch_add(5, Ordering::Relaxed);
         odd.fetch_add(1, Ordering::Relaxed);
         counting.flush(&path).unwrap();
         from_store.fetch_add(1, Ordering::Relaxed);
         counting.flush(&path).unwrap();
         let totals = read(&path).unwrap();
         assert_eq!(
-            (totals.core, totals.store, totals.made),
-            (3, 4, 1),
+            (
+                totals.core,
+                totals.store,
+                totals.made_app,
+                totals.made_voice,
+                totals.made_unknown
+            ),
+            (3, 4, 2, 1, 5),
             "{totals:?}"
         );
         assert_eq!(totals.store_ids, BTreeMap::from([(store, 3)]));
-        assert_eq!(totals.made_ids, BTreeMap::from([(made, 1)]));
         let text = fs::read_to_string(&path).unwrap();
         assert!(!text.contains("Ann"), "{text}");
         use std::os::unix::fs::PermissionsExt;
@@ -292,6 +349,28 @@ mod tests {
         fs::remove_file(&path).unwrap();
         counting.flush(&path).unwrap();
         assert!(!path.exists());
+    }
+
+    /// A no deletes the totals; the next runs begin a new file, and a
+    /// folder with none is forgotten already.
+    #[test]
+    fn a_no_forgets_the_totals() {
+        let dir = place("forget");
+        let path = dir.join(RUNS_FILE);
+        let counting = Counting::default();
+        counting
+            .counter(Source::Core)
+            .fetch_add(7, Ordering::Relaxed);
+        counting.flush(&path).unwrap();
+        assert_eq!(read(&path).unwrap().core, 7);
+        forget(&dir).unwrap();
+        assert!(!path.exists());
+        forget(&dir).unwrap();
+        counting
+            .counter(Source::Core)
+            .fetch_add(1, Ordering::Relaxed);
+        counting.flush(&path).unwrap();
+        assert_eq!(read(&path).unwrap().core, 1);
     }
 
     #[test]
@@ -313,12 +392,28 @@ mod tests {
         assert_eq!(read(&dir.join("none.json")), Some(Totals::default()));
     }
 
+    /// The maker is read from the card's front matter only; a card made
+    /// before the maker was written on it is `Unknown`, never guessed.
     #[test]
-    fn made_here_is_read_from_the_front_matter_only() {
+    fn the_maker_is_read_from_the_front_matter_only() {
         let dir = place("made");
-        fs::write(dir.join("SKILL.md"), "---\nname: a\nmade: here\n---\n# A\n").unwrap();
-        assert!(made_here(&dir));
+        let card = |front: &str| {
+            fs::write(
+                dir.join("SKILL.md"),
+                format!("---\nname: a\n{front}---\n# A\n"),
+            )
+            .unwrap();
+            made_by(&dir)
+        };
+        assert_eq!(card("made: here\nmade_by: app\n"), Some(Maker::App));
+        assert_eq!(card("made: here\nmade_by: voice\n"), Some(Maker::Voice));
+        // A skill written in the app (`written: app`) is the app's.
+        assert_eq!(card("made: here\nwritten: app\n"), Some(Maker::App));
+        assert_eq!(card("made: here\n"), Some(Maker::Unknown));
+        assert_eq!(card("made: here\nmade_by: Ann\n"), Some(Maker::Unknown));
+        assert_eq!(card("made_by: app\n"), None);
+        assert_eq!(card("made: elsewhere\nmade_by: app\n"), None);
         fs::write(dir.join("SKILL.md"), "---\nname: a\n---\nmade: here\n").unwrap();
-        assert!(!made_here(&dir));
+        assert_eq!(made_by(&dir), None);
     }
 }

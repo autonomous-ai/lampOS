@@ -18,9 +18,8 @@
 //!   - `{"ready": {}}`: `{"ready": true}`, at once: the lamp makes it
 //!     itself. It reads nothing of the asks.
 //!   - `{"counts": {}}`: what became of the skills made by voice, running
-//!     totals, and the SHA-256s the app's asks made
-//!     ([`crate::made_counts::counts`]): numbers for the opt-in health
-//!     report, never a name or a word.
+//!     totals ([`crate::made_counts::counts`]): numbers for the opt-in
+//!     health report, never a name, a word or a package.
 //! - **Made here.** A `make` is written by the lamp's own chat with the
 //!   voice's own example, check and one repair
 //!   ([`crate::make_skill_local::make_kept`], [`make_here`]), kept as made
@@ -254,16 +253,6 @@ pub fn not_kept(directory: &Path, key: &str, why: &str) {
     if let Err(error) = changed {
         eprintln!("lamp-voice: an app's skill: why it wasn't kept not kept: {error}");
     }
-}
-
-/// The tasks the app's kept asks became (`local:app:<ms>`), read only: a
-/// made skill whose `from` begins with one is the app's
-/// (`crate::made_counts`).
-pub fn asked_tasks(directory: &Path) -> Vec<String> {
-    asks(directory)
-        .iter()
-        .filter_map(|entry| entry["task"].as_str().map(str::to_owned))
-        .collect()
 }
 
 /// The made skill the app's ask `entry` became, if it is kept: the newest
