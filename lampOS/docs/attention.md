@@ -247,7 +247,7 @@ line in a loud office), "Lamp, what did I just ask you?" came back as "Lampy,
 …" and was held as said to someone it calls by name.
 
 "One" joins them with `LAMP_ONE_AS_LAMP=on` only (#4710; off by default,
-[switches.md](switches.md)). On lamp-3e83 on 2 Nov a tester's "Lamp, …"
+on in the product since 3 Nov, [switches.md](switches.md)). On lamp-3e83 on 2 Nov a tester's "Lamp, …"
 came back mostly as "One, …" ("One, how do I make a pour over coffee?",
 "One, what should I eat for lunch?") and each was held as said to someone it
 calls by name (`attention::ONE_STAND_INS`). With the switch "One" is
