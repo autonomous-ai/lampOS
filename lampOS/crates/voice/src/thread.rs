@@ -1281,6 +1281,42 @@ impl Thread {
             .map(|exchange| exchange.request)
     }
 
+    /// The lamp's words in `whose`'s exchanges but `request`'s (`None`: the
+    /// room's), each its kept start and its end: those of the conversation
+    /// going on, back to the first quiet of more than `quiet` (one is going
+    /// on only if its newest is within `quiet` of `now`), and those before
+    /// it (`LAMP_KEEP_QUIETLY`: what the lamp already offered to keep).
+    pub fn lamp_words_for(
+        &self,
+        request: u64,
+        whose: Option<&str>,
+        now: Instant,
+        quiet: Duration,
+    ) -> (Vec<String>, Vec<String>) {
+        let (mut in_talk, mut before) = (Vec::new(), Vec::new());
+        let mut newer = now;
+        let mut going_on = true;
+        for exchange in
+            self.exchanges.iter().rev().filter(|exchange| {
+                exchange.request != request && exchange.whose.as_deref() == whose
+            })
+        {
+            going_on &= newer.saturating_duration_since(exchange.at) <= quiet;
+            newer = exchange.at;
+            let lamp = if exchange.lamp.ends_with(exchange.tail.as_str()) {
+                exchange.lamp.clone()
+            } else {
+                format!("{} {}", exchange.lamp, exchange.tail)
+            };
+            if going_on {
+                in_talk.push(lamp);
+            } else {
+                before.push(lamp);
+            }
+        }
+        (in_talk, before)
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
@@ -4115,6 +4151,37 @@ mod tests {
         assert!(lamp.contains("Shall I put it on the lamp?"), "{lamp}");
         assert_eq!(ago, Duration::from_secs(5));
         assert!(Thread::new().answered_last_but(1, now).is_none());
+    }
+
+    /// `LAMP_KEEP_QUIETLY`: the lamp's words of the conversation going on,
+    /// back to the first long quiet, apart from those before it; only the
+    /// asker's scope, and never the request in hand.
+    #[test]
+    fn lamp_words_for_parts_the_talk_going_on_from_the_ones_before() {
+        let mut thread = Thread::new();
+        let then = Instant::now();
+        thread.person("My sister is coming.", true, then);
+        thread.lamp(1, "Want me to keep that?", then);
+        let later = then + Duration::from_secs(900);
+        thread.person("We booked a hotel.", true, later);
+        thread.lamp(2, "Nice.", later);
+        thread.person("Room 204.", true, later + Duration::from_secs(30));
+        thread.lamp(3, "Room 204.", later + Duration::from_secs(30));
+        let now = later + Duration::from_secs(60);
+        let quiet = Duration::from_secs(600);
+        let (in_talk, before) = thread.lamp_words_for(3, None, now, quiet);
+        assert_eq!(in_talk, ["Nice."]);
+        assert_eq!(before, ["Want me to keep that?"]);
+        // Long quiet since the newest: nothing is going on.
+        let (in_talk, before) =
+            thread.lamp_words_for(9, None, now + Duration::from_secs(700), quiet);
+        assert!(in_talk.is_empty());
+        assert_eq!(before.len(), 3);
+        // Another person's scope has none of the room's.
+        assert_eq!(
+            thread.lamp_words_for(9, Some("p1"), now, quiet),
+            (vec![], vec![])
+        );
     }
 
     /// The names and ids of `recent`'s kept calls.

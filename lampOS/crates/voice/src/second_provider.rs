@@ -6738,6 +6738,12 @@ async fn spoken(
                         Some(scope),
                     );
                 }
+                // `LAMP_KEEP_QUIETLY`: a quiet keep only on a line their own
+                // face alone was seen saying (the Reviewer-lead's 18:51 P2 on
+                // #5053); any other stays ask-first.
+                if crate::keep_quietly::on() {
+                    crate::keep_quietly::saw(request, &person, &speakers, pair.clone());
+                }
                 // Their face alone in view, none seen speaking it: the
                 // room's scope, but its reply told their name (lamp-3e83;
                 // reviewer-three's P2 on #4090).
@@ -8030,6 +8036,10 @@ async fn spoken(
         .chain(called)
         .chain(air)
         .chain(seems)
+        // `LAMP_KEEP_QUIETLY`: a known person's own plain facts kept quietly,
+        // on a line they were seen saying; never in the room's scope (the
+        // Reviewer-lead's P2s on #5053).
+        .chain(crate::keep_quietly::note_for(scope.as_ref(), request))
         // Last, right before the person's words: an acknowledgement asked
         // among the other notes was said only once in two on lamp-06c1
         // (30 Oct, #3997's cut-in proposal).
@@ -9143,7 +9153,13 @@ fn prepared_on(
                 .as_ref()
                 .filter(|_| !held_by_gap(scope))
                 .and_then(|note| note(request, &words, scope));
-            Some(Prepared::begin(shared, scope, words, notes, remembered))
+            // Its notes as round 1 tells them: the quiet note
+            // (`LAMP_KEEP_QUIETLY`) before the cut-in's.
+            let notes: Vec<String> = crate::keep_quietly::note_for(scope, request)
+                .into_iter()
+                .chain(notes.iter().cloned())
+                .collect();
+            Some(Prepared::begin(shared, scope, words, &notes, remembered))
         }
         net::Early::Resumed => {
             if prepared.is_some() {
@@ -10254,6 +10270,85 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
     Ok(())
 }
 
+/// One answer's limit on offers to keep ([`crate::keep_quietly::Quiet`]),
+/// with `LAMP_KEEP_QUIETLY` on, for a spoken line in a known person's own
+/// scope that they were seen saying ([`crate::keep_quietly::own_seen`]; one
+/// not seen stays ask-first, its offers all said): from the offers counted for
+/// them in this conversation ([`crate::keep_quietly::OFFERS`], a
+/// conversation ending after [`crate::thread::REMEMBERED_FOR`] with no
+/// answer in their scope), with the lamp's words in their exchanges the
+/// thread still holds, and the line heard. The room's scope, no scope and
+/// a written line: every sentence is said, as with the switch off.
+fn keep_quietly(
+    request: u64,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    line: Option<&str>,
+) -> crate::keep_quietly::Quiet {
+    if !crate::keep_quietly::on() || line.is_none() {
+        return crate::keep_quietly::Quiet::off();
+    }
+    let Some(person) = crate::keep_quietly::own_seen(scope, request) else {
+        return crate::keep_quietly::Quiet::off();
+    };
+    let now = Instant::now();
+    let (mut in_talk, mut before) = match crate::keep_quietly::OFFERS.lock() {
+        Ok(mut offers) => offers.read(person, now, crate::thread::REMEMBERED_FOR),
+        Err(_) => (Vec::new(), Vec::new()),
+    };
+    if let Ok(thread) = crate::thread::THREAD.lock() {
+        let (talk, earlier) =
+            thread.lamp_words_for(request, Some(person), now, crate::thread::REMEMBERED_FOR);
+        in_talk.extend(talk);
+        before.extend(earlier);
+    }
+    crate::keep_quietly::Quiet::new(&in_talk, &before, line).for_person(person)
+}
+
+/// A sentence of an answer as [`crate::keep_quietly::Quiet`] lets it go
+/// (journalled when it leaves one out), then as `hold` does; one said is
+/// counted as said.
+fn said_quietly(
+    quiet: &mut crate::keep_quietly::Quiet,
+    hold: &mut crate::remember::OfferHold,
+    sentence: String,
+    remembered: bool,
+    request: u64,
+) -> Option<String> {
+    let sentence = quiet.say(sentence);
+    if let Some(line) = quiet.take_line(request) {
+        eprintln!("{line}");
+    }
+    let said = hold.say(sentence?, remembered)?;
+    quiet.spoken(&said);
+    Some(said)
+}
+
+/// What is said when an answer ends with nothing said because each of its
+/// sentences was an offer left out (`LAMP_KEEP_QUIETLY`, Thirteen's P2 on
+/// #5053): its answer without the offer, or [`crate::keep_quietly::GOT_IT`]
+/// in the owner's language; never silence.
+fn instead_of_silence(
+    shared: &Shared,
+    quiet: &mut crate::keep_quietly::Quiet,
+    started: bool,
+    request: u64,
+) -> Option<String> {
+    if started {
+        return None;
+    }
+    let got_it = shared.fixed(crate::keep_quietly::GOT_IT);
+    let instead = quiet.instead(got_it)?;
+    eprintln!(
+        "lamp-voice second: request {request}: every sentence was an offer to keep left out; said {} instead (LAMP_KEEP_QUIETLY)",
+        if instead == got_it {
+            "a short acknowledgement"
+        } else {
+            "the answer without its offer"
+        }
+    );
+    Some(instead)
+}
+
 /// A round's held sentences ([`crate::remember::OfferHold`]) at its end:
 /// an offer to keep beside a `remember` call is left out, and logged.
 fn offered(
@@ -10347,6 +10442,10 @@ async fn answer(
     if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
         thread.line_of(request, &said);
     }
+    // `LAMP_KEEP_QUIETLY`: an offer to keep said at most once a
+    // conversation, never about a thing offered before, never on small
+    // talk; a held keep's own ask always (#4508).
+    let mut quiet = keep_quietly(request, scope.as_ref(), heard.then_some(said.as_str()));
     // Its speech socket opened now, while the chat thinks, with the switch
     // (`LAMP_SECOND_SPEECH_SOCKET`).
     shared.services.open_speech_ahead(request);
@@ -11138,7 +11237,13 @@ async fn answer(
                             }));
                         }
                         for sentence in sentences {
-                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            if let Some(sentence) = said_quietly(
+                                &mut quiet,
+                                &mut offer_hold,
+                                sentence,
+                                remember_ran,
+                                request,
+                            ) {
                                 queue.push(sentence).await?;
                             }
                         }
@@ -11197,7 +11302,13 @@ async fn answer(
                         (None, Some(claim)) => claim.push_str(&held),
                         (None, None) => {
                             for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
-                                if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                                if let Some(sentence) = said_quietly(
+                                    &mut quiet,
+                                    &mut offer_hold,
+                                    sentence,
+                                    remember_ran,
+                                    request,
+                                ) {
                                     queue.push(sentence).await?;
                                 }
                             }
@@ -11278,7 +11389,13 @@ async fn answer(
                     Some(declined) => declined.push_str(&held),
                     None => {
                         for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
-                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            if let Some(sentence) = said_quietly(
+                                &mut quiet,
+                                &mut offer_hold,
+                                sentence,
+                                remember_ran,
+                                request,
+                            ) {
                                 queue.push(sentence).await?;
                             }
                         }
@@ -11328,7 +11445,13 @@ async fn answer(
                         queue.announce().await?;
                     }
                     for sentence in split.push(&piece) {
-                        if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                        if let Some(sentence) = said_quietly(
+                            &mut quiet,
+                            &mut offer_hold,
+                            sentence,
+                            remember_ran,
+                            request,
+                        ) {
                             queue.push(sentence).await?;
                         }
                     }
@@ -11408,7 +11531,13 @@ async fn answer(
                     }
                 } else {
                     for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
-                        if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                        if let Some(sentence) = said_quietly(
+                            &mut quiet,
+                            &mut offer_hold,
+                            sentence,
+                            remember_ran,
+                            request,
+                        ) {
                             queue.push(sentence).await?;
                         }
                     }
@@ -11582,7 +11711,8 @@ async fn answer(
                     .any(|call| call.name == crate::remember::REMEMBER);
             if shared.look_by_call && calls.iter().any(|call| call.name == LOOK_CALL) {
                 if let Some(rest) = split.finish()
-                    && let Some(rest) = offer_hold.say(rest, remember_ran)
+                    && let Some(rest) =
+                        said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
                 {
                     queue.push(rest).await?;
                 }
@@ -11597,7 +11727,8 @@ async fn answer(
                 return Ok(());
             }
             if let Some(rest) = split.finish()
-                && let Some(rest) = offer_hold.say(rest, remember_ran)
+                && let Some(rest) =
+                    said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
             {
                 queue.push(rest).await?;
             }
@@ -11671,6 +11802,11 @@ async fn answer(
                 return Ok(());
             }
             if calls.is_empty() {
+                if let Some(instead) =
+                    instead_of_silence(shared, &mut quiet, queue.started, request)
+                {
+                    queue.push(instead).await?;
+                }
                 return Ok(());
             }
             // An add-on's quoted line calls nothing, though none was
@@ -12096,6 +12232,11 @@ async fn answer(
                 // keep (reviewer-three and the reviewer-lead on #3628). A
                 // recall reads, and keeps nothing.
                 let did = answer.told["remembered"] != false && answer.told.get("error").is_none();
+                // A carried line's keep held for their yes (#4508): its ask
+                // is the code's own, and is said (`LAMP_KEEP_QUIETLY`).
+                if call.name == crate::remember::REMEMBER && answer.told.get("held").is_some() {
+                    quiet.held_keep();
+                }
                 if call.name != crate::remember::RECALL && did {
                     kept_now = true;
                     remember_ran |= call.name == crate::remember::REMEMBER;
@@ -12238,6 +12379,11 @@ async fn answer(
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: its own words came with calls that each did what was asked, and nothing else was asked: the turn ends with them (LAMP_SECOND_SAY_WITH_CALL)"
                 );
+                if let Some(instead) =
+                    instead_of_silence(shared, &mut quiet, queue.started, request)
+                {
+                    queue.push(instead).await?;
+                }
                 return Ok(());
             }
             if let Some(note) = said_once {

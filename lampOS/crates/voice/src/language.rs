@@ -367,6 +367,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 그건 아직 안 했어요. 다시 한 번 부탁해 줄래요?",
         ],
     ),
+    // What the second route says when every sentence of a reply was an
+    // offer to keep left out (`LAMP_KEEP_QUIETLY`, Thirteen's P2 on #5053).
+    (
+        crate::keep_quietly::GOT_IT,
+        [
+            "Mình hiểu rồi.",
+            "わかった。",
+            "好的，明白了。",
+            "알겠어요.",
+        ],
+    ),
     // The first stand's ask and its "here I go", sent to the say service as
     // text (Fourth's finding on #4710). In another language than English it
     // asks for the touch alone, never the spoken yes.
@@ -748,7 +759,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 22);
+        assert_eq!(FIXED_LINES.len(), 23);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
