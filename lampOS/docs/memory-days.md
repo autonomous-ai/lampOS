@@ -40,7 +40,9 @@ binary never calls a model, starts a model worker, or makes a network request. I
 
 The message `the model adapter is not configured` means this build does not
 automatically extract promises, threads or preferences from conversations,
-or infer that a correction should replace an earlier observation. The
+or infer that a correction should replace an earlier observation; with
+`--taste-rules` code rules keep a known person's plainly stated everyday
+tastes ([below](#tastes-kept-by-rule---taste-rules-plan-c-step-a)). The
 successful no-model skip does not queue extraction for later. Explicit
 remember, raw and linked journalling, ranked search, frozen notes from
 existing facts and observations, provenance-aware forgetting and normal
@@ -823,6 +825,100 @@ change an existing job with the same name. A valid conversation too large
 for model input can therefore be skipped successfully. This receipt means
 no work was submitted; it is not a retained completion receipt. Normal
 absent/false preparation remains unchanged.
+
+## Tastes kept by rule (`--taste-rules`, plan C step A)
+
+The memory owner's extraction plan C (3 Nov) learns tastes, habits and
+summaries in two steps: A, code rules with no model, then B, a nightly model
+with per-item checks. This is A. Start `lamp-memory --memory-days
+--taste-rules` to switch it on; without the flag nothing changes (the flag
+needs `--memory-days`, and the start line then says `taste_rules=on`).
+
+With it, each exchange written to a known person's own scope (a `p-…` id,
+`lamp_msgs::known::is_person_id`) is read in its write, before its
+commit, by `crates/memory/src/taste_rules.rs`. Only `heard`, what the
+person said, is read; the lamp's `said` line never is. The room's scope
+(`everyone`: guests, unknown speakers and the room's lines a known face
+was seen saying, kept by `speaker`) and a rules scope keep nothing. Which
+scope a line goes to is the voice's own rule, `memory_scope.rs`, unchanged.
+Each sentence of the line (up to `.`, `!`, `?`, `;` or a line break, at
+most four a line and 300 bytes each) that states the person's own taste for
+an everyday thing is kept:
+
+| Kind | English | Vietnamese |
+|---|---|---|
+| `preference` | I love / like / really like / enjoy / prefer / adore …; my favourite X is Y | tôi / em / mình (rất, cũng …) thích …; X yêu thích (nhất) của tôi / em / mình là … |
+| `dislike` | I hate / dislike / can't stand …; I don't / do not / no longer / never like … | … ghét …; … không / chẳng (còn) thích … |
+
+**Health, money and other people are never kept by a rule.** The product
+keeps none of them unless the person clearly asks the lamp to remember
+them (the observation pass's rule, `remember::OBSERVE_PROMPT`, and
+[memory.md](memory.md)), so there is no allergy or diet rule ("I'm allergic
+to peanuts", "tôi dị ứng tôm", "I'm vegetarian", "tôi ăn chay" keep
+nothing), no rule for a fact about someone else ("my wife likes coffee",
+"my mom's name is Lan"), and a taste sentence with any word of health,
+medicine, diet, money or another person (`taste_rules::SENSITIVE`: "I hate
+my medicine", "I love saving money", "I love my wife's cooking", "tôi thích
+tiền", "tôi thích nấu ăn cho vợ") is left out whole. A person word with
+"'s" counts as the word ("I hate my boss's jokes", "I love my sister's
+cooking"). A sentence is also left out when its object, as heard, has a
+capitalised word other than "I" ("I can't stand Tom", "tôi ghét Lan"; a
+capitalised brand goes too, since a rule cannot tell it from a name), or
+when reported speech follows the verb (`says`, `said`, `told`, `tells`,
+`nói`, `bảo`, `kể`: "I hate broccoli, Minh says"). Saying "remember …"
+still keeps such a thing, as before, by the person's own ask.
+
+The observation is that one sentence, copied by the code as heard, never a
+paraphrase; category `preference` (what the session note and the tidy
+pass already read), its kind and what it is about in a side table
+`tastes(rid, kind, about)` made only when the switch is on
+(`Days::taste_kind`), its source the exchange, its time the exchange's. It
+is searched, offered in the next session note and expires as any
+observation does (30 days unused).
+
+Also left out: a sentence ending `?`, or Vietnamese ending `không`, `à`,
+`nhỉ`, `chưa` and the like ("I like coffee?", "do you like coffee", "em
+thích cà phê không"); one that hedges (`maybe`, `might`, `perhaps`,
+`probably`, `think`, `guess`, `not sure`, `có lẽ`, `chắc`, `hình như`,
+`có thể`): a maybe is never kept as a fact; anything not opened by the
+person's own "I", "my favourite", "tôi", "em" or "mình"; an object that
+says nothing alone ("I love it", "I like that", "em thích anh"); an object
+that starts with "to" and a verb ("I hate to bother you"), speaks of the
+listener (`you`, `your`, `bạn`: "I like the way you said that") or is only
+"nothing", "none", "everything" or "anything"; a wish or the past ("I'd
+like a coffee", "I used to love coffee"). P2's strength
+(#5052) is not used.
+
+A newer taste about the same thing (the same object, or the same
+favourite) supersedes the older rule-kept one with a `replacements` edge:
+"I don't like coffee anymore" after "I love coffee" leaves the older as
+inactive history (`history:true`), as a tidy supersession does. The same
+words again keep nothing new, and neither do a scope's kept thing or
+observation in the same words (`tidy::restates`, over only the rows the
+index finds with one of its words). Model observations are never
+superseded by a rule.
+
+Forgetting works by the links already there: `forget {id}` of the line
+takes the observation (a descendant) and its versions; `forget {id}` of the
+observation takes its evidence line, as for a tidy observation;
+`forget_last`, `forget_all` and `forget_person` take it with the rest, and
+the `tastes` row goes by its foreign key. A failure inside the rules rolls
+back only their savepoint, never the exchange. They call no model and no
+network, and look up only by index (`tastes.about`, the search index). On
+a Mac in debug, reading a line takes microseconds
+(`taste_rules::tests::reading_a_line_takes_microseconds`); a write's
+median with 200 rule-kept observations was 67 ms off and 104 ms on, for
+lines that each keep two observations, the difference being mostly those
+rows' share of the durable commit
+(`it::days_tastes::the_rules_add_little_to_the_write`: on within twice off
+plus 20 ms). Off, a store holds what it held before, row for row
+(`it::days_tastes::off_the_store_is_unchanged`). Tests:
+`taste_rules::tests` (each rule in both languages, the negatives) and
+`it::days_tastes`. Not yet benched or run on a lamp.
+
+The source-linked observation that copies the person's exact words is the
+Tiers design's fact with exact source quotes ([memory-tiers.md](memory-tiers.md)),
+taken here without its model.
 
 ## The model boundary
 

@@ -15,6 +15,7 @@ pub mod search;
 pub mod server;
 pub mod store;
 pub mod strength;
+pub mod taste_rules;
 pub mod tidy;
 
 pub use protocol::{Request, Response, handle};

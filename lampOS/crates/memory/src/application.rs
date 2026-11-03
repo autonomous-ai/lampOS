@@ -12,9 +12,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const USAGE: &str = "usage: lamp-memory --dir ABSOLUTE_DIR --socket ABSOLUTE_SOCKET_PATH [--keep-days N] [--utc-offset-minutes M | --zone system|NAME] [--memory-days] [--bus-root ABSOLUTE_DIR] [--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME]";
+const USAGE: &str = "usage: lamp-memory --dir ABSOLUTE_DIR --socket ABSOLUTE_SOCKET_PATH [--keep-days N] [--utc-offset-minutes M | --zone system|NAME] [--memory-days [--taste-rules]] [--bus-root ABSOLUTE_DIR] [--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME]";
 
-const HELP: &str = "Keeps what the lamp remembers under --dir, a directory only its owner can enter (made\nwith mode 0700 if it is not there; refused if its group or everyone can enter it).\nThe default stores a journal file for each local day and a kept file per person.\n--memory-days opts into SQLite, ranked search and linked observations, importing and\nremoving the old files before serving. That directory then requires --memory-days;\nno model is configured or called. See docs/memory-days.md before enabling it.\nAnswers one JSON object per line on --socket (mode 0600), with ready beside the\nsocket while taking requests. --keep-days N (default 30, at least 1): delete journal\ndays more than N days before today. --utc-offset-minutes M (default 0, -720 to 840):\nminutes east of UTC for day boundaries, the same all year. --zone system takes the\nlamp's own time zone (/etc/localtime, written at setup) at each moment, across daylight\nsaving and a zone setup changes while it runs; --zone NAME names one. Not both.\n--bus-root ABSOLUTE_DIR opts into a memory health report once a second. The bus\nis optional and cannot hold the request loop; without this flag no reports run.\nWith it, each forget of everything kept under a person is told on memory/forgot.\n--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME (both or neither) opens a\nsecond socket, mode 0660 and owned by group NAME from /etc/group, that takes only\n{\"op\":\"forget_person\",\"person\":ID}: the app's removal of a person.\nSee docs/memory.md.";
+const HELP: &str = "Keeps what the lamp remembers under --dir, a directory only its owner can enter (made\nwith mode 0700 if it is not there; refused if its group or everyone can enter it).\nThe default stores a journal file for each local day and a kept file per person.\n--memory-days opts into SQLite, ranked search and linked observations, importing and\nremoving the old files before serving. That directory then requires --memory-days;\nno model is configured or called. See docs/memory-days.md before enabling it.\n--taste-rules (with --memory-days) keeps a known person's stated tastes (\"I love coffee\",\n\"tôi thích phở\") as observations in their own words, by code rules, with no model.\nAnswers one JSON object per line on --socket (mode 0600), with ready beside the\nsocket while taking requests. --keep-days N (default 30, at least 1): delete journal\ndays more than N days before today. --utc-offset-minutes M (default 0, -720 to 840):\nminutes east of UTC for day boundaries, the same all year. --zone system takes the\nlamp's own time zone (/etc/localtime, written at setup) at each moment, across daylight\nsaving and a zone setup changes while it runs; --zone NAME names one. Not both.\n--bus-root ABSOLUTE_DIR opts into a memory health report once a second. The bus\nis optional and cannot hold the request loop; without this flag no reports run.\nWith it, each forget of everything kept under a person is told on memory/forgot.\n--forget-socket ABSOLUTE_SOCKET_PATH --forget-group NAME (both or neither) opens a\nsecond socket, mode 0660 and owned by group NAME from /etc/group, that takes only\n{\"op\":\"forget_person\",\"person\":ID}: the app's removal of a person.\nSee docs/memory.md.";
 
 #[derive(Debug, Eq, PartialEq)]
 struct Arguments {
@@ -24,6 +24,8 @@ struct Arguments {
     utc_offset_minutes: i32,
     zone: Option<String>,
     memory_days: bool,
+    /// `--taste-rules`, only with `--memory-days`: plan C, step A.
+    taste_rules: bool,
     bus_root: Option<PathBuf>,
     /// The app's narrow socket and the group it is for: both or neither.
     forget: Option<(PathBuf, String)>,
@@ -33,6 +35,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let mut args = args.into_iter();
     let (mut dir, mut socket, mut keep_days, mut utc_offset_minutes) = (None, None, None, None);
     let mut memory_days = false;
+    let mut taste_rules = false;
     let (mut bus_root, mut zone) = (None, None);
     let (mut forget_socket, mut forget_group) = (None::<PathBuf>, None::<String>);
     while let Some(key) = args.next() {
@@ -43,6 +46,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 && utc_offset_minutes.is_none()
                 && zone.is_none()
                 && !memory_days
+                && !taste_rules
                 && bus_root.is_none()
                 && forget_socket.is_none()
                 && forget_group.is_none()
@@ -58,6 +62,13 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 return Err("an option was given twice");
             }
             memory_days = true;
+            continue;
+        }
+        if key == "--taste-rules" {
+            if taste_rules {
+                return Err("an option was given twice");
+            }
+            taste_rules = true;
             continue;
         }
         let known = matches!(
@@ -120,6 +131,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         (None, None) => None,
         _ => return Err("--forget-socket and --forget-group are both given or neither"),
     };
+    if taste_rules && !memory_days {
+        return Err("--taste-rules needs --memory-days");
+    }
     if zone.is_some() && utc_offset_minutes.is_some() {
         return Err("--zone and --utc-offset-minutes are one or the other");
     }
@@ -130,6 +144,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         utc_offset_minutes: utc_offset_minutes.unwrap_or(0),
         zone,
         memory_days,
+        taste_rules,
         bus_root,
         forget,
     };
@@ -235,7 +250,12 @@ fn days_start_line(arguments: &Arguments) -> String {
         .zone
         .as_ref()
         .map_or_else(String::new, |zone| format!(" zone={zone}"));
-    format!("started memory_days=true{zone}; the model adapter is not configured")
+    let rules = if arguments.taste_rules {
+        " taste_rules=on"
+    } else {
+        ""
+    };
+    format!("started memory_days=true{zone}{rules}; the model adapter is not configured")
 }
 
 fn serve(arguments: &Arguments, server: Server, health: Option<&State>) -> io::Result<()> {
@@ -249,6 +269,9 @@ fn serve(arguments: &Arguments, server: Server, health: Option<&State>) -> io::R
             now_unix_ms(),
         )
         .map_err(io::Error::other)?;
+        if arguments.taste_rules {
+            store.enable_taste_rules().map_err(io::Error::other)?;
+        }
         if let Some(health) = health {
             health.set_aside(store.set_aside());
             let counts = store
