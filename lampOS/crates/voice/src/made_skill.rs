@@ -295,8 +295,7 @@ impl Uses {
 /// refused; widening this is a decision still to be taken. What the skill
 /// does within it is checked by `lamp-skills pack` after.
 pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
-    let table: toml::Table =
-        toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
+    let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
     if table.contains_key("tool") {
         return Err(Refused::new(
             "it gives the model a function, which a made skill can't",
@@ -356,6 +355,35 @@ pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
     Ok((version.to_owned(), uses))
 }
 
+/// A `skill.toml` that isn't TOML at all (lamp-9adf, 3 Nov: voice and app
+/// makes both refused so, and nothing said why): the parser's words are
+/// said in the journal and go back to the model once, as the check's lines
+/// do, so a slip of syntax is fixed rather than the make refused outright.
+fn unreadable(error: toml::de::Error) -> Refused {
+    let lines: Vec<String> = error
+        .to_string()
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && *line != "|")
+        .map(str::to_owned)
+        .collect();
+    // The journal has where and what, never the quoted line: that is the
+    // model's own text, which only the repair carries (as `check_reason`).
+    eprintln!(
+        "lamp-voice: a made skill's skill.toml can't be read: {}",
+        match lines.as_slice() {
+            [] => String::new(),
+            [only] => only.clone(),
+            [first, .., last] => format!("{first}: {last}"),
+        }
+    );
+    let lines = lines.join(" / ");
+    Refused(
+        "its skill.toml can't be read".into(),
+        Some(format!("skill.toml is not TOML: {lines}")),
+    )
+}
+
 /// What a made skill does, in plain words written from its `skill.toml`:
 /// when it runs and what it does then. This, never the model's own
 /// description, is the card's and what the lamp says before it asks to put
@@ -372,8 +400,7 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
             Some(PLAIN_ONLY.into()),
         )
     };
-    let table: toml::Table =
-        toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
+    let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
     // Only what is said below, or changes nothing that runs: a `[[while]]`,
     // a `[quiet]`, a budget or any other key would run otherwise than the
     // words (Thirteen's P2 on #5042).
@@ -1302,6 +1329,24 @@ light = { dim = 1 }
 
     fn files_err(answer: &str) -> String {
         files(answer).unwrap_err().0
+    }
+
+    /// A skill.toml that isn't TOML is refused with the parser's words for
+    /// the repair: where it broke and the line, never a bare refusal.
+    #[test]
+    fn a_skill_toml_that_isnt_toml_carries_the_parsers_words() {
+        let broken = TOML.replace("[permissions]", "[permissions");
+        for refused in [
+            capped(&broken),
+            plainly(&broken).map(|said| (said, Uses::default())),
+        ] {
+            let Refused(why, lines) = refused.unwrap_err();
+            assert_eq!(why, "its skill.toml can't be read");
+            let lines = lines.expect("lines for a repair");
+            assert!(lines.starts_with("skill.toml is not TOML: "), "{lines}");
+            assert!(lines.contains("line "), "{lines}");
+            assert!(!lines.contains('\n'), "{lines}");
+        }
     }
 
     /// The coordinator's cap (19 Oct): the light and the body, and only

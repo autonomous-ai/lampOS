@@ -879,6 +879,28 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// lamp-9adf, 3 Nov: a skill.toml that isn't TOML (a bare word as a
+    /// value) goes back to the model once with the parser's words, as a
+    /// check's refusal does, never refused outright.
+    #[test]
+    fn a_skill_toml_that_isnt_toml_goes_back_to_the_model_once() {
+        let (root, keeping) = keeping("unreadable");
+        let bad = good().replace("version = \"1.0.0\"", "version = 1.0.0 beta");
+        assert!(bad != good());
+        let (url, served) = service(vec![(200, bad.clone()), (200, good())]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        let (url, served) = service(vec![(200, bad.clone()), (200, bad)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
+        assert!(
+            told["error"].as_str().unwrap().contains("can't be read"),
+            "{told}"
+        );
+        assert_eq!(served.join().unwrap(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// lamp-9adf, 2 Nov 17:08: a skill whose ask was cut stays untold. A
     /// later one, asked and said yes to, is put on: the cut one, kept more
     /// than ten minutes before, no longer holds it back. While only one is
