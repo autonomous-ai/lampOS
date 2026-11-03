@@ -4,6 +4,7 @@ use crate::{
     days::{Days, Error, Result, Wider},
     protocol::{self, Request, Response, Who},
     store::{Ask, Day, Entry, Person},
+    strength::Strength,
     tidy,
 };
 use serde::Deserialize;
@@ -61,6 +62,11 @@ enum Extra {
         /// (`Wider::newer_first`). Without it, as before.
         #[serde(default)]
         newer_first: bool,
+        /// `LAMP_MEMORY_STRENGTH` (the memory owner's Tiers-ideas plan, 3
+        /// Nov, P2): each entry whose own words are a plan or a maybe says
+        /// so in `strength` ([`Strength`]). Absent, as before.
+        #[serde(default)]
+        strength: bool,
     },
     /// The legacy `recall` with any of #2176's fields: a span of days
     /// (`day_from`, `day_to`) or `recall_v2`. Without them a recall is the
@@ -87,6 +93,11 @@ enum Extra {
         /// (`Wider::newer_first`). Without it, as before.
         #[serde(default)]
         newer_first: bool,
+        /// `LAMP_MEMORY_STRENGTH` (the memory owner's Tiers-ideas plan, 3
+        /// Nov, P2): each entry whose own words are a plan or a maybe says
+        /// so in `strength` ([`Strength`]). Absent, as before.
+        #[serde(default)]
+        strength: bool,
     },
     Forget {
         #[serde(default)]
@@ -109,6 +120,10 @@ enum Extra {
         /// Without it, as before.
         #[serde(default)]
         profile: bool,
+        /// `LAMP_MEMORY_STRENGTH`: the note's facts say `strength` as
+        /// search's entries do ([`labelled_note`]). Absent, as before.
+        #[serde(default)]
+        strength: bool,
     },
     SessionClose {
         #[serde(default)]
@@ -270,7 +285,14 @@ fn value(response: Response) -> Value {
 /// A recall's answer, each kept entry with the day it is about (`on`) as
 /// `kept` and `search` give it (#3987): the voice tells it apart from the
 /// day it was said. Older readers ignore it.
-fn recalled_with_days(store: &Days, person: &Person, entries: &[Entry]) -> Result<Value> {
+/// With `strength`, each entry whose own words are a plan or a maybe says so
+/// ([`label_entry`]).
+fn recalled_with_days(
+    store: &Days,
+    person: &Person,
+    entries: &[Entry],
+    strength: bool,
+) -> Result<Value> {
     let mut answer = value(Response::Recalled {
         entries: entries.to_vec(),
     });
@@ -284,9 +306,60 @@ fn recalled_with_days(store: &Days, person: &Person, entries: &[Entry]) -> Resul
             if let (Entry::Kept(_), Some(at)) = (entry, said.get(&entry.id())) {
                 told["last_said_unix_ms"] = json!(at);
             }
+            if strength {
+                let words = match entry {
+                    Entry::Exchange(exchange) => &exchange.heard,
+                    Entry::Kept(kept) => &kept.text,
+                };
+                label_entry(told, words);
+            }
         }
     }
     Ok(answer)
+}
+
+/// `strength` on a reply's entry when `words` are a plan or a maybe; none
+/// for a line as said (the memory owner's Tiers-ideas plan, 3 Nov, P2). An
+/// exchange is read by what was heard, never by what the lamp said.
+fn label_entry(entry: &mut Value, words: &str) {
+    if let Some(label) = Strength::of(words).label() {
+        entry["strength"] = json!(label);
+    }
+}
+
+/// A session's note with each fact's `strength`, within the same `cap`: a
+/// labelled note that would pass it leaves out its last facts, the least
+/// first by the note's own order, and their ids with them, so the note
+/// never says more than it did and no fact is told without its label. A
+/// note that isn't the store's JSON (an empty one, under a small cap) is as
+/// it was. The words are the note's own, so a frozen note is labelled the
+/// same at every open.
+fn labelled_note(mut note: Value, cap: usize) -> Value {
+    let Some(mut quoted) = note["note"]
+        .as_str()
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+    else {
+        return note;
+    };
+    let Some(facts) = quoted["facts"].as_array_mut() else {
+        return note;
+    };
+    for fact in facts.iter_mut() {
+        let words = fact["text"].as_str().unwrap_or_default().to_owned();
+        label_entry(fact, &words);
+    }
+    let mut text = quoted.to_string();
+    while text.len() > cap {
+        let Some(gone) = quoted["facts"].as_array_mut().and_then(Vec::pop) else {
+            break;
+        };
+        if let Some(ids) = note["source_ids"].as_array_mut() {
+            ids.retain(|id| *id != gone["id"]);
+        }
+        text = quoted.to_string();
+    }
+    note["note"] = json!(text);
+    note
 }
 
 fn legacy(store: &mut Days, request: Request) -> Result<Value> {
@@ -423,7 +496,7 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
                 &person,
                 &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
             )?;
-            recalled_with_days(store, &person, &entries)?
+            recalled_with_days(store, &person, &entries, false)?
         }
         Request::ForgetLast { person, kind } => value(Response::Forgot {
             removed: store.forget_last(&one(person)?, kind)?,
@@ -484,6 +557,7 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_to,
             recall_v2,
             newer_first,
+            strength,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
@@ -517,6 +591,14 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                         && let Some(at) = said.get(&record.id)
                     {
                         entry["last_said_unix_ms"] = json!(at);
+                    }
+                    if strength {
+                        let words = if record.kind == "exchange" {
+                            &record.heard
+                        } else {
+                            &record.text
+                        };
+                        label_entry(entry, words);
                     }
                 }
             }
@@ -557,6 +639,7 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_to,
             recall_v2,
             newer_first,
+            strength,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
@@ -576,7 +659,7 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
                 wider,
             )?;
-            let mut recalled = recalled_with_days(store, &person, &entries)?;
+            let mut recalled = recalled_with_days(store, &person, &entries, strength)?;
             // `newer_first`: as search. A recall's entries stay in time
             // order, so only the flag says it.
             if newer_first && let Some(told) = recalled["entries"].as_array_mut() {
@@ -603,8 +686,16 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             session,
             max_bytes,
             profile,
+            strength,
         } => {
-            json!({"ok":true,"snapshot":store.session_open_with(&one(person)?,&session,max_bytes.unwrap_or(1200).min(1200) as usize,profile)?})
+            let cap = max_bytes.unwrap_or(1200).min(1200) as usize;
+            let snapshot = store.session_open_with(&one(person)?, &session, cap, profile)?;
+            if strength {
+                let snapshot = serde_json::to_value(&snapshot).expect("a note is JSON values only");
+                json!({"ok":true,"snapshot":labelled_note(snapshot, cap)})
+            } else {
+                json!({"ok":true,"snapshot":snapshot})
+            }
         }
         Extra::SessionClose { person, session } => {
             store.session_close(&one(person)?, &session)?;
@@ -785,9 +876,10 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
         };
 
         // #2176: a recall with a span or the second version is the new one;
-        // so is one with `newer_first`.
+        // so is one with `newer_first`, or with `strength` (the Tiers-ideas
+        // plan, P2).
         let wider = name == "recall"
-            && ["day_from", "day_to", "recall_v2", "newer_first"]
+            && ["day_from", "day_to", "recall_v2", "newer_first", "strength"]
                 .iter()
                 .any(|field| parsed.get(field).is_some());
         if NEW.contains(&name) || wider {

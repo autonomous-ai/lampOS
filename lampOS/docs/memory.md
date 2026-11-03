@@ -1573,6 +1573,29 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `off_is_byte_identical`) and
     `search::newer_first_tests`. The voice sends the field with P4.
 
+- **Said, plan or maybe** (the memory owner's Tiers-ideas plan, 3 Nov, P2,
+  `LAMP_MEMORY_STRENGTH=on`, with the Days client only; off unless set).
+  Adapted from Tiers ([memory-tiers.md](memory-tiers.md)): a line found by
+  recall, or in a session's note, whose own words are a plan ("I will",
+  "going to", "định") or a maybe ("maybe", "not decided or booked", "có lẽ",
+  "chưa quyết") says so, and the voice tells the model it was "said as a maybe;
+  not known to be decided or booked" or "said as a plan; not known to be
+  done", and on a past day that "whether it happened is not known". The bench's pottery
+  decoy, "Maybe I will learn pottery; I have not decided or booked a class",
+  is told as a maybe. Worked out when read, stored nowhere; a word list for
+  English and Vietnamese only, which can only label a line weaker than
+  said. [memory-days.md](memory-days.md) has the words and the wire.
+  - **Off:** every request and answer is as before.
+  - Tests: `strength::tests` (the word table, English and Vietnamese; a
+    question or a negation never upgrades), `crates/memory/tests/it/days_strength.rs`
+    (the decoy is a maybe on search, recall and the note; the lamp's own
+    words never label an exchange; a labelled note keeps its cap; off is
+    byte for byte the same) and
+    `remember::tests::a_maybe_or_plan_line_is_told_as_said` (what the model
+    is told) and `a_past_plan_is_not_told_as_not_done` (a past `on` gets
+    both fields, never "not done"). The voice sends `strength` from `LAMP_MEMORY_STRENGTH` in the
+    plan's P4.
+
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
   client only; off unless set; both voice routes; on in the product unit
   since 28 Oct, after lamp-06c1 kept a line said again a second time). `remember` asks the
