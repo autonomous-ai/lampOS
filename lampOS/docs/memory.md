@@ -632,6 +632,20 @@ voice.
 A line kept as yours while you were the only face in view can include words
 someone else said out of view.
 
+**Their reminders on such a line** (`LAMP_ONE_FACE_REMINDERS=on`, on in the
+product, the memory owner's call on 4 Nov): the line's keep decides its
+reminder reads too. Its `list_reminders`, `cancel_reminder` and
+`snooze_reminder` ask the Schedule as the person its keep goes to
+(`ScopeLease::kept_by_one_face`, `tools::schedule_whose`), so they hear their
+own reminders and the room's (`Asker::may_see`), never another person's. On
+lamp-29e7 on 3 Nov the person's face was alone in 17 of 17 looks, read
+speaking in 0, and "What reminders do I have?" left out their own reminder.
+Nothing else widens: recall, hits, notes and context stay the room's, as
+above, and a second face, an unknown face, another voice, a narrow after it,
+or either switch off leaves the line the room's. Known risk, accepted by the
+memory owner on 4 Nov: a voice not seen saying it, with the person's face
+alone in view, hears the person's reminders and may cancel or snooze them.
+
 ### Talk notes and the running summary
 
 With `LAMP_CONVERSATION_SUMMARY=on` (on in the product, the lamp-memory

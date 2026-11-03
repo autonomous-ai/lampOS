@@ -355,6 +355,11 @@ Environment=LAMP_PERSON_SCOPE_SEEN=on
 # does not wait on the same-voice check, so a keep can hold words said out of view. A second face, another voice or
 # no face in view, and it is as above; a held forget's yes still needs their face seen saying it.
 Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
+# And on such a line, "what reminders do I have?" and the cancel and snooze lookups hear the person's own reminders
+# with the room's, never another person's (lamp-29e7 on 3 Nov: their face alone in 17 of 17 looks, read speaking in
+# 0, and their own reminder left out of the list). Memory's reads stay the room's. Known risk, accepted by the
+# memory owner on 4 Nov: a voice not seen saying it, with the person's face alone in view, hears their reminders.
+Environment=LAMP_ONE_FACE_REMINDERS=on
 # But within a conversation going on, a line of theirs no face was seen speaking (or one with nobody named), with no
 # other face in view and no 45 s quiet since their last exchange, stays in that conversation (#4339, lamp-3e83: one such line dropped to the
 # room's, the chat lost the talk and asked its question again), when their face was in view through it or within

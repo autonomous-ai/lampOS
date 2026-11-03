@@ -1601,6 +1601,27 @@ fn the_product_keeps_a_keep_theirs_with_one_known_face_in_view() {
     }
 }
 
+/// A one-face line's reminder reads are its person's own and the room's
+/// (`LAMP_ONE_FACE_REMINDERS`): on lamp-29e7 on 3 Nov the person's face was
+/// alone in 17 of 17 looks, read speaking in 0, and "What reminders do I
+/// have?" left out their own. The memory owner's call, 4 Nov, risk
+/// accepted. Beside the one-face keep it acts with.
+#[test]
+fn the_product_lets_a_one_face_line_hear_its_persons_reminders() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_ONE_FACE_REMINDERS=on",
+        "Environment=LAMP_PERSON_SCOPE_ONE_FACE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// Only faces of people at the desk count as people at the lamp
 /// (`LAMP_FACES_AT_DESK_ONLY`): on lamp-a0ae on 2 Nov tiny, unsure faces
 /// beside the owner held their name back on 51 of 79 turns as "more than one

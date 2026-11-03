@@ -1747,6 +1747,8 @@ fn second_route_worker_environment(
         // An earlier turn's calls told with its words (lamp build 9699).
         crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+        // A one-face line's reminder reads are its person's (lamp-29e7).
+        crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
         crate::person::BY_DEFAULT_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
@@ -1919,6 +1921,7 @@ mod tests {
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
             crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
+            crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -2610,6 +2613,7 @@ mod tests {
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
                     || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
+                    || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
@@ -2749,6 +2753,7 @@ mod tests {
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_ONE_AS_LAMP=on",
+                    "LAMP_ONE_FACE_REMINDERS=on",
                     "LAMP_OWNER_PLACE=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
