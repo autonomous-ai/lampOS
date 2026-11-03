@@ -6,6 +6,7 @@ mod cut_to_a_person;
 mod decline_silent;
 mod held_consent;
 mod held_forget;
+mod history_keeps_calls;
 mod music_current;
 mod music_policy;
 mod music_scope;
