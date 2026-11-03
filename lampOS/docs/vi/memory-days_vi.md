@@ -649,3 +649,84 @@ maybe) for that day; whether it happened is not known". Khi tắt, mọi
 yêu cầu và câu trả lời giống hệt từng byte như trước
 (`days_strength::off_is_byte_identical`). Memory cũ từ chối trường này, nên
 cập nhật cả hai cùng lúc.
+
+## Sở thích giữ theo quy tắc (`--taste-rules`, kế hoạch C bước A)
+
+Kế hoạch C của người phụ trách trí nhớ (3/11) học sở thích, thói quen và tóm
+tắt qua hai bước: A, quy tắc bằng mã không dùng mô hình; rồi B, một mô hình
+chạy hằng đêm với kiểm tra từng mục. Đây là A. Chạy `lamp-memory
+--memory-days --taste-rules` để bật; không có cờ thì không gì thay đổi (cờ cần
+`--memory-days`, và dòng khởi động khi đó ghi `taste_rules=on`).
+
+Khi bật, mỗi lượt ghi vào phạm vi riêng của một người đã biết (id `p-…`) được
+`crates/memory/src/taste_rules.rs` đọc ngay trong lần ghi, trước khi commit.
+Chỉ đọc `heard`, lời người đó nói; câu `said` của lamp không bao giờ được đọc.
+Phạm vi của phòng (`everyone`: khách, người lạ, cả câu của phòng mà mặt một
+người quen được thấy nói) và phạm vi quy tắc không giữ gì. Câu thuộc phạm vi
+nào vẫn do quy tắc của voice quyết định (`memory_scope.rs`), không đổi. Mỗi
+câu (đến `.`, `!`, `?`, `;` hoặc xuống dòng, tối đa bốn câu một lượt, 300 byte
+một câu) nói sở thích của chính người đó về một thứ thường ngày thì được giữ:
+
+| Loại | Tiếng Anh | Tiếng Việt |
+|---|---|---|
+| `preference` | I love / like / really like / enjoy / prefer / adore …; my favourite X is Y | tôi / em / mình (rất, cũng …) thích …; X yêu thích (nhất) của tôi / em / mình là … |
+| `dislike` | I hate / dislike / can't stand …; I don't / do not / no longer / never like … | … ghét …; … không / chẳng (còn) thích … |
+
+**Sức khỏe, tiền bạc và người khác không bao giờ được giữ theo quy tắc.** Sản
+phẩm không giữ những điều đó trừ khi người dùng nói rõ muốn lamp ghi nhớ
+(quy tắc của lượt quan sát, `remember::OBSERVE_PROMPT`, và
+[memory.md](../memory.md)), nên không có quy tắc dị ứng hay ăn chay («tôi dị
+ứng tôm», «tôi ăn chay», «I'm allergic to peanuts» không giữ gì), không có quy
+tắc cho điều về người khác («my wife likes coffee», «tên của mẹ tôi là Lan»),
+và một câu sở thích có bất kỳ từ nào về sức khỏe, thuốc, ăn kiêng, tiền hay
+người khác (`taste_rules::SENSITIVE`: «tôi ghét uống thuốc», «tôi thích
+tiền», «tôi thích nấu ăn cho vợ») bị bỏ qua cả câu. Từ chỉ người có thêm
+«'s» cũng tính như chính từ đó («I hate my boss's jokes», «I love my sister's
+cooking»). Câu cũng bị bỏ khi đối tượng, như đã nghe, có một từ viết hoa khác
+«I» («I can't stand Tom», «tôi ghét Lan»; tên hãng viết hoa cũng bị bỏ, vì quy
+tắc không phân biệt được với tên người), hoặc khi có lời thuật lại sau động
+từ (`says`, `said`, `told`, `tells`, `nói`, `bảo`, `kể`: «I hate broccoli,
+Minh says»). Nói «hãy nhớ …» vẫn giữ
+những điều đó như trước, theo chính yêu cầu của người dùng.
+
+Quan sát là đúng câu đó, mã chép nguyên văn như đã nghe, không diễn đạt lại;
+nhóm `preference` (thứ ghi chú phiên và lượt tidy đã đọc), loại và điều nó nói
+về nằm trong bảng phụ `tastes(rid, kind, about)` chỉ được tạo khi bật cờ
+(`Days::taste_kind`), nguồn là lượt hội thoại, thời điểm là của lượt đó. Nó
+được tìm kiếm, đưa vào ghi chú của phiên sau và hết hạn như mọi quan sát
+(30 ngày không dùng).
+
+Cũng bỏ qua: câu kết thúc bằng `?`, hay câu tiếng Việt kết thúc bằng `không`,
+`à`, `nhỉ`, `chưa`… («em thích cà phê không»); câu do dự (`maybe`, `might`,
+`think`, `có lẽ`, `chắc`, `hình như`, `có thể`): điều «có lẽ» không bao giờ
+được giữ như sự thật; câu không mở đầu bằng chính người nói; đối tượng không
+tự nói gì («I love it», «em thích anh»); đối tượng bắt đầu bằng «to» và một
+động từ («I hate to bother you»), nói về người nghe (`you`, `your`, `bạn`: «I
+like the way you said that») hay chỉ là «nothing», «none», «everything»,
+«anything»; mong muốn hay quá khứ («I'd like a
+coffee», «I used to love coffee»). Độ chắc (P2, #5052) không được dùng.
+
+Một sở thích mới hơn về cùng một thứ (cùng đối tượng, cùng món yêu thích)
+thay thế cái cũ do quy tắc giữ bằng một cạnh `replacements`: «Tôi không thích
+trà sữa nữa» sau «Tôi thích trà sữa» giữ câu cũ làm lịch sử không còn hiệu
+lực (`history:true`). Cùng lời nói lại thì không giữ thêm, cũng như khi phạm
+vi đã giữ điều đó cùng lời (`tidy::restates`). Quy tắc không bao giờ thay thế
+quan sát của mô hình.
+
+Quên dùng các liên kết sẵn có: `forget {id}` của lượt hội thoại xóa quan sát
+và các phiên bản của nó; `forget {id}` của quan sát xóa lượt gốc của nó;
+`forget_last`, `forget_all` và `forget_person` xóa nó cùng phần còn lại, và
+dòng `tastes` đi theo khóa ngoại. Lỗi trong quy tắc chỉ hoàn tác savepoint của
+chúng, không bao giờ hoàn tác lượt hội thoại. Không gọi mô hình hay mạng, chỉ
+tra theo chỉ mục. Trên Mac ở bản debug, đọc một câu mất vài micro giây; trung
+vị một lần ghi với 200 quan sát sẵn có là 67 ms khi tắt và 104 ms khi bật,
+với mỗi câu giữ hai quan sát, phần chênh chủ yếu là các dòng đó trong lần
+commit bền vững (`it::days_tastes::the_rules_add_little_to_the_write`). Khi
+tắt, kho giữ đúng những dòng như trước
+(`it::days_tastes::off_the_store_is_unchanged`). Kiểm thử:
+`taste_rules::tests` và `it::days_tastes`. Chưa đo bằng bộ đo, chưa chạy trên
+lamp.
+
+Ý tưởng quan sát có liên kết nguồn, chép đúng lời của người nói, là sự thật
+kèm trích dẫn nguyên văn của thiết kế Tiers
+([memory-tiers.md](../memory-tiers.md)), ở đây không dùng mô hình.
