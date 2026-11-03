@@ -381,6 +381,46 @@ give such a target its folder. A folder target,
 any other refusal, a timeout or a second refusal is never asked again,
 so nothing can start twice, and a named target's hand-overs all start.
 
+**`serve --new-folder`** (subdarren-P3 part 1, off unless set): Claude Code
+and Codex ask the person to trust a folder Harness didn't make ("Do you
+trust this folder?"), and Harness pre-trusts only a folder it made itself
+(`harness new --help`: "Claude Code and Codex ask the person to trust a
+folder Harness did not make"). On lamp-c0a4 on 3 November the first task to
+a new, empty `~/harnesses/lamp-tasks` waited at that question, read as
+`needs-input`, until someone pressed it. With the switch, a folder target
+of exactly `~/harnesses/<name>` (`<name>` of ASCII letters, digits, `.`,
+`_` and `-`, no `.` or `-` at either end, at most 64 bytes: a name Harness
+keeps as it is, so it makes exactly that folder) that this lamp hasn't
+seen on that computer is sent as `--new <name>` in place of the folder
+(`harness new claude --machine <id> --new lamp-tasks --name … --mode auto
+--json --task …`), so Harness makes the folder and trusts it. Then:
+- **made** (`new` succeeded, started or pending): the folder is marked
+  seen;
+- **there already** (Harness's `PROJECT_EXISTS`, made earlier by Harness or
+  by hand: exit 1 and `{"ok":false,"error":"“NAME” already exists on
+  COMPUTER: FOLDER. Choose another name …"}`, a sentence, read by " already
+  exists on " alone): it is marked seen, and the same `new` is asked once more with the
+  target's own folder in place of `--new <name>`, as without the switch, in
+  what is left of `new`'s one 60 s bound (journal: `tasks: lamp-task-N: the
+  folder for 'NAME' is on that computer already, so it starts there`). A
+  folder already there and trusted, as on the test Mac, starts as before; one
+  made by hand and never trusted still asks, as Harness never trusts it;
+- **anything else** (another refusal, another exit, a timeout): nothing is
+  marked and nothing asked again, so the next hand-over asks `--new` again.
+
+Each first ask says so in the journal (`tasks: lamp-task-N: the folder for
+'NAME' is new to this lamp on that computer, so Harness is asked to make
+it`), after any `--route` has said new work. A marked folder's later
+hand-overs name the folder, as before. The marks, machine id and folder,
+are kept in `folders-seen.json` in the tasks folder (`--dir`), mode 0600,
+written whole beside it and renamed over it, at most 256 (past that, the first
+in sort order is dropped), so a restart doesn't ask `--new` again. They are only a
+shortcut: a missing, unreadable or malformed file is read as none seen
+(with a journal line), which costs one `--new` refused as there already. Any
+other folder (`~/code/x`, an absolute path), a bare name (which Harness
+makes on its own, above), a cloud target, or the switch off: the hand-over
+goes exactly as before.
+
 Every hand-over says how it went in one journal line, whatever the outcome
 (on everywhere, no switch): `tasks: lamp-task-N: dispatch STATE [CODE] (exit
 N, T s, stderr: LAST)`. STATE is `accepted`, `pending`, `not_sent` or

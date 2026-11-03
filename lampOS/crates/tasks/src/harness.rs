@@ -412,6 +412,15 @@ pub struct CliConfig {
     /// [`Cli::route_first`]). Off unless set (`serve --route`): `new`, as
     /// before.
     pub route: bool,
+    /// `serve --new-folder` (subdarren-P3 part 1, off unless set): the file
+    /// in the tasks folder where the folders this lamp has seen are kept,
+    /// one per computer ([`NewFolder`]). A target whose folder is
+    /// `~/harnesses/<name>`, the one Harness makes for the project name
+    /// `<name>`, has its first hand-over sent as `--new <name>`, so Harness
+    /// makes the folder and trusts it, and Claude Code doesn't stop at "Do you
+    /// trust this folder?" with nobody at the computer (lamp-c0a4, 3 Nov).
+    /// `None`: the folder, as before.
+    pub new_folder: Option<PathBuf>,
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -432,6 +441,7 @@ impl CliConfig {
             folder_missing: false,
             engines_ready: false,
             route: false,
+            new_folder: None,
             journal: None,
         }
     }
@@ -449,6 +459,8 @@ pub struct Cli {
     executable: ExecutableIdentity,
     /// Each computer's answer for each engine (`serve --engines-ready`).
     ready: Mutex<Kept>,
+    /// The folders seen on each computer (`serve --new-folder`).
+    folders: Mutex<NewFolder>,
 }
 
 fn invalid(code: &'static str) -> io::Error {
@@ -543,6 +555,14 @@ impl Cli {
         {
             return Err(invalid("invalid_port"));
         }
+        if config
+            .new_folder
+            .as_ref()
+            .is_some_and(|file| !file.is_absolute() || file.file_name().is_none())
+        {
+            return Err(invalid("invalid_new_folder"));
+        }
+        let folders = Mutex::new(NewFolder::load(config.new_folder.as_deref()));
         Ok(Self {
             config,
             caller_session,
@@ -550,6 +570,7 @@ impl Cli {
             poisoned: AtomicBool::new(false),
             executable,
             ready: Mutex::new(BTreeMap::new()),
+            folders,
         })
     }
 
@@ -559,6 +580,23 @@ impl Cli {
             .as_ref()
             .is_some_and(|cancel| cancel.load(Ordering::Acquire))
             || also.is_some_and(|cancel| cancel.load(Ordering::Acquire))
+    }
+
+    /// Whether `target`'s folder is seen on its computer (`serve
+    /// --new-folder`).
+    fn folder_seen(&self, target: &Target) -> bool {
+        self.folders
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(target)
+    }
+
+    /// Mark `target`'s folder seen on its computer, and keep it.
+    fn folder_made(&self, target: &Target) {
+        self.folders
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(target);
     }
 
     /// Hand `launch` over, and say how it went in one journal line
@@ -630,6 +668,16 @@ impl Cli {
             args.push(launch.target.project.clone().into());
             args.len() - 1
         });
+        // `serve --new-folder`: a `~/harnesses/<name>` folder this lamp has
+        // not seen on that computer is asked for as `--new <name>`, so
+        // Harness makes it and trusts it ([`NewFolder`]).
+        let new_name = project_at
+            .filter(|_| self.config.new_folder.is_some())
+            .and_then(|at| Some((at, made_name(&launch.target.project)?)))
+            .filter(|_| !self.folder_seen(&launch.target));
+        if let Some((at, name)) = new_name {
+            args.splice(at..=at, ["--new".into(), name.into()]);
+        }
         args.extend(["--name".into(), launch.name.clone().into()]);
         // Harness's default, approved by the owner on 2026-10-15: Claude
         // Code works in its own project folder without asking, and still
@@ -656,20 +704,47 @@ impl Cli {
             return routed;
         }
         let until = began + self.config.launch_timeout;
+        if let Some((_, name)) = new_name {
+            eprintln!(
+                "tasks: {}: the folder for '{name}' is new to this lamp on that computer, so Harness is asked to make it",
+                launch.name
+            );
+        }
         let mut reply = self.run(&args, until.saturating_duration_since(Instant::now()));
         seen.took(&reply);
-        // A bare name gets its folder, `~/harnesses/<name>`, from Harness on
-        // the first `new`, and every later `new` on that name is refused
-        // for it, before anything starts (Harness 0.4.55; Mobile on
-        // lamp-0c89, 23 Oct). On that refusal alone, asked once more in
-        // the folder it names, in what is left of the bound; nothing else
-        // is ever asked twice.
         let left = until.saturating_duration_since(Instant::now());
-        if let (Some(at), Ok(refused)) = (project_at, &reply)
+        // `--new <name>` made the folder, or Harness says it is there
+        // already: either way it is on that computer from now on, and later
+        // hand-overs name it. A folder already there is asked once more as
+        // the folder itself, as it was before `--new-folder`, in what is
+        // left of the bound. Any other answer marks nothing, so the next
+        // hand-over asks `--new` again.
+        if let (Some((at, name)), Ok(answered)) = (new_name, &reply) {
+            if answered.success {
+                self.folder_made(&launch.target);
+            } else if project_exists(answered) {
+                self.folder_made(&launch.target);
+                if !left.is_zero() {
+                    eprintln!(
+                        "tasks: {}: the folder for '{name}' is on that computer already, so it starts there",
+                        launch.name
+                    );
+                    args.splice(at..at + 2, [launch.target.project.clone().into()]);
+                    reply = self.run(&args, left);
+                    seen.took(&reply);
+                }
+            }
+        } else if let (Some(at), Ok(refused)) = (project_at, &reply)
             && !refused.success
             && !left.is_zero()
             && let Some(folder) = name_taken(&refused.stdout, &launch.target.project)
         {
+            // A bare name gets its folder, `~/harnesses/<name>`, from Harness on
+            // the first `new`, and every later `new` on that name is refused
+            // for it, before anything starts (Harness 0.4.55; Mobile on
+            // lamp-0c89, 23 Oct). On that refusal alone, asked once more in
+            // the folder it names, in what is left of the bound; nothing else
+            // is ever asked twice.
             eprintln!(
                 "tasks: {}: the name '{}' is taken by a folder of that name on that computer, so it starts there",
                 launch.name, launch.target.project
@@ -1874,6 +1949,184 @@ fn said_of_stderr(stderr: &[u8], prompt: &str, machines: &BTreeSet<String>) -> O
         return None;
     }
     Some(words.join(" ").chars().take(STDERR_SAID_CHARS).collect())
+}
+
+/// The project name whose folder Harness makes as `~/harnesses/<name>`,
+/// when `project` is that folder (`serve --new-folder`). Only a name Harness
+/// keeps as it is (openharness `projectName`: letters, digits, `.`, `_` and
+/// `-`, no `.` or `-` at either end, at most 64), so `--new <name>` makes
+/// exactly this folder; any other folder is never asked for so.
+fn made_name(project: &str) -> Option<&str> {
+    let name = project.strip_prefix("~/harnesses/")?;
+    let kept = !name.is_empty()
+        && name.len() <= 64
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        && !name.starts_with(['.', '-'])
+        && !name.ends_with(['.', '-']);
+    kept.then_some(name)
+}
+
+/// Whether the reply is Harness's refusal of `--new` because that project's
+/// folder is there already (`PROJECT_EXISTS`): exit 1 and
+/// `{"ok":false,"error":"“NAME” already exists on COMPUTER: FOLDER. Choose
+/// another name …"}`, a sentence, not a code (openharness `newCommand.ts`;
+/// Harness 0.5.28). Read tolerantly, by " already exists on " alone; any
+/// other refusal is a failure like any other.
+fn project_exists(reply: &Reply) -> bool {
+    #[derive(Deserialize)]
+    struct Failed {
+        ok: bool,
+        error: String,
+    }
+    reply.code == Some(1)
+        && serde_json::from_slice::<Failed>(&reply.stdout)
+            .is_ok_and(|failed| !failed.ok && failed.error.contains(" already exists on "))
+}
+
+/// The most folders kept as seen: far more than a targets file names.
+const MOST_FOLDERS_SEEN: usize = 256;
+/// The kept file is at most this long; a longer one is read as empty.
+const FOLDERS_FILE_BYTES: u64 = 128 * 1024;
+
+/// The `~/harnesses/<name>` folders this lamp has seen on each computer
+/// (`serve --new-folder`): made by Harness on a `--new`, or found there
+/// already. Kept in a file of the tasks folder, so a restart doesn't ask
+/// `--new` again. Only a shortcut: a folder missing from it costs one
+/// `--new` that Harness refuses as there already, and the hand-over then
+/// goes to the folder, as before.
+struct NewFolder {
+    file: Option<PathBuf>,
+    seen: BTreeSet<(String, String)>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FoldersFile {
+    version: u32,
+    seen: Vec<SeenFolder>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SeenFolder {
+    machine_id: String,
+    project: String,
+}
+
+impl NewFolder {
+    /// What `file` keeps. One missing is none seen; one that can't be read,
+    /// or isn't this shape, is none seen too, with a line.
+    fn load(file: Option<&Path>) -> Self {
+        let mut folders = Self {
+            file: file.map(Path::to_path_buf),
+            seen: BTreeSet::new(),
+        };
+        let Some(file) = file else {
+            return folders;
+        };
+        match Self::read(file) {
+            Ok(seen) => folders.seen = seen,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                eprintln!(
+                    "tasks: the folders seen could not be read ({error}); none are taken as seen"
+                );
+            }
+        }
+        folders
+    }
+
+    fn read(file: &Path) -> io::Result<BTreeSet<(String, String)>> {
+        let metadata = fs::symlink_metadata(file)?;
+        if !metadata.is_file() || metadata.len() > FOLDERS_FILE_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "not a small file",
+            ));
+        }
+        let kept: FoldersFile = serde_json::from_slice(&fs::read(file)?)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "not the folders file"))?;
+        if kept.version != 1 || kept.seen.len() > MOST_FOLDERS_SEEN {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "not version 1"));
+        }
+        Ok(kept
+            .seen
+            .into_iter()
+            .map(|seen| (seen.machine_id, seen.project))
+            .collect())
+    }
+
+    fn contains(&self, target: &Target) -> bool {
+        self.seen
+            .contains(&(target.machine_id.clone(), target.project.clone()))
+    }
+
+    /// Mark `target`'s folder seen, and keep the file: written whole beside
+    /// it, then renamed over it. A failed write is said and leaves the mark
+    /// in memory.
+    fn insert(&mut self, target: &Target) {
+        if self.contains(target) {
+            return;
+        }
+        if self.seen.len() >= MOST_FOLDERS_SEEN {
+            let first = self.seen.iter().next().cloned();
+            if let Some(first) = first {
+                self.seen.remove(&first);
+            }
+        }
+        self.seen
+            .insert((target.machine_id.clone(), target.project.clone()));
+        if let Some(file) = &self.file
+            && let Err(error) = self.write(file)
+        {
+            eprintln!("tasks: the folders seen could not be kept ({error})");
+        }
+    }
+
+    fn write(&self, file: &Path) -> io::Result<()> {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let kept = FoldersFile {
+            version: 1,
+            seen: self
+                .seen
+                .iter()
+                .map(|(machine_id, project)| SeenFolder {
+                    machine_id: machine_id.clone(),
+                    project: project.clone(),
+                })
+                .collect(),
+        };
+        let bytes = serde_json::to_vec(&kept).map_err(io::Error::other)?;
+        let name = file
+            .file_name()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no file name"))?;
+        let mut partial = name.to_os_string();
+        partial.push(".partial");
+        let partial = file.with_file_name(partial);
+        let mut out = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .custom_flags(libc_nofollow())
+            .open(&partial)?;
+        out.write_all(&bytes)?;
+        out.sync_all()?;
+        drop(out);
+        fs::rename(&partial, file)?;
+        if let Some(parent) = file.parent() {
+            fs::File::open(parent)?.sync_all()?;
+        }
+        Ok(())
+    }
+}
+
+/// `O_NOFOLLOW`, so the partial file is never written through a link.
+fn libc_nofollow() -> i32 {
+    OFlags::NOFOLLOW.bits() as i32
 }
 
 /// The folder Harness made for the bare project name `project`, when the

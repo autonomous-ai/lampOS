@@ -61,6 +61,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut set_up_later = false;
     let mut sign_in_by_code = false;
     let mut folder_missing = false;
+    let mut new_folder = false;
     let mut route = false;
     let mut engines_ready = false;
     let mut from_machines = None;
@@ -81,6 +82,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--sign-in-by-code" => sign_in_by_code = true,
             "--folder-missing" => folder_missing = true,
             "--route" => route = true,
+            "--new-folder" => new_folder = true,
             "--engines-ready" => engines_ready = true,
             "--targets-from-machines" => {
                 let engine = args
@@ -193,6 +195,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             folder_missing,
             engines_ready,
             route,
+            new_folder,
         },
         stop,
     )?;
