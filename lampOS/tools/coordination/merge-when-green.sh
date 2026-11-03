@@ -1,9 +1,14 @@
 #!/bin/zsh
-# merge-when-green.sh PR (22 Oct 23:4x, the owner: "do the reviewer job yourself too ... so we can move faster"): wait for
+# merge-when-green.sh PR [--precheck PR...] (22 Oct 23:4x, the owner: "do the reviewer job yourself too ... so we can move faster"): wait for
 # the PR's required checks to finish; merge it by rebase, pinned to its head, only when every check passed and the head
 # already contains lamp-voice's latest commit (the owner's 22 Oct rule). Otherwise say why and stop. Never pushes.
 # Paths from the environment (README.md): TOOLS_DIR (default: this folder), REPO_DIR (default: the repo holding it).
+# 3 Nov 15:4x (the Reviewer-lead's P3 on #5068): the precheck is still-eligible.sh on the PRs after --precheck, run as
+# a command with arguments. It used to be `eval "$PRECHECK"`, so a PRECHECK left in the caller's environment ran as code;
+# that variable is ignored now.
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"; R="${REPO_DIR:-$(git -C $TOOLS_DIR rev-parse --show-toplevel)}"; P=${1:?PR}; cd $R || exit 1
+unset PRECHECK; typeset -a pre; pre=()
+[[ $2 == --precheck ]] && pre=("${@[3,-1]}")
 # A PR whose every file the lampOS workflows skip (lampOS/docs/**/*.md and lampOS/builders/**, but not the seven docs
 # they take back in) gets no checks at all, so waiting for them timed out trains 41 and 44 (23 Oct): it merges on the
 # same current-base and precheck rules, with nothing to wait for.
@@ -52,7 +57,7 @@ for i in {1..90}; do
     $TOOLS_DIR/lv-quiet.sh
     git fetch -q origin lamp-voice "+refs/pull/$P/head:refs/remotes/pr/$P"
     if ! git merge-base --is-ancestor origin/lamp-voice refs/remotes/pr/$P; then echo "$(date +%T) #$P green but behind lamp-voice; not merged"; exit 3; fi
-    if [[ -n $PRECHECK ]] && ! eval "$PRECHECK"; then echo "$(date +%T) #$P precheck failed: not merged"; exit 6; fi
+    if (( ${#pre} )) && ! $TOOLS_DIR/still-eligible.sh "${pre[@]}"; then echo "$(date +%T) #$P precheck failed: not merged"; exit 6; fi
     gh pr merge $P -R autonomous-ai/lampOS --rebase --match-head-commit $head && echo "$(date +%T) #$P merged at ${head:0:9}" && exit 0
     echo "$(date +%T) #$P merge refused"; exit 4
   fi

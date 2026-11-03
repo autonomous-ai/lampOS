@@ -2,10 +2,15 @@
 holds-lifted.tsv
 private-names.txt
 accounts.tsv
+writers.txt
+writers-extra.txt
+writers-allowed.txt
+*.jsonl
 train-first.txt
 train-hold.txt
 train-only.txt
 train-bot.told
+train-bot.said
 train-bot.pid
 train-bot.out
 train-bot.log
