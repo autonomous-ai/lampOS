@@ -200,7 +200,10 @@ while true; do
     else
       git -C $W cherry-pick --abort
       # 28 Oct 16:4x: told once per PR, not once per lamp-voice head (#4042 got three in an hour): post less.
-      grep -q "^$p conflict" $told || { gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): #$p conflicts with lamp-voice \`$LV\` and was left out of train $n. Please rebase onto lamp-voice; your READ-OK carries over if the patch is the same." >/dev/null; echo "$p conflict $LV" >> $told; }
+      # 4 Nov 04:4x: once per PR head, so a rebased head that conflicts again is told (and logged) once more. #5043 was
+      # told on 3 Nov; rebased, it conflicted again on switches.md and sat out train 584 with nothing said.
+      ph=$(git rev-parse refs/remotes/pr/$p)
+      grep -q "^$p conflict .* $ph\$" $told || { say "#$p left out of train $n: it conflicts with lamp-voice $LV" >&2; gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): #$p conflicts with lamp-voice \`$LV\` and was left out of train $n. Please rebase onto lamp-voice; your READ-OK carries over if the patch is the same." >/dev/null; echo "$p conflict $LV $ph" >> $told; }
     fi
   done
   [[ ${#carried} -gt 0 ]] || { n=$((n-1)); sleep 60; continue; }
