@@ -437,9 +437,12 @@ gần như trống. Giờ đây, với một câu được nhận là của ngư
 ai nói, khi các lần nhìn qua câu ấy thấy khuôn mặt quen của họ trong ít nhất 3
 lần và không thấy mặt nào khác trong bất kỳ lần nào
 (`SpeakingFaces::one_face_in_view`; một lần nhìn không có ai không tính là mặt
-khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **chỉ việc ghi nhớ**
-(`remember`) là của họ: điều đó được lưu vào phạm vi của họ
-(`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`). **Mọi việc
+khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **việc ghi nhớ**
+(`remember`) **và việc quên điều đã ghi** là của họ: điều đó được lưu vào phạm
+vi của họ (`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`), và
+một `forget` một mục tìm trong phạm vi của họ rồi đến của căn phòng
+(`ScopeLease::reached_by_one_face`, quyết định duy nhất mà tuyến ký ức trong
+`tools.rs` đọc cho cả hai, nên việc quên không bao giờ hẹp hơn việc ghi). **Mọi việc
 đọc vẫn là của căn phòng**: không `recall` hay gợi ý từ ký ức của họ, không
 ghi chú ký ức của họ, không ngữ cảnh của người ấy, không chuỗi hội thoại hay
 bản tóm tắt của họ; câu được nói và đọc như của căn phòng, như khi không có
@@ -467,13 +470,39 @@ là giọng khác, chỉ thấy mặt thứ hai nói mới cho biết có ngư�
 ghi nhớ là của họ, cái giá là lời được lưu, không bao giờ bị đọc. Có mặt thứ hai, mặt lạ,
 không có mặt nào, hoặc có giọng khác, thì như trước. Một câu được nhận là của
 căn phòng vì không nhận ra ai thì không đổi, nên giọng chưa nhận ra vẫn không
-chạm được ký ức của ai (#4196, #4207). **Việc quên không đổi:** `forget` và
-`forget_everything` trên câu như vậy chạy trong phạm vi của căn phòng, và **một
+chạm được ký ức của ai (#4196, #4207). **Việc quên theo việc ghi:** một
+`forget` một mục trên câu như vậy xoá khỏi phạm vi của họ điều mà cùng quy tắc
+đã lưu ở đó, và chỉ tìm thêm trong phạm vi của căn phòng khi của họ không có gì
+về điều ấy (lần kiểm tra của Fourteen trên lamp-9adf, bản 9699: «forget my
+coffee» chỉ tìm trong phạm vi căn phòng trong khi cà phê được lưu là của họ,
+lỗi đã có từ bản 9610). Việc «không có gì» ấy là một kết quả do chính lệnh
+quên đặt ra (`remember::run_one_face_forget`), không bao giờ đọc từ câu trả
+lời: khi của họ có điều khớp nhưng không quên gì (hơn tám điều, nên hỏi là
+điều nào; danh sách bị cắt; ký ức cũ từ chối danh sách), phạm vi của căn phòng
+không bị chạm tới (P2 của Reviewer-lead trên #5022). Một `forget {about}`
+không nêu tên đã tự tìm trong phạm vi căn phòng khi họ không có gì của riêng
+mình, nên phạm vi căn phòng chỉ được chạy lại cho lệnh quên có nêu tên trong
+lời nghe được. Nó chỉ chạm tới khuôn mặt quen duy nhất được nhận cho câu này,
+được kiểm tra lại ngay trước mỗi lần chạy trong phạm vi của họ, cả cho việc
+ghi (`remember::run_one_face_keep`): có mặt thứ hai, mặt lạ, không có mặt,
+giọng khác hoặc bị thu hẹp sau đó, kể cả giữa lần đọc ấy và lần chạy, thì chỉ
+là của căn phòng. `forget_everything` trên câu như vậy vẫn chạy trong phạm vi của
+căn phòng. Chỉ lệnh quên theo điều nó nói tới hoặc theo id mà `recall` đã đưa mới chạm
+tới phạm vi của họ: một câu «forget that» trống, hoặc bất kỳ lệnh quên nào mà
+ký ức sẽ chạy như «điều được lưu gần nhất» (ký ức cũ, công tắc tắt), chỉ là của
+căn phòng, vì sau lần `recall` của căn phòng trên câu như vậy nó sẽ lấy mất
+điều họ lưu gần nhất (P2 của Thirteen trên #5022). Id được đếm theo từng
+người, nên số 3 của họ và số 3 của căn phòng là hai điều khác nhau: một lệnh
+quên theo id chỉ đi tới phạm vi mà danh sách của nó đã cho thấy id ấy trong
+phiên này, và một id đã hiện ở cả hai thì không quên gì và mô hình hỏi là
+cái nào (`remember::by_where_shown`; P2 thứ hai của Thirteen trên #5022). Và **một
 lời «có» nói trên câu như vậy không bao giờ chạy một lệnh quên đang giữ**
 (`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói. Rủi ro còn lại:
 một giọng ngoài khung hình khi họ ngồi một mình trong khung, không có dấu giọng
-để phân biệt, có thể được lưu vào ký ức của họ (không bao giờ được đọc lại cho
-giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
+để phân biệt, có thể được lưu vào ký ức của họ, và lệnh `forget` một mục của
+giọng ấy có thể xoá trong đó tối đa tám điều khớp (một `forget {about}` quên
+nhiều nhất tám điều, và không quên gì khi có nhiều hơn), không bao giờ tất cả
+(không gì được đọc lại cho giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
 hình có thể chứa lời người khác nói ngoài khung hình.
 
 ## Đầu dò của bộ đo (#4748)
