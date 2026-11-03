@@ -37,6 +37,25 @@ coord_body() {
   gh pr view $1 -R $REPO --json body --jq '{login:"",body:.body,pr_body:true}' > $2.new 2>/dev/null && [[ -s $2.new ]] && mv $2.new $2
 }
 
+# patch_of COMMIT: the commit's patch-id from its merge base with origin/lamp-voice. 31 Oct 04:0x (Fourth, 03:23): with
+# no context lines (-U0), so lamp-voice's own edits beside a hunk don't change the id; #4562 sat out trains 425-433 as
+# the same patch by range-diff.
+patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1; git diff -U0 $b $1 -- . | git patch-id --stable | cut -d' ' -f1; }
+
+# coord_same_patch HEAD COMMENTS: prints HEAD, then each commit a READ-OK in the COMMENTS file names whose patch is
+# HEAD's (a plain rebase), one a line, for reads2.py. reads2.py still decides which READ-OKs count (writers, markers).
+coord_same_patch() {
+  local hp s full
+  print -r -- $1
+  hp=$(patch_of $1) && [[ -n $hp ]] || return 0
+  for s in ${(u)${(f)"$(grep -oE 'READ-OK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $2 2>/dev/null | grep -oE '[0-9a-f]{7,40}$')"}}; do
+    [[ $1 == $s* ]] && continue
+    git cat-file -e "$s^{commit}" 2>/dev/null || git fetch -q origin $s 2>/dev/null
+    full=$(git rev-parse -q --verify "$s^{commit}" 2>/dev/null) || continue
+    [[ "$(patch_of $full)" == $hp ]] && print -r -- $full
+  done
+}
+
 # coord_head PR: prints the PR's head sha, or fails when it can't be read or its head is in another repository
 # (a fork's PR is never carried, whatever its markers say).
 coord_head() {
