@@ -144,6 +144,7 @@ impl Harness {
             reminder: None,
             say: None,
             news: Vec::new(),
+            down_line_said: false,
             last_provider_audio_at_us: None,
             start: lamp_audio::playout::StartGate::new(0),
             need: lamp_audio::playout::StartNeed::default(),

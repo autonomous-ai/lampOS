@@ -1217,6 +1217,11 @@ struct Reply {
     /// The news this turn tells (its key, and those told with it): handed
     /// to the tasks part only once the turn is heard whole (#1390).
     news: Vec<String>,
+    /// The second route said its down line for this turn
+    /// (`ProviderOutput::DownLineSaid`, #4332): a failure then says no
+    /// `turn_lost`. Not `had_audio`: an answer cut off mid-sentence still
+    /// owes it.
+    down_line_said: bool,
 }
 impl Reply {
     fn settled(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
@@ -3885,6 +3890,13 @@ fn observe_provider_output(
                 None => eprintln!(
                     "lamp-voice: the news ({key}) was answered for a turn already over: its harness stays open"
                 ),
+            }
+        }
+        // The second route told the person it broke (#4332): its failure
+        // owes no `turn_lost` on top.
+        ProviderOutput::DownLineSaid { request } => {
+            if let Some(current) = reply.as_mut().filter(|r| r.owner.turn() == *request) {
+                current.down_line_said = true;
             }
         }
         ProviderOutput::HoldingAnswer { request, session } => {
@@ -8100,7 +8112,9 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
-                ProviderOutput::NewsAnswered { .. } | ProviderOutput::OwnWordsSaid { .. } => {}
+                ProviderOutput::NewsAnswered { .. }
+                | ProviderOutput::OwnWordsSaid { .. }
+                | ProviderOutput::DownLineSaid { .. } => {}
                 // The second route's times for the request, recorded with the
                 // end of speech decision's time, for an A/B scored on each
                 // request's first answer audio (19 Oct).
@@ -14434,6 +14448,7 @@ fn commit_written_turn(
         reminder: None,
         say: None,
         news: Vec::new(),
+        down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -14672,6 +14687,7 @@ fn commit_admitted_input(
         reminder: None,
         say: None,
         news: Vec::new(),
+        down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -14782,6 +14798,7 @@ fn commit_offline_input(
         reminder: None,
         say: None,
         news: Vec::new(),
+        down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -14957,6 +14974,7 @@ fn commit_own_line(
         reminder: None,
         say: None,
         news: Vec::new(),
+        down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -15065,6 +15083,7 @@ fn continue_after_early_end(
         reminder: None,
         say: None,
         news: Vec::new(),
+        down_line_said: false,
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -17061,6 +17080,7 @@ mod tests {
                 reminder: None,
                 say: None,
                 news: Vec::new(),
+                down_line_said: false,
                 last_provider_audio_at_us: None,
                 start: StartGate::new(0),
                 need: StartNeed::default(),
@@ -18148,6 +18168,7 @@ mod tests {
             reminder: None,
             say: None,
             news: Vec::new(),
+            down_line_said: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
@@ -18471,6 +18492,7 @@ mod tests {
             reminder: None,
             say: None,
             news: Vec::new(),
+            down_line_said: false,
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),

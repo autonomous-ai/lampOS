@@ -569,6 +569,7 @@ mod tests {
             reminder: None,
             say: None,
             news: Vec::new(),
+            down_line_said: false,
             owner: turn,
             cloud: CloudRequest::new(1).unwrap(),
             local_input_ended: false,
