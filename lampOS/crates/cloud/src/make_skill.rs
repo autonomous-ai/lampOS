@@ -13,6 +13,14 @@
 //!
 //! The owner's alone, as every kind here is: only the lamp's own account
 //! channel commands it (`online::commanded`).
+//!
+//! **A skill written in the app** (`skills.write`, [`WRITE_ENVIRONMENT`]
+//! `=on` with the skills page; off): the person's own name, when to use it
+//! and what to do, held to their bounds here as lamp-voice holds them
+//! (`lamp_voice::made_skill::Written`, [`written`]), go to the same socket as
+//! `{"written": {...}}`. lamp-voice writes the skill from them as written,
+//! no model, keeps it as a made skill and asks about it aloud; `skills.made`
+//! tells what became of it, and only a spoken yes puts it on.
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
@@ -93,6 +101,109 @@ pub fn watch(socket: PathBuf) {
 /// The socket, with the switch on.
 pub fn from_environment() -> Option<PathBuf> {
     (std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")).then(|| SOCKET.into())
+}
+
+/// The written skills' switch, in lamp-cloud's unit: `on` exactly.
+/// lamp-voice's own name for it
+/// (`lamp_voice::made_skill::WRITTEN_ENVIRONMENT`, held equal by a test).
+pub const WRITE_ENVIRONMENT: &str = "LAMP_SKILL_WRITTEN";
+
+/// The socket, with [`WRITE_ENVIRONMENT`] on: `skills.write` and
+/// `skills.made` are answered, and named in `can`.
+pub fn write_from_environment() -> Option<PathBuf> {
+    (std::env::var(WRITE_ENVIRONMENT).ok().as_deref() == Some("on")).then(|| SOCKET.into())
+}
+
+/// The most of a written skill's name, its `when` line and its
+/// instructions: lamp-voice's own (`lamp_voice::made_skill`, held equal by
+/// a test).
+pub const MOST_WRITTEN_NAME_BYTES: usize = 40;
+pub const MOST_WHEN_BYTES: usize = 200;
+pub const MOST_INSTRUCTIONS_BYTES: usize = 2_000;
+
+/// A written skill's three fields as lamp-voice takes them
+/// (`lamp_voice::made_skill::Written::new`, which a test holds this to):
+/// each trimmed at its ends; the name a lowercase letter, then lowercase
+/// letters, digits and `-`, at most [`MOST_WRITTEN_NAME_BYTES`]; `when`
+/// one line of at most [`MOST_WHEN_BYTES`]; the instructions plain text,
+/// lines and tabs only, at most [`MOST_INSTRUCTIONS_BYTES`]. Or why not,
+/// in the voice's words, so the app is told before it is asked.
+pub fn written<'a>(
+    name: &'a str,
+    when: &'a str,
+    instructions: &'a str,
+) -> Result<(&'a str, &'a str, &'a str), String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("give the skill a name".into());
+    }
+    if name.len() > MOST_WRITTEN_NAME_BYTES
+        || !name.starts_with(|first: char| first.is_ascii_lowercase())
+        || !name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    {
+        return Err(format!(
+            "the name is a lowercase letter, then lowercase letters, digits and '-', at most \
+             {MOST_WRITTEN_NAME_BYTES} in all"
+        ));
+    }
+    let when = when.trim();
+    if when.is_empty() {
+        return Err("say when to use it".into());
+    }
+    if when.len() > MOST_WHEN_BYTES || when.chars().any(char::is_control) {
+        return Err(format!(
+            "when to use it is one line of at most {MOST_WHEN_BYTES} bytes"
+        ));
+    }
+    let instructions = instructions.trim();
+    if instructions.is_empty() {
+        return Err("say what the lamp should do".into());
+    }
+    if instructions.len() > MOST_INSTRUCTIONS_BYTES
+        || instructions
+            .chars()
+            .any(|letter| letter.is_control() && !matches!(letter, '\n' | '\t'))
+    {
+        return Err(format!(
+            "what the lamp should do is plain text of at most {MOST_INSTRUCTIONS_BYTES} bytes"
+        ));
+    }
+    Ok((name, when, instructions))
+}
+
+/// `skills.write` (`{"name", "when", "instructions", "request_id"}`): a
+/// skill written in the app, held to lamp-voice's own bounds ([`written`]),
+/// handed to lamp-voice as written; `{"making": true, "request_id"}`, or
+/// why not in plain words. Never the words in the journal.
+pub fn write(socket: &Path, data: &Value) -> Result<Option<Value>, String> {
+    let field = |key: &str| data.get(key).and_then(Value::as_str).unwrap_or_default();
+    let (name, when, instructions) = written(field("name"), field("when"), field("instructions"))?;
+    let id = request_id(data).ok_or("the ask needs a request id")?;
+    if !request_id_ok(id) {
+        return Err(BAD_REQUEST_ID.to_owned());
+    }
+    let reply = exchange(
+        socket,
+        &json!({"written": {
+            "name": name,
+            "when": when,
+            "instructions": instructions,
+            "request_id": id,
+        }}),
+    )?;
+    if reply.get("making") == Some(&json!(true)) {
+        eprintln!("lamp-cloud: a written skill: asked");
+        return Ok(Some(json!({"making": true, "request_id": id})));
+    }
+    let why = reply
+        .get("refused")
+        .and_then(Value::as_str)
+        .unwrap_or(UNREACHED)
+        .to_owned();
+    eprintln!("lamp-cloud: a written skill refused: {why}");
+    Err(why)
 }
 
 /// One line to lamp-voice, one line back.
@@ -185,6 +296,7 @@ pub fn made(socket: &Path, data: &Value) -> Result<Option<Value>, String> {
         let permissions = lamp_skills::Permissions {
             light: uses["light"] == true,
             body: uses["body"] == true,
+            speak: uses["speak"] == true,
             topics: uses["topics"]
                 .as_array()
                 .map(|topics| {
@@ -290,6 +402,51 @@ mod tests {
     #[test]
     fn the_switch_and_the_socket_are_lamp_voices() {
         assert_eq!(ENVIRONMENT, lamp_voice::app_make::ENVIRONMENT);
+        assert_eq!(
+            WRITE_ENVIRONMENT,
+            lamp_voice::made_skill::WRITTEN_ENVIRONMENT
+        );
+    }
+
+    /// A written skill's fields are taken here exactly as lamp-voice takes
+    /// them, its bounds and its words why not.
+    #[test]
+    fn written_fields_are_held_as_lamp_voice_holds_them() {
+        use lamp_voice::made_skill as voice;
+        assert_eq!(MOST_WRITTEN_NAME_BYTES, voice::MOST_WRITTEN_NAME_BYTES);
+        assert_eq!(MOST_WHEN_BYTES, voice::MOST_WHEN_BYTES);
+        assert_eq!(MOST_INSTRUCTIONS_BYTES, voice::MOST_INSTRUCTIONS_BYTES);
+        let long = |bytes: usize| "a".repeat(bytes);
+        for (name, when, instructions) in [
+            (
+                "study-mode",
+                "when I say study mode",
+                "Dim the light.\n\tStay quiet.",
+            ),
+            (" study ", " x ", " y "),
+            ("", "x", "y"),
+            ("Study", "x", "y"),
+            ("1a", "x", "y"),
+            ("a_b", "x", "y"),
+            (&long(40), "x", "y"),
+            (&long(41), "x", "y"),
+            ("a", "", "y"),
+            ("a", "x\ny", "y"),
+            ("a", &long(200), "y"),
+            ("a", &long(201), "y"),
+            ("a", "x", ""),
+            ("a", "x", &long(2_000)),
+            ("a", "x", &long(2_001)),
+            ("a", "x", "a\u{7}b"),
+            ("a", "x", "a\r\nb"),
+        ] {
+            let here = written(name, when, instructions).map(|(name, when, instructions)| {
+                (name.to_owned(), when.to_owned(), instructions.to_owned())
+            });
+            let there = voice::Written::new(name, when, instructions)
+                .map(|held| (held.name, held.when, held.instructions));
+            assert_eq!(here, there, "{name:?} {when:?} {instructions:?}");
+        }
         assert_eq!(SOCKET, lamp_voice::app_make::DEFAULT_SOCKET);
     }
 
@@ -431,5 +588,92 @@ mod tests {
             command_at(Path::new("/nowhere/make.sock"), &arguments(&["made", "r1"])),
             (format!("unread: {UNREACHED}"), 1)
         );
+    }
+
+    /// `skills.write`: the fields held to their bounds here, nothing asked
+    /// of the voice otherwise; then the text as written, trimmed at its
+    /// ends, goes to the voice as one line, and its answer, or its refusal,
+    /// comes back. A written skill's state is told with its voice as one
+    /// of what it may use.
+    #[test]
+    fn a_written_skill_is_handed_to_the_voice_as_written() {
+        let (socket, seen) = voice(
+            "write",
+            vec![
+                json!({"making": true}),
+                json!({"refused": "a skill is still being made"}),
+                json!({"request_id": "w1", "state": "kept", "name": "study-mode", "written": true,
+                    "sha256": "a".repeat(64),
+                    "uses": {"light": false, "body": false, "topics": [], "speak": true}}),
+            ],
+        );
+        let data = json!({"name": " study-mode ", "when": "when I say study mode",
+            "instructions": "Dim the light.\nSay \"focus\".\n", "request_id": "w1"});
+        assert_eq!(
+            write(&socket, &data),
+            Ok(Some(json!({"making": true, "request_id": "w1"})))
+        );
+        assert_eq!(
+            seen.recv().unwrap(),
+            json!({"written": {"name": "study-mode", "when": "when I say study mode",
+                "instructions": "Dim the light.\nSay \"focus\".", "request_id": "w1"}})
+        );
+        assert_eq!(
+            write(
+                &socket,
+                &json!({"name": "other", "when": "x", "instructions": "y", "request_id": "w2"})
+            ),
+            Err("a skill is still being made".to_owned())
+        );
+        let told = made(&socket, &json!({"request_id": "w1"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(told["written"], true);
+        let names: Vec<&str> = told["may_use"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|row| row["name"].as_str())
+            .collect();
+        assert_eq!(names, ["speak"], "{told}");
+        // Refused here, before the voice is asked.
+        let nowhere = Path::new("/nowhere/make.sock");
+        for (data, why) in [
+            (
+                json!({"when": "x", "instructions": "y", "request_id": "w3"}),
+                "name",
+            ),
+            (
+                json!({"name": "Study Mode", "when": "x", "instructions": "y", "request_id": "w3"}),
+                "lowercase",
+            ),
+            (
+                json!({"name": "s", "when": "", "instructions": "y", "request_id": "w3"}),
+                "when",
+            ),
+            (
+                json!({"name": "s", "when": "a".repeat(201), "instructions": "y", "request_id": "w3"}),
+                "200",
+            ),
+            (
+                json!({"name": "s", "when": "x", "instructions": " ", "request_id": "w3"}),
+                "should do",
+            ),
+            (
+                json!({"name": "s", "when": "x", "instructions": "a".repeat(2_001), "request_id": "w3"}),
+                "2000",
+            ),
+            (
+                json!({"name": "s", "when": "x", "instructions": "y"}),
+                "request id",
+            ),
+            (
+                json!({"name": "s", "when": "x", "instructions": "y", "request_id": "w 3"}),
+                "request id",
+            ),
+        ] {
+            let why_not = write(nowhere, &data).unwrap_err();
+            assert!(why_not.contains(why), "{data}: {why_not}");
+        }
     }
 }

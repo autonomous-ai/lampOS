@@ -186,6 +186,7 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         restart: None,
         guard: None,
         make_skill: None,
+        write_skill: None,
         share: None,
         services: None,
         upload: None,

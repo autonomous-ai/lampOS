@@ -102,8 +102,8 @@ a message on any other topic is neither done nor answered, not its reply
 channel, another lamp's, a longer or shorter topic, nor another case. That
 is the one guard the owner's kinds rest on (`faces.add_photo`,
 `face.remove`, the reminders' cancel, #2214, guard mode's `guard.on` and
-`guard.off`, #2562, and `skills.make`, #2813, which asks but never puts a
-skill on): whoever holds the lamp's
+`guard.off`, #2562, and `skills.make`, #2813, and `skills.write`, which
+ask but never put a skill on): whoever holds the lamp's
 signed-in account speaks as its owner. **The owner's app acts for the whole
 lamp, not one person at it:** it can cancel any reminder the lamp keeps,
 one another person set by voice at the lamp included, as it can remove any
@@ -115,7 +115,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
@@ -138,6 +138,7 @@ lamp says so.
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
 | `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker answers `ready` (asked every 60 s; the lamp's own model makes it, so the voice says yes at once, and the button can show up to 60 s after lamp-voice starts): `skills.make` (`{"words", "request_id"}`, the words at most 180 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `skills.upload.<upload_id>` (`upload_id` the first 16 lowercase hex of the file's SHA-256; no file inline) | with `LAMP_SKILL_UPLOAD=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill added from a file" below); `can` names it `skills.upload`: answered `starting` at once, which keeps the file on the backend; the file is taken from the backend's `get-message` for that kind, checked and handed to `lamp-voice`, and a second reply of the same kind follows once it settles: `success` with `{"state": "on", "upload_id", "added": "file", "uploaded": true, "name", "description", "version", "sha256", "may_use"}` once a spoken yes put it on, or `failure` with why (a check, or left off at the lamp). Either deletes the file on the backend; with no reply it is gone after a day. Nothing from the app puts it on |
+| `skills.write` | with `LAMP_SKILL_WRITTEN=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill written in the app" below; off), named in `can` on the switch alone, with `skills.made`: `{"name", "when", "instructions", "request_id"}`, a skill the person wrote in their own words, held to the voice's bounds and sent to `lamp-voice`'s app-make socket as `{"written": {...}}`, which keeps it as written, with no model; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` tells what became of it, with `"written": true`. Nothing from the app puts it on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
@@ -633,6 +634,45 @@ command's plain words), the kinds' gates in `answer::tests`,
 then on or still off; another SHA-256, or on in the no arm, fails the check
 and the run; no `CLOUD` changes nothing; no Python on the lamp).
 
+## A skill written in the app (`skills.write`, `LAMP_SKILL_WRITTEN`)
+
+Off unless `LAMP_SKILL_WRITTEN=on` in `lamp-cloud`'s unit, with the skills
+page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s, with
+`LAMP_MAKE_SKILL=on` and the say service there (the voice's side is in
+[skills.md](skills.md), "Written in the app"). Approved on the Queue by the
+first builder (3 Nov, 14:33). No computer and no model: `can` names
+`skills.write` and `skills.made` on the switch alone
+(`make_skill::write_from_environment`).
+
+- **`skills.write`** (`{"name", "when", "instructions", "request_id"}`):
+  the person's skill, V1's SKILL.md style. Each field is trimmed at its
+  ends and held here exactly as the voice holds it (`make_skill::written`,
+  equal to `lamp_voice::made_skill::Written::new` by a test): the name a
+  lowercase letter, then lowercase letters, digits and `-`, at most 40
+  bytes; `when` ("when I say study mode") one line of at most 200 bytes;
+  the instructions plain text, new lines and tabs only, at most 2,000
+  bytes; and a request id as for `skills.make`. Anything else is refused in
+  the voice's plain words before the voice is asked. Then one line to the
+  same socket, `{"written": {"name", "when", "instructions",
+  "request_id"}}`; the voice answers at once and keeps it after, on its
+  own thread. The app is told `{"making": true, "request_id"}`, or why not
+  in plain words (one already being made, the same request id again, the
+  switch off in the voice, or "making a skill can't be reached on the lamp
+  now"). The journal never has the words.
+- **`skills.made`** as for a typed skill above, with `"written": true` for
+  a written one, and `may_use` naming `speak` (its voice: the call's answer
+  is the person's instructions). A name a skill on the lamp or a kept made
+  skill already has is `not_kept`, with why.
+- **Put on only by a spoken yes at the lamp**, as above. On the skills
+  page it is in `made_here` with `"written": true`.
+
+Tests: `make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written`,
+`make_skill::tests::written_fields_are_held_as_lamp_voice_holds_them`,
+`make_skill::tests::the_switch_and_the_socket_are_lamp_voices`, the kinds'
+gates in `answer::tests` (off: "not on this lamp" and not in `can`; on:
+`skills.made` and `skills.write`), and
+`skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed`.
+
 ## The skills page (#1722, `skills.list`, `skills.remove`, `skills.off`, `skills.on`, `skills.camera`, `skills.install`)
 
 The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
@@ -746,6 +786,10 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   if not, why, in its words on one line (at most 300 bytes). A skill that
   doesn't load stays in its group, with its kind, version and permissions
   as its `skill.toml` says them.
+- **`written`**: `true` for a skill made here (`made_here`) whose
+  `SKILL.md` front matter also says `written: app`: one its person wrote
+  in the app in their own words (`skills.write`), shown as written there,
+  never as one from the Store. Left out otherwise.
 - **`may_use`**: what its `[permissions]` give, each once, in this order,
   each with its line, and `privacy`, the privacy switch's line, for what
   the camera or a microphone gives:

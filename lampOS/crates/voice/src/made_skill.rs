@@ -304,6 +304,9 @@ pub struct Uses {
     pub light: bool,
     pub body: bool,
     pub topics: Vec<String>,
+    /// Its voice: only a skill written in the app ([`Written`]), whose
+    /// call's answer is the person's instructions for the model.
+    pub speak: bool,
 }
 
 impl Uses {
@@ -311,6 +314,9 @@ impl Uses {
     /// desk".
     pub fn spoken(&self) -> String {
         let mut parts = Vec::new();
+        if self.speak {
+            parts.push("its voice".to_owned());
+        }
         if self.light {
             parts.push("its light".to_owned());
         }
@@ -335,7 +341,7 @@ impl Uses {
     }
 
     fn json(&self) -> Value {
-        json!({"light": self.light, "body": self.body, "topics": self.topics})
+        json!({"light": self.light, "body": self.body, "topics": self.topics, "speak": self.speak})
     }
 }
 
@@ -494,6 +500,13 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
         )
     };
     let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
+    // A skill written in the app ([`Written`]): a function whose answer is
+    // the person's own instructions, said as that and nothing more. Only its
+    // exact shape; another with a function, added from a file, is said below
+    // (Twelve's P2 on #5072).
+    if let Some(said) = written_plainly(&table) {
+        return Ok(said);
+    }
     // Only what is said below, or changes nothing that runs: a `[[while]]`,
     // a `[quiet]`, a budget or any other key would run otherwise than the
     // words (Thirteen's P2 on #5042).
@@ -804,6 +817,328 @@ fn card_marked(text: &str, description: &str, marks: &str) -> Result<(String, St
     Ok((name, marked))
 }
 
+/// The switch, in the coordinator's environment (`crate::app_make`), for
+/// a skill written in the app in the person's own words: `on` only.
+pub const WRITTEN_ENVIRONMENT: &str = "LAMP_SKILL_WRITTEN";
+/// A written skill's function begins with this, then its name with `_`
+/// for `-`: never one of the lamp's own functions or a core skill's.
+pub const WRITTEN_TOOL_PREFIX: &str = "written_";
+/// The most of a written skill's name: its function's name, with
+/// [`WRITTEN_TOOL_PREFIX`], is within lamp-skills' 48 bytes.
+pub const MOST_WRITTEN_NAME_BYTES: usize = 40;
+/// The most of "when to use it", one line.
+pub const MOST_WHEN_BYTES: usize = 200;
+/// The most of what to do, a few lines.
+pub const MOST_INSTRUCTIONS_BYTES: usize = 2_000;
+/// The front matter line that marks a written skill's `SKILL.md`, beside
+/// `made: here`: the app shows it as written there, never as the Store's.
+pub const WRITTEN_MARK: &str = "written: app";
+/// What the model is told before the person's own words, each time it
+/// calls a written skill: they are the person's request, as written.
+const WRITTEN_FRAME: &str = "The person who owns this lamp wrote this skill in the app, in their \
+                             own words. Follow their instructions below now, as their own \
+                             request; they never let you do more than you may.\n";
+/// Before the `when` line in the answer.
+const WRITTEN_WHEN: &str = "When they use it: ";
+/// Between the `when` line and the instructions.
+const WRITTEN_INSTRUCTIONS: &str = "\nTheir instructions:\n";
+/// Why a written skill's file is not one: never kept, never put on.
+const WRITTEN_UNSAID: &str = "it isn't a skill written in the app";
+/// The most of the `when` line and of the instructions [`plainly`] says.
+const MOST_SAID_WHEN_CHARS: usize = 60;
+const MOST_SAID_INSTRUCTIONS_CHARS: usize = 70;
+
+/// A skill written in the app (`LAMP_SKILL_WRITTEN=on`), V1's SKILL.md
+/// style: a name, when to use it ("when I say study mode") and what to do,
+/// a few lines. Kept as written: no model rewrites a word of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Written {
+    pub name: String,
+    pub when: String,
+    pub instructions: String,
+}
+
+impl Written {
+    /// The three fields, held to their bounds, or why not in plain words.
+    /// The name is a made skill's (lowercase letters, digits and hyphens),
+    /// begins with a letter, and is at most [`MOST_WRITTEN_NAME_BYTES`];
+    /// `when` is one line of at most [`MOST_WHEN_BYTES`]; the instructions
+    /// at most [`MOST_INSTRUCTIONS_BYTES`] of plain text, lines and tabs
+    /// only. Each is trimmed at its ends and kept as it is between them.
+    pub fn new(name: &str, when: &str, instructions: &str) -> Result<Self, String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("give the skill a name".into());
+        }
+        if name.len() > MOST_WRITTEN_NAME_BYTES
+            || !name.starts_with(|first: char| first.is_ascii_lowercase())
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        {
+            return Err(format!(
+                "the name is a lowercase letter, then lowercase letters, digits and '-', at most \
+                 {MOST_WRITTEN_NAME_BYTES} in all"
+            ));
+        }
+        let when = when.trim();
+        if when.is_empty() {
+            return Err("say when to use it".into());
+        }
+        if when.len() > MOST_WHEN_BYTES || when.chars().any(char::is_control) {
+            return Err(format!(
+                "when to use it is one line of at most {MOST_WHEN_BYTES} bytes"
+            ));
+        }
+        let instructions = instructions.trim();
+        if instructions.is_empty() {
+            return Err("say what the lamp should do".into());
+        }
+        if instructions.len() > MOST_INSTRUCTIONS_BYTES
+            || instructions
+                .chars()
+                .any(|letter| letter.is_control() && !matches!(letter, '\n' | '\t'))
+        {
+            return Err(format!(
+                "what the lamp should do is plain text of at most {MOST_INSTRUCTIONS_BYTES} bytes"
+            ));
+        }
+        Ok(Self {
+            name: name.to_owned(),
+            when: when.to_owned(),
+            instructions: instructions.to_owned(),
+        })
+    }
+
+    /// Its function's name: [`WRITTEN_TOOL_PREFIX`] and the name, `_` for
+    /// `-`.
+    pub fn tool(&self) -> String {
+        format!("{WRITTEN_TOOL_PREFIX}{}", self.name.replace('-', "_"))
+    }
+
+    /// What the model is told when it calls it: [`WRITTEN_FRAME`], the
+    /// `when` line and the instructions, word for word.
+    fn note(&self) -> String {
+        format!(
+            "{WRITTEN_FRAME}{WRITTEN_WHEN}{}{WRITTEN_INSTRUCTIONS}{}",
+            self.when, self.instructions
+        )
+    }
+
+    /// Its `skill.toml`: an installable skill whose only part is a
+    /// function for the model, with no trigger (it never starts by
+    /// itself), that may only answer the call with a note: the
+    /// instructions, as lamp-skills gives a tool's `say` back to the model
+    /// (`{"next": NOTE}`). No light, no body, no topic, no camera, no code.
+    pub fn toml(&self) -> String {
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\ntool = {}\n\n[permissions]\nspeak = \
+             true\n\n[[do]]\nsay = {}\n",
+            toml_string(&self.tool()),
+            toml_string(&self.note())
+        )
+    }
+
+    /// Its `SKILL.md`: the name, `description` ([`plainly`]'s, which names
+    /// the `when` line and is what the model is told of when to call it),
+    /// `made: here` and [`WRITTEN_MARK`]; the instructions, as written,
+    /// are its body.
+    fn card(&self, description: &str) -> String {
+        format!(
+            "---\nname: {}\ndescription: \"{}\"\nmade: here\n{WRITTEN_MARK}\n---\n{}\n",
+            self.name,
+            description.replace(['"', '\\'], "'"),
+            self.instructions
+        )
+    }
+}
+
+/// `text` as a TOML basic string: `"`, `\`, a new line and a tab escaped.
+/// [`Written::new`] lets no other control character in.
+fn toml_string(text: &str) -> String {
+    let mut quoted = String::with_capacity(text.len() + 2);
+    quoted.push('"');
+    for letter in text.chars() {
+        match letter {
+            '"' => quoted.push_str("\\\""),
+            '\\' => quoted.push_str("\\\\"),
+            '\n' => quoted.push_str("\\n"),
+            '\t' => quoted.push_str("\\t"),
+            other => quoted.push(other),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
+
+/// A written skill's `skill.toml`, read back: its `when` line and its
+/// instructions, if it is exactly the shape [`Written::toml`] writes
+/// (the kind, a version, a function of [`WRITTEN_TOOL_PREFIX`],
+/// `[permissions]` with `speak` alone, and one step, the note); else none.
+fn written_of(table: &toml::Table) -> Option<(String, String)> {
+    let keys = ["kind", "version", "tool", "permissions", "do"];
+    if table.len() != keys.len() || keys.iter().any(|key| !table.contains_key(*key)) {
+        return None;
+    }
+    if table["kind"].as_str() != Some("installable") || table["version"].as_str().is_none() {
+        return None;
+    }
+    table["tool"]
+        .as_str()
+        .filter(|tool| tool.starts_with(WRITTEN_TOOL_PREFIX))?;
+    let permissions = table["permissions"].as_table()?;
+    if permissions.len() != 1 || permissions.get("speak") != Some(&toml::Value::Boolean(true)) {
+        return None;
+    }
+    let [step] = table["do"].as_array()?.as_slice() else {
+        return None;
+    };
+    let step = step.as_table().filter(|step| step.len() == 1)?;
+    let (when, instructions) = step
+        .get("say")?
+        .as_str()?
+        .strip_prefix(WRITTEN_FRAME)?
+        .strip_prefix(WRITTEN_WHEN)?
+        .split_once(WRITTEN_INSTRUCTIONS)?;
+    // Held to the same bounds as when written: none other is kept.
+    let held = Written::new("x", when, instructions).ok()?;
+    (held.when == when && held.instructions == instructions)
+        .then(|| (when.to_owned(), instructions.to_owned()))
+}
+
+/// A written skill's `skill.toml` held to what one may use: its version,
+/// and its voice alone. Anything else is refused.
+pub fn written_capped(text: &str) -> Result<(String, Uses), Refused> {
+    let table: toml::Table =
+        toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
+    written_of(&table).ok_or_else(|| Refused::new(WRITTEN_UNSAID))?;
+    let version = table["version"].as_str().unwrap_or_default().to_owned();
+    Ok((
+        version,
+        Uses {
+            speak: true,
+            ..Uses::default()
+        },
+    ))
+}
+
+/// The cap a made skill is held to again as it is put on (lamp-skills'
+/// manage helper, `install_made`): a written skill's ([`written_capped`])
+/// when it gives the model a function, else a made one's ([`capped`]).
+pub fn put_on_cap(text: &str) -> Result<(String, Uses), Refused> {
+    let has_tool =
+        toml::from_str::<toml::Table>(text).is_ok_and(|table| table.contains_key("tool"));
+    if has_tool {
+        written_capped(text)
+    } else {
+        capped(text)
+    }
+}
+
+/// What a written skill does, in plain words: "When you ask for it (when I
+/// say study mode), the lamp follows the instructions you wrote: Dim the
+/// light…". Its `when` and its instructions are cut short, never left out.
+fn written_plainly(table: &toml::Table) -> Option<String> {
+    let (when, instructions) = written_of(table)?;
+    let when = cut_words(&when, MOST_SAID_WHEN_CHARS);
+    let short = cut_words(&instructions, MOST_SAID_INSTRUCTIONS_CHARS);
+    let end = if short.ends_with(['.', '!', '?', '…']) {
+        ""
+    } else {
+        "."
+    };
+    Some(format!(
+        "When you ask for it ({when}), the lamp follows the instructions you wrote: {short}{end}"
+    ))
+}
+
+/// Keep the skill `written` in the app, from the ask `from`: its two files
+/// written here from the person's words ([`Written::toml`],
+/// [`Written::card`]), held to [`written_capped`], checked and packed by
+/// `lamp-skills pack`, and kept as a made skill is, at most [`KEPT_MOST`].
+/// A name any skill on the lamp has (in `installed`, or pushed beside it)
+/// is refused; a kept one of that name not on, asked about or not, is
+/// replaced, its offer with it. Kept once: asked again, the kept one is
+/// given back.
+/// Nothing is put on: only the person's spoken yes does ([`put_on`]).
+pub fn keep_written(
+    written: &Written,
+    from: &str,
+    keeping: &Keeping,
+    installed: &Path,
+) -> Result<Made, Refused> {
+    let unkept = |why: io::Error| {
+        eprintln!("lamp-voice: a written skill was not kept: {why}");
+        Refused::new("the lamp couldn't keep it")
+    };
+    ensure_private(&keeping.directory).map_err(unkept)?;
+    drop_unfinished(&keeping.directory);
+    if let Some(made) = kept(&keeping.directory, from) {
+        return Ok(made);
+    }
+    let name = &written.name;
+    if installed.join(name).exists() || pushed(installed).join(name).exists() {
+        return Err(Refused::new(format!(
+            "a skill called {name} is already on the lamp or kept"
+        )));
+    }
+    let toml = written.toml();
+    let (version, uses) = written_capped(&toml)?;
+    let said = plainly(&toml)?;
+    let card = written.card(&said);
+    let made = packed_and_kept(
+        keeping,
+        from,
+        Card {
+            toml: &toml,
+            name: name.clone(),
+            marked: card,
+            version,
+            uses,
+        },
+        Ok(said),
+        false,
+    )?;
+    // A kept one of that name not on the lamp, asked about or not, gives way
+    // to the person's newer words: a spoken no leaves no mark, so a fix sent
+    // after it must not wait out the old ask (Seventh's P2 on #5072). Its
+    // offer goes with it, so a late yes puts nothing on; the new one is
+    // asked about on its own.
+    if let Err(why) = forget_others(&keeping.directory, name, from) {
+        eprintln!("lamp-voice: an older kept skill of that name stays: {why}");
+    }
+    Ok(made)
+}
+
+/// Where pushed skills are, beside `installed` (lamp-skills' `PUSHED_DIR`).
+fn pushed(installed: &Path) -> PathBuf {
+    installed.with_file_name("skills-dev")
+}
+
+/// Drop from the index every kept skill called `name` but the one from
+/// `from`, their packages with them.
+fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
+    let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
+        .into_iter()
+        .partition(|entry| entry["name"] == name && entry["from"] != from);
+    if gone.is_empty() {
+        return Ok(());
+    }
+    write_index(directory, &entries)?;
+    for entry in gone {
+        // The same words make the same package: kept while one still names it.
+        if let Some(package) = entry["package"].as_str().filter(|package| {
+            !package.is_empty()
+                && !package.contains('/')
+                && !package.starts_with('.')
+                && !entries.iter().any(|kept| kept["package"] == *package)
+        }) {
+            let _ = fs::remove_file(directory.join(package));
+        }
+    }
+    Ok(())
+}
+
 /// Where made skills are kept, and the program that checks them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Keeping {
@@ -997,7 +1332,8 @@ pub fn kept_names(directory: &Path) -> Vec<String> {
 
 /// `card` written to a folder of this call's own, checked and packed by
 /// `lamp-skills pack`, and kept from `from` once `said` is; `added` is kept
-/// in the index as `"added": "file"`.
+/// in the index as `"added": "file"`. What [`keep`], [`keep_added`] and
+/// [`keep_written`] share.
 fn packed_and_kept(
     keeping: &Keeping,
     from: &str,
@@ -1280,6 +1616,7 @@ fn kept(directory: &Path, from: &str) -> Option<Made> {
                         .flatten()
                         .filter_map(|topic| topic.as_str().map(str::to_owned))
                         .collect(),
+                    speak: entry["uses"]["speak"] == true,
                 },
                 package,
             })
@@ -1600,6 +1937,20 @@ fn cut_bytes(text: &str, most: usize) -> &str {
     &text[..at]
 }
 
+/// [`cut_chars`], cut back to a whole word when it cuts.
+fn cut_words(text: &str, most: usize) -> String {
+    let cut = cut_chars(text, most);
+    match cut.strip_suffix('…') {
+        Some(head) => match head.rsplit_once(' ') {
+            Some((words, _)) if !words.is_empty() => {
+                format!("{}…", words.trim_end_matches([',', ';', ':']))
+            }
+            _ => cut,
+        },
+        None => cut,
+    }
+}
+
 fn cut_chars(text: &str, most: usize) -> String {
     let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
     match line.char_indices().nth(most) {
@@ -1752,6 +2103,7 @@ light = { dim = 1 }
                 light: true,
                 body: false,
                 topics: vec!["voice/state".into()],
+                speak: false,
             }
         );
         assert_eq!(uses.spoken(), "its light and whether it is talking");
@@ -2217,6 +2569,7 @@ body = { gesture = "nod" }
                 light: true,
                 body: false,
                 topics: vec!["room/presence".into()],
+                speak: false,
             },
             package,
         }
@@ -2584,5 +2937,217 @@ body = { gesture = "nod" }
             "a skill called evening-dim is already on the lamp, put on another way",
             "{in_the_way}"
         );
+    }
+
+    /// Now, as the index's times are kept.
+    fn now_ms() -> u64 {
+        crate::app_make::now_unix_ms()
+    }
+
+    const INSTRUCTIONS: &str = "Dim the light to level 2.\nSay \"focus time\" once, then stay quiet \
+                                for 25 minutes.\n\tNo music.";
+
+    fn study_mode() -> Written {
+        Written::new("study-mode", "when I say study mode", INSTRUCTIONS).unwrap()
+    }
+
+    /// A skill written in the app (`LAMP_SKILL_WRITTEN`): its skill.toml
+    /// is a function with no trigger, never started by itself, whose
+    /// answer is the person's words as written; its card is marked made
+    /// here and written in the app, the instructions its body; and it is
+    /// said plainly as what it does.
+    #[test]
+    fn a_written_skill_is_a_function_with_the_text_as_written_and_no_trigger() {
+        let written = study_mode();
+        let text = written.toml();
+        let table: toml::Table = toml::from_str(&text).unwrap();
+        assert!(!table.contains_key("trigger") && !table.contains_key("ask"));
+        assert_eq!(table["tool"].as_str(), Some("written_study_mode"));
+        assert_eq!(table["kind"].as_str(), Some("installable"));
+        assert_eq!(
+            table["permissions"]
+                .as_table()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            ["speak"]
+        );
+        let say = table["do"][0]["say"].as_str().unwrap();
+        assert!(say.starts_with(WRITTEN_FRAME), "{say}");
+        assert!(
+            say.ends_with(&format!("\nTheir instructions:\n{INSTRUCTIONS}")),
+            "{say}"
+        );
+        assert!(
+            say.contains("When they use it: when I say study mode\n"),
+            "{say}"
+        );
+        let (version, uses) = written_capped(&text).unwrap();
+        assert_eq!(version, "1.0.0");
+        assert_eq!(uses.spoken(), "its voice");
+        assert_eq!(put_on_cap(&text).unwrap(), (version, uses));
+        // The made skills' own cap never takes one: a model's answer can't
+        // be kept as one.
+        assert!(capped(&text).unwrap_err().0.contains("function"));
+        let said = plainly(&text).unwrap();
+        assert_eq!(
+            said,
+            "When you ask for it (when I say study mode), the lamp follows the instructions you \
+             wrote: Dim the light to level 2. Say \"focus time\" once, then stay quiet for…"
+        );
+        assert!(said.chars().count() <= MOST_PLAIN_CHARS, "{said}");
+        let card = written.card(&said);
+        assert!(card.starts_with("---\nname: study-mode\ndescription: \"When you ask for it"));
+        assert!(card.contains("Say 'focus time' once"), "{card}");
+        assert!(card.contains("\nmade: here\nwritten: app\n---\n"), "{card}");
+        assert!(card.ends_with(&format!("---\n{INSTRUCTIONS}\n")), "{card}");
+    }
+
+    /// Kept as a made skill is, with what it does said plainly; nothing
+    /// waits for a yes until the lamp has asked, and nothing goes into the
+    /// skills folder: the function is declared only once a spoken yes puts
+    /// it on.
+    #[test]
+    fn a_written_skill_is_kept_and_waits_for_nothing_before_it_is_asked() {
+        let (root, keeping) = crate::make_skill_local::tests::keeping("written-kept");
+        let installed = root.join("skills");
+        fs::create_dir_all(&installed).unwrap();
+        let made = keep_written(&study_mode(), "written:app:1:1", &keeping, &installed).unwrap();
+        assert_eq!(made.name, "study-mode");
+        assert!(
+            made.description
+                .starts_with("When you ask for it (when I say study mode)")
+        );
+        assert_eq!(made.uses.spoken(), "its voice");
+        assert_eq!(index(&keeping.directory)[0]["uses"]["speak"], true);
+        assert_eq!(waiting(&keeping.directory, now_ms()), None);
+        assert_eq!(fs::read_dir(&installed).unwrap().count(), 0);
+        // The same ask again: the kept one.
+        let again = keep_written(&study_mode(), "written:app:1:1", &keeping, &installed).unwrap();
+        assert_eq!(again, made);
+        // Asked about: only then does a yes find it.
+        offered(&keeping.directory, &made.sha256, now_ms()).unwrap();
+        assert_eq!(
+            waiting(&keeping.directory, now_ms()).map(|(name, _)| name),
+            Some("study-mode".to_owned())
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A name any skill on the lamp has, installed or pushed, is refused, and
+    /// nothing is kept. A kept one of that name not on, asked about or not,
+    /// is replaced by the new one, its package and its offer with it: a no
+    /// leaves no mark, so a fix sent after it goes at once (Seventh's P2 on
+    /// #5072).
+    #[test]
+    fn a_written_skill_takes_no_name_a_skill_has() {
+        let (root, keeping) = crate::make_skill_local::tests::keeping("written-taken");
+        let installed = root.join("skills");
+        for on_lamp in [
+            installed.join("study-mode"),
+            root.join("skills-dev/study-mode"),
+        ] {
+            fs::create_dir_all(&on_lamp).unwrap();
+            let refused = keep_written(&study_mode(), "written:app:1:1", &keeping, &installed);
+            assert!(refused.unwrap_err().0.contains("already on the lamp"));
+            fs::remove_dir_all(&on_lamp).unwrap();
+        }
+        assert!(index(&keeping.directory).is_empty());
+        // Kept and not yet asked about: the next takes its place.
+        keep_written(&study_mode(), "written:app:2:1", &keeping, &installed).unwrap();
+        let first = keep_written(&study_mode(), "written:app:3:1", &keeping, &installed).unwrap();
+        let entries = index(&keeping.directory);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["from"], "written:app:3:1");
+        // Asked about and said no to, within its time: a fix goes at once,
+        // and the old offer is gone, so a late yes puts nothing on.
+        offered(&keeping.directory, &first.sha256, now_ms()).unwrap();
+        assert!(waiting(&keeping.directory, now_ms()).is_some());
+        let fixed = keep_written(&study_mode(), "written:app:3:2", &keeping, &installed).unwrap();
+        assert_eq!(index(&keeping.directory).len(), 1);
+        assert_eq!(waiting(&keeping.directory, now_ms()), None);
+        // Its ask ran out with no yes: the new one takes its place too.
+        let long_ago = now_ms() - PUT_ON_WITHIN.as_millis() as u64 - 1_000;
+        offered(&keeping.directory, &fixed.sha256, long_ago).unwrap();
+        let first = fixed;
+        // An older one of that name, said no to, with a package of its own.
+        let older = keeping.directory.join("study-mode-0.9.0-000000000000.tar");
+        fs::write(&older, b"older").unwrap();
+        let mut entries = index(&keeping.directory);
+        entries.insert(
+            0,
+            json!({"from": "written:app:0:1", "name": "study-mode", "package": "study-mode-0.9.0-000000000000.tar", "sha256": "0", "offered_at_unix_ms": long_ago}),
+        );
+        write_index(&keeping.directory, &entries).unwrap();
+        let rewritten =
+            Written::new("study-mode", "when I say study mode", "Dim the light.").unwrap();
+        let second = keep_written(&rewritten, "written:app:4:1", &keeping, &installed).unwrap();
+        let entries = index(&keeping.directory);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["from"], "written:app:4:1");
+        assert!(!older.exists());
+        // The test's packer packs the same bytes whatever the words: one
+        // package stands for both, and it stays while one names it.
+        assert_eq!(second.package, first.package);
+        assert!(second.package.exists());
+        offered(&keeping.directory, &second.sha256, long_ago).unwrap();
+        let third = keep_written(&rewritten, "written:app:5:1", &keeping, &installed).unwrap();
+        assert_eq!(third.package, second.package);
+        assert!(third.package.exists());
+        assert_eq!(index(&keeping.directory).len(), 1);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Each field within its bound, as plain text: empty, too long, a name
+    /// that is not a skill's, a `when` of two lines or a control character
+    /// in the instructions is refused in plain words.
+    #[test]
+    fn a_written_skill_is_held_to_its_bounds() {
+        let most = |bytes: usize| "a".repeat(bytes);
+        assert!(Written::new("a", &most(MOST_WHEN_BYTES), &most(MOST_INSTRUCTIONS_BYTES)).is_ok());
+        assert!(Written::new(&most(MOST_WRITTEN_NAME_BYTES), "x", "y").is_ok());
+        for (name, when, instructions, why) in [
+            ("", "x", "y", "name"),
+            ("  ", "x", "y", "name"),
+            ("Study", "x", "y", "lowercase"),
+            ("1study", "x", "y", "lowercase"),
+            ("study_mode", "x", "y", "lowercase"),
+            (&most(MOST_WRITTEN_NAME_BYTES + 1), "x", "y", "lowercase"),
+            ("study", "", "y", "when"),
+            ("study", "one\ntwo", "y", "one line"),
+            ("study", &most(MOST_WHEN_BYTES + 1), "y", "one line"),
+            ("study", "x", " ", "what the lamp should do"),
+            (
+                "study",
+                "x",
+                &most(MOST_INSTRUCTIONS_BYTES + 1),
+                "plain text",
+            ),
+            ("study", "x", "a\u{7}b", "plain text"),
+        ] {
+            let refused = Written::new(name, when, instructions).unwrap_err();
+            assert!(refused.contains(why), "{name:?} {when:?}: {refused}");
+        }
+    }
+
+    /// Anything more than the written shape is refused, as it is kept and
+    /// as it is put on: a light, a trigger, a function not a written one's
+    /// or words not framed as the person's.
+    #[test]
+    fn a_written_skill_may_use_nothing_but_its_answer() {
+        let text = study_mode().toml();
+        for wider in [
+            text.replace("speak = true", "speak = true\nlight = true"),
+            format!(
+                "{text}\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n"
+            ),
+            text.replace("written_study_mode", "study_mode"),
+            text.replace("The person who owns this lamp", "The lamp's maker"),
+            format!("{text}\n[[do]]\nlight = {{ dim = 1 }}\n"),
+            text.replace("kind = \"installable\"", "kind = \"core\""),
+        ] {
+            assert!(written_capped(&wider).is_err(), "{wider}");
+            assert!(put_on_cap(&wider).is_err(), "{wider}");
+        }
     }
 }
