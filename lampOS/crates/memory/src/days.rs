@@ -171,6 +171,12 @@ pub struct Wider {
     /// nothing ([`search::query_with`]), and a day or span finds what was
     /// kept on it, not only exchanges.
     pub second: bool,
+    /// The voice's `LAMP_MEMORY_NEWER_FIRST` (`newer_first`): of the
+    /// records found, a later one of the person's own that corrects an
+    /// earlier one ([`search::corrected_by`]) goes before it. Only the
+    /// order changes: the same records, the same `more`. A known person's
+    /// own scope only: for the room's (`Person::everyone`) it is ignored.
+    pub newer_first: bool,
 }
 
 /// No service thread, network client or model belongs to this store.
@@ -1086,7 +1092,43 @@ impl Days {
             room -= entry.bytes();
             result.push(entry);
         }
+        // Never the room's set: its lines are many speakers', and one's
+        // line must not mark another's `earlier` (the HOLD on #5049).
+        if wider.newer_first && person.as_str() != Person::EVERYONE {
+            let corrected = search::corrected_by(&person_lines(&result));
+            let mut ranked: Vec<Option<Record>> = result.into_iter().map(Some).collect();
+            result = search::newer_first(&corrected)
+                .into_iter()
+                .filter_map(|line| ranked[line].take())
+                .collect();
+        }
         Ok((result, more))
+    }
+
+    /// For `newer_first`: which of `records` a later one of them corrects
+    /// ([`search::corrected_by`]), each `true` one an earlier version.
+    pub fn earlier(records: &[Record]) -> Vec<bool> {
+        search::corrected_by(&person_lines(records))
+            .into_iter()
+            .map(|newer| newer.is_some())
+            .collect()
+    }
+
+    /// [`Self::earlier`], for a recall's entries.
+    pub fn earlier_entries(entries: &[Entry]) -> Vec<bool> {
+        let lines: Vec<(u64, u64, &str)> = entries
+            .iter()
+            .map(|entry| match entry {
+                Entry::Exchange(exchange) => {
+                    (exchange.at_unix_ms, exchange.id, exchange.heard.as_str())
+                }
+                Entry::Kept(kept) => (kept.at_unix_ms, kept.id, kept.text.as_str()),
+            })
+            .collect();
+        search::corrected_by(&lines)
+            .into_iter()
+            .map(|newer| newer.is_some())
+            .collect()
     }
 
     pub fn record(&self, person: &Person, id: u64) -> Result<Option<Record>> {
@@ -2814,6 +2856,21 @@ fn category_from(name: &str) -> Option<tidy::Category> {
         "preference" => Some(tidy::Category::Preference),
         _ => None,
     }
+}
+/// Each record's time, id and the person's own words: what was heard for
+/// an exchange, the text of anything else; never the lamp's words.
+fn person_lines(records: &[Record]) -> Vec<(u64, u64, &str)> {
+    records
+        .iter()
+        .map(|record| {
+            let words = if record.kind == "exchange" {
+                &record.heard
+            } else {
+                &record.text
+            };
+            (record.at_unix_ms, record.id, words.as_str())
+        })
+        .collect()
 }
 fn read_record(db: &Connection, person: &Person, id: u64) -> Result<Option<Record>> {
     let mut record=db.query_row("SELECT id,kind,at_unix_ms,heard,said,text,category,active FROM entries WHERE person=? AND id=?",params![person.as_str(),id],|r|{let category:Option<String>=r.get(6)?; Ok(Record{id:r.get(0)?,person:person.as_str().into(),kind:r.get(1)?,at_unix_ms:r.get(2)?,heard:r.get(3)?,said:r.get(4)?,text:r.get(5)?,category:category.and_then(|c|category_from(&c)),source_ids:vec![],supersedes:None,active:r.get(7)?})}).optional()?;
