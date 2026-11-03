@@ -2288,17 +2288,20 @@ spoken yes at the lamp (the lead's ruling on #1711; the first builder on
    makes it itself. It reads nothing of the asks. `lamp-cloud` asks it every
    60 s and names `skills.make` in `can` while it is ready, so the app's
    "Make a skill" shows on the switch alone.
-   `{"counts": {}}` (#4710): what became of the skills made by voice, as
-   running totals, `{"made_by_voice": {"kept", "on", "refused",
-   "left_off"}}`, for `lamp-cloud`'s opt-in health
+   `{"counts": {}}` (#4710): what became of the made skills, by voice and
+   from the app, as running totals, `{"made_by_voice": {"kept", "on",
+   "refused", "left_off"}, "made_by_app": {...}}`, for `lamp-cloud`'s opt-in health
    report (`cloud.md`, "Skills, counted"; `made_counts::counts`). `kept`,
    `on` and `left_off` are read from the made skills' index, each skill
-   counted once by its SHA-256; `refused`, an ask by voice that made
-   nothing, is counted on an atomic where it is told and written at most
+   counted once by its SHA-256 under the maker its `from` says (`local:app:…`
+   or `written:app:…` the app's, `local:…` the voice's); `refused`, an ask
+   that made nothing, is counted on an atomic per maker where it is told
+   (the voice's turn, or the app's make in `make_here`) and written at most
    once a minute by a thread of its own, so a voice turn never waits on a
-   file. Kept in `counts.json` beside the made skills, numbers and the
-   counted skills' SHA-256s only, never sent; an app's ask (`from`
-   `local:app:…` or `written:app:…`) is not in them. Which maker a made
+   file. Both makers are counted here, on the lamp, so the backend counts
+   no app make itself and nothing is counted twice (the owner, 3 Nov).
+   Kept in `counts.json` beside the made skills, numbers and the counted
+   skills' SHA-256s only, never sent. Which maker a made
    skill on the lamp has is on its card, so the answer names no package.
    Deleted, under its lock, by the manage helper's `forget_counts` at the
    person's no (`made_counts::forget`). Tests: `made_counts::tests`.

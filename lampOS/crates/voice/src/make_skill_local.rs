@@ -226,7 +226,7 @@ pub fn make(
     let brief = match made_skill::brief(request) {
         Ok(brief) => brief,
         Err(why) => {
-            crate::made_counts::refused(&keeping.directory);
+            crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
             return json!({
                 "error": why,
                 "next": "Tell them that in a few words."
@@ -243,7 +243,7 @@ pub fn make(
     // An ask by voice that made nothing, for the opt-in health report's
     // counts: one atomic add here, written later (`crate::made_counts`).
     if made.is_err() {
-        crate::made_counts::refused(&keeping.directory);
+        crate::made_counts::refused(&keeping.directory, made_skill::Maker::Voice);
     }
     told(made)
 }

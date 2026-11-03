@@ -1,24 +1,28 @@
-//! Made-skill asks by voice, counted for `lamp-cloud`'s opt-in health
-//! report (`docs/cloud.md`, "Skills, counted"; the owner's ask on #4710,
-//! 3 Nov): a skill made by voice never reaches the backend, so the lamp
-//! says how many were asked for and what became of them. Numbers only,
-//! kept in [`FILE`] beside the made skills, in their root-only folder; no
-//! name, word or file of a skill is in it.
+//! Made-skill asks, by voice and from the app, counted for `lamp-cloud`'s
+//! opt-in health report (`docs/cloud.md`, "Skills, counted"; the owner's
+//! ask on #4710, 3 Nov): a made skill never reaches the backend, so the
+//! lamp says how many were asked for and what became of them, by its
+//! [`Maker`]. Both makers are counted here, on the lamp that made them,
+//! so the backend never counts the app's make asks itself and nothing is
+//! counted twice (the owner, 3 Nov). Numbers only, kept in [`FILE`] beside
+//! the made skills, in their root-only folder; no name, word or file of a
+//! skill is in it.
 //!
 //! - `kept`, `on` and `left_off` are read from the made skills' own index
-//!   ([`crate::made_skill::INDEX`]) when `lamp-cloud` asks ([`counts`]): a
-//!   skill made by voice (its `from` is not the app's, [`is_app`]) counts
-//!   once as kept, once as on when a spoken yes put it on, and once as
-//!   left off when it was asked about and is no longer the offer a yes
-//!   would put on. Each is remembered by its SHA-256 in [`FILE`], so it is
-//!   counted once.
+//!   ([`crate::made_skill::INDEX`]) when `lamp-cloud` asks ([`counts`]),
+//!   under the maker its `from` says ([`Maker::of`]): a made skill counts
+//!   once as kept, once as on when a spoken yes put it on, and once as left
+//!   off when it was asked about and is no longer the offer a yes would put
+//!   on. Each is remembered by its SHA-256 in [`FILE`], so it is counted
+//!   once.
 //! - `refused`, an ask that made nothing, is never in the index: it is
-//!   counted where it is told ([`refused`]), on an atomic, and added to
-//!   [`FILE`] at most every [`FLUSH_EVERY`] by a thread of its own, or at
-//!   the next ask in the same process. A voice turn never waits on a file.
+//!   counted where it is told ([`refused`], the voice's turn or the app's
+//!   make), on an atomic per maker, and added to [`FILE`] at most every
+//!   [`FLUSH_EVERY`] by a thread of its own, or at the next ask in the same
+//!   process. A voice turn never waits on a file.
 //!
-//! The four are running totals; `lamp-cloud` makes a day's counts from two
-//! readings. Every writer holds [`LOCK`], so the worker's flush, the
+//! The four, per maker, are running totals; `lamp-cloud` makes a day's
+//! counts from two readings. Every writer holds [`LOCK`], so the worker's flush, the
 //! socket's read and [`forget`] never undo each other. When the person says
 //! no to reports, the manage helper deletes [`FILE`] ([`forget`], asked by
 //! `lamp-cloud`): the count begins again from nothing.
@@ -26,7 +30,7 @@
 //! Whether a made skill is the app's or the voice's is on its own card
 //! (`made_by`, [`made_skill::Maker`]), where `lamp-skills` reads it: this
 //! file and its answer name no package.
-use crate::made_skill;
+use crate::made_skill::{self, Maker};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -50,21 +54,55 @@ pub const FLUSH_EVERY: Duration = Duration::from_secs(60);
 /// skills ever kept at once ([`made_skill::KEPT_MOST`]).
 const MOST_SEEN: usize = 32;
 
-/// Refused asks in this process not yet in [`FILE`].
-static REFUSED: AtomicU64 = AtomicU64::new(0);
+/// Refused asks by voice in this process not yet in [`FILE`].
+static REFUSED_VOICE: AtomicU64 = AtomicU64::new(0);
+/// Refused asks from the app in this process not yet in [`FILE`].
+static REFUSED_APP: AtomicU64 = AtomicU64::new(0);
+
+/// `maker`'s refused asks not yet in [`FILE`].
+fn refused_of(maker: Maker) -> &'static AtomicU64 {
+    match maker {
+        Maker::Voice => &REFUSED_VOICE,
+        Maker::App => &REFUSED_APP,
+    }
+}
 /// The folder this process's flush writes to, once it has begun.
 static FLUSHING: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+
+/// One maker's four running totals.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Count {
+    pub kept: u64,
+    pub on: u64,
+    pub refused: u64,
+    pub left_off: u64,
+}
+
+impl Count {
+    fn json(&self) -> Value {
+        json!({"kept": self.kept, "on": self.on, "refused": self.refused, "left_off": self.left_off})
+    }
+}
 
 /// [`FILE`]'s contents.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Totals {
-    pub kept: u64,
-    pub on: u64,
-    pub refused: u64,
-    pub left_off: u64,
-    /// The SHA-256s counted, so each is counted once.
+    pub voice: Count,
+    pub app: Count,
+    /// The SHA-256s counted, so each is counted once; a package's SHA-256
+    /// is one maker's alone.
     pub seen: Seen,
+}
+
+impl Totals {
+    fn of(&mut self, maker: Maker) -> &mut Count {
+        match maker {
+            Maker::Voice => &mut self.voice,
+            Maker::App => &mut self.app,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,17 +113,10 @@ pub struct Seen {
     pub left_off: Vec<String>,
 }
 
-/// Whether a made skill's `from` is an app's ask (`local:app:…`, or a
-/// written one's `written:app:…`): [`made_skill::Maker::of`], as its card
-/// says it.
-pub fn is_app(from: &str) -> bool {
-    made_skill::Maker::of(from) == made_skill::Maker::App
-}
-
-/// One ask by voice that made nothing, counted: an atomic add, and the
+/// One ask by `maker` that made nothing, counted: an atomic add, and the
 /// flush begun for `directory` the first time, on a thread of its own.
-pub fn refused(directory: &Path) {
-    REFUSED.fetch_add(1, Ordering::Relaxed);
+pub fn refused(directory: &Path, maker: Maker) {
+    refused_of(maker).fetch_add(1, Ordering::Relaxed);
     let flushing = FLUSHING.get_or_init(|| Mutex::new(None));
     let mut place = flushing.lock().unwrap_or_else(|e| e.into_inner());
     if place.is_some() {
@@ -145,8 +176,12 @@ fn locked<R>(directory: &Path, change: impl FnOnce(&mut Totals) -> R) -> io::Res
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default();
     let before = totals.clone();
-    let refused = REFUSED.swap(0, Ordering::Relaxed);
-    totals.refused = totals.refused.saturating_add(refused);
+    let refused = [Maker::Voice, Maker::App].map(|maker| {
+        let count = refused_of(maker).swap(0, Ordering::Relaxed);
+        let total = &mut totals.of(maker).refused;
+        *total = total.saturating_add(count);
+        (maker, count)
+    });
     let told = change(&mut totals);
     if totals != before {
         let written = (|| {
@@ -157,7 +192,9 @@ fn locked<R>(directory: &Path, change: impl FnOnce(&mut Totals) -> R) -> io::Res
             fs::rename(&new, directory.join(FILE))
         })();
         if let Err(error) = written {
-            REFUSED.fetch_add(refused, Ordering::Relaxed);
+            for (maker, count) in refused {
+                refused_of(maker).fetch_add(count, Ordering::Relaxed);
+            }
             return Err(error);
         }
     }
@@ -185,13 +222,14 @@ fn once(total: &mut u64, seen: &mut Vec<String>, sha256: &str) {
 }
 
 /// The socket's `counts` (`crate::app_make`): the index read for what
-/// became of the skills made by voice, added to [`FILE`], and told as
-/// `{"made_by_voice": {"kept", "on", "refused", "left_off"}}`, the running
-/// totals. Only numbers; never a name, a word or a package.
+/// became of the made skills, added to [`FILE`], and told as
+/// `{"made_by_voice": {"kept", "on", "refused", "left_off"}, "made_by_app":
+/// {...}}`, the running totals per maker. Only numbers; never a name, a
+/// word or a package.
 pub fn counts(directory: &Path, now_unix_ms: u64) -> Value {
     let entries = made_skill::entries(directory);
     let waiting = made_skill::waiting(directory, now_unix_ms).map(|(_, sha256)| sha256);
-    let from_app = |entry: &Value| entry["from"].as_str().is_some_and(is_app);
+    let maker_of = |entry: &Value| Maker::of(entry["from"].as_str().unwrap_or_default());
     let sha_of = |entry: &Value| {
         entry["sha256"]
             .as_str()
@@ -199,28 +237,28 @@ pub fn counts(directory: &Path, now_unix_ms: u64) -> Value {
             .map(str::to_owned)
     };
     let read = locked(directory, |totals| {
-        for entry in entries.iter().filter(|entry| !from_app(entry)) {
+        for entry in &entries {
             let Some(sha256) = sha_of(entry) else {
                 continue;
             };
-            once(&mut totals.kept, &mut totals.seen.kept, &sha256);
+            let Totals { voice, app, seen } = totals;
+            let count = match maker_of(entry) {
+                Maker::Voice => voice,
+                Maker::App => app,
+            };
+            once(&mut count.kept, &mut seen.kept, &sha256);
             if entry["on"] == true {
-                once(&mut totals.on, &mut totals.seen.on, &sha256);
+                once(&mut count.on, &mut seen.on, &sha256);
             } else if entry["offered_at_unix_ms"].as_u64().is_some()
                 && waiting.as_deref() != Some(sha256.as_str())
             {
-                once(&mut totals.left_off, &mut totals.seen.left_off, &sha256);
+                once(&mut count.left_off, &mut seen.left_off, &sha256);
             }
         }
-        json!({
-            "kept": totals.kept,
-            "on": totals.on,
-            "refused": totals.refused,
-            "left_off": totals.left_off,
-        })
+        json!({"made_by_voice": totals.voice.json(), "made_by_app": totals.app.json()})
     });
     match read {
-        Ok(made) => json!({"made_by_voice": made}),
+        Ok(made) => made,
         Err(error) => {
             eprintln!("lamp-voice: made-skill counts not read: {error}");
             json!({"refused": "the counts can't be read now"})
@@ -257,8 +295,10 @@ mod tests {
         entry
     }
 
+    /// Each made skill counts under the maker its `from` says, the app's
+    /// as well as the voice's, once each however often it is read.
     #[test]
-    fn what_became_of_skills_made_by_voice_is_counted_once_each() {
+    fn what_became_of_made_skills_is_counted_once_each_by_maker() {
         let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
         let dir = folder("once");
         let now = 1_800_000_000_000u64;
@@ -270,8 +310,7 @@ mod tests {
                 json!({"on": true, "offered_at_unix_ms": now - 5_000}),
             ),
             entry("local:3", 'c', json!({"offered_at_unix_ms": now - 600_000})),
-            // An app's ask, made here or written there: never in the
-            // voice's counts.
+            // An app's ask, made here or written there: the app's.
             entry(
                 "local:app:9:1",
                 'd',
@@ -293,11 +332,18 @@ mod tests {
             (&json!(4), &json!(1), &json!(1)),
             "{told}"
         );
-        assert_eq!(told.get("app"), None, "{told}");
-        // Asked again: nothing counted twice.
+        let app = &told["made_by_app"];
+        assert_eq!(
+            (&app["kept"], &app["on"], &app["left_off"]),
+            (&json!(2), &json!(2), &json!(0)),
+            "{told}"
+        );
+        // Asked again: nothing counted twice, under either maker.
         let again = counts(&dir, now);
-        for count in ["kept", "on", "left_off"] {
-            assert_eq!(again["made_by_voice"][count], made[count], "{again}");
+        for maker in ["made_by_voice", "made_by_app"] {
+            for count in ["kept", "on", "left_off"] {
+                assert_eq!(again[maker][count], told[maker][count], "{again}");
+            }
         }
         // The offer's time ends: left off once more.
         let later = counts(&dir, now + 200_000);
@@ -312,15 +358,22 @@ mod tests {
     fn a_refused_ask_is_counted_without_a_file_and_kept_at_the_next_read() {
         let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
         let dir = folder("refused");
-        // Two refused asks: counted in memory alone, at once.
-        // Other tests' refused asks may be counted meanwhile: at least two.
-        refused(&dir);
-        refused(&dir);
-        assert!(REFUSED.load(Ordering::Relaxed) >= 2);
+        // Two refused asks by voice and one from the app: counted in
+        // memory alone, at once, each under its maker. Other tests'
+        // refused asks may be counted meanwhile: at least these.
+        refused(&dir, Maker::Voice);
+        refused(&dir, Maker::Voice);
+        refused(&dir, Maker::App);
+        assert!(REFUSED_VOICE.load(Ordering::Relaxed) >= 2);
+        assert!(REFUSED_APP.load(Ordering::Relaxed) >= 1);
         assert!(!dir.join(FILE).exists());
         let told = counts(&dir, 1);
         assert!(
             told["made_by_voice"]["refused"].as_u64().unwrap() >= 2,
+            "{told}"
+        );
+        assert!(
+            told["made_by_app"]["refused"].as_u64().unwrap() >= 1,
             "{told}"
         );
         // A no forgets the file; the next read begins again.

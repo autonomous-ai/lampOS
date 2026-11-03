@@ -3006,6 +3006,8 @@ pub(crate) mod tests {
                 let reply = json!({
                     "made_by_voice": {"kept": 1, "on": 0, "refused": 2, "left_off": 1,
                                       "said": "Alice: s3cret"},
+                    "made_by_app": {"kept": 3, "on": 1, "refused": 0, "left_off": 0,
+                                    "words": "HomeWiFi-5G"},
                     "app": ["Alice", "b".repeat(64)],
                     "words": "remind me",
                 });
@@ -3057,7 +3059,8 @@ pub(crate) mod tests {
                 "on": {"core": 1, "store": 1, "made_app": 1, "other": 1},
                 "kept_off": {"made_unknown": 1},
                 "day": {"date": "2026-10-17",
-                        "made_by_voice": {}, "runs": {"core": 4, "store": 4, "made_app": 4,
+                        "made_by_voice": {}, "made_by_app": {},
+                        "runs": {"core": 4, "store": 4, "made_app": 4,
                                                       "pushed": 4, "other": 4},
                         "store": {"a".repeat(64): 4}, "store_rest": 0}
             }),
@@ -3114,7 +3117,8 @@ pub(crate) mod tests {
         let (seq, day) = health(&mut reports, NOW + 86_400, 15);
         assert_eq!(
             day,
-            json!({"date": "2026-10-18", "made_by_voice": {}, "runs": {"core": 3},
+            json!({"date": "2026-10-18", "made_by_voice": {}, "made_by_app": {},
+                   "runs": {"core": 3},
                    "store": {}, "store_rest": 0})
         );
         // Not acknowledged: the same day again.
