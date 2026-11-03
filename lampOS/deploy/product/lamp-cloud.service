@@ -45,6 +45,9 @@ Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
 # the other broker-held changes for the broker connection's TLS (LAMP_CLOUD_TLS, docs/cloud.md).
 Environment=LAMP_SETTINGS_CHANGE=on
 Environment=LAMP_SKILLS_PAGE=on
+# The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
+# kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
+Environment=LAMP_OWNER_PLACE=on
 # A skill typed in the app (#2813, fourteen-P15): `can` names skills.make only while lamp-voice's maker
 # has a computer to hand it to (make_skill::watch, asked every 60 s).
 Environment=LAMP_APP_MAKE_SKILL=on
