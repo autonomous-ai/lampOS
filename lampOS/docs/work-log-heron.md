@@ -209,3 +209,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   lamp-voice (`days_protocol.rs`, memory-days.md, memory.md, #5049 in)
   and with #5043; code read clean, `days_strength::` 4/4, three mutations
   caught, lamp-memory suite green on its own base, no CI on the head yet.
+- 16:47: lamp-fc4b took stable 9788 by itself (unit: `held`). 16:50–16:57,
+  PLAYING posted and released: after2 four times on 9788. The chat
+  service failed through the run (9 × HTTP 503 on this lamp since 16:47,
+  one answer 67 s late; the same on 0c89 and 3e83 per the Queue), so the
+  ask was never answered in 14 s and #4450's after-answer case did not
+  form. Pass b, with the late answer playing: d07 and d08 held with the
+  new `held` reason. Section and four journal excerpts added to the
+  folder: PR #5091 (`heron/4450-lamp-fc4b-9788`, head `dd5313474`), READ
+  ASK posted with the hour at 17:0x; #4450 told. The clean run is owed:
+  retry from 17:40, PLAYING first, with the person's yes.
