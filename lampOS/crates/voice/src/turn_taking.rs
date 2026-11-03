@@ -2637,25 +2637,29 @@ mod tests {
 
     /// `LAMP_CUT_IN_LATE_YIELD=on`: a question over the lamp heard mostly
     /// as under it (lamp-c0a4, 31 Oct) makes the yield as it ends, 17 blocks
-    /// over the lamp in the 150 before the onset run. With the switch the
-    /// stillness after it commits; without it the reply resumes.
+    /// heard plainly over the lamp in the 150 before the onset run. With the
+    /// switch the stillness after it commits; without it the reply resumes.
+    /// The same blocks not plain, the render explaining 40% of them, are
+    /// the lamp's own voice misjudged (lamp-4ace, 1 Nov, #4705): no late
+    /// yield, and the reply resumes with the switch too.
     #[test]
     fn a_question_yielded_to_late_commits_with_the_switch() {
-        let cut_in = |switch: bool| {
+        const PLAIN: Option<(u8, u8)> = Some((10, 0));
+        let cut_in = |switch: bool, over: Option<(u8, u8)>| {
             let mut mask = PlaybackMask::duplex();
             if switch {
                 mask.cut_in_late_yield();
             }
             mask.assume_matched();
             let mut sequence = 1;
-            let mut steps = hear(&mut mask, &mut sequence, 14, 0.1, &evidence(0, OVER), true);
+            let mut steps = hear(&mut mask, &mut sequence, 14, 0.1, &evidence(0, over), true);
             for _ in 0..17 {
                 steps.extend(hear(
                     &mut mask,
                     &mut sequence,
                     1,
                     0.9,
-                    &evidence(0, OVER),
+                    &evidence(0, over),
                     true,
                 ));
                 steps.extend(hear(
@@ -2663,7 +2667,7 @@ mod tests {
                     &mut sequence,
                     7,
                     0.1,
-                    &evidence(0, OVER),
+                    &evidence(0, over),
                     true,
                 ));
             }
@@ -2673,7 +2677,7 @@ mod tests {
                 &mut sequence,
                 onset,
                 0.9,
-                &evidence(0, OVER),
+                &evidence(0, over),
                 true,
             ));
             steps.extend(hear(
@@ -2692,11 +2696,12 @@ mod tests {
                 &evidence(40, None),
                 true,
             ));
-            assert!(mask.yield_was_late());
+            assert_eq!(mask.yield_was_late(), over == PLAIN);
             steps.into_iter().map(|(_, step)| step).collect::<Vec<_>>()
         };
-        assert_eq!(cut_in(true), [Step::Yield, Step::Commit]);
-        assert_eq!(cut_in(false), [Step::Yield, Step::Resume]);
+        assert_eq!(cut_in(true, PLAIN), [Step::Yield, Step::Commit]);
+        assert_eq!(cut_in(false, PLAIN), [Step::Yield, Step::Resume]);
+        assert_eq!(cut_in(true, OVER), [Step::Yield, Step::Resume]);
     }
 
     #[test]
