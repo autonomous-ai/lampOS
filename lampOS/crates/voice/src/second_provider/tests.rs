@@ -963,7 +963,6 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         staff_note: true,
         accounts: false,
         machine_names: false,
-        make_skill: false,
         named_only: false,
         correct: false,
         questions: false,
@@ -5851,7 +5850,6 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         staff_note: false,
         accounts: false,
         machine_names: false,
-        make_skill: false,
         named_only: false,
         correct: false,
         questions: false,
@@ -13600,17 +13598,17 @@ async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() 
                 machine_names: false,
                 needs: None,
                 staff_note: false,
-                make_skill,
                 named_only: false,
                 correct: false,
                 questions: false,
                 sign_in: false,
             }),
+            make_skill,
             requested_audio: true,
             ..Default::default()
         };
         assert_eq!(
-            crate::agent_tasks::tools(settings.tasks.as_ref().unwrap())
+            crate::tools::declared(&settings)
                 .iter()
                 .any(|tool| tool.name == crate::made_skill::MAKE),
             make_skill,

@@ -376,9 +376,9 @@ fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
     let keeping = keeping(dir.path());
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
-    keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    let made = keep(&answer(TOML, "evening-dim"), false, "local:7", &keeping).unwrap();
     let now = now_ms();
-    lamp_voice::made_skill::asked(&keeping.directory, "s1:7:1", now).unwrap();
+    offered(&keeping.directory, &made.sha256, now).unwrap();
     let socket = dir.path().join("manage.sock");
     let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
     let (served, helper_made) = (skills.clone(), keeping.directory.clone());
@@ -549,11 +549,11 @@ fn once_the_newest_is_on_an_older_ask_puts_nothing_on() {
     let keeping = keeping(dir.path());
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
-    let older = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
-    keep(&answer(TOML, "morning-glow"), false, "s1:8:1", &keeping).unwrap();
+    let older = keep(&answer(TOML, "evening-dim"), false, "local:7", &keeping).unwrap();
+    let newer = keep(&answer(TOML, "morning-glow"), false, "local:8", &keeping).unwrap();
     let now = now_ms();
-    lamp_voice::made_skill::asked(&keeping.directory, "s1:7:1", now - 2_000).unwrap();
-    lamp_voice::made_skill::asked(&keeping.directory, "s1:8:1", now - 1_000).unwrap();
+    offered(&keeping.directory, &older.sha256, now - 2_000).unwrap();
+    offered(&keeping.directory, &newer.sha256, now - 1_000).unwrap();
     let socket = dir.path().join("manage.sock");
     let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
     let (served, helper_made) = (skills.clone(), keeping.directory.clone());

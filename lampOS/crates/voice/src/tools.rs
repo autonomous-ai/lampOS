@@ -132,9 +132,10 @@ pub struct Settings {
     pub places: bool,
     /// Work handed to an agent elsewhere ([`crate::agent_tasks`]).
     pub tasks: Option<crate::agent_tasks::Place>,
-    /// A skill is made by the lamp's own model, never a computer's agent
-    /// (`LAMP_MAKE_SKILL_LOCAL=on`, [`crate::make_skill_local`]).
-    pub make_skill_local: bool,
+    /// A skill may be made by voice, by the lamp's own model
+    /// (`LAMP_MAKE_SKILL=on`, [`crate::make_skill_local`]), with or without
+    /// the tasks part.
+    pub make_skill: bool,
     /// Schedule tools may be declared and routed to Actions.
     pub schedule_tools: bool,
     /// A typed due-reminder request may be considered by the provider.
@@ -372,7 +373,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
     }
     let (tasks, mut flags) = crate::agent_tasks::take(flags)?;
     settings.tasks = tasks;
-    settings.make_skill_local = crate::make_skill_local::from_environment();
+    settings.make_skill = crate::made_skill::from_environment();
     if let [flag, rest @ ..] = flags
         && flag == SCHEDULE_TOOLS_FLAG
     {
@@ -787,11 +788,8 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.extend(crate::agent_tasks::tools(place));
     }
     // A skill made by the lamp's own model: its two functions are the
-    // voice's, in place of the tasks part's, with or without it.
-    if settings.make_skill_local {
-        tools.retain(|tool| {
-            tool.name != crate::made_skill::MAKE && tool.name != crate::made_skill::PUT_ON
-        });
+    // voice's own, with or without the tasks part.
+    if settings.make_skill {
         tools.push(crate::make_skill_local::tool());
         tools.push(crate::made_skill::put_on_tool());
     }
@@ -1046,8 +1044,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
                 .flatten(),
         );
     }
-    if settings.make_skill_local
-        && (name == crate::made_skill::MAKE || name == crate::made_skill::PUT_ON)
+    if settings.make_skill && (name == crate::made_skill::MAKE || name == crate::made_skill::PUT_ON)
     {
         return Route::MakeLocal;
     }
@@ -2714,13 +2711,12 @@ mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: false,
-                make_skill: false,
                 named_only: false,
                 correct: false,
                 questions: false,
                 sign_in: false,
             }),
-            make_skill_local: false,
+            make_skill: false,
             schedule_tools: true,
             schedule_speak: true,
             who: Some("/run/lampos-eyes/request.sock".into()),
@@ -2998,7 +2994,6 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
-            make_skill: false,
             named_only: false,
             correct: false,
             questions: false,
@@ -3018,7 +3013,7 @@ mod tests {
                 clock: true,
                 places: false,
                 tasks: Some(place.clone()),
-                make_skill_local: false,
+                make_skill: false,
                 schedule_tools: true,
                 schedule_speak: true,
                 who: Some("/run/lampos-eyes/who.sock".into()),
@@ -4050,7 +4045,6 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
-            make_skill: false,
             named_only: false,
             correct: false,
             questions: false,
