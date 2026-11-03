@@ -105,6 +105,7 @@ impl Rig {
             engines_ready: false,
             route: false,
             absolute_folder: false,
+            new_folder: None,
             journal: None,
         };
         let rig = Self {
@@ -2942,6 +2943,324 @@ fn close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code() {
         );
     }
     assert!(rig.calls().is_empty());
+}
+
+/// `serve --new-folder` (subdarren-P3 part 1), with its file in the rig.
+fn new_folder_rig() -> Rig {
+    let mut rig = Rig::new();
+    rig.config.new_folder = Some(rig.root.path().join("folders-seen.json"));
+    rig
+}
+
+fn in_made_folder() -> Launch {
+    let mut request = launch();
+    request.target.engine = EngineKind::Claude;
+    request.target.project = "~/harnesses/lamp-tasks".into();
+    request
+}
+
+/// Harness's `PROJECT_EXISTS` refusal of `--new NAME`, with the folder
+/// (another computer, or one that says it) or without it.
+fn project_exists(name: &str, folder: Option<&str>) -> Value {
+    let error = match folder {
+        Some(folder) => format!(
+            "“{name}” already exists on lamp-office-mac: {folder}. Choose another name for the new project, \
+             or start in that folder: harness new claude --machine {MACHINE} {folder} --name lamp-task-001 -- …"
+        ),
+        None => format!(
+            "“{name}” already exists on this computer. Choose another name for the new project."
+        ),
+    };
+    let reply = json!({"ok": false, "error": error});
+    json!({"exit": 1, "stdout": format!("{reply}\n")})
+}
+
+/// Each `new` call's arguments, in order.
+fn new_args(rig: &Rig) -> Vec<Value> {
+    rig.calls()
+        .into_iter()
+        .filter(|call| call["args"][0] == "new")
+        .map(|call| call["args"].clone())
+        .collect()
+}
+
+/// The first hand-over to a `~/harnesses/<name>` folder asks Harness to make
+/// it (`--new <name>`), so it is made and trusted, and nothing else in the
+/// call changes; every later one names the folder, as before.
+#[test]
+fn with_new_folder_the_first_hand_over_asks_harness_to_make_the_folder() {
+    let rig = new_folder_rig();
+    rig.plan(
+        json!({"machines":{"default":true},"new":{"each":[{"default":true}, {"default":true}]}}),
+    );
+    let cli = rig.cli();
+    for _ in 0..2 {
+        assert_eq!(
+            cli.launch(&in_made_folder()),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            }
+        );
+    }
+    let news = new_args(&rig);
+    assert_eq!(news.len(), 2);
+    let request = in_made_folder();
+    assert_eq!(
+        news[0],
+        json!([
+            "new",
+            "claude",
+            "--machine",
+            MACHINE,
+            "--new",
+            "lamp-tasks",
+            "--name",
+            "lamp-task-001",
+            "--mode",
+            "auto",
+            "--json",
+            "--task",
+            request.prompt
+        ])
+    );
+    assert_eq!(
+        news[1],
+        json!([
+            "new",
+            "claude",
+            "--machine",
+            MACHINE,
+            "~/harnesses/lamp-tasks",
+            "--name",
+            "lamp-task-001",
+            "--mode",
+            "auto",
+            "--json",
+            "--task",
+            request.prompt
+        ])
+    );
+    let kept: Value =
+        serde_json::from_slice(&fs::read(rig.root.path().join("folders-seen.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        kept,
+        json!({"version":1,"seen":[{"machine_id":MACHINE,"project":"~/harnesses/lamp-tasks"}]})
+    );
+    assert_eq!(
+        fs::metadata(rig.root.path().join("folders-seen.json"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+}
+
+/// A folder already there (made by hand, or trusted already, as on the
+/// test Mac) is refused by `--new` as `PROJECT_EXISTS`: the hand-over is
+/// asked once more in the folder itself, in the same bound, starts there,
+/// and later ones name it at once. With or without the folder in
+/// Harness's words.
+#[test]
+fn with_new_folder_a_folder_already_there_still_works() {
+    for folder in [
+        Some("~/harnesses/lamp-tasks"),
+        Some("/Users/lee/harnesses/lamp-tasks"),
+        None,
+    ] {
+        let refusal = project_exists("lamp-tasks", folder);
+        let rig = new_folder_rig();
+        rig.plan(json!({
+            "machines": {"default": true},
+            "new": {"each": [refusal, {"default":true}, {"default":true}]}
+        }));
+        let cli = rig.cli();
+        for _ in 0..2 {
+            assert_eq!(
+                cli.launch(&in_made_folder()),
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into()
+                },
+                "{folder:?}"
+            );
+        }
+        let news = new_args(&rig);
+        assert_eq!(news.len(), 3, "{folder:?}");
+        assert_eq!(news[0][4], "--new");
+        assert_eq!(news[0][5], "lamp-tasks");
+        // The retry is the first call with the folder in place of `--new
+        // NAME`, and the target's own folder, whatever Harness printed.
+        let mut retry = news[0].as_array().unwrap().clone();
+        retry.splice(4..6, [json!("~/harnesses/lamp-tasks")]);
+        assert_eq!(news[1], Value::Array(retry));
+        assert_eq!(news[2], news[1]);
+    }
+}
+
+/// The folders seen are kept in the tasks folder: a restarted part names a
+/// folder it saw before, and asks `--new` only for one on another computer.
+#[test]
+fn with_new_folder_the_folders_seen_survive_a_restart() {
+    let rig = new_folder_rig();
+    rig.plan(json!({"machines":{"default":true},"new":{"each":[{"default":true}, {"default":true}, {"default":true}]}}));
+    assert!(matches!(
+        rig.cli().launch(&in_made_folder()),
+        LaunchOutcome::Created { .. }
+    ));
+    let again = rig.cli();
+    assert!(matches!(
+        again.launch(&in_made_folder()),
+        LaunchOutcome::Created { .. }
+    ));
+    let news = new_args(&rig);
+    assert_eq!(news[0][4], "--new");
+    assert_eq!(news[1][4], "~/harnesses/lamp-tasks");
+    // Another computer's folder of the same name is its own.
+    let mut elsewhere = in_made_folder();
+    elsewhere.target.machine_id = "fedcba9876543210fedcba9876543210".into();
+    rig.plan(json!({"machines":{"stdout":format!("{{\"machineId\":\"{MACHINE}\",\"current\":true}}\n{{\"machineId\":\"{}\",\"current\":false,\"name\":\"other\"}}\n", elsewhere.target.machine_id)},"new":{"default":true}}));
+    assert!(matches!(
+        again.launch(&elsewhere),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[2][4], "--new");
+}
+
+/// A `new` that failed otherwise, or never answered, marks nothing: the next
+/// hand-over asks `--new` again, and nothing is asked twice in one.
+#[test]
+fn with_new_folder_another_failure_marks_nothing() {
+    let exists = project_exists("lamp-tasks", None);
+    for failure in [
+        json!({"exit":1,"stdout":"{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n"}),
+        // Only exit 1 with the sentence is "there already".
+        json!({"exit":5,"stdout":exists["stdout"]}),
+        json!({"exit":1,"stdout":"{\"error\":\"PROJECT_EXISTS\"}\n"}),
+    ] {
+        let rig = new_folder_rig();
+        rig.plan(json!({"machines":{"default":true},"new":{"each":[failure, {"default":true}]}}));
+        let cli = rig.cli();
+        assert_eq!(
+            cli.launch(&in_made_folder()),
+            uncertain("new_failed"),
+            "{failure}"
+        );
+        assert!(matches!(
+            cli.launch(&in_made_folder()),
+            LaunchOutcome::Created { .. }
+        ));
+        let news = new_args(&rig);
+        assert_eq!(news.len(), 2, "{failure}");
+        assert_eq!(news[0][4], "--new");
+        assert_eq!(news[1][4], "--new");
+    }
+}
+
+/// Only `~/harnesses/<name>` with a name Harness keeps as it is is asked
+/// for with `--new`; any other folder or a bare name goes as before, and
+/// without the switch nothing changes.
+#[test]
+fn new_folder_is_only_for_a_folder_harness_would_make_and_only_when_set() {
+    for project in [
+        "~/code/lamp-tasks",
+        "/Users/lee/harnesses/lamp-tasks",
+        "~/harnesses/Lamp Tasks",
+        "~/harnesses/a/b",
+        "~/harnesses/-x",
+        "~/harnesses/.x",
+        "~/harnesses/..",
+        "~/harnesses/",
+        "~/harnesses/café",
+        "lamp-tasks",
+    ] {
+        let rig = new_folder_rig();
+        let mut request = in_made_folder();
+        request.target.project = project.into();
+        rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+        assert!(
+            matches!(rig.cli().launch(&request), LaunchOutcome::Created { .. }),
+            "{project}"
+        );
+        assert_eq!(new_args(&rig)[0][4], project, "{project}");
+        assert!(!rig.root.path().join("folders-seen.json").exists());
+    }
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true}}));
+    assert!(matches!(
+        rig.cli().launch(&in_made_folder()),
+        LaunchOutcome::Created { .. }
+    ));
+    assert_eq!(new_args(&rig)[0][4], "~/harnesses/lamp-tasks");
+}
+
+/// `serve --new-folder` and `serve --absolute-folder` together: the first
+/// hand-over to a `~/harnesses/<name>` folder goes as `--new <name>`, which
+/// names no folder to make absolute, and its reply still shows the
+/// computer's home (`<home>/harnesses/<name>`). Later hand-overs to a `~/…`
+/// folder on that computer go absolute, the plain-folder ask after
+/// `PROJECT_EXISTS` included.
+#[test]
+fn new_folder_and_absolute_folder_work_side_by_side() {
+    let mut rig = new_folder_rig();
+    rig.config.absolute_folder = true;
+    rig.plan(json!({
+        "machines": {"default": true},
+        "new": {"each": [
+            created_in("/Users/lee/harnesses/lamp-tasks"),
+            created_in("/Users/lee/harnesses/lamp-tasks"),
+            created_in("/Users/lee/code/site"),
+            project_exists("other", None),
+            created_in("/Users/lee/harnesses/other"),
+        ]}
+    }));
+    let cli = rig.cli();
+    let started = LaunchOutcome::Created {
+        agent_id: AGENT.into(),
+    };
+    let mut site = home_launch();
+    site.target.project = "~/code/site".into();
+    let mut other = home_launch();
+    other.target.project = "~/harnesses/other".into();
+    for request in [&home_launch(), &home_launch(), &site, &other] {
+        assert_eq!(cli.launch(request), started, "{}", request.target.project);
+    }
+    let folders: Vec<_> = new_args(&rig)
+        .iter()
+        .map(|args| match args[4].as_str().unwrap() {
+            "--new" => format!("--new {}", args[5].as_str().unwrap()),
+            folder => folder.to_owned(),
+        })
+        .collect();
+    assert_eq!(
+        folders,
+        [
+            "--new lamp-tasks",
+            "/Users/lee/harnesses/lamp-tasks",
+            "/Users/lee/code/site",
+            "--new other",
+            "/Users/lee/harnesses/other",
+        ]
+    );
+}
+
+/// A kept file that can't be read is none seen: one `--new`, refused as
+/// there already, and the hand-over still starts in the folder.
+#[test]
+fn with_new_folder_an_unreadable_file_costs_one_ask() {
+    let rig = new_folder_rig();
+    fs::write(rig.root.path().join("folders-seen.json"), b"not json").unwrap();
+    rig.plan(json!({
+        "machines": {"default": true},
+        "new": {"each": [project_exists("lamp-tasks", None), {"default":true}]}
+    }));
+    assert!(matches!(
+        rig.cli().launch(&in_made_folder()),
+        LaunchOutcome::Created { .. }
+    ));
+    let news = new_args(&rig);
+    assert_eq!(news[0][4], "--new");
+    assert_eq!(news[1][4], "~/harnesses/lamp-tasks");
 }
 
 /// Seen on a lamp on 3 Nov: `show` against the person's Mac took 16 to 39

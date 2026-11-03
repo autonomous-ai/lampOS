@@ -1,0 +1,16 @@
+Nov 03 18:06:25.625010 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 18:06:25.664929 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 18:07:01.657247 <lamp> lamp-tasks[676624]: tasks: lamp-253a1f3ec08e65f8ca66e99ad2c112d1: the folder for 'lamp-p3-check' is new to this lamp on that computer, so Harness is asked to make it
+Nov 03 18:07:08.852591 <lamp> lamp-tasks[676624]: tasks: lamp-253a1f3ec08e65f8ca66e99ad2c112d1: dispatch accepted (exit 0, 9.3 s)
+Nov 03 18:07:34.633315 <lamp> lamp-tasks[676624]: tasks: wait on <mac-machine-id> came back after 25736 ms: task 18 idle
+Nov 03 18:08:25.048909 <lamp> lamp-tasks[676624]: tasks: lamp-77cf4f4be0958694e87318e59645097e: dispatch accepted (exit 0, 9.3 s)
+Nov 03 18:08:50.402125 <lamp> lamp-tasks[676624]: tasks: wait on <mac-machine-id> came back after 25310 ms: task 19 idle
+Nov 03 18:09:26.948117 <lamp> lamp-tasks[676624]: tasks: lamp-edf810ebf25db8e372f531196855c8cd: dispatch accepted (exit 0, 8.5 s)
+Nov 03 18:09:52.219202 <lamp> lamp-tasks[676624]: tasks: wait on <mac-machine-id> came back after 25223 ms: task 20 idle
+Nov 03 18:10:25.482998 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 18:10:25.529001 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 18:10:51.312662 <lamp> lamp-tasks[680190]: tasks: lamp-5d77bbf669930468d4f9d13eedf3e39c: the folder for 'lamp-p3-check' is new to this lamp on that computer, so Harness is asked to make it
+Nov 03 18:10:58.119422 <lamp> lamp-tasks[680190]: tasks: lamp-5d77bbf669930468d4f9d13eedf3e39c: the folder for 'lamp-p3-check' is on that computer already, so it starts there
+Nov 03 18:11:02.447452 <lamp> lamp-tasks[680190]: tasks: lamp-5d77bbf669930468d4f9d13eedf3e39c: dispatch accepted (exit 0, 13.7 s)
+Nov 03 18:11:26.906837 <lamp> lamp-tasks[680190]: tasks: wait on <mac-machine-id> came back after 24359 ms: task 21 idle
+Nov 03 18:12:27.500088 <lamp> lamp-tasks[680190]: tasks: wait on <mac-machine-id> came back after 19833 ms: task 21 idle
