@@ -2099,24 +2099,38 @@ happens:
      model's description (`made_skill::plainly`): "When the lamp has been
      quiet for a minute, between 22:00 and 22:30, it dims the light a
      step, at most once an hour." That sentence is the card's description
-     in the package (`SKILL.md`'s, in place of the one written), in
-     `made.json`, in the app and in what the lamp says. A trigger with any
-     key but `topic`, `field`, `equals`, `for`, `cooldown`, `rearm` and
-     `during`, a trigger other than resting or someone being there or not,
-     or a step other than one light (`colour`, `level`, `for`, or `dim`
-     alone) or one gesture (`nod`, `curious`) is refused, and repaired
-     once as a check's refusal is (`PLAIN_ONLY`'s line). On lamp-0c89 the
+     in the package (`SKILL.md`'s, in place of the one written, its
+     continuation lines too), in `made.json`, in the app and in what the
+     lamp says; the model is told to say it leaving nothing out, not to
+     sum it up (the `made` words, and the local maker's). Refused, and
+     repaired once as a check's refusal is (`PLAIN_ONLY`'s line):
+     - any top-level part but `kind`, `version`, `needs`, `format`,
+       `permissions`, one `[trigger]` table, `[ask]` and `[[do]]`, so a
+       `[quiet]`, `[[while]]`, `most_a_day`, `[budget]` or `[rest]` that
+       would run otherwise than the words is never kept (Thirteen's and
+       Mobile's P2 on #5042);
+     - a trigger with any key but `topic`, `field`, `equals`, `for`,
+       `cooldown`, `rearm` and `during`, or other than resting or someone
+       being there or not;
+     - a step other than one light (`colour`, `level`, `for`, or `dim`
+       alone) or one gesture (`nod`, `curious`);
+     - words over 200 characters: said whole or not at all, never cut
+       before a step or the cooldown. On lamp-0c89 the
      lamp's model had kept "when someone says good night, dim the light
      slowly over a minute" as any quiet minute from 22:00 to 22:30, under
      its own description of what was asked.
    - **What no skill can do.** An answer that begins `cannot:` with no
      fenced block is told as not made, "a skill can't do that: " and the
      model's reason, at most 120 characters (`made_skill::CANNOT`), and
-     nothing is kept. A line outside the blocks that begins `left out:`
-     (`made_skill::LEFT_OUT`) names what was asked and isn't in it; it is
-     said after what the skill does ("… it dims the light a step. Left
-     out: dimming slowly; it dims in one step"), at most 120 characters,
-     so a yes is to that too. Tests: `made_skill::tests::what_it_does_is_said_from_its_toml`,
+     nothing is kept. Both markers are read in any case. Only the lamp's
+     own model is told to answer so (below): the computer's brief already
+     fills its 1,000 bytes. A line outside the blocks that begins
+     `left out:` (`made_skill::LEFT_OUT`) names what was asked and isn't
+     in it. It is said after what the skill does, in a fixed frame as the
+     maker's note, one clause with no quotes, at most 120 characters ("…
+     it dims the light a step. The maker notes what it couldn't do:
+     dimming slowly."), so it can't read as more of what runs, and a yes
+     is to that too. It is in the package's description as well. Tests: `made_skill::tests::what_it_does_is_said_from_its_toml`,
      `what_it_cant_say_is_refused_with_lines_for_a_repair`,
      `a_cannot_answer_is_said_and_makes_nothing`.
      - Tests: `made_skill::tests::a_repairs_brief_carries_the_checks_lines_and_still_fits`,

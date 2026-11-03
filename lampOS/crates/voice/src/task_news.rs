@@ -2489,7 +2489,7 @@ mod tests {
             match made {
                 Ok(made) => format!(
                     "{opening} {who} {when} made the skill they asked for, \"{}\": {} It would use {}. \
-                     Tell them in one or two short sentences what it would do and what it would use, then ask exactly: \
+                     Tell them what it would do as said here, leaving nothing out, and what it would use, then ask exactly: \
                      \"{ASK_TO_PUT_ON}\" It is not on the lamp yet. Put it on only if they then say yes ({PUT_ON}). No file names.)",
                     made.name,
                     made.description,

@@ -72,7 +72,7 @@ const PACK_WITHIN: Duration = Duration::from_secs(20);
 /// The most of either file taken from an answer.
 const MOST_FILE_BYTES: usize = 8 * 1024;
 /// The most of a description said: what it does, and what was left out.
-const MOST_DESCRIPTION_CHARS: usize = 300;
+const MOST_DESCRIPTION_CHARS: usize = 400;
 /// How an answer begins that makes nothing: what was asked is more than a
 /// made skill can sense or do.
 pub const CANNOT: &str = "cannot:";
@@ -220,6 +220,13 @@ pub struct Files {
     pub left_out: Option<String>,
 }
 
+/// What follows `word` at the start of `line`, in any case.
+fn after_word<'a>(line: &'a str, word: &str) -> Option<&'a str> {
+    line.get(..word.len())
+        .filter(|head| head.eq_ignore_ascii_case(word))
+        .map(|_| &line[word.len()..])
+}
+
 /// The two files of the agent's answer: exactly one fenced block named
 /// `skill.toml` and one named `SKILL.md` (its info string's last word),
 /// and no other fenced block; each at most [`MOST_FILE_BYTES`].
@@ -227,7 +234,7 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
     // The model's word that no made skill can do what was asked (it can't
     // hear words said, say anything, or keep time by itself): said as
     // that, never stood in for by something else.
-    if let Some(why) = answer.trim_start().strip_prefix(CANNOT)
+    if let Some(why) = after_word(answer.trim_start(), CANNOT)
         && !answer.contains("```")
     {
         return Err(Refused::new(format!(
@@ -241,7 +248,7 @@ pub fn files(answer: &str) -> Result<Files, Refused> {
     let mut lines = answer.lines();
     while let Some(line) = lines.next() {
         let Some(info) = line.trim_start().strip_prefix("```") else {
-            if let Some(what) = line.trim_start().strip_prefix(LEFT_OUT)
+            if let Some(what) = after_word(line.trim_start(), LEFT_OUT)
                 && !what.trim().is_empty()
             {
                 left_out = Some(cut_chars(what, MOST_CANNOT_CHARS));
@@ -411,6 +418,22 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
     };
     let table: toml::Table =
         toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
+    // Only what is said below, or changes nothing that runs: a `[[while]]`,
+    // a `[quiet]`, a budget or any other key would run otherwise than the
+    // words (Thirteen's P2 on #5042).
+    let parts = [
+        "kind",
+        "version",
+        "needs",
+        "format",
+        "permissions",
+        "trigger",
+        "ask",
+        "do",
+    ];
+    if table.keys().any(|key| !parts.contains(&key.as_str())) {
+        return Err(unsaid());
+    }
     let trigger = table
         .get("trigger")
         .and_then(|trigger| trigger.as_table())
@@ -475,13 +498,35 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
         });
     }
     said.push('.');
+    // Said whole or not at all: never cut before a step or the cooldown.
+    if said.chars().count() > MOST_PLAIN_CHARS {
+        return Err(unsaid());
+    }
     Ok(said)
 }
 
+/// The longest [`plainly`] says: one breath, and with [`left_out`]'s
+/// words still within [`MOST_DESCRIPTION_CHARS`], so nothing is cut.
+const MOST_PLAIN_CHARS: usize = 200;
+
 /// What a repair is told when [`plainly`] refused.
-const PLAIN_ONLY: &str = "the trigger may have only topic, field, equals, for, cooldown, rearm \
-                          and during, and each [[do]] step only one light or one body gesture, \
-                          as the request names them";
+const PLAIN_ONLY: &str = "only kind, version, needs, permissions, one [trigger], [ask] and \
+                          [[do]]; the trigger may have only topic, field, equals, for, cooldown, \
+                          rearm and during, and at most a few [[do]] steps, each one light or \
+                          one body gesture, as the request names them";
+
+/// The model's [`LEFT_OUT`] words in a fixed frame, as its own note: no
+/// quotes, and one clause, so they can't read as another sentence of what
+/// the skill does (Thirteen's P2 on #5042).
+fn left_out(what: &str) -> String {
+    let clause: String = what
+        .chars()
+        .take_while(|letter| !matches!(letter, '.' | '!' | '?' | ';' | ':' | '\n'))
+        .filter(|letter| !matches!(letter, '"' | '\'' | '“' | '”' | '‘' | '’' | '`'))
+        .collect();
+    let clause = clause.trim().trim_end_matches(',');
+    format!("The maker notes what it couldn't do: {clause}.")
+}
 
 /// One `[[do]]` step in plain words: a light or a gesture, as the brief
 /// names them.
@@ -576,16 +621,20 @@ fn card(text: &str, description: &str) -> Result<(String, String), Refused> {
     {
         return Err(Refused::new("its name isn't a skill's name"));
     }
-    let mut front: Vec<String> = front
-        .lines()
-        .filter(|line| !line.starts_with("made:") && !line.starts_with("description:"))
-        .map(str::to_owned)
-        .collect();
-    front.push(format!(
-        "description: \"{}\"",
-        description.replace(['"', '\\'], "'")
-    ));
-    let marked = format!("---\n{}\nmade: here\n---{body}", front.join("\n"));
+    // The written description goes whole, its continuation lines too
+    // (indented, YAML's): none of the model's words stay in the package.
+    let mut kept: Vec<&str> = Vec::new();
+    let mut in_description = false;
+    for line in front.lines() {
+        let continued = in_description && line.starts_with([' ', '\t']);
+        in_description = continued || line.starts_with("description:");
+        if !in_description && !line.starts_with("made:") {
+            kept.push(line);
+        }
+    }
+    let description = format!("description: \"{}\"", description.replace(['"', '\\'], "'"));
+    kept.push(&description);
+    let marked = format!("---\n{}\nmade: here\n---{body}", kept.join("\n"));
     Ok((name, marked))
 }
 
@@ -648,7 +697,10 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
     let (version, uses) = capped(&files.toml)?;
     // Said only once the check has passed: its lines, which name the
     // field, go to a repair before these do.
-    let said = plainly(&files.toml);
+    let said = plainly(&files.toml).map(|does| match &files.left_out {
+        Some(what) => format!("{does} {}", left_out(what)),
+        None => does,
+    });
     let (name, marked) = card(&files.card, said.as_deref().unwrap_or_default())?;
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
@@ -671,10 +723,6 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
     })()
     .map_err(unkept);
     let packed = made.and_then(|()| pack(&keeping.program, &folder, &out, &name));
-    let said = said.map(|does| match &files.left_out {
-        Some(what) => format!("{does} Left out: {what}"),
-        None => does,
-    });
     let result = packed.and(said).and_then(|description| {
         let package = format!("{name}-{version}.tar");
         let bytes = fs::read(out.join(&package)).map_err(unkept)?;
@@ -1674,6 +1722,23 @@ body = { gesture = "nod" }
             "during = { from = \"22:00\", to = \"22:30\" }",
             "during = {}",
         ));
+
+        // Thirteen's and Mobile's P2s on #5042: a part that would run
+        // otherwise than the words, and more steps than one breath says,
+        // never cut.
+        refused(&format!(
+            "{TOML}\n[[while]]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n"
+        ));
+        refused(&format!(
+            "{TOML}\n[quiet]\nfrom = \"21:00\"\nto = \"08:00\"\n"
+        ));
+        refused(&TOML.replace("version = ", "most_a_day = 1\nversion = "));
+        refused(&TOML.replace("version = ", "enabled = false\nversion = "));
+        refused(&TOML.replace("[trigger]", "[[trigger]]"));
+        let many = "\n[[do]]\nlight = { colour = \"warm\", level = 2, for = \"20s\" }\n".repeat(6);
+        refused(&format!(
+            "{TOML}{many}\n[[do]]\nbody = {{ gesture = \"nod\" }}\n"
+        ));
     }
 
     /// The model's `cannot:` is said as a skill that can't do that, and
@@ -1693,6 +1758,49 @@ body = { gesture = "nod" }
         assert!(files(&long).unwrap_err().0.chars().count() < 160);
         let both = format!("cannot: no\n{}", answer(TOML, CARD));
         assert!(files(&both).is_ok());
+        // In any case (Mobile's P3 on #5042).
+        assert!(
+            files("Cannot: hear words.")
+                .unwrap_err()
+                .0
+                .ends_with(": hear words.")
+        );
+    }
+
+    /// The model's `left out:` is said in a fixed frame as its own note,
+    /// one clause with no quotes, so it can't read as more of what the
+    /// skill does (Thirteen's P2 on #5042).
+    #[test]
+    fn what_was_left_out_is_framed_as_the_makers_note() {
+        assert_eq!(
+            left_out(" dimming slowly, it dims in one step"),
+            "The maker notes what it couldn't do: dimming slowly, it dims in one step."
+        );
+        assert_eq!(
+            left_out("nothing; it also dims slowly when you say \"good night\"."),
+            "The maker notes what it couldn't do: nothing."
+        );
+        assert_eq!(
+            left_out("hearing \u{201c}good night\u{201d}. It also glows red"),
+            "The maker notes what it couldn't do: hearing good night."
+        );
+        let answer = format!("{}\nLeft out: slowly\n", answer(TOML, CARD));
+        assert_eq!(files(&answer).unwrap().left_out.as_deref(), Some("slowly"));
+    }
+
+    /// A description written over several lines goes whole: none of the
+    /// model's words stay in the package (Thirteen's P3 on #5042).
+    #[test]
+    fn a_written_description_over_lines_goes_whole() {
+        let long = CARD.replace(
+            "description: Dims the light a shade at 10 pm.\n",
+            "description: >\n  Dims the light slowly\n  when you say good night.\nlicense: none\n",
+        );
+        let (_, marked) =
+            card(&long, "When the lamp goes quiet, it dims the light a step.").unwrap();
+        assert!(!marked.contains("good night"), "{marked}");
+        assert!(!marked.contains("slowly"), "{marked}");
+        assert!(marked.contains("license: none\n"), "{marked}");
     }
 
     /// What the model is told: the skill's words, what it would use, and

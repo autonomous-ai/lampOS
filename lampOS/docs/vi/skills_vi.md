@@ -64,7 +64,13 @@ Diễn ra như sau:
      minute, between 22:00 and 22:30, it dims the light a step, at most
      once an hour." Câu đó là mô tả của thẻ trong gói (thay mô tả trong
      `SKILL.md`), trong `made.json`, trên ứng dụng và trong lời đèn nói.
-     Trigger có khóa nào ngoài `topic`, `field`, `equals`, `for`,
+     Mô hình được dặn nói câu đó đủ, không tóm tắt. Bị từ chối (và sửa
+     một lần): mọi phần cấp ngoài cùng ngoài `kind`, `version`, `needs`,
+     `format`, `permissions`, một bảng `[trigger]`, `[ask]` và `[[do]]`
+     (nên `[quiet]`, `[[while]]`, `most_a_day`, `[budget]`, `[rest]` khiến
+     kỹ năng chạy khác lời nói không bao giờ được giữ, P2 của Thirteen và
+     Mobile trên #5042), và câu dài hơn 200 ký tự (nói đủ hoặc không nói,
+     không bao giờ cắt). Cũng vậy, trigger có khóa nào ngoài `topic`, `field`, `equals`, `for`,
      `cooldown`, `rearm` và `during`, trigger khác "đèn nghỉ" hoặc "có/không
      có người", hay bước khác một lệnh đèn (`colour`, `level`, `for`, hoặc
      chỉ `dim`) hoặc một cử chỉ (`nod`, `curious`) đều bị từ chối, và được
@@ -81,8 +87,13 @@ Diễn ra như sau:
      trong ngày mà yêu cầu không nêu. Khi một phần của yêu cầu không làm
      được ("dim slowly over a minute"), mô hình làm phần còn lại và thêm
      một dòng ngoài các khối bắt đầu bằng `left out:`
-     (`made_skill::LEFT_OUT`); đèn nói dòng đó sau câu kỹ năng làm gì (tối
-     đa 120 ký tự), nên lời "có" cũng là đồng ý với phần bị bỏ (#5041).
+     (`made_skill::LEFT_OUT`); đèn nói dòng đó sau câu kỹ năng làm gì,
+     trong một khung cố định như ghi chú của người tạo ("The maker notes
+     what it couldn't do: …", một mệnh đề, bỏ dấu ngoặc kép, tối đa 120 ký
+     tự), nên lời "có" cũng là đồng ý với phần bị bỏ (#5041). Hai dấu hiệu
+     `cannot:` và `left out:` được đọc không phân biệt hoa thường; chỉ mô
+     hình của đèn được dặn dùng chúng, vì bản yêu cầu cho máy tính đã đủ
+     1.000 byte.
 5. **Giữ lại, không cài.** Gói nằm trong thư mục riêng của giọng nói,
    `/var/lib/lampOS/voice/made-skills` (0700, người dùng của giọng nói):
    - giữ tối đa 5, cái cũ nhất bị bỏ cùng gói của nó;
