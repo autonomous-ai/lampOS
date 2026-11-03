@@ -62,9 +62,10 @@ pub const PENDING_FOR: Duration = Duration::from_secs(120);
 const MAX_ANSWER_BYTES: u64 = 16_384;
 
 /// The words, after fillers ([`FILLERS`]), that send a prepared write.
-/// Each has "send" or "gửi" in it, and nothing that has more in it: "don't
-/// send it" is no send, and "do it" never sends.
-pub const SEND_WORDS: [&str; 9] = [
+/// Each has "send" or "gửi" in it (or "gởi", or "gui" without accents),
+/// and nothing that has more in it: "don't send it" is no send, and "do
+/// it" never sends.
+pub const SEND_WORDS: [&str; 13] = [
     "send",
     "send it",
     "send that",
@@ -74,6 +75,10 @@ pub const SEND_WORDS: [&str; 9] = [
     "gửi",
     "gửi đi",
     "gửi nó đi",
+    "gởi",
+    "gởi đi",
+    "gui",
+    "gui di",
 ];
 /// Words around a "send" that change nothing.
 const FILLERS: [&str; 14] = [
@@ -108,7 +113,14 @@ pub const NOT_HEARD: &str = "Not done: I use linked services only when the lamp'
 /// What the model is told when the line is not the lamp's owner's: a guest,
 /// someone unknown, the room, or a line found to be someone else's.
 /// Nothing is called.
-pub const OWNER_ONLY: &str = "Not done: only the lamp's owner can use their linked services, and I can't tell it is them now. Say so plainly, in a few words.";
+pub const OWNER_ONLY: &str = "Not done: only the lamp's owner can use their linked services, and I can't tell it is them now. Say so plainly, in a few words, and ask them to look at the lamp so it can see who is asking.";
+/// What the model is told of a write on a route that never sends (the Live
+/// route): it has no voice prints, so it can't tell the voice saying "send"
+/// is the one that asked. Nothing is prepared or sent.
+pub const NO_SEND_HERE: &str = "Not done: on this voice I don't send or post to linked services. Say so in a few words; they can ask again on the lamp's other voice.";
+/// What the model is told when the "send" is not in the voice that asked
+/// for the write, or either voice is not known.
+pub const OTHER_VOICE: &str = "Not sent, and cancelled: I send only when the voice saying \"send\" is the one that asked for it. Say it was not sent.";
 /// What the model is told of any other call in a request a service's read
 /// answered in ([`after_read`]).
 pub const AFTER_READ: &str = "Not done: after reading from a linked service, I do nothing else in the same turn, so nothing a mail or a page says can make me act. Say what you read, and that they can ask for this again.";
@@ -118,16 +130,19 @@ pub const BRIEF_NOTE: &str = "Someone else may be here: say only how many there 
 /// What the model is told after a write is prepared.
 const READ_BACK_NEXT: &str = "Nothing is sent yet. Say read_back in full, word for word, leaving nothing out, then ask whether to send it. Send only if their next words are \"send\".";
 /// What the model is told to say once a write was sent.
-pub const SENT_NEXT: &str = "Say only: Sent.";
+pub const SENT_NEXT: &str = "Say only that it was sent, in the conversation's language.";
 /// What the model is told to say when the service did not send it.
-pub const NOT_SENT_NEXT: &str = "Say only: It was not sent.";
+pub const NOT_SENT_NEXT: &str = "Say only that it was not sent, in the conversation's language.";
 /// How long after the lamp last said a word of the read-back its "send"
 /// may come: the very next line, said soon.
 pub const SEND_WITHIN: Duration = Duration::from_secs(30);
-/// The least time each word of a read-back takes to say: faster than any
-/// voice speaks (240 words a minute), so a line that begins sooner after
-/// the read-back began was said over it.
-const WORD_TAKES: Duration = Duration::from_millis(250);
+/// The least time each word of a read-back takes to say: the lamp's voice
+/// says about 350 to 400 ms a word, so a line that begins sooner after the
+/// read-back began was said over it.
+const WORD_TAKES: Duration = Duration::from_millis(400);
+/// How long a services call waits for a line's voice print, which the
+/// same-voice child makes a moment after the line ends.
+const PRINT_WAIT: Duration = Duration::from_millis(800);
 /// The most of the lamp's words kept for one read-back's check.
 const SPOKEN_MOST: usize = 16_384;
 
@@ -363,11 +378,7 @@ pub fn began_in(pending: &mut Option<Pending>, now: Instant) {
         *pending = None;
         return;
     }
-    let words = u32::try_from(kept.spoken.split_whitespace().count()).unwrap_or(u32::MAX);
-    let said_by = kept
-        .spoken_from
-        .map(|from| from + WORD_TAKES.saturating_mul(words));
-    if said_by.is_none_or(|by| now < by) {
+    if !said_whole_by(kept, now) {
         kept.cut = true;
     }
 }
@@ -436,6 +447,12 @@ pub struct Turn<'a> {
     /// (the lease, never widened) is the owner's known face, not held by
     /// a gap or carried, and not narrowed to the room. `None` otherwise.
     pub owner: Option<&'a str>,
+    /// This route can tell voices apart (the second route,
+    /// [`judging_voices`]): only there a write is prepared or sent.
+    pub sends: bool,
+    /// How alike the voice of this line and of the line that prepared the
+    /// waiting write sound ([`VoiceAsk::Alike`]), when both prints are known.
+    pub alike: Option<f32>,
 }
 
 /// The call to send on, or what the model is told instead. Only a heard
@@ -470,6 +487,10 @@ pub fn gate(
     if reads_only(&call.name) {
         return Ok(call.clone());
     }
+    if !turn.sends {
+        *pending = None;
+        return Err(json!({ "error": NO_SEND_HERE }));
+    }
     let mut call = call.clone();
     // "said" is the voice's to give, never the model's.
     if let Some(args) = call.args.as_object_mut() {
@@ -499,6 +520,13 @@ pub fn gate(
     }
     if kept.cut || !read_back_said(&kept.read_back, &kept.spoken) {
         return Err(json!({ "error": NOT_READ_BACK }));
+    }
+    // The face says who is at the lamp; the voice says who said "send".
+    if !turn
+        .alike
+        .is_some_and(|alike| alike >= crate::same_voice::SAME_FROM)
+    {
+        return Err(json!({ "error": OTHER_VOICE }));
     }
     if let Some(args) = call.args.as_object_mut() {
         args.insert("said".into(), json!("send"));
@@ -606,6 +634,94 @@ fn owner_alone() -> bool {
     crate::known_faces::most_faces_lately() == Some(1)
 }
 
+/// Whether a read is said in full: the owner the one face in view, and the
+/// line in the conversation's voice ([`VoiceAsk::Conversation`] at
+/// `same_voice::SAME_FROM` or over). Anything unknown is no.
+pub fn read_in_full(alone: bool, likeness: Option<f32>) -> bool {
+    alone && likeness.is_some_and(|likeness| likeness >= crate::same_voice::SAME_FROM)
+}
+
+/// What a services call asks of the second route's same-voice check
+/// (`same_voice::Voices`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VoiceAsk {
+    /// `Voices::alike`: how alike two lines sound.
+    Alike(u64, u64),
+    /// `Voices::likeness_so_far`: how like the conversation's voice a line is.
+    Conversation(u64),
+}
+
+/// The second route's answer to a [`VoiceAsk`]: a cosine, `None` while a
+/// print is not known.
+pub type VoiceJudge = std::sync::Arc<dyn Fn(VoiceAsk) -> Option<f32> + Send + Sync>;
+
+#[cfg(not(test))]
+static JUDGE: std::sync::OnceLock<VoiceJudge> = std::sync::OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    static JUDGE: std::cell::RefCell<Option<VoiceJudge>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The second route's worker gives its same-voice check (once a process;
+/// one that has none gives a judge that knows no print). Only a process
+/// with a judge prepares or sends a write, and reads in full: the Live
+/// route has none.
+pub fn judging_voices(judge: VoiceJudge) {
+    #[cfg(not(test))]
+    let _ = JUDGE.set(judge);
+    #[cfg(test)]
+    JUDGE.with(|cell| *cell.borrow_mut() = Some(judge));
+}
+
+fn judge() -> Option<VoiceJudge> {
+    #[cfg(not(test))]
+    return JUDGE.get().cloned();
+    #[cfg(test)]
+    JUDGE.with(|cell| cell.borrow().clone())
+}
+
+/// `judge`'s answer to `ask`, waiting up to [`PRINT_WAIT`] for a print
+/// still being made.
+fn judged(judge: &VoiceJudge, ask: VoiceAsk) -> Option<f32> {
+    let until = Instant::now() + PRINT_WAIT;
+    loop {
+        if let Some(likeness) = judge(ask) {
+            return Some(likeness);
+        }
+        if Instant::now() >= until {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// A line began, as the second route hears it (`Heeding::hear`), at `now`:
+/// earlier than its words come. One begun over the lamp's own voice, or
+/// before the read-back could have been said whole, marks the waiting
+/// write's read-back as talked over.
+pub fn voice_began(over_the_lamps_voice: bool, now: Instant) {
+    kept::pending(|pending| voice_began_in(pending, over_the_lamps_voice, now));
+}
+
+/// [`voice_began`] on `pending`.
+pub fn voice_began_in(pending: &mut Option<Pending>, over_the_lamps_voice: bool, now: Instant) {
+    let Some(kept) = pending.as_mut() else {
+        return;
+    };
+    if over_the_lamps_voice || !said_whole_by(kept, now) {
+        kept.cut = true;
+    }
+}
+
+/// Whether the read-back kept in `kept` could have been said whole by `now`.
+fn said_whole_by(kept: &Pending, now: Instant) -> bool {
+    let words = u32::try_from(kept.spoken.split_whitespace().count()).unwrap_or(u32::MAX);
+    kept.spoken_from
+        .map(|from| from + WORD_TAKES.saturating_mul(words))
+        .is_some_and(|by| now >= by)
+}
+
 /// Run one services call on the folder's socket, held to the rules above,
 /// waiting at most [`DEADLINE`]. `heard` is false for a request not heard
 /// live at the lamp; `lease` is the request's memory scope, which says
@@ -632,11 +748,25 @@ pub fn run(
     } else {
         (None, None)
     };
+    let judge = judge();
+    let send_id = (call.name == WRITE)
+        .then(|| call.args.get("send_id").and_then(Value::as_str))
+        .flatten()
+        .is_some_and(|id| !id.is_empty());
+    let prepared = kept::pending(|pending| pending.as_ref().map(|kept| kept.request));
+    let alike = match (&judge, prepared) {
+        (Some(judge), Some(prepared)) if send_id && owner.is_some() && heard => {
+            judged(judge, VoiceAsk::Alike(prepared, request))
+        }
+        _ => None,
+    };
     let turn = Turn {
         heard,
         words: words.as_deref(),
         previous,
         owner: owner.as_deref(),
+        sends: judge.is_some(),
+        alike,
     };
     let gated = kept::pending(|pending| gate(pending, call, request, &turn, now));
     let call = match gated {
@@ -660,7 +790,14 @@ pub fn run(
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
                 thread.private_for(request);
             }
-            if !owner_alone() {
+            // In full only to the owner alone in view, in the
+            // conversation's voice; on the Live route, never.
+            let alone = owner_alone();
+            let likeness = judge
+                .as_ref()
+                .filter(|_| alone)
+                .and_then(|judge| judged(judge, VoiceAsk::Conversation(request)));
+            if !read_in_full(alone, likeness) {
                 brief(&mut told);
             }
         }
@@ -707,6 +844,8 @@ mod tests {
             words: Some(words),
             previous: Some(previous),
             owner: Some("ann"),
+            sends: true,
+            alike: Some(0.9),
         }
     }
 
@@ -757,6 +896,10 @@ mod tests {
             "Gửi đi",
             "Vâng, gửi nó đi",
             "gửi",
+            "Gởi đi",
+            "gởi",
+            "gui",
+            "ok gui di",
         ] {
             assert!(says_send(said), "{said}");
         }
@@ -775,11 +918,11 @@ mod tests {
         ] {
             assert!(!says_send(said), "{said}");
         }
-        assert!(
-            SEND_WORDS
+        assert!(SEND_WORDS.iter().all(|words| {
+            ["send", "gửi", "gởi", "gui"]
                 .iter()
-                .all(|words| words.contains("send") || words.contains("gửi"))
-        );
+                .any(|word| words.contains(word))
+        }));
     }
 
     #[test]
@@ -878,6 +1021,82 @@ mod tests {
     }
 
     #[test]
+    fn a_send_in_another_voice_or_an_unknown_one_is_refused() {
+        let now = Instant::now();
+        for (why, alike) in [
+            ("another voice", Some(0.3)),
+            ("just under", Some(crate::same_voice::SAME_FROM - 0.01)),
+            ("an unknown print", None),
+        ] {
+            let mut pending = waiting(now);
+            let turn = Turn {
+                alike,
+                ..heard("send it", 10)
+            };
+            let refused = gate(&mut pending, &send("s1"), 11, &turn, at(now)).expect_err(why);
+            assert_eq!(refused["error"], OTHER_VOICE, "{why}");
+            assert_eq!(pending, None, "{why}");
+        }
+    }
+
+    #[test]
+    fn the_live_route_never_prepares_or_sends() {
+        let now = Instant::now();
+        let live = |words| Turn {
+            sends: false,
+            alike: None,
+            ..heard(words, 10)
+        };
+        let mut pending = waiting(now);
+        let refused = gate(&mut pending, &send("s1"), 11, &live("send it"), at(now));
+        assert_eq!(refused.unwrap_err()["error"], NO_SEND_HERE);
+        assert_eq!(pending, None);
+        let write = call(WRITE, json!({"service":"gmail","action":"send_mail"}));
+        let refused = gate(&mut pending, &write, 12, &live("email Ann"), at(now));
+        assert_eq!(refused.unwrap_err()["error"], NO_SEND_HERE);
+        // Reads still pass, and are said only briefly ([`read_in_full`]).
+        assert!(
+            gate(
+                &mut pending,
+                &call(READ, json!({})),
+                13,
+                &live("my mail"),
+                now
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn a_read_is_in_full_only_alone_and_in_the_conversations_voice() {
+        assert!(read_in_full(true, Some(0.9)));
+        for (why, alone, likeness) in [
+            ("another voice", true, Some(0.3)),
+            ("no print, or Live", true, None),
+            ("others in view", false, Some(0.9)),
+        ] {
+            assert!(!read_in_full(alone, likeness), "{why}");
+        }
+    }
+
+    #[test]
+    fn a_line_begun_over_the_read_back_marks_it_cut() {
+        let now = Instant::now();
+        let mut pending = waiting(now);
+        voice_began_in(&mut pending, true, at(now));
+        assert!(pending.as_ref().unwrap().cut, "over the lamp's voice");
+        let mut pending = Some(Pending::new("s1", 10, now, READ_BACK, "ann"));
+        said_in(&mut pending, 10, READ_BACK, now);
+        // 20 words take 8 s at 400 ms a word: begun at 7 s is over it.
+        voice_began_in(&mut pending, false, now + Duration::from_secs(7));
+        assert!(pending.as_ref().unwrap().cut);
+        let mut pending = Some(Pending::new("s1", 10, now, READ_BACK, "ann"));
+        said_in(&mut pending, 10, READ_BACK, now);
+        voice_began_in(&mut pending, false, now + Duration::from_secs(12));
+        assert!(!pending.as_ref().unwrap().cut);
+    }
+
+    #[test]
     fn a_send_after_a_read_back_not_said_in_full_is_refused() {
         let now = Instant::now();
         // The model asked "Shall I do it?" and said no recipient.
@@ -972,6 +1191,7 @@ mod tests {
         for name in NAMES {
             let scheduled = Turn {
                 owner: Some("ann"),
+                sends: true,
                 ..Turn::default()
             };
             assert_eq!(

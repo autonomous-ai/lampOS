@@ -49,16 +49,24 @@ hẹp về cả phòng (một khuôn mặt khác được thấy đang nói nó)
 khách, của một khuôn mặt lạ, của cả phòng, một câu bị giữ hay bị thu hẹp, và
 một yêu cầu không có phạm vi đều được báo `OWNER_ONLY`, "Not done: only the
 lamp's owner can use their linked services, and I can't tell it is them now.
-Say so plainly, in a few words.", và không gì được gọi, cho cả đọc lẫn ghi.
+Say so plainly, in a few words, and ask them to look at the lamp so it can
+see who is asking.", và không gì được gọi, cho cả đọc lẫn ghi.
 Một yêu cầu không được nghe trực tiếp (một lượt chạy theo lịch, yêu cầu của
 một kỹ năng hay của chính đèn, một tin nhắn văn bản) được báo `NOT_HEARD` và
 cũng không gì được gọi, nên khi ở chế độ riêng tư, micro tắt, không dịch vụ
 nào được lấy dữ liệu.
 
-Ngay cả với chủ đèn, một lần đọc chỉ được nói đầy đủ khi mắt đếm được đúng
-một khuôn mặt trong tầm nhìn (`known_faces::most_faces_lately`, được đếm mỗi
-khi `LAMP_SERVICES=on` trên tuyến thứ hai). Có nhiều khuôn mặt hơn, hoặc
-không có số đếm (tuyến Live, camera tắt), câu trả lời chỉ giữ `id`, `from`,
+Khuôn mặt cho biết ai đang ở tại đèn; nó không cho biết ai đã nói (một người
+thân nói ngoài khung hình vẫn nằm trong lease của chủ đèn). Vì vậy, ngay cả
+với chủ đèn, một lần đọc chỉ được nói đầy đủ trên tuyến thứ hai, khi mắt đếm
+được đúng một khuôn mặt trong tầm nhìn (`known_faces::most_faces_lately`,
+được đếm mỗi khi `LAMP_SERVICES=on` ở đó) và câu nói ở giọng của cuộc trò
+chuyện (`same_voice::Voices::likeness_so_far` từ `same_voice::SAME_FROM`,
+0.70, trở lên; `services::read_in_full`). Các dịch vụ hỏi phép kiểm tra cùng
+giọng của tuyến thứ hai qua `services::judging_voices`, chờ tối đa 800 ms
+cho một dấu giọng. Có nhiều khuôn mặt hơn, không có số đếm, một giọng khác
+hay không có dấu giọng (camera tắt, một câu dưới 1.5 s của dấu giọng, và luôn
+luôn trên tuyến Live, vốn không có dấu giọng), câu trả lời chỉ giữ `id`, `from`,
 `subject`, `title`, `name`, `summary`, `date`, `start` và `end` của mỗi mục,
 một mục chỉ là văn bản trở thành "an item", và mô hình được báo
 `others_here`: "Someone else may be here: say only how many there are, who
@@ -343,21 +351,33 @@ password`, `change your password`, `new sign-in`, `security alert`,
 `suspicious`, `unusual sign-in`, `account recovery`, `magic link`, `token=`,
 và bằng tiếng Việt, có dấu và không dấu, `mã xác minh`, `mã xác thực`,
 `mã otp`, `mã đăng nhập`, `mã bảo mật`, `mật khẩu`, `đặt lại mật khẩu`,
-`đăng nhập`, … tổng cộng 58), một trong các từ trọn vẹn `otp`, `2fa`, `mfa`
-hoặc `pin`; "code" (hoặc các từ trọn vẹn `mã`, `token`, `pin`) trong khoảng
-80 ký tự quanh một số mã; hoặc "sign in", "log in", "login" hay "đăng nhập"
-cùng với một đường dẫn (`http://`, `https://`, `www.`) hay một số mã ở bất kỳ
-đâu. Một số mã là 4 đến 8 chữ số đứng riêng, liền nhau hoặc chia nhóm bởi
-một dấu cách hay gạch ngang ("482913", "482 913", "482-913", "4 8 2 9 1 3").
-Nó nghiêng về phía giấu: một mã giảm giá hay mã bưu chính gần một con số cũng
-bị bỏ ra.
+`đăng nhập`, … tổng cộng 59), một trong các từ trọn vẹn `otp`, `2fa`, `mfa`
+hoặc `pin`; "code" (hoặc các từ trọn vẹn `mã`, `token`, `pin`, `enter`,
+`confirm`, `confirmation`, `verify`, `verification`, `nhập`, `xác nhận`)
+trong khoảng 200 byte quanh một mã; "sign in", "log in", "login" hay "đăng
+nhập" cùng với một đường dẫn (`http://`, `https://`, `www.`) hay một số mã ở
+bất kỳ đâu; hoặc một đường dẫn đăng nhập: có `magic`, `verify`, `login`,
+`signin`, `auth`, `confirm`, `reset` hay `otp` là một từ trong path hay query
+của nó, hoặc, bên cạnh "click", "link", "tap", "nhấn" hay "bấm", một giá trị
+query từ 24 ký tự khó đọc trở lên. Một mã là một số mã, 4 đến 8 chữ số đứng
+riêng, liền nhau hoặc chia nhóm bởi một dấu cách, gạch ngang hay dấu chấm,
+hoặc một gạch ngang giữa hai dấu cách ("482913", "482 913", "482-913",
+"482.913", "482 - 913", "4 8 2 9 1 3"), hoặc một từ 4 đến 8 chữ cái và chữ số
+ASCII có cả hai loại ("F7K2Q"). Văn bản được đọc ở dạng dựng sẵn (Unicode
+NFC, crate `unicode-normalization`), nên tiếng Việt gõ bằng dấu tổ hợp cũng
+khớp. Nó nghiêng về phía giấu: một mã giảm giá hay mã bưu chính gần một con
+số cũng bị bỏ ra.
 
 Mọi mục của mỗi lần đọc đều được kiểm tra (`reads::quoted`): một thư theo
 người gửi, tiêu đề và nội dung, mọi mục khác (một tin nhắn Slack, một trang
 Notion, một file Drive, một sự kiện lịch, một mục GitHub hay Linear, từng mảnh
-câu trả lời của một tool MCP) theo mọi đoạn văn bản trong nó. Mục là nội dung
-bảo mật chỉ được trả về bằng mấy chữ "a security mail, left out" (một thư bảo
-mật, đã bỏ ra), không gì của nó được giữ. Mô hình cũng được dặn trong mô tả
+câu trả lời của một tool MCP) theo mọi đoạn văn bản trong nó, riêng nó và nối
+với mục kế tiếp, để một mã bị chia qua hai khối Notion, hai tin nhắn Slack
+hay hai mảnh câu trả lời MCP ("Your verification code is", rồi "482913") cũng
+bị bắt; khi hai mục cộng lại là nội dung bảo mật thì cả hai bị bỏ ra. Mục bị
+bỏ ra chỉ được trả về bằng mấy chữ "a security mail, left out" (một thư bảo
+mật, đã bỏ ra) trong Gmail, "a security message, left out" (một tin bảo mật,
+đã bỏ ra) ở mọi dịch vụ khác, không gì của nó được giữ. Mô hình cũng được dặn trong mô tả
 của mọi hàm là không bao giờ đọc ra một mã dùng một lần, một mã xác minh hay
 một đường dẫn đặt lại mật khẩu.
 
@@ -397,6 +417,13 @@ only reads …").
 - **Chỉ câu nói được nghe của chủ đèn** mới chạm đến một dịch vụ, dù đọc hay
   ghi ("Ai dùng được chúng", ở trên); mọi trường hợp khác là `OWNER_ONLY`
   hoặc `NOT_HEARD`, và mọi lần ghi đang chờ bị quên.
+- **Chỉ ghi trên tuyến thứ hai.** Tuyến Live không có dấu giọng, nên không
+  biết giọng ai nói "send": ở đó một `service_write`, có hay không có
+  `send_id`, được báo `NO_SEND_HERE`, "Not done: on this voice I don't send
+  or post to linked services. Say so in a few words; they can ask again on
+  the lamp's other voice.", và không gì được chuẩn bị hay gửi. Một tuyến là
+  tuyến thứ hai khi worker của nó đã đưa phép kiểm tra cùng giọng cho các
+  dịch vụ (`services::judging_voices`); tiến trình Live không bao giờ làm vậy.
 - **`said` thuộc về giọng nói.** Nó bị lấy ra khỏi mọi lệnh gọi mô hình thực
   hiện, và không được đưa vào tham số của hàm.
 - **Chuẩn bị:** một `service_write` không có `send_id` được chuyển tiếp, mọi
@@ -425,23 +452,37 @@ only reads …").
   I send it?", không sao), để người nhận, nơi đến và toàn bộ nội dung đã được
   nói. Phần đọc lại không được bị một câu nói hay một lệnh Stop cắt ngang
   (`Thread::heard_only` → `services::lamp_cut`), và câu của người đó không
-  được bắt đầu trước khi phần đọc lại có thể được nói trọn (250 ms mỗi từ,
-  nhanh hơn mọi giọng nói, tính từ từ đầu tiên của nó) hay trước khi bất kỳ
-  phần nào của nó được nói. Nếu không, mô hình được báo `NOT_READ_BACK`, "Not
+  được bắt đầu trước khi phần đọc lại có thể được nói trọn (400 ms mỗi từ,
+  nhịp của chính đèn, tính từ từ đầu tiên của nó) hay trước khi bất kỳ phần
+  nào của nó được nói, cũng không được đè lên giọng của đèn. Trên tuyến thứ
+  hai câu được tính giờ từ lúc nó bắt đầu (`Began` của `Heeding::hear`, trước
+  khi lời của nó đến → `services::voice_began`), khi có luật (`--attention`);
+  không có thì từ lúc những lời đầu của nó đến. Nếu không, mô hình được báo `NOT_READ_BACK`, "Not
   sent, and cancelled: the message was not read back in full before the
   "send". Say it was not sent, and that they can ask again." Một lần gửi bị
   từ chối làm quên id trong mọi trường hợp.
+- **Giọng nói "send" là giọng đã yêu cầu.** Dấu giọng của câu gửi và của câu
+  chuẩn bị được so (`same_voice::Voices::alike`); dưới `same_voice::SAME_FROM`
+  (0.70), hoặc một trong hai dấu giọng không biết, mô hình được báo
+  `OTHER_VOICE`, "Not sent, and cancelled: I send only when the voice saying
+  "send" is the one that asked for it. Say it was not sent." Dấu giọng chỉ
+  được làm từ một câu có từ 1.5 s lời nói trở lên bắt đầu khi đèn im lặng
+  (`same_voice::LEAST_SAMPLES`), nên một câu "send" trơn thường không có và
+  bị từ chối: "Yes, go ahead and send it" dễ qua hơn.
 - **Mọi lượt sau đó đều làm quên nó:** một câu thứ hai do bất kỳ ai bắt đầu,
   đèn nói trong một yêu cầu khác thứ hai, hoặc một lệnh gọi dịch vụ không có
   `send_id` trong một yêu cầu khác sẽ bỏ lần ghi đang chờ.
-- **Sau một lần gửi** mô hình được báo một câu cố định: "Say only: Sent." khi
-  dịch vụ trả lời `sent: true`, nếu không thì "Say only: It was not sent."
+- **Sau một lần gửi** mô hình được báo một câu cố định: "Say only that it was
+  sent, in the conversation's language." khi dịch vụ trả lời `sent: true`,
+  nếu không thì "Say only that it was not sent, in the conversation's
+  language." (nói bằng ngôn ngữ của cuộc trò chuyện).
 - **Một câu gửi thuần** (`says_send`): các từ viết thường, mọi thứ trừ chữ
   cái, chữ số và `'` thành dấu cách, các từ đệm `yes`, `yeah`, `yep`, `ok`,
   `okay`, `sure`, `please`, `now`, `lamp`, `lampy`, `vâng`, `dạ`, `ừ`, `có`
   được bỏ ở cả hai đầu, và phần còn lại đúng là một trong `send`, `send it`,
   `send that`, `send the message`, `send the email`, `go ahead and send it`,
-  `gửi`, `gửi đi`, `gửi nó đi`: câu nào cũng có "send" hoặc "gửi". Vì vậy
+  `gửi`, `gửi đi`, `gửi nó đi`, `gởi`, `gởi đi`, `gui`, `gui di`: câu nào cũng
+  có "send", "gửi", "gởi" hoặc "gui". Vì vậy
   "Yes, send it." và "Vâng, gửi đi" thì gửi; "do it", "don't send it", "send
   it to Bo instead", "đừng gửi" và "no" thì không.
 
@@ -459,9 +500,11 @@ only reads …").
   (`thread::Thread::private_for`, `PRIVATE_SAID`), dù đèn nói trước hay sau
   câu trả lời, và bị loại khỏi bản tóm tắt đang chạy
   (`LAMP_CONVERSATION_SUMMARY`), nên không gì của một thư, một sự kiện hay
-  một trang đến được file luồng hội thoại, một lượt sau, journal của bộ nhớ
+  một trang đến được file luồng hội thoại, một phiên sau, journal của bộ nhớ
   hay một ghi chú cuộc nói chuyện. Lời của chính người đó trong yêu cầu vẫn
-  được giữ như mọi khi.
+  được giữ như mọi khi. Trên tuyến Live lần đọc vẫn nằm trong ngữ cảnh riêng
+  của phiên Live đó, mà mô hình giữ đến hết phiên; chỉ luồng hội thoại và
+  những gì dựng từ nó là không có nó.
 
 Một lần ghi đang chờ được dùng chung cho cả hai tuyến giọng nói. Một lệnh gọi
 dịch vụ được giữ chờ quyết định của Policy như các lệnh của executive, với
@@ -556,6 +599,9 @@ chờ thì phát âm thanh đó, như một cuộc trò chuyện chậm.
 - **Giọng nói không tự nói phần đọc lại**: mô hình nói nó, và giọng nói kiểm
   tra rằng lời của đèn chứa nó trọn vẹn và không bị cắt hay bị nói đè trước
   khi cho một câu "send" đi qua.
+- **Không gửi trên tuyến Live**, và một câu "send" ngắn không có dấu giọng
+  bị từ chối trên tuyến thứ hai: một ngưỡng dấu giọng thấp hơn cho câu gửi,
+  hay một dấu hiệu khác về ai đã nói, chưa được thiết kế.
 - **Tuyến Live không có âm thanh chờ** cho một lệnh gọi dịch vụ chậm; chỉ
   tuyến thứ hai phát âm thanh đó.
 - **Ahrefs chưa có đăng nhập** trong ứng dụng, nên chưa thể liên kết, dù đèn
@@ -588,11 +634,18 @@ nói ra, `starting` ngay và kết quả sau đó không có token của nó, g�
 và xoá yêu cầu đúng op của chúng, một code không biết bị từ chối ngay, đăng
 xuất xoá một lần mỗi đợt, việc đăng xuất được theo dõi chỉ với `LAMP_SERVICES`
 (`main.rs`), `can`. `-p lamp-services` cũng có: một mã trong một mục Slack,
-GitHub, Notion hay lịch bị bỏ ra, và từng dạng tiếng Việt, chữ số bị chia,
-đăng nhập và mật khẩu mới được phát hiện. `-p lamp-voice` (`services`,
+GitHub, Notion hay lịch bị bỏ ra, một mã chia qua hai khối Notion, tin nhắn
+Slack hay mảnh MCP bị bỏ ra cùng cả hai, nhãn của Gmail và của dịch vụ khác,
+và từng dạng tiếng Việt (cả dấu tổ hợp), chữ số bị chia (dấu cách, gạch
+ngang, dấu chấm, gạch ngang có dấu cách), mã chữ và số, enter/confirm, đăng
+nhập, đường dẫn đăng nhập, xa chữ "code" và mật khẩu mới được phát hiện. `-p lamp-voice` (`services`,
 `tools`, `thread`, `made_skill`): công tắc cho ra cờ và thư mục, ba hàm được
 khai báo và định tuyến chỉ khi có công tắc và thư mục, luật đứng đầu, một câu
-gửi thuần và không gì khác ("do it" thì không bao giờ), một lần gửi bị từ
+gửi thuần và không gì khác ("do it" thì không bao giờ; "gởi", "gui di" thì
+có), một lần gửi ở giọng khác hay có dấu giọng không biết bị từ chối, tuyến
+Live không bao giờ chuẩn bị hay gửi, một lần đọc đầy đủ chỉ khi một mình và ở
+giọng của cuộc trò chuyện, một câu bắt đầu đè lên phần đọc lại đánh dấu nó bị
+cắt, một lần gửi bị từ
 chối và quên trừ khi mọi luật đều đúng, một lần gửi sau phần đọc lại không
 được nói trọn hay bị nói đè thì bị từ chối, mọi câu hay lượt sau đó làm quên
 lần ghi, chỉ câu nói được nghe của chủ đèn chạm đến một dịch vụ (khách, cả

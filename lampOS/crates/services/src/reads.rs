@@ -550,29 +550,57 @@ fn texts_of(value: &Value, out: &mut String) {
     }
 }
 
-/// `item`, or [`mail::SECURITY_LEFT_OUT`] in its place when any text in it
-/// is a security one ([`mail::is_security_mail`]): a one-time code, a
-/// sign-in link or a password reset in a chat message, a page, a file's
-/// name or an event is never quoted, whatever the service.
-fn unless_security(item: Value) -> Value {
-    let mut said = String::new();
-    texts_of(&item, &mut said);
-    if mail::is_security_mail("", "", &said) {
-        json!(mail::SECURITY_LEFT_OUT)
-    } else {
-        item
+/// `items` with each security one ([`mail::is_security_mail`]) replaced by
+/// `left_out`: a one-time code, a sign-in link or a password reset in a
+/// mail, a chat message, a page, a file's name or an event is never quoted,
+/// whatever the service. Each item is also read joined with the next, and
+/// both are left out when the two together are one, so a code split
+/// across two blocks, two messages or two pieces ("Your verification code
+/// is" and "482913") is never quoted either. It errs on hiding: an item
+/// beside a security one goes with it.
+fn without_security(items: Vec<Value>, left_out: &str) -> Vec<Value> {
+    let texts: Vec<String> = items
+        .iter()
+        .map(|item| {
+            let mut said = String::new();
+            texts_of(item, &mut said);
+            said
+        })
+        .collect();
+    let mut hidden: Vec<bool> = texts
+        .iter()
+        .map(|said| mail::is_security_mail("", "", said))
+        .collect();
+    for at in 1..texts.len() {
+        let joined = format!("{}\n{}", texts[at - 1], texts[at]);
+        if mail::is_security_mail("", "", &joined) {
+            hidden[at - 1] = true;
+            hidden[at] = true;
+        }
     }
+    items
+        .into_iter()
+        .zip(hidden)
+        .map(|(item, hidden)| if hidden { json!(left_out) } else { item })
+        .collect()
 }
 
 /// Items wrapped as quoted data from `name`, as many as fit in
 /// [`RESULT_MOST`] (each made smaller first if need be), and how many were
-/// left out. Every item is checked for security text first
-/// ([`unless_security`]), for every service.
+/// left out. Every item is checked for security text first, alone and with
+/// its neighbours ([`without_security`]), for every service: one left out
+/// is "a security mail, left out" in Gmail and "a security message, left
+/// out" in any other.
 pub fn quoted(name: &str, items: Vec<Value>) -> Value {
+    let left_out = if catalog::service("gmail").is_some_and(|gmail| gmail.name == name) {
+        mail::SECURITY_LEFT_OUT
+    } else {
+        mail::SECURITY_MESSAGE_LEFT_OUT
+    };
     let mut result = json!({"source": name, "about": about(name), "quoted": []});
     let total = items.len();
     let mut kept = 0;
-    for item in items.into_iter().map(unless_security) {
+    for item in without_security(items, left_out) {
         for most in [600, 200, 60] {
             let small = compact(&item, most, 0);
             result["quoted"]
@@ -793,14 +821,66 @@ mod tests {
             let quoted = quoted("Service", items(code, body));
             let text = quoted.to_string();
             assert!(!text.contains("482913"), "{code}: {text}");
-            assert!(text.contains(mail::SECURITY_LEFT_OUT), "{code}: {text}");
+            assert!(
+                text.contains(mail::SECURITY_MESSAGE_LEFT_OUT),
+                "{code}: {text}"
+            );
             assert_eq!(quoted["quoted"].as_array().unwrap().len(), 2, "{code}");
         }
         let calendar = quoted(
             "Google Calendar",
             vec![json!({"summary":"Dentist","description":"Mã xác minh: 482 913"})],
         );
-        assert_eq!(calendar["quoted"][0], mail::SECURITY_LEFT_OUT);
+        assert_eq!(calendar["quoted"][0], mail::SECURITY_MESSAGE_LEFT_OUT);
+    }
+
+    #[test]
+    fn a_code_split_across_two_items_is_left_out_with_both() {
+        // Notion blocks, then Slack messages, the code in the second.
+        let notion = items(
+            "notion",
+            r#"{"results":[{"id":"a","object":"block","paragraph":{"rich_text":[{"plain_text":"Your verification code is"}]}},{"id":"b","object":"block","paragraph":{"rich_text":[{"plain_text":"482913"}]}}]}"#,
+        );
+        let slack = items(
+            "slack",
+            r#"{"items":[{"text":"Here's the code you asked for","user":"U1"},{"text":"482 913","user":"U1"}]}"#,
+        );
+        for (name, items) in [("Notion", notion), ("Slack", slack)] {
+            let quoted = quoted(name, items);
+            let text = quoted.to_string();
+            assert!(
+                !text.contains("482913") && !text.contains("482 913"),
+                "{text}"
+            );
+            assert_eq!(
+                quoted["quoted"][0],
+                mail::SECURITY_MESSAGE_LEFT_OUT,
+                "{text}"
+            );
+            assert_eq!(
+                quoted["quoted"][1],
+                mail::SECURITY_MESSAGE_LEFT_OUT,
+                "{text}"
+            );
+        }
+        // Gmail's label stays the mail one; plain neighbours are kept.
+        let gmail = quoted(
+            "Gmail",
+            vec![
+                json!({"text":"Lunch at noon?"}),
+                json!({"text":"Code: 482913"}),
+            ],
+        );
+        assert_eq!(gmail["quoted"][1], mail::SECURITY_LEFT_OUT);
+        let plain = quoted(
+            "Slack",
+            vec![
+                json!({"text":"Lunch at noon?"}),
+                json!({"text":"See you there"}),
+            ],
+        );
+        assert_eq!(plain["quoted"][0]["text"], "Lunch at noon?");
+        assert_eq!(plain["quoted"][1]["text"], "See you there");
     }
 
     #[test]
