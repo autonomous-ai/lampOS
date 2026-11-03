@@ -1244,8 +1244,10 @@ builder. The 15 s ping is unchanged.
 ### Skills, counted
 
 The owner's ask on #4710 (3 Nov): how many skills are on, how often they
-run, and what became of the skills asked for by voice, since a skill made by
-voice never reaches the backend. An added field under `lamp-report/1`,
+run, and what became of the skills asked for by voice and from the app,
+since a made skill never reaches the backend. Both makers' asks are counted
+here, on the lamp, so the backend counts no app make itself and nothing is
+counted twice. An added field under `lamp-report/1`,
 `skills`, on a health report (Backend3, #4710: no new schema, the report
 within its 4 KiB). It has no switch of its own: it goes with the reports'
 three gates, and nothing is read without the person's yes.
@@ -1261,6 +1263,7 @@ words or files, nor a made skill's SHA-256.
   "day": {
     "date": "2026-11-03",
     "made_by_voice": {"kept": 2, "on": 1, "refused": 1, "left_off": 1},
+    "made_by_app": {"kept": 1, "refused": 1},
     "runs": {"core": 40, "store": 9, "made_voice": 3},
     "store": {"<sha256 of one>": 7, "<sha256 of another>": 2},
     "store_rest": 0
@@ -1273,7 +1276,7 @@ words or files, nor a made skill's SHA-256.
 | `on`, `kept_off` | skills on now, and kept on the lamp but not on (turned off, shipped off, an add-on with add-ons off, or one that does not load), by source | the skills folder with `lamp-skills`' own loader and its off file, as the skills page reads them; a made skill's maker from its own card |
 | `day.runs` | runs that UTC day, by source | `lamp-skills`' running totals, `runs.json` in its `--state-dir` (`skills.md`, "Runs, counted"), made skills' by the maker on each card |
 | `day.store`, `day.store_rest` | the Store's runs that day by package SHA-256 (`installed_from`), the 50 most run, the rest summed | the same file |
-| `day.made_by_voice` | asks to make a skill by voice that day: `kept` (a made skill kept), `on` (put on by a spoken yes), `refused` (made nothing), `left_off` (asked about and not put on) | the voice's running totals (`counts.json` beside the made skills), asked on its app-make socket with `{"counts": {}}`, within 1 s |
+| `day.made_by_voice`, `day.made_by_app` | asks to make a skill that day, by voice and from the owner's app: `kept` (a made skill kept), `on` (put on by a spoken yes), `refused` (made nothing), `left_off` (asked about and not put on) | the voice's running totals per maker (`counts.json` beside the made skills), asked on its app-make socket with `{"counts": {}}`, within 1 s; a voice from before it counted the app's says only `made_by_voice` |
 
 - **Sources** are map keys: `core`, `store` (the Skills Store), `made_voice`
   and `made_app` (made on this lamp, asked for by voice or in the owner's

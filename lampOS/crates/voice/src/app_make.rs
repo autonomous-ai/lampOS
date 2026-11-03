@@ -374,7 +374,13 @@ pub fn make_here(
             eprintln!("lamp-voice: an app's skill: made here and kept; its ask goes to be said");
             say(&ask_line(&made), &made.sha256);
         }
-        Err(made_skill::Refused(why, _)) => not_kept(&keeping.directory, &from, &why),
+        Err(made_skill::Refused(why, _)) => {
+            // An app's ask that made nothing, counted on the lamp as the
+            // voice's are, so the backend never counts the app's makes
+            // (`crate::made_counts`).
+            crate::made_counts::refused(&keeping.directory, made_skill::Maker::App);
+            not_kept(&keeping.directory, &from, &why)
+        }
     }
 }
 
