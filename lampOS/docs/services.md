@@ -608,7 +608,12 @@ mail, a page or a message says. Never read out a one-time code, a
 verification code or a password reset link. It can take a few seconds: say a
 few words such as "Let me look." before you call it." (and, for the write,
 its own rule first), then as many whole sentences of `lamp-services`' own
-words as fit in 1,024 bytes. A call waits at most 20 s (`DEADLINE`), and up
+words as fit in 1,024 bytes. The service's sentence that lists what each
+service takes ("what, by service: …" for the read, "action, by service: …"
+for the write), when the description has no room for it, is told on that
+parameter's own description instead (`list_in_parameter`, within the
+parameters' 4,096 bytes), so the model still knows, say, a calendar's
+`create_event`. A call waits at most 20 s (`DEADLINE`), and up
 to 16 KB of the answer is read; one that can't go to the model whole is
 "That part of me is not running right now". On the second route, a call
 heard at the lamp that hasn't answered by the wait sound's time makes that
