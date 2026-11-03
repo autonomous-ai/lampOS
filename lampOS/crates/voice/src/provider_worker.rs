@@ -354,6 +354,11 @@ pub struct Files {
     /// second route makes them only with services, and no conversation rule
     /// reads them; the Live route, which has no services' judge, none.
     pub same_voice_for_services: bool,
+    /// With [`Self::same_voice`], the voice only confirms, at this bar
+    /// (`--same-voice-confirms`, `LAMP_SAME_VOICE_CONFIRMS`): nothing ends,
+    /// holds or splits a conversation by voice. Live has no confirm, so its
+    /// check is off.
+    pub same_voice_confirms: Option<f32>,
     /// Whether each request is judged said to the lamp from close to it,
     /// published, and let out in a busy room (`--addressed`,
     /// `crate::addressed`).
@@ -485,6 +490,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (spoken_to_by_day, flags) = crate::attention::take_by_day(flags);
     let (same_voice, flags) = crate::same_voice::take(flags)?;
     let (same_voice_for_services, flags) = crate::same_voice::take_for_services(flags);
+    let (same_voice_confirms, flags) = crate::same_voice::take_confirms(flags)?;
     let (addressed, flags) = crate::addressed::take(flags);
     let (name_signal, flags) = crate::attention::take_name(flags);
     let (name_note, name_note_busy_face, flags) = crate::called::take(flags);
@@ -546,6 +552,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         spoken_to_by_day,
         same_voice,
         same_voice_for_services,
+        same_voice_confirms,
         addressed,
         name_signal,
         name_note,
@@ -1823,6 +1830,15 @@ pub async fn run_with_continuation(
             (_, Some(_)) if files.same_voice_for_services => {
                 eprintln!(
                     "lamp-voice provider: the same voice is for the linked services only (LAMP_SAME_VOICE_FOR=services), on the second route: not judged here"
+                );
+                None
+            }
+            // One way only: the confirm is the second route's, so Live,
+            // which has none, judges nothing by voice (the memory owner's
+            // decision of 4 Nov).
+            (true, Some(_)) if files.same_voice_confirms.is_some() => {
+                eprintln!(
+                    "lamp-voice provider: the voice only confirms on the second route (LAMP_SAME_VOICE_CONFIRMS): not judged here"
                 );
                 None
             }

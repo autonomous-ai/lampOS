@@ -3619,7 +3619,11 @@ pub fn serve(
         let printing = checking_the_voice_for(
             &heeding,
             files.same_voice.clone().filter(|_| route.only_voice),
-            files.spoken_to || quiet_same_one || not_own || crate::follows_face::on(),
+            files.spoken_to
+                || quiet_same_one
+                || not_own
+                || crate::follows_face::on()
+                || files.same_voice_confirms.is_some(),
             (files.same_voice_for_services, services_on),
             |model| {
                 crate::same_voice::Prints::beside_voice(model)
@@ -3642,6 +3646,12 @@ pub fn serve(
         // Only prints for every rule are the voice heard; the services'
         // alone are heard by none of them.
         let hears = printing == Printing::ForEverything;
+        // One way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
+        // decision of 4 Nov): no rule judges by voice, and the known
+        // person's own voice only confirms their line.
+        if let Some(bar) = files.same_voice_confirms.filter(|_| hears) {
+            engine = confirming_by_voice(engine, &heeding, bar);
+        }
         // The name heard only in the room's sound opens nothing alone
         // (`LAMP_NAME_SECOND_SIGN=on`, the first builder at 21:03 on
         // #1722).
@@ -6201,6 +6211,35 @@ enum Printing {
     ForEverything,
     /// For the linked services' judging only (`LAMP_SAME_VOICE_FOR=services`).
     ForServices,
+}
+
+/// `LAMP_SAME_VOICE_CONFIRMS` on `engine` and `heeding`, the check's
+/// printer already started: `heeding`'s voices judge nothing
+/// (`same_voice::Voices::confirming_only`), and the engine reads each
+/// line's print from them to confirm the known person's own line at `bar`
+/// (`Engine::confirming_by_voice`).
+fn confirming_by_voice(engine: Engine, heeding: &Arc<Mutex<Heeding>>, bar: f32) -> Engine {
+    if let Ok(mut heeding) = heeding.lock() {
+        heeding.voices = heeding
+            .voices
+            .take()
+            .map(|voices| voices.confirming_only(true));
+    }
+    eprintln!(
+        "lamp-voice second: the voice only confirms: a known person's line no face was seen speaking, their face the one face in view, is theirs at cosine {bar:.2} or over against their own voice; nothing ends, holds or splits a conversation by voice (LAMP_SAME_VOICE_CONFIRMS)"
+    );
+    let heeding = heeding.clone();
+    engine.confirming_by_voice(crate::second_provider::VoiceConfirms {
+        owner: Arc::new(crate::same_voice::OwnerVoice::new(bar)),
+        print_of: Arc::new(move |request| {
+            heeding
+                .lock()
+                .ok()?
+                .voices
+                .as_mut()?
+                .print_to_confirm(request)
+        }),
+    })
 }
 
 /// The rule's two switches on `engine` and `heeding`, each on its own.
@@ -20997,6 +21036,41 @@ mod tests {
         let place = files.tools.tasks.expect("the tasks part");
         assert!(!place.who && !place.lead_in && !place.asked);
         assert!(!place.accounts && !place.machine_names);
+    }
+
+    /// The three same-voice flags together, in the order the coordinator
+    /// writes them (`same_voice::arguments_for`: the model's path, then
+    /// `--same-voice-for-services`, then `--same-voice-confirms BAR`), all
+    /// reach the second worker, and so does the flag after them (the
+    /// reader's P3 on #5154), so a later rebase cannot drop one.
+    #[test]
+    fn the_second_worker_takes_the_three_same_voice_flags_together() {
+        let dir = Path::new("/run/lamp-voice");
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&[
+                crate::same_voice::FLAG,
+                "/m.onnx",
+                crate::same_voice::FOR_SERVICES_FLAG,
+                crate::same_voice::CONFIRMS_FLAG,
+                "0.45",
+                crate::addressed::FLAG,
+            ]),
+        )
+        .unwrap();
+        assert_eq!(files.same_voice.as_deref(), Some(Path::new("/m.onnx")));
+        assert!(files.same_voice_for_services);
+        assert_eq!(files.same_voice_confirms, Some(0.45));
+        assert!(files.addressed, "the flag after them is still read");
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&[crate::same_voice::FLAG, "/m.onnx", crate::addressed::FLAG]),
+        )
+        .unwrap();
+        assert_eq!(files.same_voice.as_deref(), Some(Path::new("/m.onnx")));
+        assert!(!files.same_voice_for_services);
+        assert_eq!(files.same_voice_confirms, None);
+        assert!(files.addressed);
     }
 
     /// Tests' map on #1712 (20:11), (2): `LAMP_MEMORY_DAYS` on the second
