@@ -3735,6 +3735,7 @@ impl ToolDesk {
                 && matches!(
                     crate::tools::route(&self.settings, &call.name),
                     Route::Executive(_)
+                        | Route::Services(_)
                         | Route::UseSkill(_)
                         | Route::Schedule(_)
                         | Route::Memory(..)
@@ -3911,6 +3912,7 @@ impl ToolDesk {
                 );
             }
             route @ (Route::Executive(_)
+            | Route::Services(_)
             | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(..)
@@ -3925,6 +3927,7 @@ impl ToolDesk {
                 self.run(provider, lineage, call, route, called_us, memory, false);
             }
             Route::Executive(_)
+            | Route::Services(_)
             | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(..)
@@ -10902,7 +10905,6 @@ pub(crate) mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: noted,
-                make_skill: false,
                 named_only: false,
                 correct: false,
                 questions: false,
@@ -11051,7 +11053,6 @@ pub(crate) mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: true,
-                make_skill: false,
                 named_only: false,
                 correct: false,
                 questions: false,

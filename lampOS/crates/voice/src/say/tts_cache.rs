@@ -246,7 +246,7 @@ impl TtsCache {
     /// lines this cache warms, and every other file may go. A switch of
     /// voice or language writes the new lines after the old ones, so oldest
     /// first drops the other voices' and languages' lines before a line
-    /// asked since. The owner's lines are at most 20, so room is always
+    /// asked since. The owner's lines are at most 21, so room is always
     /// found.
     fn make_room(&self) -> std::io::Result<()> {
         let owners: std::collections::HashSet<_> = self
@@ -492,8 +492,8 @@ mod tests {
             let (cache, calls) = counted(&dir, "Rachel");
             let cache = cache.speaking(Some(language));
             let lines = cache.warm_lines();
-            assert_eq!(lines.len(), 19 + WARM.len(), "{language:?}");
-            assert_eq!(&lines[19..], WARM);
+            assert_eq!(lines.len(), 21 + WARM.len(), "{language:?}");
+            assert_eq!(&lines[21..], WARM);
             let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
             assert_eq!(lines[1], words);
             assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));

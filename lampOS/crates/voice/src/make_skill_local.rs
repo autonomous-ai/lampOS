@@ -1,9 +1,10 @@
-//! A skill made by the lamp's own model, with no computer (Fourteen's
-//! proposal on #4710, 2 Nov): off unless `LAMP_MAKE_SKILL_LOCAL=on`. The
-//! model calls [`made_skill::MAKE`] with the person's request, and the
-//! same [`made_skill::brief`] a computer's agent is handed goes instead to
-//! the lamp's own chat (the second route's, `llm_*`), streamed, once more
-//! after a 404, a 5xx, a timeout or a broken connection ([`again`]).
+//! A skill made by voice, by the lamp's own model, with no computer
+//! (Fourteen's proposal on #4710, 2 Nov; the only maker since the first
+//! builder's 3 Nov ruling on the Queue): with `LAMP_MAKE_SKILL=on`
+//! ([`made_skill::ENVIRONMENT`]). The model calls [`made_skill::MAKE`] with
+//! the person's request, and its [`made_skill::brief`] goes to the lamp's
+//! own chat (the second route's, `llm_*`), streamed, once more after a 404,
+//! a 5xx, a timeout or a broken connection ([`again`]).
 //!
 //! Every gate of a made skill stays: the answer is taken, held to what a
 //! made skill may use, checked and packed by `lamp-skills pack` and kept
@@ -16,16 +17,14 @@
 //! by its SHA-256 alone. An answer that doesn't pass is said as not made,
 //! and nothing is kept. The model only writes: it puts nothing on.
 //!
-//! With the switch on, [`made_skill::MAKE`] and [`made_skill::PUT_ON`] are
-//! the voice's own, whether or not a tasks part is there, and a computer's
-//! agent is never handed a skill to make.
+//! [`made_skill::MAKE`] and [`made_skill::PUT_ON`] are the voice's own,
+//! whether or not a tasks part is there: a computer's agent is never
+//! handed a skill to make.
 use crate::made_skill::{self, Keeping, Made, Refused};
 use crate::second_provider::net::{self, Chat, ChatEvent, Message};
 use serde_json::{Value, json};
 use std::{sync::Arc, time::Duration};
 
-/// Where the voice reads the switch. `on` only.
-pub const ENVIRONMENT: &str = "LAMP_MAKE_SKILL_LOCAL";
 /// The longest one answer is waited for, from the request to its end.
 pub const WRITE_WITHIN: Duration = Duration::from_secs(30);
 /// The most of an answer read: two files of at most 8 KiB, and the fences.
@@ -33,9 +32,8 @@ const MOST_ANSWER_BYTES: usize = 20 * 1024;
 /// What a made skill's answer is kept from: this, and when it was made.
 pub const FROM: &str = "local:";
 /// A made skill that `lamp-skills pack` and [`made_skill::capped`] take,
-/// shown to the model whole: the brief alone was written for a computer's
-/// agent with the repository at hand, and the lamp's own model, without it,
-/// wrote fields the check refused (lamp-9adf, 2 Nov 16:10 and 16:12: a
+/// shown to the model whole: the brief alone names the fields, and the
+/// lamp's own model, without a whole skill, wrote fields the check refused (lamp-9adf, 2 Nov 16:10 and 16:12: a
 /// trigger field and a light step it doesn't know).
 const EXAMPLE: &str = "```skill.toml
 kind = \"installable\"
@@ -89,11 +87,6 @@ fn system() -> String {
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words."
     )
-}
-
-/// Whether the switch is on in this process's environment.
-pub fn from_environment() -> bool {
-    std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// The function the model is given with the switch: the lamp makes it
@@ -220,7 +213,7 @@ pub fn own_chat() -> Result<Chat, String> {
     Chat::new(&config, Arc::new(Vec::new)).map_err(|error| error.to_string())
 }
 
-/// `make_skill` with the switch: the skill for `request` written by the
+/// `make_skill`: the skill for `request` written by the
 /// model `chat` gives, kept in `keeping` as made at `now_unix_ms`, and
 /// asked about then. Blocking: the model is asked on a thread of its own,
 /// with a runtime of its own. What the model is told.
@@ -270,8 +263,8 @@ pub fn make_kept(
         }
     };
     let mut made = kept(ask(Arc::clone(&chat), brief));
-    // Refused by the lamp's check: its lines go back to the model once, as
-    // a computer's agent's repair does (`made_skill::repair_brief`).
+    // Refused by the lamp's check: its lines go back to the model once
+    // (`made_skill::repair_brief`).
     if let Err(Refused(_, Some(lines))) = &made
         && let Ok(repair) = made_skill::repair_brief(request, lines)
     {
@@ -467,8 +460,8 @@ pub fn untold_note(directory: &std::path::Path, now_unix_ms: u64) -> Option<Stri
     }
 }
 
-/// A call of [`made_skill::MAKE`] or [`made_skill::PUT_ON`] with the
-/// switch, in the product's places: `request`'s words heard (`heard`) for a
+/// A call of [`made_skill::MAKE`] or [`made_skill::PUT_ON`], in the
+/// product's places: `request`'s words heard (`heard`) for a
 /// yes, which must be said out loud.
 pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value {
     let now_unix_ms = std::time::SystemTime::now()
@@ -479,9 +472,8 @@ pub fn answer(call: &lamp_gemini::ToolCall, request: u64, heard: bool) -> Value 
     };
     if call.name == made_skill::PUT_ON {
         // The just-made skill is asked only if the lamp's own last answer
-        // said the ask (`made_skill::asked_in_answer`, as `agent_tasks`
-        // does since #4880): a yes after a cut-in or another question puts
-        // nothing on.
+        // said the ask (#4880's rule, `made_skill::asked_in_answer`): a yes
+        // after a cut-in or another question puts nothing on.
         let answered = crate::thread::THREAD
             .lock()
             .ok()
@@ -632,6 +624,24 @@ light = { dim = 1 }
         (format!("http://{address}/v1/"), served)
     }
 
+    /// A manage helper at `socket` that puts on whatever made skill it is
+    /// asked for, once: the line it was asked.
+    pub(crate) fn manage_helper(socket: &Path) -> std::thread::JoinHandle<Value> {
+        use std::io::BufRead;
+        let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(&stream, r#"{{"done": "installed"}}"#).unwrap();
+            let asked: Value = serde_json::from_str(&line).unwrap();
+            assert!(asked["install_made"].is_string(), "{asked}");
+            asked
+        })
+    }
+
     pub(crate) fn chat_at(
         url: String,
     ) -> impl Fn() -> Result<Chat, String> + Send + Sync + 'static {
@@ -777,6 +787,49 @@ light = { dim = 1 }
         }
     }
 
+    /// A lamp with no tasks part at all makes a skill by voice and puts it
+    /// on: `make_skill` is the voice's own, the lamp's model writes it, the
+    /// lamp's answer says the ask, and the plain spoken yes after it puts
+    /// that skill on, by its SHA-256, through the manage helper.
+    #[test]
+    fn with_no_tasks_part_a_skill_is_made_and_put_on_by_voice() {
+        use crate::tools::{Route, Settings, route};
+        let settings = Settings {
+            make_skill: true,
+            ..Settings::default()
+        };
+        assert!(settings.tasks.is_none());
+        assert_eq!(route(&settings, made_skill::MAKE), Route::MakeLocal);
+        assert_eq!(route(&settings, made_skill::PUT_ON), Route::MakeLocal);
+        let (root, keeping) = keeping("no-tasks");
+        let (url, served) = service(vec![(200, good())]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        let said = format!("It dims the light at ten. {}", made_skill::ASK_TO_PUT_ON);
+        // Kept at the real time: the yes comes just after.
+        let yes_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        assert!(
+            asked_at_yes(
+                &keeping.directory,
+                Some((said, Duration::from_secs(2))),
+                yes_at
+            )
+            .unwrap()
+        );
+        let sha256 = made_skill::waiting(&keeping.directory, yes_at).unwrap().1;
+        let socket = root.join("manage.sock");
+        let asked = manage_helper(&socket);
+        let put = made_skill::put_on(&keeping.directory, &socket, Some("Yes."), yes_at);
+        assert_eq!(put["put_on"], "evening-dim", "{put}");
+        assert_eq!(asked.join().unwrap(), json!({"install_made": sha256}));
+        assert_eq!(made_skill::waiting(&keeping.directory, yes_at), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// An answer without the two files is said as not made; nothing is
     /// kept and nothing waits for a yes.
     #[test]
@@ -822,6 +875,28 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let (url, served) = service(vec![(200, bad.clone()), (200, bad)]);
         let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
         assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 3 Nov: a skill.toml that isn't TOML (a bare word as a
+    /// value) goes back to the model once with the parser's words, as a
+    /// check's refusal does, never refused outright.
+    #[test]
+    fn a_skill_toml_that_isnt_toml_goes_back_to_the_model_once() {
+        let (root, keeping) = keeping("unreadable");
+        let bad = good().replace("version = \"1.0.0\"", "version = 1.0.0 beta");
+        assert!(bad != good());
+        let (url, served) = service(vec![(200, bad.clone()), (200, good())]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 2);
+        let (url, served) = service(vec![(200, bad.clone()), (200, bad)]);
+        let told = make(REQUEST, &keeping, chat_at(url), NOW + 1);
+        assert!(
+            told["error"].as_str().unwrap().contains("can't be read"),
+            "{told}"
+        );
         assert_eq!(served.join().unwrap(), 2);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -1007,41 +1082,59 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// Off, `make_skill` and `put_on_made_skill` are routed and declared as
-    /// before: the tasks part's, or nobody's. On, they are the voice's own,
-    /// with or without the tasks part, each declared once.
+    /// Off (`LAMP_MAKE_SKILL` unset), `make_skill` and `put_on_made_skill`
+    /// are nobody's and never declared, with the tasks part or without. On,
+    /// they are the voice's own, each declared once, with no tasks part at
+    /// all as with one: a computer's agent never makes a skill.
     #[test]
     fn the_switch_alone_makes_the_two_functions_the_voices() {
         use crate::tools::{Route, Settings, declared, route};
-        let off = Settings::default();
-        for name in [made_skill::MAKE, made_skill::PUT_ON] {
-            assert_eq!(route(&off, name), Route::Nobody);
-        }
-        assert!(
-            declared(&off)
-                .iter()
-                .all(|tool| tool.name != made_skill::MAKE)
-        );
-        let on = Settings {
-            make_skill_local: true,
-            ..Settings::default()
+        let tasks = crate::agent_tasks::Place {
+            directory: "/run/t".into(),
+            target: crate::agent_tasks::DEFAULT_TARGET.into(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: false,
+            named_only: false,
+            correct: false,
+            sign_in: false,
+            questions: false,
         };
-        for name in [made_skill::MAKE, made_skill::PUT_ON] {
-            assert_eq!(route(&on, name), Route::MakeLocal);
-            assert_eq!(
-                declared(&on)
-                    .iter()
-                    .filter(|tool| tool.name == name)
-                    .count(),
-                1,
-                "{name}"
-            );
+        for tasks in [None, Some(tasks)] {
+            let off = Settings {
+                tasks: tasks.clone(),
+                ..Settings::default()
+            };
+            for name in [made_skill::MAKE, made_skill::PUT_ON] {
+                assert_eq!(route(&off, name), Route::Nobody, "{name}");
+                assert!(declared(&off).iter().all(|tool| tool.name != name));
+            }
+            let on = Settings {
+                make_skill: true,
+                tasks,
+                ..Settings::default()
+            };
+            for name in [made_skill::MAKE, made_skill::PUT_ON] {
+                assert_eq!(route(&on, name), Route::MakeLocal);
+                assert_eq!(
+                    declared(&on)
+                        .iter()
+                        .filter(|tool| tool.name == name)
+                        .count(),
+                    1,
+                    "{name}"
+                );
+            }
+            let make = declared(&on)
+                .into_iter()
+                .find(|tool| tool.name == made_skill::MAKE)
+                .unwrap();
+            assert!(make.description.contains("you'll make it now"));
+            assert!(!make.description.contains("confirm_agent_task"));
         }
-        let make = declared(&on)
-            .into_iter()
-            .find(|tool| tool.name == made_skill::MAKE)
-            .unwrap();
-        assert!(make.description.contains("you'll make it now"));
-        assert!(!make.description.contains("confirm_agent_task"));
     }
 }

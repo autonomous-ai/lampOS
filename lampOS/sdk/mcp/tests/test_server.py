@@ -5,6 +5,7 @@ refusals. No lamp needed, and nothing here stands in for a lamp check."""
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import json
 from contextlib import asynccontextmanager
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from lampos import Keyring, Lamp, schema
-from lampos.testing import FakeLamp
+from lampos.testing import FAKE_JPEG, FakeLamp
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import AnyUrl
 
@@ -23,8 +24,9 @@ ALL = {
     "lamp_light", "lamp_say", "lamp_sound", "lamp_events", "lamp_stop",
 }
 # The schema's ops a tool doesn't send itself: pairing and hello are the
-# SDK's, before any tool; leases go with each body tool.
-NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release"}
+# SDK's, before any tool; leases go with each body tool; the camera's stream
+# is for a program, not a tool (`lamp_camera_snapshot` gives one picture).
+NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream"}
 # Offered only with both body and look.
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
 
@@ -521,6 +523,29 @@ def test_wait_for_gives_the_first_event_then_unsubscribes(tmp_path):
     run(go())
 
 
+def test_air_and_device_are_offered_only_with_their_grants(tmp_path):
+    from lampos.testing import AIR, DEVICE
+
+    async def go():
+        async with connected(tmp_path, grants=("light",)) as (_, _, session):
+            tool = next(t for t in (await session.list_tools()).tools if t.name == "lamp_state")
+            assert "air" not in tool.description and "computer" not in tool.description
+            assert (await session.call_tool("lamp_state", {"which": ["air"]})).isError
+            assert (await session.call_tool("lamp_wait_for", {"events": ["air.changed"], "timeout_s": 0.2})).isError
+        async with connected(tmp_path / "air", grants=("air", "device")) as (fake, _, session):
+            tool = next(t for t in (await session.list_tools()).tools if t.name == "lamp_state")
+            assert "the air at its sensor" in tool.description and "its own computer" in tool.description
+            state = await session.call_tool("lamp_state", {"which": ["air", "device"]})
+            assert json.loads(text(state)) == {"air": AIR, "device": DEVICE}
+            call = asyncio.create_task(session.call_tool("lamp_wait_for", {"events": ["air.changed"], "timeout_s": 5}))
+            await until(lambda: fake.asked("subscribe"))
+            await fake.set_air(pm2_5=41.0, co2_ppm=1350, feel="stuffy")
+            event = json.loads(text(await call))
+            assert (event["ev"], event["co2_ppm"], event["feel"]) == ("air.changed", 1350, "stuffy")
+
+    run(go())
+
+
 def test_stop_lets_go_of_a_lease_left_to_lapse(tmp_path):
     async def go():
         # No `done` comes, so the look's lease is left held.
@@ -917,5 +942,21 @@ def test_a_follow_refused_or_not_followed_lets_go_of_its_lease(tmp_path):
             assert not fake.leases and fake.asked("lease.release")
             # A refused follow leaves nothing running: the next one starts.
             assert text(await session.call_tool("lamp_follow_stop", {})) == "not following"
+
+    run(go())
+
+
+def test_the_camera_tool_is_offered_only_with_the_camera_grant_and_gives_a_picture(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("light", "camera")) as (_, _, session):
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert "lamp_camera_snapshot" in names
+            result = await session.call_tool("lamp_camera_snapshot", {})
+            assert not result.isError
+            image = result.content[0]
+            assert image.type == "image" and image.mimeType == "image/jpeg"
+            assert base64.b64decode(image.data) == FAKE_JPEG
+        async with connected(tmp_path / "plain") as (_, _, session):
+            assert "lamp_camera_snapshot" not in {tool.name for tool in (await session.list_tools()).tools}
 
     run(go())

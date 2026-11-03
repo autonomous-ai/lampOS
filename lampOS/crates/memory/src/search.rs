@@ -77,6 +77,151 @@ pub(crate) fn content_words(value: &str) -> Vec<String> {
     words
 }
 
+/// Phrases that mark a person's line as a correction of something said
+/// before ("Actually, my tea is now peppermint, no longer jasmine"), each a
+/// run of whole words, put in [`text`]'s form when compared. English and
+/// Vietnamese only. A bare "now" or "giờ" is none: "now I'm brewing jasmine
+/// tea for mom" corrects nothing, and "7 giờ" is "7 o'clock" (the
+/// Reviewer-lead's HOLD on #5049). "not … anymore" is [`NOT_ANYMORE`].
+const CORRECTION_CUES: &[&[&str]] = &[
+    &["actually"],
+    &["no", "longer"],
+    &["changed", "to"],
+    &["moved", "to"],
+    &["now", "it", "s"],
+    &["now", "it", "is"],
+    &["instead"],
+    &["thật", "ra"],
+    &["không", "còn"],
+    &["đổi", "sang"],
+    &["chuyển", "sang"],
+    &["bây", "giờ", "là"],
+    &["thay", "vì"],
+];
+
+/// "not … anymore" (also "n't", "any more"): a "not" or the "t" of "n't",
+/// then "anymore" later in the same line.
+fn not_anymore(words: &[&str]) -> bool {
+    words
+        .iter()
+        .position(|word| matches!(*word, "not" | "t"))
+        .is_some_and(|not| {
+            let rest = &words[not + 1..];
+            rest.contains(&"anymore") || rest.windows(2).any(|run| run == ["any", "more"])
+        })
+}
+
+/// Whether `value` carries one of [`CORRECTION_CUES`] as whole words, or
+/// "not … anymore".
+fn corrects(value: &str) -> bool {
+    static CUES: std::sync::OnceLock<Vec<Vec<String>>> = std::sync::OnceLock::new();
+    let cues = CUES.get_or_init(|| {
+        CORRECTION_CUES
+            .iter()
+            .map(|cue| cue.iter().map(|word| text(word)).collect())
+            .collect()
+    });
+    let normalized = text(value);
+    let words: Vec<&str> = normalized
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    not_anymore(&words)
+        || cues
+            .iter()
+            .any(|cue| words.windows(cue.len()).any(|run| run == cue.as_slice()))
+}
+
+/// [`content_words`] without the words a correction says it with (the
+/// cues', "now", "giờ", "anymore"), so two lines that both say "actually"
+/// or "now" share nothing by it.
+fn topic_words(value: &str) -> Vec<String> {
+    static SAYING: std::sync::OnceLock<std::collections::HashSet<String>> =
+        std::sync::OnceLock::new();
+    let saying = SAYING.get_or_init(|| {
+        CORRECTION_CUES
+            .iter()
+            .flat_map(|cue| cue.iter())
+            .chain(&["now", "giờ", "anymore"])
+            .map(|word| text(word))
+            .collect()
+    });
+    content_words(value)
+        .into_iter()
+        .filter(|word| !saying.contains(word))
+        .collect()
+}
+
+/// The voice's `LAMP_MEMORY_NEWER_FIRST` (`newer_first`): for each of
+/// `lines` (`(at_unix_ms, id, the person's own words)`, all one person's),
+/// the index of the newest later line that corrects it. A later line
+/// corrects an earlier one when it carries a [`CORRECTION_CUES`] phrase and
+/// is about the same fact: it shares at least two of the earlier line's
+/// [`topic_words`], and every one of them but at most one, the value that
+/// changed ("it is jasmine tea", then "Actually, my tea is now peppermint,
+/// no longer jasmine"). Two shared words alone are cheap, a Vietnamese
+/// syllable each: "Tôi uống trà nhài mỗi sáng" is not corrected by "thật
+/// ra 7 giờ tôi uống trà nhài với mẹ" (two left out). Later is a larger
+/// `at_unix_ms`, or the same and a larger id. Only the person's words
+/// count, never the lamp's, and never the room's lines, whose speakers
+/// differ ([`crate::days::Days`] asks for no room order). Adapted from
+/// memory-tiers' "newer owner evidence only" supersession (Tiers,
+/// `tiers/recall-adapter`, `memory-tiers.md`), rewritten as a read-time
+/// order: nothing is retired.
+pub(crate) fn corrected_by(lines: &[(u64, u64, &str)]) -> Vec<Option<usize>> {
+    let topics: Vec<Vec<String>> = lines
+        .iter()
+        .map(|(_, _, words)| topic_words(words))
+        .collect();
+    let cued: Vec<bool> = lines.iter().map(|(_, _, words)| corrects(words)).collect();
+    let same_fact = |older: usize, newer: usize| {
+        let shared = topics[older]
+            .iter()
+            .filter(|word| topics[newer].contains(word))
+            .count();
+        shared >= 2 && shared + 1 >= topics[older].len()
+    };
+    (0..lines.len())
+        .map(|older| {
+            (0..lines.len())
+                .filter(|&newer| {
+                    cued[newer]
+                        && (lines[newer].0, lines[newer].1) > (lines[older].0, lines[older].1)
+                        && same_fact(older, newer)
+                })
+                .max_by_key(|&newer| (lines[newer].0, lines[newer].1))
+        })
+        .collect()
+}
+
+/// The order `newer_first` gives lines ranked as `corrected_by` came:
+/// as ranked, but each line's correction (and its own, in turn) just
+/// before it when it was ranked below it. A correction is strictly later
+/// than what it corrects, so the walk ends.
+pub(crate) fn newer_first(corrected_by: &[Option<usize>]) -> Vec<usize> {
+    fn emit(
+        line: usize,
+        corrected_by: &[Option<usize>],
+        done: &mut [bool],
+        order: &mut Vec<usize>,
+    ) {
+        if done[line] {
+            return;
+        }
+        if let Some(newer) = corrected_by[line] {
+            emit(newer, corrected_by, done, order);
+        }
+        done[line] = true;
+        order.push(line);
+    }
+    let mut done = vec![false; corrected_by.len()];
+    let mut order = Vec::with_capacity(corrected_by.len());
+    for line in 0..corrected_by.len() {
+        emit(line, corrected_by, &mut done, &mut order);
+    }
+    order
+}
+
 /// Whether `value`, in [`text`]'s form, may have a character the search
 /// index keeps inside a word where [`content_words`] ends one: a combining
 /// mark that is no letter ("İ" lower-cased is "i" and a dot above, so the
@@ -215,5 +360,104 @@ impl SearchIndex {
         statement
             .query_map(params![query, limit], |row| row.get(0))?
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod newer_first_tests {
+    use super::{corrected_by, corrects, newer_first};
+
+    #[test]
+    fn cues_are_whole_words() {
+        assert!(corrects("Actually, my tea is now peppermint"));
+        assert!(corrects("I no longer drink jasmine"));
+        assert!(corrects("my tea changed to peppermint"));
+        assert!(corrects("the meeting moved to Monday"));
+        assert!(corrects("now it's peppermint"));
+        assert!(corrects("peppermint instead"));
+        assert!(corrects("I don't drink jasmine anymore"));
+        assert!(corrects("I do not drink jasmine any more"));
+        assert!(corrects("Thật ra tôi uống trà bạc hà"));
+        assert!(corrects("tôi không còn uống trà nhài"));
+        assert!(corrects("tôi đổi sang trà bạc hà"));
+        assert!(corrects("tôi chuyển sang trà bạc hà"));
+        assert!(corrects("trà của tôi bây giờ là bạc hà"));
+        assert!(corrects("trà bạc hà thay vì trà nhài"));
+        assert!(!corrects("I know my tea is jasmine"));
+        assert!(!corrects("a longer walk, then home"));
+        assert!(!corrects("an unchanged order"));
+        // A bare "now" or "giờ" is no cue (the HOLD on #5049).
+        assert!(!corrects("now I'm brewing jasmine tea for mom"));
+        assert!(!corrects("7 giờ tôi uống trà nhài với mẹ"));
+        assert!(!corrects("Giờ tôi uống trà bạc hà"));
+        assert!(!corrects("I changed my mind"));
+        assert!(!corrects("anymore, not now"));
+    }
+
+    /// The Reviewer-lead's two scenarios on #5049: neither earlier line is
+    /// marked, by the cue alone; nor with a real cue put in, by the fact.
+    #[test]
+    fn bare_now_or_gio_marks_nothing() {
+        for lines in [
+            [
+                (10, 1, "I drink jasmine tea"),
+                (20, 2, "now I'm brewing jasmine tea for mom"),
+            ],
+            [
+                (10, 1, "Tôi uống trà nhài mỗi sáng"),
+                (20, 2, "7 giờ tôi uống trà nhài với mẹ"),
+            ],
+            [
+                (10, 1, "Tôi uống trà nhài mỗi sáng"),
+                (20, 2, "thật ra 7 giờ tôi uống trà nhài với mẹ"),
+            ],
+        ] {
+            assert_eq!(corrected_by(&lines), [None, None], "{lines:?}");
+        }
+    }
+
+    #[test]
+    fn a_vietnamese_correction_is_one() {
+        let lines = [
+            (10, 1, "Tôi uống trà nhài"),
+            (20, 2, "Thật ra tôi uống trà bạc hà, không còn trà nhài"),
+        ];
+        assert_eq!(corrected_by(&lines), [Some(1), None]);
+    }
+
+    #[test]
+    fn a_correction_goes_before_what_it_corrects() {
+        let lines = [
+            (10, 1, "it is jasmine tea"),
+            (
+                20,
+                2,
+                "Actually, my tea is now peppermint, no longer jasmine",
+            ),
+            (15, 3, "the dentist is on Friday"),
+        ];
+        let corrected = corrected_by(&lines);
+        assert_eq!(corrected, [Some(1), None, None]);
+        assert_eq!(newer_first(&corrected), [1, 0, 2]);
+    }
+
+    #[test]
+    fn one_word_shared_or_an_older_cue_changes_nothing() {
+        // One topic word only ("tea"), and a cue on the older line.
+        let lines = [(10, 1, "Actually my jasmine tea"), (20, 2, "my tea now")];
+        assert_eq!(corrected_by(&lines), [None, None]);
+        assert_eq!(newer_first(&[None, None]), [0, 1]);
+    }
+
+    #[test]
+    fn a_chain_goes_newest_first() {
+        let lines = [
+            (10, 1, "my bike is a red bicycle"),
+            (20, 2, "actually my bike is now a blue bicycle"),
+            (30, 3, "actually my bike is now a green bicycle"),
+        ];
+        let corrected = corrected_by(&lines);
+        assert_eq!(corrected, [Some(2), Some(2), None]);
+        assert_eq!(newer_first(&corrected), [2, 0, 1]);
     }
 }

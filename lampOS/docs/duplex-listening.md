@@ -332,14 +332,30 @@ reads it together with the detector's score (`Hearing::heard`):
 | `Still` | Not speech-like, and the render has been silent for 300 ms |
 | `Clear` | Speech-like, and the render has been silent for 300 ms |
 | `Under` | Not speech-like while the lamp is sounding |
-| `Own` | Speech-like while the lamp is sounding, and the render accounts for it |
+| `Own` | Speech-like while the lamp is sounding, and the render accounts for it, or has just fallen 6 dB under its peak while the canceller takes 3 dB or more of the microphone (a word's tail) |
 | `Over` | Speech-like while the lamp is sounding, and the render does not account for it |
 | `Unknown` | Speech-like while the lamp is sounding, with no alignment to judge by |
 
 Speech-like is a detector score of 0.5 or more. The render accounts for a
 block when it explains more than 75 % of the microphone's energy before
 cancellation, or when more than 80 % of the cancelled signal has to be
-playback by energy accounting. Neither a score nor a level decides
+playback by energy accounting. A block whose render, at the matched
+alignment, has fallen 6 dB or more under its own peak over the last
+150 ms (`render_drop` 60 tenths, `TAIL_DROP_TENTHS`), and whose
+cancelled signal is 3 dB or more under the microphone's before
+cancellation over the same 120 ms (`residual_level` against
+`capture_level`, `TAIL_CANCELLED_TENTHS`), is taken as the tail of a word
+the lamp just stopped, still ringing in the room, and is `Own` however
+little the render explains of it: read as `Over`, that tail made late
+yields and then, plain once the lamp had yielded, committed them with
+nothing said (#5032). The fall alone is not a word's end: the 150 ms peak
+also falls 6 dB in the dips between the lamp's syllables, and a person
+over those dips was `Own` there, so a short "Stop." never yielded. The
+canceller removes what it can fit to the render, so a person well over
+the echo leaves the cancelled signal within 1 dB of the microphone (9 dB
+over it, 0.6 dB under) and stays `Over`; the lamp's own ringing is what
+the canceller takes, a median 52 dB of its voice on lamp-4ace and
+lamp-a0ae. Neither a score nor a level decides
 anything alone: a score of 0.99 with the render explaining the block is
 the lamp. The 300 ms is the longest the microphone took to fall back to
 its floor after a reply stopped, 270 ms over sixteen recorded stops, and
@@ -495,7 +511,9 @@ voice's speech-to-text, not just its yields. In a busy room the switch also coun
 the stillness rule only the plain blocks of the run that made the lamp
 yield (what still matters after a forced yield): after it the render at the
 alignment is silent, so the lamp's own tail, still arriving for up to about
-270 ms, is plain by construction, and on lamp-4ace that tail and 40 still
+270 ms, is plain by construction where the render under it has not fallen
+6 dB (from 6 dB, with the canceller taking 3 dB of the microphone, it is
+`Own`, #5032), and on lamp-4ace that tail and 40 still
 blocks ended an answer with nobody speaking. In a quiet room both rules
 commit exactly as with the switch off: talk in the clear (rule a) and
 stillness after ten plain blocks, the yield's run and after it (rule b), so
@@ -749,8 +767,10 @@ letter for each 3 dB (`c` and on is 6 dB or more down: the lamp has just
 stopped a word and the room still rings with it); and `alignment_age`, the
 blocks since that alignment last held, in tens (`4` is the 40-block bar
 past which a block is unknown). They are there to show whether the render
-was falling at each yield that nobody asked for, as a guard against a
-word's tail would assume; nothing decides on them yet. No audio and nothing audio can be rebuilt from.
+was falling at each yield that nobody asked for. `render_drop` from 6 dB
+on, with the canceller taking 3 dB of the microphone, makes a block the
+lamp's own (#5032, above); the other two decide
+nothing. No audio and nothing audio can be rebuilt from.
 It is there because a yield that comes late, or never, cannot be explained
 from the yield events alone. A finite directed session does not write it:
 it can record the audio itself.
@@ -1385,6 +1405,12 @@ functions:
 | `with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more` | With the switch: four tries that resume cost two more yields, then none |
 | `talk_well_under_the_asker_is_the_rooms_and_resumes_the_answer` (`turn_taking.rs`) | `LAMP_CUT_IN_NEAR_ASKER=on`: talk 8 dB under the asker resumes the answer, 2 dB under commits; no asker's level, or the switch off, commits |
 | `over_a_room_busy_before_the_reply_a_bed_of_talk_commits_nothing` | `LAMP_CUT_IN_OVER_BED=on`, the room busy: a bed of talk after a yield resumes at the deadline, no commit |
+| `the_lamps_own_tail_under_a_fallen_render_resumes_the_yield` | #5032: a late seven-block yield, then 12 blocks of tail under a render fallen 7 dB, then stillness: resume, not commit |
+| `a_person_over_a_held_render_is_still_over_it_and_commits` | #5032's guard: the same blocks over a render that holds (1 dB) are `Over` and plain, and stillness after them commits |
+| `a_person_over_the_lamps_dips_yields_within_the_onset` (`evidence.rs`) | #5037's P1: a 150 ms "Stop." 9 dB over the echo, across a dip between the lamp's syllables (3 or more blocks with `render_drop` 60 and up), the canceller taking 20 dB of the echo: every block `Over`, a yield at the seventh |
+| `a_person_half_a_second_after_the_render_stops_still_commits` | #5032's guard: after the tail, a person 500 ms after the render went quiet commits at the sixth block in the clear |
+| `lamp_06c1s_tails_under_a_fallen_render_commit_nothing` | Four of lamp-06c1's five zero-word commits, their ten plain blocks' `render_drop`: none commits |
+| `lamp_06c1s_tail_under_a_level_render_commits_nothing` (ignored) | The fifth, a render that never fell 3 dB: still commits; open until the echo's delay reaches `EchoEvidence` (#5032) |
 | `over_a_busy_room_the_lamps_own_tail_after_a_yield_commits_nothing` | With the switch, a busy room: plain blocks after a seven-block yield, then stillness, resume; off, they commit |
 | `with_the_over_bed_switch_a_quiet_room_commits_a_short_word_then_stillness` | With the switch, a quiet room: a seven-block yield, five plain blocks after it, then stillness commit by rule (b), as off |
 | `over_a_bed_of_talk_a_stop_word_still_ends_the_reply` | With the switch, the room busy: a stop word commits the yield at its next block |

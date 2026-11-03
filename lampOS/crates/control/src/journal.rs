@@ -223,6 +223,8 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SkillPush { .. } => "skill.push",
         Op::SkillList {} => "skill.list",
         Op::SkillRemove { .. } => "skill.remove",
+        Op::CameraSnapshot {} => "camera.snapshot",
+        Op::CameraStream { .. } => "camera.stream",
     }
 }
 
@@ -238,6 +240,8 @@ pub fn went(op: &Op) -> &'static str {
         Op::Express { .. } => "the body, by mood.sock, and the ring, by light/request",
         Op::Say { .. } => "the voice, by say.sock",
         Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. } => "the skill helper",
+        Op::CameraSnapshot {} => "the eyes' newest frame, by sight.jpg",
+        Op::CameraStream { .. } => "the eyes, by sight.jpg or their frames socket",
         _ => "the door",
     }
 }

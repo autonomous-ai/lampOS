@@ -208,6 +208,37 @@ phòng có `more`; với memory cũ không có `more`, khi hai phần cộng l�
 quả; và khi phần của căn phòng không được hỏi vì phần của người đó đã dùng hết
 hạn mức. Khi đó mô hình không được nói những ngày còn lại không có gì.
 
+## Lời sửa mới hơn xếp trước (`LAMP_MEMORY_NEWER_FIRST`)
+
+Khi bật `LAMP_MEMORY_NEWER_FIRST=on` (kế hoạch đưa ý tưởng của Tiers vào Days
+của người phụ trách trí nhớ, 3/11, phần P1; tắt nếu không đặt; ý tưởng phỏng
+theo cách memory-tiers thay thế bằng "bằng chứng mới hơn của chính chủ",
+[memory-tiers.md](../memory-tiers.md)), `search` hay `recall` của một lần
+truy xuất sẽ có thêm `"newer_first":true`. **Chưa nối cho đến P4: voice chưa
+gửi trường này, nên hôm nay bật công tắc không đổi gì**; chỉ kho trả lời nó.
+Trong các bản ghi truy vấn đã tìm được cho một người đã nhận ra, một câu mới
+hơn sửa một câu cũ hơn được xếp trước trong `search`, và câu cũ có
+`"earlier":true`; `recall` vẫn giữ thứ tự thời gian và chỉ thêm `earlier`.
+Với phạm vi của căn phòng (không có người), trường này bị bỏ qua và câu trả
+lời như khi không có nó: câu của căn phòng là của nhiều người nói, và câu của
+người này không bao giờ được đánh dấu câu của người khác là `earlier`
+(`days_recall::newer_first::room_scope_is_never_reordered`). Một câu sửa câu
+khác khi nó mới hơn, có một cụm báo hiệu sửa nguyên từ (`actually`, `no
+longer`, `not … anymore`, `changed to`, `moved to`, `now it's`/`now it is`,
+`instead`, `thật ra`, `không còn`, `đổi sang`, `chuyển sang`, `bây giờ là`,
+`thay vì`; chỉ tiếng Anh và tiếng Việt; `now` hay `giờ` đứng một mình, cũng
+là "giờ" đồng hồ, không phải báo hiệu) và nói về cùng một điều: có chung ít
+nhất hai từ đặc trưng của câu cũ (không tính từ báo hiệu) và chung tất cả
+trừ nhiều nhất một, giá trị đã đổi. Vì vậy "now I'm brewing jasmine tea for
+mom" không sửa "I drink jasmine tea", "7 giờ tôi uống trà nhài với mẹ" cũng
+không sửa "Tôi uống trà nhài mỗi sáng"
+(`search::newer_first_tests::bare_now_or_gio_marks_nothing`). Chỉ tính lời
+của chính người đó, không bao giờ tính lời đáp của đèn. Không bản ghi nào bị
+bỏ, vô hiệu hay thêm vào: vẫn các bản ghi đó, vẫn `more` đó, chỉ đổi thứ tự
+và cờ này. Khi tắt, trường không được gửi và mọi câu trả lời giống hệt từng
+byte như trước (`off_is_byte_identical`). Cần lamp-memory cùng bản build:
+memory cũ từ chối trường này.
+
 ## Ngày của một điều đã ghi nhớ trong ghi chú phiên
 
 Một ghi chú hay quan sát có ngày sự kiện (`event_days`) nay mang `on`
@@ -429,6 +460,29 @@ hỏi trước. Việc kiểm tra cùng giọng (`same_voice_releases`, một đ
 chưa bao giờ đúng) là phần làm sau.
 ## Một câu của họ không thấy mặt nói, khi chỉ có mặt họ trong khung hình
 
+**Chỉ mặt của người ngồi tại bàn mới là mặt khác** (`LAMP_FACES_AT_DESK_ONLY=on`,
+bật trong bản sản phẩm; [eyes.md](../eyes.md), "Who counts as someone at the
+lamp"): với «một mặt trong khung hình», «không mặt nào khác» và «một mình trong
+khung hình» bên dưới, một mặt cao chưa tới 0,6 chiều cao của mặt tham chiếu trong
+cùng lần nhìn (mặt cao nhất có độ chắc ít nhất 0,70 và cao không quá 0,6 khung
+hình, nên một khung giả khổng lồ không loại được chủ đèn), hoặc độ chắc chắn dưới
+0,70, không được tính là người ở bên đèn. Một lần nhìn có mặt không bao giờ đếm
+là không có ai.
+Trên lamp-a0ae ngày 2/11, ngay sau cài đặt, tên chủ đèn bị giữ lại ở 51 trên 79
+lượt vì «nhiều hơn một mặt trong khung hình»: bên cạnh mặt chủ đèn (rộng 0,09
+đến 0,19 khung hình, chắc 0,80 đến 0,92), mắt liên tục báo những mặt rộng 0,02
+đến 0,06 với độ chắc 0,61 đến 0,78, gần như mỗi lần nhìn một mã mới. Mặt như vậy
+vẫn được theo dõi và vẫn được đọc là đang nói; danh sách của mắt không bị đổi.
+Một mặt không được tính mà đọc là đang nói trong 10 giây qua vẫn giữ tên chủ đèn
+lại («a face not at the desk seen speaking»): một vị khách đứng xa phía sau, là
+giọng duy nhất, không được nghe tên chủ đèn. Mặt có độ chắc dưới 0,70 bị bỏ dù
+lớn cỡ nào, nên một vị khách tại bàn quay nghiêng (khoảng 0,65) được tính 0: nếu
+họ nói, tên vẫn bị giữ lại; nếu họ im lặng thì không.
+Dòng nhật ký quyết định tên mặc định ghi kích thước và độ chắc của các mặt được
+tính và bị bỏ, không mã, không vị trí, chỉ khi bật công tắc hoặc có mặt bị bỏ. Tắt công tắc thì mọi mặt đều được tính,
+như trước. Các ngưỡng 0,6 và 0,70 lấy từ bản ghi trên lamp-06c1 (3/11); một người thật đứng
+sau chủ đèn 1 m vẫn chưa được thử.
+
 Với `LAMP_PERSON_SCOPE_ONE_FACE=on` (bật trong bản sản phẩm; mục 1 của nhóm
 thử nghiệm ra mắt trên #3997): trên lamp-220c ngày 30/10, mặt chủ đèn có trong
 17 lần nhìn của một câu nhưng không lần nào đọc là đang nói, nên với
@@ -437,9 +491,12 @@ gần như trống. Giờ đây, với một câu được nhận là của ngư
 ai nói, khi các lần nhìn qua câu ấy thấy khuôn mặt quen của họ trong ít nhất 3
 lần và không thấy mặt nào khác trong bất kỳ lần nào
 (`SpeakingFaces::one_face_in_view`; một lần nhìn không có ai không tính là mặt
-khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **chỉ việc ghi nhớ**
-(`remember`) là của họ: điều đó được lưu vào phạm vi của họ
-(`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`). **Mọi việc
+khác), và cuộc trò chuyện **chưa có giọng nào khác**, thì **việc ghi nhớ**
+(`remember`) **và việc quên điều đã ghi** là của họ: điều đó được lưu vào phạm
+vi của họ (`ScopeLease::take_by_one_face`, `ScopeLease::kept_by_one_face`), và
+một `forget` một mục tìm trong phạm vi của họ rồi đến của căn phòng
+(`ScopeLease::reached_by_one_face`, quyết định duy nhất mà tuyến ký ức trong
+`tools.rs` đọc cho cả hai, nên việc quên không bao giờ hẹp hơn việc ghi). **Mọi việc
 đọc vẫn là của căn phòng**: không `recall` hay gợi ý từ ký ức của họ, không
 ghi chú ký ức của họ, không ngữ cảnh của người ấy, không chuỗi hội thoại hay
 bản tóm tắt của họ; câu được nói và đọc như của căn phòng, như khi không có
@@ -467,13 +524,39 @@ là giọng khác, chỉ thấy mặt thứ hai nói mới cho biết có ngư�
 ghi nhớ là của họ, cái giá là lời được lưu, không bao giờ bị đọc. Có mặt thứ hai, mặt lạ,
 không có mặt nào, hoặc có giọng khác, thì như trước. Một câu được nhận là của
 căn phòng vì không nhận ra ai thì không đổi, nên giọng chưa nhận ra vẫn không
-chạm được ký ức của ai (#4196, #4207). **Việc quên không đổi:** `forget` và
-`forget_everything` trên câu như vậy chạy trong phạm vi của căn phòng, và **một
+chạm được ký ức của ai (#4196, #4207). **Việc quên theo việc ghi:** một
+`forget` một mục trên câu như vậy xoá khỏi phạm vi của họ điều mà cùng quy tắc
+đã lưu ở đó, và chỉ tìm thêm trong phạm vi của căn phòng khi của họ không có gì
+về điều ấy (lần kiểm tra của Fourteen trên lamp-9adf, bản 9699: «forget my
+coffee» chỉ tìm trong phạm vi căn phòng trong khi cà phê được lưu là của họ,
+lỗi đã có từ bản 9610). Việc «không có gì» ấy là một kết quả do chính lệnh
+quên đặt ra (`remember::run_one_face_forget`), không bao giờ đọc từ câu trả
+lời: khi của họ có điều khớp nhưng không quên gì (hơn tám điều, nên hỏi là
+điều nào; danh sách bị cắt; ký ức cũ từ chối danh sách), phạm vi của căn phòng
+không bị chạm tới (P2 của Reviewer-lead trên #5022). Một `forget {about}`
+không nêu tên đã tự tìm trong phạm vi căn phòng khi họ không có gì của riêng
+mình, nên phạm vi căn phòng chỉ được chạy lại cho lệnh quên có nêu tên trong
+lời nghe được. Nó chỉ chạm tới khuôn mặt quen duy nhất được nhận cho câu này,
+được kiểm tra lại ngay trước mỗi lần chạy trong phạm vi của họ, cả cho việc
+ghi (`remember::run_one_face_keep`): có mặt thứ hai, mặt lạ, không có mặt,
+giọng khác hoặc bị thu hẹp sau đó, kể cả giữa lần đọc ấy và lần chạy, thì chỉ
+là của căn phòng. `forget_everything` trên câu như vậy vẫn chạy trong phạm vi của
+căn phòng. Chỉ lệnh quên theo điều nó nói tới hoặc theo id mà `recall` đã đưa mới chạm
+tới phạm vi của họ: một câu «forget that» trống, hoặc bất kỳ lệnh quên nào mà
+ký ức sẽ chạy như «điều được lưu gần nhất» (ký ức cũ, công tắc tắt), chỉ là của
+căn phòng, vì sau lần `recall` của căn phòng trên câu như vậy nó sẽ lấy mất
+điều họ lưu gần nhất (P2 của Thirteen trên #5022). Id được đếm theo từng
+người, nên số 3 của họ và số 3 của căn phòng là hai điều khác nhau: một lệnh
+quên theo id chỉ đi tới phạm vi mà danh sách của nó đã cho thấy id ấy trong
+phiên này, và một id đã hiện ở cả hai thì không quên gì và mô hình hỏi là
+cái nào (`remember::by_where_shown`; P2 thứ hai của Thirteen trên #5022). Và **một
 lời «có» nói trên câu như vậy không bao giờ chạy một lệnh quên đang giữ**
 (`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói. Rủi ro còn lại:
 một giọng ngoài khung hình khi họ ngồi một mình trong khung, không có dấu giọng
-để phân biệt, có thể được lưu vào ký ức của họ (không bao giờ được đọc lại cho
-giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
+để phân biệt, có thể được lưu vào ký ức của họ, và lệnh `forget` một mục của
+giọng ấy có thể xoá trong đó tối đa tám điều khớp (một `forget {about}` quên
+nhiều nhất tám điều, và không quên gì khi có nhiều hơn), không bao giờ tất cả
+(không gì được đọc lại cho giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
 hình có thể chứa lời người khác nói ngoài khung hình.
 
 ## Đầu dò của bộ đo (#4748)

@@ -1,0 +1,71 @@
+# lampOS linked services (Queue #4710): the person's Gmail, Google Calendar and Drive, Notion, Figma,
+# GitHub, Linear, Asana, Ahrefs and Facebook Page links, kept by this one root process in
+# /var/lib/lampos-services (0700; one 0600 file a service). Two doors, each answering only its one
+# asker by SO_PEERCRED and cgroup, whatever the socket's group lets connect: admin.sock
+# (lamp-cloud.service: set, remove, wipe, list) and tools/ with tools.json and call.sock
+# (lamp-voice.service: services_connected, service_read, service_write). Not socket-activated like
+# lamp-setup-keys: a write waits here, in memory, for its spoken "send" (2 min, once).
+# Reads only unless LAMP_SERVICES_WRITE=on (a drop-in). A token is never journalled.
+[Unit]
+Description=lampOS linked services (lamp-services)
+PartOf=lampos.target
+# Not before setup has finished (#806).
+ConditionPathExists=/var/lib/lampos-setup/done
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Root, for the store only root reads and the factory reset's plan wipes as root's; group lampos, so
+# the sockets it makes (0660) let lamp-cloud (lampos) and the voice connect, and the peer check then
+# tells them apart. It holds no capability (CapabilityBoundingSet= below), a narrow system-call set,
+# and sees the system read-only but for its own two folders.
+User=root
+Group=lampos
+Slice=lampos-parts.slice
+Nice=5
+UMask=0077
+# The backend's link and the lamp's key, as lamp-cloud reads them: for an OAuth token's refresh
+# through the backend (POST <base>/connector/refresh-token), nothing else. Missing: no refresh.
+LoadCredential=account:/etc/lampOS/setup/backend.json
+LoadCredential=key:/etc/lampOS/voice/credential
+ExecStart=/opt/lampOS/services/current/lamp-services --enable --store /var/lib/lampos-services --run /run/lampos-services
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-services
+NoNewPrivileges=yes
+# The sockets' folder, root:lampos 0750 (tools/ inside it 0755, tools.json 0644).
+RuntimeDirectory=lampos-services
+RuntimeDirectoryMode=0750
+# The tokens' store; the factory reset's plan wipes it.
+StateDirectory=lampos-services
+StateDirectoryMode=0700
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+# The services and the backend (AF_INET, AF_INET6); its own sockets (AF_UNIX).
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=lampos.target

@@ -16,6 +16,7 @@ request it took. It moves nothing, so it never stands in for a lamp check.
 from __future__ import annotations
 
 import asyncio
+import base64
 import datetime
 import ipaddress
 import json
@@ -38,6 +39,9 @@ from websockets.asyncio.server import ServerConnection, serve
 from . import schema
 from .keys import HELLO, b64, pin_of, proof, unb64
 from .moves import move_refusal
+
+# The fake's camera picture: the smallest whole JPEG (start and end markers).
+FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
 
 try:
     import jsonschema
@@ -248,6 +252,13 @@ def _now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# A made-up air reading and computer, as lamp-control's `get` answers them
+# (watch.rs `air_reading` and `device_reading`): the fake lamp's own.
+AIR = {"pm1_0": 2.1, "pm2_5": 5.3, "pm4_0": 6.8, "pm10": 7.9, "co2_ppm": 620, "humidity": 45.0, "temperature": 27.4,
+       "feel": "fresh", "known": True}
+DEVICE = {"cpu_load": 0.25, "memory_used": 0.4, "disk_free": 0.6, "uptime_s": 3600,
+          "temperature_c": {"cpu_thermal": 55.0}, "known": True}
+
 class FakeLamp:
     """A lamp that speaks the protocol on 127.0.0.1 and records what it's asked."""
 
@@ -304,6 +315,10 @@ class FakeLamp:
             "light": None,
             "mood": None,
             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
+            # Made-up readings, as lamp-control answers them; `set_air` changes
+            # the air and tells `air.changed`, `{"known": False}` for none.
+            "air": dict(AIR),
+            "device": dict(DEVICE),
         }
         self._refusals: dict[str, list[tuple[str, str, int | None]]] = defaultdict(list)
         # Each connection whose head follows the hand (`look` at `hand`) and
@@ -360,6 +375,14 @@ class FakeLamp:
         for ws in list(self._connections):
             if event in self.subscribed[id(ws)]:
                 await ws.send(frame)
+
+    async def set_air(self, **reading: Any) -> None:
+        """The air sensor reads `reading` (`pm2_5=40.0, co2_ppm=1300, feel="stuffy"`, ...): `get` `air` answers it,
+        and `air.changed` is told, as lamp-control tells a change past a step. With nothing, no sensor:
+        `{"known": False}`."""
+        self.state["air"] = {**reading, "known": True} if reading else {"known": False}
+        if reading:
+            await self.emit("air.changed", **reading)
 
     def _show(self, request: dict) -> None:
         """The ring shows a computer's light while it lasts."""
@@ -530,13 +553,15 @@ class FakeLamp:
         "person.arrived": "look", "person.left": "look", "person.stood_up": "look", "person.facing": "look",
         "hand": "look",
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
+        "air.changed": "air",
     }
+    STATE_GRANT = {"presence": "look", "air": "air", "device": "device"}
 
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
-            return ["look"] if "presence" in request.get("state", []) else []
+            return sorted({self.STATE_GRANT[s] for s in request.get("state", []) if s in self.STATE_GRANT})
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") in ("face", "hand") else ["body"]
@@ -545,6 +570,8 @@ class FakeLamp:
             "light": ["light"],
             "say": ["speak"],
             "sound": ["speak"],
+            "camera.snapshot": ["camera"],
+            "camera.stream": ["camera"],
             "lease.take": [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])],
         }.get(op, [])
 
@@ -663,6 +690,17 @@ class FakeLamp:
             await self._ok(ws, id_, to="voice")
             if self.auto_done:
                 await self.done(id_)
+        elif op == "camera.snapshot":
+            # A picture with no camera behind it: the smallest whole JPEG.
+            await self._ok(ws, id_, jpeg=base64.b64encode(FAKE_JPEG).decode(), bytes=len(FAKE_JPEG), age_ms=0)
+        elif op == "camera.stream":
+            if request["on"]:
+                fps = request.get("fps", 2)
+                await self._ok(ws, id_, stream="on", fps=fps, fps_now=None)
+                frame = {"ev": "camera.frame", "jpeg": base64.b64encode(FAKE_JPEG).decode(), "bytes": len(FAKE_JPEG), "age_ms": 0, "fps_now": None}
+                await ws.send(json.dumps(frame))
+            else:
+                await self._ok(ws, id_, stream="off")
         else:
             await self._ok(ws, id_)
             if op == "play" and self.auto_done:

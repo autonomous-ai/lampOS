@@ -1,0 +1,84 @@
+Nov 03 15:07:06.716117 lamp-c0a4 systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 15:07:06.744407 lamp-c0a4 systemd[1]: lamp-tasks.service: Deactivated successfully.
+Nov 03 15:07:06.745526 lamp-c0a4 systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 15:07:06.745867 lamp-c0a4 systemd[1]: lamp-tasks.service: Consumed 5min 31.161s CPU time.
+Nov 03 15:07:06.749435 lamp-c0a4 systemd[1]: Starting lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 15:07:06.757766 lamp-c0a4 systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 15:07:26.820484 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 108 chat round 1 called start_agent_task
+Nov 03 15:07:26.865575 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 108 asked for start_agent_task; the tasks part answered in 44 ms; the answer was sent
+Nov 03 15:07:44.007601 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 109 chat round 1 called confirm_agent_task
+Nov 03 15:07:44.051652 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 109 asked for confirm_agent_task; the tasks part answered in 44 ms; the answer was sent
+Nov 03 15:07:58.536612 lamp-c0a4 lamp-tasks[645310]: tasks: lamp-cc366a4c7b85ee72036f1f5418cda0d5: dispatch accepted (exit 0, 14.5 s)
+Nov 03 15:08:02.004947 lamp-c0a4 lamp-tasks[645310]: tasks: progress read of <machine> in 3417 ms: 10 listed; task 9 unknown, first read
+Nov 03 15:08:17.234520 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 110 chat round 1 called start_agent_task
+Nov 03 15:08:17.279876 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 110 asked for start_agent_task; the tasks part answered in 45 ms; the answer was sent
+Nov 03 15:08:22.040928 lamp-c0a4 lamp-tasks[645310]: tasks: wait on <machine> came back after 23453 ms: task 9 idle
+Nov 03 15:08:28.364903 lamp-c0a4 lamp-voice[630692]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:9:8)
+Nov 03 15:08:28.365869 lamp-c0a4 lamp-voice[630692]: lamp-voice: saying what the skill task-news asked for
+Nov 03 15:08:32.477237 lamp-c0a4 lamp-voice[630692]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:9:8) was cut short (user_interrupted): its harness stays open
+Nov 03 15:08:33.215528 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 112 heard 0 words, the last 346 ms after the line ended
+Nov 03 15:11:23.094465 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 114 heard 0 words, the last 354 ms after the line ended
+Nov 03 15:11:29.870434 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 115 heard 0 words, the last 426 ms after the line ended
+Nov 03 15:13:34.278211 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 116: its answer is played: the first thing said after the lamp's own news
+Nov 03 15:17:58.239591 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 122 heard 0 words, the last 620 ms after the line ended
+Nov 03 15:19:16.917131 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 124 heard 0 words, the last 1464 ms after the line ended
+Nov 03 15:20:08.284684 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 125 heard 0 words, the last 401 ms after the line ended
+Nov 03 15:21:20.687296 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 127 heard 0 words, the last 428 ms after the line ended
+Nov 03 15:21:24.478925 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 128 heard 0 words, the last 339 ms after the line ended
+Nov 03 15:21:29.986142 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 129 heard 0 words, the last 406 ms after the line ended
+Nov 03 15:21:47.417012 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 130 chat round 1 called confirm_agent_task
+Nov 03 15:21:47.417456 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 130 asked for confirm_agent_task; the tasks part answered in 0 ms; the answer was sent
+Nov 03 15:23:27.353837 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 131 heard 0 words, the last 338 ms after the line ended
+Nov 03 15:25:57.175716 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 133 heard 0 words, the last 470 ms after the line ended
+Nov 03 15:26:32.707794 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 134 chat round 1 called start_agent_task
+Nov 03 15:26:32.747949 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 134 asked for start_agent_task; the tasks part answered in 39 ms; the answer was sent
+Nov 03 15:26:51.938002 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 135 chat round 1 called confirm_agent_task
+Nov 03 15:26:51.981125 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 135 asked for confirm_agent_task; the tasks part answered in 42 ms; the answer was sent
+Nov 03 15:27:10.856858 lamp-c0a4 lamp-tasks[645310]: tasks: lamp-983d8442783f7543f3db8a8b76c4de7f: dispatch accepted (exit 0, 18.8 s)
+Nov 03 15:27:16.605290 lamp-c0a4 lamp-tasks[645310]: tasks: progress read of <machine> in 5705 ms: 11 listed; task 11 unknown, first read
+Nov 03 15:27:42.288922 lamp-c0a4 lamp-tasks[645310]: tasks: wait on <machine> came back after 31389 ms: task 11 idle
+Nov 03 15:27:50.141832 lamp-c0a4 lamp-voice[630692]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:11:9)
+Nov 03 15:27:50.143919 lamp-c0a4 lamp-voice[630692]: lamp-voice: saying what the skill task-news asked for
+Nov 03 15:28:09.783579 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 137 heard 0 words, the last 382 ms after the line ended
+Nov 03 15:28:17.672398 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 138 heard 0 words, the last 320 ms after the line ended
+Nov 03 15:28:17.866454 lamp-c0a4 lamp-tasks[645310]: tasks: closing task 11's harness: try 1: Closed
+Nov 03 15:29:30.932728 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 139 heard 0 words, the last 415 ms after the line ended
+Nov 03 15:30:08.580780 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 140 heard 0 words, the last 479 ms after the line ended
+Nov 03 15:31:19.477439 lamp-c0a4 lamp-voice[630692]: lamp-voice: no skill asked for the news due within 10 s: said by the voice
+Nov 03 15:31:19.477439 lamp-c0a4 lamp-voice[630692]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:11:10)
+Nov 03 15:31:32.773106 lamp-c0a4 lamp-voice[630692]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:11:10) was not heard whole (audio_written_with_playback_gaps_unscored): its harness stays open
+Nov 03 15:31:57.005320 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 144: its answer is played: the first thing said after the lamp's own news
+Nov 03 15:32:40.789253 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 145 chat round 1 called confirm_agent_task
+Nov 03 15:32:40.789253 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 145 asked for confirm_agent_task; the tasks part answered in 0 ms; the answer was sent
+Nov 03 15:34:15.180765 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 148 chat round 1 called start_agent_task
+Nov 03 15:34:15.324352 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 148 asked for start_agent_task; the tasks part answered in 143 ms; the answer was sent
+Nov 03 15:36:01.054648 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 149 heard 0 words, the last 1423 ms after the line ended
+Nov 03 15:36:18.905816 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 150 heard 0 words, the last 358 ms after the line ended
+Nov 03 15:37:13.014197 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 151 heard 0 words, the last 577 ms after the line ended
+Nov 03 15:37:54.010628 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 152 heard 0 words, the last 1127 ms after the line ended
+Nov 03 15:39:45.065004 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 154: of its 8 words, 1 in request 153's words it cut short, 6 in the lamp's answer to request 148 so far
+Nov 03 15:39:45.065004 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 154 goes on from request 153's words, cut short 1240 ms before it began: no sign of a second person: no face in view at request 153's end, no face in view at request 154's, a quiet room, no other voice heard and no two faces seen speaking in the conversation; 2 lines are asked as one (LAMP_JOIN_CUT_WORDS)
+Nov 03 15:39:52.031444 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 155 heard 0 words, the last 2844 ms after the line ended
+Nov 03 15:39:52.033482 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 155: the chain cut short has two people in it, requests 153 and 154: no sign of a second person: no face in view at request 153's end, no face in view at request 154's, a quiet room, no other voice heard and no two faces seen speaking in the conversation, but this line was held; of its pieces only those one face or voice shows the same speaker said are kept, 1 let go (LAMP_JOIN_CUT_WORDS)
+Nov 03 15:39:52.033482 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 155 is held, so request 154's words, cut short by it, are answered in its place
+Nov 03 15:40:23.417873 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 156 chat round 1 called start_agent_task
+Nov 03 15:40:23.457668 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 156 asked for start_agent_task; the tasks part answered in 39 ms; the answer was sent
+Nov 03 15:41:06.724870 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 157 heard 0 words, the last 1246 ms after the line ended
+Nov 03 15:41:52.590915 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 158 heard 0 words, the last 1269 ms after the line ended
+Nov 03 15:42:04.017800 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 159 chat round 1 called start_agent_task
+Nov 03 15:42:04.056892 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 159 asked for start_agent_task; the tasks part answered in 38 ms; the answer was sent
+Nov 03 15:42:28.325167 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 160 chat round 1 called confirm_agent_task
+Nov 03 15:42:28.372347 lamp-c0a4 lamp-voice[630692]: lamp-voice second: request 160 asked for confirm_agent_task; the tasks part answered in 46 ms; the answer was sent
+Nov 03 15:42:49.148443 lamp-c0a4 lamp-tasks[645310]: tasks: lamp-81bf7befc773cc74956846c80d780614: dispatch accepted (exit 0, 20.7 s)
+Nov 03 15:42:59.265327 lamp-c0a4 lamp-tasks[645310]: tasks: progress read of <machine> failed after 10050 ms (timeout); task 14 as before
+Nov 03 15:43:11.748170 lamp-c0a4 lamp-tasks[645310]: tasks: wait on <machine> failed after 22532 ms (wait_failed)
+Nov 03 15:43:35.821451 lamp-c0a4 lamp-tasks[645310]: tasks: progress read of <machine> in 7412 ms: 11 listed; task 14 idle, first read
+Nov 03 15:43:44.842049 lamp-c0a4 lamp-voice[630692]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:14:11)
+Nov 03 15:43:44.844018 lamp-c0a4 lamp-voice[630692]: lamp-voice: saying what the skill task-news asked for
+Nov 03 15:44:17.170086 lamp-c0a4 lamp-tasks[645310]: tasks: closing task 14's harness: try 1: Closed
+Nov 03 15:45:21.555386 lamp-c0a4 systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 15:45:21.577981 lamp-c0a4 systemd[1]: lamp-tasks.service: Deactivated successfully.
+Nov 03 15:45:21.579092 lamp-c0a4 systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 15:45:21.579511 lamp-c0a4 systemd[1]: lamp-tasks.service: Consumed 3min 17.987s CPU time.
+Nov 03 15:45:21.587770 lamp-c0a4 systemd[1]: Starting lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 15:45:21.591114 lamp-c0a4 systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).

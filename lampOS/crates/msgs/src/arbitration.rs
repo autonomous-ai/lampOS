@@ -279,7 +279,88 @@ pub fn arbitration_topics() -> Vec<(&'static str, Declaration)> {
         (LightRequest::TOPIC, LightRequest::declaration()),
         (LightReached::TOPIC, LightReached::declaration()),
         (LightOutranked::TOPIC, LightOutranked::declaration()),
+        (RingMark::TOPIC, RingMark::declaration()),
+        (RingMarkDrawn::TOPIC, RingMarkDrawn::declaration()),
     ]
+}
+
+/// What a computer is taking through the lamp, for [`RingMark`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarkKind {
+    Camera,
+    Microphone,
+}
+
+/// The ring's mark while a computer sees or hears through the lamp
+/// (`light/mark`, lamp-control's camera and microphone, docs/control.md
+/// "The camera"): one small steady dot over whatever the ring shows, a
+/// turn's face included, so a person can always tell. The asker renews it
+/// while a stream runs; it lapses at its claim's `until_us`, at most
+/// [`RingMark::MOST_US`] ahead, so a stalled asker can't leave it lit. A
+/// snapshot asks for a `blink`: the dot for a moment, once.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RingMark {
+    pub claim: Claim,
+    pub kind: MarkKind,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub blink: bool,
+}
+
+impl RingMark {
+    pub const TYPE: &str = "lamp_msgs/RingMark";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "light/mark";
+    /// The furthest ahead a mark may be asked to hold.
+    pub const MOST_US: u64 = 3_000_000;
+
+    /// Each is a message of its own: one asker's must not hide another's.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// Shape only: the claim's, and no further ahead than [`Self::MOST_US`]
+    /// at `now_us`.
+    pub fn check(&self, now_us: u64) -> Result<(), Invalid> {
+        self.claim.check()?;
+        if self.claim.until_us > now_us.saturating_add(Self::MOST_US) {
+            return Err(Invalid("a mark holds 3 s ahead at most".to_owned()));
+        }
+        Ok(())
+    }
+}
+
+/// The ring drew a computer's mark (`light/mark_drawn`): said by the ring
+/// for each asker whose mark ([`RingMark`]) was in a frame it showed, at
+/// most every [`RingMarkDrawn::EVERY_US`] each. lamp-control sends a camera
+/// frame only within a second of one for that asker, so a mark asked but
+/// not drawn (the ring's authority lapsed, its ceiling at 0, the shutdown's
+/// warning, its marks never started) stops the pictures: it fails closed
+/// (Thirteen's P2 on #4521).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RingMarkDrawn {
+    /// The asker, as its mark's claim named it (`control:<client>`).
+    pub source: String,
+    /// The boot's monotonic clock `at_us` is on.
+    pub clock_id: String,
+    pub at_us: u64,
+}
+
+impl RingMarkDrawn {
+    pub const TYPE: &str = "lamp_msgs/RingMarkDrawn";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "light/mark_drawn";
+    /// The ring's name as its publisher: lamp-control hears no other's. A
+    /// bus source is the publisher's own word, not the kernel's, so this
+    /// keeps out a stray or mistaken publisher, not one that lies.
+    pub const SOURCE: &str = "voice_ring_mark";
+    /// One asker's said at most this often.
+    pub const EVERY_US: u64 = 250_000;
+
+    /// Each is a message of its own: one asker's must not hide another's.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
 }
 
 /// The user a part runs as, by its product unit's `User=`.

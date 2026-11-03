@@ -152,11 +152,13 @@ pub const SCHEDULE_HELD: [&str; 3] = ["set_timer", "set_reminder", "cancel_remin
 pub const SETS: [&str; 2] = ["set_timer", "set_reminder"];
 
 /// Whether a call, by its route and its name, waits for the Policy's
-/// decision: every one of the executive's, and the schedule's in
-/// [`SCHEDULE_HELD`].
+/// decision: every one of the executive's and the connected services'
+/// ([`crate::services`]), and the schedule's in [`SCHEDULE_HELD`].
 pub fn holds(route: &crate::tools::Route, name: &str) -> bool {
     match route {
-        crate::tools::Route::Executive(_) | crate::tools::Route::UseSkill(_) => true,
+        crate::tools::Route::Executive(_)
+        | crate::tools::Route::UseSkill(_)
+        | crate::tools::Route::Services(_) => true,
         crate::tools::Route::Schedule(_) => SCHEDULE_HELD.contains(&name),
         _ => false,
     }

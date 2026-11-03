@@ -26,6 +26,9 @@ import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 // `express`'s feelings and their moves, as lamp-control's feelings.rs.
+// The fake's camera picture: the smallest whole JPEG (start and end markers).
+export const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
 
 // `look`'s targets lamp-control doesn't route yet, in parts.rs's words.
@@ -231,6 +234,11 @@ function certificate() {
   } finally { rmSync(folder, { recursive: true, force: true }); }
 }
 
+// A made-up air reading and computer, as lamp-control's `get` answers them
+// (watch.rs `air_reading` and `device_reading`): the fake lamp's own.
+export const AIR = Object.freeze({ pm1_0: 2.1, pm2_5: 5.3, pm4_0: 6.8, pm10: 7.9, co2_ppm: 620, humidity: 45, temperature: 27.4, feel: 'fresh', known: true });
+export const DEVICE = Object.freeze({ cpu_load: 0.25, memory_used: 0.4, disk_free: 0.6, uptime_s: 3600, temperature_c: Object.freeze({ cpu_thermal: 55 }), known: true });
+
 export class FakeLamp {
   static async start(options = {}) {
     const fake = new FakeLamp(options);
@@ -254,7 +262,10 @@ export class FakeLamp {
     this.pings = 0;
     this.leases = new Map();
     this.subscribed = new Map();
-    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false } };
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false },
+      // Made-up readings, as lamp-control answers them; `setAir` changes the
+      // air and tells `air.changed`, `{ known: false }` for none.
+      air: { ...AIR }, device: { ...DEVICE, temperature_c: { ...DEVICE.temperature_c } } };
     this.refusals = new Map();
     this.nextLease = 1;
     // The newest light a computer asked for, and until when (the fake's
@@ -300,6 +311,13 @@ export class FakeLamp {
 
   refuseNext(op, code, why = 'refused by the test', retryMs) {
     this.refusals.set(op, [...(this.refusals.get(op) ?? []), { code, why, retryMs }]);
+  }
+
+  // The air sensor reads `reading` (`{ pm2_5: 40, co2_ppm: 1300, feel: 'stuffy' }`, ...): `get` `air` answers it,
+  // and `air.changed` is told, as lamp-control tells a change past a step. With nothing, no sensor: `{ known: false }`.
+  setAir(reading) {
+    this.state.air = reading ? { ...reading, known: true } : { known: false };
+    if (reading) this.emit('air.changed', reading);
   }
 
   emit(event, fields = {}) {
@@ -442,15 +460,17 @@ export class FakeLamp {
     'person.arrived': 'look', 'person.left': 'look', 'person.stood_up': 'look', 'person.facing': 'look',
     hand: 'look',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
+    'air.changed': 'air',
   };
+  static STATE_GRANT = { presence: 'look', air: 'air', device: 'device' };
 
   needs(op, request) {
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
-    if (op === 'get') return (request.state ?? []).includes('presence') ? ['look'] : [];
+    if (op === 'get') return [...new Set((request.state ?? []).map((s) => FakeLamp.STATE_GRANT[s]).filter(Boolean))];
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
-    return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'] }[op] ?? [];
+    return { express: ['body', 'light'], light: ['light'], say: ['speak'], sound: ['speak'], 'camera.snapshot': ['camera'], 'camera.stream': ['camera'] }[op] ?? [];
   }
 
   op(ws, client, request) {
@@ -518,6 +538,18 @@ export class FakeLamp {
         this.show(request);
         return this.ok(ws, id, { to: 'ring' });
       }
+      case 'camera.snapshot':
+        // A picture with no camera behind it: the smallest whole JPEG.
+        return this.ok(ws, id, { jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0 });
+      case 'camera.stream':
+        // As lamp-control's check: 1 to 30 a second.
+        if (request.fps !== undefined && !(Number.isInteger(request.fps) && request.fps >= 1 && request.fps <= 30)) {
+          return this.refuse(ws, id, 'bad_request', 'fps: 1 to 30');
+        }
+        if (!request.on) return this.ok(ws, id, { stream: 'off' });
+        this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
+        ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: FAKE_JPEG.toString('base64'), bytes: FAKE_JPEG.length, age_ms: 0, fps_now: null }));
+        return undefined;
       case 'stop':
         // The holder's stop ends its following, as any of its actions.
         this.stopFollowing(ws);

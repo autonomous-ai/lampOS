@@ -76,6 +76,9 @@ pub struct Senses {
     /// `LAMP_SHUTDOWN=on`, held 5 to 15 s ([`lamp_msgs::shutdown_hold`]),
     /// the ring shows [`shutdown_warning`] in place of its face.
     pub button: Option<crate::ring_head::RingHead>,
+    /// A computer seeing or hearing through the lamp (`light/mark`): its
+    /// mark over every frame drawn ([`crate::ring_mark`]).
+    pub marks: Option<crate::ring_mark::Marks>,
 }
 
 /// The shutdown's warning while the primary button is held in its window
@@ -278,11 +281,22 @@ pub fn run_continuous(
         .filter(|_| lamp_msgs::shutdown_switched_on())
         .map(|root| crate::ring_head::RingHead::on_source(root, lamp_msgs::TouchSource::Primary))
         .transpose()?;
+    // Whenever there is a bus: the mark is never behind a switch.
+    let marks = bus_root.and_then(|root| {
+        match boot_clock().and_then(|clock| crate::ring_mark::Marks::on(root, &clock)) {
+            Ok(marks) => Some(marks),
+            Err(error) => {
+                eprintln!("lamp-voice ring: a computer's mark is not taken: {error}");
+                None
+            }
+        }
+    });
     let senses = Senses {
         caps,
         unplug,
         night,
         button,
+        marks,
         light,
         eye,
         eye_strong,
@@ -581,6 +595,7 @@ fn service(
         mut unplug,
         mut night,
         mut button,
+        mut marks,
     } = senses;
     let mut light = light.map(|(light, begins)| {
         face.light(begins);
@@ -715,14 +730,29 @@ fn service(
                             .as_ref()
                             .filter(|_| face.lit().on && warning.is_none())
                             .and_then(|unplug| unplug.prepare(at));
+                        let marked = marks.as_mut().is_some_and(|marks| marks.shown(at));
                         let pixels = warning.unwrap_or_else(|| {
-                            presentation.as_ref().map_or_else(
+                            let pixels = presentation.as_ref().map_or_else(
                                 || draw(&mut face, &frame, at, ceiling.get()),
                                 |presentation| presentation.pixels,
-                            )
+                            );
+                            if marked {
+                                crate::ring_mark::marked(pixels)
+                            } else {
+                                pixels
+                            }
                         });
                         match ring.show(&pixels, ceiling, frame.permit) {
                             Ok(write) => {
+                                // The mark was in a frame shown: its askers
+                                // are told, and only now.
+                                if marked
+                                    && warning.is_none()
+                                    && crate::ring_mark::visible(&pixels, ceiling)
+                                    && let Some(marks) = marks.as_mut()
+                                {
+                                    marks.drew(at);
+                                }
                                 if let (Some(unplug), Some(presentation)) =
                                     (unplug.as_mut(), presentation.as_ref())
                                 {
@@ -790,11 +820,23 @@ fn service(
             } else if let (Some(unplug), Some(presentation)) =
                 (unplug.as_mut(), presentation.as_ref())
             {
+                let marked = marks.as_mut().is_some_and(|marks| marks.shown(at));
+                let pixels = if marked {
+                    crate::ring_mark::marked(presentation.pixels)
+                } else {
+                    presentation.pixels
+                };
                 if let Some(receipt) = ring
-                    .show_resting(&presentation.pixels, ceiling)
+                    .show_resting(&pixels, ceiling)
                     .map_err(io::Error::other)?
                 {
                     unplug.drew(receipt.finished_at().as_micros(), presentation)?;
+                    if marked
+                        && crate::ring_mark::visible(&pixels, ceiling)
+                        && let Some(marks) = marks.as_mut()
+                    {
+                        marks.drew(at);
+                    }
                 }
             } else {
                 let mut pixels = face.render(Mood::Resting, 0, at, ceiling.get());
@@ -805,8 +847,20 @@ fn service(
                 if share > 0.0 {
                     pixels = crate::ring_night::over(&pixels, share, at);
                 }
+                // A computer's mark over all of it, night included.
+                let marked = marks.as_mut().is_some_and(|marks| marks.shown(at));
+                if marked {
+                    pixels = crate::ring_mark::marked(pixels);
+                }
                 let own_light = face.rests_on_its_light(at);
-                rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+                let painted = rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+                if painted
+                    && marked
+                    && crate::ring_mark::visible(&pixels, ceiling)
+                    && let Some(marks) = marks.as_mut()
+                {
+                    marks.drew(at);
+                }
             }
         }
         stall_pass.done();
@@ -881,15 +935,19 @@ fn rest<S: FrameSink>(
     ceiling: ChannelCeiling,
     own_light: bool,
     light: Option<&mut RingLight>,
-) -> io::Result<()> {
-    if let Some(receipt) = ring
+) -> io::Result<bool> {
+    let Some(receipt) = ring
         .show_resting(pixels, ceiling)
         .map_err(io::Error::other)?
-        && let Some(light) = light
-    {
+    else {
+        // Nothing painted (a cue up, a turn owning the lamp, a lease
+        // lapsed): no mark was shown either (Thirteen on #4521).
+        return Ok(false);
+    };
+    if let Some(light) = light {
         light.drew(receipt.finished_at().as_micros(), own_light);
     }
-    Ok(())
+    Ok(true)
 }
 
 /// A frame's face at `at_us`. A frame of the head tap's "hm?" starts the

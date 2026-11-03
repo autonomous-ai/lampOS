@@ -1,9 +1,9 @@
 //! Scripted local executable fixtures. No installed Harness, daemon, account,
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
-    AccountMachine, Cli, CliConfig, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed,
-    MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT, SignIn, Target, iso_unix_ms,
-    parse_auth_status, parse_machines, parse_ps, parse_wait,
+    AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
+    Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT,
+    SignIn, Target, iso_unix_ms, parse_auth_status, parse_machines, parse_ps, parse_wait,
 };
 use serde_json::{Value, json};
 use std::{
@@ -3060,4 +3060,65 @@ fn with_new_folder_an_unreadable_file_costs_one_ask() {
     let news = new_args(&rig);
     assert_eq!(news[0][4], "--new");
     assert_eq!(news[1][4], "~/harnesses/lamp-tasks");
+}
+
+/// Seen on a lamp on 3 Nov: `show` against the person's Mac took 16 to 39
+/// s, and the read before each close ran out at the 10 s `read_timeout`.
+/// The read before a close is the same `show`, given
+/// `CLOSE_READ_TIMEOUT` (no more than one `launch_timeout`) in its place:
+/// here, scaled down, a `show` slower than `read_timeout` runs out for an
+/// ordinary read and reads through before a close; one slower than the
+/// close's own bound still runs out there, as `timeout`, never an answer.
+#[test]
+fn the_read_before_a_close_is_given_longer_than_any_other_read() {
+    let mut rig = Rig::new();
+    rig.config.read_timeout = Duration::from_millis(300);
+    rig.config.launch_timeout = Duration::from_secs(4);
+    rig.show_step(json!({"default":true,"delay_ms":900}));
+    assert_eq!(rig.cli().observe(MACHINE, AGENT), Err("timeout".into()));
+    let read = rig.cli().observe_to_close(MACHINE, AGENT).unwrap();
+    assert_eq!(read.state, "idle");
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 2);
+    assert_eq!(calls[1]["args"][0], "show");
+    drop(rig);
+
+    let mut rig = Rig::new();
+    rig.config.read_timeout = Duration::from_millis(300);
+    rig.config.launch_timeout = Duration::from_millis(800);
+    rig.show_step(json!({"default":true,"delay_ms":5000}));
+    let began = Instant::now();
+    assert_eq!(
+        rig.cli().observe_to_close(MACHINE, AGENT),
+        Err("timeout".into())
+    );
+    assert!(began.elapsed() < Duration::from_secs(3));
+    assert!(CLOSE_READ_TIMEOUT > Duration::from_secs(10));
+    assert!(CLOSE_READ_TIMEOUT < CLOSE_BUDGET);
+}
+
+/// A close is given only what is left of the close's budget after its
+/// read: a `close` slower than that runs out (`timeout`), and nothing left
+/// at all starts no process (`close_no_time`). Either is a failed close,
+/// tried again later, read first.
+#[test]
+fn a_close_is_given_only_what_is_left_of_its_budget() {
+    let rig = Rig::new();
+    assert_eq!(
+        rig.cli().close_within(MACHINE, AGENT, Duration::ZERO),
+        Err("close_no_time".into())
+    );
+    assert!(rig.calls().is_empty());
+
+    rig.plan(json!({"close":{"exit":0,"delay_ms":3000}}));
+    let began = Instant::now();
+    assert_eq!(
+        rig.cli()
+            .close_within(MACHINE, AGENT, Duration::from_millis(300)),
+        Err("timeout".into())
+    );
+    assert!(began.elapsed() < Duration::from_secs(2));
+    // Killed at 300 ms, the fixture may not have kept its call yet on a
+    // loaded host; it is never started twice.
+    assert!(rig.calls().len() <= 1);
 }

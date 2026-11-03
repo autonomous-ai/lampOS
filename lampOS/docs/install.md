@@ -91,7 +91,7 @@ differs. Folders are what the unit makes or names.
 | schedule | `lamp-schedule serve` | orangepi | `/var/lib/lampos-schedule/` (0700); `/run/lampos-schedule/` (0700) | none | `call.sock` |
 | air | `lamp-air` | orangepi, `/dev/i2c-0` | none | none | the bus |
 | air's bus clock | `lamp-air limit-clock --bus-number 0` (a oneshot, before air and controls) | root | none | none | I2C bus 0's `device/freq` |
-| tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder; the Harness program in the user's home | `request.sock`, `voice.sock` |
+| tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder (none at first: the product unit's `--set-up-later --targets-from-machines claude` writes it from the person's machines once Harness is signed in); the Harness program in the user's home | `request.sock`, `voice.sock` |
 | mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
 | addons | `lamp-addons serve` (off unless `LAMP_ADDONS=on`, `addons.md`) | lampos | none | none | the bus (`addon/proposal` and the lamp's state in, `light/request` out) |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
@@ -1138,6 +1138,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **A failing step stops there,** before the link, so a lamp is never
      left with a link to nothing. Nothing is recorded, and the next run
      starts again.
+   - **No targets yet is not a failure:** the product's `lamp-tasks.service`
+     runs with `--set-up-later --targets-from-machines claude`, so the part
+     starts with no `/var/lib/lampos-tasks/targets.json` (hand-overs off, its
+     `tasks` diagnostic saying why) and, once Harness is signed in, writes
+     that file from the person's machines with Claude Code as each target's
+     engine (`docs/tasks.md`, "Before the lamp is set up for hand-overs").
+     A `targets.json` written by hand is left as it is. Before this, on
+     lamp-c0a4 on 3 Nov, the part failed at every start after `harness-on`
+     (`No such file or directory`) until systemd stopped restarting it.
    - **Signing in is the person's,** not done here: by a spoken code since
      Harness 0.4.23 (openharness#1410), with `lamp-tasks serve
      --sign-in-by-code` and the voice's `LAMP_TASKS_SIGN_IN`.

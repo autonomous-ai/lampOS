@@ -237,6 +237,7 @@ subscribe.
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false). `quiet_hours` is planned, not sent yet | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
 | `hand` | `seen`. When seen: `x`, `y` (the palm's centre, 0–1 from the picture's left and top), `size` (the palm's width, 0–1 of the picture's), `open`, `confidence`. All to 2 places, never the tracker's clock | `{"ev":"hand","seen":true,"x":0.42,"y":0.55,"size":0.12,"open":true,"confidence":0.91}` and `{"ev":"hand","seen":false}` | a hand is first seen, moves or grows by 0.05, opens or closes, at most 4 a second (the newest kept). `seen: false` once, 1 s after the last. Under 0.5 confidence is no hand | `look` |
+| `air.changed` | the air sensor's reading: `pm1_0`, `pm2_5`, `pm4_0`, `pm10` (µg/m³), `co2_ppm`, `humidity` (%), `temperature` (°C, at the sensor inside the base, so warmer than the room), each to a tenth (carbon dioxide whole) and left out while the sensor doesn't know it; `feel`: `fresh`, `fine`, `stuffy`, `very_stuffy` or `unknown`, from the carbon dioxide | `{"ev":"air.changed","pm2_5":7.4,"co2_ppm":912,"humidity":44.2,"temperature":28.3,"feel":"fine"}` | the first reading, then a value moves by its step (particles 5, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), comes or goes, or `feel` changes; at most once every 5 s, the newest kept | `air` |
 
 And two that come by themselves, with no subscription:
 
@@ -252,8 +253,9 @@ And two that come by themselves, with no subscription:
 | `presence` | `count`, `near` (0–1), `facing`. Counts and how near, never who | `{"count":1,"near":0.31,"facing":true}` | `look` |
 | `light` | the person's own light: `on`, `colour`, `level`. Also `shows`: what the ring draws now, `{on, colour, level}`. `null` until the lamp has said either | `{"on":true,"colour":"warm","level":3,"shows":{"on":true,"colour":"green","level":2}}` | none |
 | `mood` | `energy`, `warmth`, `awake`, `asleep`, the lamp's inner state. `null` until known | `{"energy":0.6,"warmth":0.7,"awake":true,"asleep":false}` | none |
+| `air` | the newest reading, as `air.changed` gives it, and `known: true`; `{"known": false}` with no sensor, its part not running, or no reading in 15 s | `{"pm2_5":7.4,"co2_ppm":912,"feel":"fine","known":true}` | `air` |
+| `device` | the lamp's own computer: `cpu_load` (the last minute's, 1 is every processor busy), `memory_used` and `disk_free` (0–1), `uptime_s`, `temperature_c` (by sensor, °C), and `known: true`; `{"known": false}` with no reading in 15 s | `{"cpu_load":0.42,"memory_used":0.55,"disk_free":0.71,"uptime_s":3600,"temperature_c":{"cpu_thermal":61.5},"known":true}` | `device` |
 | `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
-| `air` | the room's air (particles, humidity, temperature, CO2), from the lamp's air part | planned: not a state `get` answers yet | |
 
 ### Never readable
 
@@ -293,7 +295,9 @@ hours (by default 22:00 to 07:00 local; a lamp can set its own or `off`, said in
 | `lamp.on(event, handler, *, phrases=None)` | `event`: one of the schema's events (below), or `lease` or `done`. `handler(event)`: a function or coroutine. `phrases`: with `phrase.heard` only, up to 16 for the computer, each of 64 characters at most and 8 letters at least. Changing the phrases is 6 a minute | the event's. Returns a `Subscription`: `await` it to get the lamp's refusal |
 | `lamp.off(event, handler)` | as `on` | unsubscribes once the event's last handler is gone |
 | `await lamp.subscribe(events, phrases=None)`, `await lamp.unsubscribe(events)` | a list of events | each event's |
-| `await lamp.get(*states)` | `presence` (needs `look`), `light`, `mood`, `lamp` | the states asked, by those names |
+| `await lamp.get(*states)` | `presence` (needs `look`), `light`, `mood`, `lamp`, `air` (needs `air`), `device` (needs `device`) | the states asked, by those names |
+| `await lamp.air()` | | the `air` grant: the air sensor's newest reading (`pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel`) and `known`; only `{"known": False}` with no reading. Changes come as `air.changed` |
+| `await lamp.device()` | | the `device` grant: the lamp's own computer (`cpu_load`, `memory_used`, `disk_free`, `uptime_s`, `temperature_c`) and `known` |
 
 Every event and state, with its fields, an example and when it fires, is
 "Everything you can read" above.
@@ -321,6 +325,8 @@ its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 | `await lamp.joints(lease, within_ms, **targets)` | `lease`: your held `body` lease. `within_ms`: up to 5,000. `targets`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow` in degrees, −180 to 180, at least one | `body` | `body` (named) |
 | `await lamp.light(colour, level, for_ms, pattern=None)` | `colour`: `yellow`, `red`, `green`, `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`. `level`: 1–5. `for_ms`: 1–30,000. `pattern`: none (steady), `breathe` (level 2 or up), `candle` (3 or up) or `pulse` (2 or up). Under its level a pattern is `refused`. The ring plays one `pulse` a minute for a computer: a second within the minute shows its colour and level steady, without its pulse. A light never blinks | `light` | no |
 | `await lamp.say(text, *, rephrase=False)` | `text`: words, up to 300 characters, spoken **exactly as written** through the lamp's speech service (no model, no tools) once the person isn't talking. `rephrase=True`: the lamp's model says it in its own words instead, as before | `speak` | no | 6 a minute, 60 an hour; refused in quiet hours |
+| `await lamp.camera_snapshot()` | none; returns the camera's newest picture, JPEG bytes about 320 across. Refused while the lamp is private, or with the camera closed | `camera` | no |
+| `await lamp.camera_stream(on=True, fps=None, size=None)` | `fps`: 1 to 30 a second at most (2); `size`: `640x480` (the default) or `1280x720`. Where the eyes serve every frame (the answer's `fast: true`), each `camera.frame` comes as the camera made it, with the JPEG as `data` (bytes); otherwise the eyes' newest frame, about 1 to 2 a second, with `jpeg` in base64. `fps_now` is the rate lately; each new frame once, until `camera_stream(False)`, `stop` or a `camera.ended` event. Ends with `camera.ended` when the lamp turns private, or after 10 s with the camera closed | `camera` | no |
 | `await lamp.sound(name)` | `name`: a clip of 3 s or less in your package | `speak` | no |
 | `await lamp.stop()` | | none | no |
 | `await lamp.request(op, *, on_id=None, **fields)` | any op of the schema, checked against it first. `on_id(id)`: told the request's id before it is sent, to match a `done` that may come before the reply is read | the op's | |

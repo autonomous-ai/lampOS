@@ -35,6 +35,14 @@ pub trait Parts {
     fn state(&self, kind: StateKind) -> Value;
     /// Ends everything `client` asked for that is still going.
     fn stop(&mut self, client: &str, now_us: u64);
+    /// Ends `client`'s camera stream, and nothing else of it: its pairing
+    /// no longer grants the camera (Thirteen's P2 on #4521).
+    fn camera_end(&mut self, _client: &str) {}
+    /// Whether `client` has a camera stream running now: a frame already
+    /// queued for it goes only then (Thirteen's P3 on #4521).
+    fn camera_streaming(&self, _client: &str) -> bool {
+        false
+    }
 }
 
 /// The parts before actions are routed to them: every action is refused
@@ -74,9 +82,26 @@ pub struct Session {
     client: Option<String>,
     events: BTreeSet<EventKind>,
     phrases: Vec<String>,
+    /// From beyond the lamp's own network (`--remote on`): never the camera
+    /// or the microphone.
+    remote: bool,
 }
 
+/// What a computer beyond the lamp's own network is told when it asks for
+/// the camera or the microphone, whatever it was granted.
+pub const LOCAL_ONLY: &str = "local network only: the camera and the microphone are never given beyond the lamp's own network";
+
 impl Session {
+    /// This connection comes from beyond the lamp's own network.
+    pub fn set_remote(&mut self) {
+        self.remote = true;
+    }
+
+    /// Whether it comes from beyond the lamp's own network.
+    pub fn remote(&self) -> bool {
+        self.remote
+    }
+
     /// The client it said `hello` as, if it has.
     pub fn client(&self) -> Option<&str> {
         self.client.as_deref()
@@ -115,6 +140,9 @@ pub struct Door {
     codes: Codes,
     /// The grants the owner chose with the code out.
     code_grants: BTreeSet<Grant>,
+    /// A computer re-paired without the camera: its stream is ended once
+    /// the pairing is answered.
+    camera_dropped: Option<String>,
     clients: Clients,
     clients_path: Option<PathBuf>,
     leases: Leases,
@@ -230,6 +258,7 @@ impl Door {
             lamp: json!({"id": id, "name": name, "v": VERSION}),
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
+            camera_dropped: None,
             clients,
             clients_path,
             leases: Leases::new(),
@@ -374,6 +403,7 @@ impl Door {
             client: None,
             events: BTreeSet::new(),
             phrases: Vec::new(),
+            remote: false,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -545,7 +575,11 @@ impl Door {
         }
         match &op {
             Op::Pair { name, key, proof } => {
-                return self.pair(session, re, name, key, proof, now_us, wall_s);
+                let outcome = self.pair(session, re, name, key, proof, now_us, wall_s);
+                if let Some(client) = self.camera_dropped.take() {
+                    parts.camera_end(&client);
+                }
+                return outcome;
             }
             Op::Hello { client, sig } => return self.hello(session, re, client, sig),
             _ => {}
@@ -569,6 +603,14 @@ impl Door {
                 ErrorCode::NoGrant,
                 format!("not granted: {}", missing.join(", ")),
             );
+        }
+        if session.remote
+            && op
+                .needs()
+                .iter()
+                .any(|grant| matches!(grant, Grant::Camera | Grant::Microphone))
+        {
+            return refuse(ErrorCode::Refused, LOCAL_ONLY.to_owned());
         }
         match &op {
             Op::Subscribe { events, phrases } => {
@@ -873,6 +915,15 @@ impl Door {
         {
             self.tell_helper_grants(&id, &grants);
         }
+        // Re-paired without the camera: a stream it had going ends now,
+        // not when it next asks (Thirteen's P2 on #4521).
+        if before
+            .as_ref()
+            .is_some_and(|before| before.grants.contains(&Grant::Camera))
+            && !grants.contains(&Grant::Camera)
+        {
+            self.camera_dropped = Some(id.clone());
+        }
         ok(re, json!({"client": id, "grants": grants}))
     }
 
@@ -1090,6 +1141,7 @@ mod tests {
     struct Fake {
         did: Vec<String>,
         stopped: Vec<String>,
+        cameras_ended: Vec<String>,
         refuse_with: Option<Error>,
     }
 
@@ -1109,6 +1161,9 @@ mod tests {
         }
         fn stop(&mut self, client: &str, _: u64) {
             self.stopped.push(client.to_owned());
+        }
+        fn camera_end(&mut self, client: &str) {
+            self.cameras_ended.push(client.to_owned());
         }
     }
 
@@ -1172,6 +1227,40 @@ mod tests {
         );
         assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
         (door, session, fake)
+    }
+
+    /// Thirteen's P2 on #4521: a computer re-paired without the camera has
+    /// its stream ended at once, and nothing else of it; re-paired keeping
+    /// the camera, its stream goes on.
+    #[test]
+    fn a_re_pairing_that_drops_the_camera_ends_its_stream_at_once() {
+        let computer = Computer::new(41);
+        let (mut door, _, mut fake) = paired(&computer, &[Grant::Light, Grant::Camera]);
+        let id = pairing::client_id(&computer.key());
+        // One pairing try a second: each a few seconds after the last.
+        let pair_again = |door: &mut Door, fake: &mut Fake, grants: &[Grant], at: u64| {
+            let code = door.issue_code(grants.iter().copied().collect(), at);
+            let (mut session, welcome) = door.open();
+            let outcome = door.handle(
+                &mut session,
+                &computer.pair_frame(&code, &welcome),
+                fake,
+                at,
+                1,
+            );
+            assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+        };
+        pair_again(&mut door, &mut fake, &[Grant::Light, Grant::Camera], 5 * S);
+        assert!(
+            fake.cameras_ended.is_empty(),
+            "the camera kept, the stream goes on"
+        );
+        pair_again(&mut door, &mut fake, &[Grant::Light], 10 * S);
+        assert_eq!(fake.cameras_ended, [id]);
+        assert!(
+            fake.stopped.is_empty(),
+            "only the camera, not its light or leases"
+        );
     }
 
     /// docs/control.md, "The journal": one line a command, naming the
@@ -1777,6 +1866,39 @@ mod tests {
                 .starts_with("LAMP_CONTROL_QUIET ")
         );
         assert!(quiet_window_of(Some("08:00-08:00"), None).is_err());
+    }
+
+    #[test]
+    fn a_computer_beyond_the_lamps_own_network_never_gets_the_camera_whatever_it_was_granted() {
+        let computer = Computer::new(1);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Light, Grant::Camera]);
+        // On the lamp's own network the camera reaches the part.
+        let near = door.handle(
+            &mut session,
+            r#"{"id":3,"op":"camera.snapshot"}"#,
+            &mut fake,
+            2 * S,
+            1,
+        );
+        assert_eq!(code_of(&near), None, "{near:?}");
+        session.set_remote();
+        for frame in [
+            r#"{"id":4,"op":"camera.snapshot"}"#,
+            r#"{"id":5,"op":"camera.stream","on":true}"#,
+        ] {
+            let far = door.handle(&mut session, frame, &mut fake, 3 * S, 1);
+            assert_eq!(code_of(&far), Some("refused"));
+            assert_eq!(reply(&far)["error"]["why"], LOCAL_ONLY);
+        }
+        // Everything else it was granted still goes.
+        let light = door.handle(
+            &mut session,
+            r#"{"id":6,"op":"light","colour":"warm","level":2,"for_ms":1000}"#,
+            &mut fake,
+            4 * S,
+            1,
+        );
+        assert_eq!(code_of(&light), None, "{light:?}");
     }
 
     #[test]

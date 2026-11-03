@@ -15,6 +15,7 @@ use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{BootId, Controller, MonoTime, Permission};
 use std::{
     fmt, fs, io,
+    os::unix::fs::FileTypeExt,
     path::Path,
     time::{Duration, Instant},
 };
@@ -173,9 +174,9 @@ fn wait(
     // stopped and its directory removed as after any failed look.
     let first = waiting.ready(&mut worker);
     if let Err(error) = first {
-        let cleanup = cleanup(&mut worker, None);
+        let cleanup = cleanup(&mut worker, None, &directory.path);
         drop(worker);
-        let result = finish(Err(error), cleanup);
+        let result = settled(Err(error), cleanup);
         return finish(result, fs::remove_dir(&directory.path));
     }
     let path = directory.path.clone();
@@ -358,10 +359,10 @@ fn run(
             std::thread::sleep(Duration::from_millis(2));
         }
     })();
-    let cleanup = cleanup(&mut worker, indicator.as_deref_mut());
+    let cleanup = cleanup(&mut worker, indicator.as_deref_mut(), &directory.path);
     drop(indicator);
     drop(worker);
-    let result = finish(result, cleanup);
+    let result = settled(result, cleanup);
     // Keep a failed writer's evidence distinct from permission to start a new
     // one, even when its process was subsequently reaped.
     let result = finish(result, indicator_failure.map_or(Ok(()), Err));
@@ -542,9 +543,39 @@ impl Waiting {
     }
 }
 
+/// The privacy worker's own sockets in the wait's session directory, which
+/// it unlinks itself as it ends (`lamp_ipc`'s binding drop).
+const PRIVACY_WORKER_SOCKETS: [&str; 2] = ["privacy.c.w", "privacy.d.w"];
+
+/// The wait's result with its workers' [`cleanup`]: an unreadable switch
+/// from a killed and reaped privacy worker ([`killed_privacy_worker`]) is
+/// the wait's own unreadable switch, read again after the retry; any other
+/// cleanup failure is [`finish`]'s, as before. A wait that had already
+/// failed keeps its own error, so a failure that ends the service still
+/// does, and the kill is said on its own line.
+fn settled<T>(result: Result<T>, cleanup: io::Result<()>) -> Result<T> {
+    match cleanup {
+        Err(killed) if is_unavailable(&killed) => Err(match result {
+            Err(error) => {
+                eprintln!("lamp-voice: {killed}");
+                error
+            }
+            Ok(_) => killed.into(),
+        }),
+        other => finish(result, other),
+    }
+}
+
 /// Send Stop to both workers before waiting. Both share one 300 ms userspace
-/// grace, followed by explicit forced cleanup on expiry (always a failure).
-fn cleanup(privacy: &mut Worker, mut indicator: Option<&mut Worker>) -> io::Result<()> {
+/// grace, followed by explicit forced cleanup on expiry (always a failure,
+/// except a privacy worker alone killed, reaped and its sockets removed:
+/// [`killed_privacy_worker`]). `directory` is the wait's session directory,
+/// where the privacy worker's sockets are.
+fn cleanup(
+    privacy: &mut Worker,
+    mut indicator: Option<&mut Worker>,
+    directory: &Path,
+) -> io::Result<()> {
     let stopped_at = monotonic_us();
     let deadline = Instant::now() + Duration::from_millis(300);
     // A worker that ended on its own (an unreadable switch, #795) cannot
@@ -556,6 +587,7 @@ fn cleanup(privacy: &mut Worker, mut indicator: Option<&mut Worker>) -> io::Resu
     // does not end within the grace is still forced and a failure.
     let mut refused: Option<io::Error> = None;
     let mut error = None;
+    let mut killed = None;
     match privacy.channels.control.send(Control::Stop) {
         Ok(()) => {
             #[cfg(test)]
@@ -622,8 +654,7 @@ fn cleanup(privacy: &mut Worker, mut indicator: Option<&mut Worker>) -> io::Resu
                 if let Some(refused) = &refused {
                     reason.push_str(&format!("; stop delivery failed: {refused}"));
                 }
-                let failure = privacy.terminate_and_reap(io::ErrorKind::TimedOut, reason);
-                error.get_or_insert(failure);
+                killed = Some(privacy.terminate_and_reap(io::ErrorKind::TimedOut, reason));
             }
             if !indicator_exited && let Some(child) = &mut indicator {
                 let failure = child.terminate_and_reap(
@@ -640,7 +671,54 @@ fn cleanup(privacy: &mut Worker, mut indicator: Option<&mut Worker>) -> io::Resu
         error
             .get_or_insert_with(|| io::Error::other("privacy indicator black write not confirmed"));
     }
-    error.map_or(Ok(()), Err)
+    match (killed, error) {
+        (None, error) => error.map_or(Ok(()), Err),
+        (Some(killed), None) => Err(killed_privacy_worker(privacy, directory, killed)),
+        // Any other failure stays one, the kill said first as before.
+        (Some(killed), Some(other)) => {
+            Err(io::Error::new(killed.kind(), format!("{killed}; {other}")))
+        }
+    }
+}
+
+/// A privacy worker that did not stop within the grace and was killed
+/// cannot unlink its own sockets, so the session directory could not be
+/// removed and the voice exited 1 (lamp-06c1 cold boot, on4, #4332:
+/// `reaped with signal: 9 (SIGKILL); verified cleanup failed: Directory not
+/// empty`). Once it is reaped, no process owns them: they are removed, and
+/// only they, only while each is a socket (never through a symlink), and the
+/// kill is then an unreadable switch, read again with a fresh worker. On
+/// the Controls route this worker only reads the bus and holds the wait's
+/// Denied authority, never a microphone or a GPIO line, so its end grants
+/// nothing. A worker not reaped, or a path that is not its socket, keeps
+/// the kill a cleanup failure, with that path left as it is.
+fn killed_privacy_worker(privacy: &mut Worker, directory: &Path, killed: io::Error) -> io::Error {
+    if !matches!(privacy.try_exit(), Ok(Some(_))) {
+        return killed;
+    }
+    let paths = PRIVACY_WORKER_SOCKETS.map(|name| directory.join(name));
+    let mut present = Vec::new();
+    for path in &paths {
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_socket() => present.push(path),
+            Ok(_) => {
+                return io::Error::new(
+                    killed.kind(),
+                    format!("{killed}; {} is not its socket, left", path.display()),
+                );
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return io::Error::new(killed.kind(), format!("{killed}; {error}"));
+            }
+        }
+    }
+    for path in present {
+        if let Err(error) = fs::remove_file(path) {
+            return io::Error::new(killed.kind(), format!("{killed}; {error}"));
+        }
+    }
+    unavailable_io(killed)
 }
 
 fn drain_shutdown(
@@ -882,7 +960,7 @@ pub(crate) mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         worker.send_stop_until_peer_gone();
-        cleanup(&mut worker, None).unwrap();
+        cleanup(&mut worker, None, &directory.path).unwrap();
         drop(worker);
         let _ = fs::remove_dir(&directory.path);
     }
@@ -917,7 +995,7 @@ pub(crate) mod tests {
                     });
                     let ended = finish(
                         Err(unavailable("privacy publisher unavailable")),
-                        cleanup(&mut worker, None),
+                        cleanup(&mut worker, None, &fixtures.path),
                     );
                     late.join().unwrap();
                     drop(worker);
@@ -1023,7 +1101,7 @@ pub(crate) mod tests {
                 .unwrap()
                 .allowed
         );
-        cleanup(&mut worker, None).unwrap();
+        cleanup(&mut worker, None, &directory.path).unwrap();
         let peer = peer.join().unwrap();
         assert!(peer.received_stop);
         assert!(peer.denied_heartbeats > 0);
@@ -1055,7 +1133,7 @@ pub(crate) mod tests {
                 );
                 std::thread::sleep(Duration::from_millis(2));
             }
-            cleanup(&mut worker, None).unwrap();
+            cleanup(&mut worker, None, &directory.path).unwrap();
             assert!(peer.join().unwrap().received_stop);
         }
     }
@@ -1221,7 +1299,7 @@ pub(crate) mod tests {
             let directory = SessionDirectory::create().unwrap();
             let (mut privacy, privacy_peer) = stopping_child(&directory.path, "privacy", 0);
             let (mut indicator, ring_peer) = stopping_child(&directory.path, "ring", receipts);
-            let result = cleanup(&mut privacy, Some(&mut indicator));
+            let result = cleanup(&mut privacy, Some(&mut indicator), &directory.path);
             assert_eq!(
                 result.is_ok(),
                 receipts == 1,
@@ -1353,7 +1431,7 @@ pub(crate) mod tests {
         assert_eq!(gates, 2);
         let _ = worker.channels.control.send(Control::Stop);
         let seen = peer.join().unwrap();
-        let _ = cleanup(&mut worker, None);
+        let _ = cleanup(&mut worker, None, &directory.path);
         drop(worker);
         let _ = fs::remove_dir(&directory.path);
         assert!(
@@ -1384,7 +1462,7 @@ pub(crate) mod tests {
         let seen = peer.join().unwrap();
         // The stand-in has gone, so the next look cannot reach it.
         let after = waiting.step(&mut worker, None, &mut |_, _, _| Ok(()), &mut |_| Ok(true));
-        let _ = cleanup(&mut worker, None);
+        let _ = cleanup(&mut worker, None, &directory.path);
         drop(worker);
         let _ = fs::remove_dir(&directory.path);
         assert!(seen.lapsed, "a 320 ms call kept the lease");
@@ -1415,7 +1493,7 @@ pub(crate) mod tests {
         });
         let _ = worker.channels.control.send(Control::Stop);
         let seen = peer.join().unwrap();
-        let _ = cleanup(&mut worker, None);
+        let _ = cleanup(&mut worker, None, &directory.path);
         drop(worker);
         let _ = fs::remove_dir(&directory.path);
         assert!(
@@ -1456,6 +1534,120 @@ pub(crate) mod tests {
         let _ = fs::remove_dir(&fixtures.path);
     }
 
+    /// A privacy worker that ignores its Stop, in `directory`, its sockets
+    /// left behind as a killed process leaves them: its peer's endpoints,
+    /// which would unlink them, are never dropped.
+    fn a_stalled_privacy_worker(directory: &Path) -> Worker {
+        let (worker, peer) = Worker::sleeping_fixture(directory, "privacy");
+        std::mem::forget(peer);
+        worker
+    }
+
+    /// A wait whose look failed on an unreadable switch, ended by [`run`]
+    /// with `worker` in `directory`.
+    fn a_wait_ended(worker: Worker, directory: SessionDirectory) -> Result<WaitOutcome> {
+        run(
+            worker,
+            directory,
+            Waiting::new(new_boot().unwrap()).unwrap(),
+            &Termination::inactive(),
+            |_, _, _| Ok(()),
+            |_| Err(unavailable("Controls privacy unavailable while waiting")),
+            false,
+            |_| unreachable!("no indicator on this route"),
+        )
+    }
+
+    /// lamp-06c1's cold boot, on4 (#4332): the wait failed on an unreadable
+    /// switch, its privacy worker did not stop within 300 ms and was
+    /// killed, and its `privacy.c.w` and `privacy.d.w` were left, so the
+    /// session directory was `not empty` and the voice exited 1. Now the
+    /// reaped worker's sockets are removed, the directory with them, and the
+    /// wait is an unreadable switch, read again after the retry.
+    #[test]
+    fn a_killed_privacy_workers_sockets_go_and_the_switch_is_read_again() {
+        let directory = SessionDirectory::create().unwrap();
+        let path = directory.path.clone();
+        let worker = a_stalled_privacy_worker(&path);
+        let error = a_wait_ended(worker, directory).expect_err("the wait failed");
+        assert!(is_unavailable(&*error), "{error}");
+        assert!(!path.exists(), "the session directory was left");
+        let mut first = Some(error);
+        let mut waits = 0;
+        let outcome = retried(&Termination::inactive(), Duration::from_millis(1), || {
+            waits += 1;
+            first.take().map_or(Ok(WaitOutcome::Allowed), Err)
+        })
+        .unwrap();
+        assert_eq!((outcome, waits), (WaitOutcome::Allowed, 2));
+        // A look that had allowed is read again too: the kill is never
+        // passed over as verified cleanup.
+        let directory = SessionDirectory::create().unwrap();
+        let mut worker = a_stalled_privacy_worker(&directory.path);
+        let cleanup = cleanup(&mut worker, None, &directory.path);
+        let error = settled(Ok(WaitOutcome::Allowed), cleanup).expect_err("not allowed");
+        assert!(is_unavailable(&*error), "{error}");
+        assert!(error.to_string().contains("SIGKILL"), "{error}");
+        drop(worker);
+        fs::remove_dir(&directory.path).unwrap();
+    }
+
+    /// Only the killed worker's own sockets are removed: a regular file, or
+    /// a symlink even to a socket, at either path is left as it is, and the
+    /// kill stays a cleanup failure that ends the service.
+    #[test]
+    fn a_path_that_is_not_the_killed_workers_socket_is_left_and_still_fails() {
+        let outside = SessionDirectory::create().unwrap();
+        let target = outside.path.join("kept");
+        let listener = std::os::unix::net::UnixDatagram::bind(&target).unwrap();
+        for (name, symlink) in [("privacy.d.w", false), ("privacy.c.w", true)] {
+            let directory = SessionDirectory::create().unwrap();
+            let path = directory.path.clone();
+            let worker = a_stalled_privacy_worker(&path);
+            let replaced = path.join(name);
+            fs::remove_file(&replaced).unwrap();
+            if symlink {
+                std::os::unix::fs::symlink(&target, &replaced).unwrap();
+            } else {
+                fs::write(&replaced, b"not a socket").unwrap();
+            }
+            let error = a_wait_ended(worker, directory).expect_err("the wait failed");
+            assert!(!is_unavailable(&*error), "{name}: {error}");
+            assert!(error.to_string().contains("is not its socket"), "{error}");
+            let kind = fs::symlink_metadata(&replaced).unwrap().file_type();
+            assert_eq!((kind.is_symlink(), kind.is_file()), (symlink, !symlink));
+            assert!(
+                fs::symlink_metadata(&target)
+                    .unwrap()
+                    .file_type()
+                    .is_socket()
+            );
+            for left in PRIVACY_WORKER_SOCKETS {
+                let _ = fs::remove_file(path.join(left));
+            }
+            fs::remove_dir(&path).unwrap();
+        }
+        drop(listener);
+        fs::remove_file(&target).unwrap();
+    }
+
+    /// A privacy worker that stops within the grace is cleaned up as
+    /// before: its sockets are its own to unlink, and none is touched.
+    #[test]
+    fn a_privacy_worker_that_stops_keeps_its_own_sockets_to_unlink() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, peer) = stopping_child(&directory.path, "privacy", 0);
+        cleanup(&mut worker, None, &directory.path).unwrap();
+        assert!(worker.try_exit().unwrap().unwrap().success());
+        for name in PRIVACY_WORKER_SOCKETS {
+            let kind = fs::symlink_metadata(directory.path.join(name)).unwrap();
+            assert!(kind.file_type().is_socket(), "{name}");
+        }
+        drop(peer.join().unwrap());
+        drop(worker);
+        fs::remove_dir(&directory.path).unwrap();
+    }
+
     /// Whichever renewal finds the worker gone ends the wait closed, as
     /// any does, and its journal line says which (#4332).
     #[test]
@@ -1479,7 +1671,7 @@ pub(crate) mod tests {
                     }
                 }
             };
-            let _ = cleanup(&mut worker, None);
+            let _ = cleanup(&mut worker, None, &directory.path);
             drop(worker);
             let _ = fs::remove_dir(&directory.path);
             assert!(is_unavailable(&*error), "{error}");

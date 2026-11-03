@@ -10,6 +10,12 @@
 //! now has its answer here: [`LINE`], said in the route's voice and kept in
 //! the thread as the lamp's, so the next turn sees the story, the stop and
 //! that the lamp stopped. The second route only.
+//!
+//! A stop said just after the answer ended, within [`JUST_AFTER`] of its
+//! last sound, gets the same line (lamp-29e7 on 30 Oct, Sixth's item 6 on
+//! #4710: "Stop" said as the story's last words played out went to the
+//! model, or was held as a word of the room's): a stop always gets the
+//! same short line.
 
 /// Where the coordinator reads the switch.
 pub const ENVIRONMENT: &str = "LAMP_SPOKEN_STOP_ENDS";
@@ -17,6 +23,9 @@ pub const ENVIRONMENT: &str = "LAMP_SPOKEN_STOP_ENDS";
 pub const FLAG: &str = "--spoken-stop-ends";
 /// What the lamp says to a stop said over its answer.
 pub const LINE: &str = "Okay, I'll stop there.";
+/// How long after the lamp's answer ended a stop said is still said to
+/// it: the person heard the answer end as they spoke.
+pub const JUST_AFTER: std::time::Duration = std::time::Duration::from_secs(3);
 /// The most words a stop request has: "Okay, stop telling the story." is
 /// six; a longer line asks for more than a stop and goes to the model.
 const MOST_WORDS: usize = 6;
@@ -67,6 +76,16 @@ pub fn could_be_echo(heard: &str, said: &str) -> bool {
     heard.len() >= 2 && said.windows(heard.len()).any(|run| run == heard.as_slice())
 }
 
+/// Whether a line begun at `began_us` began within [`JUST_AFTER`] of the
+/// lamp's answer's last sound, played by `until_us` (both on the monotonic
+/// clock): any time before that end too, as it played. Never with no answer
+/// played yet (`until_us` 0) or no start known.
+pub fn just_after(began_us: u64, until_us: u64) -> bool {
+    began_us != 0
+        && until_us != 0
+        && began_us <= until_us.saturating_add(JUST_AFTER.as_micros() as u64)
+}
+
 /// The worker's flags for the switch, from the coordinator's environment.
 pub fn arguments_from_environment() -> Vec<String> {
     arguments(std::env::var(ENVIRONMENT).ok().as_deref())
@@ -102,6 +121,39 @@ mod tests {
         assert_eq!(take(&flags), (true, &flags[1..]));
         let other = ["x".to_owned()];
         assert_eq!(take(&other), (false, &other[..]));
+    }
+
+    #[test]
+    fn a_stop_just_after_the_answer_is_within_three_seconds_of_its_end() {
+        let end = 50_000_000;
+        assert!(just_after(end - 2_000_000, end), "while it played");
+        assert!(just_after(end + 1_000_000, end));
+        assert!(just_after(end + 3_000_000, end));
+        assert!(!just_after(end + 3_000_001, end));
+        assert!(!just_after(end + 1_000_000, 0), "no answer played");
+        assert!(!just_after(0, end), "no start known");
+    }
+
+    #[test]
+    fn a_stop_with_the_lamps_name_is_one_and_a_long_line_with_stop_is_not() {
+        for stop in [
+            "Stop Lamp.",
+            "Stop, Lamp!",
+            "Lamp, stop.",
+            "Lamp stop",
+            "Hey Lamp, stop.",
+            "Okay Lamp, stop it.",
+        ] {
+            assert!(is_stop_request(stop), "{stop}");
+        }
+        for not in [
+            "Don't stop.",
+            "Lamp, don't stop.",
+            "I had to stop at the shop on the way home today.",
+            "We stopped at the bus stop and then walked all the way home.",
+        ] {
+            assert!(!is_stop_request(not), "{not}");
+        }
     }
 
     #[test]

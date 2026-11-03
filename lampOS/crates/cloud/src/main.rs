@@ -30,6 +30,14 @@ fn say(line: &str) {
     eprintln!("lamp-cloud: {line}");
 }
 
+/// Whether the ping's answers are counted for a sign-out
+/// ([`signed_out::Login`]): to tell it (`LAMP_SIGNED_OUT=on`), or to wipe
+/// the person's service tokens on it (`LAMP_SERVICES=on`, whatever
+/// `LAMP_SIGNED_OUT` says); never without a login to reject.
+fn watches_login(telling: bool, services: bool, key: &str) -> bool {
+    (telling || services) && !key.is_empty()
+}
+
 fn identity(lamp: &Real) -> Identity {
     Identity {
         device: "lamp".into(),
@@ -168,8 +176,16 @@ fn main() -> ExitCode {
     let report_build = reports::Build::of(&build);
     let shared_for_alerts = shared.clone();
     // A rejected login said on the bus and to the app: only with
-    // LAMP_SIGNED_OUT=on, and only with a login to reject.
-    let mut login = (signed_out::on_from_environment() && !key.is_empty()).then(|| {
+    // LAMP_SIGNED_OUT=on, and only with a login to reject. Counted also
+    // with LAMP_SERVICES=on alone, so a lamp removed from the app wipes the
+    // person's service tokens whatever LAMP_SIGNED_OUT says.
+    let telling_on = signed_out::on_from_environment();
+    let mut login = watches_login(
+        telling_on,
+        lamp_cloud::services::on_from_environment(),
+        &key,
+    )
+    .then(|| {
         signed_out::Login::open(
             &key,
             std::env::var_os("STATE_DIRECTORY")
@@ -177,7 +193,16 @@ fn main() -> ExitCode {
             &mut say,
         )
     });
-    let telling = login.as_ref().map(|login| (login.watch(), bus.clone()));
+    let telling = login
+        .as_ref()
+        .filter(|_| telling_on)
+        .map(|login| (login.watch(), bus.clone()));
+    // The person's own services from the app (Queue #4710): only with
+    // LAMP_SERVICES=on; every token wiped once the lamp is signed out.
+    let services = lamp_cloud::services::Services::product(&account, &key);
+    let wiping = services
+        .clone()
+        .zip(login.as_ref().map(|login| login.watch()));
     let alerts_bus = bus.clone();
     let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     // A made skill sent to the Skills Store (fourteen-P13): only with
@@ -232,6 +257,7 @@ fn main() -> ExitCode {
             .then(lamp_cloud::make_skill::from_environment)
             .flatten(),
         share,
+        services,
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -280,6 +306,7 @@ fn main() -> ExitCode {
         guard: None,
         make_skill: None,
         share: None,
+        services: None,
         shutdown: None,
     };
     runtime.block_on(async move {
@@ -334,8 +361,19 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
+        let mut said_wipes = |line: &str| say(line);
+        let wiping = async move {
+            match wiping {
+                Some((services, since)) => {
+                    lamp_cloud::services::wipe_when_signed_out(since, services, &mut said_wipes)
+                        .await
+                }
+                None => std::future::pending().await,
+            }
+        };
         tokio::select! {
             () = alerting => {}
+            () = wiping => {}
             () = pinging => {}
             () = staying => {}
             () = looks => {}
@@ -344,4 +382,20 @@ fn main() -> ExitCode {
         }
     });
     ExitCode::from(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A lamp removed from the app wipes its service tokens with
+    /// LAMP_SERVICES alone: the sign-out is watched for it.
+    #[test]
+    fn the_sign_out_is_watched_for_the_services_whatever_lamp_signed_out_says() {
+        assert!(watches_login(false, true, "key"));
+        assert!(watches_login(true, false, "key"));
+        assert!(watches_login(true, true, "key"));
+        assert!(!watches_login(false, false, "key"));
+        assert!(!watches_login(true, true, ""), "no login to reject");
+    }
 }

@@ -50,10 +50,10 @@ owner for the grants your program needs, by what it does:
 | hears a phrase or its name | `hear` |
 | hears music, laughter, the door, footsteps | `sound` |
 | puts skills of its own on the lamp | `skills` |
+| reads the room's air, the lamp's own computer | `air`, `device` |
 | sees pictures, hears audio (arriving) | `camera`, `microphone` |
 
-`air` and `device` come with #4525. **A grant added later needs a new
-pairing code:** the owner can't widen a pairing. Then, on the computer:
+**A grant added later needs a new pairing code:** the owner can't widen a pairing. Then, on the computer:
 
 ```sh
 lamp pair CODE --pin PIN --host lamp-xxxx.local --name my-laptop
@@ -93,7 +93,8 @@ elsewhere:
 
 - **Grants:** the owner ticks what this computer may do: `body` (move),
   `light`, `speak`, `look` (presence, hands, face/hand targets), `hear`
-  (phrases, the name), `sound` (sound classes), `skills` (push skills).
+  (phrases, the name), `sound` (sound classes), `skills` (push skills),
+  `air` (the air sensor), `device` (the lamp's own computer).
   A call without its grant is refused `no_grant`. Grants are read at hello.
 - **Leases:** moving the body (`look`, `move`, `play`, `joints`) needs a
   `body` lease. Hold one with `async with lamp.lease("body"):` (JS
@@ -158,7 +159,7 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
 - What each carries, and its grant: [references/api.md](references/api.md#events-and-state).
 - Never readable, by any grant: pictures, audio, transcripts, face prints,
   names. A hand's or face's place is a share of the picture.
-- **The camera** (arriving, the `camera` grant): a snapshot, or a stream of
+- **The camera** (the `camera` grant): a snapshot, or a stream of
   frames; never while private, never off the lamp's own network:
   [references/camera.md](references/camera.md). The microphone, `body.state`
   and routed `joints` come next; this skill gains them as they land.

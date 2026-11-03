@@ -313,6 +313,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "알겠어요. 그만할게요.",
         ],
     ),
+    // Its question when a cut-in ended its answer with no words
+    // (`LAMP_CUT_IN_WORDLESS_ASKS`, off in the product).
+    (
+        crate::cut_in_wordless::LINE,
+        [
+            "Có ai vừa nói gì không?",
+            "誰か何か言った？",
+            "刚才有人说话吗？",
+            "누가 뭐라고 했어요?",
+        ],
+    ),
     // What it says when a line by name gets no words twice
     // (`LAMP_NO_WORDS_AGAIN`, off in the product; Tests' P3 on #4723).
     (
@@ -322,6 +333,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、言葉が出てこなかった。もう一度聞いてくれる？",
             "抱歉，我刚才一下子说不出话了。你能再问我一次吗？",
             "미안해요, 하려던 말을 놓쳤어요. 다시 한 번 물어봐 주세요.",
+        ],
+    ),
+    // What it says when an answer to its own question gets no words
+    // (`LAMP_ANSWER_ASK_AGAIN`, off in the product; Queue #4710, item 3).
+    (
+        crate::second_provider::ANSWER_AGAIN_LINE,
+        [
+            "Xin lỗi, bạn nói lại được không?",
+            "ごめんね、もう一度言ってくれる？",
+            "抱歉，你能再说一遍吗？",
+            "미안해요, 다시 한 번 말해 줄래요?",
         ],
     ),
     // The first stand's ask and its "here I go", sent to the say service as
@@ -700,7 +722,7 @@ mod tests {
     /// left English; English keeps the English, byte for byte.
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
-        assert_eq!(FIXED_LINES.len(), 19);
+        assert_eq!(FIXED_LINES.len(), 21);
         for (english, _) in FIXED_LINES {
             assert_eq!(fixed_in(None, english), *english);
         }
