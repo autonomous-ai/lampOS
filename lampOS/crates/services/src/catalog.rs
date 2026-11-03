@@ -30,7 +30,8 @@ pub struct Service {
     pub name: &'static str,
     /// The hosts its token may be sent to: one of these or a subdomain.
     pub hosts: &'static [&'static str],
-    /// The base of its HTTP API; `None` for Gmail, read over IMAP.
+    /// The base of its HTTP API; `None` for an MCP service. Gmail's is for
+    /// a Google sign-in only: an app password reads over IMAP.
     pub api: Option<&'static str>,
     /// Its reads are GraphQL queries (`POST /graphql`), never a mutation.
     pub graphql: bool,
@@ -66,13 +67,18 @@ pub const SERVICES: &[Service] = &[
     Service {
         code: "gmail",
         name: "Gmail",
-        // V1 lists googleapis.com, whose REST refuses an app password: on
-        // the lamp Gmail is IMAP and SMTP, so its token goes to those only.
-        hosts: &["imap.gmail.com", "smtp.gmail.com"],
-        api: None,
+        // An app password goes over IMAP and SMTP only; a Google sign-in
+        // (OAuth) over Gmail's REST API only, which refuses an app password.
+        // `serve.rs` and `mail.rs` keep each to its own hosts.
+        hosts: &["imap.gmail.com", "smtp.gmail.com", "gmail.googleapis.com"],
+        api: Some("https://gmail.googleapis.com"),
         graphql: false,
-        reads: &[],
-        writes: &[],
+        reads: &[
+            (Get, "/gmail/v1/users/me/profile"),
+            (Get, "/gmail/v1/users/me/messages"),
+            (Get, "/gmail/v1/users/me/messages/*"),
+        ],
+        writes: &[(Post, "/gmail/v1/users/me/messages/send")],
         mcp: None,
     },
     Service {
@@ -449,6 +455,7 @@ mod tests {
         assert!(host_allowed("google_drive", "www.googleapis.com"));
         assert!(host_allowed("google_calendar", "WWW.GoogleAPIs.com"));
         assert!(host_allowed("gmail", "imap.gmail.com"));
+        assert!(host_allowed("gmail", "gmail.googleapis.com"));
         for (code, host) in [
             ("github", "api.github.com.evil.test"),
             ("github", "evilapi.github.com"),
@@ -464,7 +471,8 @@ mod tests {
         ] {
             assert!(!host_allowed(code, host), "{code} to {host}");
         }
-        // Every service's hosts are V1's, but Gmail's (IMAP and SMTP).
+        // Every service's hosts are V1's, but Gmail's (IMAP and SMTP for an
+        // app password, its own REST host for a Google sign-in).
         for service in SERVICES {
             assert!(!service.hosts.is_empty(), "{}", service.code);
             if let Some(api) = service.api {
@@ -537,7 +545,24 @@ mod tests {
         assert!(!ok("ahrefs", Post, "/v3/site-explorer/overview"));
         assert!(ok("facebook", Get, "/v19.0/123/posts"));
         assert!(!ok("facebook", Post, "/v19.0/123/feed"));
-        assert!(!ok("gmail", Get, "/gmail/v1/users/me/messages"));
+        assert!(ok("gmail", Get, "/gmail/v1/users/me/messages"));
+        assert!(ok(
+            "gmail",
+            Get,
+            "/gmail/v1/users/me/messages/18c2f3a4b5d6e7f8"
+        ));
+        assert!(!ok("gmail", Post, "/gmail/v1/users/me/messages/send"));
+        assert!(!ok("gmail", Get, "/gmail/v1/users/me/settings/filters"));
+        assert!(write_allowed(
+            "gmail",
+            Post,
+            "/gmail/v1/users/me/messages/send"
+        ));
+        assert!(!write_allowed(
+            "gmail",
+            Post,
+            "/gmail/v1/users/me/messages/1/trash"
+        ));
         assert!(!ok("linear", Get, "/graphql"));
         // Writes have their own list, which reads never use.
         assert!(write_allowed(

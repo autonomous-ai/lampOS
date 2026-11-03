@@ -188,14 +188,15 @@ a secret.
 The catalogue is `crates/services/src/catalog.rs`; reads are
 `reads.rs` (`WHATS`), writes `writes.rs` (`ACTIONS`). A token goes only to the
 hosts in its row, or a subdomain of one (an MCP host exactly, no subdomain):
-V1's `OFFICIAL_HOSTS` (`skills/connectors/scripts/connector.py`), but Gmail's,
-and Google Calendar's and Drive's, held to `www.googleapis.com`, the one
-Google host their reads and writes use (a refresh goes to the lamp's
-backend, never to Google).
+V1's `OFFICIAL_HOSTS` (`skills/connectors/scripts/connector.py`), but Gmail's
+(its IMAP and SMTP hosts for an app password, `gmail.googleapis.com` for a
+Google sign-in), and Google Calendar's and Drive's, held to
+`www.googleapis.com`, the one Google host their reads and writes use (a
+refresh goes to the lamp's backend, never to Google).
 
 | Code | Name | Hosts | Reads (`what`) | Writes (`action`) |
 |---|---|---|---|---|
-| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
+| `gmail` | Gmail | `imap.gmail.com`, `smtp.gmail.com` (an app password); `gmail.googleapis.com` (a Google sign-in) | `recent {count}`, `search {query}`, `message {id}` | `send_mail {to, cc, subject, text}` |
 | `google_calendar` | Google Calendar | `www.googleapis.com` | `events {from, to, calendar, count}`, `calendars` | `create_event {title, start, end, calendar, attendees, text}` |
 | `google_drive` | Google Drive | `www.googleapis.com` | `files {query, count}`, `file {id}`, `text {id}` | none |
 | `notion` | Notion | `api.notion.com` | `search {query, count}`, `page {id}` | `append_text {id, text}` |
@@ -222,24 +223,35 @@ named it; both are known. Facebook is asked at Graph API `v19.0`, Notion with
 `auth_type: "pat"` as `X-Figma-Token`. An OAuth link (`expires_in` or
 `expires_at`, absent: one hour from now) may carry a `refresh_token` and
 `refresh: true`; a static key (`pat`, or an `api_key` with no access token)
-with no time given never expires. Gmail needs the account's email; a
-Facebook write needs `credentials.page_id` (reads fall back to `me`).
+with no time given never expires. Gmail's app password needs the account's
+email (a Google sign-in's is read from Gmail at `set` when the link has
+none); a Facebook write needs `credentials.page_id` (reads fall back to
+`me`).
 
-## Gmail: IMAP and SMTP with the app password
+## Gmail: an app password over IMAP and SMTP, or a Google sign-in over its API
 
-V1 lists `googleapis.com` for Gmail, whose REST API refuses an app password;
-on the lamp Gmail is IMAP and SMTP only (`crates/services/src/mail.rs`), so
-its token goes to those two hosts alone.
+A Gmail link is one of two kinds (`crates/services/src/mail.rs`), told apart
+by the link itself: an **app password** (`auth_type: "pat"`, or no access
+token) is used over IMAP and SMTP only, and a **Google sign-in** (an OAuth
+link: an `access_token`, `auth_type` not `pat`) over Gmail's REST API only.
+A Google Workspace account often can't make an app password ("The setting
+you are looking for is not available for your account"), so it links with a
+sign-in, as Google Calendar does. Each credential goes to its own hosts
+alone: an app password never to `gmail.googleapis.com`, which refuses it,
+and a sign-in's token never to IMAP or SMTP. Both kinds keep every rule
+below: the same `service_read` answer and limits, security mails left out,
+a write only on a spoken "send" with `LAMP_SERVICES_WRITE`, the owner's
+heard line only, nothing kept.
 
-- **The link:** `auth_type: "pat"`, the app password in `api_key` (or
-  `access_token`), the account's email in `credentials.email`. It doesn't
-  expire or refresh. Google shows the password in groups of four with spaces;
-  all whitespace (a phone's copy may carry no-break spaces) is taken out
-  before it is used.
+**An app password:**
+
+- **The link:** the app password in `api_key` (or `access_token`), the
+  account's email in `credentials.email`. It doesn't expire or refresh.
+  Google shows the password in groups of four with spaces; all whitespace
+  (a phone's copy may carry no-break spaces) is taken out before it is used.
 - **At `set`:** an IMAP `LOGIN` is tried first. Refused: `failure` with "Gmail
   refused the app password"; unreachable: "Gmail couldn't be reached"; either
-  way nothing is kept. An OAuth Gmail link fails here the same way, as its
-  access token is not an IMAP password.
+  way nothing is kept.
 - **Reads:** IMAP over TLS to `imap.gmail.com:993`: `LOGIN`, `EXAMINE INBOX`
   (the mailbox opened read-only), `UID SEARCH` (`search`'s words are Gmail's
   own, `X-GM-RAW`), `UID FETCH` of From, Subject, Date and the start of the
@@ -253,6 +265,41 @@ its token goes to those two hosts alone.
   text message in UTF-8, its body in base64, from the account itself.
 - The password is only in the `LOGIN` and `AUTH` lines. A failure is said as
   one of the two phrases above, never with what the server said.
+
+**A Google sign-in:**
+
+- **The link:** the access token, its `expires_in` (or `expires_at`), and a
+  `refresh_token` with `refresh: true`, the same shape as Google Calendar's.
+  The account is `user_email` (else `credentials.email`); a link with neither
+  takes the address Gmail's profile gives at `set`, and one still without
+  an address is refused ("Gmail needs the account's email").
+- **At `set`:** `GET https://gmail.googleapis.com/gmail/v1/users/me/profile`
+  (`users.getProfile`) with `Authorization: Bearer`. 401 or 403: `failure`
+  with "Google refused the Gmail sign-in"; anything else gone wrong:
+  "Gmail couldn't be reached"; either way nothing is kept. On success the
+  answer's `scopes` are the link's, as the backend gave them.
+- **Reads** (`users.messages.list` and `users.messages.get`, each on the
+  read list): `recent` and `search` list the inbox
+  (`/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=<count>`, `search`
+  adding `q=<words>`, Gmail's own search), then get each mail with
+  `format=metadata` (From, Subject, Date) and Gmail's short preview (its
+  HTML entities read), 300 characters of it. `message {id}` (Gmail's own id
+  a list gave: letters and digits, at most 64) gets it with `format=full`:
+  its text from a plain part first, else HTML with its tags taken out, each
+  part decoded from base64url in its charset, up to 3,000 characters. A list
+  is at most 10 mails, newest first; nothing is marked read (a get changes
+  no label). Each call is a web read (5 s to connect, 15 s each), 20 s for
+  the whole read; the tokens are scrubbed from the decoded text too.
+- **Writes:** on a spoken "send", one `POST
+  /gmail/v1/users/me/messages/send` (`users.messages.send`, the only route on
+  its write list) with `{"raw": <base64url>}`: the same plain text message
+  SMTP sends, from the account itself.
+- **Scopes** it needs from Google: `gmail.readonly` for the profile, the
+  list (with `q`) and each get, and `gmail.send` for a send (`gmail.modify`
+  or `https://mail.google.com/` cover both). IMAP is not used because it takes
+  only `https://mail.google.com/`. A token without a scope a call needs gets
+  403: "Gmail refused the lamp's link: it may need linking again in the app".
+- **Refresh:** through the backend, as every OAuth link ([Refresh](#refresh)).
 
 ## MCP services
 
@@ -566,6 +613,9 @@ the voice's credential, both handed in by the unit
 them the journal says "no backend link: OAuth links are used until they
 expire, never renewed".
 
+Gmail's Google sign-in is renewed the same way, as Google Calendar's is
+(`connector: "gmail"`); its app password never is.
+
 It happens before a read or a write, when the link allows it (`refresh`
 true and a refresh token), expires, and has under 600 s left (V1's
 `connectorRefreshSkew`). A 200 with an `access_token` and an `expires_in`
@@ -590,7 +640,7 @@ Replies are V1's shape, `{"type":"data","kind":"connector.set.<code>",
 "status":"starting|success|failure","data":{...},"error":...}`. A `set` or
 `remove` runs on a thread of its own, at most 4 at once (past it, `failure`
 "the lamp's services are busy: try again in a moment"), waited on 30 s (the
-Gmail login is in it); its result goes out on the next tick and is said
+Gmail check, an IMAP login or a profile read, is in it); its result goes out on the next tick and is said
 again if the connection is lost before the broker's ack. Failures in plain
 words: "not a service this lamp knows" (a code not among the 15, at once),
 "the lamp's services are not running", "the lamp's services did not answer
@@ -657,8 +707,9 @@ sound, as a slow chat does.
   hosts above; a link on any other is refused.
 - `lamp-services.service` is installed but off on every lamp, and none of
   this has run on a lamp: the cgroup checks under the real sockets, the IMAP
-  and SMTP exchanges with Gmail, the backend's `get-message` and refresh, and
-  each service's own API.
+  and SMTP exchanges with Gmail, Gmail's REST API with a Google sign-in (and
+  which scopes the backend's Gmail sign-in asks for), the backend's
+  `get-message` and refresh, and each service's own API.
 
 ## Tests
 
@@ -668,7 +719,12 @@ refusal; a token only over https to its own hosts (no port, user, fragment or
 lookalike host), reads only on the allow-list, writes only on the write list;
 every GraphQL mutation refused; Gmail's IMAP read-only (`EXAMINE`,
 `BODY.PEEK`) and SMTP's one message after `AUTH`; `set` keeping nothing on a
-refused Gmail login; security mails found and left out whole; answers quoted
+refused Gmail login; a Gmail Google sign-in checked at `set` with its profile
+(refused, unreached, its account taken from it), read through the REST API
+(the inbox list, each mail's metadata, one mail whole from its plain part,
+its token scrubbed, security mails left out, an id not Gmail's never sent),
+renewed through the backend, sent through the API only on a spoken "send",
+and an app password never sent to the API; security mails found and left out whole; answers quoted
 and under the voice's cap; a write refused when off, read back in full and
 sent once within two minutes; the MCP read/write rule, its pinned host, a
 link on another host never called, a write tool read back whole and called

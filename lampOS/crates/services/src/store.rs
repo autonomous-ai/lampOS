@@ -176,7 +176,9 @@ impl Entry {
             refresh: data.refresh,
             obtained_at: now,
         };
-        if code == "gmail" && entry.account().is_empty() {
+        // An app password needs its account; a Google sign-in's account is
+        // read from Gmail itself at `set` when the data has none.
+        if code == "gmail" && !entry.oauth() && entry.account().is_empty() {
             return Err("Gmail needs the account's email");
         }
         // An MCP link's address and header are checked before it is kept:
@@ -194,6 +196,12 @@ impl Entry {
         } else {
             &self.access_token
         }
+    }
+
+    /// Whether it is an OAuth link (an access token, not `pat`) rather than
+    /// a static key: for Gmail, a Google sign-in rather than an app password.
+    pub fn oauth(&self) -> bool {
+        !self.access_token.is_empty() && !self.auth_type.eq_ignore_ascii_case("pat")
     }
 
     /// The account's name, as V1's `account_of` says it.
@@ -418,6 +426,10 @@ mod tests {
         assert!(Entry::from_set("notion", &broken, 0).is_err());
         let no_email = json!({"auth_type":"pat","api_key":"k"});
         assert!(Entry::from_set("gmail", &no_email, 0).is_err());
+        // A Google sign-in's account is read from Gmail at `set`.
+        let signed_in = json!({"auth_type":"oauth","access_token":"t","expires_in":60});
+        assert!(Entry::from_set("gmail", &signed_in, 0).unwrap().oauth());
+        assert!(!Entry::from_set("gmail", &gmail_data(), 0).unwrap().oauth());
         assert!(Entry::from_set("nothing", &gmail_data(), 0).is_err());
     }
 }
