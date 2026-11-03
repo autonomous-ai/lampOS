@@ -177,23 +177,40 @@ const SECURITY_WORDS: &[&str] = &["otp", "2fa", "mfa", "pin"];
 
 /// Words that make a mail a security one when a code ([`has_code_number`],
 /// [`has_mixed_code`]) is within [`NEAR`] of them.
-const CODE_WORDS: &[&str] = &[
-    "code",
-    "mã",
-    "token",
-    "pin",
+const CODE_WORDS: &[&str] = &["code", "mã", "token", "pin", "verification"];
+
+/// How far from a code word a code still counts, in bytes either way.
+const NEAR: usize = 200;
+
+/// Words that ask to enter or confirm something: a security text only with
+/// a code-shaped token next to them, within [`NEAR_WEAK`] in the same
+/// clause ([`weak_code_near`]), never a date, a year, a price, a version, a
+/// flight, a room or a street number.
+const WEAK_CODE_WORDS: &[&str] = &[
     "enter",
     "confirm",
     "confirmation",
     "verify",
-    "verification",
     "nhập",
     "xác nhận",
     "xac nhan",
 ];
 
-/// How far from a code word a code still counts, in bytes either way.
-const NEAR: usize = 200;
+/// How far from a weak code word a code still counts, in bytes either way.
+const NEAR_WEAK: usize = 80;
+
+/// Words before a number that say it is no code ("room 1204", "build
+/// 4521", "flight 123").
+const NUMBER_LABELS: &[&str] = &[
+    "room", "suite", "floor", "build", "version", "ver", "flight", "gate", "seat", "order",
+    "invoice", "apt", "unit", "door", "phòng", "phong", "tầng", "tang", "số", "so",
+];
+
+/// What ends a clause between a weak code word and a code.
+const CLAUSE_ENDS: &[char] = &[',', ';', '!', '?', '\n'];
+
+/// What stands before or after a price.
+const MONEY: &[char] = &['$', '€', '£', '¥', '₫', 'đ', '%'];
 
 /// Words in a link's path that make it a sign-in or verification link.
 const LINK_PATH_WORDS: &[&str] = &[
@@ -232,48 +249,168 @@ fn whole_word(text: &str, word: &str) -> bool {
     })
 }
 
-/// A code standing alone within `text`: 4 to 8 digits, unbroken or in
-/// groups split by one space, dash or dot, or a dash between spaces
-/// ("482913", "482 913", "482-913", "482.913", "482 - 913", "4 8 2 9 1 3").
-fn has_code_number(text: &str) -> bool {
-    let chars: Vec<char> = text.chars().collect();
+/// A number standing alone in a text: its bytes, how many digits, and its
+/// groups and what split them ("482 913", "2026-11-04").
+struct Number {
+    start: usize,
+    end: usize,
+    digits: usize,
+    groups: Vec<usize>,
+    splits: Vec<char>,
+}
+
+impl Number {
+    /// A date: 4-2-2 or 2-2-4 digits split by dashes or dots.
+    fn is_date(&self) -> bool {
+        (self.groups == [4, 2, 2] || self.groups == [2, 2, 4])
+            && self.splits.iter().all(|split| matches!(split, '-' | '.'))
+    }
+
+    /// A code: 4 to 8 digits, not a date.
+    fn is_code(&self) -> bool {
+        (4..=8).contains(&self.digits) && !self.is_date()
+    }
+}
+
+/// The numbers standing alone within `text`: digits, unbroken or in groups
+/// split by one space, dash or dot, or a dash between spaces ("482913",
+/// "482 913", "482-913", "482.913", "482 - 913", "4 8 2 9 1 3").
+fn numbers(text: &str) -> Vec<Number> {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let byte = |at: usize| chars.get(at).map_or(text.len(), |(byte, _)| *byte);
+    let digit = |at: usize| chars.get(at).is_some_and(|(_, c)| c.is_ascii_digit());
+    let mut found = Vec::new();
     let mut at = 0;
     while at < chars.len() {
-        if !chars[at].is_ascii_digit() || (at > 0 && chars[at - 1].is_alphanumeric()) {
+        if !digit(at) || (at > 0 && chars[at - 1].1.is_alphanumeric()) {
             at += 1;
             continue;
         }
-        let mut digits = 0;
+        let mut number = Number {
+            start: byte(at),
+            end: 0,
+            digits: 0,
+            groups: Vec::new(),
+            splits: Vec::new(),
+        };
         let mut end = at;
         loop {
-            while end < chars.len() && chars[end].is_ascii_digit() {
-                digits += 1;
+            let from = end;
+            while digit(end) {
                 end += 1;
             }
-            let gap = if end + 1 < chars.len()
-                && matches!(chars[end], ' ' | '-' | '.')
-                && chars[end + 1].is_ascii_digit()
-            {
+            number.digits += end - from;
+            number.groups.push(end - from);
+            let c = |at: usize| chars.get(at).map(|(_, c)| *c);
+            let gap = if matches!(c(end), Some(' ' | '-' | '.')) && digit(end + 1) {
                 1
-            } else if end + 3 < chars.len()
-                && chars[end] == ' '
-                && matches!(chars[end + 1], '-' | '–')
-                && chars[end + 2] == ' '
-                && chars[end + 3].is_ascii_digit()
+            } else if c(end) == Some(' ')
+                && matches!(c(end + 1), Some('-' | '–'))
+                && c(end + 2) == Some(' ')
+                && digit(end + 3)
             {
                 3
             } else {
                 break;
             };
+            number.splits.push(chars[end + gap / 2].1);
             end += gap;
         }
-        let alone = !chars.get(end).is_some_and(|c| c.is_alphanumeric());
-        if alone && (4..=8).contains(&digits) {
-            return true;
+        number.end = byte(end);
+        if !chars.get(end).is_some_and(|(_, c)| c.is_alphanumeric()) {
+            found.push(number);
         }
         at = end.max(at + 1);
     }
-    false
+    found
+}
+
+/// A code standing alone within `text`: a number of 4 to 8 digits that is
+/// not a date ([`numbers`]).
+fn has_code_number(text: &str) -> bool {
+    numbers(text).iter().any(Number::is_code)
+}
+
+/// Whether `number` in `all` is a code in the plainest sense: not a year,
+/// a price, a decimal, or a number labelled as a room, a build, a flight
+/// and the like ([`NUMBER_LABELS`]).
+fn plain_code(all: &str, number: &Number) -> bool {
+    let before = all[..number.start].trim_end_matches(' ');
+    let after = all[number.end..].trim_start_matches(' ');
+    let year = number.groups.len() == 1
+        && number.digits == 4
+        && all[number.start..number.end]
+            .parse::<u32>()
+            .is_ok_and(|year| (1900..=2099).contains(&year));
+    let money = before.ends_with(MONEY)
+        || after.starts_with(MONEY)
+        || after.starts_with("vnd")
+        || after.starts_with("usd");
+    let decimal = number.groups.len() == 2 && number.groups[1] == 2 && number.splits[0] == '.';
+    let labelled = before.ends_with('#')
+        || before
+            .rsplit(|c: char| !c.is_alphanumeric())
+            .next()
+            .is_some_and(|word| NUMBER_LABELS.contains(&word));
+    number.is_code() && !year && !money && !decimal && !labelled
+}
+
+/// Whether `between` keeps a weak code word and a code in one clause.
+fn one_clause(between: &str) -> bool {
+    !between.contains(CLAUSE_ENDS) && !between.contains(". ") && !between.ends_with('.')
+}
+
+/// A code-shaped token next to the weak code word at `at`: within
+/// [`NEAR_WEAK`] bytes in the same clause, a plain code number
+/// ([`plain_code`]) or a letters-and-digits word that changes between
+/// letters and digits at least twice ("F7K2Q", not "VN123" or "10am").
+fn weak_code_near(all: &str, at: usize, len: usize) -> bool {
+    let from = at.saturating_sub(NEAR_WEAK);
+    let to = at + len + NEAR_WEAK;
+    let between = |start: usize, end: usize| {
+        if end <= at {
+            &all[end..at]
+        } else if start >= at + len {
+            &all[at + len..start]
+        } else {
+            ""
+        }
+    };
+    let number = numbers(all).iter().any(|number| {
+        number.end >= from
+            && number.start <= to
+            && one_clause(between(number.start, number.end))
+            && plain_code(all, number)
+    });
+    let mixed = all
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .any(|word| {
+            let start = word.as_ptr() as usize - all.as_ptr() as usize;
+            let end = start + word.len();
+            let changes = word
+                .as_bytes()
+                .windows(2)
+                .filter(|pair| pair[0].is_ascii_digit() != pair[1].is_ascii_digit())
+                .count();
+            end >= from
+                && start <= to
+                && (4..=8).contains(&word.len())
+                && word.chars().all(|c| c.is_ascii_alphanumeric())
+                && changes >= 2
+                && one_clause(between(start, end))
+        });
+    number || mixed
+}
+
+/// Whether a text holds something a secret could be: a code number, a
+/// letters-and-digits code or a link. A security text without one may
+/// have its secret beside it (`reads::without_security`).
+pub fn has_secret_shape(text: &str) -> bool {
+    let text = text.to_lowercase();
+    has_code_number(&text)
+        || has_mixed_code(&text)
+        || LINK_STARTS.iter().any(|link| text.contains(link))
 }
 
 /// A code of letters and digits standing alone within `text`: a word of 4
@@ -306,8 +443,12 @@ fn has_login_link(all: &str) -> bool {
         let Some((_, path)) = rest.split_once(['/', '?']) else {
             return false;
         };
+        // Whole hyphenated words and each of their parts
+        // ("/verify-email?t=x", "/magic-link"): any value on such a path is
+        // its secret, whatever its length.
         let words = path
             .split(|c: char| !c.is_alphanumeric() && c != '-')
+            .flat_map(|word| std::iter::once(word).chain(word.split('-')))
             .any(|word| LINK_PATH_WORDS.contains(&word));
         let opaque = follow
             && path
@@ -340,8 +481,10 @@ fn around(all: &str, at: usize, len: usize) -> &str {
 /// sign-in alert or link, or a verification, in English or Vietnamese.
 /// Such a text is never spoken, forwarded or kept: it is dropped from what
 /// is returned and said only as [`SECURITY_LEFT_OUT`]. A text that says
-/// "code" (or "mã", "token", "pin", "enter", "confirm", …) within [`NEAR`]
-/// of a 4 to 8 digit number or a letters-and-digits code counts too; so does
+/// "code" (or "mã", "token", "pin", "verification") within [`NEAR`] of a 4
+/// to 8 digit number (not a date) or a letters-and-digits code counts too,
+/// as does "enter", "confirm" or "verify" with a code-shaped token next to
+/// it ([`weak_code_near`]); so does
 /// one that says "sign in" or "log in" with a link or such a number
 /// anywhere, and one with a sign-in or verification link
 /// ([`has_login_link`]). Read composed (NFC). It errs on hiding: a discount
@@ -373,6 +516,18 @@ pub fn is_security_mail(from: &str, subject: &str, text: &str) -> bool {
                         .is_some_and(char::is_alphanumeric));
             let near = around(&all, at, word.len());
             whole && (has_code_number(near) || has_mixed_code(near))
+        })
+    }) || WEAK_CODE_WORDS.iter().any(|word| {
+        all.match_indices(word).any(|(at, _)| {
+            let whole = !all[..at]
+                .chars()
+                .next_back()
+                .is_some_and(char::is_alphanumeric)
+                && !all[at + word.len()..]
+                    .chars()
+                    .next()
+                    .is_some_and(char::is_alphanumeric);
+            whole && weak_code_near(&all, at, word.len())
         })
     });
     let signs_in = SIGN_IN_WORDS.iter().any(|word| all.contains(word))
@@ -1352,6 +1507,13 @@ mod tests {
             // A sign-in link with no sign-in words and no token=.
             ("x@y.z", "Hi", "Open https://app.test/magic/abc to continue"),
             ("x@y.z", "Hi", "Go to https://x.test/auth/cb?c=1"),
+            // A short value on a sign-in path, hyphenated too.
+            ("x@y.z", "Hi", "Open https://x.test/magic?t=xyz"),
+            ("x@y.z", "Hi", "Open https://x.test/verify-email?t=xyz"),
+            ("x@y.z", "Hi", "Open https://x.test/en/signin?t=xyz"),
+            // A weak word with a code next to it.
+            ("x@y.z", "Hi", "Confirm with 4821 at the desk"),
+            ("x@y.z", "Hi", "Enter A7B3C9 in the app"),
             (
                 "x@y.z",
                 "Hi",
@@ -1383,6 +1545,23 @@ mod tests {
             ("x@y.z", "Topic", "Shopping list: apples"),
             ("x@y.z", "Shipping", "Shipping 12345678 left today"),
             ("x@y.z", "Trip", "Ma and I land at 1430 on Friday"),
+            // "enter", "confirm" and "verify" beside no code.
+            ("x@y.z", "Party", "Confirm attendance for 4 Nov 2026"),
+            ("x@y.z", "Visit", "Enter via door B, 1600 Amphitheatre"),
+            (
+                "x@y.z",
+                "Release",
+                "Release v1.2.3 build 4521: please verify",
+            ),
+            ("x@y.z", "Order", "Confirm your order of $1299.00"),
+            ("x@y.z", "Trip", "Flight VN123 confirmation"),
+            ("x@y.z", "Event", "Please confirm by replying"),
+            ("x@y.z", "Event", "Please confirm by 2026-11-04"),
+            (
+                "x@y.z",
+                "Meeting",
+                "Please verify the numbers. Room 1204 at noon",
+            ),
         ] {
             assert!(!is_security_mail(from, subject, text), "{subject} {text}");
         }

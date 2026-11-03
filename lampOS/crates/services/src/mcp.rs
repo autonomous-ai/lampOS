@@ -641,11 +641,20 @@ fn pieces(text: &str) -> Vec<String> {
     out
 }
 
-/// The items one text gives: a JSON answer's list, else its pieces.
-fn text_items(text: &str) -> Vec<Value> {
+/// The items one text gives, each with its group for the security
+/// check's join: a JSON answer's list, each in the channel, thread or page
+/// it names (`reads::group_of`), else the text's pieces, all of one result's
+/// texts one group: one answer, read as one page.
+fn text_items(text: &str) -> Vec<(Option<String>, Value)> {
     match serde_json::from_str::<Value>(text) {
-        Ok(Value::Object(_) | Value::Array(_)) => reads::items("mcp", text),
-        _ => pieces(text).into_iter().map(Value::String).collect(),
+        Ok(Value::Object(_) | Value::Array(_)) => reads::items("mcp", text)
+            .into_iter()
+            .map(|item| (reads::group_of(&item), item))
+            .collect(),
+        _ => pieces(text)
+            .into_iter()
+            .map(|piece| (Some("text".to_owned()), Value::String(piece)))
+            .collect(),
     }
 }
 
@@ -654,7 +663,7 @@ fn text_items(text: &str) -> Vec<Value> {
 /// password resets, sign-in alerts) left out whole, quoted as data from
 /// the service under the voice's cap, with how many were left out.
 pub fn result_quoted(endpoint: &Endpoint, result: &Value) -> Value {
-    let mut items = Vec::new();
+    let mut items: Vec<(Option<String>, Value)> = Vec::new();
     for content in result
         .get("content")
         .and_then(Value::as_array)
@@ -671,13 +680,13 @@ pub fn result_quoted(endpoint: &Endpoint, result: &Value) -> Value {
                 .and_then(Value::as_str)
             {
                 Some(text) => items.extend(text_items(&endpoint.scrub(text))),
-                None => items.push(json!("a file, left out")),
+                None => items.push((None, json!("a file, left out"))),
             },
-            Some("resource_link") => items.push(json!({
+            Some("resource_link") => items.push((None, json!({
                 "link": mail::tidy(content.get("name").and_then(Value::as_str).unwrap_or(""), 200),
-            })),
-            Some("image") => items.push(json!("an image, left out")),
-            Some("audio") => items.push(json!("a sound, left out")),
+            }))),
+            Some("image") => items.push((None, json!("an image, left out"))),
+            Some("audio") => items.push((None, json!("a sound, left out"))),
             _ => {}
         }
     }
@@ -686,10 +695,11 @@ pub fn result_quoted(endpoint: &Endpoint, result: &Value) -> Value {
     {
         items = text_items(&endpoint.scrub(&structured.to_string()));
     }
-    // Security text is left out by `reads::quoted`, each piece alone and
-    // with its neighbours, so a code cut across two pieces goes too.
+    // Security text is left out by `reads::quoted_in`, each piece alone and
+    // with its neighbours of the same text, so a code cut across two pieces
+    // goes too.
     let total = items.len();
-    let mut quoted = reads::quoted(endpoint.name, items.into_iter().take(PIECES_MOST).collect());
+    let mut quoted = reads::quoted_in(endpoint.name, items.into_iter().take(PIECES_MOST).collect());
     if total > PIECES_MOST {
         let left = quoted["left_out"].as_u64().unwrap_or(0) as usize + total - PIECES_MOST;
         quoted["left_out"] = json!(left);
