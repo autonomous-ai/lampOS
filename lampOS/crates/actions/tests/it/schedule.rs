@@ -3,7 +3,7 @@
 use lamp_actions::{
     Executive,
     light::Light,
-    schedule::{Adapter, DEADLINE, MAX_RESULT_BYTES, NAMES, catalog},
+    schedule::{Adapter, DEADLINE, HIDDEN, MAX_RESULT_BYTES, NAMES, catalog},
     server::{self, CALL_SOCKET, CATALOG_FILE, READY_FILE},
     sound::Mixer,
 };
@@ -1462,4 +1462,63 @@ fn the_same_timer_asked_for_twice_in_a_moment_is_one() {
         ann,
     );
     assert_eq!(later["result"]["status"], "committed", "{later}");
+}
+
+/// The memory owner's option 2 (4 Nov, 29e7: "what reminders do I have?"
+/// read as the room's, told "only call your dad", the person's own left
+/// out): with `LAMP_REMINDERS_HIDDEN_COUNT` on, the room's list says how
+/// many belong to someone, a count only, never their text, time or whose,
+/// the empty list too; a person's line is told none; off, the list is
+/// exactly what it was.
+#[test]
+fn the_rooms_list_tells_only_how_many_belong_to_someone_with_the_switch_on() {
+    let schedule = Schedule::new();
+    let on = Actions::new(Some(schedule.adapter().with_hidden(true)));
+    let off = Actions::new(Some(schedule.adapter().with_hidden(false)));
+    let ann = caller(Some(ANN), false);
+    let room = caller(None, false);
+    let mom = on.call_as(
+        "set_reminder",
+        json!({"text":"Call your mom","time":"08:10"}),
+        ann.clone(),
+    );
+    assert_eq!(mom["result"]["status"], "committed", "{mom}");
+    // The room's line, the store holding only the person's own: none of
+    // the room's, never told as none set.
+    let empty = on.call_as("list_reminders", json!({}), room.clone());
+    assert_eq!(texts(&empty), Vec::<String>::new());
+    assert_eq!(empty["result"]["hidden"], 1, "{empty}");
+    let dad = on.call_as(
+        "set_reminder",
+        json!({"text":"Call your dad","time":"08:20"}),
+        room.clone(),
+    );
+    assert_eq!(dad["result"]["status"], "committed", "{dad}");
+    let told = on.call_as("list_reminders", json!({}), room.clone());
+    assert_eq!(texts(&told), ["Call your dad"]);
+    assert_eq!(told["result"]["hidden"], 1, "{told}");
+    assert_eq!(told["result"]["hidden_note"], HIDDEN);
+    let text = told.to_string();
+    for owned in ["mom", ANN, "08:10"] {
+        assert!(!text.contains(owned), "{owned} in {text}");
+    }
+    // The person's own line hears theirs and is told of none hidden.
+    let theirs = on.call_as("list_reminders", json!({}), ann.clone());
+    assert_eq!(texts(&theirs), ["Call your mom", "Call your dad"]);
+    assert!(theirs["result"].get("hidden").is_none(), "{theirs}");
+    assert!(theirs["result"].get("hidden_note").is_none(), "{theirs}");
+    // Off: the room's list as it was, the switch's two fields and nothing
+    // else apart.
+    let plain = off.call_as("list_reminders", json!({}), room.clone());
+    let mut stripped = told.clone();
+    let result = stripped["result"].as_object_mut().unwrap();
+    result.remove("hidden");
+    result.remove("hidden_note");
+    assert_eq!(plain.to_string(), stripped.to_string());
+    assert!(plain["result"].get("hidden").is_none(), "{plain}");
+    assert_eq!(
+        off.call_as("list_reminders", json!({}), ann.clone())
+            .to_string(),
+        theirs.to_string()
+    );
 }

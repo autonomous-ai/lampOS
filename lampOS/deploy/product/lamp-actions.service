@@ -32,6 +32,9 @@ Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 # A reminder every so many minutes or hours, 15 minutes to 24 hours (repeat_reminder's interval, #4710 2 Nov):
 # on lamp-9adf on 3 Nov "remind me to drink water every fifteen minutes" was set and came due on time.
 Environment=LAMP_SCHEDULE_EVERY=on
+# The room's reminder list says how many more belong to someone, a count only, never what or whose
+# (LAMP_REMINDERS_HIDDEN_COUNT, the memory owner's option 2, 4 Nov): never told as the whole list.
+Environment=LAMP_REMINDERS_HIDDEN_COUNT=on
 # A light or volume change it made is answered short, with its own words ("Warmer."), which the voice says at once
 # (LAMP_SECOND_SAY_WITH_CALL, #2135, #4700). Here only: the voice's own unit leaves LAMP_SHORT_DONE off, so with an
 # owner's language chosen it never says these English words.
