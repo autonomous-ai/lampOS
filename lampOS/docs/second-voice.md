@@ -4606,6 +4606,22 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `tests::an_untied_line_begun_over_the_answer_is_not_told_it_cut_in` (no
   cut-in note for an untied line, kept for a tied one), and the module's own
   tests. Not yet tried on a lamp.
+  - **Held, not told** (`LAMP_UNTIED_GOING_ON=held`, #5008): everything
+    above, and an untied line is held as `untied_going_on::HELD` before
+    the model sees it (`Heeding::holding_untied`). On lamp-52e6 on 3 Nov
+    (stable 9610, product environment, desk-kit AMI clips after named
+    calls) no desk line was ever left alone by the rule: 15 were let out
+    only as the conversation going on, told so or begun over the answer,
+    and the model answered 10 of them; each answer kept the next line in
+    the window, so the busy room never formed. The hold counts as talk for
+    the busy room, as `LAMP_GOING_ON_SAME_ONE`'s does, so two held desk
+    lines make a quiet room busy. Journaled `its answer is held back: a
+    conversation with the lamp is going on, but the line has no tie to the
+    lamp: …`. Cost: an untied ask the module doesn't know ("Fetch me the
+    news.", 20 s after an answer about the weather) is held too. Tests: the
+    same worker test (desk1 all held; the follow-ups still play; #3895's
+    asks held unless tied) and
+    `room_told::tests::untied_desk_lines_held_make_a_quiet_room_busy`.
 - **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
