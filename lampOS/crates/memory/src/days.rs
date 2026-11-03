@@ -38,6 +38,11 @@ pub const FOLLOW_UP_WITHIN_DAYS: u32 = 14;
 /// as given, as without `until_asked`.
 pub const FOLLOW_UP_OFFERS: u32 = 3;
 pub const NOTE_BYTES: usize = 1200;
+/// With `profile` (`Days::session_open_with`), the note's first pass of
+/// preferences and kept facts fills at most this much of the note and at
+/// most [`PROFILE_FACTS`] facts, half of [`NOTE_BYTES`].
+pub const PROFILE_BYTES: usize = 600;
+pub const PROFILE_FACTS: usize = 30;
 pub const UNUSED_DAYS: u64 = 30;
 pub const MAX_RECORDS: u64 = 50_000;
 pub const MAX_OBSERVATIONS: u64 = 2048;
@@ -1403,6 +1408,27 @@ impl Days {
         session: &str,
         max_bytes: usize,
     ) -> Result<Note> {
+        self.session_open_with(person, session, max_bytes, false)
+    }
+
+    /// [`Days::session_open`], with the voice's `LAMP_MEMORY_PROFILE`
+    /// (`profile`, the memory owner's Tiers-ideas plan, 3 Nov; the owner
+    /// profile idea adapted from memory-tiers, `tiers/recall-adapter`):
+    /// the note is filled in two passes. First a band of at most
+    /// [`PROFILE_BYTES`] and [`PROFILE_FACTS`] of preferences and kept
+    /// facts, newest first, so open threads cannot crowd tastes and habits
+    /// out. Then promises, threads and the rest, as without it, in what is
+    /// left of the same cap. The candidates, the person and the cap are
+    /// the ones without it, and the chosen facts are written in the same
+    /// order: only which of them fit can change. Without it, the note is
+    /// the one before it, byte for byte. A frozen note is reused as it is.
+    pub fn session_open_with(
+        &mut self,
+        person: &Person,
+        session: &str,
+        max_bytes: usize,
+        profile: bool,
+    ) -> Result<Note> {
         identifier(session)?;
         let cap = max_bytes.min(NOTE_BYTES);
         if let Some((note, previous_cap)) = self.note(person, session)? {
@@ -1447,6 +1473,7 @@ impl Days {
         // session opened after a restart told only "dentist on Friday" took
         // it against the new day. Older voices ignore the field.
         let days = self.event_days(person)?;
+        let mut all = Vec::with_capacity(candidates.len());
         for id in candidates {
             let record = self
                 .record(person, id)?
@@ -1461,14 +1488,52 @@ impl Days {
             if let Some(day) = days.get(&id) {
                 fact["on"] = serde_json::json!(day);
             }
-            facts.push(fact);
-            let next = render(&facts);
-            if next.len() > cap {
+            all.push((id, category == PLAIN_FACT, fact));
+        }
+        // The band (with `profile`): preferences and kept facts, in the
+        // candidates' order, which is newest first among them.
+        let mut chosen = vec![false; all.len()];
+        if profile {
+            let band = cap.min(PROFILE_BYTES);
+            for (at, (_, preference, fact)) in all.iter().enumerate() {
+                if !preference {
+                    continue;
+                }
+                if facts.len() == PROFILE_FACTS {
+                    break;
+                }
+                facts.push(fact.clone());
+                if render(&facts).len() > band {
+                    facts.pop();
+                    continue;
+                }
+                chosen[at] = true;
+            }
+        }
+        for (at, (_, _, fact)) in all.iter().enumerate() {
+            if chosen[at] {
+                continue;
+            }
+            facts.push(fact.clone());
+            if render(&facts).len() > cap {
                 facts.pop();
                 continue;
             }
-            text = next;
-            ids.push(id);
+            chosen[at] = true;
+        }
+        // Written in the candidates' order: a note's length does not hang
+        // on its facts' order, so the cap holds as chosen.
+        let facts: Vec<serde_json::Value> = all
+            .into_iter()
+            .zip(chosen)
+            .filter(|(_, chosen)| *chosen)
+            .map(|((id, _, fact), _)| {
+                ids.push(id);
+                fact
+            })
+            .collect();
+        if !facts.is_empty() {
+            text = render(&facts);
         }
         let note = Note {
             session: session.into(),

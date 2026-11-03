@@ -779,6 +779,11 @@ kept thing has that day (`event_days`) when it is a real day from the
 local day of `at_unix_ms` to 60 days after it; any other `on` is dropped
 and the thing kept undated. A dated kept thing is given by `follow_up` with
 `events`, once, after its day. The legacy store ignores it.
+With `"profile":true` (the voice's `LAMP_MEMORY_PROFILE`; the owner profile
+idea of [memory-tiers](memory-tiers.md), adapted), `session_open` fills the
+note with preferences and kept facts first, in at most 600 bytes, then the
+rest as before under the same cap, from the same candidates
+([the rule](memory-days.md#request-contract)). An older memory refuses it.
 `session_open` returns a frozen `snapshot`; default `conversation_end`
 returns bounded model `input`, without invoking a model. With `submit:true`,
 the current build validates references and returns
