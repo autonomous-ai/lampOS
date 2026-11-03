@@ -1,0 +1,5 @@
+# private-names.txt: names build-rows-pr.sh must never publish in lampOS/docs/build-rows.md.
+# Keep the real file at $LAMP_COORD_STATE/private-names.txt (or point $PRIVATE_NAMES at it). Never commit it.
+# One extended regex a line (grep -iE); lines starting with # are ignored. Missing or empty: build-rows-pr.sh stops.
+\bsome-first-name\b
+some-family-name
