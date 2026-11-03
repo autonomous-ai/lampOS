@@ -1274,7 +1274,7 @@ words or files, nor a made skill's SHA-256.
 | Field | What | Read from |
 |---|---|---|
 | `on`, `kept_off` | skills on now, and kept on the lamp but not on (turned off, shipped off, an add-on with add-ons off, or one that does not load), by source | the skills folder with `lamp-skills`' own loader and its off file, as the skills page reads them; a made skill's maker from its own card |
-| `day.runs` | runs that UTC day, by source | `lamp-skills`' running totals, `runs.json` in its `--state-dir` (`skills.md`, "Runs, counted"), made skills' by the maker on each card |
+| `day.runs` | runs that day (the lamp's local day), by source | `lamp-skills`' running totals, `runs.json` in its `--state-dir` (`skills.md`, "Runs, counted"), made skills' by the maker on each card |
 | `day.store`, `day.store_rest` | the Store's runs that day by package SHA-256 (`installed_from`), the 50 most run, the rest summed | the same file |
 | `day.made_by_voice`, `day.made_by_app` | asks to make a skill that day, by voice and from the owner's app: `kept` (a made skill kept), `on` (put on by a spoken yes), `refused` (made nothing), `left_off` (asked about and not put on) | the voice's running totals per maker (`counts.json` beside the made skills), asked on its app-make socket with `{"counts": {}}`, within 1 s; a voice from before it counted the app's says only `made_by_voice` |
 
@@ -1294,14 +1294,18 @@ words or files, nor a made skill's SHA-256.
   before the marker says neither: `made_unknown`, never guessed. A shared
   skill's package has the marker taken out with `made: here`.
 - **A day** is the change in the running totals between two readings, one
-  at each health report, put on the UTC day of the later one (so a day's
-  edge is within one health, 15 minutes). The first reading only begins the
+  at each health report, put on the lamp's local day of the later one, in
+  the system's zone (`/etc/localtime`, read at each reading through
+  `lamp-local-time`, so a zone changed in setup counts from the next one;
+  UTC when it can't be read), so a day's edge is within one health, 15
+  minutes. `date` is that local date. The first reading only begins the
   count, and a total that went down (a file begun again) counts from 0. The
   days are kept in the reports' own state (`reports/state.json`), at most 7,
   each with at most 64 Store packages apart.
-- **Sent only once over:** each health carries the oldest UTC day that is
-  over and not yet acknowledged, whole; today is never sent, so two reports
-  15 minutes apart never tell a run between them. A day is let go when the
+- **Sent only once over:** each health carries the oldest local day that
+  is over (by the zone of the last reading) and not yet acknowledged,
+  whole; today is never sent, so two reports 15 minutes apart never tell a
+  run between them. A day is let go when the
   broker acknowledges the report that carried it, and the next day goes
   with the next health.
 - **A no** deletes the days with everything else, and asks the manage

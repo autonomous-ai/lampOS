@@ -1868,10 +1868,12 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "jiff-tzdb",
  "lamp-actions",
  "lamp-bus",
  "lamp-ipc",
  "lamp-keeper",
+ "lamp-local-time",
  "lamp-msgs",
  "lamp-schedule",
  "lamp-setup",
