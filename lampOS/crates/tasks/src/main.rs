@@ -63,6 +63,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut folder_missing = false;
     let mut route = false;
     let mut engines_ready = false;
+    let mut absolute_folder = false;
     let mut from_machines = None;
     let mut seen = std::collections::BTreeSet::new();
     while let Some(arg) = args.next() {
@@ -82,6 +83,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--folder-missing" => folder_missing = true,
             "--route" => route = true,
             "--engines-ready" => engines_ready = true,
+            "--absolute-folder" => absolute_folder = true,
             "--targets-from-machines" => {
                 let engine = args
                     .next()
@@ -193,6 +195,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             folder_missing,
             engines_ready,
             route,
+            absolute_folder,
         },
         stop,
     )?;
