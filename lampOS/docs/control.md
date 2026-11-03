@@ -524,7 +524,7 @@ listening. The person wins over each, as "Who wins" says.
 
 | op | what the lamp does |
 |---|---|
-| `turn.start` | Opens a turn as a tap on the head does: the next line the person starts within 8 s is answered as spoken to the lamp. With `prompt`, the lamp says it first, and the 8 s start when it ends. The lamp shows its normal listening cue, and the journal names the computer. `done`: `finished` when the person spoke and the lamp answered; `cut_short`, "the person is talking", when the lamp's answer to a line of the person's own begins to sound while the window is open; or `dropped` with why (`nobody spoke`, `muted`, `busy`, `refused: …`). |
+| `turn.start` | Opens a turn as a tap on the head does: the next line the person starts within 8 s is answered as spoken to the lamp. With `prompt`, the lamp says it first, and the 8 s start when it ends. The lamp shows its normal listening cue, and the journal names the computer. `done`: `finished` when the person spoke and the lamp answered; `cut_short`, "the person is talking", when the lamp's answer to a line of the person's own begins to sound while the window is open; or `dropped` with why (`nobody spoke`, `muted`, `busy`, `refused: …`, and for a turn not yet answered when the same computer opened a newer one, `dropped: a newer turn of its computer's`). The same computer may open a new turn while its own earlier turn's conversation goes on: the new turn continues it, with a new id, in place of the earlier one. |
 | `turn.end` | Ends a turn this computer started with `turn.start`, and the conversation that grew from it, as the button's stop does: the answer playing, what waits to be said, and the open window. Never the person's own conversation, another computer's turn or the lamp's own words: the conversation outranks a computer ("Who wins"), so any other is refused `busy`, "not this computer's turn". |
 | `listen.set` | `false`: this computer's mute, `muted_by: control`, shown on the ring the way the person's mute is shown, so nobody thinks the lamp listens when it doesn't, and journaled with the computer. `true`: lifts only this computer's own mute, never another computer's, nor the person's switch, button or sleep mute. While two computers hold one, the lamp listens again only when both are lifted. A computer's mute ends when its connection does, or when it is revoked, so a computer gone can't leave the lamp deaf; the person's hand on the head lifts it too, as it lifts the restart guard's. |
 
@@ -535,8 +535,12 @@ listening. The person wins over each, as "Who wins" says.
   while a computer's window is open, the computer's turn ends at once
   (`cut_short`, "the person is talking") and their conversation goes on.
 - **When `turn.start` is refused:** while the lamp is muted, by anyone;
-  while the person's own conversation goes on; and while the lamp speaks
-  its own words. It is never queued behind them. With or without a
+  while the person's own conversation goes on, or another computer's turn;
+  and while the lamp speaks its own words. It is never queued behind them.
+  The same computer's own turn going on, and the conversation it grew,
+  refuse nothing: its new turn continues that conversation (lamp-75c9,
+  3 Nov 19:27: a computer's next turn was refused by its own turn's
+  conversation). A person's answer in hand still refuses it. With or without a
   `prompt`, it meets the same quiet-hours and night gates as a `say`.
 - **No microphone the person closed is opened.** `listen.set true` can't
   open the switch, the button's mute or sleep, as the app's `mic.set`
@@ -572,11 +576,20 @@ listening. The person wins over each, as "Who wins" says.
   and why (`dropped: nobody spoke`, `refused: the lamp is muted`,
   `expired`, or the voice not reached). The turn's id from the voice's
   `begun` is kept for that computer, with the request that started it,
-  until its outcome comes.
+  past its outcome, since the voice holds the conversation a turn grew
+  until it is quiet and may still end it by that id. It is replaced only
+  when a newer turn's `begun` comes, and forgotten once a `turn.end` used
+  it (ended, or the voice's "not this computer's turn"). While one is kept,
+  the next start names it as `"after":N`
+  (`{"skill":"control","turn":"start","expires_in_ms":30000,"after":7}`),
+  so the voice knows the turn going on is this computer's own; a start
+  refused or dropped before its `begun` leaves the earlier id, so a
+  `turn.end` still ends that conversation.
 - **`turn.end`** sends `{"skill":"control","turn":"end","id":N}` with the id
-  of this computer's own turn. With no turn of its own it is refused `busy`,
-  "not this computer's turn", and the voice isn't asked; asked before the
-  voice began it, `busy`, "this computer's turn has not begun yet". The
+  of this computer's latest begun turn. With no turn of its own it is
+  refused `busy`, "not this computer's turn", and the voice isn't asked;
+  with no id kept and a start asked that the voice hasn't begun yet,
+  `busy`, "this computer's turn has not begun yet". The
   reply waits for the voice: `{"turn":"ended","started":18}` (the
   `turn.start` it ended) on `ended`; the voice's "not this computer's turn"
   is the same `busy`; anything else is `refused` with the voice's why. The

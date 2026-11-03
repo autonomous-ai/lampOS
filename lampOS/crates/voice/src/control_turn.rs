@@ -11,7 +11,9 @@
 //!   window opens.
 //! - **Refused**, never queued, while the lamp is muted or paused, while a
 //!   conversation goes on and while the lamp speaks its own words
-//!   ([`refused`]). Otherwise it waits only for its speaker, a line still
+//!   ([`refused`]). A start naming the turn going on as `after` is that
+//!   computer's own: its turn and the thread's conversation don't refuse
+//!   it, and the new turn replaces the old ([`ControlTurns::open`]). Otherwise it waits only for its speaker, a line still
 //!   being admitted, a reminder held, listening ready and the model service,
 //!   never a say's quiet after any line heard, until its own expiry.
 //! - **Answered** `spoken` once the person spoke in it and the lamp's
@@ -56,6 +58,9 @@ pub const NOT_ANSWERED: &str = "not answered";
 /// line of their own begins to sound: the person is talking with the lamp,
 /// and the person wins. The door says it `cut_short`.
 pub const PERSON_TALKING: &str = "the person is talking";
+/// Why a turn not yet answered is dropped when its computer opens a newer
+/// turn in its place (a start naming it `after`).
+pub const NEWER_TURN: &str = "a newer turn of its computer's";
 
 /// Turn ids, unique for the voice's life, so an id from an earlier
 /// conversation never names a later turn.
@@ -133,6 +138,8 @@ enum Phase {
 
 struct Turn {
     id: u64,
+    /// The earlier turn of its computer's it replaced, for the journal.
+    continues: Option<u64>,
     skill: String,
     /// The start's ticket, until its outcome is told.
     asker: Option<Ticket>,
@@ -153,9 +160,12 @@ impl Turn {
             asker.begun_turn(at_us, self.id);
         }
         eprintln!(
-            "lamp-voice: the skill {} opened turn {}: a line begun within {} s is answered",
+            "lamp-voice: the skill {} opened turn {}{}: a line begun within {} s is answered",
             self.skill,
             self.id,
+            self.continues
+                .map(|old| format!(", continuing turn {old}"))
+                .unwrap_or_default(),
             OPEN_FOR_US / 1_000_000
         );
     }
@@ -179,12 +189,31 @@ impl ControlTurns {
         self.turn.as_ref().map(|turn| turn.id)
     }
 
+    /// Whether a start naming `after` is the computer's own continuation:
+    /// `after` is the turn going on.
+    pub fn continues(&self, after: Option<u64>) -> bool {
+        after.is_some_and(|after| self.ends(after))
+    }
+
+    /// The turn going on, if any, replaced by a newer one of its
+    /// computer's: its asker, if not yet answered, told `dropped` with
+    /// [`NEWER_TURN`]; one already answered is let go as it is. Its id.
+    fn replace(&mut self) -> Option<u64> {
+        let mut old = self.turn.take()?;
+        old.tell(Outcome::Dropped(NEWER_TURN.into()));
+        Some(old.id)
+    }
+
     /// Open a turn with no prompt at `at_us`, as the listening cue begins:
     /// the window opens now, and the asker is told `begun` with its id.
+    /// A turn going on is replaced ([`Self::replace`]): the coordinator
+    /// opens one then only for the same computer's start naming it.
     pub fn open(&mut self, asker: Ticket, at_us: u64) -> u64 {
+        let continues = self.replace();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let mut turn = Turn {
             id,
+            continues,
             skill: asker.skill().to_owned(),
             asker: Some(asker),
             phase: Phase::Open { since_us: at_us },
@@ -195,12 +224,15 @@ impl ControlTurns {
     }
 
     /// Begin a turn whose prompt is said first: the ticket for the prompt's
-    /// written say, whose answer opens the window ([`Self::tick`]).
+    /// written say, whose answer opens the window ([`Self::tick`]). A turn
+    /// going on is replaced, as [`Self::open`] does.
     pub fn prompt(&mut self, asker: Ticket) -> Ticket {
+        let continues = self.replace();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let (said, answered) = Ticket::own(asker.skill());
         self.turn = Some(Turn {
             id,
+            continues,
             skill: asker.skill().to_owned(),
             asker: Some(asker),
             phase: Phase::Prompting(answered),
@@ -596,5 +628,64 @@ mod tests {
         turns.cancelled("hand_stop");
         assert_eq!(answers(&answered), vec![Answer::Done(Outcome::Spoken)]);
         assert!(!turns.ends(id));
+    }
+
+    /// lamp-75c9, 3 Nov 19:27: the same computer's start during its own
+    /// turn's conversation continues it. The old turn is replaced; its
+    /// asker, answered already, is told nothing more; the new id differs.
+    #[test]
+    fn a_newer_turn_of_its_computers_replaces_the_one_going_on() {
+        let mut turns = ControlTurns::default();
+        let (asker, answered) = ticket_for_test("control");
+        let old = turns.open(asker, 10 * S);
+        let _ = answers(&answered);
+        assert!(turns.admitted(7, 11 * S));
+        turns.tick(12 * S, Some((7, true)), false, false);
+        turns.tick(13 * S, None, false, false);
+        assert_eq!(answers(&answered), vec![Answer::Done(Outcome::Spoken)]);
+        // Its conversation goes on: a start naming it is its own.
+        assert!(turns.continues(Some(old)));
+        assert!(!turns.continues(None));
+        assert!(!turns.continues(Some(old + 1_000)));
+        let (asker, newer) = ticket_for_test("control");
+        let id = turns.open(asker, 20 * S);
+        assert_ne!(id, old);
+        assert_eq!(
+            answers(&newer),
+            vec![Answer::BegunTurn { at_us: 20 * S, id }]
+        );
+        // The old asker, answered, hears nothing more.
+        assert!(answers(&answered).is_empty());
+        assert!(turns.ends(id) && !turns.ends(old));
+    }
+
+    /// A turn whose asker was never answered, replaced by a newer one of
+    /// its computer's, is told dropped, a newer turn of its computer's:
+    /// opened bare or with a prompt.
+    #[test]
+    fn an_unanswered_turn_replaced_is_dropped_for_a_newer_turn() {
+        let mut turns = ControlTurns::default();
+        let (asker, answered) = ticket_for_test("control");
+        let old = turns.open(asker, 10 * S);
+        let _ = answers(&answered);
+        let (asker, second) = ticket_for_test("control");
+        let id = turns.open(asker, 11 * S);
+        assert_ne!(id, old);
+        assert_eq!(
+            answers(&answered),
+            vec![Answer::Done(Outcome::Dropped(NEWER_TURN.into()))]
+        );
+        let _ = answers(&second);
+        // A prompted turn replacing one whose line is still unanswered.
+        assert!(turns.admitted(9, 12 * S));
+        let (asker, third) = ticket_for_test("control");
+        let _said = turns.prompt(asker);
+        assert!(!turns.ends(id) && turns.id().is_some_and(|newest| newest != id));
+        assert_eq!(
+            answers(&second),
+            vec![Answer::Done(Outcome::Dropped(NEWER_TURN.into()))]
+        );
+        // The prompt's asker hears nothing until its prompt is said.
+        assert!(answers(&third).is_empty());
     }
 }

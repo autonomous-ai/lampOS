@@ -20,8 +20,12 @@
 //!   with its prompt as `text`), opened as a tap on the head opens one. Its
 //!   outcome comes later as a `done`; the turn's id, from the voice's
 //!   `begun`, is kept for the computer, so its `turn.end` names its own
-//!   turn and no other. `turn.end` → `turn: "end"` with that id, answered
-//!   once the voice says.
+//!   turn and no other. It is kept past the outcome, as the turn's
+//!   conversation may go on, until a newer turn's `begun` replaces it or a
+//!   `turn.end` used it; a start refused before its `begun` leaves it. A
+//!   start while one is kept names it as `after`, so the voice continues
+//!   that computer's own conversation rather than refusing it.
+//!   `turn.end` → `turn: "end"` with that id, answered once the voice says.
 //! - `listen.set` → the voice's say socket as `listen`: `false` holds one
 //!   connection for the computer, which holds the voice's mute while it is
 //!   open; `true` lifts it on that connection and closes it. The door
@@ -151,7 +155,14 @@ pub struct Lamp {
 /// What each computer has going on the voice.
 #[derive(Default)]
 struct Voice {
+    /// Each computer's turn starts not yet answered.
     turns: HashMap<String, Vec<Turn>>,
+    /// Each computer's latest begun turn: the voice's id for it and the
+    /// request that started it. Kept past its outcome, since the voice
+    /// holds the conversation a turn grew until quiet and may still end it
+    /// by this id; replaced only by a newer turn's `begun`, forgotten once
+    /// a `turn.end` used it. A stale id is harmless: the voice refuses it.
+    begun: HashMap<String, Begun>,
     mutes: HashMap<String, Mute>,
     /// Numbers each turn and mute, so a thread that ends one never ends a
     /// newer one in its place.
@@ -174,12 +185,17 @@ impl Voice {
     }
 }
 
-/// A computer's turn: the request that started it, and the voice's id for
-/// it once begun.
+/// A computer's turn start not yet answered.
 struct Turn {
     seq: u64,
+}
+
+/// A computer's begun turn: the voice's id for it, and the request that
+/// started it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Begun {
+    id: u64,
     re: u64,
-    id: Option<u64>,
 }
 
 /// A computer's mute: the say socket's connection holding it, once the
@@ -521,7 +537,11 @@ impl Lamp {
 
     /// `turn.start`: a turn asked of the voice, as a say is, its outcome a
     /// `done`. The turn's id from the voice's `begun` is kept for this
-    /// computer until the outcome, for its `turn.end`.
+    /// computer's `turn.end`, in place of its earlier turn's; a start
+    /// refused before its `begun` leaves the earlier id. The earlier id
+    /// goes with the start as `after`: the voice opens a turn of the same
+    /// computer's during that turn's own conversation, and refuses it only
+    /// for the person's conversation or another computer's turn.
     fn turn_start(&self, client: &str, re: u64, prompt: Option<&str>) -> Result<Value, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
@@ -533,27 +553,28 @@ impl Lamp {
         }
         let seq = {
             let mut voice = self.voice.lock().expect("voice");
+            if let Some(earlier) = voice.begun.get(client) {
+                line["after"] = json!(earlier.id);
+            }
             let seq = voice.next();
             voice
                 .turns
                 .entry(client.to_owned())
                 .or_default()
-                .push(Turn { seq, re, id: None });
+                .push(Turn { seq });
             seq
         };
         let (voice, events, client) = (self.voice.clone(), self.events.clone(), client.to_owned());
         // Off the door's lock, as a say.
         std::thread::spawn(move || {
+            // Its id replaces the earlier turn's only now, as it begins.
             let begun = |said: &Value| {
                 if let Some(id) = said["id"].as_u64() {
-                    let mut voice = voice.lock().expect("voice");
-                    if let Some(turn) = voice
-                        .turns
-                        .get_mut(&client)
-                        .and_then(|turns| turns.iter_mut().find(|turn| turn.seq == seq))
-                    {
-                        turn.id = Some(id);
-                    }
+                    voice
+                        .lock()
+                        .expect("voice")
+                        .begun
+                        .insert(client.clone(), Begun { id, re });
                 }
             };
             let (how, why) = match UnixStream::connect(&path)
@@ -576,6 +597,8 @@ impl Lamp {
                     why
                 }
             });
+            // Answered: no longer a start waiting. Its id, if it began,
+            // stays for a `turn.end` while its conversation may go on.
             {
                 let mut voice = voice.lock().expect("voice");
                 if let Some(turns) = voice.turns.get_mut(&client) {
@@ -595,23 +618,23 @@ impl Lamp {
     }
 
     /// `turn.end`: the end of this computer's own turn, by the id the voice
-    /// gave it, answered once the voice says. Without a turn of its own the
-    /// voice isn't asked.
+    /// gave its latest begun turn, answered once the voice says. Without a
+    /// turn of its own the voice isn't asked. The id is forgotten once the
+    /// voice ended it or said it is no turn of this computer's.
     fn turn_end(&self, client: &str) -> Result<Reply, Error> {
         let Some(path) = self.say.clone() else {
             return Err(not_here("the voice"));
         };
-        let (id, started) = {
+        let begun = {
             let voice = self.voice.lock().expect("voice");
-            let turns = voice.turns.get(client).map_or(&[][..], Vec::as_slice);
-            match turns
-                .iter()
-                .rev()
-                .find_map(|turn| turn.id.map(|id| (id, turn.re)))
-            {
-                Some(found) => found,
+            match voice.begun.get(client) {
+                Some(begun) => *begun,
                 // Asked and not begun: the voice has no id for it yet.
-                None if !turns.is_empty() => {
+                None if voice
+                    .turns
+                    .get(client)
+                    .is_some_and(|turns| !turns.is_empty()) =>
+                {
                     return Err(Error::new(
                         ErrorCode::Busy,
                         "this computer's turn has not begun yet",
@@ -620,11 +643,22 @@ impl Lamp {
                 None => return Err(Error::new(ErrorCode::Busy, NOT_THIS_TURN)),
             }
         };
+        let (voice, client) = (self.voice.clone(), client.to_owned());
         Ok(Reply::Later(Box::new(move || {
-            let (_, said) =
-                ask_voice(&path, &json!({"skill": "control", "turn": "end", "id": id}))?;
-            if said["outcome"] == "ended" {
-                Ok(json!({"turn": "ended", "started": started}))
+            let (_, said) = ask_voice(
+                &path,
+                &json!({"skill": "control", "turn": "end", "id": begun.id}),
+            )?;
+            let ended = said["outcome"] == "ended";
+            if ended || said["why"] == NOT_THIS_TURN {
+                // Used: forgotten, unless a newer turn began meanwhile.
+                let mut voice = voice.lock().expect("voice");
+                if voice.begun.get(&client) == Some(&begun) {
+                    voice.begun.remove(&client);
+                }
+            }
+            if ended {
+                Ok(json!({"turn": "ended", "started": begun.re}))
             } else {
                 Err(refusal_of(&said, NO_TURNS))
             }
@@ -1709,7 +1743,7 @@ mod tests {
         assert_eq!(early.why, "this computer's turn has not begun yet");
         say(&turn, r#"{"event":"begun","at_us":5,"id":7}"#);
         for _ in 0..300 {
-            if lamp.voice.lock().unwrap().turns["c_1"][0].id == Some(7) {
+            if begun_id(&lamp, "c_1") == Some(7) {
                 break;
             }
             std::thread::sleep(Duration::from_millis(10));
@@ -1741,7 +1775,7 @@ mod tests {
                 json!({"ev": "done", "re": 3, "how": "dropped", "why": "dropped: ended by the computer"})
             )
         );
-        // Its outcome said, the turn is no longer its to end.
+        // Ended by its end, the turn is no longer its to end.
         let after = lamp.reply("c_1", 5, &end, 0).unwrap_err();
         assert_eq!(after.why, NOT_THIS_TURN);
         // Without a prompt, no text; spoken is finished.
@@ -1769,6 +1803,117 @@ mod tests {
             told.lock().unwrap()[2].1,
             json!({"ev": "done", "re": 7, "how": "dropped", "why": format!("refused: {NO_TURNS}")})
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn begun_id(lamp: &Lamp, client: &str) -> Option<u64> {
+        lamp.voice
+            .lock()
+            .unwrap()
+            .begun
+            .get(client)
+            .map(|begun| begun.id)
+    }
+
+    fn until_begun(lamp: &Lamp, client: &str, id: u64) {
+        for _ in 0..300 {
+            if begun_id(lamp, client) == Some(id) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("{client}'s turn {id} never begun");
+    }
+
+    /// lamp-75c9, 3 Nov 19:27: a computer's next turn.start, sent while its
+    /// earlier turn's conversation went on, names that turn as `after`; the
+    /// voice refusing it kept no id, so the computer's turn.end was refused
+    /// "not this computer's turn" with its conversation still going on. A
+    /// start refused before its `begun` leaves the earlier id, which its
+    /// outcome never clears; a start begun replaces it.
+    #[test]
+    fn a_later_start_names_the_earlier_turn_and_only_its_begun_replaces_it() {
+        let dir = dir("turn-after");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let (events, told) = kept();
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        let start = |re: u64| op(&format!(r#"{{"id":{re},"op":"turn.start"}}"#));
+        // The first turn: no earlier one to name.
+        lamp.act("c_1", 3, &start(3), 0).unwrap();
+        let (first, line) = accepted(&listener);
+        assert_eq!(
+            line,
+            json!({"skill": "control", "turn": "start", "expires_in_ms": 30000})
+        );
+        say(&first, r#"{"event":"begun","at_us":5,"id":7}"#);
+        until_begun(&lamp, "c_1", 7);
+        // Answered: its conversation may go on, so its id stays.
+        say(&first, r#"{"outcome":"spoken"}"#);
+        until_told(&told, 1);
+        assert_eq!(begun_id(&lamp, "c_1"), Some(7));
+        // The next start names it; another computer's names nothing.
+        lamp.act("c_1", 4, &start(4), 0).unwrap();
+        let (second, line) = accepted(&listener);
+        assert_eq!(
+            line,
+            json!({"skill": "control", "turn": "start", "expires_in_ms": 30000, "after": 7})
+        );
+        lamp.act("c_2", 4, &start(4), 0).unwrap();
+        let (other, line) = accepted(&listener);
+        assert!(line.get("after").is_none(), "{line}");
+        say(
+            &other,
+            r#"{"outcome":"refused","why":"a conversation is going on"}"#,
+        );
+        // Refused before its begun: the earlier id stays.
+        say(
+            &second,
+            r#"{"outcome":"refused","why":"a conversation is going on"}"#,
+        );
+        until_told(&told, 3);
+        assert_eq!(begun_id(&lamp, "c_1"), Some(7));
+        // So its end still ends the earlier turn's conversation.
+        let end = op(r#"{"id":5,"op":"turn.end"}"#);
+        let ending = later(lamp.reply("c_1", 5, &end, 0));
+        let (asked, line) = accepted(&listener);
+        assert_eq!(line, json!({"skill": "control", "turn": "end", "id": 7}));
+        say(&asked, r#"{"outcome":"ended"}"#);
+        assert_eq!(
+            ending.join().unwrap().unwrap(),
+            json!({"turn": "ended", "started": 3})
+        );
+        // Used: forgotten.
+        assert_eq!(begun_id(&lamp, "c_1"), None);
+        // A start begun replaces the earlier id, whatever its outcome.
+        lamp.act("c_1", 6, &start(6), 0).unwrap();
+        let (third, _) = accepted(&listener);
+        say(&third, r#"{"event":"begun","at_us":5,"id":9}"#);
+        until_begun(&lamp, "c_1", 9);
+        say(&third, r#"{"outcome":"spoken"}"#);
+        until_told(&told, 4);
+        lamp.act("c_1", 7, &start(7), 0).unwrap();
+        let (fourth, line) = accepted(&listener);
+        assert_eq!(line["after"], json!(9));
+        say(&fourth, r#"{"event":"begun","at_us":6,"id":10}"#);
+        until_begun(&lamp, "c_1", 10);
+        // An end names the newest; the voice saying it is no turn of this
+        // computer's forgets it too.
+        let ending = later(lamp.reply("c_1", 8, &end, 0));
+        let (asked, line) = accepted(&listener);
+        assert_eq!(line, json!({"skill": "control", "turn": "end", "id": 10}));
+        say(
+            &asked,
+            r#"{"outcome":"refused","why":"not this computer's turn"}"#,
+        );
+        let refused = ending.join().unwrap().unwrap_err();
+        assert_eq!(
+            (refused.code, refused.why.as_str()),
+            (ErrorCode::Busy, NOT_THIS_TURN)
+        );
+        assert_eq!(begun_id(&lamp, "c_1"), None);
+        say(&fourth, r#"{"outcome":"spoken"}"#);
+        until_told(&told, 5);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -549,16 +549,22 @@ end one it opened. The door serves them as `turn.start` and `turn.end`
 
     {"skill": "control", "turn": "start", "expires_in_ms": 10000}
     {"skill": "control", "turn": "start", "text": "Shall we go over today's list?", "expires_in_ms": 10000}
+    {"skill": "control", "turn": "start", "expires_in_ms": 10000, "after": 3}
     {"skill": "control", "turn": "end", "id": 3}
 
 - **`turn: "start"`** goes with `expires_in_ms` (as a say's) and optionally
   `text`, the prompt, under a `text`'s rules (1 to 900 bytes, no control
-  characters). Nothing else goes with it (`turn goes with text,
-  expires_in_ms or id only`), not `id` (`id goes only with turn end`).
+  characters), and optionally `after`, the id of the same computer's
+  earlier turn as its `begun` named it (nonzero: `after is a nonzero turn
+  id`); the door sends it while it keeps one. Nothing else goes with it
+  (`turn goes with text, expires_in_ms, after or id only`), not `id` (`id
+  goes only with turn end`).
 - **`turn: "end"`** goes with `id` alone, nonzero (`turn end needs the
   turn's id`, `turn end goes with its id only`); it names no expiry and
   waits at most 10 s (`say::TURN_END_EXPIRY_MS`). An `id` on anything else
-  is refused.
+  is refused, as is `after` anywhere but a start (`after goes only with
+  turn start`; with an end, `turn end goes with its id only`; with
+  `listen`, `listen goes alone`).
 - Unknown fields are still refused (`not a say request`), so a voice from
   before this refuses `turn`: the door's sign that this voice takes no
   turns.
@@ -571,7 +577,14 @@ exchange with the lamp's words in it within 45 s, a person's answer in hand
 once something of it has sounded or come, or a computer's turn still going
 on), and while the lamp's own words or sounds are in hand or playing, or
 its own written lines or reminders wait for the model (`the lamp is
-speaking`). The journal line names the signs that refused it (`(by the
+speaking`). A start whose `after` names the computer's turn going on is
+that computer's own: the turn and the thread's conversation don't refuse
+it (lamp-75c9, 3 Nov 19:27), while a person's answer in hand, the lamp's
+words, the mute and the pause still do. It opens a new turn with a new id
+in place of the old one, whose asker, if not yet answered, is told
+`{"outcome":"dropped","why":"a newer turn of its computer's"}`
+(`control_turn::NEWER_TURN`). Without `after`, or naming a turn not going
+on, a computer's turn going on refuses it as before. The journal line names the signs that refused it (`(by the
 thread)`, …), never a word heard. A room line heard, or held back as said to
 nobody, refuses nothing. Otherwise it waits only for no reminder held,
 nothing being heard, listening ready, the playback mask and the model
@@ -606,7 +619,7 @@ not the voice's. Then:
   is open (the person wins; the door says it `cut_short`), or the voice's
   why (`the lamp is muted`, `hand_stop`, `spoken_stop`, …).
 - The journal says one line as a turn opens: the skill and the turn's id,
-  never a word heard.
+  and the turn it continues if any, never a word heard.
 
 An end with the id of the turn going on ends it, while its prompt plays,
 its window is open, or the conversation its first line began goes on (it
