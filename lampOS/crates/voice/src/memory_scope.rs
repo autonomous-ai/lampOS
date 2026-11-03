@@ -784,6 +784,26 @@ impl ScopeLease {
             .map(str::to_owned)
     }
 
+    /// Whose scope this line's memory call `name` also reaches by the
+    /// one-face rule: the one place the keep and the forget are decided, so
+    /// a forget is never narrower than the keep (Fourteen's forget FAIL on
+    /// lamp-9adf, build 9699: "forget my coffee" searched only the room's
+    /// while the coffee was kept as theirs). A `remember` goes to
+    /// [`Self::kept_by_one_face`]; a single-item `forget` searches that
+    /// person's scope and then the room's on a real no-match there
+    /// (`remember::run_one_face_forget`), each re-checked right before its
+    /// run.
+    /// Every read (`recall`, hits, notes, context) stays the room's, and
+    /// `forget_everything` and a held forget's yes are never theirs by it.
+    /// `None` for any other call, and whenever [`Self::kept_by_one_face`]
+    /// is: a revoked line, one narrowed after, or none taken (a second
+    /// face, no known face, another voice).
+    pub fn reached_by_one_face(&self, name: &str) -> Option<String> {
+        matches!(name, crate::remember::REMEMBER | crate::remember::FORGET)
+            .then(|| self.kept_by_one_face())
+            .flatten()
+    }
+
     /// Whether this line's keep is someone's by the one-face rule
     /// ([`Self::kept_by_one_face`]): a held forget's yes on it is never one.
     pub fn by_one_face(&self) -> bool {
@@ -1043,14 +1063,32 @@ mod tests {
             "reads: the room's"
         );
         assert_eq!(lease.kept_by_one_face(), Some(a_id.clone()), "keeps: A's");
+        for (name, reached) in [
+            (crate::remember::REMEMBER, Some(a_id.clone())),
+            (crate::remember::FORGET, Some(a_id.clone())),
+            (crate::remember::RECALL, None),
+            (crate::remember::FORGET_EVERYTHING, None),
+        ] {
+            assert_eq!(lease.reached_by_one_face(name), reached, "{name}");
+        }
         assert!(lease.by_one_face());
         assert_eq!(lease.carried_for(), None);
         assert!(!lease.carry_conversation(&a_id), "never widened after");
         lease.narrow_to_room();
         assert_eq!(lease.kept_by_one_face(), None, "a narrow ends the keep");
+        assert_eq!(
+            lease.reached_by_one_face(crate::remember::FORGET),
+            None,
+            "a narrow ends the forget's reach too"
+        );
         let room = RequestScope::new(key(22), ScopeSnapshot::room());
         assert!(!room.lease().take_by_one_face(), "nobody's");
         assert_eq!(room.lease().kept_by_one_face(), None);
+        assert_eq!(
+            room.lease().reached_by_one_face(crate::remember::FORGET),
+            None,
+            "no known face: the room's only"
+        );
         assert!(room.lease().keep_for_one_face(&a_id), "named late");
         assert_eq!(room.lease().scope(), Some(&ScopeSnapshot::room()));
         assert_eq!(room.lease().kept_by_one_face(), Some(a_id.clone()));

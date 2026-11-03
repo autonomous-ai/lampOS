@@ -3254,6 +3254,217 @@ pub fn run_scoped_for(
     }
 }
 
+thread_local! {
+    /// Set by a single-item forget that found nothing about it in the scope
+    /// it was asked in ([`nothing_in_scope`]): the explicit outcome
+    /// [`theirs_then_rooms`] goes on to the room's by, never the reply's
+    /// text (the Reviewer-lead's P2 on #5022).
+    static NOTHING_IN_SCOPE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// This forget found nothing about it in the scope it was asked in: a real
+/// no-match. Never set when it found some and declined (more than
+/// [`ABOUT_MOST`], a cut or refused listing, asked which one), nor when it
+/// already looked in the room's itself (an unnamed `forget {about}` of
+/// someone known, `DaysClient::forget_about`'s `before`).
+fn nothing_in_scope() {
+    NOTHING_IN_SCOPE.with(|nothing| nothing.set(true));
+}
+
+/// `theirs`, a forget in the one known face's scope, and then `room`, the
+/// room's, only when `theirs` answered and found nothing about it there
+/// ([`nothing_in_scope`]). The room's is told when it forgot, or when its
+/// answer was lost (it may have); otherwise theirs is.
+fn theirs_then_rooms(
+    theirs: impl FnOnce() -> (Value, bool),
+    room: impl FnOnce() -> (Value, bool),
+) -> (Value, bool) {
+    NOTHING_IN_SCOPE.with(|nothing| nothing.set(false));
+    let told = theirs();
+    let nothing = NOTHING_IN_SCOPE.with(|nothing| nothing.replace(false));
+    if !(told.1 && nothing) {
+        return told;
+    }
+    let in_room = room();
+    NOTHING_IN_SCOPE.with(|nothing| nothing.set(false));
+    if !in_room.1 || in_room.0.get("forgotten") == Some(&json!(true)) {
+        in_room
+    } else {
+        told
+    }
+}
+
+/// Whether the store's answer to a forget is that there was nothing there:
+/// nothing kept (`removed` null) or not that id (`removed` 0).
+fn answered_nothing_there(answer: &Value) -> bool {
+    answer["ok"] == true
+        && answer
+            .get("removed")
+            .is_some_and(|removed| removed.is_null() || removed.as_u64() == Some(0))
+}
+
+/// Whether this forget is run by what it is about or by the id recall gave
+/// (the days memory, its switch on), never as `forget_last`: a bare "forget
+/// that" takes the scope's last kept thing, and on a one-face line, after
+/// the room's recall, that would be theirs while the lamp meant the room's
+/// (Thirteen's P2 on #5022). The legacy memory forgets only the last.
+fn forget_targets(call: &ToolCall) -> bool {
+    let given = |key: &str| call.args.get(key).is_some_and(|value| !value.is_null());
+    call.name == FORGET
+        && DAYS_MODE.get() == Some(&true)
+        && ((forget_all_on() && given("source_id"))
+            || ((forget_about_on() || heard_named(call)) && given("about")))
+}
+
+/// Where this session's listings showed a one-face forget's `source_id`
+/// (Thirteen's P2 on #5022): store ids are counted per person, so A's 3 and
+/// the room's 3 are two kept things, and an id is sent only to the scope
+/// whose listing showed it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IdShown {
+    /// Not a forget by id (the days memory, `forget_all` on, a valid id).
+    NotById,
+    /// The session's context is busy: told as not answering.
+    Busy,
+    /// Shown under `person`, under the room, both, or neither.
+    In { theirs: bool, rooms: bool },
+}
+
+impl DaysClient {
+    /// Where `call`'s `source_id` was shown this session ([`IdShown`]).
+    fn id_shown(&self, call: &ToolCall, person: &str) -> IdShown {
+        let Some(id) = call
+            .args
+            .get("source_id")
+            .and_then(Value::as_u64)
+            .filter(|id| *id > 0 && *id <= i64::MAX as u64)
+        else {
+            return IdShown::NotById;
+        };
+        if call.name != FORGET || !self.forget_all.load(Ordering::Acquire) {
+            return IdShown::NotById;
+        }
+        let Ok(context) = self.context.try_lock() else {
+            return IdShown::Busy;
+        };
+        IdShown::In {
+            theirs: context.of(Some(person)).contains(&id),
+            rooms: context.of(None).contains(&id),
+        }
+    }
+}
+
+/// What the model is told of a one-face forget whose `source_id` this
+/// session showed both of theirs and of the room's: nothing is forgotten,
+/// and it asks which one, then forgets it by what it is about.
+fn forget_which_id() -> Value {
+    json!({
+        "forgotten": false,
+        "note": "Nothing was forgotten yet: that source_id is two kept things, one of theirs and one of the room's. Ask them once which one they mean, in a few words, and then forget it by what it is about, not by its source_id."
+    })
+}
+
+/// A one-face forget by `shown`: an id shown in one scope only goes to that
+/// scope, one shown in both forgets nothing and asks which, and anything
+/// else is [`theirs_then_rooms`].
+fn by_where_shown(
+    shown: IdShown,
+    theirs: impl FnOnce() -> (Value, bool),
+    room: impl FnOnce() -> (Value, bool),
+) -> (Value, bool) {
+    match shown {
+        IdShown::Busy => (gone(), false),
+        IdShown::In {
+            theirs: true,
+            rooms: true,
+        } => {
+            eprintln!(
+                "lamp-voice: a one-face forget's source_id was shown of theirs and of the room's: nothing is run, asked which (LAMP_PERSON_SCOPE_ONE_FACE)"
+            );
+            (forget_which_id(), true)
+        }
+        IdShown::In {
+            theirs: false,
+            rooms: true,
+        } => room(),
+        IdShown::In {
+            theirs: true,
+            rooms: false,
+        } => theirs(),
+        IdShown::NotById | IdShown::In { .. } => theirs_then_rooms(theirs, room),
+    }
+}
+
+/// Whether this line's keep is still `person`'s by the one-face rule, read
+/// right before a run in their scope: another voice may have narrowed it
+/// since it was read (the Reviewer-lead's P3 on #5022).
+fn still_one_face(lease: &crate::memory_scope::ScopeLease, person: &str) -> bool {
+    lease.kept_by_one_face().as_deref() == Some(person)
+}
+
+/// [`run_scoped_for`] for a `remember` on a line `person`'s only by the
+/// one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`), re-checked right before
+/// the run: narrowed since, it is the room's ([`run_scoped`]).
+pub fn run_one_face_keep(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+    person: &str,
+) -> (Value, bool) {
+    if !still_one_face(lease, person) {
+        eprintln!(
+            "lamp-voice: a one-face keep whose line was narrowed since is the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
+        );
+        return run_scoped(socket, call, deadline, lease);
+    }
+    run_scoped_for(socket, call, deadline, lease, person)
+}
+
+/// A single-item `forget` on a line `person`'s only by the one-face rule:
+/// in their scope, then the room's only on a real no-match there
+/// ([`theirs_then_rooms`]), so a forget is never narrower than the keep. By
+/// id, only in the scope whose listing showed it ([`by_where_shown`]).
+/// Re-checked right before the run: narrowed since, the room's only.
+pub fn run_one_face_forget(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+    person: &str,
+) -> (Value, bool) {
+    if !still_one_face(lease, person) {
+        eprintln!(
+            "lamp-voice: a one-face forget whose line was narrowed since is the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
+        );
+        return run_scoped(socket, call, deadline, lease);
+    }
+    if !forget_targets(call) {
+        eprintln!(
+            "lamp-voice: a one-face forget that names neither what nor which is the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
+        );
+        return run_scoped(socket, call, deadline, lease);
+    }
+    let shown = DAYS
+        .get()
+        .and_then(Option::as_ref)
+        .filter(|client| client.socket == socket)
+        .map_or(IdShown::NotById, |client| client.id_shown(call, person));
+    let started = Instant::now();
+    by_where_shown(
+        shown,
+        || run_scoped_for(socket, call, deadline, lease, person),
+        || {
+            run_scoped(
+                socket,
+                call,
+                deadline.saturating_sub(started.elapsed()),
+                lease,
+            )
+        },
+    )
+}
+
 /// [`run`] for this request's turn: with [`LINK_USED_ENVIRONMENT`], what it
 /// gives is linked to that request's exchange (#2176 finding 14).
 pub fn run_of(socket: &Path, call: &ToolCall, deadline: Duration, request: u64) -> (Value, bool) {
@@ -3381,6 +3592,9 @@ fn run_for_guarded(
         return (gone(), false);
     };
     let told = answer_for(&call.name, &answer, now, zone, person);
+    if call.name == FORGET && answered_nothing_there(&answer) {
+        nothing_in_scope();
+    }
     if matches!(call.name.as_str(), REMEMBER | FORGET) && answer["ok"] == true {
         // The note a new session is told has changed.
         if let Some(jobs) = JOBS.get() {
@@ -7506,6 +7720,7 @@ impl DaysClient {
                 // memory when someone known is at the lamp, else the room's:
                 // nobody forgets another's, nor the room's for everyone.
                 if !context.of(person).contains(&id) {
+                    nothing_in_scope();
                     return (not_shown(), true);
                 }
                 // Words that name nothing ("forget that"): the id is the
@@ -7833,6 +8048,9 @@ impl DaysClient {
             }
             // A refusal the store said is told as before, and settled at the
             // end; one with nothing to tell is settled here.
+            if call.name == FORGET && answered_nothing_there(&answer) {
+                nothing_in_scope();
+            }
             let Some(mut told) = answer_for(&call.name, &answer, now, zone, person) else {
                 return if answer["ok"] == true {
                     lost((gone(), false))
@@ -8158,6 +8376,8 @@ impl DaysClient {
             .map(|index| subjects[index].0.as_str())
             .collect();
         if matching.is_empty() && named {
+            // Only theirs was looked in (#3113): a real no-match there.
+            nothing_in_scope();
             // Not found is not "not kept": the words may not be the kept
             // ones. Nothing heard in this conversation is journalled or
             // noticed after it, as after a forget, so a thing said earlier
@@ -14057,6 +14277,180 @@ mod tests {
         );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The Reviewer-lead's P2 on #5022: a one-face forget goes on to the
+    /// room's only on a real no-match in theirs. Nine of theirs about it and
+    /// one of the room's this session had: theirs asks which one, and
+    /// nothing of the room's is listed or forgotten. Named in what was
+    /// heard with none of theirs, the room's is searched and its shown one
+    /// forgotten; unnamed, `forget_about` already looked in the room's
+    /// itself, and the room's is not run a second time.
+    #[test]
+    fn a_one_face_forget_reaches_the_rooms_only_on_no_match_in_theirs() {
+        const MINH: &str = "p-be9688998f085098";
+        fn nine_of_theirs(request: &Value) -> Value {
+            match (request["op"].as_str(), request.get("person")) {
+                (Some("kept"), Some(_)) => {
+                    let entries: Vec<Value> = (1..=9)
+                        .map(|id| json!({"id":id,"at_unix_ms":NOW,"text":format!("My coffee number {id}")}))
+                        .collect();
+                    json!({"ok":true,"entries":entries})
+                }
+                (Some("kept"), None) => json!({"ok":true,"entries":[
+                    {"id":50,"at_unix_ms":NOW,"text":"The coffee is in the cupboard"}
+                ]}),
+                (Some("forget"), _) => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":false}),
+            }
+        }
+        fn none_of_theirs(request: &Value) -> Value {
+            match (request["op"].as_str(), request.get("person")) {
+                (Some("kept"), Some(_)) => json!({"ok":true,"entries":[
+                    {"id":1,"at_unix_ms":NOW,"text":"My bicycle is red"}
+                ]}),
+                (Some("kept"), None) => json!({"ok":true,"entries":[
+                    {"id":50,"at_unix_ms":NOW,"text":"The coffee is in the cupboard"}
+                ]}),
+                (Some("forget"), _) => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":false}),
+            }
+        }
+        let forget = |client: &DaysClient, args: Value| {
+            let call = call(FORGET, args);
+            theirs_then_rooms(
+                || client.run_at(&call, FIRST_READ, NOW, Some(&EAST), Some(MINH)),
+                || client.run_at(&call, FIRST_READ, NOW, Some(&EAST), None),
+            )
+        };
+        for (at, args) in [
+            (0, json!({"about":"coffee"})),
+            (1, json!({"about":"coffee", HEARD_NAMED: true})),
+        ] {
+            let (socket, served) = memory(&format!("one-face-nine-{at}"), 1, nine_of_theirs);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_about.store(true, Ordering::Release);
+            let _ = client.context.lock().unwrap().include(None, &[50]);
+            let (told, answered) = forget(&client, args);
+            assert!(answered, "{told}");
+            assert_eq!(told["forgotten"], false, "{told}");
+            assert!(
+                told["note"].as_str().unwrap().contains("Ask which one"),
+                "{told}"
+            );
+            assert_eq!(
+                served.join().unwrap(),
+                [json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH})],
+                "nothing of the room's is listed or forgotten"
+            );
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+        // Named, none of theirs: the room's is searched and its shown one
+        // forgotten, in the room's scope.
+        let (socket, served) = memory("one-face-named-none", 3, none_of_theirs);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let _ = client.context.lock().unwrap().include(None, &[50]);
+        let (told, _) = forget(&client, json!({"about":"coffee", HEARD_NAMED: true}));
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(
+            served.join().unwrap()[2],
+            json!({"op":"forget","id":50,"selective":true})
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        // Unnamed, none of theirs: forget_about's own look in the room's
+        // forgets it; the room's is not run again (a fourth request).
+        let (socket, served) = memory("one-face-unnamed-none", 3, none_of_theirs);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_about.store(true, Ordering::Release);
+        let _ = client.context.lock().unwrap().include(None, &[50]);
+        let (told, answered) = forget(&client, json!({"about":"coffee"}));
+        assert!(answered, "{told}");
+        assert_eq!(told["count"], 1, "{told}");
+        assert_eq!(
+            served.join().unwrap(),
+            [
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
+                json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
+                json!({"op":"forget","id":50,"selective":true}),
+            ]
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Thirteen's P2 on #5022: store ids are counted per person, so A's 3
+    /// and the room's 3 are two kept things. Shown from the room's listing
+    /// only, a one-face `forget {source_id: 3}` forgets the room's 3, never
+    /// A's; shown from A's only, A's; shown from both, nothing is run and
+    /// the model asks which one.
+    #[test]
+    fn a_one_face_forget_by_id_goes_to_the_scope_that_showed_it() {
+        const MINH: &str = "p-be9688998f085098";
+        fn removes(request: &Value) -> Value {
+            match request["op"].as_str() {
+                Some("forget") => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":false}),
+            }
+        }
+        let forget = |client: &DaysClient| {
+            let call = call(FORGET, json!({"source_id":3}));
+            by_where_shown(
+                client.id_shown(&call, MINH),
+                || client.run_at(&call, FIRST_READ, NOW, Some(&EAST), Some(MINH)),
+                || client.run_at(&call, FIRST_READ, NOW, Some(&EAST), None),
+            )
+        };
+        for (at, theirs_shown, rooms_shown) in [(0, false, true), (1, true, false)] {
+            let (socket, served) = memory(&format!("one-face-id-{at}"), 1, removes);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_all.store(true, Ordering::Release);
+            {
+                let mut context = client.context.lock().unwrap();
+                if theirs_shown {
+                    let _ = context.include(Some(MINH), &[3]);
+                }
+                if rooms_shown {
+                    let _ = context.include(None, &[3]);
+                }
+            }
+            let (told, answered) = forget(&client);
+            assert!(answered, "{told}");
+            assert_eq!(told["forgotten"], true, "{told}");
+            let served = served.join().unwrap();
+            assert_eq!(served.len(), 1, "{served:?}");
+            assert_eq!(served[0]["op"], "forget", "{served:?}");
+            assert_eq!(served[0]["id"], 3, "{served:?}");
+            assert_eq!(
+                served[0].get("person").and_then(Value::as_str),
+                theirs_shown.then_some(MINH),
+                "the 3 of the scope that showed it, and only that one: {served:?}"
+            );
+            assert_eq!(
+                client.context.lock().unwrap().of(Some(MINH)).contains(&3),
+                theirs_shown,
+                "the other scope's 3 stays shown"
+            );
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+        // Shown from both: nothing is forgotten, and the model asks which.
+        let (socket, served) = memory("one-face-id-both", 0, removes);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        {
+            let mut context = client.context.lock().unwrap();
+            let _ = context.include(Some(MINH), &[3]);
+            let _ = context.include(None, &[3]);
+        }
+        let (told, answered) = forget(&client);
+        assert!(answered, "{told}");
+        assert_eq!(told, forget_which_id());
+        assert!(served.join().unwrap().is_empty(), "nothing is run");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
     }
 
     /// The reviewer's second P3 on #2277: a removal, then a reply that is

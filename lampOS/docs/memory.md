@@ -561,10 +561,12 @@ short-term. Now, on a line admitted as a known person's, no face seen
 speaking it, when the eyes' looks through it held their own known face in at
 least 3 and no other face in any (`SpeakingFaces::one_face_in_view`; a look
 with nobody in it is no other face), and the conversation has shown **no
-other voice**, **their keep is theirs and nothing else is**: a `remember` on
-the line is written in their scope (`ScopeLease::take_by_one_face`,
-`ScopeLease::kept_by_one_face`, read only by the memory route's keep in
-`tools.rs`). **Every read stays the room's**: the line is narrowed to the
+other voice**, **their keep is theirs, and so is a forget of it**: a
+`remember` on the line is written in their scope (`ScopeLease::take_by_one_face`,
+`ScopeLease::kept_by_one_face`), and a single-item `forget` searches their
+scope, then the room's (`ScopeLease::reached_by_one_face`, the one decision
+the memory route in `tools.rs` reads for both, so a forget is never narrower
+than the keep). **Every read stays the room's**: the line is narrowed to the
 room, so no recall or hits from their scope, no memory note of theirs, no
 person's context, no thread or summary of theirs; the turn is told and read
 as without the rule. Why (reviewer-three's P1 on #4584, option 2, Friday's
@@ -594,13 +596,39 @@ seen speaking shows another person, and since only the keep goes to them
 the cost is words kept, never read. A second face in any look, an unknown
 face, no face in view, or another voice, and it is as before. A line
 admitted as the room's with nobody named is untouched, so an unplaced voice
-still reaches nobody's memory (#4196, #4207). **A forget is unchanged:** a
-`forget` or `forget_everything` on such a line runs in the room's scope, and
-**a yes said on such a line never runs a held forget**
+still reaches nobody's memory (#4196, #4207). **A forget follows the keep:**
+a single-item `forget` on such a line removes from their scope what the
+same rule kept there, and looks in the room's too only when theirs has
+nothing about it (Fourteen's lamp-9adf check on build 9699: "forget my
+coffee" searched only the room's while the coffee was kept as theirs, a fault
+already in 9610). That no-match is an outcome the forget sets itself
+(`remember::run_one_face_forget`), never read from its reply: when theirs
+found some and forgot none (more than eight, so it asks which one; a cut
+listing; an older memory refusing it), the room's is not touched (the
+Reviewer-lead's P2 on #5022). An unnamed `forget {about}` already looks in
+the room's itself when they have nothing of their own, so the room's is run
+again only for a forget named in what was heard. It reaches only the one
+known face taken for this line, re-checked right before each run in their
+scope, for the keep too (`remember::run_one_face_keep`): a second face, an
+unknown face, no face, another voice or a narrow after it, even between that
+read and the run, and it is the room's only. Only a forget by what it is
+about or by the id recall gave reaches their scope: a bare "forget that",
+or any forget the memory would run as "the last kept thing" (the legacy
+memory, a switch off), is the room's only, since after the room's recall
+on such a line it would take their last kept thing (Thirteen's P2 on
+#5022). Ids are counted per person, so their 3 and the room's 3 are two
+kept things: a forget by id goes only to the scope whose listing showed
+that id this session, and an id shown of both forgets nothing and the
+model asks which one (`remember::by_where_shown`; Thirteen's second P2 on
+#5022).
+`forget_everything` on such a line still runs in the room's scope, and **a yes said on such a line never runs a held forget**
 (`ScopeLease::by_one_face`, `take_held_forget`; the model is told the yes
 did not count): the yes still needs their face seen saying it. Risk left: a
 voice off camera while they sit alone in view, with no print to tell it
-apart, may be kept in their memory; it is never read back to that voice.
+apart, may be kept in their memory, and its single-item forget may remove
+from it up to eight things that match (a `forget {about}` forgets at most
+eight, and none when more match), never all; nothing is read back to that
+voice.
 A line kept as yours while you were the only face in view can include words
 someone else said out of view.
 
