@@ -18,8 +18,10 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-# Root, for the store only root reads; group lampos, so the sockets it makes (0660) let lamp-cloud
-# (lampos) and the voice connect, and the peer check then tells them apart.
+# Root, for the store only root reads and the factory reset's plan wipes as root's; group lampos, so
+# the sockets it makes (0660) let lamp-cloud (lampos) and the voice connect, and the peer check then
+# tells them apart. It holds no capability (CapabilityBoundingSet= below), a narrow system-call set,
+# and sees the system read-only but for its own two folders.
 User=root
 Group=lampos
 Slice=lampos-parts.slice
@@ -48,6 +50,20 @@ ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes
 CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
 # The services and the backend (AF_INET, AF_INET6); its own sockets (AF_UNIX).
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 

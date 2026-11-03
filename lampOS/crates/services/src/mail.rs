@@ -105,7 +105,8 @@ pub trait Mail {
 
 // --- Security mails ---------------------------------------------------------
 
-/// Phrases that make a mail a security one, lower case.
+/// Phrases that make a mail a security one, lower case, Vietnamese with
+/// and without its accents too.
 const SECURITY_PHRASES: &[&str] = &[
     "verification code",
     "verify your",
@@ -134,6 +135,8 @@ const SECURITY_PHRASES: &[&str] = &[
     "forgot your password",
     "your password was changed",
     "password has been changed",
+    "new password",
+    "change your password",
     "new sign-in",
     "sign-in attempt",
     "sign in attempt",
@@ -146,10 +149,49 @@ const SECURITY_PHRASES: &[&str] = &[
     "account recovery",
     "recovery code",
     "magic link",
+    "token=",
+    // Vietnamese: a verification or sign-in code, a password, signing in.
+    "mã xác minh",
+    "ma xac minh",
+    "mã xác thực",
+    "ma xac thuc",
+    "mã otp",
+    "ma otp",
+    "mã đăng nhập",
+    "ma dang nhap",
+    "mã bảo mật",
+    "ma bao mat",
+    "mật khẩu",
+    "mat khau",
+    "đặt lại mật khẩu",
+    "dat lai mat khau",
+    "đăng nhập",
+    "dang nhap",
 ];
 
 /// Short words that count only as whole words.
 const SECURITY_WORDS: &[&str] = &["otp", "2fa", "mfa", "pin"];
+
+/// Words that make a mail a security one when a code number
+/// ([`has_code_number`]) is near them.
+const CODE_WORDS: &[&str] = &["code", "mã", "token", "pin"];
+
+/// Signing in, which makes a mail a security one with a link or a code
+/// number anywhere in it ("Use 482913 to sign in", "Log in to Notion:
+/// https://…").
+const SIGN_IN_WORDS: &[&str] = &[
+    "sign in",
+    "sign-in",
+    "signin",
+    "log in",
+    "log-in",
+    "login",
+    "đăng nhập",
+    "dang nhap",
+];
+
+/// What starts a link.
+const LINK_STARTS: &[&str] = &["http://", "https://", "www."];
 
 fn whole_word(text: &str, word: &str) -> bool {
     text.match_indices(word).any(|(at, _)| {
@@ -159,33 +201,62 @@ fn whole_word(text: &str, word: &str) -> bool {
     })
 }
 
-/// A run of 4 to 8 digits standing alone (a code), within `text`.
+/// A code standing alone within `text`: 4 to 8 digits, unbroken or in
+/// groups split by one space or dash ("482913", "482 913", "482-913",
+/// "4 8 2 9 1 3").
 fn has_code_number(text: &str) -> bool {
-    let mut run = 0;
-    let mut alone = true;
-    let mut previous: Option<char> = None;
-    for c in text.chars().chain(std::iter::once(' ')) {
-        if c.is_ascii_digit() {
-            if run == 0 {
-                alone = !previous.is_some_and(|p| p.is_alphanumeric());
-            }
-            run += 1;
-        } else {
-            if run > 0 && (4..=8).contains(&run) && alone && !c.is_alphanumeric() {
-                return true;
-            }
-            run = 0;
+    let chars: Vec<char> = text.chars().collect();
+    let mut at = 0;
+    while at < chars.len() {
+        if !chars[at].is_ascii_digit() || (at > 0 && chars[at - 1].is_alphanumeric()) {
+            at += 1;
+            continue;
         }
-        previous = Some(c);
+        let mut digits = 0;
+        let mut end = at;
+        loop {
+            while end < chars.len() && chars[end].is_ascii_digit() {
+                digits += 1;
+                end += 1;
+            }
+            let joined = end + 1 < chars.len()
+                && matches!(chars[end], ' ' | '-')
+                && chars[end + 1].is_ascii_digit();
+            if !joined {
+                break;
+            }
+            end += 1;
+        }
+        let alone = !chars.get(end).is_some_and(|c| c.is_alphanumeric());
+        if alone && (4..=8).contains(&digits) {
+            return true;
+        }
+        at = end.max(at + 1);
     }
     false
 }
 
-/// Whether a mail is a security one: a one-time code, a password reset, a
-/// sign-in alert or a verification. Such a mail is never spoken, forwarded
-/// or kept: it is dropped from what is returned and said only as
-/// [`SECURITY_LEFT_OUT`]. A mail that says "code" near a 4 to 8 digit
-/// number counts too.
+/// `all`'s text within 80 bytes of `at`, on character boundaries.
+fn around(all: &str, at: usize, len: usize) -> &str {
+    let mut start = at.saturating_sub(80);
+    while !all.is_char_boundary(start) {
+        start -= 1;
+    }
+    let mut end = (at + len + 80).min(all.len());
+    while !all.is_char_boundary(end) {
+        end += 1;
+    }
+    &all[start..end]
+}
+
+/// Whether a text is a security one: a one-time code, a password reset, a
+/// sign-in alert or link, or a verification, in English or Vietnamese.
+/// Such a text is never spoken, forwarded or kept: it is dropped from what
+/// is returned and said only as [`SECURITY_LEFT_OUT`]. A text that says
+/// "code" (or "mã", "token", "pin") near a 4 to 8 digit number counts too,
+/// and so does one that says "sign in" or "log in" with a link or such a
+/// number anywhere. It errs on hiding: a discount code or a postal code
+/// near a number is left out too.
 pub fn is_security_mail(from: &str, subject: &str, text: &str) -> bool {
     let all = format!("{from}\n{subject}\n{text}").to_lowercase();
     if SECURITY_PHRASES.iter().any(|phrase| all.contains(phrase))
@@ -193,17 +264,24 @@ pub fn is_security_mail(from: &str, subject: &str, text: &str) -> bool {
     {
         return true;
     }
-    all.match_indices("code").any(|(at, _)| {
-        let mut start = at.saturating_sub(80);
-        while !all.is_char_boundary(start) {
-            start -= 1;
-        }
-        let mut end = (at + 84).min(all.len());
-        while !all.is_char_boundary(end) {
-            end += 1;
-        }
-        has_code_number(&all[start..end])
-    })
+    let near_code = CODE_WORDS.iter().any(|word| {
+        all.match_indices(word).any(|(at, _)| {
+            // "code" also within "passcode" or "barcode"; the rest whole.
+            let whole = *word == "code"
+                || (!all[..at]
+                    .chars()
+                    .next_back()
+                    .is_some_and(char::is_alphanumeric)
+                    && !all[at + word.len()..]
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_alphanumeric));
+            whole && has_code_number(around(&all, at, word.len()))
+        })
+    });
+    let signs_in = SIGN_IN_WORDS.iter().any(|word| all.contains(word))
+        && (LINK_STARTS.iter().any(|link| all.contains(link)) || has_code_number(&all));
+    near_code || signs_in
 }
 
 // --- MIME -------------------------------------------------------------------
@@ -1140,6 +1218,32 @@ mod tests {
             ("x@y.z", "Đăng nhập", "Mã code: 1234"),
             ("x@y.z", "Login", "Use 2FA to finish"),
             ("x@y.z", "Welcome", "Please verify your email address"),
+            // Vietnamese, with and without accents.
+            ("x@y.z", "Xin chào", "Mã xác minh của bạn là 482913"),
+            ("x@y.z", "", "Mã xác thực: 482913"),
+            ("x@y.z", "", "Ma xac thuc: 482913"),
+            ("x@y.z", "", "Mã OTP của bạn"),
+            ("x@y.z", "", "Đây là mã đăng nhập"),
+            ("x@y.z", "", "Bạn vừa đổi mật khẩu"),
+            ("x@y.z", "", "Bam vao day de dat lai mat khau"),
+            ("x@y.z", "", "Mã của bạn là 482 913"),
+            // Digits split by a space or a dash.
+            ("x@y.z", "Hello", "Your code is 482 913"),
+            ("x@y.z", "Hello", "Your code is 482-913"),
+            ("x@y.z", "Hello", "Your code: 4 8 2 9 1 3"),
+            // Signing in with a number or a link.
+            ("x@y.z", "Hi", "Use 482913 to sign in. Do not share."),
+            (
+                "x@y.z",
+                "Notion",
+                "Log in to Notion: https://notion.so/loginwithemail?t=abc",
+            ),
+            (
+                "x@y.z",
+                "Hi",
+                "Click https://x.test/a?token=abc to continue",
+            ),
+            ("x@y.z", "Account", "Choose a new password here"),
         ] {
             assert!(is_security_mail(from, subject, text), "{subject} {text}");
         }
@@ -1156,6 +1260,8 @@ mod tests {
                 "Your parcel is on its way",
             ),
             ("x@y.z", "Topic", "Shopping list: apples"),
+            ("x@y.z", "Shipping", "Shipping 12345678 left today"),
+            ("x@y.z", "Trip", "Ma and I land at 1430 on Friday"),
         ] {
             assert!(!is_security_mail(from, subject, text), "{subject} {text}");
         }
