@@ -1274,6 +1274,55 @@ compatibility, its ordinary environment and executable wrapper, storage sync
 latency relative to the 1.1-second receipt deadline, and Linux process-group
 cleanup. No host result substitutes for those checks.
 
+## Recording a hand-over for a test
+
+`tools/harness-record.sh` keeps, for a set time, what Harness reported while
+a hand-over ran, so a test can show when the agent started, worked and
+answered next to the lamp's journal. It only reads (`watch`, `show`, `ps`):
+
+```text
+tools/harness-record.sh record NAME SECS [--machine ID] [--agent ID] [--out DIR]
+tools/harness-record.sh timeline DIR/NAME
+```
+
+It writes `DIR/NAME/` (DIR is `--out`, else `$HARNESS_RECORD_DIR`, else
+`./harness-records`). Each line is `END<TAB>START<TAB>MS<TAB>BODY`, local
+times in ms since 1970. For `show` and `ps`, START is when the call was made,
+END when it answered and MS how long it took, because slow calls are what a
+hand-over test usually has to explain (on lamp-c0a4, with the office
+computer loaded, `ps --machine` took 5 to 19 s and `show` 7 to 20 s). For
+`watch`, START is when that watch run began and END when the line came.
+
+- `watch.jsonl`: `harness watch [--machine ID] AGENT --json`, every line
+  whole; only with `--agent`, because `watch` follows one agent. Each run
+  opens with `!watch run N started`. When it ends (the agent not there yet,
+  a Harness `TIMEOUT`, or stopped) the end is kept as `!rc=N watch ended`
+  and it starts again 2 s after that run began, or at once if it ran longer.
+- `show.jsonl`: `harness show [--machine ID] AGENT --json` every 2 s, with
+  `--agent`; its pretty JSON joined onto one line.
+- `ps.jsonl`: `harness ps [--machine ID] --json` every 5 s.
+- `events.jsonl`: only if `harness --help` names an `events` verb (0.5.27 has
+  none).
+- `timeline.txt`: every line merged in time order, with a short summary
+  (state, tool count; for `ps` the count of harnesses by state; `took N ms`
+  for `show` and `ps`). A Harness error reply reads `error=TIMEOUT`, or
+  `!rc=1 error=TIMEOUT` when the call also failed. The summaries come from
+  `jq`; without it the same fields are picked out of the line. `timeline`
+  builds it again.
+
+A failed call is kept as `!rc=N` and its output. One reader never runs two of
+its calls at once: a `show` slower than 2 s is followed by the next, not
+stacked. When the time is up no new call starts; a call still running gets
+up to `HARNESS_RECORD_GRACE` seconds (30 by default) to answer, and one that
+does not is killed and kept as `!killed at end` with how long it ran. A
+`watch` run is stopped at once (`!stopped at end`). On INT or TERM every call
+is killed at once. Either way nothing is left running and the timeline is
+built. `HARNESS_BIN` names the binary; no `$HOME` path is assumed, so on the
+lamp it runs as `lampos` with `HOME=/var/lib/lampos-tasks`. Keep the
+recordings out of the repository; a verification README names what was kept
+from them. `tools/harness-record-test.sh` tests it with a stand-in Harness,
+with no network or account.
+
 ## First real Harness check (lamp-4ace, 2026-10-14, 21:36)
 
 By hand, not through `lamp-tasks`, with the owner's leave to use their account
