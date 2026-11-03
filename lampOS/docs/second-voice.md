@@ -4575,9 +4575,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `lamp_spoke_lately`, a checked sound's `lamp_just_asked`, and the Live
   route.
 - **Untied talk keeps nothing going** (`LAMP_UNTIED_GOING_ON=on`,
-  `crate::untied_going_on`, #3882; off by default and not in the product
-  unit). On lamp-06c1 on 28 Oct, with the product unit's environment, made
-  voices and no faces, desk1's lines after one answered question ("Did you
+  `crate::untied_going_on`, #3882; off by default; the product unit sets
+  `held`, below, since #5008). On lamp-06c1 on 28 Oct, with the product
+  unit's environment, made voices and no faces, desk1's lines after one
+  answered question ("Did you
   send the slides to Sam yet?", "Not yet, I'll do it after lunch.", "Are
   you coming to the meeting at four?") were each let out only as the
   conversation going on, and each answer opened a new exchange
