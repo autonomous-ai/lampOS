@@ -139,7 +139,8 @@ pub struct EchoMatch {
     /// How far `render_block_level` is under its own peak over the last
     /// 150 ms at the alignment held, in tenths of a decibel: high on the
     /// tail of a word the lamp just stopped, near zero while it holds.
-    // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+    /// From [`crate::duplex::TAIL_DROP_TENTHS`] on, `Hearing::heard` takes
+    /// the block as the lamp's own tail (#5032).
     pub render_drop: u16,
 }
 
@@ -431,7 +432,7 @@ impl EchoObserver {
         self.blocks = self.blocks.saturating_add(1);
         let (raw_energy, clean_energy) = (self.raw.energy(), self.clean.energy());
         let echo = self.matched(raw_energy);
-        // #4035: logged for the tail guard; not used in Hearing::heard until 52e6 trails prove it
+        // #4035: the render's fall under its peak, the tail guard (#5032).
         let block = self.alignment.as_ref().map_or(Level::FLOOR, |alignment| {
             self.render_block(alignment.offset)
         });

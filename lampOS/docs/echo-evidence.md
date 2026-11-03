@@ -42,7 +42,7 @@ and inside `echo`:
 | `residual_playback_floor` | Percent of the cancelled signal's energy that has to be playback by accounting alone |
 | `alignment_age_blocks` | Blocks since the alignment last explained at least half the capture |
 | `render_block_level` | Level of the render at the alignment over the newest capture block alone (10 ms) |
-| `render_drop` | Tenths of a decibel `render_block_level` is under its own peak over the last 150 ms. Logged for #4035's tail guard; no decision reads it yet |
+| `render_drop` | Tenths of a decibel `render_block_level` is under its own peak over the last 150 ms. From 60 (6 dB) on, `Hearing::heard` takes the block as the lamp's own tail, `Own` (#5032) |
 
 Levels are tenths of a decibel relative to full scale, over the last 120 ms,
 about the mean, in the analysis band below roughly 2 kHz. They are not
