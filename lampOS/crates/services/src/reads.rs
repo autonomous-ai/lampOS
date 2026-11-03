@@ -504,12 +504,24 @@ pub fn items(code: &str, body: &str) -> Vec<Value> {
         .map(|item| {
             let mut texts = Vec::new();
             plain_texts(&item, &mut texts);
-            json!({
+            let mut kept = json!({
                 "id": item.get("id"),
                 "type": item.get("object").or_else(|| item.get("type")),
                 "url": item.get("url"),
                 "text": texts.join(" "),
-            })
+            });
+            // A block's page or parent block: what its neighbours share,
+            // for the security check's join ([`group_of`]).
+            if item.get("object").and_then(Value::as_str) == Some("block")
+                && let Some(parent) = item.get("parent").and_then(|parent| {
+                    ["page_id", "block_id"]
+                        .iter()
+                        .find_map(|key| parent.get(*key).and_then(Value::as_str))
+                })
+            {
+                kept["parent"] = json!(parent);
+            }
+            kept
         })
         .collect()
 }
@@ -536,8 +548,11 @@ pub fn about(name: &str) -> String {
     )
 }
 
-/// Every text in `value`, its keys aside, one per line: what a security
-/// check reads of an item.
+/// Keys whose values are ids, never read for security text.
+const ID_KEYS: &[&str] = &["id", "parent"];
+
+/// Every text in `value`, its keys and ids aside, one per line: what a
+/// security check reads of an item.
 fn texts_of(value: &Value, out: &mut String) {
     match value {
         Value::String(text) => {
@@ -545,53 +560,134 @@ fn texts_of(value: &Value, out: &mut String) {
             out.push('\n');
         }
         Value::Array(items) => items.iter().for_each(|item| texts_of(item, out)),
-        Value::Object(object) => object.values().for_each(|item| texts_of(item, out)),
+        Value::Object(object) => object
+            .iter()
+            .filter(|(key, _)| !ID_KEYS.contains(&key.as_str()))
+            .for_each(|(_, item)| texts_of(item, out)),
         _ => {}
     }
+}
+
+/// Keys naming what an item belongs to, the first found its group: a
+/// channel, a thread, a page.
+const GROUP_KEYS: &[&str] = &[
+    "channel",
+    "channel_id",
+    "thread_ts",
+    "threadId",
+    "thread_id",
+    "parent",
+    "page_id",
+];
+
+/// The channel, thread or page an item is part of, if its read says one:
+/// only items of one group are read joined ([`without_security`]).
+pub fn group_of(item: &Value) -> Option<String> {
+    GROUP_KEYS.iter().find_map(|key| {
+        let value = item.get(*key)?;
+        let id = value
+            .as_str()
+            .map(str::to_owned)
+            .or_else(|| value.get("id").and_then(Value::as_str).map(str::to_owned))?;
+        Some(format!("{key}:{id}"))
+    })
 }
 
 /// `items` with each security one ([`mail::is_security_mail`]) replaced by
 /// `left_out`: a one-time code, a sign-in link or a password reset in a
 /// mail, a chat message, a page, a file's name or an event is never quoted,
-/// whatever the service. Each item is also read joined with the next, and
-/// both are left out when the two together are one, so a code split
-/// across two blocks, two messages or two pieces ("Your verification code
-/// is" and "482913") is never quoted either. It errs on hiding: an item
-/// beside a security one goes with it.
-fn without_security(items: Vec<Value>, left_out: &str) -> Vec<Value> {
+/// whatever the service. Within one group (a channel, a thread, a page, one
+/// MCP answer's texts: the `Option<String>` beside each item), items are
+/// also read with the next two: two fine alone that are a security text
+/// joined both go, and beside a security text with no secret of its own
+/// ("Your verification code is") an item with a code or a link goes, so a
+/// code split across blocks, messages or pieces is never quoted either.
+/// Only the items that make it are left out ("Lunch at noon?" beside "Code:
+/// 482913" stays). Separate mails or events, with no group, are never
+/// joined.
+fn without_security(items: Vec<(Option<String>, Value)>, left_out: &str) -> Vec<Value> {
     let texts: Vec<String> = items
         .iter()
-        .map(|item| {
+        .map(|(_, item)| {
             let mut said = String::new();
             texts_of(item, &mut said);
             said
         })
         .collect();
-    let mut hidden: Vec<bool> = texts
+    let alone: Vec<bool> = texts
         .iter()
         .map(|said| mail::is_security_mail("", "", said))
         .collect();
-    for at in 1..texts.len() {
-        let joined = format!("{}\n{}", texts[at - 1], texts[at]);
-        if mail::is_security_mail("", "", &joined) {
-            hidden[at - 1] = true;
-            hidden[at] = true;
+    let shaped: Vec<bool> = texts
+        .iter()
+        .map(|said| mail::has_secret_shape(said))
+        .collect();
+    let mut hidden = alone.clone();
+    let together = |a: usize, b: usize| items[a].0.is_some() && items[a].0 == items[b].0;
+    let trips = |ats: &[usize]| {
+        let joined: Vec<&str> = ats.iter().map(|at| texts[*at].as_str()).collect();
+        mail::is_security_mail("", "", &joined.join("\n"))
+    };
+    for at in 0..texts.len() {
+        for far in [at + 1, at + 2] {
+            if far >= texts.len() || !together(at, far) {
+                continue;
+            }
+            match (alone[at], alone[far]) {
+                // Fine alone, a security text joined: both go.
+                (false, false) => {
+                    if trips(&[at, far]) {
+                        hidden[at] = true;
+                        hidden[far] = true;
+                    }
+                }
+                // A security text with no secret of its own ("Your
+                // verification code is"): a neighbour with one goes too.
+                (true, false) if !shaped[at] && shaped[far] => hidden[far] = true,
+                (false, true) if !shaped[far] && shaped[at] => hidden[at] = true,
+                _ => {}
+            }
+        }
+        // Three fine alone and in every pair, a security text together.
+        let three = [at, at + 1, at + 2];
+        if at + 2 < texts.len()
+            && together(at, at + 1)
+            && together(at, at + 2)
+            && three.iter().all(|at| !alone[*at])
+            && trips(&three)
+            && !trips(&[at, at + 1])
+            && !trips(&[at + 1, at + 2])
+            && !trips(&[at, at + 2])
+        {
+            three.iter().for_each(|at| hidden[*at] = true);
         }
     }
     items
         .into_iter()
         .zip(hidden)
-        .map(|(item, hidden)| if hidden { json!(left_out) } else { item })
+        .map(|((_, item), hidden)| if hidden { json!(left_out) } else { item })
         .collect()
 }
 
 /// Items wrapped as quoted data from `name`, as many as fit in
 /// [`RESULT_MOST`] (each made smaller first if need be), and how many were
 /// left out. Every item is checked for security text first, alone and with
-/// its neighbours ([`without_security`]), for every service: one left out
+/// its neighbours in its channel, thread or page ([`group_of`],
+/// [`without_security`]), for every service: one left out
 /// is "a security mail, left out" in Gmail and "a security message, left
 /// out" in any other.
 pub fn quoted(name: &str, items: Vec<Value>) -> Value {
+    quoted_in(
+        name,
+        items
+            .into_iter()
+            .map(|item| (group_of(&item), item))
+            .collect(),
+    )
+}
+
+/// [`quoted`] with each item's group given ([`without_security`]).
+pub fn quoted_in(name: &str, items: Vec<(Option<String>, Value)>) -> Value {
     let left_out = if catalog::service("gmail").is_some_and(|gmail| gmail.name == name) {
         mail::SECURITY_LEFT_OUT
     } else {
@@ -839,11 +935,12 @@ mod tests {
         // Notion blocks, then Slack messages, the code in the second.
         let notion = items(
             "notion",
-            r#"{"results":[{"id":"a","object":"block","paragraph":{"rich_text":[{"plain_text":"Your verification code is"}]}},{"id":"b","object":"block","paragraph":{"rich_text":[{"plain_text":"482913"}]}}]}"#,
+            r#"{"results":[{"id":"a","object":"block","parent":{"type":"page_id","page_id":"p1"},"paragraph":{"rich_text":[{"plain_text":"Your verification code is"}]}},{"id":"b","object":"block","parent":{"type":"page_id","page_id":"p1"},"paragraph":{"rich_text":[{"plain_text":"482913"}]}}]}"#,
         );
+        assert_eq!(notion[0]["parent"], "p1");
         let slack = items(
             "slack",
-            r#"{"items":[{"text":"Here's the code you asked for","user":"U1"},{"text":"482 913","user":"U1"}]}"#,
+            r#"{"items":[{"text":"Here's the code you asked for","user":"U1","channel":"C1"},{"text":"482 913","user":"U1","channel":"C1"}]}"#,
         );
         for (name, items) in [("Notion", notion), ("Slack", slack)] {
             let quoted = quoted(name, items);
@@ -872,6 +969,7 @@ mod tests {
             ],
         );
         assert_eq!(gmail["quoted"][1], mail::SECURITY_LEFT_OUT);
+        assert_eq!(gmail["quoted"][0]["text"], "Lunch at noon?");
         let plain = quoted(
             "Slack",
             vec![
@@ -881,6 +979,76 @@ mod tests {
         );
         assert_eq!(plain["quoted"][0]["text"], "Lunch at noon?");
         assert_eq!(plain["quoted"][1]["text"], "See you there");
+    }
+
+    #[test]
+    fn only_the_items_that_make_a_code_are_left_out_and_only_within_one_group() {
+        let channel = |texts: &[&str]| {
+            texts
+                .iter()
+                .map(|text| json!({"text": text, "channel": "C1"}))
+                .collect::<Vec<_>>()
+        };
+        let texts = |quoted: &Value| {
+            quoted["quoted"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|item| {
+                    item.get("text")
+                        .map_or("-", |text| text.as_str().unwrap())
+                        .to_owned()
+                })
+                .collect::<Vec<_>>()
+        };
+        // An item that is one alone: only it goes.
+        let one = quoted(
+            "Slack",
+            channel(&["Lunch at noon?", "Code: 482913", "Dinner at 7?"]),
+        );
+        assert_eq!(texts(&one), ["Lunch at noon?", "-", "Dinner at 7?"]);
+        // Across three: only the two that make it go.
+        for three in [
+            ["Your verification code is", "See you at lunch", "482913"],
+            ["Your code", "is", "482913"],
+        ] {
+            let result = quoted("Slack", channel(&three));
+            assert_eq!(texts(&result), ["-", three[1], "-"], "{result}");
+        }
+        // Two separate mails, or two items with no group, are never joined.
+        let mails = quoted(
+            "Gmail",
+            vec![
+                mail_item(&MailItem {
+                    id: "1".into(),
+                    text: "Please verify the numbers".into(),
+                    ..MailItem::default()
+                }),
+                mail_item(&MailItem {
+                    id: "2".into(),
+                    text: "Room 1204 at noon".into(),
+                    ..MailItem::default()
+                }),
+            ],
+        );
+        assert_eq!(mails["quoted"][0]["text"], "Please verify the numbers");
+        assert_eq!(mails["quoted"][1]["text"], "Room 1204 at noon");
+        let loose = quoted(
+            "Slack",
+            vec![json!({"text":"Your code"}), json!({"text":"482913"})],
+        );
+        assert_eq!(loose["quoted"][1]["text"], "482913");
+        // A calendar event asking to confirm, with its dates, is kept.
+        let event = quoted(
+            "Google Calendar",
+            vec![json!({
+                "summary": "Team offsite",
+                "description": "Please confirm by replying",
+                "start": {"date": "2026-11-04"},
+                "end": {"dateTime": "2026-11-05T10:00:00+07:00"},
+            })],
+        );
+        assert_eq!(event["quoted"][0]["summary"], "Team offsite", "{event}");
     }
 
     #[test]
