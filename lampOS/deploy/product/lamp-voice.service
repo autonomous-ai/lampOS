@@ -438,6 +438,11 @@ Environment=LAMP_MEMORY_FORGET_ASKS=on
 # faces (LAMP_EYES_SPEAKING). With no LAMP_SAME_VOICE_MODEL in the product no line has a voice print, so only a line
 # seen spoken by exactly one face, the one the eyes know as that person, moves; off camera or two faces, it stays.
 Environment=LAMP_MEMORY_FOLLOWS_FACE=on
+# One memory id through a rename (#2176 row 3): the voice keys a known person's memory on the id the eyes give
+# beside their name, with the eyes' LAMP_MEMORY_STABLE_ID (both or neither: apart, no ids are used). Anyone already
+# known keeps the id their memory has today, `person_id` of their name. The memory owner's yes on 4 Nov, after
+# lamp-0c4e's rename to an empty memory (#4710).
+Environment=LAMP_MEMORY_STABLE_ID=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
