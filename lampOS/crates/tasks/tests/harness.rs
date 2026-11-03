@@ -3418,6 +3418,49 @@ fn every_harness_call_says_one_line_with_ids_cut_and_no_words() {
         line.contains(" exit=1 ms=") && line.ends_with(" state=failed error=SPAWN_FAILED"),
         "{line}"
     );
+    // A failed `new` or `reply` never journals `message` or `creationId`:
+    // there they are Harness's words (twelve's P2 on #5117), with no `ok`
+    // at all, or with `ok: false` and a code.
+    let words = ["Zanzibar", "Quokka"];
+    let mut rig = Rig::new();
+    rig.new_step(
+        json!({"exit":1,"stdout":"{\"message\":\"Zanzibar\",\"creationId\":\"Quokka\"}\n"}),
+    );
+    let (cli, calls) = calls_of(&mut rig);
+    cli.launch(&launch());
+    let line = calls.lock().unwrap()[1].clone();
+    assert!(
+        line.starts_with("tasks: harness new: ") && line.contains(" exit=1 ms="),
+        "{line}"
+    );
+    assert!(
+        !line.contains("message=") && !line.contains("creation="),
+        "{line}"
+    );
+    assert_call_said_nothing_private(&line, &words);
+    let mut rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true},"new":{"default":true},"show":{"default":true},
+        "reply":{"exit":1,"stdout":
+            "{\"ok\":false,\"error\":\"NOT_IDLE\",\"message\":\"Zanzibar\",\"creationId\":\"Quokka\"}\n"}}));
+    let mut request = launch();
+    request.target.engine = EngineKind::Devin;
+    let (cli, calls) = calls_of(&mut rig);
+    cli.launch(&request);
+    let lines = calls.lock().unwrap().clone();
+    let line = lines
+        .iter()
+        .find(|line| line.starts_with("tasks: harness reply: "))
+        .unwrap_or_else(|| panic!("{lines:?}"))
+        .clone();
+    assert!(
+        line.contains(" exit=1 ms=") && line.contains(" error=NOT_IDLE"),
+        "{line}"
+    );
+    assert!(
+        !line.contains("message=") && !line.contains("creation="),
+        "{line}"
+    );
+    assert_call_said_nothing_private(&line, &words);
     // A timeout: no exit, no stdout, only the adapter's code.
     let mut rig = Rig::new();
     rig.config.read_timeout = Duration::from_millis(300);

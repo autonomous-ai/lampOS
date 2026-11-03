@@ -528,7 +528,8 @@ Harness's own log on the computer (proposal L1 and L2). The hand-over's
 - `machine=` and `agent=` are the ids the call was asked about, their first
   8 characters only (a cloud agent's keeps `cloud_` and the 8 after it);
   `agents=` is how many a `wait` waited on. They are read only from where
-  the part put them, never after `--`, where the ask and a reply's words go.
+  the part put them (the slot after `--machine` and the one after it), never
+  from the ask (`--task` for a `new`, after `--` for a `reply`).
 - `exit=` is the CLI's exit status, `killed` when it ended on a signal, or
   the part's own code when it never answered: `timeout`, `cancelled`,
   `stdout_limit`, `spawn_failed`, `executable_changed` and the like. `ms=`
@@ -542,8 +543,10 @@ Harness's own log on the computer (proposal L1 and L2). The hand-over's
   with `states=` how many in each state; `ids=` the agents a `wait` came
   back for, four at most.
 - The ids Harness gave, cut the same way: `id=` the agent's (`agent.id` of
-  `new`, `id` of `show`, `reply` and `route`), `creation=` a pending `new`'s,
-  `message=` the message a `reply` or a route's send queued.
+  `new`, `id` of `show`, `reply` and `route`); and, only for a `new` or
+  `reply` that exited 0 with `ok: true`, no error and no failed state,
+  `creation=` a pending `new`'s and `message=` the message a `reply` queued.
+  In any other reply `message` is Harness's own words, never journaled.
 
 A state or code that isn't plain lowercase or upper-case ASCII is `?`. The
 ask, a question, an answer, a progress line (`about`), a task or machine
