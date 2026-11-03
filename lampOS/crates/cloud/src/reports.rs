@@ -1852,9 +1852,9 @@ pub trait Sources {
     fn waits(&mut self) -> BTreeMap<&'static str, &'static str> {
         BTreeMap::new()
     }
-    /// The skills and their running totals ([`skills::read`]); nothing
-    /// when they can't be read.
-    fn skills(&mut self) -> Option<skills::Reading> {
+    /// The skills and their running totals at `now_s` ([`skills::read`]);
+    /// nothing when they can't be read.
+    fn skills(&mut self, _now_s: u64) -> Option<skills::Reading> {
         None
     }
     /// The parts' own skill counts deleted, after a no ([`skills`]): true
@@ -1962,7 +1962,7 @@ pub fn step(
             }
             (seen.restarts, seen.failed_units) = sources.unit_health();
             seen.waits = sources.waits();
-            seen.skills = sources.skills();
+            seen.skills = sources.skills(now_s);
             put |= shared
                 .with(|reports| reports.health(now_s, build, &seen))
                 .is_some();
@@ -2089,8 +2089,8 @@ impl Sources for Lamp {
     }
 
     /// Read at a health report only, with the person's yes.
-    fn skills(&mut self) -> Option<skills::Reading> {
-        skills::read(self.skills.as_ref()?)
+    fn skills(&mut self, now_s: u64) -> Option<skills::Reading> {
+        skills::read(self.skills.as_ref()?, now_s)
     }
 
     /// Asked of the manage helper, which owns both files.
@@ -2911,14 +2911,14 @@ pub(crate) mod tests {
         reports
             .kept
             .skills
-            .add(NOW - 86_400, &skills::read(&skill_places).unwrap());
+            .add(NOW - 86_400, &skills::read(&skill_places, NOW).unwrap());
         fs::write(&skill_places.runs, runs_file(9, 7).to_string()).unwrap();
         reports
             .kept
             .skills
-            .add(NOW - 86_340, &skills::read(&skill_places).unwrap());
+            .add(NOW - 86_340, &skills::read(&skill_places, NOW).unwrap());
         let mut seen = planted();
-        seen.skills = skills::read(&skill_places);
+        seen.skills = skills::read(&skill_places, NOW);
         reports.health(NOW, build.as_ref(), &seen).unwrap();
         let mut forged = planted_note("lamp-voice.service", 1);
         forged.result = "Alice said HomeWiFi-5G".into();
@@ -3015,6 +3015,8 @@ pub(crate) mod tests {
             }
         });
         skills::Places {
+            localtime: runs_file.with_file_name("no-localtime"),
+            timezone: runs_file.with_file_name("no-timezone"),
             folder: page.folder,
             off: page.off,
             runs: runs_file,
@@ -3042,13 +3044,13 @@ pub(crate) mod tests {
         yes(&places);
         let mut reports = Reports::open(places);
         let skill_places = planted_skills("canary", &runs_file(5, 3));
-        let first = skills::read(&skill_places).unwrap();
+        let first = skills::read(&skill_places, NOW).unwrap();
         reports.kept.skills.add(NOW - 86_400, &first);
         fs::write(&skill_places.runs, runs_file(9, 7).to_string()).unwrap();
-        let second = skills::read(&skill_places).unwrap();
+        let second = skills::read(&skill_places, NOW).unwrap();
         reports.kept.skills.add(NOW - 86_340, &second);
         let mut seen = planted();
-        seen.skills = skills::read(&skill_places);
+        seen.skills = skills::read(&skill_places, NOW);
         reports.health(NOW, None, &seen).unwrap();
         let bytes: Vec<String> = reports.due(ID).into_iter().map(|(_, b)| b).collect();
         let sent: Value = serde_json::from_str(&bytes[0]).unwrap();

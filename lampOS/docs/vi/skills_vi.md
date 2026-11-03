@@ -297,8 +297,8 @@ giờ có tên, lời hay tệp của một kỹ năng.
   đếm hai lần (chủ sở hữu, 3/11). Lưu trong `counts.json` cạnh các kỹ năng
   tự tạo. Câu trả lời không nêu gói nào:
   người tạo đã nằm trên thẻ. Kiểm thử: `made_counts::tests`.
-- `lamp-cloud` đọc cả hai ở mỗi báo cáo sức khỏe, tính số của từng ngày UTC
-  từ chênh lệch giữa hai lần đọc, giữ trong trạng thái của báo cáo, và chỉ
+- `lamp-cloud` đọc cả hai ở mỗi báo cáo sức khỏe, tính số của từng ngày theo
+  giờ địa phương của đèn (múi giờ hệ thống, UTC khi không đọc được) từ chênh lệch giữa hai lần đọc, giữ trong trạng thái của báo cáo, và chỉ
   gửi ngày đã kết thúc, ngày cũ nhất chưa được xác nhận; ngày hôm nay không
   bao giờ được gửi, nên hai báo cáo cách nhau 15 phút không để lộ một lần
   chạy giữa chúng.
