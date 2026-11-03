@@ -2534,7 +2534,9 @@ then use that person's scope:
   It fits `[a-z0-9_-]{1,32}`, so no name is ever in a path or a log line.
   The name itself stays between the eyes and the voice.
 - **One id through a rename** (`LAMP_MEMORY_STABLE_ID=on`, read by the
-  eyes and the voice; off unless set; #2176 row 3; `lamp_msgs::known`).
+  eyes and the voice; off unless set; on in the product's `lamp-eyes` and
+  `lamp-voice` units since 4 Nov, the memory owner's yes after lamp-0c4e's
+  rename to an empty memory (#4710); #2176 row 3; `lamp_msgs::known`).
   Off, a rename (`replace`, A to B) moves the person's memory: B's scope
   is `person_id("B")`, and what they told the lamp as A is left under A's.
   With the switch, the eyes give each person a memory id when first

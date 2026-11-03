@@ -799,7 +799,8 @@ this room" until someone asks to be recognised.
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added; with
-  `LAMP_MEMORY_STABLE_ID=on`, their memory `id` too (#2176), kept through a
+  `LAMP_MEMORY_STABLE_ID=on` (on in the product's unit since 4 Nov, the
+  memory owner's yes on #4710), their memory `id` too (#2176), kept through a
   rename, `person_id` of the name for anyone remembered before it, never
   two people's (ids already held are kept first, then the rest given one;
   the voice follows the eyes' switch) ([memory.md](memory.md#each-persons-own-764)). At most 20 people. No
