@@ -567,6 +567,15 @@ only reads …").
 - **Những gì đèn đã nói về nó:** mọi lời đèn nói trong yêu cầu đó sau khi lần
   ghi được chuẩn bị được giữ cùng nó, đúng như đã nói, trên cả hai tuyến
   (`thread::Thread::lamp_for` → `services::lamp_said`).
+- **Một câu "send" thuần là của lệnh ghi đang chờ.** Lịch sử của một lượt
+  sau giữ tên của một lần gọi, không bao giờ giữ câu trả lời của nó, nên mô
+  hình không thể biết `send_id`. Một `service_write` trong một request sau mà
+  câu nói là một câu gửi thuần (`says_send`) được coi là của lệnh ghi đang
+  chờ, bất kể nó đưa id nào hay không đưa: đối số của nó chỉ còn
+  `{"service": <dịch vụ lệnh ghi được chuẩn bị cho>, "send_id": <id của nó>}`,
+  nên đúng những gì đã được đọc lại được gửi, đến dịch vụ đó, theo mọi luật
+  dưới đây. `service_write` của bất kỳ câu nào khác là một lệnh ghi mới, như
+  trước.
 - **Gửi:** một `service_write` có `send_id` được chuyển tiếp, với
   `"said":"send"` được thêm vào, chỉ khi tất cả đều đúng: đó là id được giữ;
   nó đến trong một yêu cầu sau yêu cầu đã đọc lại nó; lượt của đèn ngay trước

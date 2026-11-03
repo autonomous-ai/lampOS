@@ -285,6 +285,9 @@ fn within_description(rule: &str, own: &str) -> String {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pending {
     pub send_id: String,
+    /// The service it was prepared for, as the call named it: a "send"
+    /// sends to it alone ([`gate`]).
+    pub service: String,
     pub request: u64,
     pub at: Instant,
     pub read_back: String,
@@ -312,6 +315,7 @@ impl Pending {
     pub fn new(send_id: &str, request: u64, at: Instant, read_back: &str, person: &str) -> Self {
         Self {
             send_id: send_id.to_owned(),
+            service: String::new(),
             request,
             at,
             read_back: read_back.to_owned(),
@@ -537,10 +541,28 @@ pub fn gate(
     turn: &Turn,
     now: Instant,
 ) -> Result<ToolCall, Value> {
-    let send_id = (call.name == WRITE)
-        .then(|| call.args.get("send_id").and_then(Value::as_str))
-        .flatten()
-        .filter(|id| !id.is_empty());
+    // A plain "send" in a later request is the waiting write's, whatever
+    // id the model gives, or none: a later turn's history keeps a call's
+    // name, never its answer, so the model can't know the id (lamp-9adf,
+    // 4 Nov: an id made up, or the write prepared again). It sends to the
+    // service it was prepared for, exactly as read back, held to every
+    // rule below.
+    let waiting = pending
+        .as_ref()
+        .filter(|kept| {
+            call.name == WRITE
+                && kept.request != request
+                && !kept.service.is_empty()
+                && turn.words.is_some_and(says_send)
+        })
+        .map(|kept| (kept.send_id.clone(), kept.service.clone()));
+    let send_id = match &waiting {
+        Some((id, _)) => Some(id.as_str()),
+        None => (call.name == WRITE)
+            .then(|| call.args.get("send_id").and_then(Value::as_str))
+            .flatten()
+            .filter(|id| !id.is_empty()),
+    };
     if send_id.is_none() && pending.as_ref().is_some_and(|kept| kept.request != request) {
         *pending = None;
     }
@@ -566,6 +588,9 @@ pub fn gate(
     // "said" is the voice's to give, never the model's.
     if let Some(args) = call.args.as_object_mut() {
         args.remove("said");
+    }
+    if let Some((id, service)) = &waiting {
+        call.args = json!({ "service": service, "send_id": id });
     }
     let Some(send_id) = send_id else {
         // A new write replaces any other waiting: one at a time.
@@ -696,7 +721,13 @@ pub fn answered(
         .map(str::to_owned);
     match (told.get("send_id").and_then(Value::as_str), read_back) {
         (Some(send_id), Some(read_back)) if !send_id.is_empty() => {
-            *pending = Some(Pending::new(send_id, request, now, &read_back, owner));
+            let mut kept = Pending::new(send_id, request, now, &read_back, owner);
+            call.args
+                .get("service")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .clone_into(&mut kept.service);
+            *pending = Some(kept);
             told["next"] = json!(READ_BACK_NEXT);
         }
         // An id with nothing to read back is never sent.
@@ -1076,6 +1107,88 @@ mod tests {
         assert_eq!(arguments(Some("on")), [FLAG, FOLDER]);
         assert!(arguments(Some("yes")).is_empty());
         assert!(arguments(None).is_empty());
+    }
+
+    /// lamp-9adf, 4 Nov: on the line after a read-back the model, which a
+    /// later turn tells a call's name but not its answer, gives a made-up
+    /// id, or none with the write's own words. A plain "send" sends the
+    /// waiting write to its own service, exactly as read back; anything
+    /// else is as before.
+    #[test]
+    fn a_plain_send_is_the_waiting_writes_whatever_id_the_model_gives() {
+        let now = Instant::now();
+        let kept = |service: &str| {
+            let mut pending = waiting(now);
+            if let Some(kept) = pending.as_mut() {
+                kept.service = service.to_owned();
+            }
+            pending
+        };
+        let sent = json!({"service":"gmail","send_id":"s1","said":"send"});
+        for (why, args) in [
+            (
+                "a made-up id",
+                json!({"service":"gmail","send_id":"call_7f3a"}),
+            ),
+            (
+                "none, the write asked again",
+                json!({"service":"gmail","action":"send_mail","to":["eve@c.test"],"text":"x"}),
+            ),
+            (
+                "another service named",
+                json!({"service":"slack","send_id":"zz"}),
+            ),
+        ] {
+            let mut pending = kept("gmail");
+            let passed = gate(
+                &mut pending,
+                &call(WRITE, args),
+                11,
+                &heard("Go ahead and send it.", 10),
+                at(now),
+            )
+            .unwrap_or_else(|told| panic!("{why}: {told}"));
+            assert_eq!(passed.args, sent, "{why}");
+            assert!(pending.is_none(), "{why}: sent once");
+        }
+        // Not a plain send: a new write, prepared as asked.
+        let mut pending = kept("gmail");
+        let asked = call(WRITE, json!({"service":"gmail","action":"send_mail"}));
+        let passed = gate(
+            &mut pending,
+            &asked,
+            11,
+            &heard("Send one to Eve too.", 10),
+            at(now),
+        )
+        .unwrap();
+        assert_eq!(passed.args, asked.args);
+        assert!(pending.is_none());
+        // Still held to every rule: not the line right after the read-back.
+        let mut pending = kept("gmail");
+        assert_eq!(
+            gate(
+                &mut pending,
+                &send("call_7f3a"),
+                12,
+                &heard("Go ahead and send it.", 11),
+                at(now),
+            )
+            .unwrap_err()["error"],
+            CANCELLED
+        );
+        // And the prepared write keeps the service its call named.
+        let mut pending = None;
+        let mut told = json!({"read_back": READ_BACK, "send_id": "s9"});
+        answered(
+            &mut pending,
+            &call(WRITE, json!({"service":"gmail","action":"send_mail"})),
+            10,
+            &mut told,
+            now,
+            "ann",
+        );
+        assert_eq!(pending.unwrap().service, "gmail");
     }
 
     #[test]
@@ -1513,7 +1626,10 @@ mod tests {
         answered(&mut pending, &write, 7, &mut told, now, "ann");
         assert_eq!(
             pending,
-            Some(Pending::new("s9", 7, now, "To Ann: hello", "ann"))
+            Some(Pending {
+                service: "gmail".into(),
+                ..Pending::new("s9", 7, now, "To Ann: hello", "ann")
+            })
         );
         assert_eq!(told["next"], READ_BACK_NEXT);
         // An id with no read-back is never kept.
