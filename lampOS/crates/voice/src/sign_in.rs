@@ -1618,6 +1618,7 @@ mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                now: false,
                 sign_in: true,
                 sign_in_app: false,
             }
@@ -2109,6 +2110,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -2259,6 +2261,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: true,
             sign_in_app: false,
         };

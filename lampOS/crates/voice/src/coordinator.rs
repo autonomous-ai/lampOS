@@ -11586,11 +11586,20 @@ fn conversation_with_gate_inner(
                 }
                 onboarding_invitation_turn = None;
             }
+            let told_news = current.news.clone();
             let heard = current.heard_news(&speaker_pending, snapshot);
-            if !heard.is_empty()
-                && let Some(news) = task_news.as_ref()
-            {
-                news.heard(turn, heard);
+            // Not heard whole, played through with gaps included (its harness
+            // stays open, #4035): told once more at the next quiet pause, with
+            // `LAMP_TASK_NEWS_RETELL=on` (#4342). On lamp-c0a4 on 3 Nov a news
+            // played through with gaps under someone's words was otherwise
+            // neither told again nor closed.
+            let unheard = heard.is_empty();
+            if let Some(news) = task_news.as_mut() {
+                if !heard.is_empty() {
+                    news.heard(turn, heard);
+                } else if unheard && !told_news.is_empty() {
+                    news.not_heard(told_news);
+                }
             }
             record(
                 trace,
@@ -13414,11 +13423,23 @@ fn conversation_with_gate_inner(
         // and its question has a deadline. Put first before the switch is
         // looked at, so it goes ahead with the switch on too (the
         // reviewer-lead's P2 on #2642).
+        // News whose turn was cut short since the last tick: with
+        // `LAMP_TASK_NEWS_RETELL=on`, told once more at the next quiet
+        // pause (#4342).
+        let cut = crate::task_news::take_cut_short();
+        if !cut.is_empty()
+            && let Some(news) = task_news.as_mut()
+        {
+            news.not_heard(cut);
+        }
+        // News told once more waits for no conversation going on (15 s with
+        // nothing said by or to the lamp), whatever the pause switch says:
+        // the person speaking always wins (#4342).
         if let Some(news) = task_news.as_mut()
             && !reminder_waiting
             && news.waiting().is_some()
             && crate::task_news::quiet_for_news(
-                news.sign_in_first() || news_at_pause,
+                (news.sign_in_first() || news_at_pause) && !news.retelling_first(),
                 clock,
                 last_turn_us,
                 last_spoke_us,
@@ -13453,6 +13474,7 @@ fn conversation_with_gate_inner(
             && let Some(told) = if news_at_pause
                 && !news_by_skill
                 && ticket.is_none()
+                && !news.retelling_first()
                 && !says.as_ref().is_some_and(|says| {
                     says.asks_for(crate::say::Source::Tasks, monotonic_us())
                 }) {
@@ -13473,6 +13495,7 @@ fn conversation_with_gate_inner(
             record(
                 trace,
                 json!({"kind":"task_news","at_us":clock,"key":told.key,"also":told.also,"provider_session":provider_session,
+                    "retold":news.retold(&told.key),
                     "at_pause":news_at_pause || crate::sign_in::is_news(&told.key),"since_turn_ms":clock.saturating_sub(last_turn_us) / 1_000}),
             )?;
             snapshot = commit_written_turn(
@@ -14613,6 +14636,9 @@ fn news_for_skill(
     let (key, progress, task) = news
         .waiting()
         .map(|front| (front.key.clone(), front.progress.is_some(), front.task()))?;
+    // News told once more is the voice's own: its skill's ask is long gone
+    // (#4342; on lamp-c0a4 it expired while the news rode on an answer).
+    let retelling = news.retelling_first();
     let now_us = monotonic_us();
     let found_us = news.found_at(&key).map(|found| {
         now_us.saturating_sub(u64::try_from(found.elapsed().as_micros()).unwrap_or(u64::MAX))
@@ -14621,7 +14647,7 @@ fn news_for_skill(
     for_skill(
         says,
         crate::say::Source::Tasks,
-        by_skill && !progress,
+        by_skill && !progress && !retelling,
         &key,
         task,
         held,
@@ -16757,6 +16783,9 @@ fn record_cancelled_reply(
             "lamp-voice: the news ({}) was cut short ({reason}): its harness stays open",
             current.news.join(", ")
         );
+        // Told once more at the next quiet pause, with
+        // `LAMP_TASK_NEWS_RETELL=on` (#4342).
+        crate::task_news::cut_short(&current.news);
     }
     finish_duplex_yield(trace, cancelled_at_us, reason, None, None)?;
     trace
@@ -18492,6 +18521,22 @@ mod tests {
             owner.complete_turn(now(), current.owner).unwrap();
             assert!(owner.snapshot(now()).unwrap().owner().is_none());
         }
+    }
+
+    /// #4342 (b), lamp-c0a4: a turn telling news, cut short by the person
+    /// (`user_interrupted`), hands its news on to be told once more at the
+    /// next quiet pause (`LAMP_TASK_NEWS_RETELL=on`): the coordinator's
+    /// next tick takes it, once.
+    #[test]
+    fn news_a_turn_was_telling_when_cut_short_is_handed_on_once() {
+        let _ = crate::task_news::take_cut_short();
+        let (mut owner, mut current, _permit) = active_reply();
+        current.news = vec!["s1:2:4".into()];
+        let mut reply = Some(current);
+        let mut trace = SessionState::default();
+        cancel_reply(&mut owner, &mut reply, &mut trace, "user_interrupted").unwrap();
+        assert_eq!(crate::task_news::take_cut_short(), ["s1:2:4"]);
+        assert!(crate::task_news::take_cut_short().is_empty());
     }
 
     #[test]

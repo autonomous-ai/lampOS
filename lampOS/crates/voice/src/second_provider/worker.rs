@@ -28894,6 +28894,7 @@ mod memory_observer {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -29081,6 +29082,7 @@ mod memory_observer {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
             sign_in_app: false,
         };

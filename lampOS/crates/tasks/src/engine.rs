@@ -1039,6 +1039,32 @@ pub struct Settled {
     pub ago_ms: u64,
 }
 
+/// A task for "tasks now" ([`Engine::recent`], [`crate::now`]): watched, or
+/// its agent settled in this boot. Typed state only; no word of the task's
+/// or the agent's.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Recent {
+    pub task_id: u64,
+    /// Who has it, as the task's target names it (`claude`, `codex`).
+    pub engine: String,
+    /// The target's alias the task was handed to.
+    pub target: String,
+    /// Whether the watch looks at it now ([`Engine::watched`]).
+    pub watched: bool,
+    /// As Harness wrote it, when its newest answer is settled: `idle`,
+    /// `needs-input`, `stopped` or `failed`.
+    pub settled: Option<String>,
+    /// How long ago that settled answer was first kept, by this boot's
+    /// clock.
+    pub settled_ago_ms: Option<u64>,
+    /// Whether that answer was told: its telling played (or not known not
+    /// to), or the voice told it in its own words.
+    pub told: bool,
+    /// How long ago it was told, when that was in this boot; else how long
+    /// ago it settled, the earliest the telling can have been.
+    pub told_ago_ms: Option<u64>,
+}
+
 /// One harness to close ([`Engine::begin_close`]): closed only if a read just
 /// before finds it idle on the very turn the lamp told, this answer to this
 /// asked text.
@@ -1489,7 +1515,7 @@ impl<P: Persistence> Engine<P> {
             }
             // Progress is held by the service around the engine, and only
             // with `--progress`; one that reaches here is not kept.
-            Request::GetProgress { .. } => {
+            Request::GetProgress { .. } | Request::TasksNow {} => {
                 return Err(err(
                     "progress_off",
                     "Progress is not read; the service runs without --progress.",
@@ -2121,6 +2147,57 @@ impl<P: Persistence> Engine<P> {
             .collect()
     }
 
+    /// Every task for "tasks now" ([`Recent`]): accepted, and watched, or
+    /// with a settled newest answer kept in this boot. One settled in an
+    /// earlier boot cannot be dated and is left out. Reads nothing and
+    /// changes nothing.
+    pub fn recent(&self, now: &Clock) -> Vec<Recent> {
+        let ago = |audit: &Audit| {
+            (audit.boot_id == now.boot_id)
+                .then(|| now.monotonic_ms.checked_sub(audit.monotonic_ms))
+                .flatten()
+        };
+        self.state
+            .tasks
+            .iter()
+            .filter(|task| {
+                task.dispatch.state == DispatchState::Accepted && task.dispatch.agent_id.is_some()
+            })
+            .filter_map(|task| {
+                let watched = watched_age(task, now).is_some();
+                let newest = task.observations.last().filter(|seen| settled(&seen.data));
+                let settled_ago_ms = newest.and_then(|seen| ago(&seen.observed));
+                if !watched && settled_ago_ms.is_none() {
+                    return None;
+                }
+                // Told, from the store, so it holds across a restart: its
+                // telling played (a playout under way is not told yet), or
+                // the voice told it in its own words, or its harness was
+                // closed, which only follows a telling (#1390).
+                let told_at = newest.and_then(|seen| {
+                    seen.speech
+                        .as_ref()
+                        .filter(|speech| speech.state != SpeechState::Claimed)
+                        .map(|speech| speech.finished.as_ref().unwrap_or(&speech.claimed))
+                        .or(seen.told.as_ref())
+                        .or(task.close.as_ref().map(|close| &close.attempted))
+                });
+                Some(Recent {
+                    task_id: task.id,
+                    engine: task.launch.target.engine.bus_name(),
+                    target: task.target_alias.clone(),
+                    watched,
+                    settled: newest.map(|seen| seen.data.state.clone()),
+                    settled_ago_ms,
+                    told: told_at.is_some(),
+                    // A telling that cannot be dated (an earlier boot) is
+                    // taken as at the settle time: the earliest it can be.
+                    told_ago_ms: told_at.and_then(|at| ago(at).or(settled_ago_ms)),
+                })
+            })
+            .collect()
+    }
+
     /// The next harness this lamp started whose work is done and told
     /// ([`close_due`]), its close recorded before it is handed on. The
     /// returned job is permission for one `harness close`.
@@ -2376,12 +2453,23 @@ fn watched_age(task: &Task, now: &Clock) -> Option<Option<u64>> {
 /// a question for the person: that is its newest observation, kept in this
 /// boot at most [`WATCH_FOLLOW_MS`] ago for an answer, or
 /// [`WATCH_QUESTION_MS`] for a question, with room for another. A stop or a
-/// failure ends it. The same question seen again is only counted, never
-/// told twice. What progress reads ([`Engine::watched`]) is unchanged.
+/// failure ends it, and so does the lamp closing the harness itself once
+/// its news was told (#1390): a look after that finds only the stop the
+/// lamp made, and kept it as news told again (#4342 lamp run on c0a4,
+/// 3 Nov). A close refused, left to the person or failed keeps it followed.
+/// The same question seen again is only counted, never told twice. What
+/// progress reads ([`Engine::watched`]) is unchanged.
 fn following(task: &Task, now: &Clock) -> bool {
     let Some(newest) = task.observations.last() else {
         return false;
     };
+    if task
+        .close
+        .as_ref()
+        .is_some_and(|close| close.state == CloseState::Closed)
+    {
+        return false;
+    }
     let within = match newest.data.state.as_str() {
         "idle" if settled(&newest.data) => WATCH_FOLLOW_MS,
         "needs-input" => WATCH_QUESTION_MS,
@@ -3194,6 +3282,48 @@ mod tests {
         id
     }
 
+    /// #4342: "tasks now" lists a task watched, and one settled in this
+    /// boot with when it settled and whether and when it was told; one
+    /// settled in an earlier boot cannot be dated and is left out. Listing
+    /// changes nothing.
+    #[test]
+    fn recent_tasks_are_the_watched_and_those_settled_in_this_boot() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        let revision = engine.revision();
+        let working = engine.recent(&clock(5));
+        assert_eq!(
+            working,
+            vec![Recent {
+                task_id: id,
+                engine: "codex".into(),
+                target: "desk".into(),
+                watched: true,
+                settled: None,
+                settled_ago_ms: None,
+                told: false,
+                told_ago_ms: None,
+            }]
+        );
+        assert_eq!(engine.revision(), revision);
+        let (mut engine, _) = opened();
+        let id = told(&mut engine, "idle", 10);
+        let recent = engine.recent(&clock(1_010));
+        assert_eq!(recent.len(), 1);
+        let task = &recent[0];
+        assert_eq!(task.task_id, id);
+        assert!(!task.watched);
+        assert_eq!(task.settled.as_deref(), Some("idle"));
+        assert_eq!(task.settled_ago_ms, Some(1_000));
+        assert!(task.told);
+        assert_eq!(task.told_ago_ms, Some(998));
+        let other = Clock {
+            boot_id: "next-boot".into(),
+            monotonic_ms: 1,
+        };
+        assert!(engine.recent(&other).is_empty());
+    }
+
     /// `serve --route`: a task the router typed into a session the person
     /// already had is accepted with that session as its agent, told as any
     /// task, and never closed, even with `--close-told`; stored with no
@@ -3380,6 +3510,35 @@ mod tests {
                 .code,
             "stale_job"
         );
+    }
+
+    /// #4342 lamp run on c0a4 (13:26–13:28): news told, harness closed
+    /// `Ok(Closed)`, then the watch's follow look read the agent this lamp
+    /// itself stopped and kept a `stopped` observation, told as news again.
+    /// A harness the lamp closed is not followed any more.
+    #[test]
+    fn a_harness_closed_after_its_news_is_not_followed_or_told_again() {
+        let (mut engine, memory) = opened();
+        let id = told(&mut engine, "idle", 10);
+        let job = engine.begin_close(&clock(14)).unwrap().unwrap();
+        assert_eq!(job.task_id, id);
+        engine
+            .finish_close(&job, Ok(Closed::Closed), &clock(15))
+            .unwrap();
+        let observations = stored(&memory).tasks[0].observations.len();
+        for at in [15 + WATCH_LATER_MS, 15 + 2 * WATCH_LATER_MS] {
+            assert!(!engine.watch(&clock(at)).unwrap(), "followed at {at}");
+            assert!(engine.begin_observation(&clock(at)).unwrap().is_none());
+        }
+        assert_eq!(stored(&memory).tasks[0].observations.len(), observations);
+        // A close that failed leaves it followed, as before.
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        let job = engine.begin_close(&clock(14)).unwrap().unwrap();
+        engine
+            .finish_close(&job, Err("timeout".into()), &clock(15))
+            .unwrap();
+        assert!(engine.watch(&clock(15 + WATCH_LATER_MS)).unwrap());
     }
 
     /// The first builder on #1390, lamp-4ace: the voice tells news as a turn
