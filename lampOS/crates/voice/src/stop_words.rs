@@ -249,7 +249,7 @@ fn hold_for(value: Option<&str>) -> bool {
 /// blocks' capture clock: what a person's real stop is delayed by, at most.
 pub const HOLD_US: u64 = 150_000;
 
-fn listen_for(value: Option<&str>) -> Listen {
+pub(crate) fn listen_for(value: Option<&str>) -> Listen {
     match value {
         Some("heard") => Listen::InYields,
         Some("heard-always") => Listen::Always,

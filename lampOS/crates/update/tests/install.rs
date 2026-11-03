@@ -1959,6 +1959,27 @@ fn the_product_keeps_a_cut_answer_as_heard() {
     }
 }
 
+/// A stop said over the lamp's answer is heard and answered (#5032): its
+/// yield's words are listened for (`LAMP_STOP_WORDS=heard`), so a short
+/// "Stop." commits the yield, and the commit gets the stop line, never the
+/// model (`LAMP_SPOKEN_STOP_ENDS`). Without the first, 9 of 9 spoken stops
+/// over the answer were lost on lamp-06c1.
+#[test]
+fn the_product_answers_a_stop_said_over_its_answer() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_STOP_WORDS=heard",
+        "Environment=LAMP_SPOKEN_STOP_ENDS=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A person's turn is also told the room's lines of the same conversation
 /// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339): on lamp-3e83 on 30 Oct a
 /// search answered in the room's thread was unknown to the person's next
