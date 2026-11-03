@@ -7562,6 +7562,9 @@ impl Heeding {
         self.carrying = false;
         self.carry_window.clear();
         self.held_colleagues.clear();
+        // A held remark grants no continuation across privacy (#4175).
+        self.held_in_conversation_us = None;
+        self.after_remark = false;
         // Nor brought back by a decline of a line let out before it
         // (`LAMP_DECLINE_SILENT`).
         if let Some(before) = self.before_let_out.as_mut() {
@@ -20679,6 +20682,14 @@ mod tests {
     /// (`LAMP_SECOND_NAME_CARRIES`, `LAMP_CALL_TAKES_NEXT_LINE`,
     /// `LAMP_NOT_FOR_ME_WORDS`) are not on this path.
     fn remark_scene(scene: Scene, lines: &[SceneLine]) -> Vec<Option<&'static str>> {
+        remark_scene_with_privacy(scene, lines, None)
+    }
+
+    fn remark_scene_with_privacy(
+        scene: Scene,
+        lines: &[SceneLine],
+        privacy_before: Option<u64>,
+    ) -> Vec<Option<&'static str>> {
         use crate::room_told::Room;
         use crate::second_provider::Heard;
         /// Prints by a line's first sample, each given only once released.
@@ -20800,6 +20811,12 @@ mod tests {
             }
             if scene.prints == Prints::AtVerdict {
                 released.lock().unwrap().push(request);
+            }
+            if privacy_before == Some(request) {
+                // Closing and reopening must both discard the held remark.
+                heeding.privacy_changed();
+                heeding.privacy_changed();
+                assert!(!heeding.after_remark);
             }
             let held = if named {
                 let mut signs = heeding.signs(request, said);
@@ -21168,6 +21185,39 @@ mod tests {
         assert_eq!(held[2], Some(crate::remark_about_it::HELD), "{held:?}");
         assert!(held[3..7].iter().all(Option::is_some), "{held:?}");
         assert!(held[7].is_some(), "the owner, past the bound: {held:?}");
+    }
+
+    /// #4534: held remarks must not renew conversation across privacy.
+    #[test]
+    fn privacy_change_ends_a_held_remarks_conversation_renewal() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for privacy_before in [None, Some(103)] {
+            let held = remark_scene_with_privacy(
+                Scene {
+                    left_by_model: &[],
+                    product: true,
+                    busy: true,
+                    remark: true,
+                    prints: Prints::None,
+                    carries: false,
+                },
+                &[
+                    (
+                        0,
+                        3_000,
+                        1,
+                        "Lamp, I have not been sleeping well lately.",
+                        false,
+                    ),
+                    (40_000, 1_500, -1, "That lamp is cute.", true),
+                    (75_000, 2_500, 1, "Any tips to sleep better tonight?", false),
+                ],
+                privacy_before,
+            );
+            assert_eq!(held[0], None, "{held:?}");
+            assert_eq!(held[1], Some(crate::remark_about_it::HELD), "{held:?}");
+            assert_eq!(held[2].is_some(), privacy_before.is_some(), "{held:?}");
+        }
     }
 
     /// #4175: with a colleague's print come late, the owner's reply to
