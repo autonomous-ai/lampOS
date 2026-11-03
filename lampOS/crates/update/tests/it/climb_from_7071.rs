@@ -114,7 +114,6 @@ fn lamp_update(arguments: &[&str]) {
 
 #[test]
 fn a_build_published_as_ci_does_is_climbed_by_7071s_updater() {
-    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let dir = tempfile::tempdir().unwrap();
     let stage = dir.path().join("build");
     fs::create_dir(&stage).unwrap();
@@ -122,8 +121,16 @@ fn a_build_published_as_ci_does_is_climbed_by_7071s_updater() {
     for name in ["lamp-update", "lamp-voice"] {
         fs::write(stage.join(name), format!("{name}, built for this test\n")).unwrap();
     }
+    published_and_climbed(dir.path(), &stage, FILES_URL, &[]);
+}
+
+/// Publishes the binaries in `stage` as CI does, with `more` options to
+/// `lamp-update manifest`, and opens the envelope as 7071 does: it climbs.
+/// The public key the build is signed for.
+fn published_and_climbed(dir: &Path, stage: &Path, files_url: &str, more: &[&str]) -> [u8; 32] {
+    let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let document = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
-    let key_file = dir.path().join("signing.key");
+    let key_file = dir.join("signing.key");
     fs::write(&key_file, STANDARD.encode(document.as_ref())).unwrap();
     let public: [u8; 32] = Ed25519KeyPair::from_pkcs8(document.as_ref())
         .unwrap()
@@ -134,23 +141,29 @@ fn a_build_published_as_ci_does_is_climbed_by_7071s_updater() {
     let path = |path: &Path| path.to_str().unwrap().to_owned();
     let sequence = SEQUENCE.to_string();
     let commit = "0123456789abcdef".repeat(3)[..40].to_owned();
-    lamp_update(&[
-        "manifest",
-        "--binaries",
-        &path(&stage),
-        "--deploy",
-        &path(&lamp_os.join("deploy")),
-        "--skills",
-        &path(&lamp_os.join("skills")),
-        "--channel",
-        CHANNEL,
-        "--sequence",
-        &sequence,
-        "--commit",
-        &commit,
-        "--files-url",
-        FILES_URL,
-    ]);
+    lamp_update(
+        &[
+            &[
+                "manifest",
+                "--binaries",
+                &path(stage),
+                "--deploy",
+                &path(&lamp_os.join("deploy")),
+                "--skills",
+                &path(&lamp_os.join("skills")),
+                "--channel",
+                CHANNEL,
+                "--sequence",
+                &sequence,
+                "--commit",
+                &commit,
+                "--files-url",
+                files_url,
+            ][..],
+            more,
+        ]
+        .concat(),
+    );
     lamp_update(&[
         "sign",
         "--key-file",
@@ -190,7 +203,7 @@ fn a_build_published_as_ci_does_is_climbed_by_7071s_updater() {
     assert_eq!(needs.channel.as_deref(), Some(CHANNEL));
     assert_eq!(needs.sequence, Some(SEQUENCE));
     assert!(needs.files_url.as_deref().is_some_and(is_folder_url));
-    assert_eq!(needs.files_url.as_deref(), Some(FILES_URL));
+    assert_eq!(needs.files_url.as_deref(), Some(files_url));
     let carried: Vec<File> = needs
         .files
         .into_iter()
@@ -204,4 +217,114 @@ fn a_build_published_as_ci_does_is_climbed_by_7071s_updater() {
     assert_eq!(carried.sha256, sha256_hex(&binary));
     assert_eq!(carried.size, binary.len() as u64);
     assert!((1..=MOST_FILE_BYTES).contains(&carried.size));
+    public
+}
+
+/// The far jump (#5012): a lamp still on the 7071 image, its settings
+/// writer that image's updater, meets first a build published as CI does
+/// that needs updater 10 and writes `store.env` (the lamp's is install's,
+/// off). 7071 climbs to the `lamp-update` the build carries; that one
+/// confirms itself by a dry round, the same round `check` runs, and it must
+/// end without waiting for the writer, which only a round that applies
+/// refreshes. Here that `check` is run with the built `lamp-update` from its
+/// folder on a lamp's tree.
+#[test]
+fn the_updater_7071_climbs_to_for_a_build_writing_store_env_is_not_held_for_the_writer() {
+    let dir = tempfile::tempdir().unwrap();
+    let stage = dir.path().join("build");
+    fs::create_dir(&stage).unwrap();
+    let binary = fs::read(env!("CARGO_BIN_EXE_lamp-update")).unwrap();
+    fs::write(stage.join("lamp-update"), &binary).unwrap();
+    fs::write(
+        stage.join("lamp-voice"),
+        "lamp-voice, built for this test\n",
+    )
+    .unwrap();
+    let files_url = format!("file://{}/", stage.display());
+    let public = published_and_climbed(dir.path(), &stage, &files_url, &["--min-updater", "10"]);
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &STANDARD
+            .decode(
+                serde_json::from_slice::<Envelope>(&fs::read(stage.join(ENVELOPE)).unwrap())
+                    .unwrap()
+                    .manifest,
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    const STORE_ENV: &str = "/etc/lampOS/skills/store.env";
+    let carried = manifest["settings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|setting| setting["path"] == STORE_ENV)
+        .expect("the build carries store.env");
+    let off = "LAMP_SKILLS_STORE=off\n";
+    assert_ne!(carried["text"], off);
+
+    // The lamp: the climbed lamp-update in its folder, the older writer,
+    // and install's store.env, recorded.
+    let root = dir.path().join("lamp");
+    let put = |path: &str, bytes: &[u8]| {
+        let at = root.join(path.trim_start_matches('/'));
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, bytes).unwrap();
+    };
+    let folder = format!("/opt/lampOS/update/{}", sha256_hex(&binary));
+    let climbed = root.join(format!("{}/lamp-update", folder.trim_start_matches('/')));
+    put(&format!("{folder}/lamp-update"), &binary);
+    fs::set_permissions(
+        &climbed,
+        std::os::unix::fs::PermissionsExt::from_mode(0o755),
+    )
+    .unwrap();
+    put(
+        "/usr/local/lib/lampos/lamp-update-back",
+        b"lamp-update of the 7071 image",
+    );
+    put(STORE_ENV, off.as_bytes());
+    fs::create_dir_all(root.join("etc/systemd/system")).unwrap();
+    let state = serde_json::json!({
+        "installed": {"sequence": 1, "commit": format!("{:040}", 1)},
+        "previous": null,
+        "refused": [],
+        "made": [],
+        "settings": {STORE_ENV: sha256_hex(off.as_bytes())},
+    });
+    put(
+        "/var/lib/lampos-update/state.json",
+        state.to_string().as_bytes(),
+    );
+    put(
+        "/etc/lampOS/update/key.pub",
+        STANDARD.encode(public).as_bytes(),
+    );
+    let channel = dir.path().join("channel");
+    fs::create_dir(&channel).unwrap();
+    fs::copy(stage.join(ENVELOPE), channel.join(ENVELOPE)).unwrap();
+
+    let out = Command::new(&climbed)
+        .args([
+            "check",
+            "--channel-url",
+            &format!("file://{}/", channel.display()),
+            "--lamp",
+            "lamp-4ace",
+            "--root",
+            root.to_str().unwrap(),
+        ])
+        .env("LAMP_UPDATE_SELF", "on")
+        .env("LAMP_UPDATE_APPLY", "on")
+        .output()
+        .unwrap();
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.status.success() && !said.contains("settings writer is older"),
+        "{:?}: {said}",
+        out.status
+    );
 }
