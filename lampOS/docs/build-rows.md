@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-02 16:11 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-11-03 10:38 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 92.3% over 76 rows. Quality 67.8% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 92.3% over 76 rows. Quality 62.9% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -104,12 +104,12 @@ Written by the first builder from the team's review page at 2026-11-02 16:11 (+0
 | Not spoken to | 0.60 | 0.90 | 30 Oct 23:0x, down from 0.7: tonight’s five busy rounds on lamp-4ace (8999, the product unit checked switch by switch) left desk talk alone 16 of 26 times (5/6, 2/6, 4/6, 2/4, 3/4), not the 6 of 6 of 26 Oct. |
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
-| Speaking up on its own | 0.82 | 0.85 | 26 Oct 14:5x, up from 0.8: on 6999 every reminder set was said: one cut off by people talking is offered again and said (#3523, Third), and the next one triggers the reminders skill again, so no 10 s wait. |
+| Speaking up on its own | 0.40 | 0.85 | 3 Nov 10:4x, down from 0.82 (the lead: score by the measured action rate): a reminder or timer is said only if its call was made, and calls are made about 4 times in 10 (#4305, #4861, Fourteen on 9699). |
 | Onboarding, as a first-time person meets it | 0.60 | 0.90 | 28 Oct 17:0x, up from 0.5: the tester’s run on 29e7 at 8187 passed every step but how you sound’s sentence. |
-| Remembers you: your name and what you told it | 0.65 | 0.90 | 28 Oct 05:3x, back up from 0.6: stable 7887 has Friday’s fast forget (#3871): on lamp-4ace a targeted forget answered in 375 ms and the lamp said “Gone”; |
+| Remembers you: your name and what you told it | 0.60 | 0.90 | 3 Nov 10:4x, down from 0.65: Fourteen on 9699 (9adf): remember and recall right for a known face (coffee, the dentist’s day moved), forget failed (it searched only the room’s; |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
 | Body | 0.70 | 0.80 | 25 Oct 17:0x, up from 0.65: the livelier postures and nods (#3387) are in the product since train 109 (04:25), and on the ship candidate (6786) lamp-4ace stood for a played question, turned and tilted its head a little b… |
 | Head and eye | 0.65 | 0.80 | 23 Oct 11:2x, up from 0.6: head touch passed with the lead’s own hand on lamp-52e6: a tap, a stroke, a 3 s hold that put it to sleep, a tap that woke it, and nothing with hands away (#2857 closed). |
 | The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live | 0.70 | 0.90 | 25 Oct 20:0x, up from 0.65: the ship build (6819) on the exact product unit: 48 of 49 lines meant for the lamp (the one miss played over a 10 s answer by the kit), the owner’s 22 of 22, desk talk 5 of 6 left alone, first… |
-| Light and all of it together | 0.75 | 0.80 | 24 Oct 16:1x, down from 0.8: the not-feeling-well light (pale white) came on 18 times in three hours on lamp-4ace because its case at 40 °C was judged an error (#3367 makes that 46, off at 50). |
+| Light and all of it together | 0.40 | 0.80 | 3 Nov 10:4x, down from 0.75 (the lead: score by the measured action rate): the light and volume asks act about 4 times in 10. |

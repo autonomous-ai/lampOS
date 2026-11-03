@@ -1818,6 +1818,32 @@ order is kept. A written turn is the same from the chat on.
   a spoken request is told so beside its words, with the tasks part on:
   without it, on lamp-4ace on 19 Oct, the yes was taken as a new
   hand-over, asked about again and never started.
+  With `LAMP_HISTORY_KEEPS_CALLS=on` the functions a turn ran with no
+  arguments (the light's and the volume's steps, on, off, mute) are kept
+  with its exchange (`Thread::called`, `Engine::keeping_calls`), and the
+  history tells such an exchange as a round with calls goes: the person's
+  words, an assistant message with the calls (no arguments, ids
+  `kept-<request>-<n>`), one `tool` message for each saying `(done
+  earlier; its result was not kept)`, then the lamp's words
+  (`worker::messages_marked`). Without it every earlier action reads as
+  an ask answered in words alone, and the model copies that: on build
+  9699, "Lamp, you're a bit loud." was answered "Turning myself down a
+  step." with no `volume_down` call in 4 of 14 action lines, and nothing
+  changed. Only a call that ran and answered with no error and no keep
+  refused is kept, never `more_functions`, and never one declined, held,
+  refused, or of a reminder or an add-on's quoted line. The calls go with
+  the exchange the lamp's words were filed under, so they are told only
+  to that scope's turns; a request with no kept words keeps none, and a
+  forget drops them. They are not written to the thread file (an older
+  build would set the file aside, #1505): after a restart, earlier
+  exchanges are words only. A call that took arguments is never kept: it
+  is told with none, and would teach calling it bare (Fourteen's P3 on
+  #5018). At most 8 calls an exchange, each name once. With
+  `LAMP_CONVERSATION_ROOM_LINES_TOLD` on, a room exchange's calls reach a
+  person's history with its words. A chat that refuses round 1 (a status
+  not 429 or 5xx) with kept calls in the history is asked once more
+  without them, in words only (`without_kept_calls`, the Reviewer-lead's
+  P2 on #5018). Off, the history is as before, byte for byte.
 - **A tool call knows whether it was heard.** The engine passes `heard`
   to the tool runner: true in a spoken turn, false in a written one, as the
   Live route does, so a yes to prepared work cannot come in a turn the lamp
@@ -4088,7 +4114,9 @@ after a take-over, but now for every turn:
     (`Heeding::verdict`, `held_in_conversation_us`), never more than
     `HELD_KEEPS_FOR` (90 s) after the lamp's own last words, however many
     are held. Forgetting the thread's words, or a new person at the lamp,
-    leaves nothing for it to renew;
+    leaves nothing for it to renew. Closing or reopening privacy also
+    clears the held-line renewal and the previous-remark marker, so neither
+    carries across it (`privacy_change_ends_a_held_remarks_conversation_renewal`);
   - the line right after a held remark, let out only as the conversation
     going on, not found in the conversation's own voice, answering no
     question of the lamp's and asking it nothing (`remarks::asks_in` by

@@ -484,8 +484,8 @@ voice's `list_reminders` and `cancel_reminder` go through: a cancel first
 reads the store's identity and revision, and is sent with them as its
 compare-and-set guard; every page is checked; and its failures are fixed
 sentences that never carry a reminder's words (`crate::schedule`). By
-voice, each line hears and cancels only its own, and the ones set by no one
-only on the owner's line (#4527's P2, [schedule.md](schedule.md)). The app
+voice, each line hears and cancels only its own and the room's, the ones
+set by no one (#4527's P2, #4710, [schedule.md](schedule.md)). The app
 is the owner's view: it lists and cancels every one, and their words then
 pass through the broker to the app, where before they left the lamp only to
 the voice's model. With the switch, `face.remove` with `entirely` also
