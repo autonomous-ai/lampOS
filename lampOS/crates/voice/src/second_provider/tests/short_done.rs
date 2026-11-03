@@ -1066,3 +1066,72 @@ fn the_silence_marker_holds_only_its_bounded_prefix() {
     assert_eq!(partial.piece("<no_".to_owned()), "");
     assert_eq!(partial.finish(), "<no_");
 }
+
+/// lamp-52e6, 3 Nov (the Core-verifier's core-loop run at 9582): 4 of 14
+/// light and volume asks got only "Louder.", "Brighter." or "Cooler." and
+/// no call, so the lamp said a change it never made. Such a reply is not
+/// said: the round is asked once more, told nothing changed, and the
+/// call's own line is said once the call is made. The word beside its call
+/// is said once; after a real step earlier in the turn it is the answer;
+/// other words are said as they are.
+#[test]
+fn a_step_word_with_no_call_is_not_said_and_the_call_is_asked_for() {
+    let (went, notes) = turn_noted(
+        true,
+        true,
+        "Make it brighter.",
+        vec![text("Brighter."), Ok(ChatEvent::Done)],
+        vec![calling(&["light_brighter"])],
+    );
+    assert_eq!(went.said, said(&["Brighter."]));
+    assert_eq!((went.asked, went.ran), (2, 1));
+    assert!(
+        notes
+            .iter()
+            .any(|note| note.contains("your last reply was only \"Brighter.\"")),
+        "{notes:?}"
+    );
+    // Asked once more only: a second word alone is not said either.
+    let went = turn_with(
+        true,
+        true,
+        "Make it brighter.",
+        vec![text("Brighter"), text("."), Ok(ChatEvent::Done)],
+        vec![vec![text("Brighter."), Ok(ChatEvent::Done)]],
+    );
+    assert_eq!((went.said.len(), went.asked, went.ran), (0, 2, 0));
+    // Beside its call, in the same round: the call's own line, once.
+    let mut beside = vec![text("Brighter.")];
+    beside.extend(calling(&["light_brighter"]));
+    let went = turn_with(true, true, "Make it brighter.", beside, vec![]);
+    assert_eq!(went.said, said(&["Brighter."]));
+    assert_eq!((went.asked, went.ran), (1, 1));
+    // After a real step, with neither switch: the model's word is the answer.
+    let went = turn_with(
+        false,
+        false,
+        "Make it brighter.",
+        calling(&["light_brighter"]),
+        vec![vec![text("Brighter."), Ok(ChatEvent::Done)]],
+    );
+    assert_eq!(went.said, said(&["Brighter."]));
+    assert_eq!((went.asked, went.ran), (2, 1));
+    // Other words are said as they are, sentence by sentence.
+    for (words, sentences) in [
+        (
+            "Louder music helps me focus.",
+            vec!["said:Louder music helps me focus."],
+        ),
+        ("Brighter. Better?", vec!["said:Brighter.", "said: Better?"]),
+    ] {
+        let went = turn_with(
+            true,
+            true,
+            "Tell me something.",
+            vec![text(words), Ok(ChatEvent::Done)],
+            vec![],
+        );
+        assert_eq!(went.said, sentences, "{words}");
+        assert_eq!(went.asked, 1, "{words}");
+    }
+}

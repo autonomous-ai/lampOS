@@ -294,6 +294,15 @@ const NOT_FOR_ME: &str = "not_for_me";
 /// Told before a round asked again after a reply that only narrated a
 /// call as words ("Calling recall about Lily."): not said.
 pub(crate) const CALL_ALOUD_NOTE: &str = "(For you to know: your last reply only described a function call in words, and it was not said. Never say a function's name or that you are calling one: call the function itself, or answer in words.)";
+
+/// Told before a round asked again after a reply that was only a step's
+/// own word with no call ("Louder.", lamp-52e6, 3 Nov): not said, and
+/// nothing changed.
+pub(crate) fn step_alone_note(word: &str) -> String {
+    format!(
+        "(For you to know: your last reply was only \"{word}\" and called no function, so nothing changed, and it was not said. Words alone never change the light or the volume: to make the change, call its function now; the lamp says the word itself after the call. If no change was asked for, answer in words.)"
+    )
+}
 /// A held line's one round ([`Engine::doing_though_held`]), its first event
 /// and its calls together, is given up past this: the line is over by then.
 pub const HELD_WITHIN: Duration = Duration::from_secs(6);
@@ -9632,6 +9641,9 @@ async fn answer(
             // function it names.
             let mut aloud_held = Some(String::new());
             let mut aloud: Option<String> = None;
+            // The reply, when it was only a step's own word ("Louder.",
+            // `not_speech::step_word_alone`): the same, told so.
+            let mut step_alone: Option<String> = None;
             loop {
                 let next = if first && round == 1 {
                     let at = |after: Duration| from + after;
@@ -9919,9 +9931,17 @@ async fn answer(
             }
             // The round ended with its opening still not known whether it
             // narrates a call: whole now. A narration is not said.
+            // A step's own word alone is one only while nothing was called
+            // earlier in the turn: after a real step, it is the answer.
             if let Some(held) = aloud_held.take().filter(|held| !held.is_empty()) {
+                let step = crate::not_speech::step_word_alone(&held, true)
+                    .flatten()
+                    .is_some();
                 match crate::not_speech::opens_with_a_call_aloud(&held, true) {
-                    Some(Some((end, name))) => {
+                    Some(Some((end, name))) if !(step && called_earlier) => {
+                        if step {
+                            step_alone = Some(held.trim().to_owned());
+                        }
                         text.drain(..end);
                         aloud = Some(name);
                     }
@@ -9943,12 +9963,20 @@ async fn answer(
             // With nothing else in its round, the model meant the call:
             // `not_for_me` is taken as the decline it names, unless the
             // line called the lamp by name to a face (#2191); another is
-            // asked for once more, told to call it.
+            // asked for once more, told to call it. So is a reply that was
+            // only a step's own word ("Louder.", lamp-52e6, 3 Nov): beside
+            // the step's call, the call's own line answers it.
             if let Some(name) = aloud.take() {
-                eprintln!(
-                    "lamp-voice second: request {request} chat round {round}: its reply narrated a call of {name} as words: that sentence not said, {} call(s) in its round",
-                    calls.len()
-                );
+                match step_alone.as_deref() {
+                    Some(word) => eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply was only \"{word}\", {name}'s own word: not said, {} call(s) in its round",
+                        calls.len()
+                    ),
+                    None => eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply narrated a call of {name} as words: that sentence not said, {} call(s) in its round",
+                        calls.len()
+                    ),
+                }
                 if calls.is_empty() && !text.chars().any(char::is_alphanumeric) && !queue.started {
                     let named = heard
                         && shared
@@ -9959,7 +9987,10 @@ async fn answer(
                         return Err(Stop::Declined);
                     }
                     if round < MAX_ROUNDS && !std::mem::replace(&mut aloud_asked_again, true) {
-                        messages.push(Message::system(CALL_ALOUD_NOTE.to_owned()));
+                        messages.push(Message::system(match step_alone.take() {
+                            Some(word) => step_alone_note(&word),
+                            None => CALL_ALOUD_NOTE.to_owned(),
+                        }));
                         continue;
                     }
                 }

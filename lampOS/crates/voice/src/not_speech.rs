@@ -366,6 +366,45 @@ pub fn bare_call(piece: &str) -> bool {
 /// [`names_a_function`] alone can't tell them from a word.
 const PLAIN_NAMES: [&str; 3] = ["remember", "recall", "forget"];
 
+/// The actions part's own words after a light or volume step, each with
+/// its function (`lamp_actions::short_say`; a test holds the two the
+/// same). With `LAMP_SHORT_DONE` they end the chat's earlier turns, kept
+/// in the thread as the lamp's lines, and the model copies them with no
+/// call. "Done." is no step's own and is left out: alone it answers many
+/// things.
+pub const STEP_WORDS: [(&str, &str); 6] = [
+    ("Brighter.", "light_brighter"),
+    ("Dimmer.", "light_dimmer"),
+    ("Warmer.", "light_warmer"),
+    ("Cooler.", "light_cooler"),
+    ("Louder.", "volume_up"),
+    ("Quieter.", "volume_down"),
+];
+
+/// Whether a whole reply is only one of [`STEP_WORDS`], case, spaces and a
+/// closing '.' or '!' aside: `Some(Some(name))`, its function; `Some(None)`:
+/// it is not ("Louder music helps.", "Warm enough?"); `None`: not yet known,
+/// the text so far the start of a step word, or one with no more text yet.
+/// `ended`: no more text comes. Only the whole reply counts, so "Brighter.
+/// Better?" is said as it is.
+pub fn step_word_alone(text: &str, ended: bool) -> Option<Option<&'static str>> {
+    let reply = text.trim().to_lowercase();
+    let word = reply.trim_end_matches(['.', '!']);
+    let mut maybe = false;
+    for (line, name) in STEP_WORDS {
+        let stem = line.trim_end_matches('.').to_lowercase();
+        if word == stem {
+            if ended {
+                return Some(Some(name));
+            }
+            maybe = true;
+        } else if !ended && word.len() == reply.len() && stem.starts_with(word) {
+            maybe = true;
+        }
+    }
+    if maybe { None } else { Some(None) }
+}
+
 /// Whether a reply so far opens with a call narrated as words, "Calling
 /// not_for_me." or "Calling recall about the vet appointment.": on
 /// lamp-06c1 on 30 October, 13 replies opened so, 8 of them with no call
@@ -377,7 +416,15 @@ const PLAIN_NAMES: [&str; 3] = ["remember", "recall", "forget"];
 /// (the whole text once `ended`), and the name; `Some(false)`: it is no
 /// such opening ("Calling your sister is a good idea."); `None`: not yet
 /// known. `ended`: no more text comes.
+///
+/// A whole reply that is only a step's own word ([`step_word_alone`],
+/// "Louder.") is one too, its function's name with the whole text's
+/// length: on lamp-52e6 on 3 November, 4 of 14 light and volume asks got
+/// "Louder.", "Brighter." or "Cooler." and no call, so nothing changed.
 pub fn opens_with_a_call_aloud(text: &str, ended: bool) -> Option<Option<(usize, String)>> {
+    if let Some(name) = step_word_alone(text, ended)? {
+        return Some(Some((text.len(), name.to_owned())));
+    }
     const CALLING: &str = "calling ";
     let start = text.len() - text.trim_start().len();
     let rest = &text[start..];
@@ -1623,5 +1670,53 @@ mod tests {
             assert_eq!(said(text), Some(None), "{text:?}");
         }
         assert_eq!(opens_with_a_call_aloud("Calli", true), Some(None));
+    }
+
+    /// lamp-52e6, 3 Nov: "Louder.", "Brighter." and "Cooler." came back
+    /// with no call, 4 of 14 light and volume asks. A whole reply that is
+    /// only a step's own word is known once the reply ends; more words
+    /// after it, or other words, are not one.
+    #[test]
+    fn a_step_word_alone_is_known_when_the_reply_ends() {
+        for (text, name) in [
+            ("Louder.", "volume_up"),
+            ("Brighter.", "light_brighter"),
+            (" cooler", "light_cooler"),
+            ("Quieter!", "volume_down"),
+        ] {
+            assert_eq!(step_word_alone(text, true), Some(Some(name)), "{text:?}");
+            assert_eq!(
+                opens_with_a_call_aloud(text, true),
+                Some(Some((text.len(), name.to_owned()))),
+                "{text:?}"
+            );
+            // Not yet known while more may come.
+            assert_eq!(step_word_alone(text, false), None, "{text:?}");
+        }
+        for text in ["", "L", "Lou", "Warm", "Co"] {
+            assert_eq!(step_word_alone(text, false), None, "{text:?}");
+            assert_eq!(opens_with_a_call_aloud(text, false), None, "{text:?}");
+        }
+        for text in [
+            "Louder music helps me focus.",
+            "Brighter. Better?",
+            "Warm enough?",
+            "Done.",
+            "Lou.",
+            "Calm.",
+        ] {
+            assert_eq!(step_word_alone(text, true), Some(None), "{text:?}");
+            assert_eq!(opens_with_a_call_aloud(text, true), Some(None), "{text:?}");
+        }
+        assert_eq!(step_word_alone("Brighter. Be", false), Some(None));
+    }
+
+    /// The step words are the actions part's own, so a word it says after
+    /// a real call is never one the model is held for.
+    #[test]
+    fn the_step_words_are_the_actions_parts_own() {
+        for (line, name) in STEP_WORDS {
+            assert_eq!(lamp_actions::short_say(name), line, "{name}");
+        }
     }
 }
