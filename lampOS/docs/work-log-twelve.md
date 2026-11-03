@@ -609,3 +609,12 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #4175, Reviewer-three's privacy P3 on #4534: #5028 (`fdfddb96c4`); a privacy change clears the held-line renewal and the remark marker. Local gate green (lib 4498/0/15). The Reviewer-lead's READ-OK, then NEXT TRAIN. It landed in train 550 as `a722bff422`.
 - 29e7 item 3, a misheard answer to the lamp's own question going silent: plan on #4710 (c6594466329). The first builder's yes adds a `not_for_me` from the person asked (c6594836127). Building `LAMP_ANSWER_ASK_AGAIN` on `twelve/answer-ask-again`.
 - #4705 stays a draft: the first builder's 4ace A/B on 1 Nov caught 2/3 real cut-ins against 1/3, but stopped its own story twice out of two tail tries. It stays off until a guard against the lamp's own tail exists (Sixth's #5032, the duplex echo, is near it).
+
+## 3 Nov, afternoon: ask-again landed, #5084 up, reads
+
+- 29e7 item 3: `LAMP_ANSWER_ASK_AGAIN` (off unless set). A spoken answer to the lamp's own question gets "Sorry, could you say that again?" once, instead of silence, when the reply is empty, or when the person the lamp asked gets a `not_for_me`. It started as #5078, where Thirteen's HOLD (P2) was that a face turned away is never the asked person; that and both P3s were fixed. #5078 then conflicted, so it was rebased as #5098 without a force-push. Thirteen's READ-OK was restated, and CI was green. It landed as `0d01c7b379`, `790b8eeab2`. Not verified: the switch on a lamp (c0a4 held for SubDarren).
+- #4705 → draft #5084 (`8a06418219`): only plainly heard `Over` blocks make a yield late. On #5038's head, the lamp's own voice under a held render or at its word tails still committed, and now it resumes. Local gate green (lamp-audio 91+99, lib 4542/0). #4705 is closed. The first builder queued the 4ace A/B (P, P+#4705, P+#5084).
+- #3733 closed by the first builder. Its side finding is proposal #5061 (`twelve-P3`), placed with me after #4175's 3+3.
+- #4175: still owes the 3+3 re-check, now on lamp-c0a4 (the first builder, c6598017786), once SubDarren frees the lamp.
+- #4226 step (c): no new code. The carried-sound fix is on lamp-voice (`193f88c862`), and the late hearings still had the name. A 3+3 plan for `LAMP_NAME_START_USUAL` and three questions are on #4226 (c6597638085).
+- Reads: #5063 (SubDarren's harness recorder), READ-OK with six P3s. #4970 after merge (`aca8bdc92b`), second privacy READ-OK with two P3s.
