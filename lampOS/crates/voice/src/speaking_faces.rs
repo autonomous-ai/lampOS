@@ -225,29 +225,37 @@ struct Looks {
 }
 
 impl Looks {
-    /// The links the eyes say hold now, as of the last of their own looks
-    /// at or before `at` (`boot/f1` followed by `boot/f2`, #4885). Only that
-    /// look's word counts: no pair is kept past it, so a link the eyes ended
-    /// (the old id seen again) is gone at once, and a look with the old id
-    /// in it ends it too (the Reviewer-lead's P1 on #4917).
+    /// The links the eyes say hold as of `at` (`boot/f1` followed by
+    /// `boot/f2`, #4885), from their own looks at or before it, as a chain:
+    /// a face re-found twice is `f1` to `f2` to `f3`, though the eyes say
+    /// only the last hop by then (#4966). As the eyes keep a link, each
+    /// pair lasts until a later look ends it: its old id in view again (in
+    /// the look that says it too), or its new id in view without the eyes
+    /// saying it (the Reviewer-lead's P1 on #4917). A link the eyes ended
+    /// is gone at once.
     fn links_at(&self, at: Instant) -> Vec<(String, String)> {
-        self.kept
+        let mut links: Vec<(String, String)> = Vec::new();
+        for look in self
+            .kept
             .iter()
-            .rev()
-            .find(|look| look.at <= at && !look.boot.is_empty())
-            .map(|look| {
-                look.follows
-                    .iter()
-                    .filter(|(old, _)| !look.tracked.contains(old))
-                    .map(|(old, new)| {
-                        (
-                            format!("{}/{old}", look.boot),
-                            format!("{}/{new}", look.boot),
-                        )
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
+            .filter(|look| look.at <= at && !look.boot.is_empty())
+        {
+            let id = |bare: &str| format!("{}/{bare}", look.boot);
+            let in_view = |face: &str| look.tracked.iter().any(|seen| id(seen) == face);
+            let said = look
+                .follows
+                .iter()
+                .filter(|(old, _)| !look.tracked.contains(old))
+                .map(|(old, new)| (id(old), id(new)))
+                .collect::<Vec<_>>();
+            links.retain(|link| !in_view(&link.0) && (!in_view(&link.1) || said.contains(link)));
+            for link in said {
+                if !links.contains(&link) {
+                    links.push(link);
+                }
+            }
+        }
+        links
     }
 }
 
@@ -453,8 +461,8 @@ impl SpeakingFaces {
         })
     }
 
-    /// Whether the eyes' last look at or before `to` says a new id follows
-    /// `face` (`boot/f1`), their link still pending ([`Looks::links_at`]).
+    /// Whether the eyes' links as of `to` say a new id follows `face`
+    /// (`boot/f1`), their link still pending ([`Looks::links_at`]).
     pub fn follow_of(&self, face: &str, to: Instant) -> bool {
         self.looks
             .lock()
@@ -941,8 +949,8 @@ pub const FOLLOW_DECIDED_WITHIN: Duration = Duration::from_secs(1);
 /// read it at the line's end `to`), once the eyes' print has decided a
 /// follow of that face (#4966, the Reviewer-lead's P2 on #4967). A link is
 /// position only: someone else may sit where they were. So the known face
-/// is never mapped through it; when the eyes' last look still says a new
-/// id follows it, the known file is read again every [`EVERY`] until it
+/// is never mapped through it; when the eyes' links as of `to` still say
+/// a new id follows it ([`SpeakingFaces::follow_of`]), the known file is read again every [`EVERY`] until it
 /// names another face or none, at most `within` past `to`. A file moved to
 /// the new id, once its print passed the eyes' hold, makes the line theirs;
 /// one still on the old id at the bound, or gone, leaves it the room's.
@@ -1487,6 +1495,63 @@ mod tests {
         both.faces[1].follows = Some("f1".to_owned());
         eyes.look(from + EVERY, Some((("b", 1), &both)));
         assert!(!eyes.no_other_face_in_view(Some("b/f2"), from, from + EVERY * 2));
+    }
+
+    /// The looks of a line on `f15` re-found twice: `f15` speaking, then
+    /// `f16` following `f15`, a look with no face, `f17` following `f16`,
+    /// and `last` after them.
+    fn re_found_twice(last: &[(&str, SpeakingState)]) -> (SpeakingFaces, Instant, Instant) {
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        let mut first = faces(&[("f16", Yes)]);
+        first.faces[0].follows = Some("f15".to_owned());
+        let mut second = faces(&[("f17", Yes)]);
+        second.faces[0].follows = Some("f16".to_owned());
+        let looks = [
+            faces(&[("f15", Yes)]),
+            faces(&[("f15", Yes)]),
+            faces(&[("f15", Yes)]),
+            faces(&[("f15", Yes)]),
+            first,
+            faces(&[]),
+            faces(last),
+            second,
+        ];
+        for (index, look) in looks.iter().enumerate() {
+            eyes.look(
+                from + EVERY * index as u32,
+                Some((("b", index as u64), look)),
+            );
+        }
+        (eyes, from, from + EVERY * looks.len() as u32)
+    }
+
+    /// #4966 (lamp-52e6, try 7): one face re-found twice through a line,
+    /// `f15` to `f16` to `f17`, the eyes saying only the last hop in the
+    /// last look; their known file moved on to `f17`. The line is theirs:
+    /// each hop the eyes said is kept until they end it.
+    #[test]
+    fn a_line_on_a_face_re_found_twice_is_the_known_persons() {
+        let lan = crate::known_faces::memory_person("A");
+        let known = Some(("A".to_owned(), "b/f17".to_owned()));
+        let (eyes, from, to) = re_found_twice(&[]);
+        let speakers = eyes.speakers_with_boot(from, to);
+        assert_eq!(speakers, ["b/f17"]);
+        assert!(!not_theirs(&speakers, &lan, known, true));
+        assert!(eyes.no_other_face_in_view(Some("b/f17"), from, to));
+    }
+
+    /// #4966: the same chain broken by the old id seen again (`f15` back
+    /// between the hops): `f15` is not `f17`, and the line is the room's.
+    #[test]
+    fn a_chain_the_eyes_broke_does_not_map() {
+        let lan = crate::known_faces::memory_person("A");
+        let known = Some(("A".to_owned(), "b/f17".to_owned()));
+        let (eyes, from, to) = re_found_twice(&[("f15", Yes)]);
+        let speakers = eyes.speakers_with_boot(from, to);
+        assert!(speakers.contains(&"b/f15".to_owned()), "{speakers:?}");
+        assert!(not_theirs(&speakers, &lan, known, true));
+        assert!(!eyes.no_other_face_in_view(Some("b/f17"), from, to));
     }
 
     /// #4966: a known file in a fresh folder naming A on `f1`, and the
