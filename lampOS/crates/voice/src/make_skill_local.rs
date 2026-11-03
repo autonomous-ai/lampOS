@@ -328,8 +328,8 @@ fn told(made: Result<Made, Refused>) -> Value {
                 "description": made.description,
                 "uses": made.uses.spoken(),
                 "next": format!(
-                    "In one or two short sentences say what it does and what it uses, then ask \
-                     exactly: \"{}\" Only if they then say yes out loud, call {}.",
+                    "Say what it does as its description says, leaving nothing out, then what it \
+                     uses, then ask exactly: \"{}\" Only if they then say yes out loud, call {}.",
                     made_skill::ASK_TO_PUT_ON,
                     made_skill::PUT_ON
                 )
@@ -730,7 +730,7 @@ light = { dim = 1 }
         assert_eq!(
             told["description"],
             "When the lamp goes quiet, between 22:00 and 22:30, it dims the light a step, at \
-             most once every 12 hours. Left out: dimming slowly; it dims in one step",
+             most once every 12 hours. The maker notes what it couldn't do: dimming slowly.",
             "{told}"
         );
         assert!(!told.to_string().contains("10 pm"), "{told}");
