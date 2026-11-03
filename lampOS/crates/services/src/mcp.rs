@@ -649,7 +649,10 @@ fn text_items(text: &str) -> Vec<(Option<String>, Value)> {
     match serde_json::from_str::<Value>(text) {
         Ok(Value::Object(_) | Value::Array(_)) => reads::items("mcp", text)
             .into_iter()
-            .map(|item| (reads::group_of(&item), item))
+            .map(|item| {
+                let group = reads::group_of(&item).or_else(|| Some(reads::ANSWER.to_owned()));
+                (group, item)
+            })
             .collect(),
         _ => pieces(text)
             .into_iter()
