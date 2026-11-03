@@ -4995,6 +4995,47 @@ fn a_computers_turn_opens_over_room_speech_with_no_conversation() {
     );
 }
 
+/// The lamp's own words with nobody answering them (its start, a greeting),
+/// said longer ago than the second route's window, keep no conversation
+/// going: a computer's turn opens. On lamp-75c9 on 3 Nov the turn was
+/// refused minutes after the lamp last spoke.
+#[test]
+fn a_computers_turn_opens_after_the_lamps_own_words_alone_have_gone_quiet() {
+    use crate::say::Answer;
+    let _one = super::pilot_faults::one_session();
+    {
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        *thread = crate::thread::Thread::new();
+        let then = std::time::Instant::now()
+            .checked_sub(crate::thread::GOING_ON_FOR + Duration::from_secs(15))
+            .unwrap();
+        thread.lamp(9_100, "Hello, I'm here.", then);
+        assert!(!thread.going_on(std::time::Instant::now()));
+    }
+    let (says, line, answered) = crate::say::Says::line_for_test(
+        r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
+    );
+    TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+    let run = run(Script {
+        second: false,
+        only: true,
+        silent: true,
+        say_at_frame: Some((1_600, line)),
+        written: Written::Said(12),
+        mute_at_frame: Some(2_800),
+        limit: Duration::from_secs(40),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_SAYS.with(|given| given.borrow_mut().take());
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let answered: Vec<_> = answered.try_iter().collect();
+    assert!(
+        matches!(answered.first(), Some(Answer::BegunTurn { .. })),
+        "{answered:?} {}",
+        run.summary()
+    );
+}
+
 /// A computer's turn asked while a conversation with the lamp goes on (the
 /// thread holds an exchange with the lamp's words in it) is refused at
 /// once, never queued behind it.
