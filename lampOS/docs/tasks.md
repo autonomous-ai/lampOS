@@ -2124,30 +2124,22 @@ route's news test holds the turn heard to the news's, and
 holds the number `send_heard` tells the tasks part to that turn's (the
 reviewer's P3 1).
 
-### A skill made by voice (#1685, `LAMP_MAKE_SKILL=on`, on in the product)
+### A skill made by voice (#1685): not through the tasks part
 
-The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
-`make_skill(request)` ([skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
-- **The prepare.** It goes as `start_agent_task`'s does: `prepare`, then
-  `confirm_agent_task` on the person's yes, within 120 s, as the same
-  pending work. Its `text` is the brief and the request (at most 180 bytes)
-  within 1,000 bytes, half the tasks part's 2,000. The brief begins "Write one lamp
-  skill (lampOS lamp-skills)", which is how the voice knows the task again.
-- **The model's answer.** It is told `"skill": <the request>`, never the
-  brief, and `next` asks it to say the request back.
-- **When it settles.** Task news (`task_news::read_once_with`) quotes the
-  request as such a task's words, in every state. Settled `idle` with an
-  answer, the answer is taken as the skill's two files, kept as skills.md
-  says, and told alone (never with other news, never read out).
-- **Without the switch,** such a task's news is any task's, the request
-  quoted.
-- **The journal** says `a skill made by voice is kept, version VERSION,
-  sha256 …` or why not, with `lamp-skills`' exit code only: never the files,
-  the name or `lamp-skills`' words, which can quote the agent's.
+A skill is made by the lamp's own model, never handed to a computer's agent
+(the first builder, 3 Nov, on the Queue;
+[skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
+The tasks part declares no `make_skill` or `put_on_made_skill`, and the
+worker's `--tasks-make-skill` flag is gone: `LAMP_MAKE_SKILL=on` alone gives
+the voice its own two functions, with a tasks part or without one, and an
+app's typed skill (`LAMP_APP_MAKE_SKILL`) is made the same way, never handed
+over. The made skills' news words (`made`, `not_kept`) and their repair through
+a task are gone with it. A task whose words are a skill's brief, handed over
+by an earlier release, is never told: its answer is files.
+
 - **The reset** wipes `/var/lib/lampOS/voice/made-skills` with the person's
   other stores, and removes each made skill put on in `/var/lib/lampOS/skills`
   (its `.package.json`) with its folder ([setup.md](setup.md)).
-- **Without the switch** a `make_skill` call does nothing.
 
 ### Asked of the staff, done by the lamp (#854, `LAMP_TASKS_ASKED=on`, on in the product)
 
@@ -2528,7 +2520,7 @@ With one target, `start_agent_task` still had no `who`, its description
 named only that agent, the staff's note matched only the staff, and the
 voice sent any call to the one there was. Off unless
 `LAMP_TASKS_NAMED_ONLY=on` (the provider worker's `--tasks-named-only`,
-after `--tasks-make-skill`, and only with `--tasks-who`). With it, once the
+after `--tasks-sign-in`, and only with `--tasks-who`). With it, once the
 staff are read:
 
 - `who` is offered even with one of the staff, as an enum of every agent the

@@ -1,43 +1,32 @@
 //! A skill typed in the app (#2813; the first builder on #2602, 22 Oct
-//! 10:3x): the person's words go to the same maker the voice uses
-//! ([`crate::made_skill`]), and the skill goes on only by a spoken yes at
-//! the lamp (the lead's ruling on #1711, 20 Oct 08:37). Off unless
-//! [`ENVIRONMENT`] is `on`, and only with `LAMP_MAKE_SKILL` and the tasks
-//! part.
+//! 10:3x): the person's words go to the same maker the voice uses, the
+//! lamp's own model ([`crate::make_skill_local`], #4914; the only maker
+//! since 3 Nov: no tasks part and no computer), and the skill goes on only
+//! by a spoken yes at the lamp (the lead's ruling on #1711, 20 Oct 08:37).
+//! Off unless [`ENVIRONMENT`] is `on`, and only with `LAMP_MAKE_SKILL` and
+//! the say service (`LAMP_SAY`).
 //!
 //! - **The socket** ([`SOCKET_ENVIRONMENT`], [`DEFAULT_SOCKET`] if unset),
 //!   for `lamp-cloud`: one JSON line in, one out, then closed.
 //!   - `{"make": {"words", "request_id"}}`: the words become the voice's
 //!     own brief ([`crate::made_skill::brief`], at most 180 bytes) and are
-//!     handed over at once on a thread of their own
-//!     ([`crate::agent_tasks::hand_over`]): typing them in the app is the
-//!     person's ask, so there is no "shall I start it?". The answer is
-//!     `{"making": true}` once the ask is recorded, before the hand-over,
-//!     or `{"refused": WHY}` in plain words.
+//!     made at once on a thread of their own: typing them in the app is the
+//!     person's ask. The answer is `{"making": true}` once the ask is
+//!     recorded, before it is made, or `{"refused": WHY}` in plain words.
 //!   - `{"made": {"request_id"?}}`: the state of that ask, or of the
 //!     newest, only ever one the app made ([`status`]).
-//!   - `{"ready": {}}`: `{"ready": true}` when the tasks part has a
-//!     computer to hand the work to ([`crate::agent_tasks::has_a_target`],
-//!     within [`READY_WAIT`]), else `{"ready": false, "why": NOT_SET_UP}`.
-//!     `lamp-cloud` names `skills.make` in `can` only while it is ready
-//!     (fourteen-P15), so the app's button shows only on a lamp whose
-//!     Harness has a computer. It reads nothing of the asks.
-//! - **Told aloud.** The hand-over is never kept as typed
-//!   (`task_news::keep_typed`), so its news, the skill kept and "Shall I
-//!   put it on the lamp?", is told by the voice's spoken task news at a
-//!   good moment, and the ask is dated only when it is heard whole
-//!   (`made_skill::asked`). Only a spoken yes within its 120 s puts it on
-//!   (`made_skill::put_on`, and the manage helper's own check, #2874).
-//! - **Made by the lamp's own model** (`LAMP_MAKE_SKILL_LOCAL=on`, #4914):
-//!   no tasks part and no computer. `ready` is yes at once; a `make` is
-//!   written by the lamp's own chat with the voice's own example, check and
-//!   one repair ([`crate::make_skill_local::make_kept`], [`make_here`]),
-//!   kept as made from [`LOCAL_STORE`], and once kept the lamp says aloud
-//!   what it made and asks "Shall I put it on the lamp?" through the say
-//!   service's own asks ([`ask_line`]), at a good moment. Only a spoken yes
-//!   right after that said ask puts it on: the ask is dated at the yes
+//!   - `{"ready": {}}`: `{"ready": true}`, at once: the lamp makes it
+//!     itself. It reads nothing of the asks.
+//! - **Made here.** A `make` is written by the lamp's own chat with the
+//!   voice's own example, check and one repair
+//!   ([`crate::make_skill_local::make_kept`], [`make_here`]), kept as made
+//!   from [`LOCAL_STORE`], and once kept the lamp says aloud what it made
+//!   and asks "Shall I put it on the lamp?" through the say service's own
+//!   asks ([`ask_line`]), at a good moment. Only a spoken yes right after
+//!   that said ask puts it on: the ask is dated at the yes
 //!   (`make_skill_local::asked_at_yes`), so a yes to anything else puts
-//!   nothing on. Without the say service (`LAMP_SAY`) it isn't started.
+//!   nothing on (`made_skill::put_on`, and the manage helper's own check,
+//!   #2874).
 //! - **Kept** beside the made skills, in their root-only folder: the app's
 //!   asks, at most [`MOST_ASKS`] ([`APP_INDEX`]), each its request id,
 //!   when, the task it became, and why it wasn't kept if it wasn't. Never
@@ -66,12 +55,7 @@ pub const APP_INDEX: &str = "app.json";
 pub const MOST_ASKS: usize = made_skill::KEPT_MOST;
 /// An ask still being made after this long is let go: another may start.
 pub const MAKING_LONGEST_MS: u64 = 30 * 60_000;
-/// The hand-over's whole wait, on its own thread.
-pub const HAND_OVER_WAIT: Duration = Duration::from_secs(20);
 
-/// How long a `ready` waits on the tasks part's `targets`: within the 2 s
-/// `lamp-cloud` waits on this socket.
-pub const READY_WAIT: Duration = Duration::from_secs(1);
 /// A client has this long to send its line, and the line is at most
 /// [`MOST_LINE_BYTES`].
 const LINE_WAIT: Duration = Duration::from_secs(2);
@@ -173,7 +157,7 @@ fn request_id_ok(id: &str) -> bool {
 }
 
 /// Record the app's ask `request_id` for `words` at `now_unix_ms` in the
-/// made skills' `directory`: the brief to hand over, or why not, in plain
+/// made skills' `directory`: the brief to make, or why not, in plain
 /// words. One at a time: while the newest is still being made (and not
 /// [`MAKING_LONGEST_MS`] old), another is refused.
 pub fn begin(
@@ -227,9 +211,9 @@ pub fn begin(
     }
 }
 
-/// The ask `request_id` was handed over as the task `store`:`id`, or
-/// wasn't, and why.
-pub fn handed(directory: &Path, request_id: &str, outcome: Result<(String, u64), &str>) {
+/// The ask `request_id` is being made as `task` (`local:app:<ms>`): what
+/// it makes is kept as made from it ([`made_of`]).
+pub fn handed(directory: &Path, request_id: &str, task: &str) {
     let changed = transact(directory, false, |entries| {
         let Some(entry) = entries
             .iter_mut()
@@ -237,10 +221,7 @@ pub fn handed(directory: &Path, request_id: &str, outcome: Result<(String, u64),
         else {
             return (false, ());
         };
-        match outcome {
-            Ok((store, id)) => entry["task"] = json!(format!("{store}:{id}")),
-            Err(why) => entry["not_kept"] = json!(why),
-        }
+        entry["task"] = json!(task);
         (true, ())
     });
     if let Err(error) = changed {
@@ -248,18 +229,9 @@ pub fn handed(directory: &Path, request_id: &str, outcome: Result<(String, u64),
     }
 }
 
-/// Why an app's ask wasn't kept when the tasks part says its work was
-/// never sent to the agent.
-pub const NOT_SENT: &str = "the computer didn't take the work";
-/// Why, when the computer has no agent the work could go to, or more than
-/// one to choose between.
-pub const NOT_SET_UP: &str = "the computer's agent isn't set up for the lamp yet";
-/// Why, when the agent failed or stopped before it was made.
-pub const STOPPED: &str = "the computer stopped before the skill was made";
-
-/// The news `key` (`store:id:observation`) of a made skill not kept, and
-/// why, in the maker's plain words ([`made_skill::Refused`]), never the
-/// agent's: kept against the app's ask it came from, if it did.
+/// The made skill `key` (`local:app:<ms>:1`) not kept, and why, in the
+/// maker's plain words ([`made_skill::Refused`]): kept against the app's
+/// ask it came from.
 pub fn not_kept(directory: &Path, key: &str, why: &str) {
     let changed = transact(directory, false, |entries| {
         let mut found = false;
@@ -277,42 +249,6 @@ pub fn not_kept(directory: &Path, key: &str, why: &str) {
     });
     if let Err(error) = changed {
         eprintln!("lamp-voice: an app's skill: why it wasn't kept not kept: {error}");
-    }
-}
-
-/// Whether the app's ask whose task gave the answer `key`
-/// (`store:id:observation`), if one did, is still being made: only then is
-/// a refused skill repaired (#2813 piece 2). A skill asked for by voice has
-/// no ask here, and is.
-pub fn still_making(directory: &Path, key: &str, now_unix_ms: u64) -> bool {
-    asks(directory)
-        .iter()
-        .find(|entry| {
-            entry["task"]
-                .as_str()
-                .is_some_and(|task| key.starts_with(&format!("{task}:")))
-        })
-        .is_none_or(|entry| state(directory, entry, now_unix_ms) == "making")
-}
-
-/// The app's ask whose task gave the answer `key` follows its repair, the
-/// task `to` (`store:id`): what becomes of the repair is the ask's.
-pub fn repaired(directory: &Path, key: &str, to: &str) {
-    let changed = transact(directory, false, |entries| {
-        let mut found = false;
-        for entry in entries.iter_mut() {
-            if entry["task"]
-                .as_str()
-                .is_some_and(|task| key.starts_with(&format!("{task}:")))
-            {
-                entry["task"] = json!(to);
-                found = true;
-            }
-        }
-        (found, ())
-    });
-    if let Err(error) = changed {
-        eprintln!("lamp-voice: an app's skill: its repair not kept: {error}");
     }
 }
 
@@ -415,13 +351,13 @@ pub fn make_here(
     brief: &str,
     request_id: &str,
     at_unix_ms: u64,
-    chat: impl Fn() -> Result<crate::second_provider::net::Chat, String> + Send + Sync + 'static,
+    chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     say: impl FnOnce(&str, &str),
 ) {
     handed(
         &keeping.directory,
         request_id,
-        Ok((LOCAL_STORE.to_owned(), at_unix_ms)),
+        &format!("{LOCAL_STORE}:{at_unix_ms}"),
     );
     let from = format!("{LOCAL_STORE}:{at_unix_ms}:1");
     match crate::make_skill_local::make_kept(
@@ -494,27 +430,18 @@ pub fn ask_answered(
     }
 }
 
-/// Where the hand-over goes: the tasks part and the target; or, with
-/// `local`, the lamp's own model and no hand-over at all.
-#[derive(Clone, Debug)]
-pub struct Place {
-    /// `LAMP_MAKE_SKILL_LOCAL=on` (#4914): made here, ready at once.
-    pub local: bool,
-    pub tasks: PathBuf,
-    pub target: String,
-    /// The target is the default, not one set: one the tasks part hasn't
-    /// is replaced by its one Claude target ([`crate::agent_tasks::hand_over`]).
-    pub discover: bool,
-    pub made: PathBuf,
-}
+/// The lamp's own chat, as [`crate::make_skill_local::own_chat`] gives it.
+type Chat = crate::second_provider::net::Chat;
+/// What gives the chat a skill is made with.
+pub type ChatFrom = fn() -> Result<Chat, String>;
 
-/// One line asked, answered. A `make` recorded is handed over by `hand`
-/// on a thread of its own, after the answer.
+/// One line asked, answered, of the asks kept in `made`. A `make` recorded
+/// is made by `make` on a thread of its own, after the answer.
 pub fn answer(
-    place: &Place,
+    made: &Path,
     line: &str,
     now_unix_ms: u64,
-    hand: impl FnOnce(String, String) + Send + 'static,
+    make: impl FnOnce(String, String) + Send + 'static,
 ) -> Value {
     let asked: Option<Value> = serde_json::from_str(line.trim_end()).ok();
     let only = |key: &str| {
@@ -524,15 +451,15 @@ pub fn answer(
             .filter(|asked| asked.len() == 1)
             .and_then(|asked| asked.get(key))
     };
-    if let Some(make) = only("make") {
-        let words = make["words"].as_str().unwrap_or_default();
-        let request_id = make["request_id"].as_str().unwrap_or_default();
-        return match begin(&place.made, words, request_id, now_unix_ms) {
+    if let Some(ask) = only("make") {
+        let words = ask["words"].as_str().unwrap_or_default();
+        let request_id = ask["request_id"].as_str().unwrap_or_default();
+        return match begin(made, words, request_id, now_unix_ms) {
             Ok(brief) => {
                 let request_id = request_id.to_owned();
                 if std::thread::Builder::new()
                     .name("lamp-voice-app-make".into())
-                    .spawn(move || hand(brief, request_id))
+                    .spawn(move || make(brief, request_id))
                     .is_err()
                 {
                     return json!({"refused": "it couldn't be started"});
@@ -542,24 +469,19 @@ pub fn answer(
             Err(why) => json!({"refused": why}),
         };
     }
-    if let Some(made) = only("made") {
-        return status(&place.made, made["request_id"].as_str(), now_unix_ms);
+    if let Some(asked) = only("made") {
+        return status(made, asked["request_id"].as_str(), now_unix_ms);
     }
+    // Made here: ready at once, with no computer to wait for.
     if only("ready").is_some() {
-        return if place.local || crate::agent_tasks::has_a_target(&place.tasks, READY_WAIT) {
-            json!({"ready": true})
-        } else {
-            json!({"ready": false, "why": NOT_SET_UP})
-        };
+        return json!({"ready": true});
     }
     json!({"refused": "a request is one line, {\"make\": {\"words\", \"request_id\"}}, {\"made\": {\"request_id\"}} or {\"ready\": {}}"})
 }
 
 /// The service, from the coordinator's environment: started only with
-/// [`ENVIRONMENT`] `on`, `LAMP_MAKE_SKILL` `on` and the tasks part
-/// (`LAMP_TASKS_DIR`); or, made here (`LAMP_MAKE_SKILL_LOCAL=on`), with the
-/// say service's own `asks` in place of the tasks part. Logged either way,
-/// never the words.
+/// [`ENVIRONMENT`] `on`, `LAMP_MAKE_SKILL` `on` and the say service's own
+/// `asks`, to ask aloud. Logged either way, never the words.
 pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
     if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
         return;
@@ -571,34 +493,13 @@ pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
         );
         return;
     };
-    let local = crate::make_skill_local::from_environment();
-    if local && asks.is_none() {
+    let Some(asks) = asks else {
         eprintln!(
-            "lamp-voice: an app's skill: {} needs the say service ({}=on) to ask aloud; not started",
-            crate::make_skill_local::ENVIRONMENT,
+            "lamp-voice: an app's skill: {ENVIRONMENT} needs the say service ({}=on) to ask aloud; not started",
             crate::say::ENVIRONMENT
         );
         return;
-    }
-    let tasks = match (
-        std::env::var_os(crate::agent_tasks::ENVIRONMENT)
-            .map(PathBuf::from)
-            .filter(|path| path.is_absolute()),
-        local,
-    ) {
-        (Some(tasks), _) => tasks,
-        // Made here, the tasks part is never asked.
-        (None, true) => PathBuf::new(),
-        (None, false) => {
-            eprintln!("lamp-voice: an app's skill: no tasks part; not started");
-            return;
-        }
     };
-    let set = std::env::var(crate::agent_tasks::TARGET_ENVIRONMENT)
-        .ok()
-        .filter(|target| !target.is_empty());
-    let discover = set.is_none();
-    let target = set.unwrap_or_else(|| crate::agent_tasks::DEFAULT_TARGET.to_owned());
     let path = std::env::var_os(SOCKET_ENVIRONMENT)
         .map_or_else(|| PathBuf::from(DEFAULT_SOCKET), PathBuf::from);
     let groups = fs::read_to_string("/etc/group").unwrap_or_default();
@@ -609,14 +510,13 @@ pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
             return;
         }
     };
-    let place = Place {
-        local,
-        tasks,
-        target,
-        discover,
-        made: keeping.directory.clone(),
-    };
-    match serve(&path, group, place, keeping, asks) {
+    match serve(
+        &path,
+        group,
+        keeping,
+        Some(asks),
+        crate::make_skill_local::own_chat,
+    ) {
         Ok(()) => eprintln!(
             "lamp-voice: an app's skill: listening at {}",
             path.display()
@@ -629,29 +529,30 @@ pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
 }
 
 /// Listen at `path`, opened to `group` if given, on a thread of its own:
-/// each client in turn, its line read within [`LINE_WAIT`].
+/// each client in turn, its line read within [`LINE_WAIT`]; each make
+/// written by the model `chat` gives, and its ask said through `asks`.
 pub fn serve(
     path: &Path,
     group: Option<u32>,
-    place: Place,
     keeping: made_skill::Keeping,
     asks: Option<crate::say::OwnAsks>,
+    chat: ChatFrom,
 ) -> io::Result<()> {
     let (listener, bound) = crate::say::bind(path, group)?;
     std::thread::Builder::new()
         .name("lamp-voice-app-make-socket".into())
         .spawn(move || {
             let _bound = bound;
-            accept(&listener, &place, &keeping, asks.as_ref());
+            accept(&listener, &keeping, asks.as_ref(), chat);
         })?;
     Ok(())
 }
 
 fn accept(
     listener: &UnixListener,
-    place: &Place,
     keeping: &made_skill::Keeping,
     asks: Option<&crate::say::OwnAsks>,
+    chat: ChatFrom,
 ) {
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else {
@@ -666,38 +567,28 @@ fn accept(
         {
             continue;
         }
-        let handing = place.clone();
-        let keeping = keeping.clone();
+        let making = keeping.clone();
         let asks = asks.cloned();
-        let made_directory = keeping.directory.clone();
-        let told = answer(place, &line, now_unix_ms(), move |brief, request_id| {
-            if handing.local
-                && let Some(asks) = asks
-            {
+        let told = answer(
+            &keeping.directory,
+            &line,
+            now_unix_ms(),
+            move |brief, request_id| {
+                let directory = making.directory.clone();
                 make_here(
-                    &keeping,
+                    &making,
                     &brief,
                     &request_id,
                     now_unix_ms(),
-                    crate::make_skill_local::own_chat,
-                    |line, sha256| say_ask(&asks, &made_directory, sha256, line),
+                    chat,
+                    |line, sha256| {
+                        if let Some(asks) = &asks {
+                            say_ask(asks, &directory, sha256, line);
+                        }
+                    },
                 );
-                return;
-            }
-            let outcome = crate::agent_tasks::hand_over(
-                &handing.tasks,
-                &handing.target,
-                handing.discover,
-                &brief,
-                "app-make",
-                HAND_OVER_WAIT,
-            );
-            match &outcome {
-                Ok(_) => eprintln!("lamp-voice: an app's skill: handed over"),
-                Err(why) => eprintln!("lamp-voice: an app's skill: not handed over: {why}"),
-            }
-            handed(&handing.made, &request_id, outcome);
-        });
+            },
+        );
         let _ = writeln!(stream, "{told}");
     }
 }
@@ -749,7 +640,7 @@ mod tests {
         .unwrap();
         assert!(made_skill::is_brief(&brief));
         assert_eq!(status(made, Some("r1"), NOW)["state"], "making");
-        handed(made, "r1", Ok(("s1".into(), 7)));
+        handed(made, "r1", "s1:7");
         assert_eq!(status(made, None, NOW)["state"], "making");
         let sha = "a".repeat(64);
         write_made(made, &[made_entry("s1:7:1", &sha)]);
@@ -780,28 +671,29 @@ mod tests {
         assert_eq!(status(made, None, NOW + 1_001 + within)["state"], "on");
     }
 
-    /// Not handed over, or not kept: told why in plain words, and another
-    /// may start. A made skill from the voice, not the app, is never told.
+    /// Not made, or not kept: told why in plain words, and another may
+    /// start. A made skill from the voice, not the app, is never told.
     #[test]
     fn an_ask_not_kept_says_why_and_only_the_apps_own_are_told() {
         let dir = folder("not-kept");
         let made = dir.as_path();
-        write_made(made, &[made_entry("s1:3:1", &"b".repeat(64))]);
+        write_made(made, &[made_entry("local:3:1", &"b".repeat(64))]);
         assert_eq!(status(made, None, NOW), json!({"state": "none"}));
         begin(made, "make me a skill that dims the light", "r1", NOW).unwrap();
-        handed(made, "r1", Err("the computer couldn't be reached"));
+        handed(made, "r1", "local:app:1");
+        not_kept(made, "local:app:1:1", "the lamp's model didn't answer");
         let told = status(made, None, NOW);
         assert_eq!(
             (told["state"].as_str(), told["why"].as_str()),
-            (Some("not_kept"), Some("the computer couldn't be reached"))
+            (Some("not_kept"), Some("the lamp's model didn't answer"))
         );
         begin(made, "make me a skill that glows at dusk", "r2", NOW).unwrap();
-        handed(made, "r2", Ok(("s1".into(), 9)));
-        not_kept(made, "s1:9:2", "it doesn't pass the lamp's check");
+        handed(made, "r2", "local:app:9");
+        not_kept(made, "local:app:9:1", "it doesn't pass the lamp's check");
         let told = status(made, Some("r2"), NOW);
         assert_eq!(told["state"], "not_kept");
         assert_eq!(told["why"], "it doesn't pass the lamp's check");
-        // The voice's own made skill (task 3) is never the app's.
+        // The voice's own made skill (`local:3`) is never the app's.
         assert!(told.get("name").is_none(), "{told}");
     }
 
@@ -824,7 +716,9 @@ mod tests {
         );
         assert!(begin(made, "make me another", "r2", NOW + MAKING_LONGEST_MS).is_ok());
         for n in 3..=8 {
-            handed(made, &format!("r{}", n - 1), Err("x"));
+            let task = format!("local:app:{n}");
+            handed(made, &format!("r{}", n - 1), &task);
+            not_kept(made, &format!("{task}:1"), "x");
             begin(
                 made,
                 "make me another",
@@ -850,18 +744,13 @@ mod tests {
         );
     }
 
-    /// The socket's lines: a make answered at once and handed over after,
-    /// with the brief and the request id; a status; anything else refused.
+    /// The socket's lines: a make answered at once and made after, with
+    /// the brief and the request id; a status; `ready` at once; anything
+    /// else refused.
     #[test]
-    fn the_socket_answers_a_make_at_once_and_hands_it_over_after() {
+    fn the_socket_answers_a_make_at_once_and_makes_it_after() {
         let dir = folder("socket");
-        let place = Place {
-            local: false,
-            tasks: dir.as_path().join("tasks"),
-            target: "office".into(),
-            discover: false,
-            made: dir.as_path().join("made"),
-        };
+        let place = dir.as_path().join("made");
         let (sent, got) = std::sync::mpsc::channel();
         let told = answer(
             &place,
@@ -882,29 +771,29 @@ mod tests {
             panic!("not handed")
         });
         assert!(told["refused"].as_str().unwrap().contains("one line"));
+        assert_eq!(
+            answer(&place, r#"{"ready": {}}"#, NOW, |_, _| panic!("not made")),
+            json!({"ready": true})
+        );
     }
 
-    /// Through the socket itself: a make answered, handed over on its own
-    /// thread (here to no tasks part, so not kept, and why), and the
-    /// status read back on a second connection.
+    /// Through the socket itself, with no tasks part anywhere: a make
+    /// answered, made on its own thread (here with no model to ask, so not
+    /// kept, and why), and the status read back on a second connection.
     #[test]
     fn through_the_socket_a_make_is_answered_and_its_outcome_kept() {
         let dir = folder("served");
         // Its own directory: the socket's is set to the voice's alone.
         let path = PathBuf::from(format!("/tmp/am-{}/make.sock", std::process::id()));
         let _ = fs::remove_dir_all(path.parent().unwrap());
-        let place = Place {
-            local: false,
-            tasks: dir.join("no-tasks"),
-            target: "office".into(),
-            discover: false,
-            made: dir.join("made"),
-        };
         let keeping = made_skill::Keeping {
             directory: dir.join("made"),
             program: dir.join("no-pack"),
         };
-        serve(&path, None, place, keeping, None).unwrap();
+        fn no_model() -> Result<Chat, String> {
+            Err("no model here".into())
+        }
+        serve(&path, None, keeping, None, no_model).unwrap();
         let ask = |line: &str| {
             let mut stream = std::os::unix::net::UnixStream::connect(&path).unwrap();
             writeln!(stream, "{line}").unwrap();
@@ -923,54 +812,8 @@ mod tests {
             told = ask(r#"{"made": {"request_id": "r1"}}"#);
         }
         assert_eq!(told["state"], "not_kept", "{told}");
-        assert_eq!(told["why"], "the computer couldn't be reached");
+        assert_eq!(told["why"], "the lamp's model didn't answer");
         let _ = fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    /// `ready` (fourteen-P15): yes only when the tasks part answers
-    /// `targets` with at least one; an empty list, a refusal or no tasks
-    /// part at all is no, with why. The asks are never touched.
-    #[test]
-    fn ready_only_when_the_tasks_part_has_a_computer() {
-        let dir = folder("ready");
-        // A short folder of its own: a socket's path is at most 104 bytes.
-        let tasks = PathBuf::from(format!("/tmp/amr-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&tasks);
-        fs::create_dir_all(&tasks).unwrap();
-        let place = Place {
-            local: false,
-            tasks: tasks.clone(),
-            target: "office".into(),
-            discover: false,
-            made: dir.join("made"),
-        };
-        let ready = || answer(&place, r#"{"ready": {}}"#, NOW, |_, _| panic!("not handed"));
-        let not_ready = json!({"ready": false, "why": NOT_SET_UP});
-        assert_eq!(ready(), not_ready, "no tasks part");
-        let listener = UnixListener::bind(tasks.join("request.sock")).unwrap();
-        let answers = [
-            json!({"ok": true, "targets": [{"alias": "office", "engine": "claude"}]}),
-            json!({"ok": true, "targets": []}),
-            json!({"ok": false, "error": "busy"}),
-        ];
-        let served = answers.clone();
-        std::thread::spawn(move || {
-            for (stream, told) in listener.incoming().zip(served) {
-                let mut stream = stream.unwrap();
-                let mut line = String::new();
-                BufReader::new(&stream).read_line(&mut line).unwrap();
-                assert_eq!(
-                    serde_json::from_str::<Value>(&line).unwrap(),
-                    json!({"op": "targets"})
-                );
-                writeln!(stream, "{told}").unwrap();
-            }
-        });
-        assert_eq!(ready(), json!({"ready": true}), "a computer");
-        assert_eq!(ready(), not_ready, "no computer");
-        assert_eq!(ready(), not_ready, "refused");
-        assert!(!place.made.join(APP_INDEX).exists(), "no ask written");
-        let _ = fs::remove_dir_all(&tasks);
     }
 
     /// Writers that overlap (reviewer-two's P2 on #2887): an old ask's
@@ -983,10 +826,10 @@ mod tests {
             let dir = folder("overlap");
             let made = dir.as_path();
             begin(made, "make me a skill that dims the light", "r1", NOW).unwrap();
-            handed(made, "r1", Ok(("s1".into(), 1)));
+            handed(made, "r1", "s1:1");
             let late = made.to_path_buf();
             let refusal = std::thread::spawn(move || {
-                not_kept(&late, "s1:1:hand-over", NOT_SENT);
+                not_kept(&late, "s1:1:1", "the lamp's model didn't answer");
             });
             // Past the 30 minutes, so admitted whichever writes first.
             let newer = made.to_path_buf();
@@ -998,14 +841,14 @@ mod tests {
                     NOW + MAKING_LONGEST_MS,
                 )
                 .unwrap();
-                handed(&newer, "r2", Ok(("s1".into(), 2)));
+                handed(&newer, "r2", "s1:2");
             });
             refusal.join().unwrap();
             admission.join().unwrap();
             let entries = asks(made);
             assert_eq!(entries.len(), 2, "round {round}: {entries:?}");
             assert_eq!(
-                entries[0]["not_kept"], NOT_SENT,
+                entries[0]["not_kept"], "the lamp's model didn't answer",
                 "round {round}: {entries:?}"
             );
             assert_eq!(entries[1]["task"], "s1:2", "round {round}: {entries:?}");
@@ -1027,22 +870,22 @@ mod tests {
         assert!(group_named(None, "root:x:0:\n").is_err());
     }
 
-    /// Made by the lamp's own model (#4914): `ready` at once with no tasks
-    /// part; a typed ask made and kept, and its spoken ask given to be
-    /// said. A yes right after that said ask, as the thread keeps the say
-    /// turn, makes it wait; a yes after anything else puts nothing on.
+    /// Made by the lamp's own model (#4914), on a lamp with no tasks part
+    /// at all: `ready` at once; a typed ask made and kept, and its spoken
+    /// ask given to be said. A yes right after that said ask, as the thread
+    /// keeps the say turn, makes it wait, and that plain spoken yes puts it
+    /// on through the manage helper; a yes after anything else puts
+    /// nothing on.
     #[test]
     fn made_here_is_ready_at_once_and_asked_aloud_only_by_the_said_ask() {
-        use crate::make_skill_local::tests::{chat_at, good, keeping, service};
-        let place = Place {
-            local: true,
-            tasks: PathBuf::new(),
-            target: String::new(),
-            discover: false,
-            made: PathBuf::from("/nonexistent"),
-        };
+        use crate::make_skill_local::tests::{chat_at, good, keeping, manage_helper, service};
         assert_eq!(
-            answer(&place, r#"{"ready": {}}"#, NOW, |_, _| panic!("not handed")),
+            answer(
+                Path::new("/nonexistent"),
+                r#"{"ready": {}}"#,
+                NOW,
+                |_, _| panic!("not handed")
+            ),
             json!({"ready": true})
         );
         for said_the_ask in [true, false] {
@@ -1085,6 +928,14 @@ mod tests {
                 status(&keeping.directory, Some("r1"), now)["state"],
                 if said_the_ask { "asked" } else { "kept" }
             );
+            if said_the_ask {
+                let socket = root.join("manage.sock");
+                let asked = manage_helper(&socket);
+                let told = made_skill::put_on(&keeping.directory, &socket, Some("Yes."), now);
+                assert_eq!(told["put_on"], "evening-dim", "{told}");
+                asked.join().unwrap();
+                assert_eq!(status(&keeping.directory, Some("r1"), now)["state"], "on");
+            }
             let _ = fs::remove_dir_all(&root);
         }
     }

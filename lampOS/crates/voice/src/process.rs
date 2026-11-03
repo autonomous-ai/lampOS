@@ -1719,8 +1719,9 @@ fn second_route_worker_environment(
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
         crate::untied_going_on::ENVIRONMENT,
-        // A skill made by this worker's own chat (Fourteen's proposal on #4710).
-        crate::make_skill_local::ENVIRONMENT,
+        // A skill made by this worker's own chat (Fourteen's proposal on #4710),
+        // the only maker since 3 Nov.
+        crate::made_skill::ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -1886,7 +1887,7 @@ mod tests {
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
-            crate::make_skill_local::ENVIRONMENT,
+            crate::made_skill::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
@@ -2575,7 +2576,7 @@ mod tests {
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
-                    || name == crate::make_skill_local::ENVIRONMENT
+                    || name == crate::made_skill::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
@@ -2705,7 +2706,7 @@ mod tests {
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
-                    "LAMP_MAKE_SKILL_LOCAL=on",
+                    "LAMP_MAKE_SKILL=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FOLLOWS_FACE=on",
