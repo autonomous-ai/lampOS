@@ -315,7 +315,13 @@ giữ gì.
   của Gmail mà một danh sách đưa ra: chữ và số, tối đa 64) lấy thư với
   `format=full`: nội dung từ phần văn bản thuần trước, nếu không thì từ HTML
   đã bỏ thẻ, mỗi phần được giải mã từ base64url theo charset của nó, đến
-  3,000 ký tự. Một danh sách tối đa 10 thư, mới nhất trước; không gì bị đánh
+  3,000 ký tự. Một thư mà câu trả lời `format=full` bị cắt ở giới hạn 1 MB
+  (`net::BODY_MOST`) thì không đọc được: nó được báo bằng tiêu đề và đoạn xem
+  trước `format=metadata`, rồi "(the rest of this mail is too long to read
+  here)" (`mail::TOO_LONG`). Một thư mà danh sách đã nêu nhưng lần lấy trả về
+  404 (đã bị xoá từ lúc đó) bị bỏ ra khỏi lần đọc danh sách đó; một thư được
+  hỏi theo id vẫn là "Gmail has no such item". Một danh sách tối đa 10 thư,
+  mới nhất trước; không gì bị đánh
   dấu đã đọc (một lần lấy không đổi nhãn nào). Mỗi lệnh gọi là một lần đọc
   web (5 s để kết nối, 15 s mỗi lệnh), 20 s cho cả lần đọc; các token cũng
   được xoá khỏi nội dung đã giải mã.
