@@ -37,8 +37,8 @@ Handler = Callable[[dict], Any]
 # closes one quiet for 2 minutes (lamp-control's QUIET_MAX, #3778).
 KEEPALIVE_S = 20.0
 # The actions lamp-control answers `{"to":"body"}` with no `done` after
-# (docs/control.md): a wait for them ends at that answer. `say` answers
-# `{"to":"voice"}` and its `done` does follow.
+# (docs/control.md): a wait for them ends at that answer. `say` and
+# `turn.start` answer `{"to":"voice"}` and their `done` does follow.
 ENDS_AT_REPLY = frozenset({"gesture", "move"})
 # A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
 # The SDK's check is a pre-check: it may let through what the lamp refuses,
@@ -751,6 +751,30 @@ class Lamp:
     async def remove_sound(self, name: str) -> dict:
         """Delete one of this computer's clips from the lamp."""
         return await self.request("sound.remove", name=name)
+
+    # Turns and listening (docs/control.md): the person wins over each.
+
+    async def start_turn(self, prompt: str | None = None, *, wait: bool = False) -> dict:
+        """Open a conversation turn, as a tap on the head does: the person's
+        next line is answered as spoken to the lamp. With `prompt`, the lamp
+        says it first, as a `say`. The reply is `{"to": "voice"}`; with
+        `wait`, its `done`: `finished` once the turn's answer has sounded,
+        else `dropped` with the voice's why. Needs speak and hear."""
+        return await self._act("turn.start", wait, prompt=prompt)
+
+    async def end_turn(self) -> dict:
+        """End the turn this computer started, never another's: the reply is
+        `{"turn": "ended", "started": <the turn.start's id>}`. With no turn
+        of this computer's, `BusyError`."""
+        return await self._act("turn.end", False)
+
+    async def set_listening(self, on: bool) -> dict:
+        """`False` holds this computer's mute (`{"mute": "held"}`) until
+        `set_listening(True)` (`{"mute": "lifted"}`, or `"nothing_held"`),
+        this computer goes, or a hand on the head lifts it: then a `done`
+        `cut_short`, "a hand on the head", names the request that held it
+        (`lamp.on("done", ...)`). A `stop` doesn't lift it. Needs hear."""
+        return await self._act("listen.set", False, on=on)
 
     async def stop(self) -> dict:
         reply = await self._act("stop", False)

@@ -49,6 +49,15 @@ Each of these cost someone a run on a real lamp.
 - **Quiet hours** (`limits.quiet_hours`, by default 22:00 to 07:00) refuse
   `say` and `sound`. Use light then.
 - **`say` is refused while the lamp talks with someone, or is private.**
+- **Turns and your mute: the person wins.** A turn you start answers the
+  person's next line as spoken to the lamp, but what they say never reaches
+  your computer: you get `done` (`finished` once the answer sounded,
+  `dropped` with why, e.g. "dropped: nobody spoke"), never the words.
+  `end_turn` ends only your own turn (`busy` otherwise). Your mute
+  (`set_listening(False)`) is yours alone: a hand on the head lifts it
+  (`done` `cut_short`, "a hand on the head", on the request that held it),
+  and it ends when your program's last connection closes or it is revoked,
+  so a crashed program never leaves the lamp deaf. A `stop` doesn't lift it.
 - **A restart of the lamp's voice can leave it muted** by its restart guard:
   the ring shows it muted and the lamp doesn't hear. One tap on its head
   clears it. Expect it after a lamp update or a voice restart.

@@ -54,9 +54,12 @@ def test_proofs_name_what_they_are_for():
 
 def test_every_op_has_a_call_and_every_error_code_a_class():
     calls = {"lease.take", "lease.renew", "lease.release", "pair", "hello", "subscribe", "unsubscribe", "get"}
+    # A dotted op that is a program's own action is a call named for what it
+    # does, as a Python name can't hold a dot (the JS SDK's test has the same).
     named = {
         "sound.upload": "upload_sound", "sound.list": "sounds", "sound.remove": "remove_sound",
         "skill.push": "push_skill", "skill.list": "skills", "skill.remove": "remove_skill",
+        "turn.start": "start_turn", "turn.end": "end_turn", "listen.set": "set_listening",
     }
     for op in schema.ops():
         assert op in calls or callable(getattr(Lamp, named.get(op, op.replace(".", "_")), None)), op
@@ -1492,6 +1495,48 @@ def test_the_camera_gives_a_picture_and_a_stream_with_the_camera_grant_only(tmp_
     run(go())
 
 
+async def until(check, *, within=5.0):
+    """Until `check()` holds, polling the fake lamp's record."""
+    deadline = asyncio.get_running_loop().time() + within
+    while not check():
+        assert asyncio.get_running_loop().time() < deadline, "the fake lamp never got it"
+        await asyncio.sleep(0.01)
+
+
+def test_a_turn_starts_with_its_prompt_ends_by_its_computer_and_needs_speak_and_hear(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("speak", "hear"), auto_done=False) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["busy"], match="not this computer's turn"):
+                    await lamp.end_turn()
+                assert (await lamp.start_turn("Shall we go over today's list?"))["to"] == "voice"
+                [started] = [r["id"] for r in fake.requests if r["op"] == "turn.start"]
+                ended = await lamp.end_turn()
+                assert (ended["turn"], ended["started"]) == ("ended", started)
+                # Waiting, the turn's `done` is its answer.
+                waiting = asyncio.ensure_future(lamp.start_turn(wait=True))
+                await until(lambda: len(fake.asked("turn.start")) == 2)
+                await fake.done(fake.turns[ring.pairing().client], "dropped", "dropped: nobody spoke")
+                assert (await waiting)["why"] == "dropped: nobody spoke"
+            assert fake.asked("turn.start") == [{"prompt": "Shall we go over today's list?"}, {}]
+            assert fake.asked("turn.end") == [{}]
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path / "speak")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"], match="hear"):
+                    await lamp.start_turn()
+        async with FakeLamp(grants=("speak", "hear")) as fake:
+            ring = await paired(fake, tmp_path / "both")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                # Taken and finished at once with auto_done; the turn is over.
+                assert (await lamp.start_turn("Ready?", wait=True))["how"] == "finished"
+                with pytest.raises(errors.BY_CODE["busy"]):
+                    await lamp.end_turn()
+
+    run(go())
+
+
 def test_the_camera_stream_asks_up_to_30_a_second_and_31_is_refused_before_sending(tmp_path):
     async def go():
         async with FakeLamp(grants=("light", "camera")) as fake:
@@ -1568,6 +1613,41 @@ def test_a_push_beyond_the_pairing_is_refused_before_a_byte_is_sent(tmp_path):
                 with pytest.raises(errors.BY_CODE["no_grant"]):
                     await lamp.push_skill(_skill(tmp_path / "b", "lit"))
                 assert fake.asked("skill.push") == []
+
+    run(go())
+
+
+def test_the_computers_mute_is_held_lifted_and_ended_by_a_hand_or_its_going(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("hear",)) as fake:
+            ring = await paired(fake, tmp_path)
+            client = None
+            async with await Lamp.connect(keyring=ring) as lamp:
+                client = ring.pairing().client
+                assert (await lamp.set_listening(True))["mute"] == "nothing_held"
+                assert (await lamp.set_listening(False))["mute"] == "held"
+                assert (await lamp.set_listening(False))["mute"] == "held"
+                # A stop doesn't lift it.
+                await lamp.stop()
+                assert client in fake.mutes
+                assert (await lamp.set_listening(True))["mute"] == "lifted"
+                # A hand on the head lifts it, said on the listen.set that held it.
+                dones = []
+                lamp.on("done", dones.append)
+                await lamp.set_listening(False)
+                held = fake.mutes[client][1]
+                await fake.hand_on_head()
+                await until(lambda: dones)
+                assert dones == [{"ev": "done", "re": held, "how": "cut_short", "why": "a hand on the head"}]
+                assert (await lamp.set_listening(True))["mute"] == "nothing_held"
+                await lamp.set_listening(False)
+            # The computer gone lifts it.
+            await until(lambda: client not in fake.mutes)
+        async with FakeLamp(grants=("speak",)) as fake:
+            ring = await paired(fake, tmp_path / "speak")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"], match="hear"):
+                    await lamp.set_listening(False)
 
     run(go())
 
@@ -1722,3 +1802,12 @@ def test_a_path_lamp_skills_refuses_or_no_header_holds_is_refused_before_packing
     with pytest.raises(LampError) as raised:
         pack(folder("desk-over", "a" * 100 + "/" + "b" * 100 + "/c.json"))
     assert "longer than a tar header holds" in raised.value.why
+
+
+def test_a_turns_prompt_is_summarised_in_the_debug_log_as_a_says_text():
+    from lampos import debug
+
+    shown = debug.redact({"id": 1, "op": "turn.start", "prompt": "Build passed."})
+    assert shown["prompt"] == debug.redact({"text": "Build passed."})["text"]
+    assert debug.redact({"re": 2, "ok": True, "turn": "ended", "started": 1}) == {"re": 2, "ok": True, "turn": "ended", "started": 1}
+    assert debug.redact({"re": 3, "ok": True, "mute": "held"}) == {"re": 3, "ok": True, "mute": "held"}

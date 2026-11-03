@@ -513,8 +513,11 @@ through its own gates.
 The door serves these three ops (`crates/control/src/parts.rs`), and the
 voice takes them on its say socket ([speaking-first.md](speaking-first.md),
 "A turn for lamp-control" and "A computer's mute for lamp-control").
-`control.schema.json`, the SDKs' calls and lamp-mcp's tools don't name them
-yet; they follow in their own piece.
+`control.schema.json` names them, with their replies' `turn`, `started` and
+`mute`; the SDKs call them as `start_turn`, `end_turn` and `set_listening`
+(Python) and `startTurn`, `endTurn` and `setListening` (JavaScript), and
+lamp-mcp's tools are `lamp_start_turn`, `lamp_end_turn` and
+`lamp_set_listening`.
 
 A computer can start a conversation turn, end one, and set the lamp's
 listening. The person wins over each, as "Who wins" says.

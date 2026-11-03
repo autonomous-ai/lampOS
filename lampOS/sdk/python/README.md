@@ -43,12 +43,14 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
 example runs this way: `tour.py` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
-`phrase.py`, `pomodoro.py`, `ci_light.py`, and `push_skill.py ../../examples/relaxing-music` (a pairing with `skills`).
+`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, and `push_skill.py ../../examples/relaxing-music` (a pairing with `skills`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`
 (`hum`, the lamp's own short hum) with `{"to": "voice"}` and their `done`,
-`look` refused as "the body's lease socket is not on here" (no product
+`start_turn` with `{"to": "voice"}` and its `done`, `end_turn` and
+`set_listening` as lamp-control does (`FakeLamp.hand_on_head()` lifts a
+mute), `look` refused as "the body's lease socket is not on here" (no product
 unit passes it yet), and `play` and `joints` refused (`refused`,
 "not routed yet: waits for …"), in lamp-control's own words, so a program
 built against it meets the same refusals on a lamp. `--everything` answers
@@ -110,7 +112,8 @@ asyncio.run(main())
   `light` is the person's own (`on`, `colour`, `level`) with `shows`, what the
   ring draws now; the fake's `shows` is the newest light asked while it lasts.
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
-  `light`, `say`, `sound`, `stop`. Each returns when the lamp has taken it;
+  `light`, `say`, `sound`, `stop`, and the turn and mute calls
+  `start_turn`, `end_turn`, `set_listening`. Each returns when the lamp has taken it;
   `wait=True` on a gesture, move or play returns when it has finished, or,
   where the lamp hands it on and says no more (today `gesture` and `move`,
   answered `{"to": "body"}`), at that answer.
@@ -271,7 +274,7 @@ And two that come by themselves, with no subscription:
 | event | fields | example | fires when |
 |---|---|---|---|
 | `lease` | `lease`, `state` (`held`, `suspended`, `lost`), `why` (`conversation`, `hand`, `stop_heard`, `private`, `paused`, `asleep`, `expired`, `taken_by_owner_app`, `revoked`, `released`, `slumped`) | `{"ev":"lease","lease":"l_3","state":"suspended","why":"conversation"}` | one of your leases changes: talking suspends it and resting holds it again; a hand on the body, a stop, a pause, privacy or sleep loses it |
-| `done` | `re` (your request's id), `how` (`finished`, `cut_short`, `dropped`), `why` | `{"ev":"done","re":14,"how":"finished"}` | an action that ends later has ended. Today that's `say` |
+| `done` | `re` (your request's id), `how` (`finished`, `cut_short`, `dropped`), `why` | `{"ev":"done","re":14,"how":"finished"}` | an action that ends later has ended. Today that's `say`, `sound`, `start_turn`, a `look`, and a mute `set_listening(False)` the lamp lifted (`cut_short`, "a hand on the head") |
 
 ### States, with `get`
 
@@ -359,6 +362,9 @@ its `done` instead, or the answer where no `done` follows (`gesture`, `move`).
 | `await lamp.sounds()` | your clips on the lamp, each `{name, bytes, ms}` | `speak` | no |
 | `await lamp.remove_sound(name)` | deletes one of your clips | `speak` | no |
 | `await lamp.stop()` | | none | no |
+| `await lamp.start_turn(prompt=None, *, wait=False)` | `prompt`: words said first, as `say`'s `text`. Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. Answered `{"to": "voice"}`; its `done` is `finished` once the answer has sounded, else `dropped` with the voice's why (`dropped: nobody spoke`). Refused in quiet hours, as `say` | `speak` and `hear` | no |
+| `await lamp.end_turn()` | Ends the turn this computer started, never another's: `{"turn": "ended", "started": <the turn.start's id>}`, and the start's `done` follows. With none, `busy` ("not this computer's turn") | `speak` | no |
+| `await lamp.set_listening(on)` | `False` holds this computer's mute: `{"mute": "held"}` (again: the same, nothing new). `True` lifts it: `{"mute": "lifted"}`, or `{"mute": "nothing_held"}`. The person wins: a hand on the head lifts it, said as a `done` `cut_short`, "a hand on the head", naming the `listen.set` that held it; and it ends when this computer's last connection closes or it is revoked. A `stop` doesn't lift it. Nothing the lamp hears reaches a computer either way | `hear` | no |
 | `await lamp.request(op, *, on_id=None, **fields)` | any op of the schema, checked against it first. `on_id(id)`: told the request's id before it is sent, to match a `done` that may come before the reply is read | the op's | |
 
 A lamp has no rate limits, except two guards: refused actions, 20 a second (past it the connection closes), and changes of the phrases a connection listens for, 6 a minute. Hello's `limits` says `"rates": "off"` with those two as `refused` and `phrases`. `say` and `sound` are still refused in quiet hours.

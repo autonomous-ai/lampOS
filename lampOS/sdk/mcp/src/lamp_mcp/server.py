@@ -82,6 +82,7 @@ LIMIT_KIND = {
     "light": "light",
     "say": "say",
     "sound": "say",
+    "turn.start": "say",
     "express": "express",
     "play": "motion",
     "joints": "joints",
@@ -561,6 +562,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 raise refused(error) from error
             return f"{name} removed"
 
+        @server.tool()
+        async def lamp_end_turn() -> str:
+            """End the conversation turn this computer started with `lamp_start_turn`, and the
+            conversation grown from it; never one the person or another computer started."""
+            ended = await act("turn.end")
+            return f"turn ended (the one request {ended.get('started')} started)"
+
     if allowed("camera"):
 
         @server.tool()
@@ -594,6 +602,59 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             """Take one of this computer's own skills off the lamp, by its name."""
             await act("skill.remove", name=name)
             return f"{name} removed"
+
+    # Turns and listening (docs/control.md): the person wins over each, and
+    # nothing the lamp hears comes back here, only how a turn ended.
+    if allowed("speak", "hear"):
+
+        @server.tool()
+        async def lamp_start_turn(prompt: str | None = None, wait: bool = False) -> str:
+            """Open a conversation turn as a tap on the lamp's head does: it says `prompt` first (300
+            characters at most), then answers the person's next line as spoken to it. What the person
+            says never comes back here, only how the turn ended. With `wait`, return when it ends
+            (120 s at most). Not in quiet hours, private, or while the lamp talks with someone."""
+            if prompt is not None and len(prompt) > 300:
+                raise ToolError("bad_request: at most 300 characters")
+            limits.take("turn.start")
+            ended: asyncio.Future = asyncio.get_running_loop().create_future()
+            asked: int | None = None
+
+            def note(id_: int) -> None:
+                nonlocal asked
+                asked = id_
+
+            def heard(event: dict) -> None:
+                if event.get("re") == asked and not ended.done():
+                    ended.set_result(event)
+
+            lamp.on("done", heard)
+            try:
+                try:
+                    await lamp.request("turn.start", on_id=note, **({} if prompt is None else {"prompt": prompt}))
+                except LampError as error:
+                    raise refused(error) from error
+                if not wait:
+                    return "turn started: the lamp answers the person's next line"
+                try:
+                    done = await asyncio.wait_for(asyncio.shield(ended), MOST_WAIT_S)
+                except asyncio.TimeoutError:
+                    return "turn started; not ended yet"
+                return f"turn {done.get('how')}" + (f": {done['why']}" if done.get("why") else "")
+            finally:
+                lamp.off("done", heard)
+
+    if allowed("hear"):
+
+        @server.tool()
+        async def lamp_set_listening(on: bool) -> str:
+            """`false` mutes the lamp's listening for this computer until `true`, a hand on its head,
+            or this server going; `lamp_stop` doesn't lift it. The person can always lift it."""
+            mute = (await act("listen.set", on=on)).get("mute")
+            return {
+                "held": "muted: the lamp doesn't listen until lamp_set_listening(true) or a hand on its head",
+                "lifted": "listening again",
+                "nothing_held": "listening: no mute of this computer's was held",
+            }.get(mute, f"mute {mute}")
 
     if allowed("body", "look"):
 

@@ -21,8 +21,8 @@ from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
     "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
-    "lamp_light", "lamp_say", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound", "lamp_events",
-    "lamp_stop",
+    "lamp_light", "lamp_say", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound", "lamp_end_turn",
+    "lamp_events", "lamp_stop",
 }
 # The schema's ops a tool doesn't send itself: pairing and hello are the
 # SDK's, before any tool; leases go with each body tool; the camera's stream
@@ -30,6 +30,8 @@ ALL = {
 NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream"}
 # Offered only with both body and look.
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
+# Offered only with hear (starting a turn with speak too).
+TURN = {"lamp_start_turn", "lamp_set_listening"}
 
 
 def run(coroutine):
@@ -714,7 +716,7 @@ def test_the_readme_gives_every_tool_its_parameters_defaults_and_every_resource(
         readme = (Path(__file__).parents[1] / "README.md").read_text()
         async with connected(tmp_path, grants=EVERY_GRANT) as (_, _, session):
             listed = (await session.list_tools()).tools
-            assert {tool.name for tool in listed} == ALL | FOLLOW == set(rows)
+            assert {tool.name for tool in listed} == ALL | FOLLOW | TURN == set(rows)
             for tool in listed:
                 by_parameter = {row[1].strip("`"): row for row in rows[tool.name]}
                 properties = tool.inputSchema.get("properties", {})
@@ -1032,5 +1034,33 @@ def test_the_skill_tools_push_list_and_remove_with_the_skills_grant_only(tmp_pat
         async with connected(tmp_path / "plain", grants=("light",)) as (_, _, session):
             names = {tool.name for tool in (await session.list_tools()).tools}
             assert not {"lamp_skill_push", "lamp_skills", "lamp_skill_remove"} & names
+
+    run(go())
+
+
+def test_turns_and_the_mute_send_their_ops_and_say_only_how_they_ended(tmp_path):
+    async def go():
+        async with connected(tmp_path, grants=("speak", "hear"), auto_done=False) as (fake, _, session):
+            ended = await session.call_tool("lamp_end_turn", {})
+            assert ended.isError and "busy: not this computer's turn" in text(ended)
+            started = await session.call_tool("lamp_start_turn", {"prompt": "Shall we start?"})
+            assert not started.isError and "turn started" in text(started)
+            [begun] = [r["id"] for r in fake.requests if r["op"] == "turn.start"]
+            assert text(await session.call_tool("lamp_end_turn", {})) == f"turn ended (the one request {begun} started)"
+            # Waiting, the tool says how the turn ended, never what was said.
+            waiting = asyncio.ensure_future(session.call_tool("lamp_start_turn", {"wait": True}))
+            await until(lambda: len(fake.asked("turn.start")) == 2)
+            await fake.done(fake.requests[-1]["id"], "dropped", "dropped: nobody spoke")
+            assert text(await waiting) == "turn dropped: dropped: nobody spoke"
+            assert fake.asked("turn.start") == [{"prompt": "Shall we start?"}, {}]
+            long = await session.call_tool("lamp_start_turn", {"prompt": "x" * 301})
+            assert long.isError and "at most 300 characters" in text(long)
+            assert "muted" in text(await session.call_tool("lamp_set_listening", {"on": False}))
+            assert text(await session.call_tool("lamp_set_listening", {"on": True})) == "listening again"
+            assert "no mute" in text(await session.call_tool("lamp_set_listening", {"on": True}))
+            assert fake.asked("listen.set") == [{"on": False}, {"on": True}, {"on": True}]
+        async with connected(tmp_path / "speak", grants=("speak",)) as (_, _, session):
+            tools = {tool.name for tool in (await session.list_tools()).tools}
+            assert "lamp_end_turn" in tools and not tools & TURN
 
     run(go())
