@@ -23,12 +23,39 @@ import json, os, re, sys
 LIFT_RE = re.compile(r"(?i)\bHOLD\b[^.\n]{0,24}\b(lifted|cleared)\b|\b(?:lift|clear)(?:ed|s|ing)? my (?:[0-9:x]+ )?HOLD")
 
 
+# 3 Nov 16:4x (Thirteen's HOLD on #5068): the opening `\W*` skipped "> " and a code fence, so an author's
+# "> READ-OK <head>" reply, "thanks, waiting for a second read", counted as a second read. A marker on a line that starts
+# with ">" (a Markdown quote), or inside a fenced code block (``` or ~~~, open at the marker's line), is never a marker.
+FENCE_RE = re.compile(r" {0,3}(`{3,}|~{3,})(.*)")
+
+
+def quoted(body, pos):
+    """True when the character at pos sits on a quoted line ("> ...") or inside a fenced code block."""
+    start = body.rfind("\n", 0, pos) + 1
+    if re.match(r"[ \t]*>", body[start:]):
+        return True
+    fence = None  # (char, length) of the open fence
+    for line in body[:start].split("\n"):
+        f = FENCE_RE.match(line)
+        if not f:
+            continue
+        mark = f.group(1)
+        if fence is None:
+            # An opening backtick fence's info string holds no backtick (CommonMark).
+            if mark[0] == "~" or "`" not in f.group(2):
+                fence = (mark[0], len(mark))
+        elif mark[0] == fence[0] and len(mark) >= fence[1] and not f.group(2).strip():
+            fence = None
+    # The marker's own line opening a fence ("```READ-OK ...") is code too.
+    return fence is not None or bool(FENCE_RE.match(body[start:]))
+
+
 def parse_marker(body):
     """The comment's marker: (kind, sha, rest, first_line) or None. kind is READ-OK or HOLD; sha may be "";
     first_line is True when the marker opens the comment."""
     body = body.lstrip()
     m = re.match(r"\W*(READ-OK|HOLD)\b\W*(?:#\d+\W+)?([0-9a-f]{7,40})?\s*(.*)", body)
-    if m:
+    if m and not quoted(body, m.start(1)):
         return m.group(1), m.group(2) or "", m.group(3), True
     # A marker after a signature ("reviewer-two, 10:08, to ...: HOLD 4931fff80 ..."), in the first 400 characters,
     # counts only with a commit right after it, so prose like "my HOLD is cleared" never does.
@@ -44,11 +71,20 @@ def parse_marker(body):
               and not re.search(r"[(\[]\**`?$", body[:x.start()])
               # 27 Oct 20:1x: nor one quoted, in backticks or quotation marks ("your 19:34 comment opens with
               # `HOLD 73aa8b23f`", the reviewer-lead explaining a hold): it held #3781 under the explainer's name.
-              and not re.search(r"[`\"“']\**$", body[:x.start()])), None)
+              # 3 Nov 16:4x: \Z, not $: a closing fence ("```" then a newline) right before a marker isn't a quote.
+              and not re.search(r"[`\"“']\**\Z", body[:x.start()])
+              # 3 Nov 16:4x: nor one on a quoted line ("> READ-OK <sha>") or in a fenced code block (Thirteen, #5068).
+              and not quoted(body, x.start(1))), None)
     # 28 Oct 13:1x: "Reviewer-lead, READ-OK #4006 56d1d90d5…" names the PR before the commit; it counts (#4006).
     if m:
         return m.group(1), m.group(2), m.group(3), False
     return None
+
+
+# Words that open a line of a read and are not a reader's name ("Tests: 12 passed", "Why: ...", "Fail-first: ...").
+NOT_NAMES = {"tests", "test", "gates", "gate", "checks", "check", "note", "notes", "nit", "nits", "fail-first", "why",
+             "what", "how", "fixed", "fix", "fixes", "changes", "change", "summary", "result", "results", "ran", "run",
+             "build", "files", "scope", "verified", "findings", "also", "and", "but", "then", "head", "commit", "diff"}
 
 
 def signer(body):
@@ -62,9 +98,15 @@ def signer(body):
         return sig.group(1)
     # 29 Oct 18:1x: the name right after the marker and its commit on the same line, with no time:
     # "HOLD 3559c8ab3a…  Reviewer-lead: one P2" (#4364, #4346 sat out on it as unsigned).
-    same = re.search(r"(?:READ-OK|HOLD)\*{0,2} `?[0-9a-f]{7,40}`?[:,]?\s+\**([A-Za-z][A-Za-z-]+(?: builder)?)\**\s*[,:]", body[:400])
+    # 3 Nov 16:4x: on the same line only ([ \t]+, not \s+); the next line is nxt's, with its label check.
+    same = re.search(r"(?:READ-OK|HOLD)\*{0,2} `?[0-9a-f]{7,40}`?[:,]?[ \t]+\**([A-Za-z][A-Za-z-]+(?: builder)?)\**\s*[,:]", body[:400])
     # The name that starts the line after the marker's line: "Sixth, read at …", "Reviewer-lead: my P3 …".
-    nxt = re.search(r"\A[^\n]*\n\s*\**([A-Za-z][A-Za-z-]+(?: builder)?)\**\s*[,:]", body)
+    # 3 Nov 16:4x (the Reviewer-lead's note on #5068, Thirteen reproduced it): "Tests: 12 passed" there became a second
+    # reader. Now the name is a capitalised word or "<word> builder", and never a label a read's lines open with
+    # (NOT_NAMES). A name with a time after it ("Tests, 10:02") is the signature above, label or not.
+    nxt = re.search(r"\A[^\n]*\n\s*\**(?:[Tt]he )?([A-Z][A-Za-z-]+|[A-Za-z][A-Za-z-]+ builder)\**\s*[,:]", body)
+    if nxt and nxt.group(1).lower() in NOT_NAMES:
+        nxt = None
     # 30 Oct 22:0x: the name that opens the comment, with a colon and no time: "Sixth: #4562 at `b9521db47a`, …" then
     # "HOLD b9521db47a" a line below. It read as unsigned, and Sixth's "Sixth: … my re-read of my HOLD" READ-OK didn't
     # clear it, so #4562 sat out train 423 with both READ-OKs.

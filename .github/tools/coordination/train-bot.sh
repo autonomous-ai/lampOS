@@ -8,7 +8,8 @@
 #   commits are all on lamp-voice. A failed run: the PRs touching the failing tests' crates are left out, told why, and the
 #   rest go again at once. Nothing eligible: wait 60 s.
 # DRY=1: print what one round would carry and stop.
-# 3 Nov: moved into lampOS/tools/coordination; every path comes from the environment (README.md):
+# 3 Nov: moved into .github/tools/coordination (Python stays out of lampOS/, Thirteen on #5068); every path comes from
+#   the environment (README.md):
 #   TOOLS_DIR         these scripts (default: this script's folder)
 #   LAMP_COORD_STATE  mutable state: log, told list, PR bodies, train-first/hold/only.txt, holds-lifted.tsv
 #                     (default: ~/.lamp-coordination; never the repo)
@@ -98,7 +99,11 @@ eligible() {
     fine reads2$p
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
     # at 14:17 before trains 407 and 408 carried it; both failed in lamp-update, and the bot held #4524 and #4530 instead.
-    own=$(gh run list -R $REPO --workflow lampos-arm64.yml --commit $head -L 1 --json conclusion -q '.[0].conclusion' 2>/dev/null)
+    # 3 Nov 16:4x (Thirteen's P3 on #5068): a run list gh can't fetch holds the PR (fail closed), not skips the check.
+    if ! own=$(gh run list -R $REPO --workflow lampos-arm64.yml --commit $head -L 1 --json conclusion -q '.[0].conclusion' 2>/dev/null); then
+      once run$p "#$p left out: its ARM64 runs on ${head:0:9} can't be read"; continue
+    fi
+    fine run$p
     if [[ $own == failure ]]; then
       grep -qx "$p red $head" $told || { say "#$p left out: its own ARM64 run on ${head:0:9} is red" >&2; echo "$p red $head" >> $told; }
       continue
@@ -110,8 +115,13 @@ eligible() {
 # PR's commits with its own: every commit over lamp-voice is cherry-picked. Such a PR is left out until the one under it
 # is on lamp-voice; it is told once.
 unstacked() {
-  local p q h line ok
-  local heads=(${(f)"$(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,headRefOid,headRefName --jq '.[]|select(.headRefName|startswith("first/train-")|not)|"\(.number) \(.headRefOid)"')"})
+  local p q h line ok out
+  # 3 Nov 16:4x (Thirteen's P3 on #5068): when gh can't list the open PRs, no PR is carried this round (fail closed);
+  # an empty list used to pass every PR as unstacked.
+  out=$(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,headRefOid,headRefName --jq '.[]|select(.headRefName|startswith("first/train-")|not)|"\(.number) \(.headRefOid)"') \
+    || { once unstacked "the open PRs can't be listed for the stacked check: no PR is carried this round"; return; }
+  fine unstacked
+  local heads=(${(f)out})
   for p in "$@"; do
     ok=1
     for line in $heads; do

@@ -2,7 +2,8 @@
 
 The first builder's tools for merging, reading asks and publishing the build rows.
 They ran from one Mac. Now any operator can run them from a checkout of this repo.
-They are zsh and Python scripts. They use `gh`, `git`, and BSD `date` (macOS).
+They are zsh and Python scripts. They use `gh`, `git`, `jq`, and BSD `date` (macOS).
+They live in `.github/tools/`, not `lampOS/`, which takes no Python scripts (`lampOS/AGENTS.md`, `lampOS/docs/joining.md`).
 
 Each script keeps its dated comments. They are the history of each rule.
 
@@ -11,7 +12,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | Tool | What it does |
 |---|---|
 | `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back. It picks every eligible PR, cherry-picks its commits, pushes `first/train-N`, opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints what one round would carry and stops. |
-| `merge-when-green.sh PR [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
+| `merge-when-green.sh PR [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Green: at least two ARM64 build-and-test and clippy checks, every one completed with `SUCCESS`; any other completed conclusion (a null one too) fails it. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
 | `markers.py [--writers FILE] [PR]` | Reads a PR's comments as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. |
@@ -82,14 +83,14 @@ gh pr list -R autonomous-ai/lampOS --base lamp-voice --state open --json headRef
 Look first with a dry run:
 
 ```sh
-DRY=1 lampOS/tools/coordination/train-bot.sh
+DRY=1 .github/tools/coordination/train-bot.sh
 ```
 
 Start:
 
 ```sh
 S="${LAMP_COORD_STATE:-$HOME/.lamp-coordination}"; mkdir -p "$S"
-nohup lampOS/tools/coordination/train-bot.sh > "$S/train-bot.out" 2>&1 &
+nohup .github/tools/coordination/train-bot.sh > "$S/train-bot.out" 2>&1 &
 echo $! > "$S/train-bot.pid"
 ```
 
@@ -119,8 +120,10 @@ If the Queue (#4710) can't be fetched, no PR is eligible that round.
 - A marker later in the first 400 characters counts only with a commit of 9 or more characters right after it.
   It does not count when it is quoted (backticks or quotation marks), in brackets, after a possessive ("the Reviewer-lead's READ-OK …"),
   or named as a noun ("your HOLD …", "the/that/this/their/for …").
+- A marker on a Markdown quote line (`> READ-OK …`, on any line, the first too) or inside a fenced code block (```` ``` ```` or `~~~`) never counts.
 - The signature is the reader's name: "Sixth, 09:16" (an optional "The"), the name right after the marker's commit,
-  the name that opens the next line ("Sixth: …"), or the name that opens the comment with a colon.
+  the name that opens the next line ("Sixth: …"; a capitalised word or "<word> builder", never a label such as "Tests:", "Why:" or "Fail-first:"),
+  or the name that opens the comment with a colon.
 
 **What markers.py prints.**
 
