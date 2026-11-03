@@ -242,6 +242,19 @@ const WAIT_SLACK: Duration = Duration::from_secs(30);
 /// the daemon it started to claim its pid file (`PLATFORM_START_WAIT_MS`),
 /// longer than [`Config::read_timeout`] may be (the reviewer's P3 on #2309).
 pub const DAEMON_START_TIMEOUT: Duration = Duration::from_secs(75);
+/// How long the read just before a close ([`Cli::observe_to_close`]) is
+/// given, beyond [`CliConfig::read_timeout`]'s 10 s. On a lamp on 3 Nov,
+/// `harness show` against the person's Mac took 16 to 39 s: every read
+/// before a close ran out at 10 s, so no harness was ever closed and they
+/// were left open on the Mac. The read still decides alone whether to
+/// close: a read that runs out is a failed close, never an idle agent.
+/// Every other read keeps the 10 s bound.
+pub const CLOSE_READ_TIMEOUT: Duration = Duration::from_secs(45);
+/// The whole close, its read and `harness close` together
+/// ([`Cli::close_within`]): the job lane is held no longer than one
+/// [`CliConfig::launch_timeout`] by default, so a hand-over the person just
+/// said yes to waits behind a close no longer than behind a launch.
+pub const CLOSE_BUDGET: Duration = Duration::from_secs(60);
 /// No more agents than this are waited on in one `wait`.
 pub const MOST_WAITED: usize = 64;
 /// How long `harness machines engines` is given (`serve --engines-ready`):
@@ -891,6 +904,29 @@ impl Cli {
 
     /// The agent's last turn, read on the machine it was started on.
     pub fn observe(&self, machine: &str, agent_id: &str) -> Result<Observation, String> {
+        self.observe_within(machine, agent_id, self.config.read_timeout)
+    }
+
+    /// The agent's last turn, read just before it is closed (#1390): the
+    /// same `show` as [`Cli::observe`], given [`CLOSE_READ_TIMEOUT`] (no
+    /// more than one `launch_timeout`) in place of `read_timeout`. Nothing
+    /// waits on this read but the close itself, and a slow computer must
+    /// not leave every finished harness open. A read that runs out is
+    /// `timeout`, as any other, and closes nothing.
+    pub fn observe_to_close(&self, machine: &str, agent_id: &str) -> Result<Observation, String> {
+        self.observe_within(
+            machine,
+            agent_id,
+            CLOSE_READ_TIMEOUT.min(self.config.launch_timeout),
+        )
+    }
+
+    fn observe_within(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        timeout: Duration,
+    ) -> Result<Observation, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -909,7 +945,7 @@ impl Cli {
                     "4000".into(),
                     "--json".into(),
                 ],
-                self.config.read_timeout,
+                timeout,
             )
             .map_err(|error| error.code.to_string())?;
         if !reply.success {
@@ -925,9 +961,22 @@ impl Cli {
     /// Harness also refuses one this caller did not start (exit 5); called
     /// as the person (`--harness-as-person`) it does not, and the agent id
     /// the lamp kept from its own `new` is the only guard. The caller reads
-    /// the agent just before ([`Cli::observe`]), so this only closes one
+    /// the agent just before ([`Cli::observe_to_close`]), so this only closes one
     /// still idle on the turn the lamp told.
     pub fn close(&self, machine: &str, agent_id: &str) -> Result<Closed, String> {
+        self.close_within(machine, agent_id, self.config.launch_timeout)
+    }
+
+    /// [`Cli::close`], given what is left of the close's budget
+    /// ([`CLOSE_BUDGET`]) once its read is done, and never more than one
+    /// `launch_timeout`. Nothing left (`close_no_time`) starts no process:
+    /// the close failed, and is tried again, read first, like any other.
+    pub fn close_within(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -939,6 +988,10 @@ impl Cli {
         if agent_id.starts_with("cloud_") {
             return Ok(Closed::Refused);
         }
+        let within = within.min(self.config.launch_timeout);
+        if within.is_zero() {
+            return Err("close_no_time".into());
+        }
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
             .run(
@@ -949,7 +1002,7 @@ impl Cli {
                     agent_id.into(),
                     "--json".into(),
                 ],
-                self.config.launch_timeout,
+                within,
             )
             .map_err(|error| error.code.to_string())?;
         closed(reply.code)
