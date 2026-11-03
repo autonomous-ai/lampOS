@@ -1,13 +1,14 @@
-# The camera (arriving)
+# The camera
 
-The camera comes through lamp-control with the `camera` grant (#4521). It is
-on some lamps already as a try build, and in the SDKs when #4521 lands, so
-names may still change until then. On a lamp without it, the calls are
-refused, or the `camera` grant can't be given.
+The camera comes through lamp-control with the `camera` grant. On a lamp
+without it, the calls are refused, or the `camera` grant can't be given.
 
 - **A picture:** Python `await lamp.camera_snapshot()` returns the JPEG
   bytes, about 320 across, of the eyes' newest frame. JS
   `await lamp.cameraSnapshot()` returns a Buffer.
+- **From lamp-mcp:** `lamp_camera_snapshot()` returns the picture as an
+  image. The stream has no tool: its frames are for a program, not an
+  agent's turn.
 - **A stream:** Python `await lamp.camera_stream(True, fps=2)`, or with a
   size `camera_stream(True, 24, "640x480")`; JS takes them in order,
   `lamp.cameraStream(true, 2)` or `lamp.cameraStream(true, 24, '640x480')`
@@ -32,9 +33,15 @@ refused, or the `camera` grant can't be given.
 - **Never while private:** a stream ends (`camera.ended`, "the lamp is
   private") and a snapshot is refused `private` while the person has set the
   lamp private.
-- **Only on the lamp's own network:** a computer admitted from beyond it (the
-  lamp's remote opt-in) never gets the camera. An ssh tunnel is local to the
-  lamp and carries it: that is the owner's choice when they give ssh, never a
-  way around it.
+- **Only on the lamp's own network:** its physical LAN (Ethernet or Wi-Fi,
+  one hop) or link-local. A VPN (WireGuard, a tailnet, ZeroTier) is not, and
+  neither is a private address by itself. A computer admitted from beyond it
+  (the lamp's remote opt-in) never gets the camera. An ssh tunnel is local to
+  the lamp and carries it: that is the owner's choice when they give ssh,
+  never a way around it.
+- **Only while the ring shows its mark:** if the ring can't draw the red dot,
+  a stream ends with `camera.ended` ("the ring is not showing the camera's
+  mark") and a snapshot is refused the same way. Handle it; don't retry in a
+  loop.
 - **The microphone** has its grant in the same schema change; its calls come
   with it.

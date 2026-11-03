@@ -1541,7 +1541,6 @@ mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: false,
-                make_skill: false,
                 named_only: false,
                 correct: false,
                 questions: false,
@@ -2027,7 +2026,6 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
-            make_skill: false,
             named_only: false,
             correct: false,
             questions: false,
@@ -2178,7 +2176,6 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
-            make_skill: false,
             named_only: false,
             correct: false,
             questions: false,
@@ -2853,19 +2850,19 @@ mod tests {
     /// others, and declares the two functions; anything else declares none.
     #[test]
     fn the_switch_reaches_the_worker_and_declares_the_two_functions() {
-        use crate::agent_tasks::{FLAG, MAKE_SKILL_FLAG, SIGN_IN_FLAG, take};
-        let flags = crate::agent_tasks::tests::arguments_for_sign_in(Some("on"), Some("on"));
-        assert_eq!(flags, [FLAG, "/run/t", MAKE_SKILL_FLAG, SIGN_IN_FLAG]);
+        use crate::agent_tasks::{FLAG, SIGN_IN_FLAG, take};
+        let flags = crate::agent_tasks::tests::arguments_for_sign_in(Some("on"));
+        assert_eq!(flags, [FLAG, "/run/t", SIGN_IN_FLAG]);
         let (taken, rest) = take(&flags).unwrap();
         let place = taken.unwrap();
-        assert!(place.sign_in && place.make_skill && rest.is_empty());
+        assert!(place.sign_in && rest.is_empty());
         let names: Vec<String> = crate::agent_tasks::tools(&place)
             .into_iter()
             .map(|tool| tool.name)
             .collect();
         assert!(names.contains(&START.to_owned()) && names.contains(&ANSWER.to_owned()));
         for value in [None, Some("yes"), Some("ON")] {
-            let flags = crate::agent_tasks::tests::arguments_for_sign_in(None, value);
+            let flags = crate::agent_tasks::tests::arguments_for_sign_in(value);
             let place = take(&flags).unwrap().0.unwrap();
             assert!(!place.sign_in, "{value:?}");
             assert!(

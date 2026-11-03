@@ -406,15 +406,56 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   its own stale readings already end that wait as unreadable, read again
   after 1 s with a fresh worker, which the worker's clean stop now allows.
   A lapse of a lease that grants anything, a Denied lapse past 1.5 s from
-  its expiry, no authority within 250 ms of the start, the publisher gone
-  and a worker that ended abnormally all end as before. Unit tests: a
+  its expiry, no authority within 250 ms of the start (now ridden, below),
+  the publisher gone and a worker that ended abnormally all end as before. Unit tests: a
   Denied lease lapsed by a 900 ms stall is ridden with nothing granted and
   re-armed with one line; the 06c1 queue (an expired Denied authority) is
   skipped and an expired granting one still ends with "authority snapshot
   has expired"; granting, Unknown, past-the-bound and no-authority lapses
   still end; a worker dead in the wait still ends the voice. Two Linux
   tests of the real worker (a 900 ms Denied lapse ridden, a granting lapse
-  ends) run on the ARM64 gate only. Not yet tried on a lamp.
+  ends) run on the ARM64 gate only. Not yet tried on a lamp. Then cold boot
+  6 of lamp-06c1 still ended: the voice's main thread stalled from 16.341 s
+  to 17.013 s, the privacy worker had had no authority 250 ms after its
+  start and ended on `privacy controller lease expired`, exit 1, the
+  voice's renewal after the gate got ECONNREFUSED, and the cleanup came back
+  `CleanupFailed`, so the voice exited. No authority yet grants nothing, so
+  the worker now rides it like a Denied-only lapse from 250 ms after its
+  start, publishing nothing, for at most 1.5 s more, said once as
+  `lamp-voice: privacy worker has had no authority 250 ms after its start,
+  riding it up to 1500 ms (microphones and camera stay closed)`. A Denied
+  authority during that ride re-arms it at once; none by 1.75 s still ends
+  it as before. Retrying a worker that ended with status 1 on the voice side
+  was rejected: the exit is how every other worker failure ends the wait,
+  and a retry would hide those too. Unit tests: no authority is waiting at
+  250 ms and just before 1.75 s and ends at 1.75 s; a Denied authority
+  during the ride re-arms it at once as Denied, and a lapsed one keeps it
+  closed. Not yet tried on a lamp.
+- **A killed privacy worker's sockets left in the muted wait.** On
+  lamp-06c1 on a cold boot of stock 9528 (`on4`), the wait found no switch
+  reading within 50 ms of Ready, its privacy worker did not stop within the
+  300 ms grace and was killed, and at 17.96 the voice exited 1 on
+  `privacy switch unreadable: Controls privacy unavailable while waiting;
+  verified cleanup failed: privacy worker privacy wait shared stop deadline
+  exceeded; reaped with signal: 9 (SIGKILL); verified cleanup failed:
+  Directory not empty (os error 39)` (#4332). Each socket's owner unlinks
+  its own path as it ends; a killed worker cannot, so its `privacy.c.w` and
+  `privacy.d.w` stayed and the session directory could not be removed. The
+  wait's cleanup (`killed_privacy_worker` in `service_privacy_controls.rs`)
+  now, once that worker is reaped, removes those two paths and only them,
+  each only while it is a socket, read with `symlink_metadata`, so a
+  symlink is never followed. The kill is then the switch unreadable, read
+  again after 1 s with a fresh worker, also when the look had allowed; a
+  wait that had failed otherwise keeps its own error, and the kill is said
+  on its own line. On this route the worker only reads Controls' bus and
+  holds the wait's Denied authority, with no microphone and no GPIO line,
+  so its end grants nothing. Any other path there, a worker not reaped, a
+  killed or failed ring indicator and any other cleanup failure still end
+  the service as before. Unit tests: a stalled stand-in killed in the wait
+  leaves no socket and no directory and is read again (before: a cleanup
+  failure); a regular file or a symlink to a socket at either path is left
+  and still fails; a worker that stops keeps its sockets for itself to
+  unlink. Not yet tried on a lamp.
 - **A worker's first control message older than 100 ms.** A worker sends its
   first control message as soon as its peer is there; at start the
   coordinator may read it only after starting its other workers. lamp-4ace
@@ -585,6 +626,51 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   does, and says `it underran while held up mid-answer; the answer is cut,
   priming again`. More than 3 in 10 s still ends the worker
   (`audio-device-seam.md`).
+- **Capture still opening the microphone when the voice stops.** On
+  a cold boot of lamp-06c1 (boot 1 of 4), the conversation lost its privacy
+  freshness at 18.29 s (`service privacy freshness lost before next
+  observation`), which the voice waits out with the microphones closed.
+  The coordinator sends Stop to every worker at once. Capture was still in
+  `prepare()`; the speaker took its Stop and closed its end of the
+  reference link; capture then told the speaker it was prepared, and the
+  send was refused (`ref.c.capture: Connection refused (os error 111)`).
+  Capture ended with that fault, the cleanup failed (`verified cleanup
+  failed: capture WorkerFault: … capture WorkerExit: … exit status: 1`),
+  and a failed cleanup is never waited out, so the voice exited 1 (#4332).
+  Boot 4's same freshness loss had a clean cleanup and the voice was back
+  in the wait, ready 0.2 s later. Now, once `prepare()` returns, capture
+  reads what the coordinator queued meanwhile (`peer_stop.rs`), keeps it in
+  order for its next tick, and when a Stop is among it tells neither side
+  it is prepared and ends stopped at that tick. Either audio worker whose
+  reference link (`ref.c.*`, `ref.d.*`) is refused with the coordinator's
+  Stop already queued for it ends stopped too, saying `lamp-voice: capture:
+  the speaker had gone at the voice's stop (…); capture ends stopped` (or
+  the speaker's line the other way round). The speaker's end there is its
+  Stop's: the device stopped, a paused answer's gap reported cancelled,
+  the reset recorded. The coordinator still sends the speaker's Stop
+  before capture's, unchanged. Either order leaves one worker a window,
+  of one send on an unblocked socket, in which its link is refused
+  before its own Stop is queued; that end is still a fault. Sending
+  capture's first would move the window to the speaker, not close it, and
+  would mostly lose the speaker's `Stopped` notice, on which capture
+  ends cleanly. A refused link with no Stop
+  queued, a refused coordinator channel, and any other error still end the
+  worker with its fault, and a failed cleanup still ends the voice with
+  the first reason first in its line (`privacy switch unreadable: …;
+  verified cleanup failed: …`). Tests: unit tests of the look for a Stop
+  (a refused link with a Stop queued or read ahead is clean, without one
+  or on another socket it is not, and what is read is held in order,
+  bounded); four Linux tests of the real capture worker with the
+  microphone's open held (a Stop then the speaker gone ends it cleanly,
+  where it ended on `ref.c.capture: Connection refused` before; a Stop with
+  the speaker there tells neither side it is prepared; the speaker gone
+  with no Stop still ends it on the refused link; renewals queued in the
+  open are still taken, and the stream and stop are as before); two Linux
+  tests of the speaker's end on the `null` device with a send refused by
+  a closed capture side (with its Stop queued it ends stopped, the device
+  stopped and the gap reported; without one it is still the fault). The
+  Linux tests run on the ARM64 gate only. Not yet tried on a lamp's cold
+  boots.
 
 - **A wall clock stepped by chrony during start-up.** On lamp-06c1, in 4 of
   4 cold boots, chrony stepped the wall clock by about +20 s some 46 s in,

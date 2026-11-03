@@ -12,6 +12,7 @@ error (`lampos.errors`).
 from __future__ import annotations
 
 import asyncio
+import base64
 import inspect
 import json
 import socket
@@ -113,6 +114,18 @@ def _check(op: str, fields: dict) -> None:
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
 
+
+def binary_frame(message: bytes) -> dict:
+    """A fast stream's binary `camera.frame`: its header, with the JPEG as
+    `data` (bytes)."""
+    length = int.from_bytes(message[:4], "big")
+    frame = json.loads(message[4 : 4 + length])
+    frame["data"] = message[4 + length :]
+    return frame
+
+
+# Events that come with a request, never subscribed to: a camera stream's.
+CAMERA_EVENTS = ("camera.frame", "camera.ended")
 
 class Subscription:
     """What `Lamp.on` returns: an awaitable, not a future. Awaited, it raises
@@ -499,6 +512,11 @@ class Lamp:
     async def _frames(self) -> None:
         try:
             async for text in self._ws:
+                if isinstance(text, bytes):
+                    # A fast camera frame: the header's length, the header,
+                    # then the JPEG, given as `data` (bytes).
+                    self._event(binary_frame(text))
+                    continue
                 frame = json.loads(text)
                 debug.frame("<-", frame)
                 if "re" in frame and "ok" in frame:
@@ -537,7 +555,7 @@ class Lamp:
         `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
-        if event not in schema.events() and event not in ("lease", "done"):
+        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS):
             raise LampError(f"no event {event!r}", code="bad_request")
         _short_phrase(phrases)
         self._handlers[event].append(handler)
@@ -607,6 +625,19 @@ class Lamp:
         name: the reply's `state`."""
         return (await self.request("get", state=list(states))).get("state", {})
 
+    async def air(self) -> dict:
+        """The air sensor's newest reading (the `air` grant): `pm1_0`,
+        `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`,
+        `feel`, and `known`; only `{"known": False}` with no reading. Each
+        change past a step comes as `lamp.on("air.changed", ...)`."""
+        return (await self.get("air"))["air"]
+
+    async def device(self) -> dict:
+        """The lamp's own computer (the `device` grant): `cpu_load`,
+        `memory_used`, `disk_free`, `uptime_s`, `temperature_c` by sensor,
+        and `known`."""
+        return (await self.get("device"))["device"]
+
     # Leases.
 
     def lease(self, *parts: str, for_ms: int = 30_000, why: str | None = None) -> Lease:
@@ -651,8 +682,34 @@ class Lamp:
     async def light(self, colour: str, level: int, for_ms: int, pattern: str | None = None) -> dict:
         return await self._act("light", False, colour=colour, level=level, pattern=pattern, for_ms=for_ms)
 
-    async def say(self, text: str) -> dict:
-        return await self._act("say", False, text=text)
+    async def say(self, text: str, *, rephrase: bool = False) -> dict:
+        """Say `text` in the lamp's voice, exactly as written, once the person
+        isn't talking. `rephrase=True` lets the lamp's model say it in its own
+        words instead, as before."""
+        return await self._act("say", False, text=text, rephrase=True if rephrase else None)
+
+    # The camera (the `camera` grant): the eyes' own newest picture, never
+    # while the lamp is private.
+
+    async def camera_snapshot(self) -> bytes:
+        """The camera's newest picture, a JPEG about 320 across."""
+        reply = await self.request("camera.snapshot")
+        return base64.b64decode(reply["jpeg"])
+
+    async def camera_stream(self, on: bool = True, fps: int | None = None, size: str | None = None) -> dict:
+        """Pictures as `camera.frame` events (`lamp.on("camera.frame", ...)`), at
+        most `fps` a second (1 to 30), until `camera_stream(False)`, `stop`, or
+        a `camera.ended` event. Where the eyes serve every frame (the answer's
+        `fast: true`), each comes as the camera made it, `size` `640x480` (the
+        default) or `1280x720`, with the JPEG as `data` (bytes); otherwise the
+        eyes' newest frame, about 1 to 2 a second, with `jpeg` in base64. Each
+        frame and the answer carry `fps_now`."""
+        fields: dict[str, Any] = {"on": on}
+        if fps is not None:
+            fields["fps"] = fps
+        if size is not None:
+            fields["size"] = size
+        return await self.request("camera.stream", **fields)
 
     async def sound(self, name: str) -> dict:
         return await self._act("sound", False, name=name)

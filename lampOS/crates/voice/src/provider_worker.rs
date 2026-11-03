@@ -3735,6 +3735,7 @@ impl ToolDesk {
                 && matches!(
                     crate::tools::route(&self.settings, &call.name),
                     Route::Executive(_)
+                        | Route::Services(_)
                         | Route::UseSkill(_)
                         | Route::Schedule(_)
                         | Route::Memory(..)
@@ -3911,6 +3912,7 @@ impl ToolDesk {
                 );
             }
             route @ (Route::Executive(_)
+            | Route::Services(_)
             | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(..)
@@ -3925,6 +3927,7 @@ impl ToolDesk {
                 self.run(provider, lineage, call, route, called_us, memory, false);
             }
             Route::Executive(_)
+            | Route::Services(_)
             | Route::UseSkill(_)
             | Route::Schedule(_)
             | Route::Memory(..)
@@ -10902,7 +10905,6 @@ pub(crate) mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: noted,
-                make_skill: false,
                 named_only: false,
                 correct: false,
                 questions: false,
@@ -11052,7 +11054,6 @@ pub(crate) mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: true,
-                make_skill: false,
                 named_only: false,
                 correct: false,
                 questions: false,
@@ -15275,6 +15276,7 @@ pub(crate) mod tests {
     /// task is idle, and the wait for it is read on Tokio's time.
     #[tokio::test(start_paused = true)]
     async fn resumed_question_survives_a_silent_service_and_the_assumption_is_reported() {
+        let _clock = logical_clock();
         // The person continues after the endpointer cut the question. The
         // service says nothing about the cut-off request for the whole bound.
         for reporting in [Reporting::Legacy, Reporting::Typed] {

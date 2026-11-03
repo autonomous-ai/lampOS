@@ -488,43 +488,6 @@ fn news_not_heard_whole_is_never_handed_on() {
     assert!(gap.heard.is_empty());
 }
 
-/// fourteen-P10 on #2814 (lamp-9adf, 28 Oct 17:07): news played to its end
-/// with a gap, nobody's turn over it, is played through though not heard
-/// whole, so a made skill's question in it counts as asked; whole is heard,
-/// and none of it is played through; with no audio, neither.
-#[test]
-fn news_played_through_with_a_gap_is_played_through_not_heard() {
-    for (gaps, audio) in [(1, true), (0, true), (0, false)] {
-        let mut test = Test::new();
-        telling_news(&mut test);
-        if audio {
-            let chunk = test.generation(17);
-            test.accept(&chunk, 240);
-            test.retire(&chunk);
-        }
-        test.provider_complete();
-        let current = test.reply.as_mut().unwrap();
-        current.playback_gaps = gaps;
-        assert!(current.settled(&test.pending));
-        test.owner.complete_turn(now(), current.owner).unwrap();
-        test.snapshot = test.owner.snapshot(now()).unwrap();
-        let through = current.news_played_through(&test.pending, test.snapshot);
-        let heard = current.heard_news(&test.pending, test.snapshot);
-        let case = format!("{gaps} gap(s), audio {audio}");
-        match (gaps, audio) {
-            (1, _) => {
-                assert_eq!(through, NEWS, "{case}");
-                assert!(heard.is_empty(), "{case}: its harness stays open");
-            }
-            (_, true) => {
-                assert!(through.is_empty(), "{case}");
-                assert_eq!(heard, NEWS, "{case}");
-            }
-            _ => assert!(through.is_empty() && heard.is_empty(), "{case}"),
-        }
-    }
-}
-
 /// #939, (c): with the switch, a due reminder or news waits for a skill's
 /// ask, at most `SKILL_WAITS_US` from when it was first held: taken with
 /// the ask's ticket when one is there, said by the voice once it has
@@ -992,6 +955,148 @@ fn a_skill_sound_played_to_its_end_is_spoken() {
             "a sound played less than 30 s ago".into()
         )))
     );
+}
+
+/// The local leader's 2 Nov: a paired computer's exact line, its words as
+/// sent with no model, is played as the lamp's own turn once nobody is
+/// talking with the lamp, its asker told `begun`, then `spoken` once it
+/// played to its end. While a conversation with the lamp goes on it waits,
+/// unanswered, and plays after.
+#[test]
+fn an_exact_line_waits_for_the_person_then_is_played_to_spoken() {
+    let (mut says, answered) = crate::say::Says::exact_for_test("control", vec![400; 480]);
+    let mut owner = resting_owner();
+    let (mut reply, mut pending, mut trace) = (None, None, SessionState::default());
+    let admission = InputAdmission::default();
+    // Someone is talking with the lamp: it waits, unanswered, and nothing
+    // plays.
+    let talking = crate::say::SoundNow {
+        conversing: true,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(!take_exact(
+        &mut says, &talking, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(reply.is_none());
+    assert!(answered.try_recv().is_err(), "still waiting");
+    // The person has stopped: played as the lamp's own line. (The voice's
+    // thread is a global other tests write to, so its conversation is set
+    // here, not read.)
+    let now_is = crate::say::SoundNow {
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(take_exact(
+        &mut says, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    assert_eq!(
+        reply.as_ref().unwrap().notice.origin(),
+        SpeechOrigin::SkillSound
+    );
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+    let mut played = play_sound(&mut owner, &mut reply, &mut pending, &mut trace, 2);
+    assert!(played.last.end_of_speech);
+    played
+        .peer
+        .control
+        .send(WorkerEvent::SpeechRetired {
+            owner: played.last.permit.owner(),
+            sequence: played.last.chunk_sequence,
+            final_sample: PlaybackCursor {
+                epoch: 1,
+                frame: played.cursor,
+            },
+            observed_at_us: monotonic_us(),
+        })
+        .unwrap();
+    service_speaker_control(
+        &mut played.speaker,
+        &mut owner,
+        &mut reply,
+        &mut pending,
+        &mut played.mask,
+        &mut played.snapshot,
+        &mut 0,
+        &mut 16,
+        &mut trace,
+        &mut None,
+    )
+    .unwrap();
+    let current = reply.as_mut().unwrap();
+    assert!(current.settled(&pending));
+    owner.complete_turn(now(), current.owner).unwrap();
+    let snapshot = owner.snapshot(now()).unwrap();
+    current.answer_say(&pending, snapshot);
+    assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+}
+
+/// lamp-75c9, 2 Nov, 19:15: in a busy office the voice hears speech most of
+/// the time, none of it to the lamp. An exact line plays through it: the
+/// room's speech and a candidate line being heard, with no turn and no
+/// conversation, do not hold it.
+#[test]
+fn an_exact_line_plays_through_the_rooms_speech() {
+    let (mut says, answered) = crate::say::Says::exact_for_test("control", vec![400; 480]);
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let office = crate::say::SoundNow {
+        listening: true,
+        since_turn_us: 0,
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(take_exact(
+        &mut says, &office, &mut owner, &mut reply, &mut trace
+    ));
+    assert_eq!(
+        reply.as_ref().unwrap().notice.origin(),
+        SpeechOrigin::SkillSound
+    );
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+}
+
+/// An exact line asked while the lamp is muted is refused at once, with
+/// why, and nothing plays.
+#[test]
+fn an_exact_line_while_muted_is_refused() {
+    let (mut says, answered) = crate::say::Says::exact_for_test("control", vec![400; 480]);
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let muted = crate::say::SoundNow {
+        muted: true,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(!take_exact(
+        &mut says, &muted, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(reply.is_none());
+    assert_eq!(
+        answered.try_recv(),
+        Ok(Answer::Done(Outcome::Refused("the lamp is muted".into())))
+    );
+}
+
+fn take_exact(
+    says: &mut crate::say::Says,
+    now_is: &crate::say::SoundNow,
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    trace: &mut SessionState,
+) -> bool {
+    play_exact_line(
+        says,
+        now_is,
+        monotonic_us(),
+        owner,
+        reply,
+        PlayoutStart::default(),
+        trace,
+        |_| Ok(()),
+    )
+    .unwrap()
+    .is_some()
 }
 
 /// #938: a skill's sound cut before its end, as by a person speaking over

@@ -2260,6 +2260,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-services"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "reqwest",
+ "ring",
+ "rustix",
+ "rustls",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "unicode-normalization",
+ "webpki-roots 1.0.9",
+]
+
+[[package]]
 name = "lamp-settings"
 version = "0.1.0"
 dependencies = [

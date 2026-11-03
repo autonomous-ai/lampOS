@@ -1168,6 +1168,10 @@ fn worker_command(
             role,
             var(crate::person::OWNER_ONLY_ENVIRONMENT).as_deref(),
         ))
+        .envs(faces_at_desk_worker_environment(
+            role,
+            var(crate::known_faces::AT_DESK_ENVIRONMENT).as_deref(),
+        ))
         .envs(tasks_told_worker_environment(
             role,
             var(crate::task_news::TOLD_ENVIRONMENT).as_deref(),
@@ -1607,6 +1611,19 @@ fn person_name_owner_only_worker_environment(
         .map(|_| (crate::person::OWNER_ONLY_ENVIRONMENT, "on"))
 }
 
+// Only faces of people at the desk counted as people at the lamp (the a0ae
+// name-forget report, 2 Nov), to the two workers that count the eyes' faces:
+// both routes' busy room and typed name, the second's name by default,
+// carries and keeps. Only the exact value `on`.
+fn faces_at_desk_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    value
+        .filter(|value| matches!(role, "provider" | "second") && *value == "on")
+        .map(|_| (crate::known_faces::AT_DESK_ENVIRONMENT, "on"))
+}
+
 // The file of task news already told (#2762), to the two workers that read
 // it as the coordinator does: the second route's text news
 // (`task_news::ForTexts::for_tasks`) and both routes' task tools
@@ -1694,14 +1711,19 @@ fn second_route_worker_environment(
         crate::second_provider::SHORT_DONE_ENVIRONMENT,
         // An empty answer to a line said by name asked again (#3704).
         crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
+        // A wordless cut-in that ended the answer asks a short question.
+        crate::cut_in_wordless::ENVIRONMENT,
+        // An empty answer to the lamp's own question asked again (Queue #4710).
+        crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
         crate::untied_going_on::ENVIRONMENT,
-        // A skill made by this worker's own chat (Fourteen's proposal on #4710).
-        crate::make_skill_local::ENVIRONMENT,
+        // A skill made by this worker's own chat (Fourteen's proposal on #4710),
+        // the only maker since 3 Nov.
+        crate::made_skill::ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -1720,6 +1742,8 @@ fn second_route_worker_environment(
         crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
         crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
         crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+        // An earlier turn's calls told with its words (lamp build 9699).
+        crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
         crate::person::BY_DEFAULT_ENVIRONMENT,
@@ -1860,11 +1884,13 @@ mod tests {
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
             crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
+            crate::cut_in_wordless::ENVIRONMENT,
+            crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
-            crate::make_skill_local::ENVIRONMENT,
+            crate::made_skill::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
@@ -1888,6 +1914,7 @@ mod tests {
             crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT,
             crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT,
             crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT,
+            crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
@@ -2401,6 +2428,34 @@ mod tests {
         }
     }
 
+    /// The a0ae name-forget report (2 Nov): the at-desk switch goes to the
+    /// provider and second workers only, and only as `on`.
+    #[test]
+    fn the_at_desk_switch_reaches_only_the_workers_that_count_faces() {
+        let on = std::ffi::OsStr::new("on");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                faces_at_desk_worker_environment(role, Some(on)),
+                Some((crate::known_faces::AT_DESK_ENVIRONMENT, "on"))
+            );
+            assert_eq!(faces_at_desk_worker_environment(role, None), None);
+            for unfit in ["off", "", "ON", "on "] {
+                assert_eq!(
+                    faces_at_desk_worker_environment(role, Some(std::ffi::OsStr::new(unfit))),
+                    None,
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in ["capture", "speaker", "ring", "camera", "privacy"] {
+            assert_eq!(
+                faces_at_desk_worker_environment(role, Some(on)),
+                None,
+                "{role}"
+            );
+        }
+    }
+
     /// The reviewer on #1158: the switches reach a worker through the real
     /// command it is started with. A script in the worker's place writes
     /// the environment it got: the provider has the memory's two switches,
@@ -2460,6 +2515,7 @@ mod tests {
                     lamp_msgs::SHUTDOWN_SWITCH,
                     crate::ring_night::ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
+                    crate::known_faces::AT_DESK_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -2517,12 +2573,14 @@ mod tests {
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
                     || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
+                    || name == crate::cut_in_wordless::ENVIRONMENT
+                    || name == crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
-                    || name == crate::make_skill_local::ENVIRONMENT
+                    || name == crate::made_skill::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
@@ -2546,6 +2604,7 @@ mod tests {
                     || name == crate::second_provider::CONVERSATION_CARRIED_SAVES_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT
                     || name == crate::second_provider::CONVERSATION_ROOM_LINES_TOLD_ENVIRONMENT
+                    || name == crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
@@ -2602,6 +2661,7 @@ mod tests {
                 "provider",
                 vec![
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
+                    "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EARLY_WORDS=on",
@@ -2630,6 +2690,7 @@ mod tests {
                 "second",
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
+                    "LAMP_ANSWER_ASK_AGAIN=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
                     "LAMP_BUSY_ENDS_SOONER=on",
@@ -2638,16 +2699,19 @@ mod tests {
                     "LAMP_CONVERSATION_CARRIES_PAST_SILENT=on",
                     "LAMP_CONVERSATION_ROOM_LINES_TOLD=on",
                     "LAMP_CONVERSATION_SUMMARY=on",
+                    "LAMP_CUT_IN_WORDLESS_ASKS=on",
                     "LAMP_DECLINE_SILENT=on",
                     "LAMP_EYES_SPEAKING=on",
+                    "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
+                    "LAMP_HISTORY_KEEPS_CALLS=on",
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
-                    "LAMP_MAKE_SKILL_LOCAL=on",
+                    "LAMP_MAKE_SKILL=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FOLLOWS_FACE=on",

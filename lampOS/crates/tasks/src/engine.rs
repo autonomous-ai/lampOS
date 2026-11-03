@@ -1075,6 +1075,8 @@ pub struct CloseJob {
     pub agent_id: String,
     pub answer: String,
     pub asked: Option<String>,
+    /// Which try this is, from 1 to [`CLOSE_TRIES`], for the journal.
+    pub tries: u8,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2222,6 +2224,7 @@ impl<P: Persistence> Engine<P> {
             agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
             answer: told.answer.clone(),
             asked: told.ask.clone(),
+            tries,
         };
         self.save(next)?;
         Ok(Some(job))

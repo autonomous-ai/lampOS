@@ -1,7 +1,7 @@
 use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
-    engine::{Clock as Sample, WATCH_EARLY_MS},
+    engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, WATCH_EARLY_MS},
     harness::{
         AccountMachine, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation,
         SignIn, Target,
@@ -94,6 +94,15 @@ struct Counts {
     theirs: AtomicBool,
     /// Each `close`, with the machine and agent it named (#1390).
     closes: Mutex<Vec<(String, String)>>,
+    /// `show` takes longer than the 10 s `read_timeout` while set, as
+    /// against the person's Mac on a lamp on 3 Nov (16 to 39 s): every
+    /// ordinary read runs out (`timeout`), and only the read before a close,
+    /// given longer, reads through.
+    show_slow: AtomicBool,
+    /// How many reads before a close still run out even so, as a `show`
+    /// longer than that read's own bound; and how many were made.
+    close_read_fails: AtomicUsize,
+    close_reads: AtomicUsize,
     /// Harness is signed out while set (#1676), and how often whether it is
     /// signed in was asked.
     signed_out: AtomicBool,
@@ -156,30 +165,9 @@ struct Script {
     stop: Arc<AtomicBool>,
     slow: bool,
 }
-impl Adapter for Script {
-    fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
-        Some(Arc::new(ScriptLane(self.counts.clone())))
-    }
-    fn launch(&self, _: &Launch) -> LaunchOutcome {
-        self.counts.launches.fetch_add(1, Ordering::SeqCst);
-        self.counts.order.lock().unwrap().push("launch");
-        while self.counts.hold_launch.load(Ordering::SeqCst) && !self.stop.load(Ordering::Acquire) {
-            thread::sleep(Duration::from_millis(5));
-        }
-        if self.slow {
-            while !self.stop.load(Ordering::Acquire) {
-                thread::sleep(Duration::from_millis(5));
-            }
-            return LaunchOutcome::Uncertain {
-                code: "cancelled".into(),
-            };
-        }
-        LaunchOutcome::Created {
-            agent_id: AGENT.into(),
-        }
-    }
-    fn observe(&self, machine: &str, id: &str) -> Result<Observation, String> {
-        self.counts.reads.fetch_add(1, Ordering::SeqCst);
+impl Script {
+    /// What `show` finds, however long it took.
+    fn shown(&self, machine: &str, id: &str) -> Result<Observation, String> {
         // Read on the machine the task was started on.
         assert_eq!(machine, "0123456789abcdef0123456789abcdef");
         assert_eq!(id, AGENT);
@@ -211,6 +199,47 @@ impl Adapter for Script {
             truncated: false,
             tools: 2,
         })
+    }
+}
+impl Adapter for Script {
+    fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
+        Some(Arc::new(ScriptLane(self.counts.clone())))
+    }
+    fn launch(&self, _: &Launch) -> LaunchOutcome {
+        self.counts.launches.fetch_add(1, Ordering::SeqCst);
+        self.counts.order.lock().unwrap().push("launch");
+        while self.counts.hold_launch.load(Ordering::SeqCst) && !self.stop.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(5));
+        }
+        if self.slow {
+            while !self.stop.load(Ordering::Acquire) {
+                thread::sleep(Duration::from_millis(5));
+            }
+            return LaunchOutcome::Uncertain {
+                code: "cancelled".into(),
+            };
+        }
+        LaunchOutcome::Created {
+            agent_id: AGENT.into(),
+        }
+    }
+    fn observe(&self, machine: &str, id: &str) -> Result<Observation, String> {
+        self.counts.reads.fetch_add(1, Ordering::SeqCst);
+        if self.counts.show_slow.load(Ordering::SeqCst) {
+            return Err("timeout".into());
+        }
+        self.shown(machine, id)
+    }
+    fn observe_to_close(&self, machine: &str, id: &str) -> Result<Observation, String> {
+        self.counts.close_reads.fetch_add(1, Ordering::SeqCst);
+        let fails = &self.counts.close_read_fails;
+        if fails
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok()
+        {
+            return Err("timeout".into());
+        }
+        self.shown(machine, id)
     }
     fn close(&self, machine: &str, id: &str) -> Result<Closed, String> {
         self.counts
@@ -634,6 +663,101 @@ fn a_harness_the_person_went_on_with_or_that_waits_for_them_is_left() {
     let s = Running::closing(true);
     handed_and_told(&s);
     assert!(closed_within(&s, 500).is_empty());
+}
+
+/// The close's state, its try and its code, as `get_task` shows them.
+fn close_of(s: &Running, id: &Value) -> Value {
+    s.ask(json!({"op":"get_task","id":id}))["task"]["close"].clone()
+}
+
+/// Seen on a lamp on 3 Nov: `show` against the person's Mac took 16 to 39
+/// s, past the 10 s every read has, so the read before each close ran out
+/// and no harness was ever closed. The read before a close has a bound of
+/// its own (`harness::CLOSE_READ_TIMEOUT`): with every ordinary read running
+/// out, the harness done and told is still read idle and closed. One the
+/// same slow read finds waiting for the person is left to them, never closed.
+#[test]
+fn a_show_slower_than_the_read_bound_still_ends_in_a_close() {
+    let s = Running::closing(true);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    let id = handed(&s);
+    let observation = read(&s, &id);
+    s.counts.show_slow.store(true, Ordering::SeqCst);
+    tell(&s, &id, observation);
+    assert_eq!(
+        closed_within(&s, 5_000),
+        [(
+            "0123456789abcdef0123456789abcdef".to_string(),
+            AGENT.to_string()
+        )]
+    );
+    assert!(s.counts.close_reads.load(Ordering::SeqCst) > 0);
+    s.wait(&id, |v| v["task"]["close"]["state"] == "closed");
+
+    // Told idle, then the person answered it at the computer and it waits
+    // for them again: the slow read before the close says so, and it is
+    // left to them.
+    let s = Running::closing(true);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    let id = handed(&s);
+    let observation = read(&s, &id);
+    s.counts.show_slow.store(true, Ordering::SeqCst);
+    *s.counts.plain.lock().unwrap() = None;
+    tell(&s, &id, observation);
+    s.wait(&id, |v| v["task"]["close"]["state"] == "left");
+    assert!(s.counts.close_reads.load(Ordering::SeqCst) > 0);
+    s.clock.0.lock().unwrap().monotonic_ms = 10_000_000;
+    assert!(closed_within(&s, 500).is_empty());
+}
+
+/// A read before a close that runs out even with its own bound is no idle
+/// agent: the close fails (`observe_timeout`) and nothing is closed. It is
+/// tried again a minute later, read first again, and closes then.
+#[test]
+fn a_close_whose_read_runs_out_is_tried_again_read_first() {
+    let s = Running::closing(true);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    s.counts.close_read_fails.store(1, Ordering::SeqCst);
+    let id = handed_and_told(&s);
+    s.wait(&id, |v| v["task"]["close"]["state"] == "failed");
+    let close = close_of(&s, &id);
+    assert_eq!(close["code"], "observe_timeout", "{close}");
+    assert_eq!(close["tries"], 1, "{close}");
+    assert!(closes(&s).is_empty(), "closed on a read that ran out");
+    s.clock.0.lock().unwrap().monotonic_ms += CLOSE_RETRY_MS;
+    assert!(!closed_within(&s, 5_000).is_empty(), "never closed");
+    assert_eq!(s.counts.close_reads.load(Ordering::SeqCst), 2);
+    s.wait(&id, |v| v["task"]["close"]["state"] == "closed");
+}
+
+/// A read before a close that runs out every time is given up after
+/// `CLOSE_TRIES` tries, a minute apart: nothing is closed, and it is never
+/// read again for a close however long the lamp runs.
+#[test]
+fn a_close_whose_read_always_runs_out_gives_up_after_its_tries() {
+    let s = Running::closing(true);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    s.counts
+        .close_read_fails
+        .store(usize::MAX, Ordering::SeqCst);
+    let id = handed_and_told(&s);
+    for tried in 1..=CLOSE_TRIES {
+        s.wait(&id, |v| {
+            v["task"]["close"]["state"] == "failed" && v["task"]["close"]["tries"] == tried
+        });
+        s.clock.0.lock().unwrap().monotonic_ms += CLOSE_RETRY_MS;
+    }
+    s.clock.0.lock().unwrap().monotonic_ms += 10 * CLOSE_RETRY_MS;
+    thread::sleep(Duration::from_millis(300));
+    assert_eq!(
+        s.counts.close_reads.load(Ordering::SeqCst),
+        usize::from(CLOSE_TRIES)
+    );
+    let close = close_of(&s, &id);
+    assert_eq!(close["state"], "failed", "{close}");
+    assert_eq!(close["tries"], CLOSE_TRIES, "{close}");
+    assert_eq!(close["code"], "observe_timeout", "{close}");
+    assert!(closes(&s).is_empty());
 }
 
 #[test]

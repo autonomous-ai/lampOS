@@ -112,7 +112,7 @@ pub fn catalog_with(every: bool) -> Vec<Function> {
         if every {
             function(
                 NAMES[2],
-                "Repeat a reminder daily or weekly at the requested local time, or every so many minutes or hours. Weekly needs a weekday; daily must omit it; both need time. For 'every hour', 'every 2 hours' or 'every 20 minutes', use every interval with whole minutes or whole hours, never both, from 15 minutes to 24 hours, and no time; with a span such as 'from 8 to 6', add from and to as HH:MM (either order; one across midnight is fine). 'Stop reminding me' cancels the whole series with cancel_reminder.",
+                "Repeat a reminder daily or weekly at the requested local time, or every so many minutes or hours. Weekly needs a weekday; daily must omit it; both need time. For 'every hour', 'every 2 hours' or 'every 20 minutes', use every interval with whole minutes or whole hours, never both, from 15 minutes to 24 hours, and no time; asked for less than every 15 minutes, set nothing yet: say plainly that every 15 minutes is the shortest, and ask if that will do; with a span such as 'from 8 to 6', add from and to as HH:MM (either order; one across midnight is fine). 'Stop reminding me' cancels the whole series with cancel_reminder.",
                 json!({"text":text,"time":time,"every":{"type":"string","enum":["daily","weekly","interval"]},"weekday":{"type":"string","enum":["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]},"minutes":{"type":"integer","minimum":MIN_EVERY_MINUTES,"maximum":MAX_EVERY_MINUTES},"hours":{"type":"integer","minimum":1,"maximum":MAX_EVERY_MINUTES / 60},"from":time,"to":time,"zone":zone}),
                 json!(["text", "every"]),
             )
@@ -149,9 +149,10 @@ pub fn catalog_with(every: bool) -> Vec<Function> {
 /// on #4527, the first builder's (a)): whose reminders it hears, cancels and
 /// snoozes ([`Asker`]), and who a reminder it sets is kept as. Sent by the
 /// voice beside each call on the executive's socket; a call without one is
-/// nobody's: it hears and changes none of anyone's, and what it sets is the
-/// owner's line's. The app's own calls ([`Adapter::call`],
-/// [`Adapter::call_plain`]) take none and see every item, as the owner's.
+/// nobody's: it hears and changes only the room's (set by no one, the first
+/// builder on #4710, 3 Nov 10:09), and what it sets is the room's. The app's
+/// own calls ([`Adapter::call`], [`Adapter::call_plain`]) take none and see
+/// every item, as the owner's.
 #[derive(Clone, Debug, Default, Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Caller {
@@ -362,8 +363,9 @@ impl Adapter {
                     deadline,
                 )? {
                     Ok(reply) => reply,
-                    // An older Schedule keeps no setters: every item is
-                    // no one's, the owner's line's alone (#4527's P2).
+                    // An older Schedule keeps no setters and takes no
+                    // asker: only the owner's line lists its items, as
+                    // before (#4527's P2).
                     Err(refusal)
                         if refusal["error"] == "bad_request"
                             && asker.as_ref().is_some_and(|asker| !asker.owner) =>

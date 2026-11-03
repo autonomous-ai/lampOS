@@ -24,6 +24,8 @@ RuntimeDirectoryMode=0700
 Nice=5
 # LAMP_ZONE: the lamp's zone name, written by the install and by setup.
 EnvironmentFile=/etc/lampOS/zone.env
+# Keeps a reminder every so many minutes or hours (LAMP_SCHEDULE_EVERY, as lamp-actions' unit; schedule.md).
+Environment=LAMP_SCHEDULE_EVERY=on
 ExecStart=/opt/lampOS/schedule/current/lamp-schedule serve --enable --dir /var/lib/lampos-schedule/store --socket /run/lampos-schedule/call.sock --zone ${LAMP_ZONE} --bus-root /run/lampos-bus --kernel-clock
 Restart=on-failure
 RestartSec=5s

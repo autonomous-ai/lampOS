@@ -1212,22 +1212,21 @@ fn texts(list: &Value) -> Vec<String> {
 }
 
 /// Reviewer-three's after-merge P2 on #4527, the first builder's (a): two
-/// people each asking "my reminders" hear their own; an unknown face hears
-/// none; the owner hears theirs and the ones set with nobody sure; a
-/// guest's cancel or snooze by the owner's id is refused as not found; a
-/// call without its caller is nobody's. A short timer set by nobody is
-/// every line's (option 1 on #4656's after-merge P2): the unknown face
-/// hears and cancels the one it set, and never a relative reminder set
-/// three weeks out (Reviewer-three's P1 on #4668).
+/// people each asking "my reminders" hear their own; a guest's cancel or
+/// snooze by the owner's id is refused as not found; a call without its
+/// caller is nobody's. One set with nobody sure is the room's (option 1 on
+/// #4656's after-merge P2 for timers, the first builder on #4710, 3 Nov
+/// 10:09, for every item): every line, an unknown face too, hears it and may
+/// cancel it, short or long.
 #[test]
-fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_server() {
+fn each_person_hears_and_changes_only_their_own_and_the_rooms_reminders_through_the_real_server() {
     let schedule = Schedule::new();
     let actions = Actions::new(Some(schedule.adapter()));
     let owner = caller(Some(ANN), true);
     let bo = caller(Some(BO), false);
     let unknown = caller(None, false);
-    // Reminders, due at 08:10, 600 s after `WALL`: a short timer set by
-    // nobody is every line's.
+    // Reminders, due at 08:10, 600 s after `WALL`: one set by nobody is
+    // every line's.
     let set = |text: &str, who: &Value| {
         let told = actions.call_as(
             "set_reminder",
@@ -1242,15 +1241,15 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
     let plant = set("Water the plant", &unknown);
     let list = |who: &Value| actions.call_as("list_reminders", json!({}), who.clone());
     assert_eq!(texts(&list(&owner)), ["Ann's pills", "Water the plant"]);
-    assert_eq!(texts(&list(&bo)), ["Bo's call"]);
-    assert!(texts(&list(&unknown)).is_empty());
-    // Not due yet, the line's own count: Bo is told of his one only.
+    assert_eq!(texts(&list(&bo)), ["Bo's call", "Water the plant"]);
+    assert_eq!(texts(&list(&unknown)), ["Water the plant"]);
+    // Not due yet, the line's own count: Bo is told of his and the room's.
     let due = actions.call_as("list_reminders", json!({"pending_only":true}), bo.clone());
-    assert_eq!(due["result"]["not_yet_due"], 1, "{due}");
-    // A call without its caller is nobody's.
+    assert_eq!(due["result"]["not_yet_due"], 2, "{due}");
+    // A call without its caller is nobody's: it hears only the room's.
     let bare = actions.raw(json!({"op":"call","name":"list_reminders","args":{}}));
-    assert!(texts(&bare).is_empty());
-    for (id, who) in [(pills, &bo), (pills, &unknown), (plant, &bo)] {
+    assert_eq!(texts(&bare), ["Water the plant"]);
+    for (id, who) in [(pills, &bo), (pills, &unknown)] {
         let refused = actions.call_as("cancel_reminder", json!({"id":id}), who.clone());
         assert_eq!(refused["code"], "not_found", "{refused}");
     }
@@ -1274,10 +1273,12 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
         owner.clone(),
     );
     assert_eq!(snoozed["result"]["status"], "committed", "{snoozed}");
-    let cancelled = actions.call_as("cancel_reminder", json!({"id":plant}), owner.clone());
+    // The room's reminder: anyone in the room may stop it, Bo too.
+    let cancelled = actions.call_as("cancel_reminder", json!({"id":plant}), bo.clone());
     assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
+    assert_eq!(texts(&list(&owner)), ["Ann's pills"]);
     // At the stove, no face seen: the timer it sets it hears and cancels,
-    // and never the relative reminder three weeks out, or a reminder.
+    // and the relative reminder three weeks out it set too.
     let pasta = actions.call_as(
         "set_timer",
         json!({"text":"Pasta","seconds":600}),
@@ -1290,10 +1291,11 @@ fn each_person_hears_and_changes_only_their_own_reminders_through_the_real_serve
         unknown.clone(),
     );
     assert_eq!(weeks["result"]["status"], "committed", "{weeks}");
-    assert_eq!(texts(&list(&unknown)), ["Pasta"]);
+    assert_eq!(texts(&list(&unknown)), ["Pasta", "Renew the visa"]);
     let cancelled = actions.call_as("cancel_reminder", json!({"id":pasta}), unknown.clone());
     assert_eq!(cancelled["result"]["cancelled"], true, "{cancelled}");
-    assert!(texts(&list(&unknown)).is_empty());
+    assert_eq!(texts(&list(&unknown)), ["Renew the visa"]);
+    assert_eq!(texts(&list(&bo)), ["Bo's call", "Renew the visa"]);
 }
 
 /// "Forget everything about me": the voice's own op cancels every reminder

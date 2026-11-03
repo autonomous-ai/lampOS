@@ -1960,7 +1960,7 @@ pub fn serve(
         eprintln!("lamp-voice second: {line}");
     }
     // A skill made by the lamp's own model asks this worker's chat.
-    if files.tools.make_skill_local {
+    if files.tools.make_skill {
         crate::make_skill_local::set_config(config.clone());
     }
     if own_key_report(own_keys_on, config.hosted.own_deepseek.is_some()).is_some() {
@@ -2404,6 +2404,19 @@ pub fn serve(
             crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
             bus
         });
+    // The connected services are the owner's only, and read in full only
+    // with them alone in view (`crate::services`): the owner and the faces
+    // counted, whatever the by-default name's switch.
+    if std::env::var(crate::services::ENVIRONMENT).ok().as_deref() == Some("on") {
+        if let Some(bus) = files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+        {
+            crate::known_faces::keep_faces_counted(bus);
+        }
+        crate::known_faces::keep_owner_fresh(owner_file.clone(), owner_faces.clone());
+    }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
     let told_for = memory_context_carried(
@@ -2463,17 +2476,35 @@ pub fn serve(
                         .and_then(|_| crate::known_faces::most_faces_lately());
                     let known_now = who.as_deref().and_then(crate::known_faces::known_lately);
                     let another = another_voice_told.load(std::sync::atomic::Ordering::Acquire);
+                    // A face not at the desk seen speaking: a far guest who
+                    // is the only voice (`LAMP_FACES_AT_DESK_ONLY`).
+                    let speaking_not_at_desk = bus.is_some()
+                        && crate::known_faces::spoke_not_at_desk_lately();
                     match crate::person::someone_else_now(
                         &owners,
                         faces,
                         known_now.as_deref(),
                         another,
+                        speaking_not_at_desk,
                         carried.as_deref(),
                     )
                     {
                         Some(why) => {
+                            // The faces' sizes of the look that counted
+                            // (`LAMP_FACES_AT_DESK_ONLY`): sizes only.
+                            // Only with the switch on or a face dropped:
+                            // off, the line reads as before.
+                            let sizes = crate::known_faces::most_faces_lately_told();
+                            let sizes = if crate::known_faces::faces_worth_telling(
+                                &sizes,
+                                crate::known_faces::at_desk_only(),
+                            ) {
+                                format!(" [faces {sizes}]")
+                            } else {
+                                String::new()
+                            };
                             eprintln!(
-                                "lamp-voice second: the owner is not named by default: {why}; their name is taken out of the conversation's earlier lines (LAMP_PERSON_NAME_BY_DEFAULT)"
+                                "lamp-voice second: the owner is not named by default: {why}{sizes}; their name is taken out of the conversation's earlier lines (LAMP_PERSON_NAME_BY_DEFAULT)"
                             );
                             withheld = Some(name.to_owned());
                             format!("\n\n{}", crate::person::HELD_BACK_NOTE)
@@ -2599,9 +2630,8 @@ pub fn serve(
         .tasks
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
-    // Made through the tasks part, or by the lamp's own model.
-    let making_skills =
-        tools.tasks.as_ref().is_some_and(|place| place.make_skill) || tools.make_skill_local;
+    // Made by the lamp's own model.
+    let making_skills = tools.make_skill;
     let declines = tools.decline;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
@@ -2837,6 +2867,17 @@ pub fn serve(
         );
         ROOM_LINES_TOLD.store(true, std::sync::atomic::Ordering::Release);
     }
+    // An earlier turn's calls are told before its words, so an action is
+    // not learned as words alone (`LAMP_HISTORY_KEEPS_CALLS=on`).
+    let keeps_calls = std::env::var(crate::second_provider::HISTORY_KEEPS_CALLS_ENVIRONMENT)
+        .is_ok_and(|value| value == "on");
+    if keeps_calls {
+        eprintln!(
+            "lamp-voice second: the functions an earlier turn ran are told with its words in the chat's history (LAMP_HISTORY_KEEPS_CALLS)"
+        );
+        HISTORY_KEEPS_CALLS.store(true, std::sync::atomic::Ordering::Release);
+    }
+    engine = engine.keeping_calls(keeps_calls);
     if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
         .is_ok_and(|value| value == "on")
     {
@@ -3093,7 +3134,7 @@ pub fn serve(
     }
     // A hand-over waiting for its yes, with the tasks part (#1712).
     // And a made skill waiting for its yes to be put on (`crate::made_skill`),
-    // with the tasks part or made by the lamp's own model.
+    // or made and not yet asked about.
     if has_tasks || making_skills {
         engine = engine.noting_a_task_waiting(Arc::new(move |request| {
             crate::agent_tasks::pending_note(request, Instant::now()).or_else(|| {
@@ -3104,11 +3145,7 @@ pub fn serve(
                             .map_or(0, |since| since.as_millis() as u64);
                         let directory = std::path::Path::new(crate::made_skill::DIRECTORY);
                         crate::made_skill::waiting_note(directory, now_unix_ms).or_else(|| {
-                            crate::make_skill_local::from_environment()
-                                .then(|| {
-                                    crate::make_skill_local::untold_note(directory, now_unix_ms)
-                                })
-                                .flatten()
+                            crate::make_skill_local::untold_note(directory, now_unix_ms)
                         })
                     })
                     .flatten()
@@ -3234,6 +3271,29 @@ pub fn serve(
         );
     }
     engine = engine.asking_again_for_no_words(no_words_again);
+    // A cut-in that ended the lamp's answer with no words is asked "Did
+    // someone say something?" (`LAMP_CUT_IN_WORDLESS_ASKS=on`).
+    let wordless_asks = crate::cut_in_wordless::on();
+    if wordless_asks {
+        eprintln!(
+            "lamp-voice second: a cut-in that ended the lamp's answer with no words, in a quiet room, is answered with one short question, the model not asked (LAMP_CUT_IN_WORDLESS_ASKS)"
+        );
+    }
+    engine = engine.asking_after_wordless_cut_ins(wordless_asks);
+    // An answer to the lamp's own question is never left in silence by an
+    // empty reply: the lamp asks to hear it again, once
+    // (`LAMP_ANSWER_ASK_AGAIN=on`, Queue #4710 item 3). It reads the
+    // lamp's question from the thread, as a checked sound does.
+    let answer_again = std::env::var(crate::second_provider::ANSWER_ASK_AGAIN_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if answer_again {
+        eprintln!(
+            "lamp-voice second: a line answering the lamp's own question, answered with no words and no call, is said a short ask to hear it again, never twice in a row (LAMP_ANSWER_ASK_AGAIN)"
+        );
+    }
+    engine = engine.asking_again_for_answers(answer_again);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
@@ -3279,6 +3339,22 @@ pub fn serve(
         )));
         if let Ok(mut heeding) = heeding.lock() {
             heeding.telling_another_voice(another_voice.clone());
+        }
+        // The connected services ask whose voice a line is in
+        // (`crate::services::VoiceAsk`): a send only in the voice that asked,
+        // a read in full only in the conversation's.
+        {
+            let heeding = heeding.clone();
+            crate::services::judging_voices(Arc::new(move |ask| {
+                let mut heeding = heeding.lock().ok()?;
+                let voices = heeding.voices.as_mut()?;
+                match ask {
+                    crate::services::VoiceAsk::Alike(a, b) => voices.alike(a, b),
+                    crate::services::VoiceAsk::Conversation(request) => {
+                        voices.likeness_so_far(request)
+                    }
+                }
+            }));
         }
         let quiet_same_one =
             std::env::var(crate::second_provider::QUIET_GOING_ON_SAME_ONE_ENVIRONMENT)
@@ -3564,6 +3640,19 @@ pub fn serve(
                 heeding
                     .lock()
                     .is_ok_and(|heeding| heeding.judged_busy(request))
+            }));
+        }
+        // A decline of an answer to the lamp's own question from the
+        // person it asked is asked again (`LAMP_ANSWER_ASK_AGAIN`).
+        if answer_again {
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.answer_again = true;
+            }
+            let heeding = heeding.clone();
+            engine = engine.answering_the_asked_person(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.said_by_the_asked(request))
             }));
         }
         engine = heeding_switches(
@@ -3933,6 +4022,10 @@ pub fn serve(
                 .and_then(|mut heeding| heeding.heed_led(request, said, heard, from, lead))
         }));
     }
+    // The second route without the rule has no prints: still this route's
+    // judge, which knows none, so a write is refused for an unknown voice
+    // and a read is brief (`crate::services::judging_voices`, set once).
+    crate::services::judging_voices(Arc::new(|_| None));
     // Without the rule, a line's own words say whether it called the lamp.
     if !files.attention {
         engine = engine.noting_whether_called(Arc::new(|_, words| {
@@ -3979,7 +4072,10 @@ pub fn serve(
             ),
         }
     }
-    if checked {
+    // Whether the lamp just asked: for a checked sound, and for an empty
+    // answer to its question (`LAMP_ANSWER_ASK_AGAIN`). A sound is only
+    // checked with sounds checked, so the hook alone changes no sound.
+    if checked || answer_again {
         let file = thread.clone();
         engine = engine.answering_the_lamp(Arc::new(move |request| {
             crate::thread::current(file.as_deref(), |thread| {
@@ -5441,6 +5537,9 @@ pub(crate) struct Heeding {
     /// The newest request, if it began over the lamp's own answer (its
     /// Start's `over_the_lamps_voice`), as [`Self::hear`] is told.
     began_over: Option<u64>,
+    /// The line begun within `spoken_stop::JUST_AFTER` of the lamp's
+    /// answer's end, not over it: a stop in it is said to the lamp too.
+    began_just_after: Option<u64>,
     /// The same-voice check (`LAMP_SAME_VOICE_MODEL`, #829,
     /// [`Self::checking_the_voice`]), as the Live worker keeps it.
     voices: Option<crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>>,
@@ -5453,6 +5552,12 @@ pub(crate) struct Heeding {
     /// The request judged last, if it began with the lamp's name said to a
     /// face turned to the lamp ([`named_to_a_face`]).
     named_faced: Option<u64>,
+    /// The request judged last, if the person the lamp asked said it
+    /// ([`asked_person_said`], `LAMP_ANSWER_ASK_AGAIN`).
+    asked_one: Option<u64>,
+    /// `LAMP_ANSWER_ASK_AGAIN=on`: only then is [`Self::asked_one`] judged,
+    /// so with it off nothing more runs per line.
+    answer_again: bool,
     /// `LAMP_GOING_ON_NOT_OWN=on` ([`Self::not_counting_own_answers`]).
     not_own: bool,
     /// With it: the lines let out only as the conversation going on since
@@ -5753,6 +5858,22 @@ pub(crate) fn named_to_a_face(
             && *at <= began_us.saturating_add(NAME_STARTS_WITHIN_US)
     });
     turned == Some(true) && (heard_named || crate::attention::begins_with_the_name(heard))
+}
+
+/// Whether a line was said by the person the lamp asked, from its voice's
+/// `likeness` to the conversation's (`Voices::likeness_so_far`) and whether
+/// a face was `turned` to the lamp over it (`LAMP_ANSWER_ASK_AGAIN`, the
+/// first builder on Queue #4710): the same voice
+/// ([`crate::same_voice::SAME_FROM`] or more), or a face turned to the lamp,
+/// and never a voice printed as another's
+/// ([`crate::same_voice::DIFFERENT_BELOW`]) nor a face known turned away:
+/// a person who turns from the lamp to say a line is talking to someone
+/// else, even in the asked voice (Thirteen's P2 on #5078). Neither known:
+/// no.
+pub(crate) fn asked_person_said(likeness: Option<f32>, turned: Option<bool>) -> bool {
+    let another = likeness.is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW);
+    let same = likeness.is_some_and(|likeness| likeness >= crate::same_voice::SAME_FROM);
+    turned != Some(false) && !another && (same || turned == Some(true))
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -6339,10 +6460,13 @@ impl Heeding {
             held_colleagues: held_colleagues::HeldColleagues::default(),
             sure_other_samples: CARRY_SURE_OTHER_SPEECH_SAMPLES,
             began_over: None,
+            began_just_after: None,
             voices: None,
             voice_ends_going_on: false,
             named_always: false,
             named_faced: None,
+            asked_one: None,
+            answer_again: false,
             not_own: false,
             chain: Vec::new(),
             said_until_free_us: None,
@@ -6731,7 +6855,7 @@ impl Heeding {
                                     }
                                     let look = FacesLook {
                                         at_us: message.header.at_us,
-                                        faces: seen.faces.len(),
+                                        faces: crate::known_faces::people_at_lamp(&seen),
                                         expires_ms: message.header.expires_ms,
                                     };
                                     held.look(look, epoch, monotonic_us());
@@ -7264,6 +7388,12 @@ impl Heeding {
         self.named_faced == Some(request)
     }
 
+    /// Whether `request` was judged said by the person the lamp asked
+    /// ([`asked_person_said`]).
+    pub(crate) fn said_by_the_asked(&self, request: u64) -> bool {
+        self.asked_one == Some(request)
+    }
+
     /// A line in another voice than the conversation's is no part of it
     /// (#829), judged by `printer` as the Live worker judges it: with
     /// `LAMP_SAME_VOICE_MODEL`, beside `LAMP_SPOKEN_TO=on`, or here beside
@@ -7287,9 +7417,18 @@ impl Heeding {
         } = heard
         {
             self.began_over = over_the_lamps_voice.then_some(request);
+            self.began_just_after = (!over_the_lamps_voice
+                && self.said_until_us.is_some_and(|until_us| {
+                    crate::spoken_stop::just_after(monotonic_us(), until_us)
+                }))
+            .then_some(request);
+            // A write waiting for its "send" is timed from when a line
+            // began, not when its words came (`crate::services`).
+            crate::services::voice_began(over_the_lamps_voice, std::time::Instant::now());
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
+            self.began_just_after = None;
         }
         let Some(voices) = self.voices.as_mut() else {
             return;
@@ -7562,6 +7701,9 @@ impl Heeding {
         self.carrying = false;
         self.carry_window.clear();
         self.held_colleagues.clear();
+        // A held remark grants no continuation across privacy (#4175).
+        self.held_in_conversation_us = None;
+        self.after_remark = false;
         // Nor brought back by a decline of a line let out before it
         // (`LAMP_DECLINE_SILENT`).
         if let Some(before) = self.before_let_out.as_mut() {
@@ -8594,6 +8736,17 @@ impl Heeding {
         let named_faced =
             self.named_always && named_to_a_face(&signs.names, began_us, heard, signs.turned);
         self.named_faced = named_faced.then_some(request);
+        // Said by the person the lamp asked (`LAMP_ANSWER_ASK_AGAIN`): the
+        // conversation's voice, or a face turned to the lamp with no other
+        // voice heard. Read without using up the line's one judgement.
+        self.asked_one = None;
+        if self.answer_again {
+            let likeness = self
+                .voices
+                .as_mut()
+                .and_then(|voices| voices.likeness_so_far(request));
+            self.asked_one = asked_person_said(likeness, signs.turned).then_some(request);
+        }
         attention.ended(request, ended_us);
         if self.cut_in == Some(request) {
             attention.ended_as_cut_in(request);
@@ -9160,8 +9313,9 @@ impl Heeding {
         let mut verdict =
             attention.first_output_busy(request, seen.room, seen.going_on, self.strict, turned);
         let alone = attention.played_on_the_conversation_alone();
+        // Or just after its answer ended (Sixth's item 6 on #4710).
         let stop_over_the_lamp = self.spoken_stops
-            && self.began_over == Some(request)
+            && (self.began_over == Some(request) || self.began_just_after == Some(request))
             && crate::spoken_stop::is_stop_request(heard);
         if alone && lone_words(heard) && !stop_over_the_lamp {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
@@ -11007,12 +11161,43 @@ pub(super) fn keep_heard(
 /// has its words marked [`SAID_IN_THE_ROOM`], or with none, a note before
 /// the lamp's.
 fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
-    let cut = crate::cut_in_told::cut_here(exchange.cut);
-    messages_marked(exchange, cut)
+    messages_told(
+        exchange,
+        HISTORY_KEEPS_CALLS.load(std::sync::atomic::Ordering::Acquire),
+    )
 }
 
+/// [`messages`], with the functions its turn ran told before the lamp's
+/// words when `keeps_calls` ([`HISTORY_KEEPS_CALLS`]).
+fn messages_told(exchange: crate::thread::Recent, keeps_calls: bool) -> Vec<Message> {
+    let cut = crate::cut_in_told::cut_here(exchange.cut);
+    messages_marked(exchange, cut, keeps_calls)
+}
+
+/// `LAMP_HISTORY_KEEPS_CALLS=on`, set once as the worker starts ([`serve`]):
+/// an earlier turn that ran functions is told as it went, its calls and
+/// then its words ([`messages_marked`]), not as words alone. Lamp build 9699:
+/// "Lamp, you're a bit loud." answered "Turning myself down a step." with no
+/// `volume_down` call, 4 of 14 action lines, and nothing changed; the
+/// history the model copied showed every earlier action as an ask answered
+/// in words only.
+pub(crate) static HISTORY_KEEPS_CALLS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// What a kept call is answered in the history: its result was not kept,
+/// and nothing in it is made up.
+pub(crate) const KEPT_CALL_RESULT: &str = "(done earlier; its result was not kept)";
+
 /// [`messages`], with `cut` told right after the lamp's words when given.
-fn messages_marked(exchange: crate::thread::Recent, cut: Option<&str>) -> Vec<Message> {
+/// With `keeps_calls`, an exchange whose turn ran functions has them before
+/// the lamp's words: an assistant message with the calls (no arguments, no
+/// words), each call's result as [`KEPT_CALL_RESULT`], as a chat round with
+/// calls goes. The person's words, or the note, stay first.
+fn messages_marked(
+    exchange: crate::thread::Recent,
+    cut: Option<&str>,
+    keeps_calls: bool,
+) -> Vec<Message> {
     let mut messages = Vec::with_capacity(3);
     if let Some(written) = exchange.written {
         messages.push(Message::system(format!(
@@ -11027,6 +11212,24 @@ fn messages_marked(exchange: crate::thread::Recent, cut: Option<&str>) -> Vec<Me
         }));
     } else if exchange.room {
         messages.push(Message::system(SAID_IN_THE_ROOM.to_owned()));
+    }
+    if keeps_calls && !exchange.calls.is_empty() {
+        let calls: Vec<crate::second_provider::net::ToolCall> = exchange
+            .calls
+            .into_iter()
+            .map(|call| crate::second_provider::net::ToolCall {
+                id: call.id,
+                name: call.name,
+                args: serde_json::json!({}),
+                extra: None,
+            })
+            .collect();
+        messages.push(Message::assistant_calls(None, &calls));
+        messages.extend(
+            calls
+                .into_iter()
+                .map(|call| Message::tool(call.id, KEPT_CALL_RESULT)),
+        );
     }
     messages.push(Message::assistant(exchange.lamp));
     // A cut answer kept as heard, marked where it stopped, so "go on" picks
@@ -16810,6 +17013,29 @@ mod tests {
         *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
+    /// `LAMP_ANSWER_ASK_AGAIN` (the first builder on Queue #4710): a line is
+    /// the asked person's by the same voice or a face turned to the lamp,
+    /// never in a voice printed as another's.
+    #[test]
+    fn the_asked_person_is_the_same_voice_or_a_face_turned_to_the_lamp() {
+        use crate::same_voice::{DIFFERENT_BELOW, SAME_FROM};
+        assert!(super::asked_person_said(Some(SAME_FROM), None));
+        assert!(super::asked_person_said(None, Some(true)));
+        assert!(super::asked_person_said(Some(0.5), Some(true)));
+        // Another voice, even with a face turned to the lamp; or nothing
+        // known.
+        assert!(!super::asked_person_said(
+            Some(DIFFERENT_BELOW - 0.01),
+            Some(true)
+        ));
+        assert!(!super::asked_person_said(Some(0.5), Some(false)));
+        assert!(!super::asked_person_said(None, None));
+        // The asked voice with a face turned away: talking to someone else
+        // (Thirteen's P2 on #5078).
+        assert!(!super::asked_person_said(Some(SAME_FROM), Some(false)));
+        assert!(!super::asked_person_said(Some(1.0), Some(false)));
+    }
+
     /// What the engine is told for a checked sound (17 October): the lamp's
     /// own last line a question, in a conversation going on. A line that
     /// asks nothing, or the same question past the conversation, is not.
@@ -18862,6 +19088,7 @@ mod tests {
             lamp: "ORCHID.".into(),
             room: false,
             cut: false,
+            calls: Vec::new(),
         });
         assert_eq!(
             written,
@@ -18878,6 +19105,7 @@ mod tests {
             lamp: "Hello.".into(),
             room: false,
             cut: false,
+            calls: Vec::new(),
         });
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
     }
@@ -18990,10 +19218,11 @@ mod tests {
             ),
             room: false,
             cut,
+            calls: Vec::new(),
         };
         let here = crate::cut_in_told::CUT_HERE;
         assert_eq!(
-            messages_marked(story(true), Some(here)),
+            messages_marked(story(true), Some(here), false),
             [
                 Message::user("Tell me a story."),
                 Message::assistant(format!(
@@ -19003,9 +19232,113 @@ mod tests {
                 Message::system(here),
             ]
         );
-        assert_eq!(messages_marked(story(true), None).len(), 2);
+        assert_eq!(messages_marked(story(true), None, false).len(), 2);
         // Off by default: the switch sets it as the worker starts.
         assert_eq!(crate::cut_in_told::cut_here(false), None);
+    }
+
+    /// `LAMP_HISTORY_KEEPS_CALLS` (lamp build 9699: "Lamp, you're a bit
+    /// loud." answered "Turning myself down a step." with no call, 4 of 14
+    /// action lines): an earlier turn that called a function is told as it
+    /// went, the call, its result as not kept, then the lamp's words, so
+    /// the next turn does not learn to answer an action in words alone. Off,
+    /// and for a turn that called nothing, as before.
+    #[test]
+    fn an_earlier_turns_calls_are_told_before_its_words_with_the_switch() {
+        let quieter = || crate::thread::Recent {
+            person: "Lamp, you're a bit loud.".into(),
+            lamp: "Turning myself down a step.".into(),
+            calls: vec![crate::thread::KeptCall {
+                id: "kept-7-0".into(),
+                name: "volume_down".into(),
+            }],
+            ..crate::thread::Recent::default()
+        };
+        assert_eq!(
+            messages_marked(quieter(), None, true),
+            [
+                Message::user("Lamp, you're a bit loud."),
+                Message::assistant_calls(
+                    None,
+                    &[crate::second_provider::net::ToolCall {
+                        id: "kept-7-0".into(),
+                        name: "volume_down".into(),
+                        args: serde_json::json!({}),
+                        extra: None,
+                    }]
+                ),
+                Message::tool("kept-7-0", KEPT_CALL_RESULT),
+                Message::assistant("Turning myself down a step."),
+            ]
+        );
+        assert_eq!(
+            messages_marked(quieter(), None, false),
+            [
+                Message::user("Lamp, you're a bit loud."),
+                Message::assistant("Turning myself down a step."),
+            ],
+            "off: words only, as before"
+        );
+        let plain = || crate::thread::Recent {
+            person: "Hi.".into(),
+            lamp: "Hello.".into(),
+            ..crate::thread::Recent::default()
+        };
+        assert_eq!(
+            messages_marked(plain(), None, true),
+            messages_marked(plain(), None, false),
+            "a turn that called nothing"
+        );
+        assert_eq!(
+            messages_marked(plain(), None, true),
+            [Message::user("Hi."), Message::assistant("Hello.")]
+        );
+    }
+
+    /// The same through the thread and the worker's history: a turn that
+    /// ran `volume_down` is told with its call to the next turn of its own
+    /// scope, never another's.
+    #[test]
+    fn a_kept_call_reaches_the_next_turns_history_in_its_own_scope_only() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let a = crate::remember::person_id("A");
+        let now = Instant::now();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person("Lamp, you're a bit loud.", true, now);
+            thread.called(1, "volume_down");
+            thread.lamp_for(1, "Turning myself down a step.", now, Some(&a));
+        }
+        let history = |whose: Option<&str>, keeps_calls: bool| -> Vec<Message> {
+            let recent = crate::thread::THREAD.lock().unwrap().recent_for(
+                whose,
+                now,
+                HISTORY_WITHIN,
+                HISTORY_EXCHANGES,
+            );
+            recent
+                .into_iter()
+                .flat_map(|exchange| messages_told(exchange, keeps_calls))
+                .collect()
+        };
+        let theirs = history(Some(&a), true);
+        assert_eq!(theirs.len(), 4, "{theirs:?}");
+        assert_eq!(
+            theirs[1].tool_calls[0]["function"]["name"],
+            serde_json::json!("volume_down")
+        );
+        assert_eq!(theirs[2].role, "tool");
+        assert_eq!(theirs[2].tool_call_id.as_deref(), Some("kept-1-0"));
+        assert_eq!(
+            history(Some(&a), false),
+            [
+                Message::user("Lamp, you're a bit loud."),
+                Message::assistant("Turning myself down a step."),
+            ]
+        );
+        assert!(history(None, true).is_empty(), "never the room's");
+        crate::thread::THREAD.lock().unwrap().forget();
     }
 
     /// The reviewer-lead on #2675: an add-on's quoted line, and the lamp's
@@ -20679,6 +21012,14 @@ mod tests {
     /// (`LAMP_SECOND_NAME_CARRIES`, `LAMP_CALL_TAKES_NEXT_LINE`,
     /// `LAMP_NOT_FOR_ME_WORDS`) are not on this path.
     fn remark_scene(scene: Scene, lines: &[SceneLine]) -> Vec<Option<&'static str>> {
+        remark_scene_with_privacy(scene, lines, None)
+    }
+
+    fn remark_scene_with_privacy(
+        scene: Scene,
+        lines: &[SceneLine],
+        privacy_before: Option<u64>,
+    ) -> Vec<Option<&'static str>> {
         use crate::room_told::Room;
         use crate::second_provider::Heard;
         /// Prints by a line's first sample, each given only once released.
@@ -20800,6 +21141,12 @@ mod tests {
             }
             if scene.prints == Prints::AtVerdict {
                 released.lock().unwrap().push(request);
+            }
+            if privacy_before == Some(request) {
+                // Closing and reopening must both discard the held remark.
+                heeding.privacy_changed();
+                heeding.privacy_changed();
+                assert!(!heeding.after_remark);
             }
             let held = if named {
                 let mut signs = heeding.signs(request, said);
@@ -21168,6 +21515,39 @@ mod tests {
         assert_eq!(held[2], Some(crate::remark_about_it::HELD), "{held:?}");
         assert!(held[3..7].iter().all(Option::is_some), "{held:?}");
         assert!(held[7].is_some(), "the owner, past the bound: {held:?}");
+    }
+
+    /// #4534: held remarks must not renew conversation across privacy.
+    #[test]
+    fn privacy_change_ends_a_held_remarks_conversation_renewal() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for privacy_before in [None, Some(103)] {
+            let held = remark_scene_with_privacy(
+                Scene {
+                    left_by_model: &[],
+                    product: true,
+                    busy: true,
+                    remark: true,
+                    prints: Prints::None,
+                    carries: false,
+                },
+                &[
+                    (
+                        0,
+                        3_000,
+                        1,
+                        "Lamp, I have not been sleeping well lately.",
+                        false,
+                    ),
+                    (40_000, 1_500, -1, "That lamp is cute.", true),
+                    (75_000, 2_500, 1, "Any tips to sleep better tonight?", false),
+                ],
+                privacy_before,
+            );
+            assert_eq!(held[0], None, "{held:?}");
+            assert_eq!(held[1], Some(crate::remark_about_it::HELD), "{held:?}");
+            assert_eq!(held[2].is_some(), privacy_before.is_some(), "{held:?}");
+        }
     }
 
     /// #4175: with a colleague's print come late, the owner's reply to
@@ -24555,6 +24935,17 @@ mod tests {
                 "{switch} {over}"
             );
         }
+        // Sixth's item 6 on #4710: "Stop them." begun just after the lamp's
+        // answer ended is said to the lamp too; begun long after, the room's.
+        // ("Stop Lamp." names the lamp, and is let out by its name anyway.)
+        for (just_after, held) in [(true, false), (false, true)] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.hearing_spoken_stops();
+            heeding.began_just_after = just_after.then_some(9);
+            let verdict = heeding.judge(9, line, "Stop them.", signs(true, false));
+            assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{just_after}");
+        }
         // In a busy room too, with someone else at the desk (the
         // Reviewer-lead's P2 on #4019): not held as `BUSY_SHORT`.
         for (switch, held) in [(true, false), (false, true)] {
@@ -26662,7 +27053,6 @@ mod memory_observer {
             machine_names: false,
             needs: None,
             staff_note: true,
-            make_skill: false,
             named_only: false,
             correct: false,
             questions: false,
@@ -26850,7 +27240,6 @@ mod memory_observer {
             machine_names: false,
             needs: None,
             staff_note: true,
-            make_skill: false,
             named_only: false,
             correct: false,
             questions: false,

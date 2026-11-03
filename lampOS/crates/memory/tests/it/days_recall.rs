@@ -380,3 +380,183 @@ fn a_question_about_an_finds_an_likes_tea() {
         assert_eq!(ids(&second), [tea], "{op}: {second}");
     }
 }
+
+/// The voice's `LAMP_MEMORY_NEWER_FIRST` (`newer_first`, the memory
+/// owner's Tiers-ideas plan, 3 Nov, adapted from memory-tiers): of what a
+/// search or recall found, a later line of the person's own that corrects
+/// an earlier one goes before it, and the earlier one says
+/// `"earlier":true`. Only the order and that flag change.
+mod newer_first {
+    use super::*;
+
+    const OLD: &str = "it is jasmine tea";
+    const NEW: &str = "Actually, my tea is now peppermint, no longer jasmine";
+
+    const MAI: &str = "p-0123456789abcdef";
+    const BAO: &str = "p-00000000000b0b0b";
+
+    fn mai() -> Person {
+        Person::new(MAI).unwrap()
+    }
+
+    fn line(store: &mut Days, answer: Value) -> String {
+        days_protocol::answer(store, &serde_json::to_vec(&answer).unwrap(), NOW).line
+    }
+
+    fn earlier(answer: &Value) -> Vec<bool> {
+        answer["entries"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{answer}"))
+            .iter()
+            .map(|entry| entry.get("earlier") == Some(&json!(true)))
+            .collect()
+    }
+
+    #[test]
+    fn newer_correction_ranks_first() {
+        let scratch = Scratch::new("newer-first");
+        let mut store = scratch.open();
+        let old = store
+            .append(&mai(), NOW - 3 * DAY, OLD, "Lovely.", &[])
+            .unwrap();
+        let new = store.append(&mai(), NOW - DAY, NEW, "Noted.", &[]).unwrap();
+        let ask = |newer_first: bool| json!({"op":"search","person":MAI,"query":"jasmine tea","newer_first":newer_first});
+        // Today: the shorter, older line ranks first on the words alone.
+        let today = send(&mut store, ask(false));
+        assert_eq!(ids(&today), [old, new], "{today}");
+        assert_eq!(earlier(&today), [false, false], "{today}");
+        let first = send(&mut store, ask(true));
+        assert_eq!(ids(&first), [new, old], "{first}");
+        assert_eq!(earlier(&first), [false, true], "{first}");
+        // A recall keeps its time order; only the flag says it.
+        let recalled = send(
+            &mut store,
+            json!({"op":"recall","person":MAI,"query":"jasmine tea","newer_first":true}),
+        );
+        assert_eq!(ids(&recalled), [old, new], "{recalled}");
+        assert_eq!(earlier(&recalled), [true, false], "{recalled}");
+    }
+
+    #[test]
+    fn no_cue_keeps_fts_rank() {
+        let scratch = Scratch::new("no-cue");
+        let mut store = scratch.open();
+        store
+            .append(&mai(), NOW - 3 * DAY, OLD, "Lovely.", &[])
+            .unwrap();
+        store
+            .append(
+                &mai(),
+                NOW - DAY,
+                "my mother brought jasmine tea and cake",
+                "Nice.",
+                &[],
+            )
+            .unwrap();
+        // A cue with only one shared word ("tea") is no correction either.
+        store
+            .append(&mai(), NOW - DAY / 2, "actually I want tea", "Sure.", &[])
+            .unwrap();
+        let ask = |field: Option<bool>| {
+            let mut ask = json!({"op":"search","person":MAI,"query":"jasmine tea"});
+            if let Some(on) = field {
+                ask["newer_first"] = json!(on);
+            }
+            ask
+        };
+        let today = send(&mut store, ask(None));
+        let on = send(&mut store, ask(Some(true)));
+        assert_eq!(ids(&on), ids(&today), "{on}");
+        assert_eq!(earlier(&on), vec![false; ids(&on).len()], "{on}");
+    }
+
+    #[test]
+    fn other_person_never_reordered_in() {
+        let scratch = Scratch::new("other-person");
+        let mut store = scratch.open();
+        let bao = Person::new(BAO).unwrap();
+        let old = store
+            .append(&mai(), NOW - 3 * DAY, OLD, "Lovely.", &[])
+            .unwrap();
+        store.append(&bao, NOW - DAY, NEW, "Noted.", &[]).unwrap();
+        store
+            .append(&everyone(), NOW - DAY, NEW, "Noted.", &[])
+            .unwrap();
+        for op in ["search", "recall"] {
+            let on = send(
+                &mut store,
+                json!({"op":op,"person":MAI,"query":"jasmine tea","newer_first":true}),
+            );
+            assert_eq!(ids(&on), [old], "{op}: {on}");
+            assert_eq!(earlier(&on), [false], "{op}: {on}");
+        }
+    }
+
+    /// The room's set is many speakers' lines: one's correction never
+    /// marks another's `earlier`, so `newer_first` is ignored there (the
+    /// Reviewer-lead's HOLD on #5049: A's "my jasmine tea", then B's
+    /// "actually my tea is now peppermint, no longer jasmine").
+    #[test]
+    fn room_scope_is_never_reordered() {
+        let scratch = Scratch::new("room-scope");
+        let mut store = scratch.open();
+        store
+            .append(&everyone(), NOW - 3 * DAY, "my jasmine tea", "Lovely.", &[])
+            .unwrap();
+        store
+            .append(
+                &everyone(),
+                NOW - DAY,
+                "actually my tea is now peppermint, no longer jasmine",
+                "Noted.",
+                &[],
+            )
+            .unwrap();
+        for op in ["search", "recall"] {
+            let ask = |newer_first: Option<bool>| {
+                let mut ask = json!({"op":op,"query":"jasmine tea"});
+                if let Some(on) = newer_first {
+                    ask["newer_first"] = json!(on);
+                }
+                ask
+            };
+            let off = send(&mut store, ask(Some(false)));
+            let on = send(&mut store, ask(Some(true)));
+            assert_eq!(ids(&off).len(), 2, "{op}: {off}");
+            assert_eq!(ids(&on), ids(&off), "{op}: {on}");
+            assert_eq!(earlier(&on), [false, false], "{op}: {on}");
+            assert_eq!(on, off, "{op}");
+        }
+    }
+
+    #[test]
+    fn off_is_byte_identical() {
+        let scratch = Scratch::new("off-identical");
+        let mut store = scratch.open();
+        store
+            .append(&mai(), NOW - 3 * DAY, OLD, "Lovely.", &[])
+            .unwrap();
+        store.append(&mai(), NOW - DAY, NEW, "Noted.", &[]).unwrap();
+        store
+            .remember(&mai(), NOW - 2 * DAY, "my tea is jasmine")
+            .unwrap();
+        for base in [
+            json!({"op":"search","person":MAI,"query":"jasmine tea"}),
+            json!({"op":"search","person":MAI,"query":"jasmine tea","history":true,"limit":2}),
+            json!({"op":"search","person":MAI,"query":"jasmine tea","recall_v2":true,"day_from":day(4),"day_to":day(0)}),
+            json!({"op":"recall","person":MAI,"query":"jasmine tea","recall_v2":true}),
+        ] {
+            let absent = line(&mut store, base.clone());
+            let mut off = base.clone();
+            off["newer_first"] = json!(false);
+            assert_eq!(line(&mut store, off), absent, "{base}");
+            assert!(!absent.contains("earlier"), "{absent}");
+        }
+        // The legacy recall, with no new field, is answered as it was: the
+        // same line as before this switch, by the legacy path.
+        let legacy = json!({"op":"recall","person":MAI,"query":"jasmine tea"});
+        let answer = line(&mut store, legacy.clone());
+        assert!(!answer.contains("earlier"), "{answer}");
+        assert_eq!(line(&mut store, legacy), answer);
+    }
+}

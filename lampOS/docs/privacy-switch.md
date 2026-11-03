@@ -221,8 +221,18 @@ lapsed while the board stalled in the I/O is ridden too, not published with
 its lapsed expiry (which its own check refuses). A lapse ridden
 1.5 s from its expiry (`DENIED_LAPSE_MOST_US`) still ends the worker with
 `privacy controller lease expired`, and so does a lapse of any lease that
-grants the microphones or the camera, or leaves either Unknown, and no
-authority within 250 ms of the worker's start. The switch's own checks run
+grants the microphones or the camera, or leaves either Unknown. No authority
+at all by 250 ms after the worker's start (`FIRST_AUTHORITY_US`) grants
+nothing either, so it is ridden the same way from that point, with nothing
+published, for at most 1.5 s more, and the journal says once
+`lamp-voice: privacy worker has had no authority 250 ms after its start,
+riding it up to 1500 ms (microphones and camera stay closed)`. On lamp-06c1's
+cold boot (boot 6) the voice's main thread stalled about 0.67 s before the
+first authority reached the worker, the worker ended at 250 ms, and the
+voice's renewal after the gate then found it gone and the voice exited. A
+Denied authority that comes during that ride re-arms the worker at once, as
+Denied; with none by 1.75 s after the start the worker ends as before. The
+voice does not retry a worker that ended. The switch's own checks run
 on every look, ride or not: a stale or missing reading, or the publisher
 gone or late, ends the worker as before. A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
@@ -237,6 +247,14 @@ privacy worker's observations queue up through that prologue, so the voice's
 one second of waiting past one read stale before the microphone is first
 allowed (`PRIVACY_START_STALE_US`) counts from its loop's start, after the
 prologue, with the gate closed until then.
+
+A privacy worker that does not stop within the wait's 300 ms grace is killed,
+and a killed worker cannot unlink its own sockets. Once it is reaped, the
+wait's cleanup removes its `privacy.c.w` and `privacy.d.w`, each only while
+it is a socket (never through a symlink), so the session directory goes too,
+and the kill is the switch unreadable, read again after 1 s (lamp-06c1's cold
+boot on stock 9528, `Directory not empty`, #4332). Anything else at those
+paths stays, and stays a cleanup failure that ends the service.
 
 Ears also holds Voice to its latch: once a `voice/privacy` session has reported
 the switch closed, Ears refuses any later permit from that session, and only a

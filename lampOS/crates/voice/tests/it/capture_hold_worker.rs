@@ -15,7 +15,7 @@
 use lamp_audio::{
     CAPTURE_SAMPLES, RENDER_SAMPLES,
     duplex::Hearing,
-    testing::{CaptureControl, ScriptedCapture},
+    testing::{CaptureControl, HeldCall, ScriptedCapture},
 };
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{BootId, Controller, MonoTime, Permission, TurnOwner};
@@ -179,6 +179,12 @@ struct Rig {
     /// Linux a send that finds it gone drops its `CaptureStopped` unread
     /// (`a_refused_send_drops_what_the_gone_peer_had_sent`, #1359).
     ending: bool,
+    /// The microphone's first `configure`, when the test holds it.
+    held: Option<HeldCall>,
+    /// Where a gone speaker's link is bound ([`Rig::speaker_gone`]): a
+    /// private session directory of its own, as the transport requires.
+    /// After `speaker`, so the link's sockets go before it.
+    gone: Option<SessionDirectory>,
     /// Held for the rig's life ([`ONE_AT_A_TIME`]). The last field, so a
     /// rig dropped mid-test closes its channels before the next rig starts.
     _alone: std::sync::MutexGuard<'static, ()>,
@@ -282,6 +288,29 @@ impl Rig {
         record: bool,
         wait: bool,
     ) -> Self {
+        Self::spawn_holding(
+            device_name,
+            (failed_opens, errno),
+            recovery,
+            stop_words,
+            record,
+            wait,
+            false,
+        )
+    }
+
+    /// [`Self::spawn`], with the microphone's first `configure` held when
+    /// `hold_configure` (#4332): the worker sits in `prepare()` until the
+    /// test lets it go, at [`Rig::held`].
+    fn spawn_holding(
+        device_name: &'static str,
+        (failed_opens, errno): (usize, i32),
+        recovery: ReferenceRecovery,
+        stop_words: Source,
+        record: bool,
+        wait: bool,
+        hold_configure: bool,
+    ) -> Self {
         // A test that failed while holding it leaves it poisoned; the next
         // one still runs alone.
         let alone = ONE_AT_A_TIME
@@ -309,6 +338,7 @@ impl Rig {
         for _ in 0..failed_opens {
             device.fail_next(lamp_audio::device::OPEN_CALL, errno);
         }
+        let held = hold_configure.then(|| device.hold_next_configure());
         let path = directory.path.clone();
         // Named, for `capture_wait_cost` to find its counts in /proc.
         let worker = std::thread::Builder::new()
@@ -361,6 +391,8 @@ impl Rig {
             fault: None,
             refused: None,
             ending: false,
+            held,
+            gone: None,
             _alone: alone,
         };
         rig.service();
@@ -649,6 +681,29 @@ impl Rig {
     fn end_with(&mut self, control: Control) {
         self.parent.control.send(control).unwrap();
         self.ending = true;
+    }
+
+    /// [`Self::finish`] for a worker stopped before its handshake: neither
+    /// the coordinator nor the speaker was told capture was prepared.
+    fn finish_without_frames(mut self) -> Vec<Heard> {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while !self.stopped {
+            assert!(Instant::now() < deadline, "the worker did not stop");
+            self.service();
+            sleep(Duration::from_micros(500));
+        }
+        let result = self.worker.take().unwrap().join().unwrap();
+        assert_eq!(result, Ok(()));
+        assert!(
+            !self.prepared,
+            "the coordinator was told capture was prepared"
+        );
+        let told = self.speaker.control.receive::<ReferenceControl>();
+        assert!(
+            !matches!(told, Ok(Some(ReferenceControl::CapturePrepared { .. }))),
+            "the speaker was told capture was prepared"
+        );
+        self.frames
     }
 
     /// The worker has ended: nothing more arrives, and its loop returned
@@ -1237,6 +1292,143 @@ fn a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due() {
     rig.authority_at = None;
     let frames = rig.finish();
     assert_eq!(frames.len(), 50);
+}
+
+/// The worker in `prepare()`, its microphone's `configure` held, with the
+/// speaker's side of the link connected (#4332).
+fn held_in_prepare(device_name: &'static str) -> (Rig, HeldCall) {
+    let mut rig = Rig::spawn_holding(
+        device_name,
+        (0, lamp_audio::device::errno::BUSY),
+        ReferenceRecovery::Off,
+        Source::Processed,
+        false,
+        false,
+        true,
+    );
+    let held = rig.held.take().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !held.reached(Duration::from_millis(1)) {
+        assert!(
+            Instant::now() < deadline,
+            "the worker never reached prepare()"
+        );
+        rig.service();
+        let _ = rig.speaker.connect_step();
+    }
+    while !rig.speaker.connect_step().unwrap() {
+        assert!(
+            Instant::now() < deadline,
+            "the speaker's side never connected"
+        );
+        sleep(Duration::from_micros(500));
+    }
+    (rig, held)
+}
+
+impl Rig {
+    /// The speaker has closed its end of the reference link, as one that
+    /// took its Stop has. Its place is taken by a link bound elsewhere,
+    /// connected to nothing.
+    fn speaker_gone(&mut self) {
+        let elsewhere = self.gone.insert(SessionDirectory::create().unwrap());
+        let boot = new_boot().unwrap();
+        let gone = ReferenceChannels::bind(&elsewhere.path, "speaker", boot, boot).unwrap();
+        drop(std::mem::replace(&mut self.speaker, gone));
+    }
+
+    /// The worker's thread has ended; what it returned.
+    fn ended(&mut self) -> Result<(), String> {
+        let worker = self.worker.take().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while !worker.is_finished() {
+            assert!(Instant::now() < deadline, "the worker did not end");
+            self.service();
+            sleep(Duration::from_micros(500));
+        }
+        self.service();
+        worker.join().unwrap()
+    }
+}
+
+/// 06c1's cold boot 1 (#4332): the coordinator sent Stop to every worker
+/// while capture was still opening the microphone, the speaker took its own
+/// and closed the link, and capture's `CapturePrepared` to it was refused
+/// (`ref.c.capture: Connection refused`). That fault failed the voice's
+/// cleanup and the voice exited 1. Capture now reads the Stop queued while
+/// it prepared, says nothing to either side, and ends stopped, cleanly.
+#[test]
+fn a_stop_sent_while_the_microphone_opens_ends_capture_cleanly_though_the_speaker_has_gone() {
+    let (mut rig, held) = held_in_prepare("scripted stopped in prepare, speaker gone");
+    // A fault, if it came, is kept for the assertion below, not a panic.
+    rig.tolerate_fault = true;
+    rig.end_with(Control::Stop);
+    rig.speaker_gone();
+    held.release();
+    let ended = rig.ended();
+    assert_eq!(ended, Ok(()), "fault: {:?}", rig.worker_fault);
+    assert_eq!(rig.worker_fault, None);
+    assert!(rig.stopped, "no CaptureStopped");
+    assert!(
+        !rig.prepared,
+        "the coordinator was told capture was prepared"
+    );
+}
+
+/// The same Stop with the speaker still there: it is not told capture is
+/// prepared either, so it never primes a clock for a capture that is ending.
+#[test]
+fn a_stop_sent_while_the_microphone_opens_tells_the_speaker_nothing() {
+    let (mut rig, held) = held_in_prepare("scripted stopped in prepare, speaker there");
+    rig.end_with(Control::Stop);
+    held.release();
+    let frames = rig.finish_without_frames();
+    assert!(frames.is_empty());
+}
+
+/// The speaker gone with no Stop sent, as a speaker that crashed leaves it:
+/// the refused link is the fault it was, and the worker still ends on it.
+#[test]
+fn a_refused_reference_link_without_a_stop_still_ends_capture_with_a_fault() {
+    let (mut rig, held) = held_in_prepare("scripted speaker gone, no stop");
+    rig.tolerate_fault = true;
+    rig.speaker_gone();
+    held.release();
+    let reason = rig
+        .ended()
+        .expect_err("the worker ended on the refused link");
+    assert!(
+        reason.contains("ref.c.capture") && reason.contains("Connection refused"),
+        "{reason}"
+    );
+    assert!(!rig.stopped);
+    if let Some(code) = &rig.worker_fault {
+        assert!(code.contains("Connection refused"), "{code}");
+    }
+}
+
+/// What the coordinator sent while the microphone opened is read to look
+/// for a Stop, and still taken in order after it: renewals queued in a
+/// `prepare()` without a Stop leave the handshake, the stream and the stop
+/// as they were.
+#[test]
+fn renewals_queued_while_the_microphone_opens_are_still_taken_in_order() {
+    warm_up();
+    let signal = Signal::new(40);
+    let (mut rig, held) = held_in_prepare("scripted renewals in prepare");
+    // Renewals queue behind the held open, as the coordinator's lease goes on.
+    for _ in 0..3 {
+        rig.authority_at = None;
+        rig.service();
+        sleep(Duration::from_millis(5));
+    }
+    held.release();
+    rig.handshake();
+    rig.stream(&signal, 20);
+    rig.settle(0);
+    rig.end_with(Control::Stop);
+    let frames = rig.finish();
+    assert_eq!(frames.len(), 20);
 }
 
 /// With `LAMP_CAPTURE_WAIT=on` the running loop waits on the microphone

@@ -157,7 +157,8 @@ pub fn reply(
                 && (crate::settings::KINDS.contains(&kind.as_str())
                     || crate::settings::KEYS_KINDS.contains(&kind.as_str())
                     || crate::settings::PLACE_KINDS.contains(&kind.as_str())
-                    || kind == crate::settings::WIFI_KIND)
+                    || kind == crate::settings::WIFI_KIND
+                    || crate::services::connector_kind(&kind).is_some())
             {
                 let mut starting = identity.starting(now, &kind);
                 // The keys' kinds say the app's id back at once too (#2094).
@@ -228,6 +229,9 @@ struct Handed {
     unasked_lost: Vec<crate::unasked::Piece>,
     /// Changes' results the broker acknowledged, for `Changes::acked`.
     changes_acked: Vec<crate::settings::Outcome>,
+    /// The services' results the connection took before their ack, oldest
+    /// first, to go again (`crate::services`).
+    services_lost: Vec<crate::settings::Outcome>,
     /// Journal lines, one per step of a change's result (Mobile on #1959,
     /// 21:0x): handed, sent as a packet, acked or lost. Never its data.
     journal: Vec<String>,
@@ -243,6 +247,9 @@ enum Tagged {
     /// A skill's line for the phone, sent again if it is lost before its
     /// ack (`crate::unasked`).
     Unasked(crate::unasked::Piece),
+    /// A service's result, said again if it is lost before its ack
+    /// (`crate::services`).
+    Service(crate::settings::Outcome),
 }
 
 impl Handed {
@@ -355,6 +362,10 @@ impl Handed {
                     self.unasked_lost.push(piece);
                     None
                 }
+                Tagged::Service(outcome) => {
+                    self.services_lost.push(outcome);
+                    None
+                }
                 _ => None,
             })
             .collect()
@@ -398,6 +409,10 @@ fn dropped(
     reports: &Option<Arc<crate::reports::Shared>>,
 ) {
     let again = handed.lost();
+    let services = std::mem::take(&mut handed.services_lost);
+    if let Some(shared) = lamp.services() {
+        shared.owe(services);
+    }
     let unasked = std::mem::take(&mut handed.unasked_lost);
     if !unasked.is_empty() {
         lamp.owe_unasked(unasked);
@@ -525,6 +540,8 @@ async fn session(
         // Changes after setup (#1959): their results are looked for on the
         // same tick, only with their switch.
         let changes = lamp.changes();
+        // The services' results (Queue #4710), the same way, with their switch.
+        let services = lamp.services();
         let polled = {
             let poll = events.poll();
             tokio::pin!(poll);
@@ -539,7 +556,7 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if texting || changes.is_some() => {
+                    _ = tick.tick(), if texting || changes.is_some() || services.is_some() => {
                         let me = identity.borrow().clone();
                         if texting {
                             for data in lamp.chat_events(crate::chat::now_ms()) {
@@ -586,6 +603,19 @@ async fn session(
                                 let tag = Tagged::Change(outcome.clone());
                                 if !handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
                                     changes.owe(vec![outcome]);
+                                }
+                            }
+                        }
+                        // A service's result: only its kind and status are
+                        // ever in the journal, never what was fetched.
+                        if connected && let Some(services) = &services {
+                            for outcome in services.take() {
+                                let reply = outcome.reply(&me, &now()).to_string();
+                                let tag = Tagged::Service(outcome.clone());
+                                if handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
+                                    say.line(&outcome.journal());
+                                } else {
+                                    services.owe(vec![outcome]);
                                 }
                             }
                         }
@@ -1065,6 +1095,100 @@ mod tests {
         // A save is answered, as every other kind.
         let saved = br#"{"cmd":"data","kind":"led.resting.set","data":{"mode":"off"}}"#;
         assert!(reply(&identity(), &mut lamp, saved, now).is_some());
+    }
+
+    /// The person's services (Queue #4710): off, each kind is "not on this
+    /// lamp" and `can` has no `services`; on, a set is `starting` at once
+    /// and its result later, from the fetch and the admin socket, and no
+    /// reply, journal line or `Debug` ever holds the fetched token.
+    #[test]
+    fn a_service_is_starting_at_once_and_its_result_follows_without_its_token() {
+        use crate::services::tests::{TOKEN, admin, connector, results, services};
+        let now = "2026-11-03T10:00:00Z";
+        let ask = |kind: &str| format!(r#"{{"cmd":"data","kind":"{kind}","type":"privacy"}}"#);
+        let said = |lamp: &mut Fake, kind: &str| -> serde_json::Value {
+            serde_json::from_str(&reply(&identity(), lamp, ask(kind).as_bytes(), now).unwrap())
+                .unwrap()
+        };
+        let mut off = Fake::default();
+        for kind in [
+            "connector.set.gmail",
+            "connector.remove.gmail",
+            "services.list",
+        ] {
+            let refused = said(&mut off, kind);
+            assert_eq!(refused["status"], "failure");
+            assert_eq!(refused["error"], format!("not on this lamp: {kind}"));
+        }
+        let info = said(&mut off, "system.info");
+        assert!(
+            !info["data"]["can"]
+                .as_array()
+                .unwrap()
+                .contains(&"services".into())
+        );
+
+        let admin =
+            admin(r#"{"ok":true,"connector":"gmail","scopes":["mail.read"],"connected":[]}"#);
+        let mut lamp = Fake {
+            services: Some(services(admin.socket(), Ok(connector("gmail")))),
+            ..Fake::default()
+        };
+        let info = said(&mut lamp, "system.info");
+        let can = info["data"]["can"].as_array().unwrap().clone();
+        assert!(can.contains(&"services".into()) && can.contains(&"services.list".into()));
+
+        let starting = said(&mut lamp, "connector.set.gmail");
+        assert_eq!(
+            (&starting["kind"], &starting["status"]),
+            (
+                &serde_json::json!("connector.set.gmail"),
+                &serde_json::json!("starting")
+            )
+        );
+        let shared = lamp.services.clone().unwrap();
+        let done = results(&shared, 1);
+        let success = done[0].reply(&identity(), now);
+        assert_eq!(success["status"], "success");
+        assert_eq!(
+            success["data"],
+            serde_json::json!({"connector": "gmail", "scopes": ["mail.read"]})
+        );
+        let unknown = said(&mut lamp, "connector.set.dropbox");
+        assert_eq!(unknown["status"], "failure");
+        assert_eq!(unknown["error"], crate::services::NOT_KNOWN);
+        assert_eq!(
+            said(&mut lamp, "connector.remove.gmail")["status"],
+            "starting"
+        );
+        let removed = results(&shared, 1)[0].reply(&identity(), now);
+        assert_eq!(removed["data"], serde_json::json!({"connector": "gmail"}));
+        let listed = said(&mut lamp, "services.list");
+        assert_eq!(listed["status"], "success");
+        assert_eq!(listed["data"], serde_json::json!({"connected": []}));
+
+        // A fetch that fails: `failure` with a plain reason.
+        let mut failing = Fake {
+            services: Some(services(
+                admin.socket(),
+                Err("fetch privacy data: http 500".into()),
+            )),
+            ..Fake::default()
+        };
+        let starting = said(&mut failing, "connector.set.notion");
+        let failed = results(failing.services.as_ref().unwrap(), 1);
+        let failure = failed[0].reply(&identity(), now);
+        assert_eq!(failure["status"], "failure");
+        assert_eq!(failure["error"], "fetch privacy data: http 500");
+
+        let everything = format!(
+            "{starting} {success} {removed} {listed} {failure} {} {} {:?} {:?} {done:?} {failed:?}",
+            done[0].journal(),
+            failed[0].journal(),
+            lamp.services,
+            failing.services,
+        );
+        assert!(!everything.contains(TOKEN), "{everything}");
     }
 
     fn identity() -> Identity {

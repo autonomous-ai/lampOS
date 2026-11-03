@@ -167,6 +167,22 @@ impl TtsCache {
         Ok(samples)
     }
 
+    /// `text` rendered now through the speech service, never kept: a paired
+    /// computer's exact words (`exact`, lamp-control's `say`), which are
+    /// not the lamp's own fixed lines and must not fill [`MOST_FILES`]. Or
+    /// why not: the service's refusal, or a line empty or past
+    /// [`MOST_FRAMES`].
+    pub fn render_once(&self, text: &str) -> Result<Vec<i16>, String> {
+        let samples = (self.render)(text).map_err(|why| format!("not rendered: {why}"))?;
+        if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
+            return Err(format!(
+                "rendered empty or past {} s",
+                MOST_FRAMES / SOUND_RATE
+            ));
+        }
+        Ok(samples)
+    }
+
     /// `text`'s samples if kept already, never rendered here: for a caller
     /// that must not wait on the speech service (#3748).
     pub fn kept(&self, text: &str) -> Option<Vec<i16>> {
@@ -230,7 +246,7 @@ impl TtsCache {
     /// lines this cache warms, and every other file may go. A switch of
     /// voice or language writes the new lines after the old ones, so oldest
     /// first drops the other voices' and languages' lines before a line
-    /// asked since. The owner's lines are at most 20, so room is always
+    /// asked since. The owner's lines are at most 21, so room is always
     /// found.
     fn make_room(&self) -> std::io::Result<()> {
         let owners: std::collections::HashSet<_> = self
@@ -476,8 +492,8 @@ mod tests {
             let (cache, calls) = counted(&dir, "Rachel");
             let cache = cache.speaking(Some(language));
             let lines = cache.warm_lines();
-            assert_eq!(lines.len(), 19 + WARM.len(), "{language:?}");
-            assert_eq!(&lines[19..], WARM);
+            assert_eq!(lines.len(), 21 + WARM.len(), "{language:?}");
+            assert_eq!(&lines[21..], WARM);
             let words = language.fixed(lamp_msgs::SLEEP_LINE).unwrap();
             assert_eq!(lines[1], words);
             assert_ne!(cache.key(words), cache.key(lamp_msgs::SLEEP_LINE));

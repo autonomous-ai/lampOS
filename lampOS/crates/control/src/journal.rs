@@ -223,6 +223,8 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SkillPush { .. } => "skill.push",
         Op::SkillList {} => "skill.list",
         Op::SkillRemove { .. } => "skill.remove",
+        Op::CameraSnapshot {} => "camera.snapshot",
+        Op::CameraStream { .. } => "camera.stream",
     }
 }
 
@@ -238,6 +240,8 @@ pub fn went(op: &Op) -> &'static str {
         Op::Express { .. } => "the body, by mood.sock, and the ring, by light/request",
         Op::Say { .. } => "the voice, by say.sock",
         Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. } => "the skill helper",
+        Op::CameraSnapshot {} => "the eyes' newest frame, by sight.jpg",
+        Op::CameraStream { .. } => "the eyes, by sight.jpg or their frames socket",
         _ => "the door",
     }
 }
@@ -269,7 +273,15 @@ impl Journal {
 
 fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
     let inside = match op {
-        Op::Say { text } => said(text),
+        Op::Say { text, rephrase } => format!(
+            "{}{}",
+            said(text),
+            if rephrase == &Some(true) {
+                ", rephrased"
+            } else {
+                ", exact"
+            }
+        ),
         Op::Gesture { name } | Op::Play { name } | Op::Sound { name } => word(name),
         Op::Move { step_ms, frames } => format!("{} frames, step_ms {step_ms}", frames.len()),
         Op::Express { feeling, strength } => format!("{}, strength {strength:.2}", word(feeling)),

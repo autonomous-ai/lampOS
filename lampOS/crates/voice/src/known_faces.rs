@@ -1962,7 +1962,14 @@ pub fn owner_forgotten() {
 /// The owner kept at setup (`onboarding::owner_of`) while the eyes still
 /// know them ([`still_known`]), refreshed into [`owner_now`] every
 /// [`OWNER_EVERY`] on a thread of its own.
+/// Started once per process, however many parts ask for it (the by-default
+/// name and the connected services).
 pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    STARTED.call_once(|| keep_owner_fresh_now(file, socket));
+}
+
+fn keep_owner_fresh_now(file: Option<PathBuf>, socket: Option<PathBuf>) {
     std::thread::spawn(move || {
         loop {
             refresh_owner(file.as_deref(), socket.as_deref());
@@ -2055,17 +2062,156 @@ impl KnownMark {
     }
 }
 
-/// How many faces the eyes see now, from their newest look on the bus
-/// (`humans/faces/tracked`), `None` when there is no unexpired look: for a
-/// known face's held gap ([`crate::memory_scope::FaceCache::replace_seen`]),
-/// which holds only when the eyes looked and saw none.
+/// Only faces of people at the desk are counted as people at the lamp
+/// (`LAMP_FACES_AT_DESK_ONLY=on`, [`people_at_lamp`]); off unless set, and
+/// then every face the eyes report is one, as before. On lamp-a0ae (2 Nov,
+/// right after setup) the owner's name was held back on 51 of 79 turns as
+/// "more than one face in view": beside the owner's face (0.09 to 0.19 of
+/// the frame wide, 0.80 to 0.92 sure) the eyes kept reporting faces 0.02 to
+/// 0.06 wide at 0.61 to 0.78, a new track id nearly every look, in about
+/// half of all looks. The memory owner's rule: only people at the desk
+/// count.
+pub const AT_DESK_ENVIRONMENT: &str = "LAMP_FACES_AT_DESK_ONLY";
+
+/// A face is someone at the desk only if its box is at least this share of
+/// the reference face's height in the same look ([`at_desk`]): relative,
+/// so it holds near the lamp and far from it. From lamp-06c1's recording (3
+/// Nov): a same-size face beside the owner read 0.93 to 0.95 of their
+/// height, one at 0.75 of the size 0.83, at 0.625 0.63 to 0.70, at 0.55
+/// 0.55 to 0.56; a0ae's far faces were at most 0.46 of the owner's width.
+/// 0.5 would count the 0.55 face.
+pub const AT_DESK_HEIGHT: f32 = 0.6;
+
+/// A face is someone at the desk only if the eyes are at least this sure it
+/// is a face ([`at_desk`]): a second guard behind the size. On lamp-06c1 the
+/// weakest real same-size second face read 0.78, so 0.75 sat too close;
+/// a0ae's far faces read 0.61 to 0.78.
+pub const AT_DESK_CONFIDENCE: f32 = 0.70;
+
+/// The reference face is the tallest of those at least
+/// [`AT_DESK_CONFIDENCE`] sure and at most this share of the frame tall: on
+/// lamp-06c1 (3 Nov, the arm moving) a false box 0.85 to 0.97 of the frame
+/// tall at 0.61 to 0.81 came and went, and as the reference it would have
+/// dropped the owner (0.16 to 0.27 tall).
+pub const AT_DESK_TALLEST: f32 = 0.6;
+
+/// Whether [`AT_DESK_ENVIRONMENT`] is exactly `on`, read once.
+pub fn at_desk_only() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var(AT_DESK_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// For each face of one look, whether it is someone at the desk: with
+/// `desk_only`, at least [`AT_DESK_CONFIDENCE`] sure and at least
+/// [`AT_DESK_HEIGHT`] of the reference face's height, the reference being
+/// the tallest face at least that sure and at most [`AT_DESK_TALLEST`] of the
+/// frame tall, so a giant false box never drops the owner. A look with a
+/// face in it never counts nobody: when none passes, its tallest face counts
+/// (the owner's own confidence fell to 0.61 at an edge on lamp-06c1).
+/// Without `desk_only`, every face. The eyes' list itself is never changed.
+pub fn at_desk(faces: &[lamp_msgs::Face], desk_only: bool) -> Vec<bool> {
+    if !desk_only {
+        return vec![true; faces.len()];
+    }
+    let height = |face: &lamp_msgs::Face| face.ymax - face.ymin;
+    let sure = |face: &lamp_msgs::Face| face.confidence >= AT_DESK_CONFIDENCE;
+    let reference = faces
+        .iter()
+        .filter(|face| sure(face) && height(face) <= AT_DESK_TALLEST)
+        .map(height)
+        .fold(0.0_f32, f32::max);
+    let mut counted: Vec<bool> = faces
+        .iter()
+        .map(|face| sure(face) && reference > 0.0 && height(face) >= AT_DESK_HEIGHT * reference)
+        .collect();
+    if !counted.contains(&true)
+        && let Some(tallest) = (0..faces.len())
+            .max_by(|one, other| height(&faces[*one]).total_cmp(&height(&faces[*other])))
+    {
+        counted[tallest] = true;
+    }
+    counted
+}
+
+/// How many people are at the lamp in one look of the eyes: the faces
+/// [`at_desk`] keeps, with [`at_desk_only`]; every face without.
+pub fn people_at_lamp(faces: &lamp_msgs::Faces) -> usize {
+    count_at_desk(faces, at_desk_only())
+}
+
+/// [`people_at_lamp`] with the switch given.
+pub fn count_at_desk(faces: &lamp_msgs::Faces, desk_only: bool) -> usize {
+    at_desk(&faces.faces, desk_only)
+        .into_iter()
+        .filter(|counted| *counted)
+        .count()
+}
+
+/// For the journal: each face of one look as its box's width and height
+/// and its confidence, counted ones first, then the dropped ones
+/// ([`at_desk`]). Sizes only, no id, no place in the picture.
+pub fn faces_told(faces: &lamp_msgs::Faces, desk_only: bool) -> String {
+    let counted = at_desk(&faces.faces, desk_only);
+    let told = |keep: bool| {
+        let sizes: Vec<String> = faces
+            .faces
+            .iter()
+            .zip(&counted)
+            .filter(|(_, counted)| **counted == keep)
+            .map(|(face, _)| {
+                format!(
+                    "w{:.2} h{:.2} c{:.2}",
+                    face.xmax - face.xmin,
+                    face.ymax - face.ymin,
+                    face.confidence
+                )
+            })
+            .collect();
+        if sizes.is_empty() {
+            "none".to_owned()
+        } else {
+            sizes.join(", ")
+        }
+    };
+    format!("counted {}; dropped {}", told(true), told(false))
+}
+
+/// Whether a face of one look that the eyes read speaking (`yes`) is one
+/// [`at_desk`] does not count: someone far behind the owner talking to the
+/// lamp (the Reviewer-lead's P2 on #4987). Never without `desk_only`, as
+/// every face counts then.
+pub fn speaking_not_at_desk(faces: &lamp_msgs::Faces, desk_only: bool) -> bool {
+    at_desk(&faces.faces, desk_only)
+        .into_iter()
+        .zip(&faces.faces)
+        .any(|(counted, face)| {
+            !counted
+                && face
+                    .speaking
+                    .as_ref()
+                    .is_some_and(|speaking| speaking.state == lamp_msgs::SpeakingState::Yes)
+        })
+}
+
+/// Whether the name-by-default decision line tells the deciding look's
+/// faces ([`faces_told`]): with `desk_only`, or when a face was dropped,
+/// so the line reads as before with the switch off.
+pub fn faces_worth_telling(told: &str, desk_only: bool) -> bool {
+    !told.is_empty() && (desk_only || !told.ends_with("; dropped none"))
+}
+
+/// How many people the eyes see at the lamp now ([`people_at_lamp`]), from
+/// their newest look on the bus (`humans/faces/tracked`), `None` when there
+/// is no unexpired look: for a known face's held gap
+/// ([`crate::memory_scope::FaceCache::replace_seen`]), which holds only when
+/// the eyes looked and saw none.
 pub fn faces_in_view(bus: &lamp_bus::Bus) -> Option<usize> {
     bus.latest(lamp_msgs::Faces::TOPIC)
         .ok()
         .flatten()
         .filter(|message| !message.expired)
         .and_then(|message| message.parse::<lamp_msgs::Faces>().ok())
-        .map(|faces| faces.faces.len())
+        .map(|faces| people_at_lamp(&faces))
 }
 
 /// How far back [`most_faces_lately`] looks: one look that missed a face
@@ -2073,22 +2219,35 @@ pub fn faces_in_view(bus: &lamp_bus::Bus) -> Option<usize> {
 /// read the one with none) never makes two people one.
 pub const FACES_WITHIN: Duration = Duration::from_secs(3);
 
+/// How long a face not at the desk seen speaking holds the owner's name
+/// back ([`spoke_not_at_desk_lately`]): longer than [`FACES_WITHIN`], so a
+/// line that ended a few seconds before its reply is still covered.
+pub const SPOKE_NOT_AT_DESK_WITHIN: Duration = Duration::from_secs(10);
+
 /// How often [`keep_faces_counted`] reads the eyes' newest look: they look
 /// about four times a second.
 pub const FACES_EVERY: Duration = Duration::from_millis(100);
 
 /// The eyes' face counts of the last [`FACES_WITHIN`], as [`faces_in_view`]
-/// read them.
+/// read them, each with its faces' sizes for the journal ([`faces_told`]).
 #[derive(Debug, Default)]
 pub struct FacesLately(
-    std::collections::VecDeque<(std::time::Instant, usize)>,
+    std::collections::VecDeque<(std::time::Instant, usize, String)>,
     /// The last look counted, by its publisher's boot and `seq`.
     Option<(String, u64)>,
+    /// When a face not at the desk last read speaking
+    /// ([`speaking_not_at_desk`]).
+    Option<std::time::Instant>,
 );
 
 impl FacesLately {
     pub fn seen(&mut self, at: std::time::Instant, faces: usize) {
-        self.0.push_back((at, faces));
+        self.seen_told(at, faces, String::new());
+    }
+
+    /// [`Self::seen`] with the look's faces as the journal tells them.
+    pub fn seen_told(&mut self, at: std::time::Instant, faces: usize, told: String) {
+        self.0.push_back((at, faces, told));
         self.forget_before(at);
     }
 
@@ -2098,9 +2257,20 @@ impl FacesLately {
     /// spurious look read three times would pass for two (the Reviewer-lead's
     /// and Fourth's P2 on #4364).
     pub fn look(&mut self, at: std::time::Instant, look: (String, u64), faces: usize) {
+        self.look_told(at, look, faces, String::new());
+    }
+
+    /// [`Self::look`] with the look's faces as the journal tells them.
+    pub fn look_told(
+        &mut self,
+        at: std::time::Instant,
+        look: (String, u64),
+        faces: usize,
+        told: String,
+    ) {
         if self.1.as_ref() != Some(&look) {
             self.1 = Some(look);
-            self.seen(at, faces);
+            self.seen_told(at, faces, told);
         }
     }
 
@@ -2111,16 +2281,44 @@ impl FacesLately {
     /// 16:52, the one screen face) never makes one person two (#4118).
     pub fn most(&mut self, now: std::time::Instant) -> Option<usize> {
         self.forget_before(now);
-        let mut counts: Vec<usize> = self.0.iter().map(|(_, faces)| *faces).collect();
+        let mut counts: Vec<usize> = self.0.iter().map(|(_, faces, _)| *faces).collect();
         counts.sort_unstable_by(|a, b| b.cmp(a));
         counts.get(1).or(counts.first()).copied()
+    }
+
+    /// The faces' sizes of the newest look in [`FACES_WITHIN`] of `now`
+    /// with as many people as [`Self::most`] gives, for the journal: the
+    /// look that decided it. Empty with none.
+    pub fn most_told(&mut self, now: std::time::Instant) -> String {
+        let Some(most) = self.most(now) else {
+            return String::new();
+        };
+        self.0
+            .iter()
+            .rev()
+            .find(|(_, faces, _)| *faces == most)
+            .map(|(_, _, told)| told.clone())
+            .unwrap_or_default()
+    }
+
+    /// A face not at the desk read speaking in a look at `at`
+    /// ([`speaking_not_at_desk`]).
+    pub fn spoke_not_at_desk(&mut self, at: std::time::Instant) {
+        self.2 = Some(at);
+    }
+
+    /// Whether a face not at the desk read speaking within
+    /// [`SPOKE_NOT_AT_DESK_WITHIN`] of `now`.
+    pub fn spoke_not_at_desk_since(&self, now: std::time::Instant) -> bool {
+        self.2
+            .is_some_and(|at| now.saturating_duration_since(at) <= SPOKE_NOT_AT_DESK_WITHIN)
     }
 
     fn forget_before(&mut self, now: std::time::Instant) {
         while self
             .0
             .front()
-            .is_some_and(|(at, _)| now.saturating_duration_since(*at) > FACES_WITHIN)
+            .is_some_and(|(at, _, _)| now.saturating_duration_since(*at) > FACES_WITHIN)
         {
             self.0.pop_front();
         }
@@ -2128,13 +2326,20 @@ impl FacesLately {
 }
 
 static FACES_LATELY: std::sync::Mutex<FacesLately> =
-    std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None));
+    std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None, None));
 
 /// Read the eyes' newest look every [`FACES_EVERY`] into
 /// [`most_faces_lately`], on a thread of its own.
 // ponytail: polls `latest`, so a look between two reads can be missed; a
 // bus subscriber if that ever matters.
 pub fn keep_faces_counted(bus: lamp_bus::Bus) {
+    // Once per process: the by-default name and the connected services
+    // both count faces.
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    STARTED.call_once(|| keep_faces_counted_now(bus));
+}
+
+fn keep_faces_counted_now(bus: lamp_bus::Bus) {
     std::thread::spawn(move || {
         loop {
             if let Some((look, faces)) = bus
@@ -2147,13 +2352,26 @@ pub fn keep_faces_counted(bus: lamp_bus::Bus) {
                     message
                         .parse::<lamp_msgs::Faces>()
                         .ok()
-                        .map(|faces| (look, faces.faces.len()))
+                        .map(|faces| (look, faces))
                 })
             {
-                FACES_LATELY
+                let desk_only = at_desk_only();
+                let mut lately = FACES_LATELY
                     .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .look(std::time::Instant::now(), look, faces);
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                // Told only for a new look: the sizes are formatted once.
+                if lately.1.as_ref() != Some(&look) {
+                    let at = std::time::Instant::now();
+                    if speaking_not_at_desk(&faces, desk_only) {
+                        lately.spoke_not_at_desk(at);
+                    }
+                    lately.look_told(
+                        at,
+                        look,
+                        count_at_desk(&faces, desk_only),
+                        faces_told(&faces, desk_only),
+                    );
+                }
             }
             std::thread::sleep(FACES_EVERY);
         }
@@ -2167,6 +2385,26 @@ pub fn most_faces_lately() -> Option<usize> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .most(std::time::Instant::now())
+}
+
+/// Whether a face not at the desk read speaking in the eyes' looks of the
+/// last [`SPOKE_NOT_AT_DESK_WITHIN`] ([`keep_faces_counted`]), for
+/// `person::someone_else_now`.
+pub fn spoke_not_at_desk_lately() -> bool {
+    FACES_LATELY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .spoke_not_at_desk_since(std::time::Instant::now())
+}
+
+/// The faces' sizes of the look [`most_faces_lately`] took its count from
+/// ([`FacesLately::most_told`], [`faces_told`]), for the journal; empty
+/// with none.
+pub fn most_faces_lately_told() -> String {
+    FACES_LATELY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .most_told(std::time::Instant::now())
 }
 
 /// How long ago the eyes may have written the known file for
@@ -3029,6 +3267,252 @@ mod tests {
         std::fs::remove_file(&mailbox).unwrap();
         refresh_owner(Some(&file), Some(&socket.with_file_name("none.sock")));
         assert_eq!(told(), "");
+    }
+
+    /// A face `width` of the frame wide at `confidence`, square in a 4:3
+    /// frame, as the eyes report it.
+    fn desk_face(id: &str, width: f32, confidence: f32) -> lamp_msgs::Face {
+        lamp_msgs::Face {
+            id: id.to_owned(),
+            xmin: 0.3,
+            ymin: 0.2,
+            xmax: 0.3 + width,
+            ymax: 0.2 + width * 4.0 / 3.0,
+            confidence,
+            yaw: None,
+            facing: None,
+            speaking: None,
+            follows: None,
+        }
+    }
+
+    fn desk_look(faces: &[(f32, f32)]) -> lamp_msgs::Faces {
+        lamp_msgs::Faces {
+            faces: faces
+                .iter()
+                .enumerate()
+                .map(|(k, (width, confidence))| desk_face(&format!("f{k}"), *width, *confidence))
+                .collect(),
+        }
+    }
+
+    /// The a0ae name-forget report (2 Nov), the first builder's shape: the owner 0.09 to 0.19 of the
+    /// frame wide at 0.80 to 0.92, beside faces 0.02 to 0.06 wide at 0.61
+    /// to 0.78 that come and go, is one person in every look; a second
+    /// person at the desk beside them is still two.
+    #[test]
+    fn only_faces_at_the_desk_are_people_at_the_lamp() {
+        let count = |faces: &[(f32, f32)]| count_at_desk(&desk_look(faces), true);
+        // The live sample's looks, and the ranges' other ends.
+        let a0ae: [&[(f32, f32)]; 7] = [
+            &[(0.15, 0.88)],
+            &[(0.15, 0.88), (0.06, 0.67), (0.02, 0.61)],
+            &[(0.13, 0.80), (0.06, 0.67)],
+            &[(0.12, 0.87), (0.04, 0.78), (0.02, 0.61)],
+            &[(0.19, 0.92), (0.06, 0.78), (0.03, 0.70)],
+            &[(0.09, 0.80), (0.04, 0.78)],
+            &[(0.09, 0.80), (0.06, 0.61), (0.02, 0.61)],
+        ];
+        for look in a0ae {
+            assert_eq!(count(look), 1, "{look:?}");
+        }
+        // Churning through 3 s of looks: one person, so the owner is named.
+        let at = std::time::Instant::now();
+        let mut lately = FacesLately::default();
+        for (k, look) in a0ae.iter().cycle().take(12).enumerate() {
+            let faces = desk_look(look);
+            lately.look_told(
+                at + Duration::from_millis(250 * k as u64),
+                ("b".into(), k as u64),
+                count_at_desk(&faces, true),
+                faces_told(&faces, true),
+            );
+        }
+        let now = at + Duration::from_millis(2_900);
+        assert_eq!(lately.most(now), Some(1));
+        let owner = vec!["Lan".to_owned()];
+        assert_eq!(
+            crate::person::someone_else_now(
+                &owner,
+                lately.most(now),
+                Some("Lan"),
+                false,
+                false,
+                None
+            ),
+            None,
+            "named by default beside the far faces"
+        );
+        // Off, as before: the same looks are two people, and the name held.
+        let mut before = FacesLately::default();
+        for (k, look) in a0ae.iter().cycle().take(12).enumerate() {
+            before.seen(
+                at + Duration::from_millis(250 * k as u64),
+                count_at_desk(&desk_look(look), false),
+            );
+        }
+        assert_eq!(before.most(now), Some(3));
+        assert_eq!(
+            crate::person::someone_else_now(
+                &owner,
+                before.most(now),
+                Some("Lan"),
+                false,
+                false,
+                None
+            ),
+            Some("more than one face in view")
+        );
+        // A guest far behind the owner who is the only voice: their face,
+        // not counted, read speaking holds the name back (the
+        // Reviewer-lead's P2 on #4987); the owner speaking, or a far face
+        // read still, does not. Off, nothing is dropped, so never.
+        let speaking = |look: &[(f32, f32)], who: usize, state: lamp_msgs::SpeakingState| {
+            let mut faces = desk_look(look);
+            faces.faces[who].speaking = Some(lamp_msgs::Speaking {
+                state,
+                score: 0.05,
+                from: None,
+            });
+            faces
+        };
+        let guest = speaking(
+            &[(0.15, 0.88), (0.07, 0.80)],
+            1,
+            lamp_msgs::SpeakingState::Yes,
+        );
+        assert_eq!(count_at_desk(&guest, true), 1);
+        assert!(speaking_not_at_desk(&guest, true));
+        assert!(!speaking_not_at_desk(&guest, false));
+        let owner_speaking = speaking(
+            &[(0.15, 0.88), (0.07, 0.80)],
+            0,
+            lamp_msgs::SpeakingState::Yes,
+        );
+        assert!(!speaking_not_at_desk(&owner_speaking, true));
+        let guest_still = speaking(
+            &[(0.15, 0.88), (0.07, 0.80)],
+            1,
+            lamp_msgs::SpeakingState::No,
+        );
+        assert!(!speaking_not_at_desk(&guest_still, true));
+        let mut heard = FacesLately::default();
+        assert!(!heard.spoke_not_at_desk_since(at));
+        heard.spoke_not_at_desk(at);
+        heard.look(at, ("b".into(), 1), count_at_desk(&guest, true));
+        let reply = at + Duration::from_secs(4);
+        assert_eq!(heard.most(reply), None, "past the count's 3 s");
+        assert!(heard.spoke_not_at_desk_since(reply));
+        assert_eq!(
+            crate::person::someone_else_now(
+                &owner,
+                Some(1),
+                Some("Lan"),
+                false,
+                heard.spoke_not_at_desk_since(reply),
+                None
+            ),
+            Some("a face not at the desk seen speaking")
+        );
+        assert!(
+            !heard
+                .spoke_not_at_desk_since(at + SPOKE_NOT_AT_DESK_WITHIN + Duration::from_millis(1))
+        );
+        // Two people side by side at the desk: two, and the name held.
+        assert_eq!(count(&[(0.14, 0.85), (0.12, 0.82)]), 2);
+        assert_eq!(count(&[(0.14, 0.85), (0.12, 0.82), (0.03, 0.66)]), 2);
+        // Someone well behind the owner, sure it is a face: not at the desk.
+        assert_eq!(count(&[(0.15, 0.90), (0.06, 0.80)]), 1);
+        // A near face the eyes are unsure of: not counted beside the owner;
+        // alone, a look with a face never counts nobody.
+        assert_eq!(count(&[(0.15, 0.88), (0.13, 0.65)]), 1);
+        assert_eq!(count(&[(0.13, 0.65)]), 1);
+        // The owner at an edge, 0.61 sure, alone: still one.
+        assert_eq!(count(&[(0.093, 0.61)]), 1);
+        // A large unsure misdetection never pushes the owner out.
+        assert_eq!(count(&[(0.40, 0.60), (0.12, 0.85)]), 1);
+        // No face, no person.
+        assert_eq!(count(&[]), 0);
+        // lamp-06c1's recording (3 Nov), by height: a same-size face beside
+        // the owner (0.93 of their height, the weaker 0.78 sure) is two.
+        let by_height = |faces: &[(f32, f32)]| {
+            let look = lamp_msgs::Faces {
+                faces: faces
+                    .iter()
+                    .enumerate()
+                    .map(|(k, (height, confidence))| lamp_msgs::Face {
+                        ymax: 0.1 + height,
+                        ymin: 0.1,
+                        ..desk_face(&format!("f{k}"), 0.1, *confidence)
+                    })
+                    .collect(),
+            };
+            count_at_desk(&look, true)
+        };
+        assert_eq!(by_height(&[(0.177, 0.90), (0.165, 0.78)]), 2);
+        // A face 0.55 of the owner's height at 0.84: not at the desk.
+        assert_eq!(by_height(&[(0.177, 0.91), (0.098, 0.84)]), 1);
+        // A giant false box (0.85 to 0.97 tall at 0.61 to 0.81, the arm
+        // moving) never knocks the owner out: unsure, it is dropped; sure,
+        // it is never the reference, so the owner still counts.
+        let giant = |confidence: f32| {
+            let faces = lamp_msgs::Faces {
+                faces: vec![
+                    lamp_msgs::Face {
+                        xmin: 0.03,
+                        xmax: 0.53,
+                        ymin: 0.02,
+                        ymax: 0.93,
+                        ..desk_face("f10", 0.5, confidence)
+                    },
+                    lamp_msgs::Face {
+                        ymin: 0.5,
+                        ymax: 0.67,
+                        ..desk_face("f14", 0.10, 0.88)
+                    },
+                ],
+            };
+            at_desk(&faces.faces, true)
+        };
+        assert_eq!(giant(0.61), [false, true]);
+        assert_eq!(giant(0.81), [true, true]);
+        // Off: every face the eyes report, as `faces.len()`.
+        for look in a0ae {
+            assert_eq!(count_at_desk(&desk_look(look), false), look.len());
+        }
+        assert_eq!(count_at_desk(&desk_look(&[(0.13, 0.65)]), false), 1);
+        // The eyes' list is never changed.
+        let faces = desk_look(&[(0.15, 0.88), (0.02, 0.61)]);
+        let kept = faces.clone();
+        let _ = count_at_desk(&faces, true);
+        assert_eq!(faces, kept);
+    }
+
+    /// The decision line's sizes: counted faces first, dropped ones after,
+    /// sizes and confidence only (no id, no place in the picture).
+    #[test]
+    fn the_faces_told_are_sizes_only() {
+        let faces = desk_look(&[(0.15, 0.88), (0.06, 0.67)]);
+        let told = faces_told(&faces, true);
+        assert_eq!(told, "counted w0.15 h0.20 c0.88; dropped w0.06 h0.08 c0.67");
+        assert!(!told.contains("f0") && !told.contains("f1"), "{told}");
+        assert_eq!(
+            faces_told(&faces, false),
+            "counted w0.15 h0.20 c0.88, w0.06 h0.08 c0.67; dropped none"
+        );
+        // Told with the switch on, or when a face was dropped; off, the
+        // decision line reads as before (the Reviewer-lead's P3 on #4987).
+        assert!(faces_worth_telling(&told, true));
+        assert!(faces_worth_telling(&told, false));
+        let off = faces_told(&faces, false);
+        assert!(!faces_worth_telling(&off, false));
+        assert!(faces_worth_telling(&off, true));
+        assert!(!faces_worth_telling("", true));
+        let mut lately = FacesLately::default();
+        let at = std::time::Instant::now();
+        assert_eq!(lately.most_told(at), "");
+        lately.look_told(at, ("b".into(), 1), 1, told.clone());
+        assert_eq!(lately.most_told(at), told);
     }
 
     /// lamp-52e6, 29 Oct 13:03: one look that missed a face among two in

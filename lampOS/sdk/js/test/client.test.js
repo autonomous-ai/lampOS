@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { Keyring, Lamp, LampError, NotPaired, WrongLamp, byCode, fromReply, schema } from '../src/index.js';
-import { FakeLamp, HAND_PATHS, handEvents, handTrack } from '../src/testing.js';
+import { AIR, DEVICE, FakeLamp, HAND_PATHS, handEvents, handTrack } from '../src/testing.js';
 
 // A move the body plays (and lamp-control takes): 4 frames of 500 ms, 1.5 s in
 // all, from rest and back, well inside each joint's reach and speed.
@@ -51,7 +51,8 @@ test('proofs name what they are for', async () => {
 
 test('every op has a call and every error code a class', () => {
   const plumbing = new Set(['pair', 'hello', 'subscribe', 'unsubscribe', 'get', 'lease.take', 'lease.renew', 'lease.release']);
-  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[op] === 'function', op);
+  const call = (op) => op.replace(/\.(\w)/g, (_, c) => c.toUpperCase());
+  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[call(op)] === 'function', op);
   for (const code of schema.errorCodes) assert.equal(new byCode[code]('x').code, code);
   assert.equal(fromReply({ code: 'rate', why: 'x', retry_ms: 900 }).retryMs, 900);
   assert.ok(fromReply({ code: 'no_grant', why: 'x' }) instanceof byCode.no_grant);
@@ -367,7 +368,7 @@ test('names outside the schema never leave this computer', async () => {
     for (const call of [lamp.gesture('scanning'), lamp.gesture('idle'), lamp.light('magenta', 3, 1000)]) {
       await assert.rejects(call, (error) => error.code === 'bad_request');
     }
-    assert.throws(() => lamp.on('camera.frame', () => {}), LampError);
+    assert.throws(() => lamp.on('camera.zoomed', () => {}), LampError);
     await lamp.stop();
     assert.deepEqual(fake.received.filter((f) => ['gesture', 'light'].includes(f.op)), []);
   });
@@ -418,6 +419,27 @@ test('get answers the states asked', async () => {
     const state = await lamp.get('presence', 'lamp');
     // As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
     assert.deepEqual(state, { presence: { count: 2, near: 0.4, facing: true }, lamp: { talking: false, paused: false, private: false, asleep: false } });
+  });
+});
+
+test('air and device need their grants, and air.changed comes on a new reading', async () => {
+  await withLamp({ grants: ['air', 'device'] }, async (lamp, fake) => {
+    assert.deepEqual(await lamp.air(), AIR);
+    assert.deepEqual(await lamp.device(), DEVICE);
+    let told;
+    const heard = new Promise((resolve) => { told = resolve; });
+    await lamp.on('air.changed', (event) => told(event));
+    fake.setAir({ pm2_5: 41, co2_ppm: 1350, feel: 'stuffy' });
+    const event = await heard;
+    assert.deepEqual([event.pm2_5, event.co2_ppm, event.feel], [41, 1350, 'stuffy']);
+    assert.deepEqual(await lamp.air(), { pm2_5: 41, co2_ppm: 1350, feel: 'stuffy', known: true });
+    // No sensor: known false, nothing else.
+    fake.setAir();
+    assert.deepEqual(await lamp.air(), { known: false });
+  });
+  await withLamp({ grants: ['light'] }, async (lamp) => {
+    await assert.rejects(lamp.air(), /no_grant/);
+    await assert.rejects(lamp.device(), /no_grant/);
   });
 });
 
@@ -940,4 +962,34 @@ test('a look at the hand needs the body\'s lease socket, as other looks do', asy
     await assert.rejects(lamp.followHand().start(), byCode.refused);
     assert.equal(fake.leases.size, 0);
   });
+});
+
+test('a say is exact unless rephrase is asked', async () => {
+  await withLamp({ grants: ['speak'] }, async (lamp, fake) => {
+    await lamp.say('Build passed, 3 tests.');
+    await lamp.say('Tell them the build passed.', { rephrase: true });
+    assert.deepEqual(fake.asked('say'), [
+      { text: 'Build passed, 3 tests.' },
+      { text: 'Tell them the build passed.', rephrase: true },
+    ]);
+  });
+});
+
+test('the camera stream asks up to 30 a second, and 31 is refused before sending', () => withLamp({ grants: ['light', 'camera'] }, async (lamp) => {
+  const started = await lamp.cameraStream(true, 30);
+  assert.equal(started.fps, 30);
+  assert.ok('fps_now' in started);
+  await assert.rejects(lamp.cameraStream(true, 31), LampError);
+}));
+
+test('a fast binary frame is its header and the JPEG as data', async () => {
+  const { binaryFrame } = await import('../src/client.js');
+  const header = Buffer.from(JSON.stringify({ ev: 'camera.frame', bytes: 4, width: 640, height: 480, fps_now: 24.8 }));
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(header.length);
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  const frame = binaryFrame(Buffer.concat([length, header, jpeg]));
+  assert.equal(frame.ev, 'camera.frame');
+  assert.equal(frame.width, 640);
+  assert.deepEqual([...frame.data], [...jpeg]);
 });

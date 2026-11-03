@@ -123,6 +123,10 @@ struct Exchange {
     /// The note the lamp was given in writing for it, when it began the
     /// turn itself (a written request): not words anyone said.
     written: Option<String>,
+    /// The functions its turn ran, in the order they ran, once each
+    /// ([`Thread::called`]). Never kept in the file (#1505): a thread read
+    /// back tells its exchanges in words only, as before.
+    calls: Vec<String>,
 }
 
 /// A completed exchange, preserving the scope bound when its response began.
@@ -176,10 +180,43 @@ pub struct Thread {
     /// made or its first call came ([`Self::line_of`], #3113): the newest
     /// [`LINES`]. A later line never takes its place.
     lines: VecDeque<(u64, String)>,
+    /// The functions requests ran before the lamp said any words of theirs
+    /// ([`Self::called`]), the newest [`LINES`] requests': each goes to its
+    /// exchange when it opens.
+    calling: VecDeque<(u64, Vec<String>)>,
+    /// The newest [`LINES`] requests a connected service's read answered
+    /// in ([`Self::private_for`]): their lamp's words are never kept.
+    private: VecDeque<u64>,
 }
+
+/// What stands for the lamp's words in a request a connected service's
+/// read answered in ([`Thread::private_for`]): nothing of a mailbox, a
+/// calendar or a page is kept, saved, told again or summarised.
+pub const PRIVATE_SAID: &str = "(read from a linked service; not kept)";
 
 /// How many requests' own lines are held ([`Thread::line_of`]).
 const LINES: usize = 8;
+/// The most functions kept for one exchange, and the most of a name.
+const CALLS: usize = 8;
+const NAME_BYTES: usize = 64;
+/// The start of a kept call's id ([`KeptCall::id`]), by which a chat that
+/// refuses them is asked again without them
+/// (`second_provider::without_kept_calls`).
+pub const KEPT_CALL_ID: &str = "kept-";
+
+impl Exchange {
+    /// Its calls as [`Recent::calls`] gives them.
+    fn kept_calls(&self) -> Vec<KeptCall> {
+        self.calls
+            .iter()
+            .enumerate()
+            .map(|(at, name)| KeptCall {
+                id: format!("{KEPT_CALL_ID}{}-{at}", self.request),
+                name: name.clone(),
+            })
+            .collect()
+    }
+}
 
 /// One exchange as it is kept in the file: when, by the wall clock, since
 /// the process that reads it back has another `Instant`.
@@ -210,6 +247,19 @@ pub struct Recent {
     /// (`LAMP_SAID_AS_HEARD`, [`Thread::heard_only`]): `lamp` is only what
     /// was played.
     pub cut: bool,
+    /// The functions its turn ran, in the order they ran
+    /// (`LAMP_HISTORY_KEEPS_CALLS`, [`Thread::called`]); none when it called
+    /// nothing.
+    pub calls: Vec<KeptCall>,
+}
+
+/// A function an exchange's turn ran ([`Recent::calls`]): its name, and an
+/// id of its own for the chat's messages, `kept-<request>-<n>`, the same
+/// at every turn it is told.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeptCall {
+    pub id: String,
+    pub name: String,
 }
 
 /// A scope's exchanges due for its running summary ([`Thread::summary_due`]).
@@ -298,6 +348,8 @@ impl Thread {
             count_only: None,
             quoted: None,
             lines: VecDeque::new(),
+            calling: VecDeque::new(),
+            private: VecDeque::new(),
         }
     }
 
@@ -582,6 +634,7 @@ impl Thread {
                     add(&mut written, &text, PERSON_BYTES);
                     written
                 }),
+                calls: Vec::new(),
             });
         }
         Ok(thread)
@@ -619,6 +672,11 @@ impl Thread {
         if self.heard_done || stale {
             self.heard.clear();
             self.heard_done = false;
+        }
+        // A new line begins: a write waiting for its "send" counts it
+        // (`crate::services`), so only the very next line can send it.
+        if self.heard.trim().is_empty() && text.chars().any(char::is_alphanumeric) {
+            crate::services::line_began(now);
         }
         add(&mut self.heard, text, PERSON_BYTES);
         // Scrubbed joined too: a code or an account split across pieces is
@@ -735,6 +793,7 @@ impl Thread {
 
     /// Attribute an answer to its admitted scope rather than a later face observation.
     pub fn lamp_for(&mut self, request: u64, text: &str, now: Instant, scope: Option<&str>) {
+        let words = text;
         let text = &crate::sign_in::scrub(text);
         // The name of a function said where it should have been called is
         // not something the lamp said: neither that piece nor what follows
@@ -751,6 +810,9 @@ impl Thread {
         if self.cut == Some(request) {
             return;
         }
+        // A write waiting for its "send" hears what the lamp said of its
+        // read-back, as said, and of any other request (`crate::services`).
+        crate::services::lamp_said(request, words, now);
         let opening = self.exchanges.back().map(|last| last.request) != Some(request);
         if opening && crate::not_speech::names_a_function(text) {
             self.unsaid = Some(request);
@@ -787,6 +849,13 @@ impl Thread {
                 self.exchanges.pop_front();
             }
             let written = self.note_for(request, &whose);
+            let calls = self
+                .calling
+                .iter()
+                .position(|(held, _)| *held == request)
+                .and_then(|at| self.calling.remove(at))
+                .map(|(_, calls)| calls)
+                .unwrap_or_default();
             self.exchanges.push_back(Exchange {
                 request,
                 at: now,
@@ -800,15 +869,62 @@ impl Thread {
                 cut: false,
                 whose,
                 written,
+                calls,
             });
         }
+        let private = self.private.contains(&request);
         if let Some(last) = self.exchanges.back_mut() {
+            if private {
+                // A service's read: none of what the lamp said of it.
+                hide(last);
+                self.changed = true;
+                return;
+            }
             add(&mut last.lamp, text, LAMP_BYTES);
             keep_end(&mut last.tail, text, TAIL_BYTES);
             // Scrubbed joined too (Jarvis's P2 on #2137).
             last.lamp = crate::sign_in::scrub_piece(&last.lamp);
             last.tail = crate::sign_in::scrub_piece(&last.tail);
             self.changed = true;
+        }
+    }
+
+    /// Request `request`'s turn ran function `name`, and it was not refused
+    /// (`LAMP_HISTORY_KEEPS_CALLS`, `Engine::keeping_calls`): kept with
+    /// the request's exchange, so a later turn is told the call with the
+    /// lamp's words ([`Recent::calls`]). A call that comes before any of
+    /// the lamp's words waits for its exchange to open, wherever
+    /// [`Self::lamp_for`] files it; a request that never says a kept word
+    /// (one whose words are not kept, a gone scope's, a silent one) is
+    /// never told, nor are its calls.
+    pub fn called(&mut self, request: u64, name: &str) {
+        if name.is_empty() || name.len() > NAME_BYTES {
+            return;
+        }
+        let keep = |calls: &mut Vec<String>| {
+            if calls.len() < CALLS && !calls.iter().any(|called| called == name) {
+                calls.push(name.to_owned());
+            }
+        };
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+        {
+            keep(&mut exchange.calls);
+            return;
+        }
+        match self.calling.iter_mut().find(|(held, _)| *held == request) {
+            Some((_, calls)) => keep(calls),
+            None => {
+                if self.calling.len() == LINES {
+                    self.calling.pop_front();
+                }
+                let mut calls = Vec::new();
+                keep(&mut calls);
+                self.calling.push_back((request, calls));
+            }
         }
     }
 
@@ -879,6 +995,11 @@ impl Thread {
     /// for an answer the thread doesn't hold.
     pub fn heard_only(&mut self, request: u64, said: &str) {
         self.cut = Some(request);
+        // A read-back cut is no read-back: its write is never sent.
+        crate::services::lamp_cut(request);
+        if self.private.contains(&request) {
+            return;
+        }
         let Some(exchange) = self
             .exchanges
             .iter_mut()
@@ -909,6 +1030,7 @@ impl Thread {
         crate::conversation_summary::forget_all();
         self.exchanges.clear();
         self.lines.clear();
+        self.calling.clear();
         self.note = None;
         self.heard.clear();
         self.heard_at = None;
@@ -1058,6 +1180,17 @@ impl Thread {
         Some((lamp, now.saturating_duration_since(exchange.at)))
     }
 
+    /// The request of the newest exchange with the lamp's words, `request`'s
+    /// own left out: the lamp's turn just before it ([`crate::services`]).
+    pub fn answered_request_but(&self, request: u64) -> Option<u64> {
+        self.exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .map(|exchange| exchange.request)
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
@@ -1188,6 +1321,29 @@ impl Thread {
             .collect()
     }
 
+    /// A connected service's read answered in request `request`
+    /// (`crate::services`): its exchange keeps only [`PRIVATE_SAID`] for
+    /// the lamp's words, now and as the lamp goes on, so none of a mail, an
+    /// event or a page reaches the thread's file, a later turn, the memory's
+    /// journal or the running summary, which never has it at all.
+    pub fn private_for(&mut self, request: u64) {
+        if !self.private.contains(&request) {
+            if self.private.len() == LINES {
+                self.private.pop_front();
+            }
+            self.private.push_back(request);
+        }
+        if let Some(exchange) = self
+            .exchanges
+            .iter_mut()
+            .rev()
+            .find(|exchange| exchange.request == request)
+        {
+            hide(exchange);
+            self.changed = true;
+        }
+    }
+
     /// Request `request`'s line was answered in a held scope
     /// ([`crate::memory_scope::ScopeSnapshot::held`]): its exchange is
     /// never given to the running summary ([`Self::summary_due`],
@@ -1248,6 +1404,7 @@ impl Thread {
                 lamp: exchange.lamp.trim().to_owned(),
                 room: false,
                 cut: exchange.cut,
+                calls: exchange.kept_calls(),
             })
             .collect();
         recent.reverse();
@@ -1312,6 +1469,7 @@ impl Thread {
                 lamp: exchange.lamp.trim().to_owned(),
                 room: exchange.whose.is_none(),
                 cut: exchange.cut,
+                calls: exchange.kept_calls(),
             })
             .collect();
         recent.reverse();
@@ -1387,6 +1545,14 @@ const GOING_ON: &str = "\n\nA moment ago\nThis is what you and the person at you
 /// reads its path. Unset: the thread is in memory only.
 pub const FILE_FLAG: &str = "--thread-file";
 pub const FILE_ENVIRONMENT: &str = "LAMP_THREAD_FILE";
+
+/// An exchange's lamp words replaced by [`PRIVATE_SAID`], held from the
+/// running summary ([`Thread::private_for`]).
+fn hide(exchange: &mut Exchange) {
+    exchange.lamp = PRIVATE_SAID.to_owned();
+    exchange.tail = PRIVATE_SAID.to_owned();
+    exchange.held = true;
+}
 
 pub(crate) fn usable(path: &Path) -> bool {
     path.is_absolute()
@@ -1730,6 +1896,45 @@ impl Connect for Recalling {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A connected service's read (`crate::services`): none of what the
+    /// lamp said of it is saved, told again, journalled or summarised,
+    /// whether the lamp spoke before the read answered or after.
+    #[test]
+    fn a_services_read_keeps_none_of_its_words() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Read my latest mail", true, now);
+        thread.lamp(5, "Let me look. ", now);
+        thread.private_for(5);
+        thread.lamp(5, "Ann wrote: the door code is under the mat.", now);
+        thread.person("And my calendar?", true, now);
+        thread.private_for(6);
+        thread.lamp(6, "Dentist at four, about the crown.", now);
+        thread.heard_only(6, "Dentist at four");
+        thread.person("Thanks", true, now);
+        thread.lamp(7, "You're welcome.", now);
+        let saved = thread.save(now, SystemTime::now()).unwrap_or_default();
+        for private in ["door", "Dentist", "Let me look"] {
+            assert!(!saved.contains(private), "{private} in {saved}");
+        }
+        let told = thread.recent(now, REMEMBERED_FOR, 10);
+        assert!(!format!("{told:?}").contains("door"));
+        let summary = thread.summary_rest(None, now);
+        assert_eq!(
+            summary
+                .iter()
+                .map(|(request, ..)| *request)
+                .collect::<Vec<_>>(),
+            [7],
+            "the summary skips both reads"
+        );
+        let finished = thread.finished(7, now);
+        assert_eq!(finished.len(), 3);
+        for exchange in finished {
+            assert!(!exchange.said.contains("door") && !exchange.said.contains("Dentist"));
+        }
+    }
 
     /// What a session is sent at setup follows the switch: nothing about
     /// functions with it off, the voice's own with it on.
@@ -2423,6 +2628,7 @@ mod tests {
             lamp: lamp.to_owned(),
             room: false,
             cut: false,
+            calls: Vec::new(),
         };
         for (day, text) in kept {
             // Read a minute after its newest exchange, within the ten
@@ -3424,6 +3630,7 @@ mod tests {
                 lamp: "The code word is ORCHID.".into(),
                 room: false,
                 cut: false,
+                calls: Vec::new(),
             }]
         );
         // The note is the written turn's alone: a spoken one after it has none.
@@ -3744,5 +3951,116 @@ mod tests {
         assert!(lamp.contains("Shall I put it on the lamp?"), "{lamp}");
         assert_eq!(ago, Duration::from_secs(5));
         assert!(Thread::new().answered_last_but(1, now).is_none());
+    }
+
+    /// The names and ids of `recent`'s kept calls.
+    fn calls_of(recent: &Recent) -> Vec<(&str, &str)> {
+        recent
+            .calls
+            .iter()
+            .map(|call| (call.id.as_str(), call.name.as_str()))
+            .collect()
+    }
+
+    /// `LAMP_HISTORY_KEEPS_CALLS` (lamp build 9699: "Lamp, you're a bit
+    /// loud." answered "Turning myself down a step." with no call, 4 of 14
+    /// action lines): the functions a turn ran are kept with its exchange,
+    /// in the order they ran and once each, whether they ran before the
+    /// lamp's words or after them. A turn that called nothing keeps none, a
+    /// request with no words is never told, another request's calls never
+    /// join an exchange, and a forget drops what waits.
+    #[test]
+    fn the_functions_a_turn_ran_are_kept_with_its_exchange() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Lamp, you're a bit loud.", true, now);
+        thread.called(1, "volume_down");
+        thread.called(1, "volume_down");
+        thread.lamp(1, "Turning myself down a step.", now);
+        thread.called(1, "light_dimmer");
+        thread.person("Thanks.", true, now);
+        thread.lamp(2, "Any time.", now);
+        // Ran, but the lamp said nothing for it: no exchange to tell.
+        thread.called(3, "light_brighter");
+        let recent = thread.recent(now, REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(
+            calls_of(&recent[0]),
+            [("kept-1-0", "volume_down"), ("kept-1-1", "light_dimmer")]
+        );
+        assert_eq!(recent[0].lamp, "Turning myself down a step.");
+        assert!(recent[1].calls.is_empty(), "a turn that called nothing");
+        // A call waiting for its words is gone with a forget.
+        thread.called(4, "volume_up");
+        thread.forget();
+        thread.person("Louder.", true, now);
+        thread.lamp(4, "Louder it is.", now);
+        let recent = thread.recent(now, REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(recent.len(), 1);
+        assert!(recent[0].calls.is_empty(), "{recent:?}");
+    }
+
+    /// The calls go with the exchange where its words were kept: a turn of
+    /// A's is told its calls, the room's and B's never; a request whose
+    /// words are not kept (onboarding's sentence) keeps no calls either.
+    #[test]
+    fn the_functions_a_turn_ran_stay_in_its_own_scope() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.called(1, "light_warmer");
+        thread.person("Warmer, please.", true, now);
+        thread.lamp_for(1, "Warmer it is.", now, Some(&a));
+        let theirs = thread.recent_for(Some(&a), now, REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(calls_of(&theirs[0]), [("kept-1-0", "light_warmer")]);
+        assert!(
+            thread
+                .recent_for(None, now, REMEMBERED_FOR, EXCHANGES)
+                .is_empty()
+        );
+        assert!(
+            thread
+                .recent_for(Some(&b), now, REMEMBERED_FOR, EXCHANGES)
+                .is_empty()
+        );
+        thread.count_only(Some(2));
+        thread.called(2, "light_brighter");
+        thread.lamp_for(2, "Say: the quick brown fox.", now, Some(&a));
+        thread.count_only(None);
+        let theirs = thread.recent_for(Some(&a), now, REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(theirs.len(), 1, "{theirs:?}");
+    }
+
+    /// The calls are never written to the thread file: a rolled-back build
+    /// reads it with `deny_unknown_fields` and would set the whole thread
+    /// aside (#1505). Read back, the exchange is told as before, words
+    /// only; a file without them, as every older build wrote, reads too.
+    #[test]
+    fn the_functions_a_turn_ran_are_not_written_to_the_file() {
+        let now = Instant::now() + Duration::from_secs(3_600);
+        let wall = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        let mut thread = Thread::new();
+        thread.person("Lamp, you're a bit loud.", true, now);
+        thread.called(1, "volume_down");
+        thread.lamp(1, "Turning myself down a step.", now);
+        let text = thread.save(now, wall).unwrap();
+        assert!(!text.contains("volume_down"), "{text}");
+        assert!(!text.contains("calls"), "{text}");
+        let read = Thread::read(&text, now, wall).unwrap();
+        let recent = read.recent(now, REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].person, "Lamp, you're a bit loud.");
+        assert_eq!(recent[0].lamp, "Turning myself down a step.");
+        assert!(recent[0].calls.is_empty());
+        let older = format!(
+            r#"[{{"at_unix_ms":{},"person":"Louder.","lamp":"Louder it is."}}]"#,
+            1_800_000_000_000_u64 - 5_000
+        );
+        let read = Thread::read(&older, now, wall).unwrap();
+        let recent = read.recent(now, REMEMBERED_FOR, EXCHANGES);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].lamp, "Louder it is.");
+        assert!(recent[0].calls.is_empty());
     }
 }

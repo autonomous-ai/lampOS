@@ -64,6 +64,11 @@ says otherwise, this is what runs.
   turns to its name and has its own idle ([body.md](body.md),
   [expression.md](expression.md)).
 - Memory is `lamp-memory`, as below.
+- **A person's linked services** (Gmail, their calendar, Notion, GitHub and
+  the rest of V1's connectors) are `lamp-services`, built but off: its
+  tokens in root's store, read through the voice's three functions, a write
+  only on a spoken "send" after a full read-back (`LAMP_SERVICES`,
+  `LAMP_SERVICES_WRITE`, [services.md](services.md)).
 
 ## Product boundary
 

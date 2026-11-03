@@ -1,0 +1,39 @@
+# lamp-fc4b, lamp-voice journal, pass 3, after2 alone (13:00 +07, the lamp's clock, +0.4 s against the Mac). Lines about requests; connection and token lines left out.
+13:00:14.721 lamp-voice second: request 48: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+13:00:15.682 lamp-voice second: request 49 goes on from request 48: its 1370 ms of sound go first
+13:00:15.682 lamp-voice second: request 49: speech to text kept ready in 0 ms, 80 ms of the line's sound waiting
+13:00:18.541 lamp-voice second: request 49 at the line's end: settled=false, speech_final=true, finals cover 2750 of 4170 ms sent, pending=none, last final 491 ms before End, finalize answered in 253 ms to 3700 ms, results 2 with words, 1 without, words from=finalize, the rest quiet: sound to 2260 ms
+13:00:18.542 lamp-voice second: request 49 heard 5 words, the last 254 ms after the line ended
+13:00:18.542 lamp-voice second: request 49: of its 5 words, 2 in the lamp's answer to request 45 so far
+13:00:18.542 lamp-voice second: request 49: no conversation going on: the line ran 2 s, it was last heard saying words, to their end, 175 s ago, it was last called 207 s ago, 0 lines left alone since it last spoke
+13:00:18.542 lamp-voice second: request 49: its name, heard in the room's sound, counts by: its words calling it, its hearing at the line's start (LAMP_NAME_SECOND_SIGN)
+13:00:18.542 lamp-voice second: request 49: lamp-name's hearing began 173 ms into the line (the newest 173 ms); the line's start is up to 1300 ms
+13:00:18.542 lamp-voice second: request 49: its answer is played: its name was heard in the room's sound
+13:00:18.542 lamp-voice second: request 49: the model is told the lamp's name was heard
+13:00:19.562 lamp-voice second: request 49 chat round 1 first event in 1019 ms
+13:00:19.686 lamp-voice second: request 49 first piece to the voice 1143 ms after the words were heard, 4 words
+13:00:19.688 lamp-voice second: request 49 speech tags: 0 given to the voice, 0 dropped (LAMP_SECOND_SPEECH_TAGS)
+13:00:20.107 lamp-voice second: request 49 first answer audio 1564 ms after the words were heard
+13:00:20.585 lamp-voice second: request 49 ElevenLabs: 2 of 2 pieces began, 1 on a reused connection, 33 chars; the first piece's first audio byte 420 ms after it went, the slowest 609 ms
+13:00:28.092 lamp-voice second: request 50: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+13:00:30.276 lamp-voice second: request 50 at the line's end: settled=false, speech_final=false, finals cover none of 2470 ms sent, pending=interim 2000 ms after the last final, last final none, finalize answered in 315 ms to 2470 ms, results 3 with words, 0 without, words from=finalize
+13:00:30.276 lamp-voice second: request 50 heard 7 words, the last 316 ms after the line ended
+13:00:30.276 lamp-voice second: request 50: of its 7 words, 1 in the lamp's answer to request 49 so far
+13:00:30.277 lamp-voice second: request 50: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+13:00:31.777 lamp-voice second: request 50 made a sound while its chat had not begun in 1500 ms
+13:00:31.790 lamp-voice second: request 50: ended before its answer: a newer line began; its words wait for that line's verdict
+13:00:31.790 lamp-voice second: request 50: 0 of its answer's 0 words were played, 10 ms of it, before it was cut; request 51 is asked with only those as the lamp's
+13:00:31.790 lamp-voice second: request 51 began over only request 50's wait sound: taken as begun in the clear
+13:00:31.791 lamp-voice second: request 51: speech to text kept ready in 0 ms, 70 ms of the line's sound waiting
+13:00:36.156 lamp-voice second: request 51 at the line's end: settled=false, speech_final=true, finals cover 3940 of 4850 ms sent, pending=none, last final 657 ms before End, finalize answered in 244 ms to 4840 ms, results 5 with words, 1 without, words from=finalize
+13:00:36.156 lamp-voice second: request 51 heard 8 words, the last 244 ms after the line ended
+13:00:36.157 lamp-voice second: request 51: of its 8 words, 0 in request 50's words it cut short, 0 in the lamp's answer to request 49 so far
+13:00:36.157 lamp-voice second: request 51: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+13:00:36.157 lamp-voice second: request 51 goes on from request 50's words, cut short 1830 ms before it began: no sign of a second person: no face in view at request 50's end, no face in view at request 51's, a quiet room, no other voice heard and no two faces seen speaking in the conversation; 2 lines are asked as one (LAMP_JOIN_CUT_WORDS)
+13:00:36.157 lamp-voice second: request 51: 1 lines joined into it had none of their answers played; those answers are not kept as the lamp's words (LAMP_JOIN_CUT_WORDS)
+13:00:37.659 lamp-voice second: request 51 made a sound while its chat had not begun in 1501 ms
+13:00:37.682 lamp-voice second: request 51 chat round 1 first event in 1523 ms
+13:00:37.757 lamp-voice second: request 51 first piece to the voice 1598 ms after the words were heard, 4 words
+13:00:37.855 lamp-voice second: request 51 speech tags: 0 given to the voice, 0 dropped (LAMP_SECOND_SPEECH_TAGS)
+13:00:38.056 lamp-voice second: request 51 first answer audio 1898 ms after the words were heard
+13:00:38.821 lamp-voice second: request 51 ElevenLabs: 3 of 3 pieces began, 2 on a reused connection, 62 chars; the first piece's first audio byte 299 ms after it went, the slowest 538 ms

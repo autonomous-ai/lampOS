@@ -534,6 +534,85 @@ know where the answer stopped:
   and read back so) and
   `provider_worker::tests::going_on_asks::cut_in_told_is_read_after_going_on_asks`.
 
+## A stop always gets one line, and a wordless cut-in a question (#4710)
+
+On the second route, two fixed lines answer a cut-in the model is never
+asked about, each said in the route's voice (in the owner's language when
+one is chosen) and kept in the thread as the lamp's:
+
+- **A stop** (`LAMP_SPOKEN_STOP_ENDS=on`, `crate::spoken_stop`): a short line
+  that asks the lamp to stop ("Stop.", "Stop Lamp.", "Lamp, stop.", "That's
+  enough."; never "Don't stop." or a longer line with "stop" in it) said
+  over the lamp's answer, or begun within `spoken_stop::JUST_AFTER` (3 s) of
+  its last sound, is answered "Okay, I'll stop there.". The window is
+  lamp-29e7's case (Sixth's item 6 on #4710): a stop said as the story's
+  last words played out went to the model, or was held as a word of the
+  room's (`Heeding::began_just_after`).
+- **A wordless cut-in** (`LAMP_CUT_IN_WORDLESS_ASKS=on`,
+  `crate::cut_in_wordless`): a cough, a beep or a knock over the lamp's
+  answer that made it yield and then commit, ending the answer
+  (`user_interrupted`), comes back with no words; without the switch the
+  lamp then goes quiet mid-answer. With it, the line is answered "Did
+  someone say something?". Only for a line whose Start came over the lamp's
+  audible answer (the yield committed): a yield that resumed sends no
+  Start, so it stays silent; a wordless line begun in the clear (no answer
+  cut), or one in a busy room (where a wordless yield is the
+  room's, `LAMP_CUT_IN_OVER_BED`) gets nothing. Asked at most once a minute
+  (`cut_in_wordless::AGAIN_AFTER`): a second knock that cuts the question
+  itself leaves the lamp quiet, never asking again and again. The product
+  leaves it off (#4938): the lamp's own echo commits as a cut-in with 0
+  words (on lamp-06c1 on 3 Nov, 7 of 15 stories had one over the lamp's
+  answer), so the question would answer the lamp's own voice. It goes on
+  once a replay shows those echo asks near 0.
+- **Words on the way** (#4938, lamp-06c1, 3 Nov 02:34): a "Stop Lamp." over
+  a story committed on 760 ms of speech, and speech to text's final came
+  back with no words, so it was asked "Did someone say something?". For a
+  line begun over the lamp's answer, with `LAMP_CUT_IN_WORDLESS_ASKS` or
+  `LAMP_SPOKEN_STOP_ENDS` on, the provider now keeps the last words speech
+  to text had on the way (`listener.said()`, fillers stripped,
+  `second_provider::words_on_the_way`). When the final is empty: a stop among
+  them is taken as said and gets the stop line (the journal: "its final
+  words came back empty, but its N words on the way were a stop: taken as
+  said"); any other words get neither line ("… had words on the way: not
+  asked if someone spoke"), and the model is not asked words that never came
+  final; with nothing on the way (a cough, a knock) the question is asked.
+- **Known gaps** (#4938): the lamp's own echo can still cut its answer with
+  no words. A playback gap admitted the story's tail in the clear, or a loud
+  word of its own made a yield commit (06c1, 3 Nov 02:13 and 02:24); with
+  nothing on the way that is asked "Did someone say something?", where the
+  lamp used to go quiet. Telling that sound from a person's needs evidence
+  from the coordinator that the provider doesn't have. A bare "Stop." is also
+  not answered when it is a yield over the lamp that resumes (no Start is
+  sent), or when it comes about a second after the answer and no line is
+  opened.
+- **Always played** (lamp-06c1, 30 Oct 15:53:43): the stop line used to be
+  rendered whole only after the cut, then played as a wait sound. With the
+  voice slow it was still unplayed 5 s later when a wordless line replaced
+  its turn, and the person heard nothing. Now both lines are rendered as
+  the worker starts and at each line's start until kept
+  (`second_provider::FixedClips`), played at once from that clip as the
+  lamp's words (the journal: "first answer audio … its fixed line"); one not
+  kept yet is streamed from the voice as it comes, as the turn's piece, and
+  asked once more if it came with no sound.
+- **The lamp check** (`tools/played/stop-lines.sh`): its "Stop." after a
+  short answer is timed from the answer's `turn_finished`, by the lamp's
+  clock. On lamp-06c1 on 2 Nov it was timed from the turn's first
+  `speech_final_sample_retired`, which ends one playback interval only (the
+  wait sound's, or a sentence's before the next came,
+  `docs/playback-occurrences.md`): "Stop." then fell over the poem itself,
+  a bare word over the lamp yielded and resumed, and no request came, 6 of 6
+  in both arms. A bare "Stop." a second after the answer's sound is let in
+  as a line of its own (`coordinator::tests::duplex::a_bare_stop_a_second_after_the_answer_is_let_in`).
+- **Latency:** nothing is added before any other answer's first audio; a
+  fixed line plays as soon as its turn is judged.
+- **Tests:** `second_provider::tests::the_stop_line_rendered_ahead_plays_at_once_though_the_voice_is_stuck`,
+  `a_fixed_line_with_no_sound_is_asked_once_more`,
+  `a_stop_over_or_just_after_the_answer_gets_the_one_line`,
+  `a_wordless_cut_in_that_ended_the_answer_asks_one_short_question`,
+  `a_wordless_cut_in_asks_at_most_once_a_minute`,
+  `spoken_stop::tests`, `cut_in_wordless::tests`, and the worker's
+  "Stop Lamp." just after the answer.
+
 ## A misheard cut-in's "hm?" (#828)
 
 Asked to say "Sorry?" after a misheard cut-in (`ASK_AGAIN_NOTE`, above), the

@@ -1,0 +1,12 @@
+995915 systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+026529 systemd[1]: lamp-tasks.service: Deactivated successfully.
+027872 systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+028264 systemd[1]: lamp-tasks.service: Consumed 2.853s CPU time.
+038089 systemd[1]: Starting lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+044700 systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+048004 lamp-tasks[663735]: tasks: no task targets yet; hand-overs are off until they are written
+090111 lamp-tasks[663735]: tasks: no computer names
+323867 lamp-tasks[663735]: tasks: Harness signed in: yes
+401624 lamp-tasks[663735]: tasks: 1 task targets written from the machines
+411873 lamp-tasks[663735]: tasks: the targets file changed: 1 task targets
+411873 lamp-tasks[663735]: tasks: 1 computer names

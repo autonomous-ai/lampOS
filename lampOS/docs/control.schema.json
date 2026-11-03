@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound, never while the lamp is private (not routed yet).",
       "enum": [
         "body",
         "light",
@@ -35,7 +35,11 @@
         "look",
         "hear",
         "sound",
-        "skills"
+        "skills",
+        "air",
+        "device",
+        "camera",
+        "microphone"
       ]
     },
     "part": {
@@ -59,7 +63,8 @@
         "touch",
         "button",
         "time",
-        "lamp.changed"
+        "lamp.changed",
+        "air.changed"
       ]
     },
     "state_name": {
@@ -67,7 +72,9 @@
         "presence",
         "light",
         "mood",
-        "lamp"
+        "lamp",
+        "air",
+        "device"
       ]
     },
     "colour": {
@@ -189,6 +196,12 @@
         },
         {
           "$ref": "#/$defs/stop"
+        },
+        {
+          "$ref": "#/$defs/camera.snapshot"
+        },
+        {
+          "$ref": "#/$defs/camera.stream"
         }
       ]
     },
@@ -727,7 +740,7 @@
       "additionalProperties": false
     },
     "say": {
-      "description": "A line in the lamp's own voice, through its quiet, privacy and busy gates.",
+      "description": "A line in the lamp's own voice: spoken exactly as sent, straight through the speech service with no model, once the person isn't talking; with rephrase, said by the voice's model in its own words, as before. Through the privacy switch, the keeper's pause and quiet hours.",
       "type": "object",
       "properties": {
         "id": {
@@ -741,6 +754,10 @@
           "minLength": 1,
           "maxLength": 300,
           "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f]+$"
+        },
+        "rephrase": {
+          "type": "boolean",
+          "description": "true: the voice's model says it in its own words (a written turn), as before. Default false: exactly as sent."
         }
       },
       "required": [
@@ -793,7 +810,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now.",
           "type": "object",
           "properties": {
             "re": {
@@ -900,6 +917,114 @@
                 },
                 "lamp": {
                   "$ref": "#/$defs/lamp_state"
+                },
+                "air": {
+                  "description": "get's air (the air grant): the newest reading with known: true, or only known: false.",
+                  "type": "object",
+                  "properties": {
+                    "pm1_0": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 1 µm, µg/m³, to a tenth."
+                    },
+                    "pm2_5": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                    },
+                    "pm4_0": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 4 µm, µg/m³, to a tenth."
+                    },
+                    "pm10": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000,
+                      "description": "Particles under 10 µm, µg/m³, to a tenth."
+                    },
+                    "co2_ppm": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Carbon dioxide, parts per million."
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "Relative humidity at the sensor, percent, to a tenth."
+                    },
+                    "temperature": {
+                      "type": "number",
+                      "minimum": -40,
+                      "maximum": 125,
+                      "description": "Degrees Celsius at the sensor, to a tenth: inside the lamp's base, warmed by the lamp, so not the room's."
+                    },
+                    "feel": {
+                      "enum": [
+                        "fresh",
+                        "fine",
+                        "stuffy",
+                        "very_stuffy",
+                        "unknown"
+                      ],
+                      "description": "How the air would feel, from the carbon dioxide: fresh under 800 ppm, fine to 1,200, stuffy to 2,000, very_stuffy past it, unknown without a reading."
+                    },
+                    "known": {
+                      "type": "boolean",
+                      "description": "Whether there is a reading: false with no sensor, its part not running, or none in 15 s, and then nothing else."
+                    }
+                  },
+                  "required": [
+                    "known"
+                  ],
+                  "additionalProperties": false
+                },
+                "device": {
+                  "description": "get's device (the device grant): the newest numbers with known: true, or only known: false.",
+                  "type": "object",
+                  "properties": {
+                    "cpu_load": {
+                      "type": "number",
+                      "minimum": 0,
+                      "description": "The last minute's load over the processors: 1 is every processor busy."
+                    },
+                    "memory_used": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "The share of memory in use."
+                    },
+                    "disk_free": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "The share of the system disk free."
+                    },
+                    "uptime_s": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Seconds since the board started."
+                    },
+                    "temperature_c": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      },
+                      "description": "Each temperature the board reports, by its sensor's name, in degrees Celsius."
+                    },
+                    "known": {
+                      "type": "boolean",
+                      "description": "Whether there is a reading: false with no sensor, its part not running, or none in 15 s, and then nothing else."
+                    }
+                  },
+                  "required": [
+                    "known"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
@@ -916,6 +1041,43 @@
               "items": {
                 "type": "object"
               }
+            },
+            "jpeg": {
+              "description": "A JPEG picture, base64.",
+              "type": "string"
+            },
+            "bytes": {
+              "description": "The JPEG's size in bytes.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "age_ms": {
+              "description": "How old the picture was when read.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "stream": {
+              "enum": [
+                "on",
+                "off"
+              ]
+            },
+            "fps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "fps_now": {
+              "description": "camera.stream: the rate new frames came at lately, a second; null before any was measured.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "fast": {
+              "description": "camera.stream: true when its frames come binary, every frame the camera makes.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -1273,7 +1435,9 @@
               "enum": [
                 "welcome",
                 "lease",
-                "done"
+                "done",
+                "camera.frame",
+                "camera.ended"
               ]
             }
           ]
@@ -1657,8 +1821,276 @@
               "how"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "air.changed"
+              }
+            }
+          },
+          "then": {
+            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 µg/m³, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
+            "properties": {
+              "pm1_0": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 1 µm, µg/m³, to a tenth."
+              },
+              "pm2_5": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+              },
+              "pm4_0": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 4 µm, µg/m³, to a tenth."
+              },
+              "pm10": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000,
+                "description": "Particles under 10 µm, µg/m³, to a tenth."
+              },
+              "co2_ppm": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Carbon dioxide, parts per million."
+              },
+              "humidity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Relative humidity at the sensor, percent, to a tenth."
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": -40,
+                "maximum": 125,
+                "description": "Degrees Celsius at the sensor, to a tenth: inside the lamp's base, warmed by the lamp, so not the room's."
+              },
+              "feel": {
+                "enum": [
+                  "fresh",
+                  "fine",
+                  "stuffy",
+                  "very_stuffy",
+                  "unknown"
+                ],
+                "description": "How the air would feel, from the carbon dioxide: fresh under 800 ppm, fine to 1,200, stuffy to 2,000, very_stuffy past it, unknown without a reading."
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "camera.frame"
+              }
+            }
+          },
+          "then": {
+            "description": "One new picture of a camera.stream.",
+            "properties": {
+              "jpeg": {
+                "type": "string",
+                "description": "A JPEG picture, base64."
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "age_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fps_now": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "description": "The eyes' rate of new frames over the last 2 s; null before two were seen."
+              }
+            },
+            "required": [
+              "jpeg",
+              "bytes",
+              "age_ms"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "camera.ended"
+              }
+            }
+          },
+          "then": {
+            "description": "The camera.stream ended by itself: the lamp turned private, or the camera stayed closed.",
+            "properties": {
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "why"
+            ]
+          }
         }
       ]
+    },
+    "air": {
+      "description": "The air sensor's newest reading (air/state, every 5 s). A value the sensor doesn't know yet is left out.",
+      "type": "object",
+      "properties": {
+        "pm1_0": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 1 µm, µg/m³, to a tenth."
+        },
+        "pm2_5": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+        },
+        "pm4_0": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 4 µm, µg/m³, to a tenth."
+        },
+        "pm10": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Particles under 10 µm, µg/m³, to a tenth."
+        },
+        "co2_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Carbon dioxide, parts per million."
+        },
+        "humidity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Relative humidity at the sensor, percent, to a tenth."
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": -40,
+          "maximum": 125,
+          "description": "Degrees Celsius at the sensor, to a tenth: inside the lamp's base, warmed by the lamp, so not the room's."
+        },
+        "feel": {
+          "enum": [
+            "fresh",
+            "fine",
+            "stuffy",
+            "very_stuffy",
+            "unknown"
+          ],
+          "description": "How the air would feel, from the carbon dioxide: fresh under 800 ppm, fine to 1,200, stuffy to 2,000, very_stuffy past it, unknown without a reading."
+        }
+      },
+      "additionalProperties": false
+    },
+    "device": {
+      "description": "The lamp's own computer (board/state, every 5 s).",
+      "type": "object",
+      "properties": {
+        "cpu_load": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The last minute's load over the processors: 1 is every processor busy."
+        },
+        "memory_used": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The share of memory in use."
+        },
+        "disk_free": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The share of the system disk free."
+        },
+        "uptime_s": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Seconds since the board started."
+        },
+        "temperature_c": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Each temperature the board reports, by its sensor's name, in degrees Celsius."
+        }
+      },
+      "additionalProperties": false
+    },
+    "camera.snapshot": {
+      "description": "The camera's newest picture, once, as the eyes keep it (a JPEG about 320 across). Needs the camera grant. Refused while the lamp is private (private) or with the camera closed (refused: the camera is closed).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "camera.snapshot"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "camera.stream": {
+      "description": "The camera's pictures as camera.frame events, each new frame once as it comes, at most fps a second (1 to 30, 2 if not given; today the eyes give about 1 to 2 new frames a second), until on is false, stop, the connection closes, or a camera.ended event (the lamp turned private, or the camera closed for 10 s). The answer's fps_now is the rate new frames came at lately, null before any was measured. Needs the camera grant; refused while the lamp is private. Where the eyes serve every frame (the answer's fast: true), each comes as a binary WebSocket message: the header's length (4 bytes, big-endian), the header (JSON: ev camera.frame, bytes, width, height, fps_now), then the JPEG as the camera made it, at most 512 KiB.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "camera.stream"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "size": {
+          "enum": [
+            "640x480",
+            "1280x720"
+          ],
+          "description": "The fast stream's size, where the eyes serve every frame: the camera's own 25 fps MJPEG modes. 640x480 if not given."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
+      ],
+      "additionalProperties": false
     }
   }
 }

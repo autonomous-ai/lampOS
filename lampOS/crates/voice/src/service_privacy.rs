@@ -771,4 +771,34 @@ pub(crate) mod tests {
         assert!(worker.try_exit().unwrap().is_some());
         drop(gate.join().unwrap());
     }
+
+    /// 06c1's boot 1 (#4332): a failed cleanup is never waited out, but its
+    /// line still says the first reason first, so a journal shows why the
+    /// conversation ended as well as why the voice did. A clean cleanup
+    /// keeps the reason itself, for the wait.
+    #[test]
+    fn a_failed_cleanup_says_the_privacy_reason_first_and_a_clean_one_keeps_it() {
+        let why = "service privacy freshness lost before next observation";
+        let failed = finish::<()>(
+            Err(unavailable(why)),
+            Err(io::Error::other(
+                "capture WorkerFault: capture failed during shutdown",
+            )),
+        )
+        .unwrap_err();
+        assert!(!is_unavailable(&*failed));
+        assert_eq!(
+            failed.to_string(),
+            format!(
+                "privacy switch unreadable: {why}; verified cleanup failed: \
+                 capture WorkerFault: capture failed during shutdown"
+            )
+        );
+        let clean = finish::<()>(Err(unavailable(why)), Ok(())).unwrap_err();
+        assert!(is_unavailable(&*clean));
+        assert_eq!(
+            clean.to_string(),
+            format!("privacy switch unreadable: {why}")
+        );
+    }
 }

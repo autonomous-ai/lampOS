@@ -623,7 +623,6 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
-            make_skill: false,
             named_only: false,
             correct: false,
             questions: false,

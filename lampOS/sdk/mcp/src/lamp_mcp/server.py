@@ -16,6 +16,7 @@ come through `lamp_wait_for`, and the state through resources.
 
 import argparse
 import asyncio
+import base64
 import collections
 import importlib.metadata
 import os
@@ -24,7 +25,7 @@ import time
 from typing import Any, Literal
 
 from lampos import Lamp, LampError, schema
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
 
@@ -54,12 +55,13 @@ STATE_OF_EVENT = {
     "person.stood_up": "presence",
     "person.facing": "presence",
     "lamp.changed": "lamp",
+    "air.changed": "air",
 }
-STATES = ("presence", "light", "mood", "lamp")
+STATES = ("presence", "light", "mood", "lamp", "air", "device")
 # The grant reading a state or hearing an event needs, as `crates/control`
 # has it (protocol.rs, `StateKind::needs` and `EventKind::needs`): what isn't
 # here needs none.
-STATE_NEEDS = {"presence": "look"}
+STATE_NEEDS = {"presence": "look", "air": "air", "device": "device"}
 EVENT_NEEDS = {
     "person.arrived": "look",
     "person.left": "look",
@@ -69,6 +71,7 @@ EVENT_NEEDS = {
     "phrase.heard": "hear",
     "name.heard": "hear",
     "sound.heard": "sound",
+    "air.changed": "air",
 }
 # Which `limits` kind each op counts against (docs/control.md, "Limits").
 LIMIT_KIND = {
@@ -220,7 +223,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             f"A lampOS lamp, {lamp.info.get('name') or lamp.info.get('id', 'paired')}, on the person's desk. "
             "It moves, lights and speaks for you within its own safety limits, and takes itself back the "
             "moment someone talks to it or touches it: then an action is refused or cut short, never forced. "
-            "It never gives camera pictures, audio, transcripts or who someone is."
+            + (
+                "With the camera grant it can show what its camera sees, never while it is private; "
+                "it never gives audio, transcripts or who someone is."
+                if "camera" in grants
+                else "It never gives camera pictures, audio, transcripts or who someone is."
+            )
         ),
     )
 
@@ -337,6 +345,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "light": "its light",
         "mood": "its mood",
         "lamp": "whether it is talking, paused, private or asleep",
+        "air": "the air at its sensor (particles, carbon dioxide, humidity, temperature, and how it feels)",
+        "device": "its own computer (processor load, memory, disk free, temperatures)",
     }
 
     @server.tool(
@@ -344,7 +354,9 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         + ", ".join(state_words[state] for state in states)
         + f". `which` is some of {', '.join(states)}; by default all of them."
     )
-    async def lamp_state(which: list[Literal["presence", "light", "mood", "lamp"]] | None = None) -> dict:
+    async def lamp_state(
+        which: list[Literal["presence", "light", "mood", "lamp", "air", "device"]] | None = None,
+    ) -> dict:
         ungranted = [state for state in which or [] if state not in states]
         if ungranted:
             raise ToolError(f"no_grant: this computer may read {', '.join(states)}")
@@ -496,12 +508,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     if allowed("speak"):
 
         @server.tool()
-        async def lamp_say(text: str) -> str:
-            """Say a short line in the lamp's own voice (300 characters at most). It isn't said while the
-            lamp is in quiet hours, private, or talking with someone."""
+        async def lamp_say(text: str, rephrase: bool = False) -> str:
+            """Say a short line in the lamp's own voice (300 characters at most), exactly as written, once
+            the person isn't talking; `rephrase` lets the lamp say it in its own words instead. It isn't said
+            while the lamp is in quiet hours or private."""
             if len(text) > 300:
                 raise ToolError("bad_request: at most 300 characters")
-            await act("say", text=text)
+            await act("say", text=text, rephrase=True if rephrase else None)
             return "said"
 
         @server.tool()
@@ -512,6 +525,15 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             tool's error."""
             await act("sound", name=name)
             return f"{name} played"
+
+    if allowed("camera"):
+
+        @server.tool()
+        async def lamp_camera_snapshot() -> Image:
+            """What the lamp's camera sees now: its newest picture, a JPEG about 320 across. Refused while
+            the lamp is private or its camera is closed."""
+            reply = await act("camera.snapshot")
+            return Image(data=base64.b64decode(reply["jpeg"]), format="jpeg")
 
     if allowed("body", "look"):
 

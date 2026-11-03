@@ -58,6 +58,8 @@ pub const SAY_ANSWER_WITHIN: Duration = Duration::from_secs(90);
 /// Where the events of actions that end later go: the client, and the
 /// event (`done`).
 pub type Events = Arc<dyn Fn(&str, Value) + Send + Sync>;
+/// Where a client's binary camera frames go (`crate::camera`'s fast stream).
+pub type Binary = Arc<dyn Fn(&str, &[u8]) + Send + Sync>;
 
 /// Something a light request can be published on: the bus, or a test's
 /// list.
@@ -106,6 +108,9 @@ pub struct Lamp {
     /// (#4209). A `stop` doesn't free it: the door never stops the body,
     /// which plays the motion to its end.
     motion: Option<u64>,
+    /// The camera, read from the eyes' newest frame (`--sight-file`); none
+    /// without one.
+    camera: Option<crate::camera::Camera>,
 }
 
 impl Lamp {
@@ -133,7 +138,34 @@ impl Lamp {
             clock: lamp_ipc::monotonic_us,
             follow: None,
             motion: None,
+            camera: None,
         }
+    }
+
+    /// `camera.snapshot` and `camera.stream` from the eyes' sight file,
+    /// never while `watch` says the lamp is private: after [`Self::watching`],
+    /// whose watch it reads. Without a watch nothing tells the door the lamp
+    /// is private, so the camera is refused.
+    /// The camera's fast stream from the eyes' frames socket, its frames
+    /// sent through `sink` once the server has set it.
+    pub fn fast_frames(mut self, socket: PathBuf, sink: crate::camera::Sink) -> Self {
+        self.camera = self.camera.map(|camera| camera.fast(socket, sink));
+        self
+    }
+
+    pub fn seeing(
+        mut self,
+        sight: PathBuf,
+        (mark, drawn): (crate::camera::Mark, crate::camera::Drawn),
+    ) -> Self {
+        let watch = self.watch.clone();
+        let private: crate::camera::Private = Arc::new(move || {
+            watch
+                .as_ref()
+                .is_none_or(|watch| watch.lock().map_or(true, |watch| watch.private()))
+        });
+        self.camera = Some(crate::camera::Camera::new(sight, private).marking(mark, drawn));
+        self
     }
 
     /// Another clock for claims, for tests.
@@ -357,12 +389,16 @@ impl Lamp {
         }
     }
 
-    fn say(&self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
-        self.to_voice(
-            client,
-            re,
-            json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS}),
-        )
+    /// `say`: the computer's words exactly as sent, rendered straight
+    /// through the voice's speech service with no model or tools (`exact`),
+    /// spoken once the person isn't talking; with `rephrase`, given to the
+    /// voice's model as a written turn, as before.
+    fn say(&self, client: &str, re: u64, text: &str, rephrase: bool) -> Result<Value, Error> {
+        let mut line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
+        if !rephrase {
+            line["exact"] = json!(true);
+        }
+        self.to_voice(client, re, line)
     }
 
     /// `sound`: the lamp's own short hum, the voice's built-in cue (no file,
@@ -483,9 +519,21 @@ impl Parts for Lamp {
                 pattern,
                 for_ms,
             } => self.light(client, colour, *level, *pattern, *for_ms),
-            Op::Say { text } => self.say(client, re, text),
+            Op::Say { text, rephrase } => self.say(client, re, text, rephrase.unwrap_or(false)),
             Op::Look { at } => self.look(client, re, at),
             Op::Joints { .. } => Err(waits_for("a goal stream on the body's lease socket")),
+            Op::CameraSnapshot {} => self
+                .camera
+                .as_ref()
+                .ok_or_else(|| not_here("the camera"))?
+                .snapshot(client),
+            Op::CameraStream { on, fps, size } => {
+                let events = self.events.clone();
+                self.camera
+                    .as_mut()
+                    .ok_or_else(|| not_here("the camera"))?
+                    .stream(client, *on, *fps, size.as_deref(), events)
+            }
             Op::Express { feeling, strength } => self.express(client, feeling, *strength, now_us),
             // Only the hum today (protocol.rs refuses any other name).
             Op::Sound { .. } => self.sound(client, re),
@@ -501,7 +549,22 @@ impl Parts for Lamp {
             .unwrap_or(Value::Null)
     }
 
+    fn camera_streaming(&self, client: &str) -> bool {
+        self.camera
+            .as_ref()
+            .is_some_and(|camera| camera.streaming(client))
+    }
+
+    fn camera_end(&mut self, client: &str) {
+        if let Some(camera) = &mut self.camera {
+            camera.end(client);
+        }
+    }
+
     fn stop(&mut self, client: &str, _: u64) {
+        if let Some(camera) = &mut self.camera {
+            camera.end(client);
+        }
         if let Some(follow) = &self.follow {
             let mut follower = follow.lock().expect("follower");
             if follower.as_deref() == Some(client) {
@@ -853,7 +916,7 @@ mod tests {
         let asked = voice.join().unwrap();
         assert_eq!(
             asked,
-            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000})
+            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000, "exact": true})
         );
         for _ in 0..200 {
             if !told.lock().unwrap().is_empty() {

@@ -1,12 +1,12 @@
 //! Bounded local sockets, one durable owner and one independent Harness worker.
 use crate::{
     engine::{
-        Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob, ObservationJob,
-        Watched,
+        CLOSE_TRIES, Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob,
+        ObservationJob, Watched,
     },
     harness::{
-        AccountMachine, Cli, CliConfig, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed,
-        MOST_WAITED, Observation, SignIn, Target,
+        AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, Launch,
+        LaunchOutcome, Listed, MOST_WAITED, Observation, SignIn, Target,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
@@ -363,6 +363,24 @@ pub trait Adapter: Send + 'static {
         let _ = (machine_id, agent_id);
         Err("unsupported".into())
     }
+    /// The read just before a close ([`close_told`]), which may take longer
+    /// than any other read (`harness::CLOSE_READ_TIMEOUT`). An adapter
+    /// without a bound of its own reads as [`Adapter::observe`] does.
+    fn observe_to_close(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String> {
+        self.observe(machine_id, agent_id)
+    }
+    /// [`Adapter::close`], given only `within`: what is left of the close's
+    /// budget (`harness::CLOSE_BUDGET`) after its read. An adapter with no
+    /// bounds of its own closes as [`Adapter::close`] does.
+    fn close_within(
+        &self,
+        machine_id: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
+        let _ = within;
+        self.close(machine_id, agent_id)
+    }
     /// Whether Harness is signed in to the person's account (`serve
     /// --set-up-later`). An adapter without it says so.
     fn signed_in(&self) -> Result<SignIn, String> {
@@ -412,6 +430,17 @@ impl Adapter for Cli {
     }
     fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
         Cli::close(self, machine_id, agent_id)
+    }
+    fn observe_to_close(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String> {
+        Cli::observe_to_close(self, machine_id, agent_id)
+    }
+    fn close_within(
+        &self,
+        machine_id: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
+        Cli::close_within(self, machine_id, agent_id, within)
     }
     fn signed_in(&self) -> Result<SignIn, String> {
         Cli::signed_in(self)
@@ -473,6 +502,23 @@ impl Adapter for Production {
             Self::Absent => Err("no_harness".into()),
         }
     }
+    fn observe_to_close(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String> {
+        match self {
+            Self::Cli(cli) => cli.observe_to_close(machine_id, agent_id),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn close_within(
+        &self,
+        machine_id: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
+        match self {
+            Self::Cli(cli) => cli.close_within(machine_id, agent_id, within),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
     fn signed_in(&self) -> Result<SignIn, String> {
         match self {
             Self::Cli(cli) => cli.signed_in(),
@@ -506,15 +552,53 @@ impl Adapter for Production {
 /// the lamp told (#1390): the same answer to the same asked text. Anything
 /// else is the person going on with it at the computer, and it is left to
 /// them; one already stopped or failed has nothing to close.
+///
+/// The read is its own (`Adapter::observe_to_close`), given longer than any
+/// other read: on a lamp on 3 Nov `show` against the person's Mac took 16 to
+/// 39 s, every read before a close ran out at the 10 s `read_timeout`, and
+/// no harness was closed. It is never skipped for an earlier read (a held
+/// `wait` or `ps` saying idle): the person may have typed into the harness
+/// since, and only a read just before the close says it is still the turn
+/// the lamp told. A read that fails, its time run out among them, is no
+/// idle agent: the close fails with `observe_<code>` (`observe_timeout`),
+/// and the engine tries it again a minute later, read first again, no more
+/// than [`CLOSE_TRIES`] times in all. Read and close share one
+/// [`CLOSE_BUDGET`], so the job lane is held no longer than one launch.
 fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> {
-    let now = adapter.observe(&job.machine_id, &job.agent_id)?;
+    let began = Instant::now();
+    let now = adapter
+        .observe_to_close(&job.machine_id, &job.agent_id)
+        .map_err(|code| format!("observe_{code}"))?;
     if matches!(now.state.as_str(), "stopped" | "failed") {
         return Ok(Closed::Gone);
     }
     if now.state != "idle" || now.answer != job.answer || now.ask != job.asked {
         return Ok(Closed::Left);
     }
-    adapter.close(&job.machine_id, &job.agent_id)
+    adapter.close_within(
+        &job.machine_id,
+        &job.agent_id,
+        CLOSE_BUDGET.saturating_sub(began.elapsed()),
+    )
+}
+
+/// The journal's line for one close: which task's harness, which try of
+/// [`CLOSE_TRIES`], and how it went. The last try failing says so, and that
+/// the harness is left open on the computer: it is never asked again.
+fn close_line(job: &CloseJob, result: &Result<Closed, String>) -> String {
+    let id = job.task_id;
+    let tries = job.tries;
+    match result {
+        Err(code) if tries >= CLOSE_TRIES => format!(
+            "tasks: closing task {id}'s harness: try {tries} of {CLOSE_TRIES} failed ({code}); \
+             giving up, the harness is left open"
+        ),
+        Err(code) => format!(
+            "tasks: closing task {id}'s harness: try {tries} of {CLOSE_TRIES} failed ({code}); \
+             tried again in a minute, read first"
+        ),
+        Ok(closed) => format!("tasks: closing task {id}'s harness: try {tries}: {closed:?}"),
+    }
 }
 
 struct Work {
@@ -790,8 +874,8 @@ fn owner<C: Clock>(
                 Outcome::Observe(job, Err(code)) => engine.observation_failed(&job, &code, &now),
                 Outcome::Close(job, result) => {
                     // One line a close, so the journal says which harness
-                    // the lamp closed and how it went.
-                    eprintln!("tasks: closing task {}'s harness: {result:?}", job.task_id);
+                    // the lamp closed and how it went ([`close_line`]).
+                    eprintln!("{}", close_line(&job, &result));
                     engine.finish_close(&job, result, &now)
                 }
                 Outcome::Machines(read) => {
@@ -2511,6 +2595,115 @@ mod tests {
 
     use super::*;
     use std::os::unix::fs::symlink;
+
+    /// An adapter for [`close_told`] alone: its read before a close says
+    /// `read`, and each close it is asked for is kept with its budget.
+    struct Closing {
+        read: Result<Observation, String>,
+        closes: Mutex<Vec<Duration>>,
+    }
+    impl Adapter for Closing {
+        fn launch(&self, _: &Launch) -> LaunchOutcome {
+            panic!("launch while closing")
+        }
+        fn observe(&self, _: &str, _: &str) -> Result<Observation, String> {
+            panic!("the ordinary read, bounded by read_timeout, used to close")
+        }
+        fn observe_to_close(&self, _: &str, _: &str) -> Result<Observation, String> {
+            self.read.clone()
+        }
+        fn close_within(&self, _: &str, _: &str, within: Duration) -> Result<Closed, String> {
+            self.closes.lock().unwrap().push(within);
+            Ok(Closed::Closed)
+        }
+    }
+    fn closing(read: Result<Observation, String>) -> (Result<Closed, String>, Vec<Duration>) {
+        let adapter = Closing {
+            read,
+            closes: Mutex::new(Vec::new()),
+        };
+        let job = CloseJob {
+            task_id: 7,
+            machine_id: "0123456789abcdef0123456789abcdef".into(),
+            agent_id: "11111111-1111-4111-8111-111111111111".into(),
+            answer: "A poem about coffee.".into(),
+            asked: Some("Write a poem".into()),
+            tries: 1,
+        };
+        let result = close_told(&adapter, &job);
+        (result, adapter.closes.into_inner().unwrap())
+    }
+    fn seen(state: &str, answer: &str) -> Observation {
+        Observation {
+            agent_id: "11111111-1111-4111-8111-111111111111".into(),
+            state: state.into(),
+            ask: Some("Write a poem".into()),
+            answer: answer.into(),
+            truncated: false,
+            tools: 1,
+        }
+    }
+
+    /// The close reads with its own longer read, never the ordinary one;
+    /// idle on the told turn, it closes within what is left of
+    /// [`CLOSE_BUDGET`]. A read that fails or runs out is no idle agent:
+    /// nothing is closed, and the code says the read failed. Any state but
+    /// idle on the told turn is never closed.
+    #[test]
+    fn a_close_reads_first_and_closes_only_an_idle_agent_on_the_told_turn() {
+        let (result, closes) = closing(Ok(seen("idle", "A poem about coffee.")));
+        assert_eq!(result, Ok(Closed::Closed));
+        assert_eq!(closes.len(), 1);
+        assert!(closes[0] <= CLOSE_BUDGET && closes[0] > CLOSE_BUDGET / 2);
+
+        for code in ["timeout", "busy", "observe_failed"] {
+            let (result, closes) = closing(Err(code.into()));
+            assert_eq!(result, Err(format!("observe_{code}")));
+            assert!(closes.is_empty(), "{code}");
+        }
+        for (state, answer, said) in [
+            ("needs-input", "A poem about coffee.", Closed::Left),
+            ("working", "A poem about coffee.", Closed::Left),
+            ("idle", "Their own next answer.", Closed::Left),
+            ("stopped", "A poem about coffee.", Closed::Gone),
+            ("failed", "A poem about coffee.", Closed::Gone),
+        ] {
+            let (result, closes) = closing(Ok(seen(state, answer)));
+            assert_eq!(result, Ok(said), "{state}");
+            assert!(closes.is_empty(), "{state}");
+        }
+    }
+
+    /// Each close is one journal line naming its try; the last failed try
+    /// says the harness is left open, given up.
+    #[test]
+    fn a_close_journal_line_names_its_try_and_the_give_up() {
+        let mut job = CloseJob {
+            task_id: 7,
+            machine_id: "0123456789abcdef0123456789abcdef".into(),
+            agent_id: "11111111-1111-4111-8111-111111111111".into(),
+            answer: String::new(),
+            asked: None,
+            tries: 1,
+        };
+        let failed = Err("observe_timeout".to_string());
+        let line = close_line(&job, &failed);
+        assert!(
+            line.contains("try 1 of 3 failed (observe_timeout)"),
+            "{line}"
+        );
+        assert!(line.contains("tried again"), "{line}");
+        job.tries = CLOSE_TRIES;
+        let line = close_line(&job, &failed);
+        assert!(
+            line.contains("giving up, the harness is left open"),
+            "{line}"
+        );
+        assert_eq!(
+            close_line(&job, &Ok(Closed::Closed)),
+            "tasks: closing task 7's harness: try 3: Closed"
+        );
+    }
 
     /// A lane whose waits are held until cancelled; the first one called
     /// answers its cancel 300 ms late, as a slow child's reaping can.

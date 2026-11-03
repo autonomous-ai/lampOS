@@ -102,6 +102,9 @@ Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
 Environment=LAMP_SECOND_DOWN_LINE=on
 Environment=LAMP_SECOND_WAIT_CUE=on
 Environment=LAMP_SECOND_LOOK=on
+# A skill's look on this route (Look for things, in the Skills Store): without it the lamp says it will look and never
+# does. On lamp-9adf on 3 Nov "can you find my glasses?" looked five places and said what it saw at each (#4710).
+Environment=LAMP_SECOND_SKILL_LOOK=on
 # Each turn told and kept for the person (or the room) admitted with its request, not the session's owner: the lead's
 # decision of 21 Oct on #1711, after the two-person run on lamp-52e6 (11 of 12, nothing crossed; #1895, #2233).
 Environment=LAMP_SECOND_SCOPED_CONTEXT=on
@@ -145,6 +148,10 @@ Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
+# A line that begins with the lamp's name, said to a face turned to the lamp, is answered in a busy room (#2191): on
+# lamp-52e6 on 20 Oct, under two other voices' talk, a named line was held back with it off and none with it on, and
+# talk without the name went the same way. The face it needs is a second sign above, so every name it answers counts.
+Environment=LAMP_NAMED_ALWAYS=on
 # A hearing of the name inside one line's sound stays with that line: on lamp-4ace on 26 Oct (6919) a hearing in
 # "Can you pass me the charger? The white one." counted for the desk line begun 0.7 s after it, which was answered.
 Environment=LAMP_NAME_STAYS_IN_ITS_LINE=on
@@ -162,23 +169,34 @@ Environment=LAMP_REPLY_END_REACH=on
 # Its own voice heard back, a cut-in told as one, words said once, and a reply that is not for it.
 Environment=LAMP_SECOND_OWN_ECHO=on
 Environment=LAMP_CUT_IN_TOLD=on
-# A stop said over the lamp's answer ("Stop", "Stop them.", "That's enough.") is answered
-# "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985).
+# A stop said over the lamp's answer, or within 3 s after it ended ("Stop", "Stop Lamp", "That's enough."), is
+# answered "Okay, I'll stop there." and kept in the thread, never asked of the model (#3985, #4710).
 Environment=LAMP_SPOKEN_STOP_ENDS=on
 # An answer cut by a line or a stop is kept as the words that were played, so "go on" picks up from the cut
 # (#3997): probe-cut-in on lamp-06c1 on 30 Oct, resume 19/20 to 20/20 with LAMP_CUT_IN_TOLD; two played demos, 2 of 2.
 Environment=LAMP_SAID_AS_HEARD=on
+# LAMP_CUT_IN_WORDLESS_ASKS stays off (3 Nov, #4938): the lamp's own echo commits as a cut-in with 0 words, so
+# "Did someone say something?" would answer the lamp's own voice. On lamp-06c1 on 3 Nov 7 of 15 stories had such a
+# commit over the lamp's answer. It goes on once a replay shows those echo asks near 0.
 Environment=LAMP_SECOND_SAID_ONCE=on
 # A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
 # against 2.95-3.27 s, a real light change 1.82-1.89 s, nothing said twice (the first builder on #4710, 17:35).
 Environment=LAMP_SECOND_SAY_WITH_CALL=on
+# An earlier turn that ran a light or volume step is told to the model as the call, then its words, so an ask
+# is not learned as words alone (#5018): on lamp-9adf at 9730, 10 of 10 device lines called, 0 talk-only (4 of 14 off).
+Environment=LAMP_HISTORY_KEEPS_CALLS=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # Talk over the lamp's own line (a say, a reminder, news) in a busy room is let go and the line goes on; its name,
 # a turned face or a tap still stops it (#2602's design, #4933): on lamp-52e6 a talk-over say was spoken 3/3 (3 Nov),
 # dropped 5/5 with it off; name 2/2, face 3/3, quiet room 3/3 still cut it (2 Nov).
 Environment=LAMP_OWN_LINE_OVER_TALK=on
+# Desk talk let out only as a conversation going on, with no tie to the lamp, is held, not answered, and counts as
+# talk for the busy room (#5008): on lamp-52e6 (3 Nov, stable 9610) desk lines held 8/8, against 6/8 with it off;
+# named calls 8/8 and tied follow-ups 4/4 still answered; a busy room formed from 2 held lines. Cost: an untied
+# ask with no name ("Fetch me the news.") is held too, not yet counted on a lamp.
+Environment=LAMP_UNTIED_GOING_ON=held
 # A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by
 # LAMP_SECOND_SPEECH_MODEL's eleven_v4_turbo (#2901): the owner's pick at lamp-52e6 on 28 Oct, first sound unchanged.
 Environment=LAMP_SECOND_SPEECH_TAGS=on
@@ -260,9 +278,10 @@ Environment=LAMP_NAME_IN_PASSING=ignored
 # starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
 Environment=LAMP_SPOKEN_TO=on
 # "Lamp," that Deepgram writes "One," calls the lamp, "Wang," and "Lung," too with one person in a conversation,
-# and a retry of a line held as said to someone by name is no reply to them (#4710, lamp-3e83 2 Nov).
-# Off until its lamp-3e83 check (switches.md).
-# Environment=LAMP_ONE_AS_LAMP=on
+# and a retry of a line held as said to someone by name is no reply to them (#4710, lamp-3e83 2 Nov). On after the
+# tester's check on lamp-3e83 (3 Nov, 9680: "One, …" and its retry answered, held on 2 Nov) and lamp-06c1's played
+# check (3 Nov, 9724 voice): "One, …" 8/8 answered, short replies 4/4 and desk lines 2/2 held, a colleague's name held (switches.md).
+Environment=LAMP_ONE_AS_LAMP=on
 Environment=LAMP_FIRST_WORDS=kept
 # A line begun with the lamp silent keeps 300 ms more of its sound, so a first word the detector is slow on is not lost
 # ("What did I just ask you?" heard as "Did I just ask you?"). lamp-4ace's third A/B, 25 Oct, #3411: three of ten pause
@@ -301,15 +320,13 @@ Environment=LAMP_TASKS_NEEDS=/usr/local/bin/harness
 # words and tells each task once, with the skill's ask, or itself when no ask has come within 10 s (#1038).
 # The skill takes news of a task that stopped or asks something too (#1722).
 Environment=LAMP_TASK_NEWS=skill
-# A skill made for the person (#1685, #2813, fourteen-P15): asked aloud or typed in the app's "Make a skill",
-# made on their computer through the tasks part, and put on only by a spoken yes at the lamp (the lead's
-# ruling on #1711). The app's button shows only while the tasks part has a computer (app_make's `ready`).
+# A skill made for the person (#1685, #2813, #4914): asked aloud or typed in the app's "Make a skill",
+# made by the lamp's own model, with no computer and no tasks part, and put on only by a spoken yes at
+# the lamp (the lead's ruling on #1711); the app's button shows at once. Played on lamp-9adf on 2 Nov, by
+# voice and from the app, each put on by a plain "Yes." (#4946). A computer's agent no longer makes one
+# (the first builder, 3 Nov, on the Queue).
 Environment=LAMP_MAKE_SKILL=on
 Environment=LAMP_APP_MAKE_SKILL=on
-# Made by the lamp's own model instead, with no computer and no tasks part (#4914, #4946): the same
-# brief, checks and spoken yes; the app's button shows at once. Played on lamp-9adf on 2 Nov, by voice
-# and from the app, each put on by a plain "Yes." (the owner's ask; the first builder's yes on #4710).
-Environment=LAMP_MAKE_SKILL_LOCAL=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
@@ -421,6 +438,10 @@ Environment=LAMP_PERSON_NAME_OWNER_ONLY=on
 # A reply is told the person speaking is most likely the one who set the lamp up, unless someone else is
 # seen or heard now; the reply only, nothing personal kept on it (LAMP_PERSON_NAME_BY_DEFAULT, #3884).
 Environment=LAMP_PERSON_NAME_BY_DEFAULT=on
+# Only faces of people at the desk count as people at the lamp: at least 0.6 of the reference face's
+# height and 0.70 sure (values from lamp-06c1's recording, 3 Nov). On lamp-a0ae (2 Nov) faces 0.02-0.06 wide at 0.61-0.78 beside the owner held the
+# name back on 51 of 79 turns as "more than one face in view" (LAMP_FACES_AT_DESK_ONLY, docs/eyes.md).
+Environment=LAMP_FACES_AT_DESK_ONLY=on
 Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg
 # What the lamp sees, when asked, from the eyes' full look (lamp-eyes --full-look), not the 320 working frame.
 Environment=LAMP_LOOK_FULL=on

@@ -532,7 +532,25 @@ started once its answer is told:
   - **No "go on" from the lamp:** no request lets the person ask the lamp to
     go on with a task, so a task told is a task done, from the lamp's side.
 - **Read first, every time:** the close job reads the agent (`show`) just
-  before closing.
+  before closing (`Cli::observe_to_close`).
+  - **Its own bound:** that read is given `CLOSE_READ_TIMEOUT`, 45 s (no
+    more than one `launch_timeout`), not the 10 s `read_timeout` every other
+    read keeps. On a lamp on 3 Nov, `show` against the person's Mac took 16
+    to 39 s: every read before a close ran out at 10 s, and no harness was
+    closed, so they stayed open on the Mac.
+  - **One budget:** the read and `harness close` share `CLOSE_BUDGET`, 60 s;
+    the close is given what the read left (`Cli::close_within`), never more
+    than one `launch_timeout`. With nothing left it starts no process and
+    fails, code `close_no_time`. So the job lane is held no longer than one
+    launch, and a hand-over the person just said yes to waits behind a
+    close no longer than behind another launch.
+  - **Never skipped:** an earlier idle read (a held `wait`, `ps` or the read
+    that was told) never stands in for it. The person may have typed into
+    the harness since; only this read says it is still the told turn.
+  - **A read that fails is no idle agent:** its time run out, or any other
+    failure, closes nothing. The close fails with the read's code prefixed
+    `observe_` (`observe_timeout`), and is tried again like a failed close
+    (below).
   - **Still idle on the told turn** (the same answer to the same asked
     text): closed with `harness close --machine <id> <agent-id> --json`, by
     the agent's own id, never `--now`. Harness saves its screen and stops it,
@@ -560,11 +578,20 @@ started once its answer is told:
   covers working or waiting for the person (`WORKING`), changed while closing
   (`AGENT_CHANGED`) and gone alike, with only a message in the `--json`
   reply. So exit 1 is `failed`: tried again a minute later (`CLOSE_RETRY_MS`),
-  three times in all (`CLOSE_TRIES`), each try reading the agent first.
+  three times in all (`CLOSE_TRIES`), each try reading the agent first. A
+  read that fails or runs out (`observe_<code>`), a close that runs out
+  (`timeout`) and `close_no_time` are `failed` the same way. After the third
+  failed try the harness is left open, never asked again.
 - **Restarts:** a restart during a close leaves it `failed`, code `restart`,
   to be tried again the same way.
-- **The journal:** each close prints one line, `tasks: closing task N's
-  harness: …`, and `get_task` shows the task's `close`.
+- **The journal:** each close prints one line, and `get_task` shows the
+  task's `close` (its `state`, `tries` and `code`):
+  - `tasks: closing task N's harness: try T: Closed` (or `Gone`, `Left`,
+    `Refused`);
+  - `tasks: closing task N's harness: try T of 3 failed (CODE); tried again
+    in a minute, read first`;
+  - on the third: `… try 3 of 3 failed (CODE); giving up, the harness is
+    left open`.
 - **Reverting:** a `lamp-tasks` from before #1505 is `deny_unknown_fields`
   on its stored state, so it can't load a store with `close` or `closable` in
   it, nor a store with an observation `told` (written only with
@@ -585,13 +612,29 @@ started once its answer is told:
   - `a_turn_the_person_asked_or_a_task_from_before_the_switch_is_never_closed`;
   - `a_failed_close_is_tried_three_times_and_a_refused_one_never`;
   - `a_close_under_way_at_a_restart_is_tried_again`.
+- **`runtime::tests`:**
+  - `a_close_reads_first_and_closes_only_an_idle_agent_on_the_told_turn`
+    (the read before a close is its own, never the 10 s one; a failed read
+    closes nothing, `observe_<code>`; only idle on the told turn closes,
+    within what is left of `CLOSE_BUDGET`);
+  - `a_close_journal_line_names_its_try_and_the_give_up`.
 - **`tests/runtime.rs`, through the service:**
   - `a_harness_done_and_told_is_closed_once_by_the_service` (the person's
     own idle harness listed by `ps` beside it is never closed);
   - `without_close_told_no_harness_is_closed`;
-  - `a_harness_the_person_went_on_with_or_that_waits_for_them_is_left`.
+  - `a_harness_the_person_went_on_with_or_that_waits_for_them_is_left`;
+  - `a_show_slower_than_the_read_bound_still_ends_in_a_close` (every
+    ordinary read runs out and the harness is still closed; one the slow
+    read finds waiting for the person is left);
+  - `a_close_whose_read_runs_out_is_tried_again_read_first`;
+  - `a_close_whose_read_always_runs_out_gives_up_after_its_tries` (three
+    reads, a minute apart, nothing closed, then never again).
 - **`tests/harness.rs`, on the fixture CLI:**
-  `close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code`.
+  `close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code`;
+  `the_read_before_a_close_is_given_longer_than_any_other_read` (scaled
+  down: a `show` slower than `read_timeout` reads through before a close,
+  and one slower than the close's own bound still runs out);
+  `a_close_is_given_only_what_is_left_of_its_budget`.
 - **The voice's `coordinator::tests::say`, the turn's proof:**
   `news_heard_whole_is_handed_on_as_the_turn_ends`,
   `news_cut_short_is_never_handed_on`,
@@ -795,8 +838,13 @@ A home lamp gets Harness, its sign-in and the person's computers after the
 tasks part is installed. Without the switch, the part stops at start with
 no `targets.json` or no program at `--harness`, and systemd restarts it
 again and again, saying nothing useful. `lamp-tasks serve --set-up-later`
-(off unless set; no unit sets it yet) lets it run, and says why hand-overs
-are off:
+(off unless set; set in the product unit, `deploy/product/lamp-tasks.service`,
+with `--targets-from-machines claude`, since 3 Nov) lets it run, and says why
+hand-overs are off. On lamp-c0a4 on 3 Nov, without it, `lamp-update
+harness-on` left the part failing at every start (`tasks: No such file or
+directory (os error 2)`) until systemd stopped restarting it. The product
+unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
+(`crates/update/tests/install.rs`):
 
 - **No targets file:** the part starts with no target. Every `prepare` is
   refused with `target`, as for an alias it doesn't have, and
@@ -845,7 +893,9 @@ are off:
   starts, stops and reports as before.
 
 - **Targets written from the person's machines** (`--targets-from-machines
-  ENGINE`, only with `--set-up-later`; off unless set, #1676 B6 step 3).
+  ENGINE`, only with `--set-up-later`; off unless set, #1676 B6 step 3; the
+  product unit sets `--targets-from-machines claude`, so each of the
+  person's computers is a target for Claude Code).
   While Harness is signed in (`signed_in` `yes`, not `offline`), every five
   looks (five minutes on a lamp, after everything else on the Harness
   worker), the part runs `harness machines --json` and writes
@@ -1284,6 +1334,55 @@ compatibility, its ordinary environment and executable wrapper, storage sync
 latency relative to the 1.1-second receipt deadline, and Linux process-group
 cleanup. No host result substitutes for those checks.
 
+## Recording a hand-over for a test
+
+`tools/harness-record.sh` keeps, for a set time, what Harness reported while
+a hand-over ran, so a test can show when the agent started, worked and
+answered next to the lamp's journal. It only reads (`watch`, `show`, `ps`):
+
+```text
+tools/harness-record.sh record NAME SECS [--machine ID] [--agent ID] [--out DIR]
+tools/harness-record.sh timeline DIR/NAME
+```
+
+It writes `DIR/NAME/` (DIR is `--out`, else `$HARNESS_RECORD_DIR`, else
+`./harness-records`). Each line is `END<TAB>START<TAB>MS<TAB>BODY`, local
+times in ms since 1970. For `show` and `ps`, START is when the call was made,
+END when it answered and MS how long it took, because slow calls are what a
+hand-over test usually has to explain (on lamp-c0a4, with the office
+computer loaded, `ps --machine` took 5 to 19 s and `show` 7 to 20 s). For
+`watch`, START is when that watch run began and END when the line came.
+
+- `watch.jsonl`: `harness watch [--machine ID] AGENT --json`, every line
+  whole; only with `--agent`, because `watch` follows one agent. Each run
+  opens with `!watch run N started`. When it ends (the agent not there yet,
+  a Harness `TIMEOUT`, or stopped) the end is kept as `!rc=N watch ended`
+  and it starts again 2 s after that run began, or at once if it ran longer.
+- `show.jsonl`: `harness show [--machine ID] AGENT --json` every 2 s, with
+  `--agent`; its pretty JSON joined onto one line.
+- `ps.jsonl`: `harness ps [--machine ID] --json` every 5 s.
+- `events.jsonl`: only if `harness --help` names an `events` verb (0.5.27 has
+  none).
+- `timeline.txt`: every line merged in time order, with a short summary
+  (state, tool count; for `ps` the count of harnesses by state; `took N ms`
+  for `show` and `ps`). A Harness error reply reads `error=TIMEOUT`, or
+  `!rc=1 error=TIMEOUT` when the call also failed. The summaries come from
+  `jq`; without it the same fields are picked out of the line. `timeline`
+  builds it again.
+
+A failed call is kept as `!rc=N` and its output. One reader never runs two of
+its calls at once: a `show` slower than 2 s is followed by the next, not
+stacked. When the time is up no new call starts; a call still running gets
+up to `HARNESS_RECORD_GRACE` seconds (30 by default) to answer, and one that
+does not is killed and kept as `!killed at end` with how long it ran. A
+`watch` run is stopped at once (`!stopped at end`). On INT or TERM every call
+is killed at once. Either way nothing is left running and the timeline is
+built. `HARNESS_BIN` names the binary; no `$HOME` path is assumed, so on the
+lamp it runs as `lampos` with `HOME=/var/lib/lampos-tasks`. Keep the
+recordings out of the repository; a verification README names what was kept
+from them. `tools/harness-record-test.sh` tests it with a stand-in Harness,
+with no network or account.
+
 ## First real Harness check (lamp-4ace, 2026-10-14, 21:36)
 
 By hand, not through `lamp-tasks`, with the owner's leave to use their account
@@ -1638,8 +1737,8 @@ used only to say it.
   told again. Heard whole, the tasks part is told as for any news, so its
   `told` is set. Progress and a sign-in's question are never told again
   this way (progress is the Policy's to time; a sign-in asks again its own
-  way). A skill made by voice is not either: its note keeps and asks. Off,
-  news not heard whole stays as before: kept as told, said only when asked.
+  way). Off, news not heard whole stays as before: kept as told, said only
+  when asked.
   A task waiting for the person (`needs-input`, as the push wait ends it) is
   already told once by its own words above ("Claude Code is waiting for
   you on your computer"), the same question never twice; the switch only
@@ -2232,30 +2331,22 @@ route's news test holds the turn heard to the news's, and
 holds the number `send_heard` tells the tasks part to that turn's (the
 reviewer's P3 1).
 
-### A skill made by voice (#1685, `LAMP_MAKE_SKILL=on`, on in the product)
+### A skill made by voice (#1685): not through the tasks part
 
-The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
-`make_skill(request)` ([skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
-- **The prepare.** It goes as `start_agent_task`'s does: `prepare`, then
-  `confirm_agent_task` on the person's yes, within 120 s, as the same
-  pending work. Its `text` is the brief and the request (at most 180 bytes)
-  within 1,000 bytes, half the tasks part's 2,000. The brief begins "Write one lamp
-  skill (lampOS lamp-skills)", which is how the voice knows the task again.
-- **The model's answer.** It is told `"skill": <the request>`, never the
-  brief, and `next` asks it to say the request back.
-- **When it settles.** Task news (`task_news::read_once_with`) quotes the
-  request as such a task's words, in every state. Settled `idle` with an
-  answer, the answer is taken as the skill's two files, kept as skills.md
-  says, and told alone (never with other news, never read out).
-- **Without the switch,** such a task's news is any task's, the request
-  quoted.
-- **The journal** says `a skill made by voice is kept, version VERSION,
-  sha256 …` or why not, with `lamp-skills`' exit code only: never the files,
-  the name or `lamp-skills`' words, which can quote the agent's.
+A skill is made by the lamp's own model, never handed to a computer's agent
+(the first builder, 3 Nov, on the Queue;
+[skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
+The tasks part declares no `make_skill` or `put_on_made_skill`, and the
+worker's `--tasks-make-skill` flag is gone: `LAMP_MAKE_SKILL=on` alone gives
+the voice its own two functions, with a tasks part or without one, and an
+app's typed skill (`LAMP_APP_MAKE_SKILL`) is made the same way, never handed
+over. The made skills' news words (`made`, `not_kept`) and their repair through
+a task are gone with it. A task whose words are a skill's brief, handed over
+by an earlier release, is never told: its answer is files.
+
 - **The reset** wipes `/var/lib/lampOS/voice/made-skills` with the person's
   other stores, and removes each made skill put on in `/var/lib/lampOS/skills`
   (its `.package.json`) with its folder ([setup.md](setup.md)).
-- **Without the switch** a `make_skill` call does nothing.
 
 ### Asked of the staff, done by the lamp (#854, `LAMP_TASKS_ASKED=on`, on in the product)
 
@@ -2636,7 +2727,7 @@ With one target, `start_agent_task` still had no `who`, its description
 named only that agent, the staff's note matched only the staff, and the
 voice sent any call to the one there was. Off unless
 `LAMP_TASKS_NAMED_ONLY=on` (the provider worker's `--tasks-named-only`,
-after `--tasks-make-skill`, and only with `--tasks-who`). With it, once the
+after `--tasks-sign-in`, and only with `--tasks-who`). With it, once the
 staff are read:
 
 - `who` is offered even with one of the staff, as an enum of every agent the

@@ -56,6 +56,11 @@ enum Extra {
         day_to: Option<String>,
         #[serde(default)]
         recall_v2: bool,
+        /// The voice's `LAMP_MEMORY_NEWER_FIRST`: a later correction goes
+        /// before what it corrects, which says `"earlier":true`
+        /// (`Wider::newer_first`). Without it, as before.
+        #[serde(default)]
+        newer_first: bool,
     },
     /// The legacy `recall` with any of #2176's fields: a span of days
     /// (`day_from`, `day_to`) or `recall_v2`. Without them a recall is the
@@ -77,6 +82,11 @@ enum Extra {
         day_to: Option<String>,
         #[serde(default)]
         recall_v2: bool,
+        /// The voice's `LAMP_MEMORY_NEWER_FIRST`: a later correction goes
+        /// before what it corrects, which says `"earlier":true`
+        /// (`Wider::newer_first`). Without it, as before.
+        #[serde(default)]
+        newer_first: bool,
     },
     Forget {
         #[serde(default)]
@@ -467,16 +477,21 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_from,
             day_to,
             recall_v2,
+            newer_first,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
             let spanned = day_from.is_some();
             let (day, last_day) = span(day, day_from, day_to)?;
+            let person = one(person)?;
+            // A known person's own lines only: in the room's, one speaker's
+            // line could mark another's `earlier` (the HOLD on #5049).
+            let newer_first = newer_first && person.as_str() != Person::EVERYONE;
             let wider = Wider {
                 last_day,
                 second: recall_v2,
+                newer_first,
             };
-            let person = one(person)?;
             let (records, more) = store.search_wider_more(
                 &person,
                 &ask(Some(&query), day.as_deref(), limit, max_bytes)?,
@@ -510,6 +525,14 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                     }
                 }
             }
+            // `newer_first`: one a later one of these corrects says so.
+            if newer_first && let Some(entries) = entries.as_array_mut() {
+                for (entry, earlier) in entries.iter_mut().zip(Days::earlier(&records)) {
+                    if earlier {
+                        entry["earlier"] = json!(true);
+                    }
+                }
+            }
             // #3627: for a span, whether more matched than was given, by
             // count or bytes.
             let mut found = json!({"ok":true,"entries":entries});
@@ -527,22 +550,36 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_from,
             day_to,
             recall_v2,
+            newer_first,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
             let spanned = day_from.is_some();
             let (day, last_day) = span(day, day_from, day_to)?;
+            let person = one(person)?;
+            // A known person's own lines only: in the room's, one speaker's
+            // line could mark another's `earlier` (the HOLD on #5049).
+            let newer_first = newer_first && person.as_str() != Person::EVERYONE;
             let wider = Wider {
                 last_day,
                 second: recall_v2,
+                newer_first,
             };
-            let person = one(person)?;
             let (entries, more) = store.recall_wider_more(
                 &person,
                 &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
                 wider,
             )?;
             let mut recalled = recalled_with_days(store, &person, &entries)?;
+            // `newer_first`: as search. A recall's entries stay in time
+            // order, so only the flag says it.
+            if newer_first && let Some(told) = recalled["entries"].as_array_mut() {
+                for (told, earlier) in told.iter_mut().zip(Days::earlier_entries(&entries)) {
+                    if earlier {
+                        told["earlier"] = json!(true);
+                    }
+                }
+            }
             if spanned {
                 recalled["more"] = json!(more);
             }
@@ -740,9 +777,10 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             _ => "?".into(),
         };
 
-        // #2176: a recall with a span or the second version is the new one.
+        // #2176: a recall with a span or the second version is the new one;
+        // so is one with `newer_first`.
         let wider = name == "recall"
-            && ["day_from", "day_to", "recall_v2"]
+            && ["day_from", "day_to", "recall_v2", "newer_first"]
                 .iter()
                 .any(|field| parsed.get(field).is_some());
         if NEW.contains(&name) || wider {
