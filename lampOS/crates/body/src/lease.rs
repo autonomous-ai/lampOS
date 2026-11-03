@@ -46,6 +46,10 @@
 //! "elbow":…,"clamped":…}`, `{"pose":"cut_short","why":…}` or
 //! `{"pose":"refused","why":…}`. The pose is kept while held and let go,
 //! back to the stand, when the lease ends.
+//!
+//! And may let the base go limp ([`Limping`], for recording a move by
+//! hand): `{"limp":true}` turns base yaw's torque off while held, and any
+//! end of the hold, or `{"limp":false}`, takes it back where it lies.
 
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
@@ -628,6 +632,80 @@ fn pose_cut_short(why: &str) -> String {
 
 fn pose_refused(why: &str) -> String {
     line(serde_json::json!({"pose": "refused", "why": why}))
+}
+
+/// The holder's limp base ([`Limping::ask`], record from pose):
+/// `{"limp":true}` lets base yaw go (torque off) so a hand may turn it,
+/// `{"limp":false}` takes it back where it lies. Base yaw only: it cannot
+/// fall. Answered at once, `{"limp":"on"}` or `{"limp":"off"}`, or
+/// `{"limp":"refused","why":…}`. Any end of the hold (let go, lapsed, lost,
+/// a conversation) takes it back and says `{"limp":"off","why":…}`; after a
+/// conversation the holder asks again, so torque never comes off by itself.
+/// Why a look is refused while the base is limp.
+pub const LIMP_REFUSES: &str = "the base is limp";
+
+#[derive(Debug, Default)]
+pub struct Limping {
+    on: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LimpLine {
+    limp: bool,
+}
+
+impl Limping {
+    /// Whether a holder's line is a limp, for [`Limping::ask`].
+    pub fn is_limp(line: &[u8]) -> bool {
+        serde_json::from_slice::<serde_json::Value>(line)
+            .is_ok_and(|value| value.get("limp").is_some())
+    }
+
+    /// A limp line from the holder, and its answer.
+    pub fn ask(&mut self, line: &[u8], held: bool) -> String {
+        let Ok(LimpLine { limp }) = serde_json::from_slice::<LimpLine>(line) else {
+            return limp_said(
+                "refused",
+                Some("a limp is {\"limp\":true} or {\"limp\":false}"),
+            );
+        };
+        if limp && !held {
+            return limp_said("refused", Some("the body is not held"));
+        }
+        self.on = limp;
+        limp_said(if limp { "on" } else { "off" }, None)
+    }
+
+    /// A look asked while the base is limp: refused, never a no-op on the
+    /// base and then a jerk when its torque comes back.
+    pub fn look_refused() -> String {
+        refused(LIMP_REFUSES)
+    }
+
+    /// Whether base yaw is let go now, as the body's `Asked::limp` takes it.
+    pub fn on(&self) -> bool {
+        self.on
+    }
+
+    /// Whether the body is held now, or why not: an end of the hold takes
+    /// the base back, said once.
+    pub fn step(&mut self, held: Result<(), &'static str>) -> Option<String> {
+        match held {
+            Err(why) if self.on => {
+                self.on = false;
+                Some(limp_said("off", Some(why)))
+            }
+            _ => None,
+        }
+    }
+}
+
+fn limp_said(state: &str, why: Option<&str>) -> String {
+    match why {
+        Some(why) => line(serde_json::json!({"limp": state, "why": why})),
+        None => line(serde_json::json!({"limp": state})),
+    }
 }
 
 fn line(value: serde_json::Value) -> String {
@@ -1253,5 +1331,47 @@ mod tests {
         let said = posing.end("let go");
         assert_eq!(said, None, "nothing owed");
         assert_eq!(posing.pose(), None, "the lease's end lets the pose go");
+    }
+
+    /// A limp is taken only while held, said at once, and any end of the
+    /// hold takes it back, said once with why; it never comes back by itself.
+    #[test]
+    fn a_limp_base_is_only_while_held_and_any_end_takes_it_back() {
+        let mut limping = Limping::default();
+        assert!(Limping::is_limp(br#"{"limp":true}"#));
+        assert!(!Limping::is_limp(br#"{"look":"ahead"}"#));
+        let said = limping.ask(br#"{"limp":true}"#, false);
+        assert_eq!(value(&said)["limp"], "refused");
+        assert_eq!(value(&said)["why"], "the body is not held");
+        assert!(!limping.on());
+        let said = limping.ask(br#"{"limp":"yes"}"#, true);
+        assert_eq!(value(&said)["limp"], "refused");
+        assert_eq!(
+            limping.ask(br#"{"limp":true}"#, true),
+            said_line(r#"{"limp":"on"}"#)
+        );
+        assert!(limping.on());
+        assert_eq!(limping.step(Ok(())), None);
+        let said = limping.step(Err("conversation")).unwrap();
+        assert_eq!(
+            value(&said),
+            serde_json::json!({"limp": "off", "why": "conversation"})
+        );
+        assert!(
+            !limping.on(),
+            "a conversation takes it back; the holder asks again"
+        );
+        assert_eq!(limping.step(Ok(())), None);
+        assert_eq!(limping.step(Err("the lease ended")), None, "said once");
+        limping.ask(br#"{"limp":true}"#, true);
+        assert_eq!(
+            limping.ask(br#"{"limp":false}"#, true),
+            said_line(r#"{"limp":"off"}"#)
+        );
+        assert!(!limping.on());
+    }
+
+    fn said_line(text: &str) -> String {
+        text.to_owned() + "\n"
     }
 }

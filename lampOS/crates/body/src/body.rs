@@ -652,6 +652,11 @@ pub struct Asked {
     /// arm inside its window between the fold and the stand, laid on the
     /// pose as a gesture is, so V1's anti-tip rule cuts any step of it.
     pub pose: Option<[f32; 3]>,
+    /// The holder lets the base go limp (`lease`'s `limp`, record from
+    /// pose): base yaw's torque off while `held`, so a hand may turn it, its
+    /// goal following where it lies. Taken back, where it lies, as soon as
+    /// this or `held` ends. Base yaw only: it cannot fall.
+    pub limp: bool,
     /// Under `Limits::strain_guard` (#4501): a person held the head or a
     /// button a second, or a health check started, since the lamp was
     /// seated. It may stand again.
@@ -690,6 +695,7 @@ impl Asked {
         held_by_test: false,
         held: false,
         aim: None,
+        limp: false,
         unseat: false,
         night: false,
         night_woke: false,
@@ -716,6 +722,7 @@ impl Asked {
         held_by_test: false,
         held: false,
         aim: None,
+        limp: false,
         unseat: false,
         night: false,
         night_woke: false,
@@ -2703,7 +2710,7 @@ fn wake<P: PortIo, R: Runtime>(
                 }
                 for joint in Joint::ALL {
                     let (was, is) = (found[joint.index()], now[joint.index()]);
-                    if is.status != was.status {
+                    if is.status != was.status && !bus.left[joint.index()] {
                         surprise.get_or_insert(Stop::Status {
                             joint: joint.id(),
                             found: was.status,
@@ -2725,6 +2732,13 @@ fn wake<P: PortIo, R: Runtime>(
                 }
                 for (index, joint) in COMMANDED.iter().enumerate() {
                     let is = now[joint.index()];
+                    // A joint left as it is (a holder's limp base) is not
+                    // woken: nothing is asked of it, so nothing is judged,
+                    // and wherever a hand turns it, it has settled.
+                    if bus.left[joint.index()] {
+                        settled[index] = true;
+                        continue;
+                    }
                     report.peak_load[index] = report.peak_load[index].max(is.load);
                     let bound = if lifts(from, to, index) {
                         limits.load[index].max(WAKE_LIFT_LOAD)
@@ -3106,6 +3120,14 @@ fn take_hold<P: PortIo, R: Runtime>(
         if bus.runtime.recovery_inhibited() {
             return Err(Stop::Cancelled);
         }
+        // A joint left as it is (`Bus::left`: a holder's limp base, or one
+        // its own protection flagged) is written nothing, not its goal and
+        // not its torque: a retake after a hand's rest would otherwise turn
+        // a limp base back on under the hand (the Reviewer-lead's and
+        // Thirteen's P1 on #5047).
+        if bus.left[joint.index()] {
+            continue;
+        }
         let at = found[joint.index()].position;
         // A flag is read and judged with the rest afterwards.
         if outcome.is_ok() {
@@ -3139,6 +3161,7 @@ fn take_hold<P: PortIo, R: Runtime>(
     report.last = Some(now);
     let moved: Vec<(Joint, u16)> = joints
         .iter()
+        .filter(|joint| !bus.left[joint.index()])
         .map(|joint| {
             let index = joint.index();
             (*joint, now[index].position.abs_diff(found[index].position))
@@ -3946,6 +3969,7 @@ pub(crate) fn run_looking(
         held_by_test: false,
         held: false,
         aim: None,
+        limp: false,
         unseat: false,
         night: false,
         night_woke: false,
@@ -5145,6 +5169,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut gesture_cooling = 0u16;
     // Steps are being cut short by the anti-tip rule.
     let mut tipping = false;
+    // Base yaw let go for the holder (`Asked::limp`): its torque is off.
+    let mut limp_base = false;
+    // Whether the limp is what left base yaw as it is (`Bus::left`), not
+    // its own protection: only then does taking it back clear the mark
+    // (the local leader's P2 on #5047).
+    let mut limp_left = false;
     // Looks in a row in which its eyes reported a face.
     let mut faces_running = 0u8;
     // When a lamp standing at rest next shifts by itself, what draws when
@@ -5932,6 +5962,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 Some(("dropped: paused", None))
             } else if asked_now.asleep {
                 Some(("dropped: asleep", None))
+            } else if limp_base {
+                // Its holder let the base go: a move would be a no-op on it,
+                // then a jerk when its torque came back.
+                Some(("dropped: the base is limp", None))
             } else if leaving.is_some() {
                 Some(("dropped: it is stopping", None))
             } else if slumped {
@@ -6716,6 +6750,86 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 arm_goals[index] =
                     bus.eased(joint, arm_written[index], arm_goals[index], arm_rests);
             }
+        }
+        // A holder's limp base (`Asked::limp`): torque off on base yaw while
+        // held, so a hand may turn it, and its goal follows where it lies,
+        // so nothing jumps when it is taken back. Taken back where it lies
+        // (`take_hold`) once the holder lets it go, the lease ends or is
+        // suspended, a hand stops it, or the lamp goes private.
+        // A read missed (`blind`) only keeps a base from going limp: one
+        // already limp stays so, not taken back and let go again on each
+        // missed read (the Reviewer-lead's P3 on #5047).
+        let limp_wanted = asked_now.held && asked_now.limp && (limp_base || !blind);
+        if limp_wanted != limp_base
+            && let Some(last) = report.last
+        {
+            if limp_wanted {
+                match bus.write_patiently(Joint::BaseYaw, &torque_write(Joint::BaseYaw, 0)) {
+                    Ok(()) => {
+                        limp_base = true;
+                        // Left as it is (`Bus::left`): no goal is written
+                        // to it while limp, since a goal turns a servo's
+                        // torque back on (the Reviewer-lead's P1 on #5047).
+                        // A base its protection left already stays so.
+                        limp_left = !bus.left[Joint::BaseYaw.index()];
+                        bus.left[Joint::BaseYaw.index()] = true;
+                        eprintln!(
+                            "lamp-body: step {}: base yaw let go for its holder (torque off), at {}",
+                            report.steps,
+                            last[Joint::BaseYaw.index()].position
+                        );
+                    }
+                    Err(detail) => eprintln!(
+                        "lamp-body: step {}: letting base yaw go for its holder failed: {detail}",
+                        report.steps
+                    ),
+                }
+            } else if !limp_left || last[Joint::BaseYaw.index()].status != 0 {
+                // Left by its own protection, before the limp or while it
+                // was limp (a status flag on a left joint is no surprise):
+                // nothing is written to it, not even the hold, and it stays
+                // left as it is while the rest goes on (the local leader's
+                // P2 on #5047).
+                limp_base = false;
+                limp_left = false;
+                eprintln!(
+                    "lamp-body: step {}: base yaw not taken back from its holder: left as it is (status {:#04x})",
+                    report.steps,
+                    last[Joint::BaseYaw.index()].status
+                );
+            } else {
+                bus.left[Joint::BaseYaw.index()] = false;
+                limp_left = false;
+                match take_hold(bus, &mut report, &[Joint::BaseYaw], &last) {
+                    Ok(now) => {
+                        limp_base = false;
+                        report.last = Some(now);
+                        written[2] = now[Joint::BaseYaw.index()].position;
+                        eprintln!(
+                            "lamp-body: step {}: base yaw taken back from its holder, at {}",
+                            report.steps, written[2]
+                        );
+                    }
+                    // Still being turned as its torque came on: `take_hold`
+                    // has held it where it got to, and the run goes on (the
+                    // Reviewer-lead's P2 on #5047: the whole lamp let go,
+                    // its arm slumping, for a hand on the base).
+                    // `take_hold` keeps what it read before it refuses.
+                    Err(Stop::Refused { why }) => {
+                        limp_base = false;
+                        let at = report.last.unwrap_or(last)[Joint::BaseYaw.index()].position;
+                        written[2] = at;
+                        eprintln!(
+                            "lamp-body: step {}: base yaw taken back from its holder while still turned ({why}), held at {at}",
+                            report.steps
+                        );
+                    }
+                    Err(stop) => break stop,
+                }
+            }
+        }
+        if limp_base && let Some(last) = report.last {
+            goals[2] = last[Joint::BaseYaw.index()].position;
         }
         still_steps = if goals != written || arm_goals != arm_written {
             0
@@ -7634,9 +7748,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             left_as_is = false;
             commanded = COMMANDED.map(|joint| f32::from(now[joint.index()].position));
             velocity = [0.0; 3];
+            // A joint left as it is (a limp base) was not taken up again,
+            // and a flag on it is no surprise, as for any joint left so.
             if let Some(joint) = COMMANDED
                 .into_iter()
-                .find(|joint| now[joint.index()].status != 0)
+                .find(|joint| !bus.left[joint.index()] && now[joint.index()].status != 0)
             {
                 break Stop::Status {
                     joint: joint.id(),
@@ -7738,7 +7854,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // from a power cut: slowly, never away from home, a head that
             // drooped led enough to lift it, and woken where it settles.
             let from = COMMANDED.map(|joint| now[joint.index()].position);
-            let to = home_now.map(|count| count.round() as u16);
+            // A joint left as it is (a holder's limp base, `Bus::left`) is
+            // not driven: it wakes where it lies, so the wake neither writes
+            // to it nor judges it short of home (the Reviewer-lead's P1 on
+            // #5047: a base turned by hand failed the wake's tracking and
+            // the head slumped again every 15 s).
+            let to: [u16; 3] = std::array::from_fn(|index| {
+                if bus.left[COMMANDED[index].index()] {
+                    from[index]
+                } else {
+                    home_now[index].round() as u16
+                }
+            });
             let woke_at_start = report.woke.take();
             let woken = wake(
                 bus,
@@ -7801,6 +7928,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             let mut goals = to;
             for (index, joint) in COMMANDED.iter().enumerate() {
                 let at = found[joint.index()].position;
+                // A joint left as it is keeps to where it lies, and its home
+                // stays the found one.
+                if bus.left[joint.index()] {
+                    goals[index] = at;
+                    continue;
+                }
                 if at.abs_diff(to[index]) > limits.tracking {
                     goals[index] = at;
                     let shifted = i32::from(home[index]) + i32::from(at) - i32::from(to[index]);
