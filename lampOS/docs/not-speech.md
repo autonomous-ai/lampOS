@@ -705,7 +705,12 @@ A call written as words is kept nowhere, on either route
   "Louder.", "Brighter." or "Cooler." with no call, the word copied from
   the thread's earlier turns, and nothing changed): a whole reply that is
   only such a word, case and a closing '.' or '!' aside, is taken as the
-  narration above, held until the reply ends. With no call earlier in the
+  narration above, held until the reply ends. Another reply whose first
+  piece could still begin a step word ("B", "Co", "Lou") holds its sound
+  until a piece leaves the word: usually the next token, two for a reply
+  that runs on from a step word's start ("Bright" then " idea", "Loud"
+  then " music"), as the "calling " opening is held (the Reviewer-lead's P3
+  on #5006). With no call earlier in the
   turn it is dropped: with nothing else in its round it is asked once more,
   told that nothing changed and to call the function (`step_alone_note`),
   and beside its call the call's own line says it once. After a real step
