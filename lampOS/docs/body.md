@@ -1970,6 +1970,7 @@ answered `refused` with why and closed. Lines of JSON each way
 | `{"let_go":true}` | `{"lease":"free"}` |
 | `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive) or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
 | `{"pose":{"roll":R,"shoulder":S,"elbow":E}}` (degrees, one at least; as `get('body')` counts them), while held | once, later: `{"pose":"there","roll":…,"shoulder":…,"elbow":…,"clamped":…}`, or `{"pose":"cut_short","why":…}`; at once while not held, while the body takes no pose, or for another pose: `{"pose":"refused","why":…}` |
+| `{"limp":true}` or `{"limp":false}`, while held | at once: `{"limp":"on"}` or `{"limp":"off"}`; `{"limp":"refused","why":…}` while not held; and unasked, once, `{"limp":"off","why":…}` when the hold ends |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
 
 **A holder's look** (`lease::Looking`, the protocol's `look`): degrees become
@@ -2036,6 +2037,47 @@ held again; any other end lets it go, back to the stand. Tests:
 `a_pose_after_a_conversation_is_there_with_the_arm_sagging_short`,
 `a_pose_stopped_far_short_of_its_goal_is_cut_short`,
 `a_pose_with_a_joint_still_moving_stays_owed`.
+
+**A holder's limp base** (`lease::Limping`, for recording a move by hand,
+base yaw only, which cannot fall; the head's pitch comes later with a fall
+guard): `{"limp":true}` while held writes base yaw's torque off, so a hand
+may turn the base. It is left as it is while limp (`Bus::left`): no goal is
+written to it, since a goal written to a servo turns its torque back on. Its
+goal follows where it lies every step, so nothing jumps when torque comes
+back. A read missed while limp keeps it limp; one missed before only keeps
+it from going limp that step. It is taken back where it lies
+(`take_hold`: its goal there, then torque on) on `{"limp":false}` or any end
+of the hold: let go, lapsed, lost (a hand, privacy, a pause, a sleep) and a
+conversation, said `{"limp":"off","why":…}` once. A base still being
+turned as its torque comes on (moved more than `TAKE_HOLD_SLACK`) is held
+where it got to, and the run goes on: the lamp is never let go on all five
+for a hand on the base. A base its own protection left as it is (a status
+flag, found so at start or raised while it was limp, which is no surprise on
+a joint left so) is not taken back: nothing is written to it, not even the
+hold, and it stays left while the rest goes on. The limp clears only the
+mark it set itself. Every take-hold, a hand's rest and its retake included,
+writes nothing to a joint left as it is, not its goal and not its torque, so
+a hand resting on a lamp whose base is limp never turns the base back on.
+The wake after a hand's let-go does not drive a limp base either: it wakes
+where a hand turned it, is not judged short of home, and its home stays the
+found one, so the head is let go once for the hand and not again. A stop
+(SIGTERM) while the base is limp leaves it torque-off, as the end's hold
+writes nothing to a joint left as it is. After a conversation the
+holder asks again: torque never comes off by itself. Nothing else loses its
+torque. While the base is limp nothing drives it: a holder's look is
+refused, `{"look":"refused","why":"the base is limp"}`, and a gesture or move
+asked on the mood socket is dropped and said, "dropped: the base is limp".
+Either would be a no-op on the limp base, then a jerk when its torque came
+back. The journal says each let go and taking back with the base's
+counts. Tests: `a_held_limp_base_turns_by_hand_and_is_taken_back_where_it_lies`,
+`a_limp_base_is_written_no_goal_so_its_torque_stays_off_under_the_hand`,
+`a_limp_base_still_turned_when_taken_back_is_held_and_the_run_goes_on`,
+`a_limp_base_flagged_by_its_protection_is_not_taken_back`,
+`a_hand_resting_while_the_base_is_limp_never_retakes_the_base`,
+`a_limp_base_turned_by_hand_never_fails_the_wake_after_a_hands_let_go`,
+`a_limp_base_is_only_while_held_and_any_end_takes_it_back`,
+`a_gesture_asked_while_the_base_is_limp_is_dropped_and_said`,
+`the_lease_door_refuses_a_look_while_the_base_is_limp`.
 
 Said unasked when it changes:
 - `{"lease":"suspended","why":"conversation"}` while the mood is listening,
