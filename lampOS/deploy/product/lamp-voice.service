@@ -278,9 +278,10 @@ Environment=LAMP_NAME_IN_PASSING=ignored
 # starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
 Environment=LAMP_SPOKEN_TO=on
 # "Lamp," that Deepgram writes "One," calls the lamp, "Wang," and "Lung," too with one person in a conversation,
-# and a retry of a line held as said to someone by name is no reply to them (#4710, lamp-3e83 2 Nov).
-# Off until its lamp-3e83 check (switches.md).
-# Environment=LAMP_ONE_AS_LAMP=on
+# and a retry of a line held as said to someone by name is no reply to them (#4710, lamp-3e83 2 Nov). On after the
+# tester's check on lamp-3e83 (3 Nov, 9680: "One, …" and its retry answered, held on 2 Nov) and lamp-06c1's played
+# check (3 Nov, 9724 voice): "One, …" 8/8 answered, short replies 4/4 and desk lines 2/2 held, a colleague's name held (switches.md).
+Environment=LAMP_ONE_AS_LAMP=on
 Environment=LAMP_FIRST_WORDS=kept
 # A line begun with the lamp silent keeps 300 ms more of its sound, so a first word the detector is slow on is not lost
 # ("What did I just ask you?" heard as "Did I just ask you?"). lamp-4ace's third A/B, 25 Oct, #3411: three of ten pause
