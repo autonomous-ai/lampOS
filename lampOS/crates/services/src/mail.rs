@@ -9,8 +9,17 @@
 //!
 //! The app password is only in the LOGIN and AUTH lines; every failure is
 //! said as [`Failure`], never with what the server said.
-use crate::{catalog, net};
-use base64::{Engine, engine::general_purpose::STANDARD};
+//!
+//! A link made with a Google sign-in (OAuth, for an account that can't
+//! make an app password, as Google Workspace's often can't) reads and
+//! sends through Gmail's REST API instead: the calls and their answers
+//! here, the requests made by `serve.rs` with the token.
+use crate::{catalog, net, reads};
+use base64::{
+    Engine,
+    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+};
+use serde_json::{Value, json};
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 
@@ -45,6 +54,8 @@ pub const SECURITY_MESSAGE_LEFT_OUT: &str = "a security message, left out";
 pub enum Failure {
     /// The login was refused.
     Refused,
+    /// Gmail's REST API refused a Google sign-in's token.
+    SignInRefused,
     /// No answer, a broken one, or a command refused after login.
     Unreached,
 }
@@ -53,6 +64,7 @@ impl Failure {
     pub fn words(self) -> &'static str {
         match self {
             Self::Refused => "Gmail refused the app password",
+            Self::SignInRefused => "Google refused the Gmail sign-in",
             Self::Unreached => "Gmail couldn't be reached",
         }
     }
@@ -75,8 +87,9 @@ pub enum MailAsk {
     Recent(usize),
     /// Gmail's own search words (`X-GM-RAW`), at most this many.
     Search(String, usize),
-    /// One mail by its id (its UID), with its text.
-    Message(u32),
+    /// One mail by its id (its UID over IMAP, Gmail's own id over the
+    /// REST API), with its text.
+    Message(String),
 }
 
 /// One message to send, from the account itself.
@@ -1147,7 +1160,10 @@ pub async fn read_mail<S: AsyncRead + AsyncWrite + Unpin>(
             let newest = &uids[uids.len().saturating_sub(*most)..];
             imap.fetch(newest, PREVIEW_FETCH, PREVIEW_MOST).await?
         }
-        MailAsk::Message(uid) => imap.fetch(&[*uid], MESSAGE_FETCH, TEXT_MOST).await?,
+        MailAsk::Message(id) => {
+            let uid = id.parse().map_err(|_| Failure::Unreached)?;
+            imap.fetch(&[uid], MESSAGE_FETCH, TEXT_MOST).await?
+        }
     };
     imap.logout().await;
     Ok(items)
@@ -1365,9 +1381,171 @@ pub async fn send_mail<S: AsyncRead + AsyncWrite + Unpin>(
     Ok(())
 }
 
+// --- Gmail's REST API (a Google sign-in) --------------------------------------
+
+/// Gmail's REST API, which only a Google sign-in's token goes to.
+pub const API: &str = "https://gmail.googleapis.com";
+/// The longest id of Gmail's own taken.
+const API_ID_MOST: usize = 64;
+
+/// Whether `id` is one of Gmail's own: letters and digits, bounded.
+pub fn api_id_ok(id: &str) -> bool {
+    !id.is_empty() && id.len() <= API_ID_MOST && id.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+/// A URL under the account's own (`/gmail/v1/users/me/…`).
+fn api_url(segments: &[&str], query: &[(&str, String)]) -> Result<String, String> {
+    let mut all = vec!["gmail", "v1", "users", "me"];
+    all.extend_from_slice(segments);
+    reads::url(API, &all, query)
+}
+
+/// The account's profile (`users.getProfile`): `set`'s check of a sign-in.
+pub fn api_profile_url() -> Result<String, String> {
+    api_url(&["profile"], &[])
+}
+
+/// The ids of the inbox's newest mails, at most `most`, or of those Gmail's
+/// own search `words` finds in it (`users.messages.list`).
+pub fn api_list_url(words: Option<&str>, most: usize) -> Result<String, String> {
+    let mut query = vec![
+        ("labelIds", "INBOX".to_owned()),
+        ("maxResults", most.clamp(1, LIST_MOST).to_string()),
+    ];
+    if let Some(words) = words {
+        query.push(("q", words.to_owned()));
+    }
+    api_url(&["messages"], &query)
+}
+
+/// One mail (`users.messages.get`): its From, Subject and Date with Gmail's
+/// short preview, or with `whole` every part, its text read here.
+pub fn api_message_url(id: &str, whole: bool) -> Result<String, String> {
+    if !api_id_ok(id) {
+        return Err("a mail's id is the one a list gave".into());
+    }
+    let query: Vec<(&str, String)> = if whole {
+        vec![("format", "full".into())]
+    } else {
+        std::iter::once(("format", "metadata".to_owned()))
+            .chain(["From", "Subject", "Date"].map(|name| ("metadataHeaders", name.to_owned())))
+            .collect()
+    };
+    api_url(&["messages", id], &query)
+}
+
+/// Where one message is sent (`users.messages.send`).
+pub fn api_send_url() -> Result<String, String> {
+    api_url(&["messages", "send"], &[])
+}
+
+/// A list's ids, newest first as Gmail gives them, at most [`LIST_MOST`].
+pub fn api_ids(text: &str) -> Vec<String> {
+    let value: Value = serde_json::from_str(text).unwrap_or_default();
+    value["messages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|listed| listed["id"].as_str())
+        .filter(|id| api_id_ok(id))
+        .take(LIST_MOST)
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The account's address, from its profile.
+pub fn api_address(text: &str) -> Option<String> {
+    let value: Value = serde_json::from_str(text).ok()?;
+    value["emailAddress"]
+        .as_str()
+        .filter(|address| address_ok(address))
+        .map(str::to_owned)
+}
+
+/// A part's header fields, as the API lists them.
+fn api_headers(part: &Value) -> Headers {
+    Headers(
+        part["headers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|field| {
+                Some((
+                    field["name"].as_str()?.to_ascii_lowercase(),
+                    field["value"].as_str()?.to_owned(),
+                ))
+            })
+            .collect(),
+    )
+}
+
+/// One part's text, as [`part_text`] reads a MIME part: (plain or not, the
+/// text), multiparts searched for a plain part first. The API gives each
+/// part's body already decoded from its transfer encoding, in base64url.
+fn api_part_text(part: &Value, depth: u8) -> Option<(bool, String)> {
+    let kind = part["mimeType"].as_str().unwrap_or("").to_ascii_lowercase();
+    if kind.starts_with("multipart/") {
+        if depth >= 4 {
+            return None;
+        }
+        let texts: Vec<(bool, String)> = part["parts"]
+            .as_array()?
+            .iter()
+            .filter_map(|part| api_part_text(part, depth + 1))
+            .collect();
+        return texts
+            .iter()
+            .find(|(plain, _)| *plain)
+            .or_else(|| texts.first())
+            .cloned();
+    }
+    let data = part["body"]["data"].as_str()?;
+    let bytes = URL_SAFE_NO_PAD.decode(data.trim_end_matches('=')).ok()?;
+    let headers = api_headers(part);
+    let charset = param(headers.get("content-type").unwrap_or(""), "charset").unwrap_or_default();
+    let text = charset_text(&bytes, &charset);
+    match kind.as_str() {
+        "text/plain" => Some((true, text)),
+        "text/html" => Some((false, strip_html(&text))),
+        _ => None,
+    }
+}
+
+/// One mail from `users.messages.get`'s answer: with `whole` its text (at
+/// most [`TEXT_MOST`]), else Gmail's preview (at most [`PREVIEW_MOST`]).
+pub fn api_item(text: &str, whole: bool) -> Option<MailItem> {
+    let value: Value = serde_json::from_str(text).ok()?;
+    let id = value["id"].as_str().filter(|id| api_id_ok(id))?;
+    let payload = &value["payload"];
+    let head = api_headers(payload);
+    let field = |name| decode_words(head.get(name).unwrap_or(""));
+    let text = if whole {
+        let text = api_part_text(payload, 0).map(|(_, text)| text);
+        tidy(&text.unwrap_or_default(), TEXT_MOST)
+    } else {
+        // The preview comes with its HTML entities.
+        tidy(
+            &strip_html(value["snippet"].as_str().unwrap_or("")),
+            PREVIEW_MOST,
+        )
+    };
+    Some(MailItem {
+        id: id.to_owned(),
+        from: field("from"),
+        subject: field("subject"),
+        date: field("date"),
+        text,
+    })
+}
+
+/// The send's body: the same message SMTP sends, in base64url as `raw`.
+pub fn api_send_body(from: &str, out: &Outgoing, date: &str, id: &str) -> Value {
+    json!({"raw": URL_SAFE_NO_PAD.encode(message(from, out, date, id))})
+}
+
 // --- Gmail over TLS -----------------------------------------------------------
 
-/// The real Gmail: TLS to its own hosts only.
+/// The real Gmail: TLS to its IMAP and SMTP hosts only.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Gmail;
 
@@ -1375,7 +1553,8 @@ async fn connect(
     host: &str,
     port: u16,
 ) -> Result<tokio_rustls::client::TlsStream<tokio::net::TcpStream>, Failure> {
-    if !catalog::host_allowed("gmail", host) {
+    // The app password never goes to the REST host.
+    if ![IMAP_HOST, SMTP_HOST].contains(&host) || !catalog::host_allowed("gmail", host) {
         return Err(Failure::Unreached);
     }
     let config = Arc::new(net::tls().map_err(|_| Failure::Unreached)?);

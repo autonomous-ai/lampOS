@@ -76,8 +76,9 @@ pub const BUSY: &str = "the lamp's services are busy: try again in a moment";
 pub const FETCH_PATH: &str = "/devices/get-message";
 /// V1's `privacyFetchTimeout`.
 pub const FETCH_WITHIN: Duration = Duration::from_secs(30);
-/// How long a `set` or `remove` is waited on: Gmail's IMAP login is tried
-/// before it is kept, then a small write.
+/// How long a `set` or `remove` is waited on: Gmail's link is checked (an
+/// IMAP login, or its profile read for a Google sign-in) before it is
+/// kept, then a small write.
 pub const ADMIN_WAIT: Duration = Duration::from_secs(30);
 /// How long `services.list` is waited on, inline on the broker's loop: it
 /// reads a few small files.
