@@ -434,6 +434,59 @@ uncertain. Human error text is never parsed as proof of non-dispatch. A pending
 creation is retained without guessing an agent from its name. The CLI's
 creation-ID lookup gap prevents reliable automatic reconciliation.
 
+### What the journal says about Harness calls
+
+Every Harness CLI call the part makes says one journal line too, whatever
+the outcome (on everywhere, no switch): the preflight `machines`, the
+engine probe, `route`, `new`, Devin's `show` and `reply`, the `show` of a
+read, `ps` for progress, the held `wait`, `close`, `auth status` and
+`start`. So a slow or failed call can be found on a lamp, and matched to
+Harness's own log on the computer (proposal L1 and L2). The hand-over's
+`dispatch` line above stays as it is. The line is
+
+`tasks: harness VERB: [machine=M] [agent=A | agents=N] exit=CODE ms=T
+[out=B] [state=S] [error=E] [tools=K] [listed=L] [states=S:n,…] [ids=…]
+[id=I] [creation=C] [message=G]`
+
+- VERB is `new`, `show`, `ps`, `wait`, `reply`, `close`, `route`,
+  `machines`, `engines` (`machines engines`), `auth-status` or `start`;
+  any other is `other`.
+- `machine=` and `agent=` are the ids the call was asked about, their first
+  8 characters only (a cloud agent's keeps `cloud_` and the 8 after it);
+  `agents=` is how many a `wait` waited on. They are read only from where
+  the part put them, never after `--`, where the ask and a reply's words go.
+- `exit=` is the CLI's exit status, `killed` when it ended on a signal, or
+  the part's own code when it never answered: `timeout`, `cancelled`,
+  `stdout_limit`, `spawn_failed`, `executable_changed` and the like. `ms=`
+  is how long the call took; `out=` stdout's size in bytes, when it exited.
+- From stdout only typed fields: `state=` the agent's or the send's state,
+  a route's decision (`new`, `session`), `pending` for a `new` still being
+  made, `signed-in`, `signed-out` or `offline` for `auth status`, else
+  `ok` or `failed`; `error=` Harness's code (`SPAWN_FAILED`), or `?` for
+  an error in words; `tools=` the agent's tool count (`show`); `listed=`
+  how many harnesses (`ps`, `wait`) or machines (`machines`) it listed,
+  with `states=` how many in each state; `ids=` the agents a `wait` came
+  back for, four at most.
+- The ids Harness gave, cut the same way: `id=` the agent's (`agent.id` of
+  `new`, `id` of `show`, `reply` and `route`), `creation=` a pending `new`'s,
+  `message=` the message a `reply` or a route's send queued.
+
+A state or code that isn't plain lowercase or upper-case ASCII is `?`. The
+ask, a question, an answer, a progress line (`about`), a task or machine
+name, a folder and Harness's words are never in it. For example:
+
+```
+tasks: harness new: machine=01234567 exit=0 ms=1840 out=212 state=ok id=11111111
+tasks: harness reply: machine=01234567 agent=11111111 exit=0 ms=410 out=98 state=queued id=11111111 message=m1
+tasks: harness show: machine=01234567 agent=11111111 exit=timeout ms=10002
+tasks: harness ps: machine=01234567 exit=0 ms=380 out=1544 listed=3 states=idle:1,starting:1,working:1
+tasks: harness wait: machine=01234567 agents=2 exit=0 ms=93120 out=88 listed=1 states=idle:1 ids=11111111
+tasks: harness close: machine=01234567 agent=11111111 exit=1 ms=520 out=40 state=failed error=?
+```
+
+A `ps` is one line each 30 to 120 s per watched machine, and the held
+`wait` one line each time it comes back (10 min at most).
+
 ## Speech and questions
 
 An observation can be read at any later time; it can receive a new speech

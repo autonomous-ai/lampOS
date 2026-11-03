@@ -415,6 +415,9 @@ pub struct CliConfig {
     /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub journal: Option<Arc<Mutex<Vec<String>>>>,
+    /// Each Harness call's journal line ([`call_line`]) is also kept here,
+    /// for a test to read; it always goes to stderr, the unit's journal.
+    pub calls: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 impl CliConfig {
@@ -433,6 +436,7 @@ impl CliConfig {
             engines_ready: false,
             route: false,
             journal: None,
+            calls: None,
         }
     }
 }
@@ -1139,7 +1143,26 @@ impl Cli {
         self.run_cancellable(args, timeout, stdout_limit, None)
     }
 
+    /// Every Harness call goes through here, and says how it went in one
+    /// journal line ([`call_line`]), whatever the outcome.
     fn run_cancellable(
+        &self,
+        args: &[OsString],
+        timeout: Duration,
+        stdout_limit: usize,
+        also: Option<&AtomicBool>,
+    ) -> Result<Reply, RunError> {
+        let began = Instant::now();
+        let result = self.run_once(args, timeout, stdout_limit, also);
+        let line = call_line(args, &result, began.elapsed());
+        eprintln!("{line}");
+        if let Some(calls) = &self.config.calls {
+            calls.lock().unwrap_or_else(|e| e.into_inner()).push(line);
+        }
+        result
+    }
+
+    fn run_once(
         &self,
         args: &[OsString],
         timeout: Duration,
@@ -1874,6 +1897,227 @@ fn said_of_stderr(stderr: &[u8], prompt: &str, machines: &BTreeSet<String>) -> O
         return None;
     }
     Some(words.join(" ").chars().take(STDERR_SAID_CHARS).collect())
+}
+
+/// How much of an id a call line keeps: enough to find the same call in
+/// Harness's own log on the computer, never the whole id.
+const ID_CHARS: usize = 8;
+
+/// The Harness verbs a call line names by name; any other is `other`.
+const VERBS: [&str; 9] = [
+    "new", "show", "ps", "wait", "reply", "close", "route", "machines", "start",
+];
+
+/// The first [`ID_CHARS`] of an id; a cloud agent's keeps its `cloud_`
+/// first, so the part that tells two apart is there.
+fn short_id(id: &str) -> String {
+    let (kind, rest) = id
+        .strip_prefix("cloud_")
+        .map_or(("", id), |rest| ("cloud_", rest));
+    format!("{kind}{}", rest.chars().take(ID_CHARS).collect::<String>())
+}
+
+/// A word Harness answers with that a call line may say: a state
+/// (`needs-input`) or a decision (`new`), plain lowercase ASCII, 32 bytes at
+/// most. Anything else is `?`.
+fn state_word(value: &str) -> &str {
+    if !value.is_empty()
+        && value.len() <= 32
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_".contains(&byte))
+    {
+        value
+    } else {
+        "?"
+    }
+}
+
+/// Harness's refusal code (`SPAWN_FAILED`, `NOT_IDLE`): upper-case ASCII,
+/// digits and `_`, 3 to 48 bytes. Anything else, a message in words, is `?`.
+fn error_code(value: &str) -> &str {
+    if (3..=48).contains(&value.len())
+        && value.starts_with(|c: char| c.is_ascii_uppercase())
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+    {
+        value
+    } else {
+        "?"
+    }
+}
+
+/// One Harness call's journal line, whatever its outcome (proposal L1 and
+/// L2), so a slow or failed call can be found on a lamp and matched to
+/// Harness's own log: `tasks: harness VERB: [machine=M] [agent=A |
+/// agents=N] exit=CODE ms=T [out=B] [what stdout said]`. Ids are their
+/// first [`ID_CHARS`] only ([`short_id`]), and only from where the adapter
+/// put them: nothing after `--`, which is the ask or a reply's words. From
+/// stdout only typed things ([`said_of_stdout`]). Never the ask, a
+/// question, an answer, a name or Harness's words.
+fn call_line(args: &[OsString], result: &Result<Reply, RunError>, took: Duration) -> String {
+    // Only what comes before `--`: after it are the person's words.
+    let named = &args[..args
+        .iter()
+        .position(|arg| arg == "--")
+        .unwrap_or(args.len())];
+    let arg = |at: usize| named.get(at).and_then(|arg| arg.to_str());
+    let verb = match (arg(0), arg(1)) {
+        (Some("machines"), Some("engines")) => "engines",
+        (Some("auth"), Some("status")) => "auth-status",
+        (Some(verb), _) if VERBS.contains(&verb) => verb,
+        _ => "other",
+    };
+    let mut line = format!("tasks: harness {verb}:");
+    // `machines engines ID`; every other verb names it with `--machine`.
+    let machine_at = if verb == "engines" {
+        Some(2)
+    } else {
+        named
+            .iter()
+            .position(|arg| arg == "--machine")
+            .map(|at| at + 1)
+    };
+    if let Some(at) = machine_at {
+        if let Some(machine) = arg(at).filter(|machine| machine_id(machine)) {
+            line.push_str(&format!(" machine={}", short_id(machine)));
+        }
+        match verb {
+            "show" | "reply" | "close" => {
+                if let Some(agent) = arg(at + 1).filter(|agent| agent_id(agent)) {
+                    line.push_str(&format!(" agent={}", short_id(agent)));
+                }
+            }
+            "wait" => {
+                let count = arg(at + 1).map_or(0, |agents| {
+                    agents.split(',').filter(|agent| agent_id(agent)).count()
+                });
+                line.push_str(&format!(" agents={count}"));
+            }
+            _ => {}
+        }
+    }
+    let ms = took.as_millis();
+    match result {
+        Ok(reply) => {
+            let exit = reply
+                .code
+                .map_or_else(|| "killed".to_owned(), |code| code.to_string());
+            line.push_str(&format!(" exit={exit} ms={ms} out={}", reply.stdout.len()));
+            line.push_str(&said_of_stdout(verb, &reply.stdout));
+        }
+        // `timeout`, `cancelled`, `stdout_limit`, `spawn_failed` …: the
+        // adapter's own code, never Harness's words.
+        Err(error) => line.push_str(&format!(" exit={} ms={ms}", error.code)),
+    }
+    line
+}
+
+/// What a call line says of a Harness reply on stdout: typed fields only.
+/// `state=` the agent's or the send's state, a route's decision, a sign-in's
+/// or `ok`'s; `error=` Harness's code; `tools=` the agent's tool count;
+/// `listed=` how many harnesses or machines, with `states=` how many in each
+/// state; and the ids it gave, `id=` the agent's (`agent.id` of `new`, `id`
+/// of `show`, `reply`, `route`), `creation=` a pending `new`'s, `message=`
+/// a `reply`'s or a route's sent message's, and `ids=` those a `wait` came
+/// back for. Never an `ask`, `answer`, `about`, `name` or `reason`.
+fn said_of_stdout(verb: &str, bytes: &[u8]) -> String {
+    let mut said = String::new();
+    // `machines --json` is one JSON line a machine.
+    if verb == "machines" {
+        let listed = String::from_utf8_lossy(bytes)
+            .lines()
+            .filter(|line| serde_json::from_str::<Value>(line).is_ok_and(|line| line.is_object()))
+            .count();
+        said.push_str(&format!(" listed={listed}"));
+        return said;
+    }
+    let Ok(reply) = serde_json::from_slice::<Value>(bytes) else {
+        return said;
+    };
+    let text = |value: &Value| value.as_str().map(str::to_owned);
+    let state = if reply["pending"] == true {
+        Some("pending".to_owned())
+    } else if let Some(state) = text(&reply["state"])
+        .or_else(|| text(&reply["sent"]["state"]))
+        .or_else(|| text(&reply["decided"]))
+    {
+        Some(state_word(&state).to_owned())
+    } else if let Some(signed_in) = reply["loggedIn"].as_bool() {
+        Some(
+            match (signed_in, reply["offline"] == true) {
+                (false, _) => "signed-out",
+                (true, true) => "offline",
+                (true, false) => "signed-in",
+            }
+            .to_owned(),
+        )
+    } else {
+        reply["ok"]
+            .as_bool()
+            .map(|ok| if ok { "ok" } else { "failed" }.to_owned())
+    };
+    if let Some(state) = state {
+        said.push_str(&format!(" state={state}"));
+    }
+    if let Some(code) = text(&reply["error"])
+        .or_else(|| text(&reply["sent"]["error"]))
+        .or_else(|| text(&reply["sent"]["code"]))
+    {
+        said.push_str(&format!(" error={}", error_code(&code)));
+    } else if reply["error"].is_object() {
+        said.push_str(" error=?");
+    }
+    if let Some(tools) = reply["tools"].as_u64() {
+        said.push_str(&format!(" tools={tools}"));
+    }
+    if let Some(rows) = reply["harnesses"].as_array() {
+        let mut states: BTreeMap<&str, usize> = BTreeMap::new();
+        for row in rows {
+            *states
+                .entry(row["state"].as_str().map_or("?", state_word))
+                .or_default() += 1;
+        }
+        said.push_str(&format!(" listed={}", rows.len()));
+        if !states.is_empty() {
+            let states: Vec<String> = states
+                .iter()
+                .map(|(state, count)| format!("{state}:{count}"))
+                .collect();
+            said.push_str(&format!(" states={}", states.join(",")));
+        }
+        // The agents a `wait` came back for, a few at most.
+        if verb == "wait" {
+            let ids: Vec<String> = rows
+                .iter()
+                .filter_map(|row| row["id"].as_str().filter(|id| agent_id(id)))
+                .take(4)
+                .map(short_id)
+                .collect();
+            if !ids.is_empty() {
+                said.push_str(&format!(" ids={}", ids.join(",")));
+            }
+        }
+    }
+    if let Some(id) = reply["agent"]["id"]
+        .as_str()
+        .or_else(|| reply["id"].as_str())
+        .filter(|id| agent_id(id))
+    {
+        said.push_str(&format!(" id={}", short_id(id)));
+    }
+    if let Some(id) = reply["creationId"].as_str().filter(|id| token(id, 96)) {
+        said.push_str(&format!(" creation={}", short_id(id)));
+    }
+    if let Some(id) = reply["message"]
+        .as_str()
+        .or_else(|| reply["sent"]["message"].as_str())
+        .filter(|id| token(id, 96))
+    {
+        said.push_str(&format!(" message={}", short_id(id)));
+    }
+    said
 }
 
 /// The folder Harness made for the bare project name `project`, when the
