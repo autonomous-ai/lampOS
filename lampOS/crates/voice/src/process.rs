@@ -1735,6 +1735,7 @@ fn second_route_worker_environment(
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
         crate::second_provider::net::CHAT_KEPT_ENVIRONMENT,
+        crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT,
         crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_ENVIRONMENT,
         crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT,
@@ -2659,6 +2660,7 @@ mod tests {
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::CHAT_KEPT_ENVIRONMENT
+                    || name == crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_SOCKET_ENVIRONMENT
                     || name == crate::second_provider::RELAY_ROUTES_ENVIRONMENT
@@ -2872,6 +2874,7 @@ mod tests {
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",
                     "LAMP_SECOND_CHAT_KEPT=on",
+                    "LAMP_SECOND_CHAT_SECOND_TRY=on",
                     "LAMP_SECOND_CHAT_WARM=on",
                     "LAMP_SECOND_CHECKING_LINE=on",
                     "LAMP_SECOND_CUE_AFTER_MS=on",

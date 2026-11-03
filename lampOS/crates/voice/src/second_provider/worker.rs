@@ -3495,6 +3495,21 @@ pub fn serve(
         );
     }
     engine = engine.waiting_for_written(written_wait);
+    // A first round with nothing begun goes once more on a new connection
+    // (`LAMP_SECOND_CHAT_SECOND_TRY=on`; #4710).
+    let second_try = crate::second_provider::second_try_on(
+        std::env::var(crate::second_provider::CHAT_SECOND_TRY_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    );
+    if second_try {
+        eprintln!(
+            "lamp-voice second: a turn's first chat with nothing begun {} ms after the words goes once more on a new connection (LAMP_SECOND_CHAT_SECOND_TRY)",
+            crate::second_provider::SECOND_TRY_AFTER.as_millis()
+        );
+    }
+    engine = engine
+        .trying_the_chat_twice(second_try.then_some(crate::second_provider::SECOND_TRY_AFTER));
     // A line lost on the network is asked once more when a service host
     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
     // first builder's 00:02 on #1722). As the only voice, with its hosts.
