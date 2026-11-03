@@ -179,6 +179,10 @@ pub struct Settings {
     /// shutdown.md): only then is a model with no `prepare_to_unplug` told
     /// to say so ([`crate::without_a_tool`], #4595).
     pub shutdown_from_app: bool,
+    /// `lamp-services`' tools folder (`LAMP_SERVICES=on`,
+    /// [`crate::services`]): its three functions, read and called as the
+    /// skills' folder is, held to the voice's own rules.
+    pub services: Option<PathBuf>,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -259,6 +263,9 @@ pub fn arguments_from_environment() -> Vec<String> {
     ));
     flags.extend(crate::without_a_tool::arguments(
         std::env::var(lamp_msgs::SHUTDOWN_SWITCH).ok().as_deref(),
+    ));
+    flags.extend(crate::services::arguments(
+        std::env::var(crate::services::ENVIRONMENT).ok().as_deref(),
     ));
     flags
 }
@@ -486,6 +493,18 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::without_a_tool::SHUTDOWN_FLAG
     {
         settings.shutdown_from_app = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::services::FLAG
+    {
+        let [folder, rest @ ..] = rest else {
+            return Err(std::io::Error::other("--services-dir needs a path"));
+        };
+        if !Path::new(folder).is_absolute() {
+            return Err(std::io::Error::other("--services-dir must be absolute"));
+        }
+        settings.services = Some(PathBuf::from(folder));
         flags = rest;
     }
     Ok((settings, flags))
@@ -819,6 +838,11 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if settings.sleep_asked {
         tools.push(crate::sleep_asked::tool());
     }
+    // The connected services' functions, before the executive's: never the
+    // ones the executive or a skill names (`voices_own`).
+    if let Some(folder) = &settings.services {
+        tools.extend(crate::services::tools(folder));
+    }
     if let Some(directory) = &settings.exec {
         let room = bound.saturating_sub(tools.len());
         tools.extend(
@@ -885,6 +909,7 @@ fn voices_own(name: &str) -> bool {
         || crate::reports_stop::is_tool(name)
         || crate::reports_stop::is_state_tool(name)
         || crate::sleep_asked::is_tool(name)
+        || crate::services::is_tool(name)
 }
 
 /// The skills' folder that runs `name`, when the executive does not.
@@ -906,7 +931,7 @@ fn skills_for(settings: &Settings, name: &str) -> Option<PathBuf> {
 /// never opened with half of what the executive can do. A file there and
 /// refused is said in the journal, with why (#799): no setting leaves the
 /// lamp without the executive's functions and says nothing.
-fn catalog(path: &Path) -> Vec<Tool> {
+pub(crate) fn catalog(path: &Path) -> Vec<Tool> {
     read_catalog(path).unwrap_or_else(|why| {
         eprintln!("lamp-voice: the executive's functions are left out of the session: {why}");
         Vec::new()
@@ -995,6 +1020,10 @@ pub enum Route {
     /// answered here, at once, with the line to say, or not now while
     /// onboarding is under way.
     Sleep,
+    /// A connected service's function, through `lamp-services`' tools
+    /// folder ([`crate::services`]): held to the voice's own rules, and
+    /// waited for [`crate::services::DEADLINE`].
+    Services(PathBuf),
     /// Nobody here runs that.
     Nobody,
 }
@@ -1071,6 +1100,12 @@ pub fn route(settings: &Settings, name: &str) -> Route {
         } else {
             Route::Nobody
         };
+    }
+    if crate::services::is_tool(name) {
+        return settings
+            .services
+            .clone()
+            .map_or(Route::Nobody, Route::Services);
     }
     if crate::sleep_asked::is_tool(name) {
         return if settings.sleep_asked {
@@ -1939,6 +1974,10 @@ fn run_call_with_scope(
                 Err(told) => (crate::use_skill::NAME, (told, true)),
             }
         }
+        Route::Services(folder) => (
+            "the services",
+            crate::services::run(folder, call, request, heard),
+        ),
         Route::Decline | Route::Clock | Route::ReportsState | Route::Sleep | Route::Nobody => {
             ("nobody", (unavailable(), false))
         }
@@ -2693,6 +2732,7 @@ mod tests {
         let settings = Settings {
             sleep_asked: false,
             shutdown_from_app: false,
+            services: None,
             decline: true,
             use_skill: false,
             requested_audio: true,
@@ -3004,6 +3044,7 @@ mod tests {
             Settings {
                 sleep_asked: false,
                 shutdown_from_app: false,
+                services: None,
                 decline: true,
                 use_skill: false,
                 requested_audio: false,
@@ -5561,5 +5602,165 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The connected services' folder ([`crate::services`]), faked: one
+    /// thread answering each line it is sent with `answer`, and keeping
+    /// what it was sent.
+    fn services_folder(name: &str) -> (PathBuf, std::sync::Arc<std::sync::Mutex<Vec<Value>>>) {
+        let dir = schedule_directory(name);
+        let tools: Vec<Value> = crate::services::NAMES
+            .iter()
+            .map(|name| {
+                json!({"name":name,"description":"From lamp-services.",
+                    "parameters":{"type":"object","properties":{"service":{"type":"string"},"said":{"type":"string"}}}})
+            })
+            .chain([json!({"name":"service_delete","description":"Not the voice's."})])
+            .collect();
+        std::fs::write(dir.join(CATALOG_FILE), json!({"tools":tools}).to_string()).unwrap();
+        let listener = std::os::unix::net::UnixListener::bind(dir.join(CALL_SOCKET)).unwrap();
+        let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let kept = asked.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let line: Value = serde_json::from_str(&line).unwrap();
+                let result = match line["name"].as_str() {
+                    Some(crate::services::CONNECTED) => {
+                        json!({"connected":[{"code":"gmail","account":"a@b.c"}]})
+                    }
+                    Some(crate::services::WRITE) => {
+                        json!({"read_back":"To Ann: hello","send_id":"s1","sent":false})
+                    }
+                    _ => json!({"items":[{"from":"Ann","subject":"Hi"}]}),
+                };
+                kept.lock().unwrap().push(line);
+                writeln!(stream, "{}", json!({"ok":true,"result":result})).unwrap();
+            }
+        });
+        (dir, asked)
+    }
+
+    #[test]
+    fn services_are_declared_and_routed_only_with_the_switch_and_the_folder() {
+        let (dir, asked) = services_folder("services-route");
+        let folder = dir.display().to_string();
+        // Off: none declared, none routed, and the executive can't name one.
+        let exec = schedule_directory("services-exec");
+        std::fs::write(
+            exec.join(CATALOG_FILE),
+            json!({"tools":[{"name":"service_write","description":"An impostor."}]}).to_string(),
+        )
+        .unwrap();
+        let off = Settings {
+            exec: Some(exec.clone()),
+            ..Default::default()
+        };
+        assert!(declared(&off).is_empty());
+        for name in crate::services::NAMES {
+            assert_eq!(route(&off, name), Route::Nobody, "{name}");
+        }
+        assert!(crate::services::arguments(None).is_empty());
+        // On: the flag and its folder, the three declared with the rule,
+        // routed there; nothing else of the folder's.
+        let flags = vec![crate::services::FLAG.to_owned(), folder.clone()];
+        let (on, rest) = take(&flags).unwrap();
+        assert!(rest.is_empty());
+        assert_eq!(on.services, Some(dir.clone()));
+        let tools = declared(&on);
+        let named: Vec<&str> = tools.iter().map(|tool| tool.name.as_str()).collect();
+        assert_eq!(named, crate::services::NAMES);
+        for tool in &tools {
+            assert!(tool.description.contains("quoted data"), "{}", tool.name);
+            assert!(tool.description.contains("one-time code"), "{}", tool.name);
+            assert!(tool.description.ends_with("From lamp-services."));
+            assert_eq!(
+                tool.parameters.as_ref().unwrap()["properties"]
+                    .get("said")
+                    .is_some(),
+                tool.name != crate::services::WRITE,
+                "said is never offered for a write"
+            );
+        }
+        assert_eq!(route(&on, "service_delete"), Route::Nobody);
+        let services = Route::Services(dir.clone());
+        for name in crate::services::NAMES {
+            assert_eq!(route(&on, name), services, "{name}");
+        }
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        // A scheduled run (not heard) reads, marked as quoted data.
+        let (whom, (told, answered)) = run_call(
+            &services,
+            &call(
+                crate::services::READ,
+                json!({"service":"gmail","what":"recent"}),
+            ),
+            4_710_001,
+            false,
+        );
+        assert_eq!(whom, "the services");
+        assert!(answered);
+        assert_eq!(told["items"][0]["from"], "Ann");
+        assert_eq!(told["note"], crate::services::DATA_NOTE);
+        let (_, (told, _)) = run_call(
+            &services,
+            &call(crate::services::CONNECTED, json!({})),
+            4_710_002,
+            false,
+        );
+        assert_eq!(told["connected"][0]["code"], "gmail");
+        // A write not heard live, or a send not said: refused, never asked.
+        let before = asked.lock().unwrap().len();
+        let (_, (told, _)) = run_call(
+            &services,
+            &call(
+                crate::services::WRITE,
+                json!({"service":"gmail","action":"send","to":"a@b.c"}),
+            ),
+            4_710_003,
+            false,
+        );
+        assert_eq!(told["error"], crate::services::NOT_HEARD);
+        let (_, (told, _)) = run_call(
+            &services,
+            &call(
+                crate::services::WRITE,
+                json!({"service":"gmail","send_id":"s1","said":"send"}),
+            ),
+            4_710_004,
+            true,
+        );
+        assert_eq!(told["error"], crate::services::CANCELLED);
+        assert_eq!(
+            asked.lock().unwrap().len(),
+            before,
+            "the service was never asked"
+        );
+        // `use_skill`, a skill's way in, reaches only a skills' folder.
+        let wrapped = Settings {
+            use_skill: true,
+            ..on.clone()
+        };
+        let (_, (told, _)) = run_call(
+            &Route::UseSkill(Box::new(wrapped)),
+            &call(
+                crate::use_skill::NAME,
+                json!({"skill":crate::services::WRITE}),
+            ),
+            4_710_005,
+            true,
+        );
+        assert!(told.get("error").is_some(), "{told}");
+        assert_eq!(asked.lock().unwrap().len(), before);
+        std::fs::remove_dir_all(&dir).unwrap();
+        std::fs::remove_dir_all(&exec).unwrap();
     }
 }

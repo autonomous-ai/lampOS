@@ -270,6 +270,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-records.service",
     "lamp-schedule.service",
     "lamp-selftest.service",
+    "lamp-services.service",
     "lamp-setup-change@.service",
     "lamp-setup-keys@.service",
     "lamp-setup-recover.service",
@@ -618,6 +619,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "186a1f5ee3e57fb1db1ed9f3cdad60c38e7843711858f9087746190c6735ae1f", // #4710: linked services' tokens
     "c0984e92851125e0a4d588bd793473698ae6f918825a9cd85c3aa9b5aac7d01e", // #4514: pushed skills' developer folder
     "cf1adcb3075bff001ae625c90ddab1e956a25c9b3bcf633ce07c1228737d0adc", // #4333: the owner's place beside the name
     "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b", // #2948 carried onto lamp-voice 23 Oct: head touch on (#711)
@@ -3153,8 +3155,9 @@ mod tests {
     #[test]
     fn every_deploy_product_unit_is_installed_or_named_left_out() {
         // Left out until their lamp check: the keeper's restart helper
-        // (#2193) and the own keys' helper (#2094).
+        // (#2193), the own keys' helper (#2094) and linked services (#4710).
         const LEFT_OUT: &[&str] = &[
+            "lamp-services.service",
             "lamp-keeper-restart.socket",
             "lamp-keeper-restart@.service",
             "lamp-setup-keys.socket",
