@@ -160,3 +160,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   piece: after2 on lamp-fc4b, read-only, on the first stable that carries
   #5034 (promote 2); post whether d08 is then held. Heron waits for that
   stable, then asks the person again before any ssh or sound.
+- 14:06: #5044 landed in train 555 (lamp-voice `89c1d9927`, the folder's
+  commit as `9a977cb47`). #4450 stays `status:taken` by heron for the
+  after2 replay on the first stable with #5034; stable is still 9724.
+  Hour posted 13:55.
