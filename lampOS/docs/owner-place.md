@@ -10,7 +10,8 @@ after setup"), the person's own folder (`/etc/lampOS/person/`) and the
 reset's wipe of it, the second route's note beside a line's words (as the
 staff note, `second-voice.md`), the weather's function, and the speech
 key terms. Nothing new runs; everything is off unless
-`LAMP_OWNER_PLACE=on`.
+`LAMP_OWNER_PLACE=on`, which the product's `lamp-cloud` and `lamp-voice` units
+set since 3 Nov (the lead's yes on #4333, city level only).
 
 ## The app's contract
 

@@ -199,6 +199,9 @@ Environment=LAMP_SECOND_SPEECH_TAGS=on
 # until a request is bound to the person seen speaking it (reviewer-two on #3371): a silent face in view would
 # otherwise give its name and kept notes to an off-camera caller's answer.
 Environment=LAMP_SECOND_WEATHER=on
+# The owner's approximate place from the app, city level (#4333): told only beside a line that needs a place
+# ("near me", the weather). The lead's yes on 3 Nov; shown on lamp-0c89 on 30 Oct (asked nothing back, and asked after a clear).
+Environment=LAMP_OWNER_PLACE=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
 Environment=LAMP_SECOND_CHAT_KEPT=on
