@@ -3647,7 +3647,14 @@ pub fn serve(
         // The lamp's answers to lines let out only as the conversation
         // going on, with no tie to it, keep no conversation going
         // (`LAMP_UNTIED_GOING_ON=on`, #3882).
-        if crate::untied_going_on::on() {
+        if crate::untied_going_on::held() {
+            eprintln!(
+                "lamp-voice second: a line let out only as the conversation going on, with no tie to the lamp, is held as people's talk, and counts as talk for the busy room (LAMP_UNTIED_GOING_ON=held)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.holding_untied();
+            }
+        } else if crate::untied_going_on::on() {
             eprintln!(
                 "lamp-voice second: the lamp's answers to lines let out only as the conversation going on, with no tie to it, keep no conversation going, and such a line is told it may be people's talk (LAMP_UNTIED_GOING_ON)"
             );
@@ -5456,6 +5463,8 @@ pub(crate) struct Heeding {
     said_until_free_us: Option<u64>,
     /// `LAMP_UNTIED_GOING_ON=on` ([`Self::not_renewing_untied`]).
     untied: bool,
+    /// `LAMP_UNTIED_GOING_ON=held` ([`Self::holding_untied`]).
+    untied_held: bool,
     /// With it: the request judged last, if it was let out only as the
     /// conversation going on with no tie to the lamp
     /// ([`crate::untied_going_on`]): told it may be people's talk, and its
@@ -6338,6 +6347,7 @@ impl Heeding {
             chain: Vec::new(),
             said_until_free_us: None,
             untied: false,
+            untied_held: false,
             untied_line: None,
             chain_untied: Vec::new(),
             busy_called_strict: false,
@@ -6558,6 +6568,15 @@ impl Heeding {
     /// line kept the next one inside the window.
     pub(crate) fn not_renewing_untied(&mut self) {
         self.untied = true;
+    }
+
+    /// `LAMP_UNTIED_GOING_ON=held` (#5008): an untied line is held, not
+    /// told, so the model gets no turn on desk talk. On lamp-52e6 on 3 Nov
+    /// the model answered 10 of 15 desk lines it was told may be people's
+    /// talk. Implies [`Self::not_renewing_untied`].
+    pub(crate) fn holding_untied(&mut self) {
+        self.untied = true;
+        self.untied_held = true;
     }
 
     /// `request` joins `chain` only for having no tie to the lamp
@@ -9146,6 +9165,18 @@ impl Heeding {
             && crate::spoken_stop::is_stop_request(heard);
         if alone && lone_words(heard) && !stop_over_the_lamp {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
+        }
+        // `LAMP_UNTIED_GOING_ON=held` (#5008): desk talk with no tie to the
+        // lamp is held, not told; the model answered most such lines.
+        if self.untied_held
+            && alone
+            && !tied
+            && !stop_over_the_lamp
+            && matches!(verdict, Some(crate::attention::Verdict::Play(_)))
+        {
+            verdict = Some(crate::attention::Verdict::Hold(
+                crate::untied_going_on::HELD,
+            ));
         }
         // A reply to nothing the lamp asked, said over its answer, is
         // someone else's (#2136): "Yes, give me five minutes." to B, over
@@ -16460,7 +16491,12 @@ mod tests {
         // out, its words played to their end a second after that; `over`:
         // begun over the lamp's answer. Each line's verdict, and whether it
         // got the people's-talk note.
-        let run = |untied: bool, lines: &[(u64, &str, &str, bool)]| -> Vec<(bool, bool)> {
+        // `held`: `LAMP_UNTIED_GOING_ON=held` (#5008), else `on` when
+        // `untied`.
+        let run_as = |untied: bool,
+                      held_mode: bool,
+                      lines: &[(u64, &str, &str, bool)]|
+         -> Vec<(bool, bool)> {
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             crate::room_told::room()
@@ -16469,9 +16505,12 @@ mod tests {
                 .count_only_talk(true);
             let mut heeding = Heeding::new(true, true, None, None);
             heeding.as_the_only_voice(false, true, false);
-            if untied {
+            if held_mode {
+                heeding.holding_untied();
+            } else if untied {
                 heeding.not_renewing_untied();
             }
+            let untied = untied || held_mode;
             let words_end = |heeding: &mut Heeding, request: u64, end: u64, now: u64| {
                 let end_us = (monotonic_us() + end * 1_000_000).saturating_sub(now * 1_000_000);
                 heeding.lamp_did(crate::second_provider::Did::Said(request, end_us));
@@ -16523,6 +16562,8 @@ mod tests {
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             out
         };
+        let run = |untied: bool, lines: &[(u64, &str, &str, bool)]| run_as(untied, false, lines);
+        let held = |lines: &[(u64, &str, &str, bool)]| run_as(true, true, lines);
         use crate::room_told;
         let question = (
             0,
@@ -16582,6 +16623,19 @@ mod tests {
             ],
             "on: the first told it may be people's talk, its answer renews nothing"
         );
+        // #5008: told, the model answered 10 of 15 such lines on lamp-52e6
+        // on 3 Nov. Held, the model gets none of desk1's four lines.
+        assert_eq!(
+            held(&desk1),
+            [
+                (true, false),
+                (false, false),
+                (false, false),
+                (false, false),
+                (false, false)
+            ],
+            "held: no desk line reaches the model"
+        );
         // Real follow-ups 30 s after the answer: each still plays, and its
         // answer still renews the window for a line 30 s later, which is
         // outside the question's 45 s. An untied line renews nothing.
@@ -16626,6 +16680,13 @@ mod tests {
                 !noted,
                 "{follow_up}: a cut-in tied to the lamp keeps its exemption"
             );
+            // Held: the follow-up plays as with `on`; the untied desk line
+            // after it is held, not told.
+            let played: Vec<bool> = held(&after(follow_up, lamp))
+                .into_iter()
+                .map(|(played, _)| played)
+                .collect();
+            assert_eq!(played, [true, true, false], "held: {follow_up}");
         }
         // The cost: an untied line renews nothing, so the next line without
         // the name or a face, 30 s on, is held; without the switch it plays.
@@ -16638,22 +16699,27 @@ mod tests {
             run(false, &talk),
             [(true, false), (true, false), (true, true)]
         );
+        // Held, the untied line itself is not answered.
+        assert_eq!(held(&talk), [(true, false), (false, false), (false, false)]);
         // The lamp asks #3895's review kept as negatives (Fourteen's P2),
-        // said 20 s after the answer: all still play with the switch.
-        for ask in [
-            "Can you grab the weather for tomorrow?",
-            "Fetch the forecast for the weekend.",
-            "Fetch me the news.",
-            "Pass the message on to my wife.",
-            "Hand over the details of the order.",
-            "I'm going downstairs, turn the light off.",
-            "Good night, I'll be right back.",
-            "Mom is calling, what time is it?",
+        // said 20 s after the answer: all still play with the switch `on`.
+        // `held`'s cost (#5008): those with no tie (no shared word, no ask
+        // the module knows) are held; the person says the name.
+        for (ask, tied) in [
+            ("Can you grab the weather for tomorrow?", true),
+            ("Fetch the forecast for the weekend.", false),
+            ("Fetch me the news.", false),
+            ("Pass the message on to my wife.", false),
+            ("Hand over the details of the order.", false),
+            ("I'm going downstairs, turn the light off.", true),
+            ("Good night, I'll be right back.", false),
+            ("Mom is calling, what time is it?", true),
         ] {
             let lines = [question, (20, ask, "Here you go.", false)];
             for untied in [false, true] {
                 assert!(run(untied, &lines)[1].0, "{ask} {untied}");
             }
+            assert_eq!(held(&lines)[1].0, tied, "{ask} held");
         }
     }
 
