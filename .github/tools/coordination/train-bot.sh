@@ -33,9 +33,6 @@ for x in $R $(git -C $R rev-parse --show-toplevel 2>/dev/null) "$(git -C $R work
 done
 LOG=$SP/train-bot.log; cd $R || exit 1
 say() { echo "$(date +%T) $*" | tee -a $LOG; }
-# 31 Oct 04:0x (Fourth, 03:23): with no context lines (-U0), so lamp-voice's own edits beside a hunk don't change the id; #4562
-# sat out trains 425-433 as the same patch by range-diff.
-patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1; git diff -U0 $b $1 -- . | git patch-id --stable | cut -d' ' -f1; }
 told=$SP/train-bot.told; touch $told
 # 3 Nov 15:4x: the fetches and the writers list are lib.sh's, shared with still-eligible.sh.
 source $TOOLS_DIR/lib.sh
@@ -90,7 +87,9 @@ eligible() {
     # 3 Nov 15:4x: only "none" or "met N" carries it; a fetch or a reads2.py error leaves it out.
     coord_body $p $bf || { once body$p "#$p left out: its body can't be fetched"; continue; }
     fine body$p
-    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf $head)
+    # 4 Nov 04:1x: reads on an earlier head with the same patch count too (coord_same_patch), as for one read above.
+    heads=(${(f)"$(coord_same_patch $head $cf)"})
+    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf $heads)
     if [[ $two == short* ]]; then
       grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; echo "$p short $head" >> $told; }
       continue

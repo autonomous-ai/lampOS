@@ -16,7 +16,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
 | `markers.py [--writers FILE] [PR]` | Reads a PR's comments as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. |
-| `reads2.py [--writers FILE] HEAD_SHA` | Reads the PR body and comments as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. |
+| `reads2.py [--writers FILE] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body and comments as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
 | `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
 | `lib.sh` | Sourced by `train-bot.sh` and `still-eligible.sh`: the writers list and the fetches, each failing closed. |
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
@@ -128,7 +128,7 @@ If the Queue (#4710) can't be fetched, no PR is eligible that round.
 **What markers.py prints.**
 
 - The PR is eligible on its newest READ-OK when no HOLD stands.
-  A READ-OK counts for the PR's head, or for a head with the same patch-id (a plain rebase). The patch-id is taken with no context lines.
+  A READ-OK counts for the PR's head, or for a head with the same patch-id (a plain rebase). The patch-id is taken with no context lines. This holds for TWO READS too.
 - A signed HOLD is keyed on the login plus the signed name. It stands until the same login and name post a later READ-OK.
   Words alone ("this clears my HOLD" in a comment that is not a READ-OK) never lift it.
 - An unsigned HOLD stands until that login posts a later READ-OK whose first 400 characters say the HOLD is lifted or cleared
