@@ -127,8 +127,11 @@ fi
 status "RUNNING checks"
 [[ -e /var/lib/lampos-setup/done ]] && fail "already set up: the unset run is for a lamp before the app setup"
 grep -q ^country_code /etc/hostapd/hostapd.conf && fail "old image (country_code in hostapd.conf)"
-v=$(cat /sys/bus/usb/devices/3-1.1.4/idVendor 2>/dev/null):$(cat /sys/bus/usb/devices/3-1.1.4/idProduct 2>/dev/null)
-[[ $v == 01da:5875 ]] && rec "CAMERA_4B=PASS 3-1.1.4 01da:5875" || fail "camera at 3-1.1.4 is [$v], not 01da:5875 (4b)"
+# The hub enumerates on board-hub port 1 or 3 by unit (hardware lead, 28 Oct): record the port.
+cam=""; for p in 3-1.1.4 3-1.3.4; do [[ $(cat /sys/bus/usb/devices/$p/idVendor 2>/dev/null):$(cat /sys/bus/usb/devices/$p/idProduct 2>/dev/null) == 01da:5875 ]] && cam=$p; done
+[[ $cam == 3-1.1.4 ]] && rec "CAMERA_4B=PASS 3-1.1.4 01da:5875"
+[[ $cam == 3-1.3.4 ]] && rec "CAMERA_4B=PORT 3-1.3.4 01da:5875 (the product pins 3-1.1.4: waits on hw-agent2nd-P1)"
+[[ -n $cam ]] || fail "no camera 01da:5875 at 3-1.1.4 or 3-1.3.4 (4b)"
 systemctl cat lamp-update | grep -q lampos-stable && rec "UPDATE_CHANNEL_4F=PASS lampos-stable" || fail "lamp-update is not on lampos-stable (4f)"
 r=""; for u in bootstrap os-server hal; do systemctl is-active -q $u && r="$r $u"; done
 [[ -z $r ]] && rec "V1_UNITS_4G=PASS none running" || fail "V1 units running:$r (4g)"
@@ -146,15 +149,29 @@ if ! grep -q ^BODY_POSES= "$ENV_FILE" 2>/dev/null; then
   fi
   grep -q '^lamp-body-measure: ' <<<"$out" && fail "the rest read refused: $(grep '^lamp-body-measure:' <<<"$out" | head -1)"
   rec "HEAD_REST=$(grep -o 'pitch [0-9]*;' <<<"$out" | head -1 | tr -d ';')"
-
-  status "RUNNING 4c1 arm stand"
-  steps -- ./steps.sh --unit-id "$ID" --write --to 1 || fail "step 1 (the arm stand) stopped"
+  STAND=1
 fi
+
+# 4c1 and 4c2 together (the hardware lead, 28 Oct): the inputs are read while
+# the arm stands, on their own lines (GPIO beside the servo bus); the person
+# touches and presses whenever they like. Hands off waits for the stand to
+# finish (--quiet-after), so a moving arm is never in the quiet window.
+status "RUNNING 4c1 arm stand + 4c2 inputs"
+flag=$DIR/stand-done.$$; ICOUT=$DIR/input-check.out; rm -f "$flag" "$ICOUT"
+speak factory_inputs_wait
+python3 "$HOME_DIR/input-check.py" --quiet-after "$flag" >"$ICOUT" 2>&1 & ipid=$!
+trap '[[ -n ${ipid:-} ]] && { touch "$flag"; kill "$ipid" 2>/dev/null; wait "$ipid" 2>/dev/null; }; rm -f "$flag"' EXIT
+stand_ok=1
+if [[ ${STAND:-0} == 1 ]]; then
+  steps -- ./steps.sh --unit-id "$ID" --write --to 1 || stand_ok=0
+fi
+touch "$flag"
+[[ $stand_ok == 1 ]] || fail "step 1 (the arm stand) stopped"
 grep -q ^BODY_POSES= "$ENV_FILE" || fail "step 1 wrote no lamp.env"
 rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4C1=PASS"
-
-status "RUNNING 4c2 inputs"
-out=$(python3 "$HOME_DIR/input-check.py" 2>&1); rc=$?; echo "$out"
+status "RUNNING 4c2 inputs (the arm done)"
+wait "$ipid"; rc=$?; ipid=""
+out=$(cat "$ICOUT"); echo "$out"
 mapfile -t inputs < <(sed -n 's/^RECORD //p' <<<"$out")
 rec "${inputs[@]}"
 [[ $rc == 0 ]] || fail "inputs: $(sed -n 's/^RECORD INPUTS=//p' <<<"$out")"

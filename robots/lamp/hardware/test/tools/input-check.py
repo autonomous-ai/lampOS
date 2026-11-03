@@ -165,6 +165,11 @@ def main():
     ap.add_argument("--speaker", default="device_speaker")
     ap.add_argument("--no-voice", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="read and judge, write nothing")
+    ap.add_argument("--quiet-after", metavar="FILE",
+                    help="run beside the arm's stand: the touch window stays open until FILE exists "
+                         "(the stand done), so hands off never meets a moving arm; the prompts before it "
+                         "are left to the stand, which speaks")
+    ap.add_argument("--quiet-after-max-seconds", type=float, default=600.0)
     args = ap.parse_args()
     voice = Voice(args)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -208,19 +213,28 @@ def main():
             held[key] = (l, l.value() if idle is None else idle)
             print(f"{key.lower()}: {chip} line {line}, now {'at rest' if l.value() == held[key][1] else 'PRESSED'}")
 
-        voice.say("factory_inputs_wait")
+        # Beside the stand the stand speaks; this one keeps quiet until hands off.
+        early = (lambda key: None) if args.quiet_after else voice.say
+        early("factory_inputs_wait")
         print(f"waiting up to {args.wait_seconds:g} s for the first touch or press", flush=True)
         if not first_touch(held, args.wait_seconds):
             started = False
         else:
             started = True
-            voice.say("factory_inputs_touch")
+            early("factory_inputs_touch")
             print(f"touch: {args.touch_seconds:g} s from the first touch, touch each head pad, press the button "
                   f"and the reset briefly, any order", flush=True)
         if started:
             # The first touch is still under the hand: watch() starts from rest, so it counts.
             touch = watch(held, args.touch_seconds,
-                          cue=(args.touch_seconds - 10, lambda: voice.say("factory_padcheck_10")))
+                          cue=(args.touch_seconds - 10, lambda: early("factory_padcheck_10")))
+            if args.quiet_after and not os.path.exists(args.quiet_after):
+                # The arm is still standing: what is touched meanwhile is a touch,
+                # and hands off waits for the stand to finish.
+                print("touch: the arm is still standing; hands off waits for it", flush=True)
+                end = time.time() + args.quiet_after_max_seconds
+                while not os.path.exists(args.quiet_after) and time.time() < end:
+                    touch = merged(touch, watch(held, 0.2))
             voice.say("factory_padcheck_rest")
             # Touches finishing after "hands off" are touches: the quiet window
             # waits for nothing to be touched for --settle-seconds (at most 60 s).
