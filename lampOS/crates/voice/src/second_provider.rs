@@ -1597,6 +1597,9 @@ struct Shared {
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
+    /// Who was seen saying a known person's line is kept for its services
+    /// write (`LAMP_SERVICES`, [`Engine::keeping_sight_for_services`]).
+    services_sight: bool,
     /// With [`Self::carries`], a silent face doesn't count
     /// (`LAMP_CONVERSATION_CARRIES_PAST_SILENT`,
     /// [`Engine::carrying_past_silent`]): whether the conversation has
@@ -3295,6 +3298,7 @@ impl Engine {
                 scope_seen: false,
                 carries: None,
                 carried_saves: false,
+                services_sight: false,
                 past_silent: None,
                 one_face: None,
                 keeps_calls: None,
@@ -3560,6 +3564,16 @@ impl Engine {
     pub fn saving_carried(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.carried_saves = on;
+        self
+    }
+
+    /// With `LAMP_SERVICES=on`: who the eyes saw saying a known person's
+    /// line is kept as it is admitted, before the chat begins, for the
+    /// line's own services write (`services::seen_saying_owner`), whatever
+    /// `LAMP_MEMORY_ROOM_SPEAKER` says.
+    pub fn keeping_sight_for_services(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.services_sight = on;
         self
     }
 
@@ -6527,6 +6541,23 @@ async fn spoken(
             Some((eyes, known)) => {
                 let (speakers, pair, alone) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
+                // With `LAMP_SERVICES`, who was seen saying it is kept for
+                // the line's own services write before the chat begins: a
+                // write is the owner's only when their face was seen saying
+                // it (`services::seen_saying_owner`), and nothing else keeps
+                // the reading without `LAMP_MEMORY_ROOM_SPEAKER`.
+                if shared.services_sight {
+                    publish_room_line(
+                        crate::speaking_faces::LineSeen {
+                            request,
+                            speakers: speakers.clone(),
+                            known: pair.clone(),
+                            enrollment: enrollment.clone(),
+                        },
+                        shared.remember_speaker,
+                        Some(scope),
+                    );
+                }
                 // Their face alone in view, none seen speaking it: the
                 // room's scope, but its reply told their name (lamp-3e83;
                 // reviewer-three's P2 on #4090).

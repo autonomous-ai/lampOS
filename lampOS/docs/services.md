@@ -56,7 +56,10 @@ face seen speaking through it (`speaking_faces::line_seen`, the known face
 alone seen saying it by `remember::speaker_of`, and no other face seen
 saying it; `services::seen_saying_owner`), which needs
 `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on`; with either off,
-or the owner off camera, it never counts. Even then, a read is said in full
+or the owner off camera, it never counts. That reading is kept for the line
+as it is admitted to the owner's scope, before the chat begins, whenever
+`LAMP_SERVICES=on` (`Engine::keeping_sight_for_services`), whatever
+`LAMP_MEMORY_ROOM_SPEAKER` says. Even then, a read is said in full
 only on the second route, while the eyes count one face in view
 (`known_faces::most_faces_lately`, counted whenever `LAMP_SERVICES=on` there)
 and the line is in the conversation's voice

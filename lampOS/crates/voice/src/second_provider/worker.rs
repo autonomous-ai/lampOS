@@ -2856,6 +2856,11 @@ pub fn serve(
             .is_ok_and(|value| value == "on"),
     );
     engine = engine_seeing;
+    // A services write is the owner's only with their face seen saying its
+    // line (`crate::services`): that reading is kept for it.
+    engine = engine.keeping_sight_for_services(
+        std::env::var(crate::services::ENVIRONMENT).ok().as_deref() == Some("on"),
+    );
     // A known person's line no face was seen speaking, in their conversation
     // going on with no other face in view, is carried as theirs (#4339,
     // `LAMP_CONVERSATION_CARRIES=on`): only beside the scoping by sight above.
