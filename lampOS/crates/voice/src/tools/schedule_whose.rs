@@ -5,7 +5,9 @@
 //! only on the asker's own and the room's. One set with nobody sure (set
 //! before this, or by an unknown face or the room's line) is the room's,
 //! heard and changed on every line (the first builder on #4710, 3 Nov 10:09).
-//! No switch: it only narrows who hears what.
+//! No switch: a person's reminders narrow to their own line, and the ones
+//! with no setter (including any stored before setters existed) widen to
+//! every line.
 //!
 //! Who that is follows memory's scope ([`crate::memory_scope`]):
 //! - the **setter** is the person a keep in the line would be written for at
