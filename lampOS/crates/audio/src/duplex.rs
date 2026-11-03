@@ -92,6 +92,17 @@ pub struct Hearing {
     pub silence_heard: bool,
 }
 
+/// How far the render at the echo's alignment has fallen under its own
+/// peak over the last 150 ms ([`EchoMatch::render_drop`]), in tenths of a
+/// decibel, from which a block is the tail of a word the lamp just stopped
+/// and so its own: 6 dB (`docs/duplex-listening.md`, the render strings).
+/// Without it that tail, barely explained by a render that has gone quiet,
+/// read as a person over the lamp, plainly, and a late yield it made
+/// committed with nothing said (#5032).
+///
+/// [`EchoMatch::render_drop`]: crate::evidence::EchoMatch::render_drop
+pub const TAIL_DROP_TENTHS: u16 = 60;
+
 impl Hearing {
     /// Chosen on the development half of two recorded sessions and their
     /// synthetic overlaps; see `docs/duplex-listening.md`. The 300 ms is the
@@ -129,6 +140,9 @@ impl Hearing {
             // block. A block the render does explain is never stale: it
             // sets the age to zero.
             Some(echo) if echo.alignment_age_blocks > self.fresh_blocks => Heard::Unknown,
+            // A word's tail ringing on in the room, the render under it
+            // fallen from its peak: the lamp's own, not a person (#5032).
+            Some(echo) if echo.render_drop >= TAIL_DROP_TENTHS => Heard::Own,
             Some(echo)
                 if echo.capture_explained <= self.explained_percent
                     && echo.residual_playback_floor <= self.floor_percent =>
@@ -441,7 +455,8 @@ impl Interruption {
     /// plain blocks ends the reply; a stop word and a forced yield still
     /// do, and stillness counts only the plain blocks of the run that made
     /// the yield, not those after it: once the lamp has yielded, the render
-    /// is silent and its own tail is heard as a person, plainly. Without
+    /// is silent and its own tail can be heard as a person, plainly, where
+    /// the render under it has not fallen [`TAIL_DROP_TENTHS`]. Without
     /// `busy`, or off, nothing changes: a late yield's seven onset blocks
     /// never reach `plain_blocks`, so a quiet room needs the blocks after.
     /// Set before each block.
@@ -997,11 +1012,145 @@ mod tests {
             over_bed(&mut on, true, true, &tail),
             [(yielded, Step::Yield), (yielded + 12 + 40, Step::Resume)]
         );
-        // Off, the tail's plain blocks add up to an interruption.
+        // Off, a tail read as plain blocks over the lamp adds up to an
+        // interruption. A tail under a fallen render is not read so: it is
+        // the lamp's own (#5032, the test of a fallen render above).
         let mut off = Interruption::new(Confirmation::EVALUATED);
         assert_eq!(
             over_bed(&mut off, false, false, &tail),
             [(yielded, Step::Yield), (yielded + 12 + 40, Step::Commit)]
+        );
+    }
+
+    /// Blocks read from their evidence as the voice reads them: each is
+    /// (probability, evidence, count), the lamp with reply audio throughout.
+    fn hear(blocks: &[(f32, EchoEvidence, usize)]) -> Vec<(usize, Step)> {
+        let mut interruption = Interruption::new(Confirmation::EVALUATED);
+        let mut steps = Vec::new();
+        let mut index = 0;
+        for &(probability, evidence, count) in blocks {
+            for _ in 0..count {
+                let heard = HEARING.heard(probability, &evidence);
+                let plain = HEARING.plain(heard, &evidence);
+                match interruption.observe(heard, plain, true) {
+                    Step::Carry => {}
+                    step => steps.push((index, step)),
+                }
+                index += 1;
+            }
+        }
+        steps
+    }
+
+    /// A block barely explained by the render, the render at its alignment
+    /// `drop` tenths of a decibel under its own recent peak.
+    fn dropped(drop: u16) -> EchoEvidence {
+        let mut evidence = evidence(0, Some((10, 0)));
+        if let Some(echo) = evidence.echo.as_mut() {
+            echo.render_drop = drop;
+        }
+        evidence
+    }
+
+    /// #5032: late in a reply a word's tail rings on in the room while the
+    /// render under it has fallen 7 dB from its peak. It is the lamp's own,
+    /// not a person: the yield resumes on stillness instead of committing
+    /// with nothing said.
+    #[test]
+    fn the_lamps_own_tail_under_a_fallen_render_resumes_the_yield() {
+        let steps = hear(&[
+            (0.9, evidence(0, Some((97, 10))), 130),
+            (0.9, dropped(0), LATE),
+            (0.9, dropped(70), 12),
+            (0.1, evidence(30, None), 45),
+        ]);
+        let yielded = 130 + LATE - 1;
+        assert_eq!(
+            steps,
+            [(yielded, Step::Yield), (yielded + 12 + 40, Step::Resume)]
+        );
+    }
+
+    /// #5032's guard: a person speaking over a render that holds its level
+    /// is still over the lamp, plainly, and stillness after them commits.
+    #[test]
+    fn a_person_over_a_held_render_is_still_over_it_and_commits() {
+        let held = dropped(10);
+        assert_eq!(HEARING.heard(0.9, &held), Heard::Over);
+        assert!(HEARING.plain(Heard::Over, &held));
+        let steps = hear(&[
+            (0.9, evidence(0, Some((97, 10))), 130),
+            (0.9, dropped(0), LATE),
+            (0.9, held, 12),
+            (0.1, evidence(30, None), 45),
+        ]);
+        let yielded = 130 + LATE - 1;
+        assert_eq!(
+            steps,
+            [(yielded, Step::Yield), (yielded + 12 + 40, Step::Commit)]
+        );
+    }
+
+    /// #5032's guard: a person who begins 500 ms after the render went
+    /// quiet, the lamp's tail before them its own, still commits.
+    #[test]
+    fn a_person_half_a_second_after_the_render_stops_still_commits() {
+        let steps = hear(&[
+            (0.9, evidence(0, Some((97, 10))), 130),
+            (0.9, dropped(0), LATE),
+            (0.9, dropped(70), 12),
+            (0.1, evidence(13, Some((10, 0))), 17),
+            (0.1, evidence(30, None), 21),
+            (0.9, evidence(50, None), 6),
+        ]);
+        let yielded = 130 + LATE - 1;
+        assert_eq!(
+            steps,
+            [
+                (yielded, Step::Yield),
+                (yielded + 12 + 17 + 21 + 6, Step::Commit)
+            ]
+        );
+    }
+
+    /// One trail of lamp-06c1's (#5032): the `render_drop` letter of each
+    /// plain block, 3 dB a letter, `c` and on 6 dB or more, after a late
+    /// reply's own voice and before 45 still blocks.
+    fn trail(drops: &str) -> Vec<(usize, Step)> {
+        let mut blocks = vec![(0.9, evidence(0, Some((97, 10))), 130)];
+        blocks.extend(
+            drops
+                .bytes()
+                .map(|letter| (0.9, dropped(u16::from(letter - b'a') * 30 + 10), 1)),
+        );
+        blocks.push((0.1, evidence(30, None), 45));
+        hear(&blocks)
+    }
+
+    /// lamp-06c1's zero-word commits (#5032) that a fallen render explains.
+    /// Only the ten plain blocks of each are known, not the full trail.
+    #[test]
+    fn lamp_06c1s_tails_under_a_fallen_render_commit_nothing() {
+        for drops in ["bbbaaaabdh", "bbcccbcbbb", "bcdhlpttrj", "abdfggfdaa"] {
+            let steps = trail(drops);
+            assert!(
+                steps.iter().all(|(_, step)| *step != Step::Commit),
+                "{drops}: {steps:?}"
+            );
+        }
+    }
+
+    /// lamp-06c1's 10:41 zero-word commit (#5032): the render never fell
+    /// 3 dB, so `render_drop` cannot tell its tail from a person. Open until
+    /// the echo's delay reaches `EchoEvidence` and the render counts as
+    /// quiet only once its echo has stopped arriving.
+    #[test]
+    #[ignore = "#5032: needs the echo delay in EchoEvidence"]
+    fn lamp_06c1s_tail_under_a_level_render_commits_nothing() {
+        let steps = trail("aaaaaaaaaa");
+        assert!(
+            steps.iter().all(|(_, step)| *step != Step::Commit),
+            "{steps:?}"
         );
     }
 
