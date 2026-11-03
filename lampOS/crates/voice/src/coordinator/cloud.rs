@@ -205,6 +205,8 @@ impl CloudRequest {
 
     pub(super) fn submitted(&mut self, command: &ProviderInput) -> io::Result<()> {
         self.validate_submission(command)?;
+        // A line handed on stops the memory's night (`LAMP_MEMORY_TIERS`).
+        crate::tiers_night::stir();
         match command {
             ProviderInput::Start { .. } => self.start_submitted = true,
             ProviderInput::End { .. } => self.input_end_submitted = true,

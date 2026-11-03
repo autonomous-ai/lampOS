@@ -807,11 +807,40 @@ How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
 - **The night.** Once per local day between 03:00 and 06:00, for each
   mirrored scope: its open episode ends (also at `session_close` and
   `conversation_end`), expiry and fading run, and its bounded sleep input is
-  prepared. lamp-memory has no network (`PrivateNetwork=yes`) and no model is
-  configured, so the night is counted `unconfigured` and its records wait;
-  `tiers night person=<scope> model=unconfigured records= facts= lines=
-  episodes=` is said, counts only. A model is a `tiers::Sleeper`; the tests
-  give one.
+  prepared. lamp-memory has no network (`PrivateNetwork=yes`), so the input
+  is queued as a job for the voice (`tiers night person=<scope>
+  model=queued records= facts= lines= episodes=`, counts only); the voice
+  does the model call ([second-voice.md](second-voice.md), "The memory's
+  night"). A model in this process is a `tiers::Sleeper`; the tests and
+  the bench give one.
+- **The night's two ops** (main socket only, and only with the switch set;
+  Days alone refuses them as any unknown op; the narrow socket takes
+  `forget_person` only):
+  - `{"op":"tiers_sleep_take"}` → `{"ok":true,"job":null}`, or
+    `{"ok":true,"job":{"id":"<16 hex>","system":"<the tiered store's
+    prompt>","input":{...}}}`: the oldest job never given out. `input` is
+    the store's bounded sleep input (at most 64 KiB) less its `owner`: one
+    scope's words, without its name. The id is opaque.
+  - `{"op":"tiers_sleep_give","job":"<id>","reply":{...}}` →
+    `{"ok":true,"outcome":"applied"|"invalid"|"stale"|"unknown"|"late"}`.
+    The job is removed first, so whatever the outcome it is never given
+    out again. `reply` that is no JSON object (`null` from a voice that
+    could not read the model's answer) is `invalid`. Memory checks that
+    every source record is still in the store and still mapped to a Days
+    entry, then applies it with the store's own validator (`apply_sleep`):
+    a failing check is `invalid`, a store changed since is `stale`.
+    `unknown` is a job that is gone: expired, dropped by a forget, or never
+    queued. `late`: the tiers' thread did not answer within 1 s
+    (`tiers::NIGHT_OP_WAIT`). An applied pass with more records pending
+    queues the scope's next pass (at most 4 a night).
+  - Jobs are bounded: at most 16 (`tiers::NIGHT_JOBS`; a night that finds
+    the queue full is not queued); a job taken and not given back within
+    120 s (`tiers::JOB_LEASE`) is dropped; at 06:00, or on another day,
+    every job is dropped (`tiers night jobs expired=N untaken=N`). A night
+    whose first job no voice took is counted `unconfigured`. Any forget in
+    a scope, its reset and a full wipe drop that scope's jobs (counted
+    stale). The tally counts `jobs_queued`, `jobs_taken`, `jobs_applied`,
+    `jobs_invalid`, `jobs_stale` and `jobs_expired`.
 
 What is not done yet: no backfill of what Days held before the switch was
 set; a kept thing replaced (`replaces`) stays a fact in the tiers beside its
