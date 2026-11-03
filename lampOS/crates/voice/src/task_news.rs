@@ -107,6 +107,56 @@ pub const AFTER_LAMP_US: u64 = 3_000_000;
 pub const LAMP_TAIL_US: u64 =
     lamp_audio::duplex::Hearing::EVALUATED.clear_after_blocks as u64 * 10_000;
 
+/// `on`: settled news (done, failed, stopped, or waiting for the person)
+/// taken to tell but not heard whole is told once more (#4342). On
+/// lamp-c0a4 a task's done news rode on a `check_agent_task` answer that
+/// the person cut short (`user_interrupted`); the answer had kept it as
+/// told already, the Task news skill's ask expired, and the person never
+/// heard it. With this on, such news is told once more, by the voice, at
+/// the next quiet pause: nothing said by or to the lamp for [`QUIET_US`]
+/// (no conversation going on, whatever [`AT_PAUSE_ENVIRONMENT`] says),
+/// someone there, within [`RETELL_WITHIN_MS`] of the work settling. Not
+/// heard whole again, it is never told again unasked: two tries at most,
+/// the first one included. It stays answerable by `check_agent_task` and
+/// `tasks_now`. Progress and a sign-in's news are never told again this
+/// way. Read at start; off unless set.
+pub const RETELL_ENVIRONMENT: &str = "LAMP_TASK_NEWS_RETELL";
+/// News is told once more only within this of its work settling
+/// ([`RETELL_ENVIRONMENT`]): later, the moment it belonged to has passed.
+pub const RETELL_WITHIN_MS: u64 = 30 * 60_000;
+
+/// Whether news not heard whole is told once more
+/// ([`RETELL_ENVIRONMENT`]): `on`, and nothing else.
+pub fn retell_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// Whether the news `key` may be told once more ([`RETELL_ENVIRONMENT`]):
+/// a settled observation or a hand-over that failed; never progress (the
+/// Policy's to time, and old once missed) nor a sign-in's question (asked
+/// again its own way, `crate::sign_in::AskAgain`).
+fn retellable(key: &str) -> bool {
+    !crate::sign_in::is_news(key) && !key.contains(":progress-") && News::task_of(key).is_some()
+}
+
+thread_local! {
+    /// The news whose turn was cut short ([`cut_short`]), for the
+    /// coordinator to hand to [`TaskNews::not_heard`] at its next tick: a
+    /// reply is let go in many places that hold no task news. Of the
+    /// coordinator's own thread.
+    static CUT_SHORT: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The news `keys` a turn was telling when it was cut short.
+pub(crate) fn cut_short(keys: &[String]) {
+    CUT_SHORT.with(|cut| cut.borrow_mut().extend(keys.iter().cloned()));
+}
+
+/// The news cut short since the last call ([`cut_short`]).
+pub(crate) fn take_cut_short() -> Vec<String> {
+    CUT_SHORT.with(|cut| std::mem::take(&mut *cut.borrow_mut()))
+}
+
 /// Whether news is told at the first pause ([`AT_PAUSE_ENVIRONMENT`]):
 /// `on`, and nothing else.
 pub fn at_pause(value: Option<&str>) -> bool {
@@ -170,6 +220,9 @@ enum Wake {
     /// A task newly settled on `tasks/status` (#560): read now, not at the
     /// next of [`READ_EVERY`].
     Settled,
+    /// News not heard whole, to tell once more ([`RETELL_ENVIRONMENT`]):
+    /// offered again at the next read though it is kept as told.
+    Retell(String),
 }
 
 /// A sign-in by voice followed by the news (#1676), with its switch: the
@@ -207,7 +260,12 @@ impl News {
     /// The task it is news of, from its key (`<store>:<task>:<what>`): a
     /// skill's ask for that task takes it (`say::Says::take_from`).
     pub fn task(&self) -> Option<u64> {
-        let mut fields = self.key.rsplitn(3, ':');
+        Self::task_of(&self.key)
+    }
+
+    /// [`Self::task`], of a key.
+    fn task_of(key: &str) -> Option<u64> {
+        let mut fields = key.rsplitn(3, ':');
         fields.next()?;
         let task = fields.next()?;
         fields.next()?;
@@ -252,6 +310,26 @@ fn still_current(status: Option<&TaskStatus>, of: &ProgressOf) -> bool {
     })
 }
 
+/// Where news not heard whole stands ([`RETELL_ENVIRONMENT`]), and since
+/// when: kept [`RETELL_WITHIN_MS`], then forgotten.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Retelling {
+    /// To tell once more: offered again though kept as told.
+    Due(Instant),
+    /// Taken to tell the second time: never again unasked.
+    Retold(Instant),
+    /// Not heard twice, or heard after all: never again unasked.
+    Spent(Instant),
+}
+
+impl Retelling {
+    fn since(self) -> Instant {
+        match self {
+            Self::Due(since) | Self::Retold(since) | Self::Spent(since) => since,
+        }
+    }
+}
+
 pub struct TaskNews {
     offered: Receiver<News>,
     told: Sender<Wake>,
@@ -270,6 +348,10 @@ pub struct TaskNews {
     status: Arc<Mutex<Option<TaskStatus>>>,
     /// News heard whole, for the tasks part to be told ([`Self::heard`]).
     heard: Sender<(String, u64)>,
+    /// [`RETELL_ENVIRONMENT`] is on.
+    retell: bool,
+    /// News not heard whole, by key ([`Self::not_heard`]).
+    retelling: BTreeMap<String, Retelling>,
 }
 
 impl Drop for TaskNews {
@@ -645,6 +727,7 @@ impl ForTexts {
                                 &read_told(&file),
                                 &BTreeSet::new(),
                                 made.as_ref(),
+                                &BTreeSet::new(),
                             );
                             if let Ok(mut read) = read.lock() {
                                 *read = news;
@@ -866,6 +949,8 @@ impl TaskNews {
             stopping,
             status,
             heard,
+            retell: retell_on(std::env::var(RETELL_ENVIRONMENT).ok().as_deref()),
+            retelling: BTreeMap::new(),
         })
     }
 
@@ -874,10 +959,83 @@ impl TaskNews {
     /// part is told so, so that with `--close-told` the harness its task
     /// started is closed (#1390), and a sign-in's question may be answered
     /// in a later request (#1676). News taken to tell but cut short, or not
-    /// heard, never comes here. Never waits.
-    pub fn heard(&self, request: u64, keys: Vec<String>) {
+    /// heard, never comes here ([`Self::not_heard`]). Heard, it is never
+    /// told once more. Never waits.
+    pub fn heard(&mut self, request: u64, keys: Vec<String>) {
         for key in keys {
+            if let Some(retelling) = self.retelling.get_mut(&key)
+                && matches!(retelling, Retelling::Due(_))
+            {
+                *retelling = Retelling::Spent(retelling.since());
+            }
             let _ = self.heard.send((key, request));
+        }
+    }
+
+    /// News taken to tell, unasked or in an answer, whose turn was cut
+    /// short, never played or played with gaps (`coordinator`): with [`RETELL_ENVIRONMENT`]
+    /// on, each settled piece is told once more at the next quiet pause
+    /// ([`Self::retelling_first`]), offered again by the reader though it
+    /// is kept as told. One not heard a second time is never told again
+    /// unasked: two tries at most. Off, nothing changes. Never waits.
+    pub fn not_heard(&mut self, keys: Vec<String>) {
+        if !self.retell {
+            return;
+        }
+        let now = Instant::now();
+        self.forget_old(now);
+        for key in keys.into_iter().filter(|key| retellable(key)) {
+            match self.retelling.get(&key).copied() {
+                None => {
+                    eprintln!(
+                        "lamp-voice: the news ({key}) was not heard whole: told once more at the next quiet pause"
+                    );
+                    self.retelling.insert(key.clone(), Retelling::Due(now));
+                    let _ = self.told.send(Wake::Retell(key));
+                }
+                Some(Retelling::Spent(_)) => {}
+                Some(retelling) => {
+                    eprintln!(
+                        "lamp-voice: the news ({key}) was not heard whole twice: not told again unasked"
+                    );
+                    self.retelling
+                        .insert(key, Retelling::Spent(retelling.since()));
+                }
+            }
+        }
+    }
+
+    /// Whether the news first in line is news told once more
+    /// ([`Self::not_heard`]): told only when nothing was said by or to the
+    /// lamp for [`QUIET_US`], by the voice itself, and alone. Call after
+    /// [`Self::waiting`]; it never blocks.
+    pub fn retelling_first(&self) -> bool {
+        self.waiting
+            .front()
+            .is_some_and(|news| matches!(self.retelling.get(&news.key), Some(Retelling::Due(_))))
+    }
+
+    /// Whether the news `key` was taken to tell a second time
+    /// ([`Self::not_heard`]).
+    pub fn retold(&self, key: &str) -> bool {
+        matches!(self.retelling.get(key), Some(Retelling::Retold(_)))
+    }
+
+    /// News not heard whole is let go [`RETELL_WITHIN_MS`] after: one still
+    /// due is then not told again (it is kept as told).
+    fn forget_old(&mut self, now: Instant) {
+        let within = Duration::from_millis(RETELL_WITHIN_MS);
+        self.retelling
+            .retain(|_, retelling| now.saturating_duration_since(retelling.since()) < within);
+    }
+
+    /// The news `key` taken to tell: one due to be told once more is now
+    /// told the second time.
+    fn taken(&mut self, key: &str) {
+        if let Some(retelling) = self.retelling.get_mut(key)
+            && matches!(retelling, Retelling::Due(_))
+        {
+            *retelling = Retelling::Retold(retelling.since());
         }
     }
 
@@ -901,8 +1059,17 @@ impl TaskNews {
                 self.waiting.push_back(news);
             }
         }
+        // News due to be told once more is kept as told already
+        // ([`Self::not_heard`]); it is let go once its time is over.
+        if !self.retelling.is_empty() {
+            self.forget_old(Instant::now());
+        }
         if let Ok(told) = self.told_already.try_lock() {
-            self.waiting.retain(|news| !told.contains(&news.key));
+            let retelling = &self.retelling;
+            self.waiting.retain(|news| {
+                !told.contains(&news.key)
+                    || matches!(retelling.get(&news.key), Some(Retelling::Due(_)))
+            });
         }
         // Progress not told in time is old news, and progress whose task
         // has finished, gone or moved on would say what is no longer so:
@@ -993,8 +1160,24 @@ impl TaskNews {
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
             heard,
+            retell: false,
+            retelling: BTreeMap::new(),
         };
         (news, heard_out)
+    }
+
+    /// For a test of the voice's turn: [`RETELL_ENVIRONMENT`] on, and the
+    /// news `keys` not heard whole once already, so due to be told once
+    /// more.
+    #[cfg(test)]
+    pub(crate) fn retelling_for_test(mut self, keys: &[&str]) -> Self {
+        self.retell = true;
+        let now = Instant::now();
+        for key in keys {
+            self.retelling
+                .insert((*key).to_owned(), Retelling::Due(now));
+        }
+        self
     }
 
     /// Take the news waiting, as it is being told: it is not offered again.
@@ -1014,6 +1197,7 @@ impl TaskNews {
             _ => false,
         };
         let news = self.waiting.pop_front()?;
+        self.taken(&news.key);
         if past || moved_on {
             return None;
         }
@@ -1071,6 +1255,7 @@ impl TaskNews {
                     .collect();
                 others.reverse();
                 for other in &others {
+                    self.taken(&other.key);
                     let _ = self.told.send(Wake::Told(other.key.clone()));
                 }
                 news.note = note;
@@ -1112,12 +1297,20 @@ fn read_forever(
         }
     };
     let made = crate::made_skill::Keeping::from_environment();
+    // News not heard whole, to offer once more at the next read though it
+    // is kept as told ([`Wake::Retell`]).
+    let mut retelling = BTreeSet::new();
     loop {
         // A settled task's wake waiting here is answered by the read just
         // below.
         while let Ok(wake) = told.try_recv() {
-            if let Wake::Told(key) = wake {
-                keep(&key, &mut again);
+            match wake {
+                Wake::Told(key) => keep(&key, &mut again),
+                Wake::Retell(key) => {
+                    offered.remove(&key);
+                    retelling.insert(key);
+                }
+                Wake::Settled => {}
             }
         }
         // Read again each time: the provider worker keeps there what the
@@ -1127,13 +1320,17 @@ fn read_forever(
             shared.clone_from(&told_keys);
         }
         if let Some(now) = clock() {
-            for news in read_once_with(&socket, &now, &told_keys, &offered, made.as_ref()) {
+            let unheard: BTreeSet<String> = told_keys.difference(&retelling).cloned().collect();
+            for news in read_once_with(&socket, &now, &unheard, &offered, made.as_ref(), &retelling)
+            {
                 offered.insert(news.key.clone());
                 if offer.send(news).is_err() {
                     return;
                 }
             }
         }
+        // Offered once more, or past telling: either way not again.
+        retelling.clear();
         // A sign-in the person began by voice (#1676, `crate::sign_in`): its
         // code if it came late, the question once approved in Harness, and
         // how it ended, each told once; read again soon while one is open.
@@ -1199,6 +1396,11 @@ fn read_forever(
             match told.recv_timeout(left) {
                 Ok(Wake::Told(key)) => keep(&key, &mut again),
                 Ok(Wake::Settled) => next = next.min(read_at + woken_gap),
+                Ok(Wake::Retell(key)) => {
+                    offered.remove(&key);
+                    retelling.insert(key);
+                    next = next.min(read_at + woken_gap);
+                }
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
             }
@@ -1282,17 +1484,30 @@ fn read_once(
     told: &BTreeSet<String>,
     offered: &BTreeSet<String>,
 ) -> Vec<News> {
-    read_once_with(socket, now, told, offered, None)
+    read_once_with(socket, now, told, offered, None, &BTreeSet::new())
+}
+
+/// Until when news settled `age_ms` ago may be told once more
+/// ([`RETELL_WITHIN_MS`]); none when that is over already.
+fn retell_until(age_ms: u64) -> Option<Instant> {
+    let left = RETELL_WITHIN_MS
+        .checked_sub(age_ms)
+        .filter(|left| *left > 0)?;
+    Instant::now().checked_add(Duration::from_millis(left))
 }
 
 /// [`read_once`], with a skill made by voice kept and told (`made`,
-/// `crate::made_skill`): its answer is its files, never read out.
+/// `crate::made_skill`): its answer is its files, never read out. News in
+/// `retelling` is being offered once more ([`RETELL_ENVIRONMENT`]): only
+/// within [`RETELL_WITHIN_MS`] of its work settling, let go when that is
+/// over, and never a made skill's (its note keeps and asks).
 fn read_once_with(
     socket: &Path,
     now: &BootClock,
     told: &BTreeSet<String>,
     offered: &BTreeSet<String>,
     made: Option<&crate::made_skill::Keeping>,
+    retelling: &BTreeSet<String>,
 ) -> Vec<News> {
     // Read once there is news to put in words, not at each look.
     let words = std::cell::LazyCell::new(NewsWords::installed);
@@ -1321,6 +1536,19 @@ fn read_once_with(
                 if !failed && let Some(keeping) = made {
                     crate::app_make::not_kept(&keeping.directory, &key, crate::app_make::NOT_SENT);
                 }
+                // Told once more only within its time of the hand-over
+                // ending, as `failed_hand_over` read it.
+                let until = if retelling.contains(&key) {
+                    let ended = item["dispatch"]["finished"]["monotonic_ms"]
+                        .as_u64()
+                        .unwrap_or_default();
+                    match retell_until(now.ms.saturating_sub(ended)) {
+                        Some(until) => Some(until),
+                        None => continue,
+                    }
+                } else {
+                    None
+                };
                 if !told.contains(&key)
                     && !offered.contains(&key)
                     && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
@@ -1329,7 +1557,7 @@ fn read_once_with(
                     news.push(News {
                         key,
                         note,
-                        until: None,
+                        until,
                         progress: None,
                         finished: None,
                         also: Vec::new(),
@@ -1362,6 +1590,17 @@ fn read_once_with(
             if told.contains(&key) || offered.contains(&key) || age_ms > OLDEST_MS {
                 continue;
             }
+            let until = if retelling.contains(&key) {
+                if crate::made_skill::is_brief(task["text"].as_str().unwrap_or_default()) {
+                    continue;
+                }
+                match retell_until(age_ms) {
+                    Some(until) => Some(until),
+                    None => continue,
+                }
+            } else {
+                None
+            };
             let Some(observation) = ask(
                 socket,
                 &json!({"op":"get_observation","id":id,"observation_id":observation_id}),
@@ -1416,7 +1655,7 @@ fn read_once_with(
                 news.push(News {
                     key,
                     note,
-                    until: None,
+                    until,
                     progress: None,
                     finished,
                     also: Vec::new(),
@@ -3150,7 +3389,7 @@ mod tests {
             program,
         };
         let none = BTreeSet::new();
-        let news = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        let news = read_once_with(&socket, &now(), &none, &none, Some(&keeping), &none);
         assert_eq!(news.len(), 1);
         let told = &news[0].note;
         assert!(told.contains("Claude Code just made the skill they asked for, \"evening-dim\": Dims the light a shade at 10 pm."), "{told}");
@@ -3205,7 +3444,7 @@ mod tests {
         );
         assert!(crate::made_skill::waiting_note(&keeping.directory, unix_ms()).is_some());
         // Read again: the kept one, not checked again.
-        let again = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        let again = read_once_with(&socket, &now(), &none, &none, Some(&keeping), &none);
         assert_eq!(again[0].note, *told);
         assert_eq!(std::fs::read_to_string(&runs).unwrap().lines().count(), 1);
         // Put on by a yes: its news has nothing left to ask, and isn't told
@@ -3218,7 +3457,7 @@ mod tests {
         )
         .unwrap();
         assert!(crate::made_skill::is_on(&keeping.directory, &news[0].key));
-        let after = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        let after = read_once_with(&socket, &now(), &none, &none, Some(&keeping), &none);
         assert!(after.is_empty(), "{after:?}");
         // So its news is told once the yes put it on, kept as told once, so
         // `--close-told` closes its harness (Second's P3 on #4246).
@@ -3376,7 +3615,7 @@ mod tests {
             let readers: Vec<_> = (0..2)
                 .map(|_| {
                     scope.spawn(|| {
-                        read_once_with(&request_socket, &now(), &none, &none, Some(&keeping))
+                        read_once_with(&request_socket, &now(), &none, &none, Some(&keeping), &none)
                     })
                 })
                 .collect();
@@ -3407,7 +3646,7 @@ mod tests {
         assert_eq!(app()["state"], "making", "{}", app());
         // The repair's answer: kept and told, or told not kept, once; the
         // first answer is never handed over again.
-        let news = read_once_with(&request_socket, &now(), &none, &none, Some(&keeping));
+        let news = read_once_with(&request_socket, &now(), &none, &none, Some(&keeping), &none);
         assert_eq!(
             news.len(),
             1,
@@ -3428,7 +3667,7 @@ mod tests {
             );
             assert_eq!(app()["state"], "not_kept", "{}", app());
         }
-        let again = read_once_with(&request_socket, &now(), &none, &none, Some(&keeping));
+        let again = read_once_with(&request_socket, &now(), &none, &none, Some(&keeping), &none);
         assert_eq!(again.len(), 1, "only the repair's news");
         assert_eq!(
             prepared.lock().unwrap().len(),
@@ -3632,6 +3871,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
         };
         let kept = read(&on);
@@ -3776,7 +4016,7 @@ mod tests {
             task.clone(),
             json!({}),
         );
-        read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        read_once_with(&socket, &now(), &none, &none, Some(&keeping), &none);
         let told = state("r1");
         assert_eq!(
             (told["state"].as_str(), told["why"].as_str()),
@@ -3791,12 +4031,12 @@ mod tests {
             task.clone(),
             json!({}),
         );
-        read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        read_once_with(&socket, &now(), &none, &none, Some(&keeping), &none);
         assert_eq!(state("r2")["state"], "making");
         // Its agent failed: settled.
         let list = json!({"ok":true,"store_id":"s1","items":[{"id":4,"observations":1}]});
         let socket = serve("failed", list, task, json!({"state": "failed"}));
-        read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        read_once_with(&socket, &now(), &none, &none, Some(&keeping), &none);
         let told = state("r2");
         assert_eq!(
             (told["state"].as_str(), told["why"].as_str()),
@@ -3815,12 +4055,12 @@ mod tests {
         let failed = json!({"ok":true,"text":brief,"target":{"engine":"claude"},
             "observations":[seen(1, "failed", "boot-a", NOW - 1_000)]});
         let socket = serve("early", list, failed, json!({"state": "failed"}));
-        let news = read_once_with(&socket, &now(), &none, &none, Some(&keeping));
+        let news = read_once_with(&socket, &now(), &none, &none, Some(&keeping), &none);
         assert_eq!(news[0].key, "s1:5:1");
         assert_eq!(state("r3")["state"], "making", "not yet its task");
         crate::app_make::handed(&keeping.directory, "r3", Ok(("s1".into(), 5)));
         let told: BTreeSet<String> = ["s1:5:1".to_owned()].into();
-        read_once_with(&socket, &now(), &told, &none, Some(&keeping));
+        read_once_with(&socket, &now(), &told, &none, Some(&keeping), &none);
         let told = state("r3");
         assert_eq!(
             (told["state"].as_str(), told["why"].as_str()),
@@ -4288,6 +4528,8 @@ mod tests {
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
             heard: mpsc::channel().0,
+            retell: false,
+            retelling: BTreeMap::new(),
         };
         let soon = News {
             key: "s:3:progress-1".into(),
@@ -4317,6 +4559,8 @@ mod tests {
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
             heard: mpsc::channel().0,
+            retell: false,
+            retelling: BTreeMap::new(),
         };
         let waiting = |key: &str| News {
             key: key.into(),
@@ -4352,6 +4596,8 @@ mod tests {
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
             heard: mpsc::channel().0,
+            retell: false,
+            retelling: BTreeMap::new(),
         };
         assert!(news.waiting().is_none());
         let one = News {
@@ -4449,6 +4695,8 @@ mod tests {
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
             heard: mpsc::channel().0,
+            retell: false,
+            retelling: BTreeMap::new(),
         };
         (news, offer, heard)
     }
@@ -5025,5 +5273,245 @@ mod tests {
             their_computer(&json!({"target":{"engine":"devin"},"target_alias":"devin"})),
             "their computer"
         );
+    }
+
+    /// News of task `id` waiting for the person, keyed `s:<id>:1`.
+    fn plain_news(key: &str) -> News {
+        News {
+            key: key.into(),
+            note: "(Claude Code just finished.)".into(),
+            until: None,
+            progress: None,
+            finished: None,
+            also: Vec::new(),
+        }
+    }
+
+    /// #4342 (b), lamp-c0a4: news taken to tell but not heard whole is
+    /// offered once more though it is kept as told, is first in line as
+    /// news told once more, and taken the second time is never told a
+    /// third: not heard again, it is let go. Two tries at most.
+    #[test]
+    fn news_not_heard_whole_is_told_once_more_and_never_a_third_time() {
+        let (mut news, offer, wakes) = waiting_news();
+        news.retell = true;
+        let one = plain_news("s:1:1");
+        offer.send(one.clone()).unwrap();
+        assert_eq!(news.waiting(), Some(&one));
+        assert!(!news.retelling_first());
+        assert_eq!(news.tell(), Some(one.clone()));
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Told("s:1:1".into()));
+        // Kept as told by the reader from here on.
+        news.told_already.lock().unwrap().insert("s:1:1".into());
+        // Cut short: the reader is asked to offer it once more.
+        news.not_heard(vec!["s:1:1".into()]);
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Retell("s:1:1".into()));
+        offer.send(one.clone()).unwrap();
+        assert_eq!(
+            news.waiting(),
+            Some(&one),
+            "kept as told, yet due once more"
+        );
+        assert!(news.retelling_first());
+        assert!(!news.retold("s:1:1"));
+        assert_eq!(news.tell(), Some(one.clone()));
+        assert!(news.retold("s:1:1"));
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Told("s:1:1".into()));
+        // Cut short the second time: never again unasked.
+        news.not_heard(vec!["s:1:1".into()]);
+        assert!(wakes.try_recv().is_err());
+        offer.send(one.clone()).unwrap();
+        assert!(news.waiting().is_none());
+        news.not_heard(vec!["s:1:1".into()]);
+        assert!(wakes.try_recv().is_err());
+    }
+
+    /// #4342 (b): without `LAMP_TASK_NEWS_RETELL=on` news not heard whole is
+    /// as before: kept as told, never offered again. Heard after all (the
+    /// person asked and heard the answer whole), news due once more is not
+    /// told again. Progress and a sign-in's question never are.
+    #[test]
+    fn news_is_told_once_more_only_with_the_switch_and_not_once_heard() {
+        let (mut news, offer, wakes) = waiting_news();
+        news.told_already.lock().unwrap().insert("s:1:1".into());
+        news.not_heard(vec!["s:1:1".into()]);
+        assert!(wakes.try_recv().is_err());
+        offer.send(plain_news("s:1:1")).unwrap();
+        assert!(news.waiting().is_none());
+
+        let (mut news, offer, wakes) = waiting_news();
+        news.retell = true;
+        news.told_already.lock().unwrap().insert("s:2:1".into());
+        news.not_heard(vec!["s:2:1".into()]);
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Retell("s:2:1".into()));
+        news.heard(7, vec!["s:2:1".into()]);
+        offer.send(plain_news("s:2:1")).unwrap();
+        assert!(news.waiting().is_none(), "heard after all");
+
+        news.not_heard(vec![
+            "s:3:progress-1-2".into(),
+            "sign-in-1-asking".into(),
+            "nonsense".into(),
+        ]);
+        assert!(wakes.try_recv().is_err());
+        assert_eq!(
+            news.retelling.keys().collect::<Vec<_>>(),
+            ["s:2:1"],
+            "only the settled news"
+        );
+    }
+
+    /// #4342 (b): news is told once more only within 30 minutes of its
+    /// work settling: the reader offers it with that as its `until`, and
+    /// not at all after. One kept as told and not due is not offered.
+    #[test]
+    fn news_is_told_once_more_only_within_thirty_minutes_of_settling() {
+        let root = std::env::temp_dir().join(format!("task-news-retell-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let answer = match asked["op"].as_str().unwrap() {
+                    "list" => {
+                        json!({"ok":true,"store_id":"s1","items":[{"id":1,"observations":1}]})
+                    }
+                    "get_task" => task("claude", json!([seen(1, "idle", "boot-a", NOW - 60_000)])),
+                    "get_observation" => {
+                        json!({"ok":true,"data":{"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let none = BTreeSet::new();
+        let due = BTreeSet::from(["s1:1:1".to_owned()]);
+        // Kept as told, and due once more: the reader leaves it out of the
+        // told it reads with.
+        let news = read_once_with(&socket, &now(), &none, &none, None, &due);
+        assert_eq!(news.len(), 1);
+        let until = news[0].until.expect("told once more until");
+        let left = until.saturating_duration_since(Instant::now());
+        assert!(
+            left > Duration::from_secs(28 * 60) && left <= Duration::from_secs(29 * 60),
+            "{left:?}"
+        );
+        // Not due: as before, nothing until.
+        assert_eq!(read_once(&socket, &now(), &none, &none)[0].until, None);
+        // Settled more than 30 minutes ago: not told once more.
+        let late = BootClock {
+            boot_id: "boot-a".into(),
+            ms: NOW + RETELL_WITHIN_MS,
+        };
+        assert!(read_once_with(&socket, &late, &none, &none, None, &due).is_empty());
+        assert!(retell_until(RETELL_WITHIN_MS).is_none());
+        assert!(retell_until(0).is_some());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #4342 (c): a task the person handed over that stops to ask them
+    /// something is said once, as waiting for them on their computer, the
+    /// same question never again; and with `LAMP_TASK_NEWS_RETELL=on`, cut
+    /// short, it is offered once more ([`Wake::Retell`]) and then not again.
+    #[test]
+    fn a_task_waiting_for_the_person_is_said_once_and_once_more_if_cut_short() {
+        let root =
+            std::env::temp_dir().join(format!("task-news-needs-input-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let listener = UnixListener::bind(root.join("request.sock")).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let answer = match asked["op"].as_str().unwrap() {
+                    "list" => {
+                        json!({"ok":true,"store_id":"s1","items":[{"id":3,"observations":1}]})
+                    }
+                    "get_task" => task(
+                        "claude",
+                        json!([seen(1, "needs-input", "boot-a", NOW - 5_000)]),
+                    ),
+                    "get_observation" => {
+                        json!({"ok":true,"data":{"state":"needs-input","answer":"","truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let (offer, offered) = mpsc::channel();
+        let (wake, woken) = mpsc::channel();
+        let told_file = root.join("told");
+        let reader = {
+            let (directory, told_file) = (root.clone(), told_file.clone());
+            std::thread::spawn(move || {
+                let shared = Mutex::new(BTreeSet::new());
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &woken,
+                    &shared,
+                    &|| Some(now()),
+                    Duration::from_millis(20),
+                    &SignInFollow {
+                        on: false,
+                        heard: Arc::new(Mutex::new(BTreeSet::new())),
+                        again_after: crate::sign_in::ASK_AGAIN_AFTER,
+                    },
+                );
+            })
+        };
+        let first = offered.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(first.key, "s1:3:1");
+        assert!(
+            first
+                .note
+                .contains("that Claude Code is waiting for them on their computer"),
+            "{}",
+            first.note
+        );
+        assert_eq!(first.until, None);
+        // Told; the same question is never offered again.
+        wake.send(Wake::Told("s1:3:1".into())).unwrap();
+        for _ in 0..2 {
+            std::thread::sleep(Duration::from_millis(40));
+            wake.send(Wake::Settled).unwrap();
+        }
+        assert!(offered.recv_timeout(Duration::from_millis(150)).is_err());
+        assert!(read_told(&told_file).contains("s1:3:1"));
+        // Cut short: offered once more, though kept as told.
+        wake.send(Wake::Retell("s1:3:1".into())).unwrap();
+        let again = offered.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(again.key, "s1:3:1");
+        assert!(again.until.is_some());
+        // And no more.
+        for _ in 0..2 {
+            std::thread::sleep(Duration::from_millis(40));
+            wake.send(Wake::Settled).unwrap();
+        }
+        assert!(offered.recv_timeout(Duration::from_millis(150)).is_err());
+        drop(wake);
+        reader.join().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #4342: news a cancelled turn was telling reaches the coordinator's
+    /// next tick on its own thread, once.
+    #[test]
+    fn news_cut_short_is_taken_once() {
+        assert!(take_cut_short().is_empty());
+        cut_short(&["s:1:1".into(), "s:2:1".into()]);
+        assert_eq!(take_cut_short(), ["s:1:1", "s:2:1"]);
+        assert!(take_cut_short().is_empty());
     }
 }

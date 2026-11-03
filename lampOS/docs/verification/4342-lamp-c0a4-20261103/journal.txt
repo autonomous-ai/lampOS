@@ -1,0 +1,182 @@
+Nov 03 16:42:26.119880 <lamp> lamp-voice[661395]: lamp-voice second: request 2 heard 0 words, the last 759 ms after the line ended
+Nov 03 16:42:32.023848 <lamp> lamp-voice[661395]: lamp-voice second: request 3 heard 0 words, the last 343 ms after the line ended
+Nov 03 16:42:37.853695 <lamp> lamp-voice[661395]: lamp-voice second: request 4 heard 0 words, the last 842 ms after the line ended
+Nov 03 16:42:46.763899 <lamp> lamp-voice[661395]: lamp-voice second: request 5 heard 0 words, the last 331 ms after the line ended
+Nov 03 16:43:13.362441 <lamp> lamp-voice[661395]: lamp-voice second: request 7 heard 12 words, the last 304 ms after the line ended
+Nov 03 16:43:14.863658 <lamp> lamp-voice[661395]: lamp-voice second: request 7 made a sound while its chat had not begun in 1501 ms
+Nov 03 16:43:17.863132 <lamp> lamp-voice[661395]: lamp-voice second: request 7 chat round 1 had not begun in 4500 ms; the turn ends unanswered
+Nov 03 16:43:18.078713 <lamp> lamp-voice[661395]: lamp-voice second: request 7 said its thoughts are slow
+Nov 03 16:43:51.558154 <lamp> lamp-voice[661395]: lamp-voice second: request 8 heard 10 words, the last 611 ms after the line ended
+Nov 03 16:43:51.558154 <lamp> lamp-voice[661395]: lamp-voice second: request 8: no conversation going on: the line ran 4 s, it was never heard saying words, to their end,, it was last called 38 s ago, 0 lines left alone since it last spoke
+Nov 03 16:43:52.484106 <lamp> lamp-voice[661395]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 16:43:53.058938 <lamp> lamp-voice[661395]: lamp-voice second: request 8 made a sound while its chat had not begun in 1501 ms
+Nov 03 16:44:02.222128 <lamp> lamp-voice[661395]: lamp-voice second: request 9 heard 0 words, the last 235 ms after the line ended
+Nov 03 16:44:02.223725 <lamp> lamp-voice[661395]: lamp-voice second: request 9 is held, so request 8's words, cut short by it, are answered in its place
+Nov 03 16:44:03.516511 <lamp> lamp-voice[661395]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 16:44:03.518289 <lamp> lamp-voice[661395]: lamp-voice second: request 9 chat round 1 failed after 1294 ms: service answered HTTP 503
+Nov 03 16:44:03.614114 <lamp> lamp-voice[661395]: lamp-voice second: request 9 said its thoughts are slow (again, the shorter line)
+Nov 03 16:44:59.689116 <lamp> lamp-voice[661395]: lamp-voice second: request 10 heard 0 words, the last 222 ms after the line ended
+Nov 03 16:45:02.317819 <lamp> lamp-voice[661395]: lamp-voice second: request 11 heard 1 words, the last 559 ms after the line ended
+Nov 03 16:45:02.319372 <lamp> lamp-voice[661395]: lamp-voice second: request 11: no conversation going on: the line ran 2 s, it was never heard saying words, to their end,, it was last called 70 s ago, 0 lines left alone since it last spoke
+Nov 03 16:45:02.319372 <lamp> lamp-voice[661395]: lamp-voice second: request 11: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+Nov 03 16:45:04.821261 <lamp> lamp-voice[661395]: lamp-voice second: request 12 heard 0 words, the last 2000 ms after the line ended
+Nov 03 16:45:29.539754 <lamp> lamp-voice[661395]: lamp-voice second: request 13 heard 13 words, the last 654 ms after the line ended
+Nov 03 16:45:29.539754 <lamp> lamp-voice[661395]: lamp-voice second: request 13: no conversation going on: the line ran 6 s, it was never heard saying words, to their end,, it was last called 97 s ago, 0 lines left alone since it last spoke
+Nov 03 16:45:30.828289 <lamp> lamp-voice[661395]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 16:45:30.830652 <lamp> lamp-voice[661395]: lamp-voice second: request 13 chat round 1 failed after 1290 ms: service answered HTTP 503
+Nov 03 16:45:31.042701 <lamp> lamp-voice[661395]: lamp-voice second: request 13 said its thoughts are slow
+Nov 03 16:47:43.395635 <lamp> lamp-voice[661395]: lamp-voice second: request 16 heard 11 words, the last 390 ms after the line ended
+Nov 03 16:47:43.395635 <lamp> lamp-voice[661395]: lamp-voice second: request 16: no conversation going on: the line ran 5 s, it was never heard saying words, to their end,, it was last called 133 s ago, 0 lines left alone since it last spoke
+Nov 03 16:47:43.398969 <lamp> lamp-voice[661395]: lamp-voice second: request 16: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+Nov 03 16:48:21.826008 <lamp> lamp-voice[661395]: lamp-voice second: request 17 heard 10 words, the last 333 ms after the line ended
+Nov 03 16:48:21.826008 <lamp> lamp-voice[661395]: lamp-voice second: request 17: no conversation going on: the line ran 6 s, it was never heard saying words, to their end,, it was last called 172 s ago, 0 lines left alone since it last spoke
+Nov 03 16:48:22.762139 <lamp> lamp-voice[661395]: lamp-voice second: a service answered HTTP 500 (internal_error)
+Nov 03 16:48:22.762139 <lamp> lamp-voice[661395]: lamp-voice second: request 17 chat round 1 failed after 935 ms: service answered HTTP 500
+Nov 03 16:48:22.978470 <lamp> lamp-voice[661395]: lamp-voice second: request 17 said its thoughts are slow
+Nov 03 16:49:05.099042 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 16:49:05.126088 <lamp> systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:49:05.134460 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:49:07.163367 <lamp> systemd[1]: Stopping lamp-voice.service - lampOS voice (lamp-voice serve)...
+Nov 03 16:49:07.355301 <lamp> systemd[1]: Stopped lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 03 16:49:07.379485 <lamp> systemd[1]: Started lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 03 16:49:08.089677 <lamp> lamp-voice[663213]: {"seconds":null,"status":"listening_ready"}
+Nov 03 16:49:18.319351 <lamp> lamp-voice[663213]: lamp-voice second: request 2 heard 0 words, the last 5661 ms after the line ended
+Nov 03 16:49:50.995915 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 16:49:51.027872 <lamp> systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:49:51.044700 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:50:01.572893 <lamp> lamp-voice[663213]: lamp-voice second: request 3 heard 0 words, the last 1249 ms after the line ended
+Nov 03 16:50:39.472854 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 16:50:39.492151 <lamp> systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:50:39.502809 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:51:17.469507 <lamp> lamp-voice[663213]: lamp-voice second: request 4 heard 6 words, the last 290 ms after the line ended
+Nov 03 16:54:09.150924 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 16:54:09.174768 <lamp> systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:54:09.188195 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 16:54:11.225143 <lamp> systemd[1]: Stopping lamp-voice.service - lampOS voice (lamp-voice serve)...
+Nov 03 16:54:11.520947 <lamp> systemd[1]: Stopped lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 03 16:54:11.551504 <lamp> systemd[1]: Started lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 03 16:54:12.294303 <lamp> lamp-voice[665828]: {"seconds":null,"status":"listening_ready"}
+Nov 03 16:54:37.306972 <lamp> lamp-voice[665828]: lamp-voice second: request 1 heard 11 words, the last 281 ms after the line ended
+Nov 03 16:54:37.309047 <lamp> lamp-voice[665828]: lamp-voice second: request 1: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+Nov 03 16:54:44.791771 <lamp> lamp-voice[665828]: lamp-voice second: request 2 heard 0 words, the last 355 ms after the line ended
+Nov 03 16:54:47.093134 <lamp> lamp-voice[665828]: lamp-voice second: request 3 heard 0 words, the last 1459 ms after the line ended
+Nov 03 16:55:14.869171 <lamp> lamp-voice[665828]: lamp-voice second: request 4 heard 10 words, the last 379 ms after the line ended
+Nov 03 16:56:57.207274 <lamp> lamp-voice[665828]: lamp-voice second: request 5 heard 11 words, the last 355 ms after the line ended
+Nov 03 16:56:57.207274 <lamp> lamp-voice[665828]: lamp-voice second: request 5: no conversation going on: the line ran 5 s, it was last heard saying words, to their end, 68 s ago, it was last called 102 s ago, 0 lines left alone since it last spoke
+Nov 03 16:56:57.207274 <lamp> lamp-voice[665828]: lamp-voice second: request 5: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+Nov 03 16:57:34.076157 <lamp> lamp-voice[665828]: lamp-voice second: request 6 heard 11 words, the last 329 ms after the line ended
+Nov 03 16:57:34.076157 <lamp> lamp-voice[665828]: lamp-voice second: request 6: no conversation going on: the line ran 4 s, it was last heard saying words, to their end, 105 s ago, it was last called 139 s ago, 0 lines left alone since it last spoke
+Nov 03 16:57:35.117905 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 16:57:35.577327 <lamp> lamp-voice[665828]: lamp-voice second: request 6 made a sound while its chat had not begun in 1500 ms
+Nov 03 16:57:36.150119 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 16:57:36.152073 <lamp> lamp-voice[665828]: lamp-voice second: request 6 chat round 1 failed after 2073 ms: service answered HTTP 503
+Nov 03 16:57:36.367625 <lamp> lamp-voice[665828]: lamp-voice second: request 6 said its thoughts are slow
+Nov 03 16:58:08.539854 <lamp> lamp-voice[665828]: lamp-voice second: request 7 heard 0 words, the last 333 ms after the line ended
+Nov 03 16:59:01.557472 <lamp> lamp-voice[665828]: lamp-voice second: request 8 heard 0 words, the last 263 ms after the line ended
+Nov 03 16:59:10.716778 <lamp> lamp-voice[665828]: lamp-voice second: request 9 heard 11 words, the last 358 ms after the line ended
+Nov 03 16:59:10.719393 <lamp> lamp-voice[665828]: lamp-voice second: request 9: no conversation going on: the line ran 5 s, it was last heard saying words, to their end, 202 s ago, it was last called 96 s ago, 0 lines left alone since it last spoke
+Nov 03 16:59:12.218780 <lamp> lamp-voice[665828]: lamp-voice second: request 9 made a sound while its chat had not begun in 1501 ms
+Nov 03 16:59:38.034062 <lamp> lamp-voice[665828]: lamp-voice second: request 10 heard 0 words, the last 622 ms after the line ended
+Nov 03 16:59:38.034062 <lamp> lamp-voice[665828]: lamp-voice second: request 10 is held, so request 9's words, cut short by it, are answered in its place
+Nov 03 16:59:45.355454 <lamp> lamp-voice[665828]: lamp-voice second: request 11 heard 0 words, the last 2602 ms after the line ended
+Nov 03 16:59:50.339771 <lamp> lamp-voice[665828]: lamp-voice second: request 12 heard 0 words, the last 1593 ms after the line ended
+Nov 03 17:00:05.435199 <lamp> lamp-voice[665828]: lamp-voice second: request 13 heard 3 words, the last 397 ms after the line ended
+Nov 03 17:00:08.059548 <lamp> lamp-voice[665828]: lamp-voice second: request 14 heard 7 words, the last 442 ms after the line ended
+Nov 03 17:00:08.060078 <lamp> lamp-voice[665828]: lamp-voice second: request 13's words, cut short, are let go: request 14 is answered
+Nov 03 17:00:09.562020 <lamp> lamp-voice[665828]: lamp-voice second: request 14 made a sound while its chat had not begun in 1501 ms
+Nov 03 17:00:21.654713 <lamp> lamp-voice[665828]: lamp-voice second: request 15 heard 0 words, the last 224 ms after the line ended
+Nov 03 17:00:21.656551 <lamp> lamp-voice[665828]: lamp-voice second: request 15 is held, so request 14's words, cut short by it, are answered in its place
+Nov 03 17:01:04.587457 <lamp> lamp-voice[665828]: lamp-voice second: request 16 heard 16 words, the last 260 ms after the line ended
+Nov 03 17:01:06.089588 <lamp> lamp-voice[665828]: lamp-voice second: request 16 made a sound while its chat had not begun in 1501 ms
+Nov 03 17:01:06.324886 <lamp> lamp-voice[665828]: lamp-voice second: request 16 chat round 1 called start_agent_task
+Nov 03 17:01:06.372796 <lamp> lamp-voice[665828]: lamp-voice second: request 16 asked for start_agent_task; the tasks part answered in 47 ms; the answer was sent
+Nov 03 17:01:24.394483 <lamp> lamp-voice[665828]: lamp-voice second: request 17 heard 10 words, the last 272 ms after the line ended
+Nov 03 17:01:25.897231 <lamp> lamp-voice[665828]: lamp-voice second: request 17 made a sound while its chat had not begun in 1501 ms
+Nov 03 17:01:26.338671 <lamp> lamp-voice[665828]: lamp-voice second: request 17 chat round 1 called confirm_agent_task
+Nov 03 17:01:26.392968 <lamp> lamp-voice[665828]: lamp-voice second: request 17 asked for confirm_agent_task; the tasks part answered in 53 ms; the answer was sent
+Nov 03 17:01:38.645105 <lamp> lamp-tasks[665808]: tasks: lamp-633ef007432da03af4b083a6bdbb1007: dispatch accepted (exit 0, 12.2 s)
+Nov 03 17:01:55.216422 <lamp> lamp-voice[665828]: lamp-voice second: request 18 heard 9 words, the last 726 ms after the line ended
+Nov 03 17:01:56.963811 <lamp> lamp-voice[665828]: lamp-voice second: request 18 chat round 1 called tasks_now
+Nov 03 17:01:56.981193 <lamp> lamp-voice[665828]: lamp-voice second: request 18 asked for tasks_now; the tasks part answered in 17 ms; the answer was sent
+Nov 03 17:02:37.081077 <lamp> lamp-voice[665828]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:15:13)
+Nov 03 17:02:40.084288 <lamp> lamp-voice[665828]: lamp-voice second: request 20 chat round 1 had not begun in 3000 ms; the turn ends unanswered
+Nov 03 17:02:40.088293 <lamp> lamp-voice[665828]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:15:13) was not heard whole (no_audio_answer): its harness stays open
+Nov 03 17:02:40.088293 <lamp> lamp-voice[665828]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:15:13) was not heard whole: told once more at the next quiet pause
+Nov 03 17:02:49.082504 <lamp> lamp-voice[665828]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:15:13)
+Nov 03 17:03:18.072425 <lamp> lamp-tasks[665808]: tasks: closing task 15's harness: Ok(Closed)
+Nov 03 17:08:00.102838 <lamp> lamp-voice[665828]: lamp-voice second: request 22 heard 7 words, the last 1139 ms after the line ended
+Nov 03 17:08:00.102838 <lamp> lamp-voice[665828]: lamp-voice second: request 22: no conversation going on: the line ran 2 s, it was last heard saying words, to their end, 293 s ago, it was last called 364 s ago, 0 lines left alone since it last spoke
+Nov 03 17:08:04.631185 <lamp> lamp-voice[665828]: lamp-voice second: request 22 chat round 1 called tasks_now
+Nov 03 17:08:04.645035 <lamp> lamp-voice[665828]: lamp-voice second: request 22 asked for tasks_now; the tasks part answered in 13 ms; the answer was sent
+Nov 03 17:08:45.644706 <lamp> lamp-voice[665828]: lamp-voice second: request 23 heard 0 words, the last 517 ms after the line ended
+Nov 03 17:14:12.043224 <lamp> lamp-voice[665828]: lamp-voice second: request 24 heard 16 words, the last 653 ms after the line ended
+Nov 03 17:14:12.047723 <lamp> lamp-voice[665828]: lamp-voice second: request 24: no conversation going on: the line ran 6 s, it was last heard saying words, to their end, 351 s ago, it was last called 371 s ago, 0 lines left alone since it last spoke
+Nov 03 17:14:12.958409 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 17:14:13.546009 <lamp> lamp-voice[665828]: lamp-voice second: request 24 made a sound while its chat had not begun in 1501 ms
+Nov 03 17:14:14.912333 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 17:14:14.914262 <lamp> lamp-voice[665828]: lamp-voice second: request 24 chat round 1 failed after 2868 ms: service answered HTTP 503
+Nov 03 17:14:15.127773 <lamp> lamp-voice[665828]: lamp-voice second: request 24 said its thoughts are slow
+Nov 03 17:14:47.150453 <lamp> lamp-voice[665828]: lamp-voice second: request 25 heard 3 words, the last 562 ms after the line ended
+Nov 03 17:14:50.236945 <lamp> lamp-voice[665828]: lamp-voice second: request 26 heard 7 words, the last 1108 ms after the line ended
+Nov 03 17:14:50.241445 <lamp> lamp-voice[665828]: lamp-voice second: request 26: no conversation going on: the line ran 2 s, it was last heard saying words, to their end, 389 s ago, it was last called 38 s ago, 1 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+Nov 03 17:14:50.241445 <lamp> lamp-voice[665828]: lamp-voice second: request 25's words, cut short, are let go: request 26 is answered
+Nov 03 17:14:50.887509 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 17:14:51.739342 <lamp> lamp-voice[665828]: lamp-voice second: request 26 made a sound while its chat had not begun in 1500 ms
+Nov 03 17:14:52.632830 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 17:14:52.633346 <lamp> lamp-voice[665828]: lamp-voice second: request 26 chat round 1 failed after 2394 ms: service answered HTTP 503
+Nov 03 17:14:52.732254 <lamp> lamp-voice[665828]: lamp-voice second: request 26 said its thoughts are slow (again, the shorter line)
+Nov 03 17:16:28.043025 <lamp> lamp-voice[665828]: lamp-voice second: request 27 heard 16 words, the last 276 ms after the line ended
+Nov 03 17:16:28.046684 <lamp> lamp-voice[665828]: lamp-voice second: request 27: no conversation going on: the line ran 6 s, it was last heard saying words, to their end, 487 s ago, it was last called 97 s ago, 0 lines left alone since it last spoke
+Nov 03 17:16:28.945474 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 17:16:28.946049 <lamp> lamp-voice[665828]: lamp-voice second: request 27 chat round 1 failed after 901 ms: service answered HTTP 503
+Nov 03 17:16:29.159709 <lamp> lamp-voice[665828]: lamp-voice second: request 27 said its thoughts are slow
+Nov 03 17:18:43.966515 <lamp> lamp-voice[665828]: lamp-voice second: request 30 heard 16 words, the last 254 ms after the line ended
+Nov 03 17:18:43.970514 <lamp> lamp-voice[665828]: lamp-voice second: request 30: no conversation going on: the line ran 6 s, it was last heard saying words, to their end, 623 s ago, it was last called 135 s ago, 0 lines left alone since it last spoke
+Nov 03 17:18:44.662795 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 17:18:44.663667 <lamp> lamp-voice[665828]: lamp-voice second: request 30 chat round 1 failed after 695 ms: service answered HTTP 503
+Nov 03 17:18:44.881597 <lamp> lamp-voice[665828]: lamp-voice second: request 30 said its thoughts are slow
+Nov 03 17:24:26.742297 <lamp> lamp-voice[665828]: lamp-voice second: request 32 heard 0 words, the last 1329 ms after the line ended
+Nov 03 17:24:40.607495 <lamp> lamp-voice[665828]: lamp-voice second: request 33 heard 0 words, the last 352 ms after the line ended
+Nov 03 17:26:37.271665 <lamp> lamp-voice[665828]: lamp-voice second: request 34 heard 0 words, the last 287 ms after the line ended
+Nov 03 17:29:10.807987 <lamp> lamp-voice[665828]: lamp-voice second: request 35 heard 0 words, the last 721 ms after the line ended
+Nov 03 17:29:37.154283 <lamp> lamp-voice[665828]: lamp-voice second: request 36 heard 16 words, the last 264 ms after the line ended
+Nov 03 17:29:37.157778 <lamp> lamp-voice[665828]: lamp-voice second: request 36: no conversation going on: the line ran 5 s, it was last heard saying words, to their end, 1276 s ago, it was last called 653 s ago, 0 lines left alone since it last spoke
+Nov 03 17:29:38.656383 <lamp> lamp-voice[665828]: lamp-voice second: request 36 made a sound while its chat had not begun in 1500 ms
+Nov 03 17:29:39.677664 <lamp> lamp-voice[665828]: lamp-voice second: a service answered HTTP 503 (service_unavailable_error)
+Nov 03 17:29:41.656115 <lamp> lamp-voice[665828]: lamp-voice second: request 36 chat round 1 had not begun in 4500 ms; the turn ends unanswered
+Nov 03 17:29:41.871685 <lamp> lamp-voice[665828]: lamp-voice second: request 36 said its thoughts are slow
+Nov 03 17:30:15.149462 <lamp> lamp-voice[665828]: lamp-voice second: request 37 heard 10 words, the last 339 ms after the line ended
+Nov 03 17:30:15.151082 <lamp> lamp-voice[665828]: lamp-voice second: request 37: no conversation going on: the line ran 4 s, it was last heard saying words, to their end, 1314 s ago, it was last called 37 s ago, 0 lines left alone since it last spoke
+Nov 03 17:30:21.598702 <lamp> lamp-voice[665828]: lamp-voice second: request 38 heard 0 words, the last 278 ms after the line ended
+Nov 03 17:39:47.740414 <lamp> lamp-voice[665828]: lamp-voice second: request 39 heard 0 words, the last 618 ms after the line ended
+Nov 03 17:40:53.218028 <lamp> lamp-voice[665828]: lamp-voice second: request 40 heard 16 words, the last 286 ms after the line ended
+Nov 03 17:40:53.221150 <lamp> lamp-voice[665828]: lamp-voice second: request 40: no conversation going on: the line ran 6 s, it was last heard saying words, to their end, 630 s ago, it was last called 638 s ago, 0 lines left alone since it last spoke
+Nov 03 17:40:54.720646 <lamp> lamp-voice[665828]: lamp-voice second: request 40 made a sound while its chat had not begun in 1501 ms
+Nov 03 17:40:55.027069 <lamp> lamp-voice[665828]: lamp-voice second: request 40 chat round 1 called start_agent_task
+Nov 03 17:40:55.076279 <lamp> lamp-voice[665828]: lamp-voice second: request 40 asked for start_agent_task; the tasks part answered in 49 ms; the answer was sent
+Nov 03 17:41:16.663313 <lamp> lamp-voice[665828]: lamp-voice second: request 41 heard 10 words, the last 3087 ms after the line ended
+Nov 03 17:41:18.165720 <lamp> lamp-voice[665828]: lamp-voice second: request 41 made a sound while its chat had not begun in 1500 ms
+Nov 03 17:41:21.165597 <lamp> lamp-voice[665828]: lamp-voice second: request 41 chat round 1 had not begun in 4500 ms; the turn ends unanswered
+Nov 03 17:41:21.381882 <lamp> lamp-voice[665828]: lamp-voice second: request 41 said its thoughts are slow
+Nov 03 17:41:47.370299 <lamp> lamp-voice[665828]: lamp-voice second: request 42 heard 0 words, the last 416 ms after the line ended
+Nov 03 17:45:35.533967 <lamp> lamp-voice[665828]: lamp-voice second: request 43 heard 0 words, the last 1658 ms after the line ended
+Nov 03 17:45:36.377134 <lamp> lamp-voice[665828]: lamp-voice second: request 43: no conversation going on: the line ran 3 s, it was last heard saying words, to their end, 275 s ago, it was last called 259 s ago, 0 lines left alone since it last spoke
+Nov 03 17:46:47.117215 <lamp> lamp-voice[665828]: lamp-voice second: request 44 heard 0 words, the last 315 ms after the line ended
+Nov 03 17:52:02.296046 <lamp> lamp-voice[665828]: lamp-voice second: request 45 heard 16 words, the last 224 ms after the line ended
+Nov 03 17:52:02.296046 <lamp> lamp-voice[665828]: lamp-voice second: request 45: no conversation going on: the line ran 6 s, it was last heard saying words, to their end, 383 s ago, it was last called 385 s ago, 0 lines left alone since it last spoke
+Nov 03 17:52:03.691846 <lamp> lamp-voice[665828]: lamp-voice second: request 45 chat round 1 called start_agent_task
+Nov 03 17:52:03.739882 <lamp> lamp-voice[665828]: lamp-voice second: request 45 asked for start_agent_task; the tasks part answered in 47 ms; the answer was sent
+Nov 03 17:52:22.119143 <lamp> lamp-voice[665828]: lamp-voice second: request 46 heard 10 words, the last 326 ms after the line ended
+Nov 03 17:52:23.395158 <lamp> lamp-voice[665828]: lamp-voice second: request 46 chat round 1 called confirm_agent_task
+Nov 03 17:52:23.444987 <lamp> lamp-voice[665828]: lamp-voice second: request 46 asked for confirm_agent_task; the tasks part answered in 49 ms; the answer was sent
+Nov 03 17:52:33.709691 <lamp> lamp-tasks[665808]: tasks: lamp-65d4a0f2ab2cedf358e80039473c691d: dispatch accepted (exit 0, 10.2 s)
+Nov 03 17:53:00.720556 <lamp> lamp-voice[665828]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:17:14)
+Nov 03 17:53:14.907277 <lamp> lamp-voice[665828]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:17:14) was not heard whole (audio_written_with_playback_gaps_unscored): its harness stays open
+Nov 03 17:56:06.510393 <lamp> lamp-voice[665828]: lamp-voice second: request 48 heard 0 words, the last 1205 ms after the line ended
+Nov 03 17:59:58.024372 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 03 17:59:58.049403 <lamp> systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 17:59:58.083596 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 03 18:00:00.137002 <lamp> systemd[1]: Stopping lamp-voice.service - lampOS voice (lamp-voice serve)...
+Nov 03 18:00:00.429131 <lamp> systemd[1]: Stopped lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 03 18:00:00.460346 <lamp> systemd[1]: Started lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 03 18:00:01.240682 <lamp> lamp-voice[673333]: {"seconds":null,"status":"listening_ready"}

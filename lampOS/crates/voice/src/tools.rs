@@ -2676,6 +2676,7 @@ mod tests {
                 named_only: false,
                 correct: false,
                 questions: false,
+                now: false,
                 sign_in: false,
             }),
             make_skill_local: false,
@@ -2960,6 +2961,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
         };
         assert_eq!(
@@ -4012,6 +4014,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
         };
         let with = Settings {

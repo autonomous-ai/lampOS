@@ -627,6 +627,7 @@ mod tests {
             named_only: false,
             correct: false,
             questions: false,
+            now: false,
             sign_in: false,
         };
         let declared: Vec<String> = crate::agent_tasks::tools(&place)
