@@ -220,6 +220,15 @@
         },
         {
           "$ref": "#/$defs/skill.remove"
+        },
+        {
+          "$ref": "#/$defs/turn.start"
+        },
+        {
+          "$ref": "#/$defs/turn.end"
+        },
+        {
+          "$ref": "#/$defs/listen.set"
         }
       ]
     },
@@ -957,6 +966,67 @@
       ],
       "additionalProperties": false
     },
+    "turn.start": {
+      "description": "Opens a conversation turn as a tap on the head does: the person's next line is answered as spoken to the lamp. With `prompt`, the lamp says it first, as a say's words. Held to say's quiet hours and rate; needs speak and hear, and no lease. Answered `to: voice`; its `done` follows: finished once the turn's answer has sounded, else dropped with the voice's why.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "turn.start"
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f]+$"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "turn.end": {
+      "description": "Ends the turn this computer started, and the conversation grown from it; never another's. Needs speak. Answered `turn: ended` with `started`, the turn.start it ended; with no turn of this computer's, busy.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "turn.end"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "listen.set": {
+      "description": "This computer's mute: false holds it (`mute: held`) until it says true (`mute: lifted`, or `nothing_held`), its last connection closes, it is revoked, or a hand on the head lifts it, said as a done cut_short on the listen.set that held it. A stop doesn't lift it. Needs hear.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "listen.set"
+        },
+        "on": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
+      ],
+      "additionalProperties": false
+    },
     "skill.push": {
       "description": "One part of a skill package (lamp-skills pack's shape: ustar, lamp-skill.json first, then NAME/path), sent in order from 0; the last part's answer comes once the lamp has checked and installed it. Needs the skills grant.",
       "type": "object",
@@ -1055,7 +1125,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; turn.end carries turn and started; listen.set carries mute.",
           "type": "object",
           "properties": {
             "re": {
@@ -1335,6 +1405,20 @@
             },
             "removed": {
               "type": "string"
+            },
+            "turn": {
+              "const": "ended"
+            },
+            "started": {
+              "description": "turn.end's: the id of the turn.start it ended.",
+              "$ref": "#/$defs/id"
+            },
+            "mute": {
+              "enum": [
+                "held",
+                "lifted",
+                "nothing_held"
+              ]
             }
           },
           "required": [

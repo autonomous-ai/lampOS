@@ -325,6 +325,13 @@ export class FakeLamp {
     // hand said.
     this.following = new Map();
     this.hand = null;
+    // Each computer's own turn, by the id of the turn.start that opened it,
+    // until its `done`; and each computer's mute, held by the connection and
+    // request id of its listen.set false, until it says true, its last
+    // connection closes or `handOnHead` lifts it.
+    this.turns = new Map();
+    this.mutes = new Map();
+    this.clientOf = new Map();
   }
 
   async listen() {
@@ -427,7 +434,17 @@ export class FakeLamp {
 
   // End the action whose request id was `re`, to the client that asked.
   done(re, how = 'finished', why) {
+    // A turn's outcome ends it, as the voice's does.
+    for (const [client, started] of [...this.turns]) if (started === re) this.turns.delete(client);
     this.asker.get(re)?.send(JSON.stringify({ ev: 'done', re, how, ...(why ? { why } : {}) }));
+  }
+
+  // A hand on the head lifts every computer's mute, as the voice does: each is
+  // told with a `done` `cut_short` on the listen.set that held it.
+  handOnHead() {
+    const mutes = [...this.mutes.values()];
+    this.mutes.clear();
+    for (const { ws, re } of mutes) ws.send(JSON.stringify({ ev: 'done', re, how: 'cut_short', why: 'a hand on the head' }));
   }
 
   serve(ws) {
@@ -439,6 +456,10 @@ export class FakeLamp {
     ws.on('close', () => {
       this.subscribed.delete(ws);
       this.following.delete(ws);
+      // A computer gone lifts its mute: its last connection closed.
+      const gone = this.clientOf.get(ws);
+      this.clientOf.delete(ws);
+      if (gone && ![...this.clientOf.values()].includes(gone)) this.mutes.delete(gone);
       for (const [lease, held] of this.leases) if (held.ws === ws) this.leases.delete(lease);
     });
     ws.on('message', (data) => {
@@ -462,7 +483,11 @@ export class FakeLamp {
         if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
       }
       if (request.op === 'pair') return this.pair(ws, request, nonce);
-      if (request.op === 'hello') { client = this.hello(ws, request, nonce); return undefined; }
+      if (request.op === 'hello') {
+        client = this.hello(ws, request, nonce);
+        if (client) this.clientOf.set(ws, client);
+        return undefined;
+      }
       if (!client) return this.refuse(ws, id, 'no_hello', 'hello first');
       return this.op(ws, client, request);
     });
@@ -549,9 +574,15 @@ export class FakeLamp {
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
-    const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove'];
+    const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end'];
     if (op.startsWith('skill.')) return ['skills'];
-    return speak.includes(op) ? ['speak'] : { express: ['body', 'light'], light: ['light'], 'camera.snapshot': ['camera'], 'camera.stream': ['camera'] }[op] ?? [];
+    if (speak.includes(op)) return ['speak'];
+    // A turn speaks and hears what is said to the lamp.
+    return {
+      express: ['body', 'light'], light: ['light'],
+      'camera.snapshot': ['camera'], 'camera.stream': ['camera'],
+      'turn.start': ['speak', 'hear'], 'listen.set': ['hear'],
+    }[op] ?? [];
   }
 
   clipsOf(client) {
@@ -740,6 +771,33 @@ export class FakeLamp {
         this.ok(ws, id, { to: 'voice' });
         if (this.autoDone) this.done(id);
         return undefined;
+      case 'turn.start':
+        // As lamp-control: handed to the voice, kept as this computer's turn
+        // until its `done`; finished at once with autoDone.
+        this.turns.set(client, id);
+        this.ok(ws, id, { to: 'voice' });
+        if (this.autoDone) this.done(id);
+        return undefined;
+      case 'turn.end': {
+        const started = this.turns.get(client);
+        if (started === undefined) {
+          this.requests.pop();
+          return this.refuse(ws, id, 'busy', "not this computer's turn");
+        }
+        this.turns.delete(client);
+        this.ok(ws, id, { turn: 'ended', started });
+        this.done(started, 'dropped', 'dropped: ended by the computer');
+        return undefined;
+      }
+      case 'listen.set':
+        // As lamp-control: false holds this computer's mute (again, nothing
+        // new); true lifts it, or says nothing was held.
+        if (!request.on) {
+          if (!this.mutes.has(client)) this.mutes.set(client, { ws, re: id });
+          return this.ok(ws, id, { mute: 'held' });
+        }
+        if (!this.mutes.delete(client)) return this.ok(ws, id, { mute: 'nothing_held' });
+        return this.ok(ws, id, { mute: 'lifted' });
       default:
         this.ok(ws, id);
         if (op === 'play' && this.autoDone) this.done(id);

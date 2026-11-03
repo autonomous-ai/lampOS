@@ -284,7 +284,8 @@ Install the two in one `pip` command: the SDK (`lampos`) isn't on PyPI, so
 The tools send every op of the protocol: `lamp_state`, `lamp_wait_for`,
 `lamp_gesture`, `lamp_light`, `lamp_say`, `lamp_sound`, `lamp_look`,
 `lamp_move`, `lamp_play`, `lamp_joints`, `lamp_express`, `lamp_follow_hand`,
-`lamp_follow_stop` and `lamp_stop` (the README's table has each one's
+`lamp_follow_stop`, `lamp_start_turn`, `lamp_end_turn`, `lamp_set_listening`
+and `lamp_stop` (the README's table has each one's
 parameters). Each is offered only with the grant it needs. A body tool takes
 a short body lease of its own, or renews the one it holds, and keeps to what
 hello's `limits` says. A refusal comes back as the tool's error,
