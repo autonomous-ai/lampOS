@@ -122,7 +122,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   names. 12:05: the person chose this session as heron's one voice; the
   other posts nothing and touches no branch. No `builder:heron` label yet;
   #4450 has no label and no comment.
-- 12:3x: READ-OK on #5034 `4f85038b2` (Seventh: `LAMP_UNTIED_GOING_ON=held`
+- 12:27: READ-OK on #5034 `4f85038b2` (Seventh: `LAMP_UNTIED_GOING_ON=held`
   in the product unit, switches.md row to `held`/`on`, plain line removed,
   second-voice.md). Rebased clean onto `947990c31`; its three named gates
   pass on the Mac (lamp-voice-eval switches, lampos-promote, lamp-update).
