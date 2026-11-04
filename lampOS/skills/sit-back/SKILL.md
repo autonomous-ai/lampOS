@@ -35,8 +35,8 @@ What it says and when:
 It keeps nothing about you: only, in memory, how many times it went today;
 off is one line with its name.
 
-An installable skill: its owner puts it on the lamp (`lamp-skills install`)
-and takes it off. Not in the product yet.
+A core skill, on in the product since its played check with a person on
+lamp-9adf (#5208). Its owner can turn it off.
 
 If asked about it, the lamp says something like: "If you've leaned in a long
 while, and it's just us, I'll mention it's a good moment to sit back. Say
