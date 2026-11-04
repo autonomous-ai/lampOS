@@ -1,10 +1,10 @@
 # Tests for markers.py, reads2.py and qholds.py: plain python3, no dependencies.
 # Run from .github/tools/coordination: python3 tests/test_markers.py
-import json, os, subprocess, sys, tempfile, unittest
+import json, os, shutil, subprocess, sys, tempfile, unittest
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
-from markers import read_markers, parse_marker, signer
+from markers import read_markers, parse_marker, signer, merge_reviews
 from reads2 import two_reads
 from qholds import standing
 
@@ -222,6 +222,118 @@ class QueueHold(unittest.TestCase):
     def test_a_queue_hold_from_a_non_writer_is_ignored(self):
         q = [c("stranger", "HOLD a13408fb8d", "2026-11-03T02:40:00Z")]
         self.assertEqual(standing("a13408fb8d" + "0" * 30, q, [], W), "")
+
+
+def r(login, body, t, state="COMMENTED"):
+    """A review as lib.sh fetches it: submitted_at as created_at."""
+    return {"login": login, "body": body, "created_at": t, "state": state}
+
+
+class Reviews(unittest.TestCase):
+    """4 Nov (#5212 part 1): reads posted as GitHub reviews count as comments do."""
+
+    def test_a_review_only_read_ok_counts(self):
+        items = merge_reviews([], [r("writer-a", "READ-OK " + HEAD + "\n\nEl, 14:10: privacy re-read", "2026-11-04T07:10:58Z")])
+        self.assertEqual(read_markers(items, W), "READ-OK " + HEAD)
+
+    def test_a_review_hold_after_a_comment_read_ok_holds(self):
+        cs = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 10:00", "2026-11-04T03:00:00Z")]
+        rs = [r("writer-b", "HOLD " + HEAD + "\n\nEl, 10:30: one P2", "2026-11-04T03:30:00Z")]
+        self.assertEqual(read_markers(merge_reviews(cs, rs), W), "HELD")
+
+    def test_a_comment_hold_after_a_review_read_ok_holds(self):
+        rs = [r("writer-b", "READ-OK " + HEAD + "\n\nEl, 10:00", "2026-11-04T03:00:00Z")]
+        cs = [c("writer-a", "HOLD " + HEAD + "\n\nSixth, 10:30: one P2", "2026-11-04T03:30:00Z")]
+        self.assertEqual(read_markers(merge_reviews(cs, rs), W), "HELD")
+
+    def test_an_earlier_review_hold_is_cleared_by_the_same_readers_later_comment_read_ok(self):
+        rs = [r("writer-b", "HOLD " + HEAD + "\n\nEl, 09:00: one P2", "2026-11-04T02:00:00Z")]
+        cs = [c("writer-b", "READ-OK " + HEAD + "\n\nEl, 10:00: fixed", "2026-11-04T03:00:00Z")]
+        self.assertEqual(read_markers(merge_reviews(cs, rs), W), "READ-OK " + HEAD)
+
+    def test_an_empty_approved_review_counts_for_nothing(self):
+        items = merge_reviews([], [r("writer-a", "", "2026-11-04T03:00:00Z", "APPROVED"), r("writer-a", "  \n", "2026-11-04T03:01:00Z", "APPROVED")])
+        self.assertEqual(items, [])
+        self.assertEqual(read_markers(items, W), "")
+
+    def test_a_pending_review_and_a_non_writers_review_count_for_nothing(self):
+        rs = [r("writer-a", "READ-OK " + HEAD, None, "PENDING"), r("stranger", "READ-OK " + HEAD, "2026-11-04T03:00:00Z")]
+        self.assertEqual(read_markers(merge_reviews([], rs), W), "")
+
+    def test_a_review_read_ok_is_one_of_two_reads(self):
+        items = [{"login": "", "body": "TWO READS", "pr_body": True}] + merge_reviews(
+            [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 10:00", "2026-11-04T03:00:00Z")],
+            [r("writer-b", "READ-OK " + HEAD + "\n\nEl, 11:00", "2026-11-04T04:00:00Z")])
+        self.assertEqual(two_reads(items, HEAD, W), "met 2")
+
+    def test_a_review_read_ok_lifts_its_readers_queue_hold(self):
+        q = [c("writer-b", "HOLD a13408fb8d\n\nEl, 09:40: lamp check pending", "2026-11-04T02:40:00Z")]
+        pr = merge_reviews([], [r("writer-b", "READ-OK a13408fb8d\n\nEl, 10:30: this clears my HOLD.", "2026-11-04T03:30:00Z")])
+        self.assertEqual(standing("a13408fb8d" + "0" * 30, q, pr, W), "")
+
+    def test_a_dismissed_reviews_read_ok_counts_for_nothing(self):
+        rs = [r("writer-a", "READ-OK " + HEAD + "\n\nEl, 10:00", "2026-11-04T03:00:00Z", "DISMISSED")]
+        self.assertEqual(merge_reviews([], rs), [])
+        self.assertEqual(read_markers(merge_reviews([], rs), W), "")
+
+    def test_a_review_does_not_shift_a_lifted_unsigned_comment_hold(self):
+        cs = [c("writer-b", "READ-OK " + HEAD + "\n\nFourth, 09:00", "2026-11-04T02:00:00Z"),
+              c("writer-a", "HOLD " + HEAD, "2026-11-04T03:00:00Z")]
+        rs = [r("writer-b", "El, 09:30: a note, no marker", "2026-11-04T02:30:00Z")]
+        with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False) as f:
+            f.write("1234\twriter-a/unsigned#1\te2b57f1f\thttps://example.invalid/1\n"); path = f.name
+        try:
+            self.assertEqual(read_markers(cs, W, pr="1234", lifted_path=path), "READ-OK " + HEAD)
+            items = merge_reviews(cs, rs)
+            self.assertTrue(items[1].get("review"))
+            self.assertEqual(read_markers(items, W, pr="1234", lifted_path=path), "READ-OK " + HEAD)
+        finally:
+            os.unlink(path)
+
+    def test_an_unsigned_review_hold_is_keyed_on_its_time(self):
+        rs = [r("writer-a", "HOLD " + HEAD, "2026-11-04T03:00:00Z")]
+        items = merge_reviews([c("writer-b", "READ-OK " + HEAD + "\n\nFourth, 09:00", "2026-11-04T02:00:00Z")], rs)
+        self.assertEqual(read_markers(items, W, pr="1234", lifted_path=os.devnull), "HELD")
+        with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False) as f:
+            f.write("1234\twriter-a/unsigned-review#2026-11-04T03:00:00Z\te2b57f1f\thttps://example.invalid/1\n"); path = f.name
+        try:
+            self.assertEqual(read_markers(items, W, pr="1234", lifted_path=path), "READ-OK " + HEAD)
+        finally:
+            os.unlink(path)
+
+    def test_an_unsigned_review_hold_lifts_on_its_accounts_read_ok_saying_so(self):
+        items = merge_reviews([c("writer-a", "READ-OK " + HEAD + "\n\nthis clears my HOLD", "2026-11-04T04:00:00Z")],
+                              [r("writer-a", "HOLD " + HEAD, "2026-11-04T03:00:00Z")])
+        self.assertEqual(read_markers(items, W), "READ-OK " + HEAD)
+
+    @unittest.skipUnless(shutil.which("zsh"), "needs zsh")
+    def test_lib_sh_merges_reviews_in_time_order_and_fails_closed(self):
+        """lib.sh's coord_pr_comments with a stub gh that prints what `--jq` would (comments, then reviews)."""
+        d = tempfile.mkdtemp()
+        try:
+            cm = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 10:00", "2026-11-04T03:00:00Z")]
+            rv = [r("writer-b", "HOLD " + HEAD + "\n\nEl, 10:30", "2026-11-04T03:30:00Z"), r("writer-a", "", "2026-11-04T03:40:00Z", "APPROVED")]
+            for name, rows in (("comments", cm), ("reviews", rv)):
+                with open(os.path.join(d, name), "w") as f:
+                    f.write("".join(json.dumps(x) + "\n" for x in rows))
+            gh = os.path.join(d, "gh")
+            with open(gh, "w") as f:
+                f.write('#!/bin/sh\ncase "$2" in\n*/comments*) cat "$STUB/comments";;\n'
+                        '*/reviews*) [ -n "$FAIL_REVIEWS" ] && exit 1; cat "$STUB/reviews";;\nesac\n')
+            os.chmod(gh, 0o755)
+            env = dict(os.environ, PATH=d + os.pathsep + os.environ["PATH"], STUB=d, TOOLS_DIR=HERE, SP=d, PYTHON=sys.executable)
+            out = os.path.join(d, "out")
+            cmd = ["zsh", "-c", 'source $TOOLS_DIR/lib.sh; coord_pr_comments 5080 "$1"', "x", out]
+            self.assertEqual(subprocess.run(cmd, env=env).returncode, 0)
+            with open(out) as f:
+                items = [json.loads(line) for line in f if line.strip()]
+            self.assertEqual([x["login"] for x in items], ["writer-a", "writer-b"])
+            self.assertEqual(read_markers(items, W), "HELD")
+            env["FAIL_REVIEWS"] = "1"
+            self.assertNotEqual(subprocess.run(cmd, env=env).returncode, 0)
+            self.assertFalse(os.path.exists(out))
+        finally:
+            shutil.rmtree(d)
 
 
 class HoldsLifted(unittest.TestCase):

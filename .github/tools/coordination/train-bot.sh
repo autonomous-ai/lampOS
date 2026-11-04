@@ -1,7 +1,7 @@
 #!/bin/zsh
 # train-bot.sh (23 Oct 07:5x, the owner: "merging is the TOP PRIORITY ... all PRs are merged instantly"): merge trains onto
 # lamp-voice, back to back, with nobody building them by hand.
-#   Eligible: an open, non-draft PR onto lamp-voice (not a train) whose comments hold a `READ-OK <sha>` line for its current
+#   Eligible: an open, non-draft PR onto lamp-voice (not a train) whose comments (or review bodies) hold a `READ-OK <sha>` line for its current
 #   head (or a head whose diff from its merge base is the same patch, i.e. a plain rebase), with no `HOLD` line after it.
 #   Each round: cherry-pick every eligible PR's own commits onto lamp-voice's head (one that conflicts is told to rebase and
 #   left out), push first/train-N, open its PR, wait for ARM64 and clippy, merge by rebase, then close each carried PR whose
@@ -53,7 +53,8 @@ eligible() {
   # A PR whose head is in another repository is never carried (coord_head checks it again).
   for p in $(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName,isCrossRepository --jq '.[]|select(.isDraft|not)|select(.isCrossRepository|not)|select(.headRefName|startswith("first/train-")|not)|.number'); do
     head=$(coord_head $p) || { once head$p "#$p left out: its head can't be read, or is in another repository"; continue; }
-    coord_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
+    # 4 Nov: with its reviews' bodies (#5212 part 1).
+    coord_pr_comments $p $cf || { once comments$p "#$p left out: its comments can't be fetched"; continue; }
     fine head$p; fine comments$p
     # 3 Nov 09:4x: a HOLD posted on the Queue (#4710) whose first line is `HOLD <sha>` holds the PR whose head starts with
     # that sha, until the same account posts a READ-OK on the PR, after it, saying the HOLD is lifted or cleared

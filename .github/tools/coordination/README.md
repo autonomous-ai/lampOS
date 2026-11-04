@@ -16,9 +16,9 @@ Each script keeps its dated comments. They are the history of each rule.
 | `behind-unrelated.sh TRAIN_HEAD [LAMP_VOICE]` | Used by `merge-when-green.sh --behind-unrelated`. Read-only. Prints `merge as is: ...` (exit 0) or `rebuild: <reason>` (exit 1); see "A green train behind lamp-voice" below. |
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
-| `markers.py [--writers FILE] [PR]` | Reads a PR's comments as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. |
-| `reads2.py [--writers FILE] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body and comments as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
-| `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
+| `markers.py [--writers FILE] [PR]` | Reads a PR's comments and review bodies as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. `markers.py --merge COMMENTS REVIEWS` merges the two fetches into one list in time order (`lib.sh`). |
+| `reads2.py [--writers FILE] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body, comments and review bodies as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
+| `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments and review bodies as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
 | `lib.sh` | Sourced by `train-bot.sh` and `still-eligible.sh`: the writers list and the fetches, each failing closed. |
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
 | `tests/test_behind_unrelated.py` | Tests for `behind-unrelated.sh` and `merge-when-green.sh --behind-unrelated`, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
@@ -69,7 +69,7 @@ State never lives in the repo. It lives in `$LAMP_COORD_STATE`:
   Its first line is `# fetched <epoch>`. It is fetched again when an hour old.
 - `writers-extra.txt`: logins the operator adds, one a line. Optional.
 - `writers-allowed.txt`: the two above together, the file the readers get.
-- `queue.jsonl`, `pr-comments.jsonl`, `pr-body.jsonl`: the bot's last fetches.
+- `queue.jsonl`, `pr-comments.jsonl` (comments and review bodies), `pr-body.jsonl`: the bot's last fetches.
 - `asks-last`: the time of `asks-for-me.sh`'s last run.
 - `labels.json`, `gen/`: `build-rows-pr.sh`'s work files.
 
@@ -135,7 +135,11 @@ The PR body's TWO READS ask (a line that asks it, below) always counts.
 If the collaborators can't be fetched and `writers.txt` is an hour old or more, no PR is eligible (fail closed).
 A PR whose head is in another repository is never carried.
 
-**Fetches fail closed.** If a PR's head, comments or body can't be fetched, that PR is not eligible.
+**Reviews read as comments.** A GitHub review's body counts exactly as a comment does: same writers, same marker rules,
+in time order with the comments (its submit time), so a later HOLD beats an earlier READ-OK whichever kind each is.
+A review's state (APPROVED, CHANGES_REQUESTED, ...) is never a read. A review with an empty body, not yet submitted, or dismissed counts for nothing.
+
+**Fetches fail closed.** If a PR's head, comments, reviews or body can't be fetched, that PR is not eligible.
 If the Queue (#4710) can't be fetched, no PR is eligible that round.
 `still-eligible.sh` rechecks the markers, the Queue HOLDs and TWO READS just before a train merges.
 
@@ -161,6 +165,8 @@ If the Queue (#4710) can't be fetched, no PR is eligible that round.
   ("HOLD lifted", "clears my HOLD", "lifts my 16:45 HOLD").
 - The bot's own `HOLD train N` clears on any writer's later READ-OK marker that names a commit. A quoted READ-OK does not clear it.
 - Any HOLD closed in words but never cleared by a READ-OK as above is lifted only by a row in `holds-lifted.tsv`.
+  A row's key is `<login>/<signed name, lowercase>`, `<login>/unsigned#<N>` (N counts the PR's comments from 0; reviews never count),
+  or `<login>/unsigned-review#<submitted_at>` for an unsigned HOLD posted as a review.
   Post the reader's closing comment on the PR when you add the row.
 
 **Queue HOLDs.** A Queue (#4710) comment of the last 3 days whose first line is `HOLD <sha>` holds the PR whose head starts with that sha.
