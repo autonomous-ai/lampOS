@@ -1317,6 +1317,64 @@ impl Thread {
         (in_talk, before)
     }
 
+    /// The conversation going on as `request` is heard, for
+    /// [`crate::opens_further`] (`LAMP_OPENS_FURTHER`): back from `now`, the
+    /// exchanges with the lamp's words, `request`'s own left out, each
+    /// within [`GOING_ON_FOR`] of the one after it (the newest of `now`);
+    /// a longer quiet ends it. Gives the end of what the lamp said in each,
+    /// oldest first, and how many people are in it: the known people (memory
+    /// ids) with an exchange in it, `speaker` (whom `request` was admitted
+    /// for, if anyone known) and each line admitted for someone known within
+    /// [`GOING_ON_FOR`] of `now` ([`Self::admitted`]); and, beside a known
+    /// one, the room's exchanges as one more, since two known people taking
+    /// turns are answered in the room's scope (Twelve's P2 on #5235). Unsure
+    /// counts more, so the door is left out.
+    pub fn conversation_so_far(
+        &self,
+        request: u64,
+        speaker: Option<&str>,
+        now: Instant,
+    ) -> (Vec<String>, usize) {
+        let mut said = Vec::new();
+        let mut people: Vec<&str> = speaker.into_iter().collect();
+        for (person, _) in self
+            .admitted
+            .iter()
+            .filter(|(_, at)| now.saturating_duration_since(*at) <= GOING_ON_FOR)
+        {
+            if !people.contains(&person.as_str()) {
+                people.push(person);
+            }
+        }
+        let mut room = false;
+        let mut after = now;
+        for exchange in self
+            .exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .filter(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+        {
+            if after.saturating_duration_since(exchange.at) > GOING_ON_FOR {
+                break;
+            }
+            after = exchange.at;
+            said.push(if exchange.tail.is_empty() {
+                exchange.lamp.clone()
+            } else {
+                exchange.tail.clone()
+            });
+            match exchange.whose.as_deref() {
+                Some(whose) if !people.contains(&whose) => people.push(whose),
+                Some(_) => {}
+                None => room = true,
+            }
+        }
+        said.reverse();
+        let room = usize::from(room && !people.is_empty());
+        (said, people.len() + room)
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR
@@ -3517,6 +3575,117 @@ mod tests {
         assert!(thread.switch_due(later), "B quiet two minutes: A's again");
         thread.opening(later);
         assert_eq!(thread.opened_for(), Some(a.as_str()));
+    }
+
+    /// The opening's note (`LAMP_OPENS_FURTHER`) for `request`'s line as the
+    /// thread counts the conversation it is heard in.
+    fn opening_for(
+        thread: &Thread,
+        request: u64,
+        speaker: Option<&str>,
+        now: Instant,
+    ) -> Result<String, &'static str> {
+        let (lamp_said, people) = thread.conversation_so_far(request, speaker, now);
+        crate::opens_further::note(&crate::opens_further::Moment {
+            heard: "I had such a long day at work.",
+            lamp_said: &lamp_said,
+            people,
+            ..crate::opens_further::Moment::default()
+        })
+    }
+
+    /// Twelve's P2 on #5235: B speaks just after A's exchange with the lamp.
+    /// B's own exchange is not kept until the lamp answers, so B counts as
+    /// the person B's line was admitted for, or as a line admitted for B.
+    #[test]
+    fn a_second_persons_line_after_anothers_exchange_gets_no_opening() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.person("How do I fix a squeaky door?", true, now);
+        thread.lamp_for(1, "A drop of oil on the hinge.", now, Some(&a));
+        let soon = now + Duration::from_secs(5);
+        assert_eq!(
+            opening_for(&thread, 2, Some(&b), soon),
+            Err("another person is in the conversation"),
+            "B's line, admitted for B"
+        );
+        thread.admitted(&b, soon);
+        assert_eq!(
+            opening_for(&thread, 2, None, soon),
+            Err("another person is in the conversation"),
+            "B's line admitted lately, its scope not read"
+        );
+    }
+
+    /// Two known people taking turns are answered in the room's scope, so
+    /// their exchanges are the room's: beside a known person they count as
+    /// another, and no line of either gets the note.
+    #[test]
+    fn two_people_taking_turns_get_no_opening() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        thread.admitted(&a, now);
+        thread.person("What's for dinner?", true, now);
+        thread.lamp_for(1, "Maybe pasta.", now, Some(&a));
+        let second = Duration::from_secs(1);
+        thread.admitted(&b, now + second);
+        thread.opening(now + second);
+        assert_eq!(thread.opened_for(), None, "the room's");
+        thread.person("I'd rather have soup.", true, now + second);
+        thread.lamp_for(2, "Soup works too.", now + second, None);
+        let next = now + second * 2;
+        thread.admitted(&a, next);
+        for speaker in [Some(a.as_str()), Some(b.as_str()), None] {
+            assert_eq!(
+                opening_for(&thread, 3, speaker, next),
+                Err("another person is in the conversation"),
+                "{speaker:?}"
+            );
+        }
+        // Without any line admitted (no scoped session): A's line after a
+        // room exchange still counts two.
+        let mut unscoped = Thread::new();
+        unscoped.lamp_for(1, "Maybe pasta.", now, Some(&a));
+        unscoped.lamp_for(2, "Soup works too.", now + second, None);
+        assert_eq!(
+            opening_for(&unscoped, 3, Some(&a), next),
+            Err("another person is in the conversation")
+        );
+    }
+
+    /// One person alone, known or not, still gets the note; a person who
+    /// spoke before the conversation went quiet no longer counts.
+    #[test]
+    fn one_person_alone_still_gets_the_opening() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.admitted(&a, now);
+        thread.person("What's for dinner?", true, now);
+        thread.lamp_for(1, "Maybe pasta.", now, Some(&a));
+        let soon = now + Duration::from_secs(5);
+        thread.admitted(&a, soon);
+        assert_eq!(thread.conversation_so_far(2, Some(&a), soon).1, 1);
+        assert!(opening_for(&thread, 2, Some(&a), soon).is_ok());
+        let mut room = Thread::new();
+        room.lamp_for(1, "Maybe pasta.", now, None);
+        assert_eq!(room.conversation_so_far(2, None, soon).1, 0);
+        assert!(opening_for(&room, 2, None, soon).is_ok());
+        // B spoke, then a quiet longer than the conversation's: A's new
+        // conversation is A's alone.
+        let mut earlier = Thread::new();
+        earlier.admitted(&b, now);
+        earlier.lamp_for(1, "Sure.", now, Some(&b));
+        let after = now + GOING_ON_FOR + Duration::from_secs(1);
+        earlier.admitted(&a, after);
+        assert!(opening_for(&earlier, 2, Some(&a), after).is_ok());
     }
 
     /// The reviewer-lead's P2 on #4479, and #4508 (carried lines may be

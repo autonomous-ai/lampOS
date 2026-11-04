@@ -1765,6 +1765,8 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
+        // An answer that may open the talk further (#5194).
+        crate::opens_further::ENVIRONMENT,
         crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
         crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
         // Read by the second worker, which tells the coordinator (#3026).
@@ -1941,6 +1943,7 @@ mod tests {
             crate::made_skill::ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
+            crate::opens_further::ENVIRONMENT,
             crate::second_provider::TURNED_SPEAKING_ENVIRONMENT,
             crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT,
             crate::unfinished_words::ENVIRONMENT,
@@ -2655,6 +2658,7 @@ mod tests {
                     || name == crate::made_skill::ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
+                    || name == crate::opens_further::ENVIRONMENT
                     || name == crate::second_provider::TURNED_SPEAKING_ENVIRONMENT
                     || name == crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT
                     || name == crate::unfinished_words::ENVIRONMENT
@@ -2826,6 +2830,7 @@ mod tests {
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
+                    "LAMP_OPENS_FURTHER=on",
                     "LAMP_OWNER_PLACE=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",

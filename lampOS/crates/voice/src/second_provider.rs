@@ -1375,6 +1375,8 @@ struct Shared {
     speech_tags: Option<bool>,
     /// [`Engine::answering_short`] (#2877).
     short_done: bool,
+    /// [`Engine::opening_further`] (#5194).
+    opens_further: bool,
     /// [`Engine::saying_checking`] (#4684).
     checking_line: bool,
     /// [`Engine::saying_at_once`] (#2135).
@@ -3275,6 +3277,7 @@ impl Engine {
                 declines_silent: false,
                 speech_tags: None,
                 short_done: false,
+                opens_further: false,
                 checking_line: false,
                 say_at_once: false,
                 action_claims: false,
@@ -4178,6 +4181,17 @@ impl Engine {
     pub fn answering_short(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.short_done = on;
+        }
+        self
+    }
+
+    /// `LAMP_OPENS_FURTHER=on` ([`crate::opens_further`], #5194): a spoken
+    /// line the gates let through is told [`crate::opens_further::NOTE`]
+    /// beside it, so its answer may end with one short opening. Before any
+    /// turn only.
+    pub fn opening_further(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.opens_further = on;
         }
         self
     }
@@ -8025,6 +8039,21 @@ async fn spoken(
                 .is_some_and(|scope| scope.person().is_some() && !scope.held())
         })
         .and_then(|(note, _)| note(request));
+    // `LAMP_OPENS_FURTHER` (#5194): its answer may end with one short
+    // opening, as a companion's does, when the gates let it. None without
+    // the switch.
+    let opens = opening_note(
+        &shared,
+        (request, &text, scope.as_ref()),
+        stopped.is_some(),
+        alone.is_some(),
+        !cut_in.is_empty()
+            || called.is_some()
+            || misheard.is_some()
+            || waiting.is_some()
+            || pushed.is_some(),
+        true,
+    );
     // Said by name: answer it; else it may not be for the lamp. The line let
     // out by a conversation alone has its own note for that.
     let call = alone
@@ -8058,6 +8087,7 @@ async fn spoken(
         // on a line they were seen saying; never in the room's scope (the
         // Reviewer-lead's P2s on #5053).
         .chain(crate::keep_quietly::note_for(scope.as_ref(), request))
+        .chain(opens)
         // Last, right before the person's words: an acknowledgement asked
         // among the other notes was said only once in two on lamp-06c1
         // (30 Oct, #3997's cut-in proposal).
@@ -9122,6 +9152,62 @@ async fn note_ready(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLe
     }
 }
 
+/// The note beside a spoken line that its answer may end with one short
+/// opening (`LAMP_OPENS_FURTHER`, #5194, [`crate::opens_further::note`]),
+/// or `None`: without the switch, or when a gate holds it. `scope`: whom the
+/// line was admitted for, counted among the conversation's people. `stopped`: the
+/// first line after a hand's stop (its words are read here too); `alone`:
+/// let out only as the conversation going on; `told_else`: told something
+/// else first. `journal`: say why on the final words, not on early ones,
+/// whose chat ([`prepared_on`]) is begun with the same note so the final
+/// words still fit it.
+fn opening_note(
+    shared: &Shared,
+    (request, text, scope): (u64, &str, Option<&crate::memory_scope::ScopeLease>),
+    stopped: bool,
+    alone: bool,
+    told_else: bool,
+    journal: bool,
+) -> Option<String> {
+    if !shared.opens_further {
+        return None;
+    }
+    // Whom this line was admitted for, counted beside the conversation's
+    // exchanges: their own is kept only once the lamp speaks.
+    let speaker = scope
+        .and_then(crate::memory_scope::ScopeLease::scope)
+        .and_then(|scope| scope.person());
+    let busy = shared.busy(request)
+        || crate::room_told::room()
+            .lock()
+            .is_ok_and(|mut room| room.at(monotonic_us()) == crate::room_told::Room::Busy);
+    let (lamp_said, people) = crate::thread::THREAD
+        .lock()
+        .map(|thread| thread.conversation_so_far(request, speaker, Instant::now()))
+        .unwrap_or_default();
+    let moment = crate::opens_further::Moment {
+        heard: text,
+        busy,
+        stopped: stopped || says_stop(text),
+        alone,
+        told_else,
+        lamp_said: &lamp_said,
+        people,
+    };
+    let note = crate::opens_further::note(&moment);
+    if journal {
+        match &note {
+            Ok(_) => eprintln!(
+                "lamp-voice second: request {request}: the model is told its answer may end with one short opening (LAMP_OPENS_FURTHER)"
+            ),
+            Err(why) => eprintln!(
+                "lamp-voice second: request {request}: no opening further: {why} (LAMP_OPENS_FURTHER)"
+            ),
+        }
+    }
+    note.ok()
+}
+
 /// What a turn's prepared chat is once `said` comes: begun on new early
 /// words, kept on the same, dropped when the person went on.
 fn prepared_on(
@@ -9171,11 +9257,22 @@ fn prepared_on(
                 .as_ref()
                 .filter(|_| !held_by_gap(scope))
                 .and_then(|note| note(request, &words, scope));
+            // The opening's note as the final words will be told it, so a
+            // chat begun here still fits them (`LAMP_OPENS_FURTHER`).
+            let opens = opening_note(
+                shared,
+                (request, &words, scope),
+                false,
+                false,
+                !notes.is_empty(),
+                false,
+            );
             // Its notes as round 1 tells them: the quiet note
-            // (`LAMP_KEEP_QUIETLY`) before the cut-in's.
+            // (`LAMP_KEEP_QUIETLY`) before the cut-in's, the opening last.
             let notes: Vec<String> = crate::keep_quietly::note_for(scope, request)
                 .into_iter()
                 .chain(notes.iter().cloned())
+                .chain(opens)
                 .collect();
             Some(Prepared::begin(shared, scope, words, &notes, remembered))
         }
