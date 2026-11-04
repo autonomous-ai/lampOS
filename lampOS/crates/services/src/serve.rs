@@ -2001,6 +2001,38 @@ mod tests {
         sent_through_the_api(&services.http.calls()[before..], "planted-gmail-4710");
     }
 
+    /// With both Gmail links, each name reaches its own: the other is
+    /// stood in only for a name with no link (the second read of #5279).
+    #[test]
+    fn with_both_gmail_links_each_name_reaches_its_own() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        run(services.admin(&oauth_gmail("planted-gmail-4710")));
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        for (code, token, name) in [
+            ("gmail", "planted-gmail-4710", "Gmail"),
+            ("gmail-app", "planted-app-4710", "Gmail with Google sign-in"),
+        ] {
+            let before = services.http.calls().len();
+            let answer = run(services.tool(&mail_ask(code)));
+            assert_eq!(answer["ok"], true, "{code}: {answer}");
+            let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+            let sent = run(services.tool(&mail_send(code, &id)));
+            assert_eq!(
+                sent["result"],
+                json!({"sent":true,"service":name}),
+                "{code}: {sent}"
+            );
+            sent_through_the_api(&services.http.calls()[before..], token);
+        }
+        // A read named `gmail` reads the Gmail link, not the send-only one.
+        let answer = run(services.tool(&read_line(json!({"service":"gmail","what":"recent"}))));
+        assert_ne!(answer["error"], reads::GMAIL_APP_NO_READS, "{answer}");
+    }
+
     #[test]
     fn a_read_named_gmail_with_a_send_only_link_says_it_only_sends() {
         let dir = tempfile::tempdir().unwrap();
