@@ -1127,7 +1127,14 @@ is Backend3's.
    lowercase hex of the file's SHA-256) with no file inline, as V1's privacy
    kinds and `connector.set`. `lamp-cloud` answers `starting` at once, which
    keeps the file on the backend, and does the rest on a thread of its own;
-   one fetch at a time ("a skill from a file is still being added").
+   one fetch at a time. The kind comes from the file's SHA-256, so a second
+   upload only touches the first when it is the same file: the same kind
+   again while it is in flight (fetched, checked, waiting for the yes, or
+   its result not yet acked by the broker) is answered `starting` again and
+   joins it, and one result settles both. It is never answered `BUSY`,
+   which would make the backend delete the one copy the first is still
+   fetching. A different file while one is fetched is `failure`, "a skill
+   from a file is still being added", and loses only its own copy.
 2. **The message.** `GET <base>/devices/get-message?kind=skills.upload.<upload_id>`,
    `<base>` the account's `llm_base_url` with a trailing `/v1` cut off (as
    the ping's), with `authorization: Bearer` and the lamp's key and
@@ -1166,6 +1173,22 @@ is Backend3's.
 7. **The result** goes to the app as the kind's second reply, on the
    broker's own loop while online, and is said again if the connection
    drops before the broker's ack: the backend deletes the file on either.
+   Once acked, the upload is no longer in flight (`Uploads::acked`).
+
+**Across a restart.** What is in flight is kept in `uploads.json` in
+`lamp-cloud`'s state folder (`STATE_DIRECTORY`, `/var/lib/lampos-cloud`;
+0600, written whole as its other state, removed when nothing is in flight):
+for each upload only `upload_id`, `kind`, `sha256` (the kept skill's, as
+`lamp-voice` told it; `null` before) and `state` (`fetching` or `asking`),
+never the file's words or the skill's name. At start
+(`Uploads::resume`), one `fetching` is fetched again (the backend still
+holds the file, as no result was acked) and one `asking` is settled again
+by `{"added": {"sha256"}}`, so the app still hears `success` or `failure`
+after a restart. A resumed `success` carries `{"state": "on", "upload_id",
+"added": "file", "uploaded": true, "sha256"}` only, the rest being
+`lamp-voice`'s (`skills.list` has it). A record that doesn't read as one
+`lamp-cloud` wrote is dropped. The backend drops a file nobody claims within
+a day by itself.
 
 The journal says the bytes taken, kept or not and why not, and whether a
 yes put it on, never the file's words or its name (`upload::tests`).
@@ -1174,7 +1197,10 @@ Tests: `upload::tests` (the switch and the kind's id; a bare SKILL.md taken
 from the message with the key and `success` only once on; left off or
 never asked a failure; a package's refusal; a SHA-256, size, id or format
 that doesn't match; too big; a Store-signed package; `run.py` and other
-files; a taken name; its result kept for the app), and
+files; a taken name; its result kept for the app; the same upload again
+joining the one in flight, another file `BUSY`; a restart while asking and
+while fetching still telling the app; the state file never naming the skill
+or holding its words, 0600), and
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`.
 
 ## Health and crash reports (#1683, step 1)
