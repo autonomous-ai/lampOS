@@ -23,6 +23,7 @@
         "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
       ],
       "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "60cc25ee4b6fd8795b9f5e27c5b649201ed5c209355bcd50fda9484254ee19b1",
         "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
@@ -41,11 +42,18 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
+        "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
         "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.service": [
+        "4ccc67618d98468fbadbb06ee5a673d63d15e48adf4a71a28edf9f24af18eec5"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.timer": [
+        "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
       ]
     },
     "pro": {
@@ -75,6 +83,7 @@
         "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
       ],
       "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "60cc25ee4b6fd8795b9f5e27c5b649201ed5c209355bcd50fda9484254ee19b1",
         "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
@@ -95,11 +104,18 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
+        "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
         "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.service": [
+        "4ccc67618d98468fbadbb06ee5a673d63d15e48adf4a71a28edf9f24af18eec5"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.timer": [
+        "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
       ]
     },
     "pro-respeaker-lite": {
@@ -129,6 +145,7 @@
         "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
       ],
       "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "60cc25ee4b6fd8795b9f5e27c5b649201ed5c209355bcd50fda9484254ee19b1",
         "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
@@ -151,11 +168,18 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
+        "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
         "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.service": [
+        "4ccc67618d98468fbadbb06ee5a673d63d15e48adf4a71a28edf9f24af18eec5"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.timer": [
+        "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
       ]
     },
     "pro-xvf3800": {
@@ -181,6 +205,7 @@
         "ed111387c31b7a291348b0f81e40299ebf562eb812f57228eed07692d4ecfaf2"
       ],
       "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf": [
+        "60cc25ee4b6fd8795b9f5e27c5b649201ed5c209355bcd50fda9484254ee19b1",
         "81b29cf03d6b8b48312c779626314b3c6a50edc591ca70c16023b9ce36656f08"
       ],
       "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
@@ -199,11 +224,18 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
+        "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
         "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.service": [
+        "4ccc67618d98468fbadbb06ee5a673d63d15e48adf4a71a28edf9f24af18eec5"
+      ],
+      "/etc/systemd/system/lamp-journal-setup.timer": [
+        "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
       ]
     }
   }
