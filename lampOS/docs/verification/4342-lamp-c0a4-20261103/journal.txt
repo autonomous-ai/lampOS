@@ -180,3 +180,52 @@ Nov 03 18:00:00.137002 <lamp> systemd[1]: Stopping lamp-voice.service - lampOS v
 Nov 03 18:00:00.429131 <lamp> systemd[1]: Stopped lamp-voice.service - lampOS voice (lamp-voice serve).
 Nov 03 18:00:00.460346 <lamp> systemd[1]: Started lamp-voice.service - lampOS voice (lamp-voice serve).
 Nov 03 18:00:01.240682 <lamp> lamp-voice[673333]: {"seconds":null,"status":"listening_ready"}
+Nov 04 09:20:20.624477 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 04 09:20:20.657673 <lamp> systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 04 09:20:20.673065 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 04 09:20:20.723478 <lamp> lamp-tasks[788872]: tasks: 1 computer names
+Nov 04 09:20:22.035583 <lamp> lamp-tasks[788872]: tasks: Harness signed in: yes
+Nov 04 09:20:22.718179 <lamp> systemd[1]: Stopping lamp-voice.service - lampOS voice (lamp-voice serve)...
+Nov 04 09:20:22.884908 <lamp> systemd[1]: Stopped lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 04 09:20:22.926956 <lamp> systemd[1]: Started lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 04 09:20:23.738775 <lamp> lamp-voice[788907]: {"seconds":null,"status":"listening_ready"}
+Nov 04 09:20:24.161333 <lamp> lamp-tasks[788872]: tasks: the targets file was not written from the machines; it is left as it is
+Nov 04 09:22:12.006388 <lamp> lamp-tasks[788872]: tasks: lamp-346d4185d99730f21952fd4075fabf9e: dispatch accepted (exit 0, 9.7 s)
+Nov 04 09:22:29.483682 <lamp> lamp-tasks[788872]: tasks: wait on 5d53993e1d92768ba6c710bebe4f709f came back after 17418 ms: task 33 idle
+Nov 04 09:37:22.803162 <lamp> lamp-voice[788907]: lamp-voice second: request 1 heard 0 words, the last 1031 ms after the line ended
+Nov 04 09:40:23.128104 <lamp> lamp-voice[788907]: lamp-voice second: request 2 heard 5 words, the last 206 ms after the line ended
+Nov 04 09:40:24.132424 <lamp> lamp-voice[788907]: lamp-voice: no skill asked for the news due within 10 s: said by the voice
+Nov 04 09:40:24.132424 <lamp> lamp-voice[788907]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:33:39)
+Nov 04 09:40:25.505593 <lamp> lamp-voice[788907]: lamp-voice second: request 3 first answer audio 1369 ms after the words were heard
+Nov 04 09:40:29.587818 <lamp> lamp-voice[788907]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:33:39) was cut short (user_interrupted): its harness stays open
+Nov 04 09:40:29.589841 <lamp> lamp-voice[788907]: lamp-voice second: request 3: 6 of its answer's 18 words were played, 3340 ms of it, before it was cut; request 4 is asked with only those as the lamp's
+Nov 04 09:40:29.589841 <lamp> lamp-voice[788907]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:33:39) was not heard whole: told once more at the next quiet pause
+Nov 04 09:40:30.244456 <lamp> lamp-voice[788907]: lamp-voice second: request 4 heard 2 words, the last 265 ms after the line ended
+Nov 04 09:40:30.246506 <lamp> lamp-voice[788907]: lamp-voice second: request 4: its answer is played: the first thing said after the lamp's own news
+Nov 04 09:40:30.246506 <lamp> lamp-voice[788907]: lamp-voice second: request 4 first answer audio 0 ms after the words were heard: its fixed line, rendered ahead (LAMP_SPOKEN_STOP_ENDS)
+Nov 04 09:40:47.032127 <lamp> lamp-voice[788907]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:33:39)
+Nov 04 09:40:48.654363 <lamp> lamp-voice[788907]: lamp-voice second: request 5 first answer audio 1618 ms after the words were heard
+Nov 04 09:41:07.252815 <lamp> lamp-tasks[788872]: tasks: closing task 33's harness: try 1: Closed
+Nov 04 09:41:15.419812 <lamp> lamp-tasks[788872]: tasks: lamp-9021a3ee570202320193b40212075ff1: dispatch accepted (exit 0, 7.4 s)
+Nov 04 09:41:32.238593 <lamp> lamp-tasks[788872]: tasks: wait on 5d53993e1d92768ba6c710bebe4f709f came back after 16724 ms: task 34 idle
+Nov 04 09:41:35.877046 <lamp> lamp-voice[788907]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:34:40)
+Nov 04 09:41:37.475475 <lamp> lamp-voice[788907]: lamp-voice second: request 6 first answer audio 1594 ms after the words were heard
+Nov 04 09:41:40.131369 <lamp> lamp-voice[788907]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:34:40) was cut short (user_interrupted): its harness stays open
+Nov 04 09:41:40.133420 <lamp> lamp-voice[788907]: lamp-voice: the news (6d74ef230f2ab9da82d8394f16435675:34:40) was not heard whole: told once more at the next quiet pause
+Nov 04 09:41:40.133926 <lamp> lamp-voice[788907]: lamp-voice second: request 6: 3 of its answer's 16 words were played, 2000 ms of it, before it was cut; request 7 is asked with only those as the lamp's
+Nov 04 09:41:40.927032 <lamp> lamp-voice[788907]: lamp-voice second: request 7 heard 5 words, the last 392 ms after the line ended
+Nov 04 09:41:40.927032 <lamp> lamp-voice[788907]: lamp-voice second: request 7: its answer is played: the first thing said after the lamp's own news
+Nov 04 09:41:42.392630 <lamp> lamp-voice[788907]: lamp-voice second: request 7 first answer audio 1464 ms after the words were heard
+Nov 04 09:41:58.136337 <lamp> lamp-voice[788907]: lamp-voice: telling news from the work handed over (6d74ef230f2ab9da82d8394f16435675:34:40)
+Nov 04 09:41:59.677737 <lamp> lamp-voice[788907]: lamp-voice second: request 8 first answer audio 1537 ms after the words were heard
+Nov 04 09:42:17.792770 <lamp> lamp-tasks[788872]: tasks: closing task 34's harness: try 1: Closed
+Nov 04 09:43:06.004176 <lamp> systemd[1]: Stopping lamp-tasks.service - lampOS tasks (lamp-tasks serve)...
+Nov 04 09:43:06.029934 <lamp> systemd[1]: Stopped lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 04 09:43:06.054160 <lamp> systemd[1]: Started lamp-tasks.service - lampOS tasks (lamp-tasks serve).
+Nov 04 09:43:06.090700 <lamp> lamp-tasks[794493]: tasks: 1 computer names
+Nov 04 09:43:07.344420 <lamp> lamp-tasks[794493]: tasks: Harness signed in: yes
+Nov 04 09:43:08.105503 <lamp> systemd[1]: Stopping lamp-voice.service - lampOS voice (lamp-voice serve)...
+Nov 04 09:43:08.273452 <lamp> systemd[1]: Stopped lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 04 09:43:08.315580 <lamp> systemd[1]: Started lamp-voice.service - lampOS voice (lamp-voice serve).
+Nov 04 09:43:09.229927 <lamp> lamp-voice[794530]: {"seconds":null,"status":"listening_ready"}
+Nov 04 09:43:09.618749 <lamp> lamp-tasks[794493]: tasks: the targets file was not written from the machines; it is left as it is

@@ -104,16 +104,12 @@ The yes ("Hey Lamp, yes, please send that task to Claude Code.") got
 `confirm_agent_task` on both tries where the start had been called and the
 service answered.
 
-## Not verified (provider outage)
+## Not verified
 
-- **Planned cut-short retell** (`cut short (user_interrupted)`, then a
-  retell at the next quiet pause): the over-talk was not heard as a line,
-  and the s3 retries were capped at three rounds, 10 min apart, because of
-  the outage.
-- **Hand-over right after a news: confirm → dispatch accepted** (#5060
-  measure, with a close in flight): not run, since it depended on the retell
-  above. This binary has the 10 s close read, not #5060's 45 s.
 - **Needs-input line said once:** not shown (optional).
+- On 3 November the planned cut-short retell and the hand-over right after
+  a news were not shown because of the provider outage. Both were shown on
+  4 November (below).
 
 ## Restore
 
@@ -128,3 +124,126 @@ too), both active, NRestarts 0, `listening_ready` 18:00:01.24; drop-ins
 - [journal.txt](journal.txt): lamp-voice + lamp-tasks lines from both
   attempts, filtered to tool calls, words heard, dispatch, news, retell,
   close, service errors and start lines; the host name replaced by `<lamp>`.
+
+## 4 November: planned cut-short retell and hand-over after a news
+
+Run on lamp-c0a4 from 09:20 to 09:43 (lamp time), with a synthetic voice
+played from the Mac as the person. Cloud stayed on and no volume was changed
+(the lamp Speaker stayed at 40%). The chat service answered throughout.
+
+### Build
+
+A local Docker ARM64 build (not CI) of `e9601f4111`, PR #5118's first commit.
+The PR's head, `542cc3503b`, changes only `tasks_now` path stripping and
+docs, so the retell code is the same. The build has the 45 s close read
+(`CLOSE_READ_TIMEOUT`).
+
+| Binary | SHA-256 |
+|---|---|
+| lamp-voice | `5ae45f4ef69b3993e2527bb960a8f33fae3cf37ff3409b3563d0275cfed87ede` |
+| lamp-tasks | `2495c43661c06fb41fd4a4e516df649fad4f6ebaab7f5eb01d3f5ffef7fd06f2` |
+| lamp-turn-end | `2fae7df06df3ab3fbf55510b866240073b6230ac22b51a64c49f68895b82f5b1` |
+
+### Install
+
+The install matched 3 November: the same `<test>` folders, the same model
+and runtime copies, and one drop-in per unit. The voice drop-in sets
+`LAMP_TASKS_NOW=on` and `LAMP_TASK_NEWS_RETELL=on`. The tasks drop-in keeps
+today's product flags, which now include `--set-up-later
+--targets-from-machines claude`.
+
+- **Before:** lamp-tasks `4c7a3c6f…`, lamp-voice `7973f309…` (every worker
+  and `lamp-turn-end`), both active, NRestarts 0. Drop-ins:
+  `exit-note.conf` only. `targets.json` `43ddde40…` (one target, `office`).
+- **Installed at 09:20:22:** both units active, NRestarts 0. Every voice
+  process ran from `<test>`, worker `second` had `--tasks-now`, and
+  `listening_ready` came at 09:20:23.74.
+
+### Steps
+
+Each ask was handed over through the sockets, not by voice: `prepare` on
+`request.sock`, then `confirm` on `voice.sock`, as `lampos`. The ask was
+"Reply with the single word done. Do not change any files.", sent to the
+`office` target.
+
+1. **News waits for someone there.** Task 33 was confirmed at 09:22:02 and
+   dispatch was accepted at 09:22:12 (`exit 0, 9.7 s`). The task was idle at
+   09:22:29, but its news was not told for 18 min. The lamp has no eyes that
+   say someone is there (no `/run/lampos-eyes/present`), and a socket
+   hand-over says nothing. So the news waited for "something said within
+   120 s" (`HEARD_WITHIN_US`), as designed.
+2. To give it that, a line not addressed to the lamp ("Okay, let me check
+   something.") was played at 09:40:19. The news was told 5 s later.
+3. **"Hey Lamp, stop."** was played about 0.7 s after the news's first
+   answer audio.
+4. Then the Mac stayed quiet.
+
+### A. Planned cut-short retell: shown on the first try
+
+| Event (task 33) | At |
+|---|---|
+| line heard (request 2, 5 words) | 09:40:23.13 |
+| news told: "no skill asked … said by the voice", then "telling news" (request 3) | 09:40:24.13 |
+| first answer audio of the news (1,369 ms) | 09:40:25.51 |
+| "Hey Lamp, stop." played | 09:40:26–:29 |
+| `was cut short (user_interrupted): its harness stays open`; 6 of 18 words played (3,340 ms) | 09:40:29.59 |
+| `was not heard whole: told once more at the next quiet pause` | 09:40:29.59 |
+| stop heard as a line (request 4, 2 words); its fixed line played (`LAMP_SPOKEN_STOP_ENDS`) | 09:40:30.25 |
+| news told again (request 5) | 09:40:47.03 (17.4 s after the cut, about 15 s after the stop line ended) |
+| first answer audio of the retell (1,618 ms) | 09:40:48.65 |
+| retell heard whole; `closing task 33's harness: try 1: Closed` | 09:41:07.25 |
+
+**Unplanned second case (task 34).** It was told 3 s after it went idle,
+because the stop had been heard within 120 s. The next "Okay, let me check
+something." landed on it and cut it short.
+
+| Event (task 34) | At |
+|---|---|
+| news told (request 6) | 09:41:35.88 |
+| cut short (`user_interrupted`) after 3 of 16 words (2,000 ms) | 09:41:40.13 |
+| told once more at the next quiet pause | 09:41:40.13 |
+| line heard (request 7) and answered as "the first thing said after the lamp's own news" | 09:41:40.93 |
+| news told again (request 8) | 09:41:58.14 |
+| `closing task 34's harness: try 1: Closed` | 09:42:17.79 |
+
+Each news was retold once, heard whole, and its harness closed. No
+`retold` line and no "not heard whole twice" line appeared (C).
+
+### B. Hand-over right after a news (#5060 measure)
+
+The hand-over for task 34 started as soon as the retold news of task 33 was
+over (3 s with no lamp-voice line, 09:40:54). At that point the close of
+task 33 had not yet logged.
+
+| Event | At |
+|---|---|
+| retold news of task 33 told | 09:40:47.03 |
+| hand-over started (ssh + `prepare`) | 09:40:54 |
+| `confirm` answered `ok` (31 ms) | 09:41:07 |
+| `closing task 33's harness: try 1: Closed` | 09:41:07.25 |
+| `dispatch accepted (exit 0, 7.4 s)` for task 34 | 09:41:15.42 (8.4 s after the confirm) |
+| task 34 idle | 09:41:32.24 |
+
+The close that was in flight still logged `Closed` on its first try, and the
+hand-over made during it was accepted.
+
+The 13 s from the start of the hand-over to the confirm was not split
+further. It includes the ssh from the Mac and the `prepare` step, and it
+ends within the same second as the close.
+
+### Restore
+
+At 09:43:06 both drop-ins were removed, systemd was reloaded, and both units
+were restarted. The `<test>` folders were removed.
+
+- lamp-tasks: `4c7a3c6f…` (`/opt/lampOS/tasks/4c7a3c6f…/lamp-tasks`).
+- lamp-voice: `7973f309…`, as were every worker and `lamp-turn-end`.
+- Both active, NRestarts 0, `listening_ready` at 09:43:09.23.
+- Drop-ins: `exit-note.conf` only. `targets.json` unchanged (`43ddde40…`).
+
+Every harness opened in this run (tasks 33 and 34) was closed by lamp-tasks.
+None is left open.
+
+The 4 November lines are appended to [journal.txt](journal.txt). They are
+filtered to dispatch, idle, news, cut-short, retell, close, words heard,
+first audio and start lines, with the host name replaced by `<lamp>`.
