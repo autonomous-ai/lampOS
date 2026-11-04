@@ -617,7 +617,9 @@ only reads …").
   "send" is the one that asked for it. Say it was not sent." Dấu giọng chỉ
   được làm từ một câu có từ 1.5 s lời nói trở lên bắt đầu khi đèn im lặng
   (`same_voice::LEAST_SAMPLES`), nên một câu "send" trơn thường không có: khi
-  đó lần ghi được giữ (2 phút và 30 s của nó vẫn chạy) và mô hình được báo
+  đó lần ghi được giữ (2 phút của nó vẫn chạy, còn 30 s được tính lại từ
+  lúc đèn hỏi lại, vì cùng câu "send" đầu tiên việc này đã quá 30 s kể từ lúc
+  đọc lại trên lamp-9adf) và mô hình được báo
   `NO_PRINT_YET`, "Not sent yet: I couldn't hear whose voice that was.", với
   bước tiếp theo "Ask them, in the conversation's language, to say "go ahead
   and send it" (in Vietnamese "ừ, gửi đi giúp tôi"), and nothing else. …".
