@@ -3008,6 +3008,9 @@ struct Marks {
     /// Begun while onboarding waits for a call (#3504): only the lamp's
     /// name is the step's call, not a turn ([`ProviderInput::StepCall`]).
     step_call: AtomicBool,
+    /// A cut-in's stop phrase, heard by the stop words while its commit
+    /// waited for them ([`ProviderInput::StopWords`], #5076).
+    stop_words: Mutex<Option<String>>,
     /// The line before it in this session and how long after that one's
     /// end this one began, when none of that one's words or sound began
     /// this one already ([`Engine::joining_cut_words`]). When its sound or
@@ -5135,6 +5138,7 @@ impl Engine {
                     privacy: privacy_generation,
                     count_only: AtomicBool::new(false),
                     step_call: AtomicBool::new(false),
+                    stop_words: Mutex::new(None),
                     after_end: link,
                     folded,
                     over_the_lamps_voice,
@@ -5331,6 +5335,18 @@ impl Engine {
                     eprintln!(
                         "lamp-voice second: request {request}: ended by a confident verdict: its answer's first sound waits {kept_ms} ms more, for the line to go on (LAMP_ENDPOINT_PAUSE_JOIN)"
                     );
+                }
+            }
+            // A cut-in committed before its yield's words came, and they
+            // came a stop phrase (`LAMP_STOP_WORDS_COMMIT_WAITS`, #5076):
+            // read by the turn's task once its own words are in, before its
+            // End, which the coordinator held for them.
+            ProviderInput::StopWords { request, words, .. } => {
+                if self.shared.spoken_stop_ends
+                    && let Some(turn) = self.turn.as_ref().filter(|turn| turn.request == request)
+                    && let Ok(mut stop_words) = turn.marks.stop_words.lock()
+                {
+                    *stop_words = Some(words);
                 }
             }
             // The line has gone quiet for a moment: its words so far are
@@ -6581,6 +6597,28 @@ async fn spoken(
                 words.split_whitespace().count()
             );
             words.to_owned()
+        }
+        _ => text,
+    };
+    // A cut-in committed before its yield's words came, whose words then
+    // came a stop phrase while the commit waited for them (#5076, lamp-52e6
+    // on 4 Nov: "Stop, Lamp." over a story, its own words back empty or
+    // "Start land."): the stop it was (`LAMP_STOP_WORDS_COMMIT_WAITS`).
+    let text = match marks
+        .stop_words
+        .lock()
+        .ok()
+        .and_then(|mut words| words.take())
+    {
+        Some(words)
+            if !crate::spoken_stop::is_stop_request(&text)
+                && crate::spoken_stop::is_stop_request(&words) =>
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: its {} words were no stop, but its yield's words were: taken as said (LAMP_STOP_WORDS_COMMIT_WAITS)",
+                text.split_whitespace().count()
+            );
+            words
         }
         _ => text,
     };

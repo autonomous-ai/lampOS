@@ -187,6 +187,11 @@ impl Gate {
                 privacy_generation,
                 ..
             }
+            | ProviderInput::StopWords {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::CountOnly {
                 request,
                 privacy_generation,

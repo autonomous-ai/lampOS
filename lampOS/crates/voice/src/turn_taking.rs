@@ -636,6 +636,13 @@ impl PlaybackMask {
     pub fn still_blocks(&self) -> Option<u8> {
         self.duplex.as_ref()?.interruption.still_blocks()
     }
+    /// Whether the latest yield was settled by a commit, for its words'
+    /// listener (`LAMP_STOP_WORDS_COMMIT_WAITS`, #5076).
+    pub fn last_yield_committed(&self) -> bool {
+        self.duplex
+            .as_ref()
+            .is_some_and(|duplex| matches!(duplex.last_yield, Some((_, Yielded::Committed))))
+    }
     /// Whether a yield is in force, by what was heard alone.
     pub fn yield_in_force(&self) -> bool {
         self.duplex
@@ -2479,7 +2486,7 @@ mod tests {
                     Tell::Words {
                         stop, backchannel, ..
                     } => mask.words(stop, backchannel),
-                    Tell::Nothing | Tell::Unheard => {}
+                    Tell::Nothing | Tell::Unheard | Tell::Waited { .. } => {}
                 }
                 sequence += 1;
                 (step, words.spoken_stop() || step == Step::Commit)
