@@ -339,17 +339,20 @@ mod tests {
             .find(|(name, _)| *name == "lamp-addons.service")
             .unwrap();
         assert!(!switches(addons).iter().any(|name| name == "LAMP_ADDONS"));
-        // Linked services (Queue #4710): on in all three units, writes in
-        // lamp-services' own; the unit passes no `--enable`, so a drop-in's
-        // `LAMP_SERVICES=off` still stops it.
+        // Linked services (Queue #4710): on for reads in all three units,
+        // writes left to a drop-in; the unit passes no `--enable`, so a
+        // drop-in's `LAMP_SERVICES=off` still stops it.
         let (_, services) = crate::install::PRODUCT
             .iter()
             .find(|(name, _)| *name == "lamp-services.service")
             .unwrap();
         let services_switches = switches(services);
-        for name in ["LAMP_SERVICES", "LAMP_SERVICES_WRITE"] {
-            assert!(services_switches.iter().any(|on| on == name), "{name}");
-        }
+        assert!(services_switches.iter().any(|name| name == "LAMP_SERVICES"));
+        assert!(
+            !services_switches
+                .iter()
+                .any(|name| name == "LAMP_SERVICES_WRITE")
+        );
         for unit in ["lamp-cloud.service", "lamp-voice.service"] {
             let (_, text) = crate::install::PRODUCT
                 .iter()

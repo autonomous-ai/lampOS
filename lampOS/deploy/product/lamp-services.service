@@ -5,11 +5,11 @@
 # (lamp-cloud.service: set, remove, wipe, list) and tools/ with tools.json and call.sock
 # (lamp-voice.service: services_connected, service_read, service_write). Not socket-activated like
 # lamp-setup-keys: a write waits here, in memory, for its spoken "send" (2 min, once).
-# Writes with LAMP_SERVICES_WRITE=on (below). A token is never journalled.
-# The product unit (lampOS/docs/install.md). On, with the same LAMP_SERVICES line in lamp-cloud.service
+# Reads only unless LAMP_SERVICES_WRITE=on (a drop-in). A token is never journalled.
+# The product unit (lampOS/docs/install.md). On for reads, with the same line in lamp-cloud.service
 # and lamp-voice.service: read on lamp-9adf on build 9928's own binaries on 4 Nov (Google Calendar, by
 # voice, the owner's face seen saying it). A drop-in setting LAMP_SERVICES=off turns it off: then it
-# exits at once with no socket opened, and stays inactive; LAMP_SERVICES_WRITE=off leaves reads only.
+# exits at once with no socket opened, and stays inactive.
 [Unit]
 Description=lampOS linked services (lamp-services)
 PartOf=lampos.target
@@ -35,11 +35,9 @@ UMask=0077
 # through the backend (POST <base>/connector/refresh-token), nothing else. Missing: no refresh.
 LoadCredential=account:/etc/lampOS/setup/backend.json
 LoadCredential=key:/etc/lampOS/voice/credential
-# Reads and writes on (the header). A write is prepared, read back in full and sent only on the owner's
-# own spoken "send" within 2 min (services.md); on lamp-9adf on 3-4 Nov a calendar write was prepared, read
-# back and bound to its "send", and the send itself is not yet seen through on a lamp.
+# Reads on (the header). Writes stay off: a "send" needs a voice print, and the product sets no
+# LAMP_SAME_VOICE_MODEL, so on lamp-9adf on 4 Nov every send was refused for its voice (services.md).
 Environment=LAMP_SERVICES=on
-Environment=LAMP_SERVICES_WRITE=on
 ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
 Restart=on-failure
 RestartSec=5s

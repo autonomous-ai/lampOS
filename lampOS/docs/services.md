@@ -104,11 +104,12 @@ unless `LAMP_SERVICES=on` is in its environment (or it is started with
 `--enable`, which its unit does not pass): off, it says one line and exits 0
 at once, so the unit stays inactive and is not restarted. The product's three
 units, `lamp-services.service`, `lamp-cloud.service` and
-`lamp-voice.service`, each set `LAMP_SERVICES=on` (read on lamp-9adf on
-build 9928's own binaries on 4 Nov), and `lamp-services.service` also sets
-`LAMP_SERVICES_WRITE=on`. A drop-in setting `LAMP_SERVICES=off` turns them
-off, and one setting `LAMP_SERVICES_WRITE=off` on `lamp-services.service`
-leaves reads only ([switches.md](switches.md)). A lamp updated by a `lamp-update` older than
+`lamp-voice.service`, each set `LAMP_SERVICES=on`, for reads only: read on
+lamp-9adf on build 9928's own binaries on 4 Nov. A drop-in setting
+`LAMP_SERVICES=off` turns them off. `LAMP_SERVICES_WRITE` is set by no
+product unit: a "send" needs a voice print, and the product sets no
+`LAMP_SAME_VOICE_MODEL`, so on lamp-9adf every send was refused for its
+voice ([switches.md](switches.md)). A lamp updated by a `lamp-update` older than
 the one that installs `lamp-services` has no tools folder until its next
 switch, and the voice then declares no services' functions.
 
@@ -827,5 +828,5 @@ no scope and a scheduled run refused, read and write), nothing else run
 after a read in the same request, a read cut to who and what about with
 others maybe here, a read's words kept nowhere in the thread or the
 summary, a made skill never reaching a service. `-p lamp-update` (the unit installed with `LAMP_SERVICES=on` in it, as in
-`lamp-cloud.service` and `lamp-voice.service`, `LAMP_SERVICES_WRITE=on` and
+`lamp-cloud.service` and `lamp-voice.service`, no `LAMP_SERVICES_WRITE` and
 no `--enable`, the reset plan's hash) and `-p lamp-setup` (`tests/it/reset.rs`).
