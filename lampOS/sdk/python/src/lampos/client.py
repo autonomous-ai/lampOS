@@ -20,6 +20,7 @@ import os
 import socket
 import ssl
 import unicodedata
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable
@@ -852,6 +853,10 @@ class Lamp:
         report = check(folder, shape_required=False)
         if not report.ok:
             raise LampError(f"{report.folder.name}: {report.errors[0]}", code="bad_request")
+        for warning in report.warnings:
+            # Said, not swallowed: a push without `lampos[check]` goes on, and
+            # the developer hears that the lamp checks the shape instead.
+            warnings.warn(f"{report.folder.name}: {warning}", stacklevel=2)
         if "skills" not in self.grants:
             raise BY_CODE["no_grant"]("not granted: skills")
         beyond = asks_beyond(folder, self.grants)
