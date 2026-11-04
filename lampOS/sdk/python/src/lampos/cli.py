@@ -17,6 +17,7 @@ import argparse
 import asyncio
 import json
 import sys
+import warnings
 
 from . import schema
 from .client import Lamp
@@ -103,8 +104,12 @@ async def _skill_check(args) -> int:
 
 
 async def _skill_push(args) -> int:
-    async with await Lamp.connect(args.lamp) as lamp:
-        skill = await lamp.push_skill(args.folder)
+    with warnings.catch_warnings(record=True) as said:
+        warnings.simplefilter("always")
+        async with await Lamp.connect(args.lamp) as lamp:
+            skill = await lamp.push_skill(args.folder)
+    for warning in said:
+        print(f"lamp: warning: {warning.message}", file=sys.stderr)
     held = f", held: {skill['held']}" if skill.get("held") else ""
     print(f"{skill.get('name')} {skill.get('version')} pushed, {'on' if skill.get('on') else 'off'}{held}")
     for shown in skill.get("shown", []):
