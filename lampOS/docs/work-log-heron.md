@@ -457,3 +457,8 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   LAMP_SKILL_READS, so dropping the `.envs` survives; one row in
   `the_memory_switches_alone_reach_the_started_routes` catches it (tried).
   The same gap is how my #5303 read missed the bug, owned on the PR.
+- 01:2x — #5317 READ-OK restated at 5b0ca9dd76: the started-worker row
+  is in, and both survivors now fail (`.envs` dropped: process::tests
+  17/1; the ask-word guard: the new row); made_skill 36, process 18.
+  Nine asked #4526 (90c52a59ba) and #4579 (869bd94832) of the
+  Reviewer-lead first, then Heron, for the 5 Nov evening promote.
