@@ -542,6 +542,12 @@ listening. The person wins over each, as "Who wins" says.
   3 Nov 19:27: a computer's next turn was refused by its own turn's
   conversation). A person's answer in hand still refuses it. With or without a
   `prompt`, it meets the same quiet-hours and night gates as a `say`.
+- **A computer gone before its turn opens gets no cue.** When its last
+  connection closes or it is revoked while a `turn.start` still waits (for
+  listening to be ready, the model service, the speaker), the door shuts
+  that start's say-socket connection and the voice drops it
+  (`dropped`, "its asker went away"): no listening cue and no 8 s window.
+  A turn already open is left to its `turn.end` and the person.
 - **No microphone the person closed is opened.** `listen.set true` can't
   open the switch, the button's mute or sleep, as the app's `mic.set`
   can't.
