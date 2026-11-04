@@ -429,6 +429,12 @@ decided by the PM: a new paid or external service, a person's data leaving
 the lamp, a default that changes what a home hears or sees unprompted,
 hardware and safety bounds, and anything that moves a ship date.
 
+**V2 only** (the lead, 4 November 2026). Lamps ship to customers with the V2
+image. No work goes into V1 (`main`, the old tree) or into moving lamps from
+V1 to V2; such issues and pull requests are closed as not planned. Porting
+a V1 behaviour into V2 is V2 work, as the V1 baseline in
+[AGENTS.md](../AGENTS.md) says.
+
 **App, backend and lamp work go in this order:** the backend's contract,
 then its endpoint; then the lamp, behind its switch; then the app, which the
 mobile builder checks end to end on a real phone and a lamp. The lamp
