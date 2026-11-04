@@ -326,6 +326,12 @@ Environment=LAMP_TASK_NEWS=skill
 Environment=LAMP_MAKE_SKILL=on
 Environment=LAMP_APP_MAKE_SKILL=on
 Environment=LAMP_SCHEDULE_TOOLS=on
+# The person's linked services, read by voice for the owner only (Queue #4710): declared only when
+# lamp-services' tools.json is there, so a lamp whose update has not yet put lamp-services on is told
+# none. Read on lamp-9adf on build 9928 on 4 Nov ("what is on my Google calendar this week?").
+# Writes as lamp-services.service sets LAMP_SERVICES_WRITE (on in the product): sent only on the owner's
+# spoken "send" after the read-back.
+Environment=LAMP_SERVICES=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
