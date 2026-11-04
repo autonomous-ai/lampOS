@@ -497,3 +497,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   dropped-line mutation fails). #5335 READ-OK at 81005804ed (release hashes
   checked by download), with a two-voices call left to Faye (Kore Wi-Fi pair
   vs the Rachel lamp voice). #5337 left to Friday.
+- 04:18: Faye did not accept #5333's forget gap as a risk: Friday adds a
+  per-person forget mark, El restates, and I restate my HOLD after it. #5335
+  trained on my READ-OK; the Wi-Fi pair stays in Kore as approved on 2 Nov,
+  so the two-voices call is settled.
