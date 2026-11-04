@@ -131,7 +131,7 @@ These are what `markers.py`, `reads2.py`, `qholds.py` and `train-bot.sh` do.
 
 **Accounts.** Only comments from logins with write access count: `writers.txt` plus `writers-extra.txt`.
 A READ-OK, a HOLD, lifting words, a TWO READS comment or a Queue HOLD from any other login is skipped.
-The PR body's TWO READS ask always counts.
+The PR body's TWO READS ask (a line that asks it, below) always counts.
 If the collaborators can't be fetched and `writers.txt` is an hour old or more, no PR is eligible (fail closed).
 A PR whose head is in another repository is never carried.
 
@@ -167,7 +167,7 @@ If the Queue (#4710) can't be fetched, no PR is eligible that round.
 It stands until the same login posts a later READ-OK marker on the PR whose first 400 characters say the HOLD is lifted or cleared
 (the same words as above; `**READ-OK**` counts).
 
-**TWO READS.** `TWO READS` anywhere in the PR body, or as the first line of a writer's comment, asks for two readers.
+**TWO READS.** A line of the PR body that asks it, or the first line of a writer's comment, asks for two readers. A body line asks when it opens with `TWO READS` (after an optional heading, list, quote or bold mark) followed by `:`, a dash, `(` or the line's end (`TWO READS: Fourth and the first builder`, `## TWO READS`), or carries `TWO READS:` with readers after it (`Privacy. TWO READS: Reviewer-lead, Tests.`). A body that only names the rule ("privacy pull requests need TWO READS", "a separate PR (TWO READS)") asks nothing (4 Nov, #5212).
 Then two different people need a READ-OK marker for a commit the head starts with.
 A person is a login plus the name it signs, not a login alone.
 Several builders share one GitHub account, so counting logins would make a legitimate two-reader PR impossible.
