@@ -3,8 +3,8 @@
 Scope: `crates/audio/src/notice.rs`, the `lamp-audio notices` check, and the
 optional same-owner integration in `lamp-voice`. The loader plays nothing by
 itself. Live playback requires explicit configuration and a still-valid owned
-failed turn. No recording is in this source: the product's four are in the
-`notices-2026-10-20` release, placed by `lamp-update install` (below).
+failed turn. No recording is in this source: the product's five are in the
+`notices-2026-11-03` release, placed by `lamp-update install` (below).
 
 ## The rule
 
@@ -77,7 +77,7 @@ release that adds it goes onto a lamp only with, or after, a build that
 knows it.
 
 The longest notice was 10 s before #3743; the no-Wi-Fi line with the reset
-pinhole runs about 13.4 s in the lamp's voice. An older loader refuses an
+pinhole runs 11.4 s in the pinned clip (13.4 s in its first test render). An older loader refuses an
 entry over 10 s (`invalid_entry`), and the Wi-Fi helper's fallback, words for
 the model, can't be spoken without a network. So a notices release with a
 recording over 10 s goes onto a lamp only with, or after, the build that
@@ -334,13 +334,19 @@ the install change merges.
 | `wifi_lost` | "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again." | `wifi-lost.en-US.wav` |
 | `wifi_recovering` | "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app." | `wifi-recovering.en-US.wav` |
 
-The `wifi_lost` words above are the new ones (#3743), naming the RESET
-pinhole on the back of the base. The clip `wifi-lost.en-US.wav` pinned in
-`deploy/product/models.json` still has the old words ("If your Wi-Fi has
-changed, hold the reset button for five seconds."). A lamp plays the clip, so
-the new words arrive from the next notices release. The new line renders at
-13.37 s in the lamp's voice, over an older loader's 10 s, so that release goes
-out with or after the build that allows 15 s (above).
+The two Wi-Fi lines (#3743) are not the second route's: they were rendered
+as `production` with `tools/render-wifi-line.sh` in Live's voice (Kore,
+`gemini-3.8-live`), then retimed to 1.25x with the pitch kept, at the
+person's ask after their listen, and approved on that second listen
+(2 Nov). The words are unchanged. `wifi_lost` names the RESET pinhole on the
+back of the base: 273,485 frames, 11.395 s, SHA-256 `7eaeea42…`.
+`wifi_recovering`: 123,991 frames, 5.166 s, SHA-256 `2927e69c…`. The
+`wifi_lost` clip is over an older loader's 10 s and the `wifi_recovering`
+kind is new, so the release goes out only with or after a build that has
+both (#4094's 15 s loader and #4157's kind; above). The other three lines
+are the `notices-2026-10-20` files, unchanged. The release before,
+`notices-2026-10-20`, had `wifi_lost` with the old words ("Hold my button
+for five seconds to set me up again.").
 
 **In the owner's language (#4473 (c)).** On a lamp whose owner's language
 is not English (second-voice.md, "The fixed lines"), `provider_unavailable`,
@@ -355,17 +361,16 @@ recorded under the release's kind, its `wav_sha256` `speech-cache:<key>`.
 again?"); the release has no `turn_lost` file, so with the line not kept
 the sigh stands in. An English lamp plays the files exactly as before.
 
-`wifi_recovering` (#3743, the words agreed with Sixth on #3020) is new: no
-clip is rendered or pinned yet. It is under 10 s, but its kind is new, so its
-release waits for a build that knows it (above). Until then
-`lamp-setup recover` asks for it, the voice answers `not_provisioned`, the
-journal says so and nothing is heard.
+`wifi_recovering` (#3743, the words agreed with Sixth on #3020) is new in
+`notices-2026-11-03`. On a lamp without that release, `lamp-setup recover`
+asks for it, the voice answers `not_provisioned`, the journal says so and
+nothing is heard.
 
-They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
+They and `manifest.json` are in the release `notices-2026-11-03`, pinned by
 size and SHA-256 in `deploy/product/models.json`. `lamp-update install`
 places them in `/opt/lampOS/voice/notices`, the folder the product unit's
 `--failure-notice-dir` names. A lamp moved from V1 gets no install, and its
-package carries no notices, so `lamp-keeper prepare` places the same five
+package carries no notices, so `lamp-keeper prepare` places the same six
 files, by install's own fetch and check, in `/var/lib/lampOS/voice/notices`
 (#2943, [keeper.md](keeper.md)): only a missing one, and a failed fetch is
 said, never a refusal. The generic voice unit (`deploy/units`) names that
@@ -373,7 +378,11 @@ folder, in the product unit's language, held to both by `lamp-update`'s
 unit test. Not the product's folder: the package's packager takes every
 `/opt/lampOS` path in a unit for one it carries. The manifest lists every kind, so it goes only
 onto a voice that knows them all: `wifi_lost` is known from `a441fea06`,
-build 4142 on.
+build 4142 on, and `wifi_recovering` and the 15 s limit from stable 8389 on.
+A moved lamp that already holds the `notices-2026-10-20` manifest and
+`wifi-lost.en-US.wav` keeps them (not its pin: kept, and said); only the
+missing `wifi-recovering.en-US.wav` is fetched, which its old manifest does
+not name. Remove the two and run prepare again to take the new pin.
 
 ## When a line is missing: the lamp's sigh (#2943)
 
@@ -392,7 +401,7 @@ reason>"`, and `failure_notice_capability` carries `"fallback":"sigh"`. With
 no `--failure-notice-dir` nothing stands in, and the lamp stays silent as
 before. The sigh says only that something is wrong, not what. The recorded
 lines, which say why, are still the answer: the product's come from
-`notices-2026-10-20` by install, and a moved lamp's by `lamp-keeper prepare`.
+`notices-2026-11-03` by install, and a moved lamp's by `lamp-keeper prepare`.
 
 ## Optional same-owner live integration
 
