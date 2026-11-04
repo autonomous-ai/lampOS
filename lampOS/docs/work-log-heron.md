@@ -504,3 +504,6 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 04:3x: #5293 READ-OK restated at a312c4e939 by range-diff from 27f0cfd1f
   (Fourteen asked): two rebases, context moves only, non-doc patch lines
   identical, CI green.
+- 05:2x: #5064 READ-OK restated at 71dafb08c2 after Friday's docs-only
+  rebase: code byte-identical, gate green (remember 333, process 61), and
+  dropping the newer-first or profile `.envs` still fails 2 of 61.
