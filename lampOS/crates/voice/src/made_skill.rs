@@ -309,8 +309,9 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
              kind = \"installable\", version = \"1.0.0\", no name key; [permissions] with only \
              speak = true, services = {{ {service} = \"read\" }} and topics only voice/state and \
              room/presence; one [trigger] on voice/state (field \"state\", equals \"resting\") or \
-             room/presence (field \"someone\", equals true), with for; a time of day as \
-             its during = {{ from = \"08:00\", to = \"08:30\" }}; [ask] policy = \"nudge\"; \
+             room/presence (field \"someone\", equals true), with for; during = \
+             {{ from = \"HH:MM\", to = \"HH:MM\" }} only for a time asked for; \
+             [ask] policy = \"nudge\"; \
              one [[do]] step: {step}. \
              SKILL.md: front matter name (lowercase, hyphens) and description (one sentence: \
              what it does, when). {REQUEST_MARK}{request}"
@@ -2347,10 +2348,15 @@ light = { dim = 1 }
         let github = brief_with("each morning read me my GitHub issues", true).unwrap();
         assert!(github.contains("notifications; issues {repo}; pulls {repo}; repos, its keys"));
         assert!(!github.contains("query") && !github.contains("graphql"));
-        // P3.3: the time of day is the request's, its window only shown.
-        for brief in [&github, &drive] {
-            assert!(brief.contains("a time of day as its during = {"), "{brief}");
-            assert!(!brief.contains("21:00"), "{brief}");
+        // P3.3: the time of day is the request's. No time is shown: lamp-9adf,
+        // 5 Nov 01:00, "when I come back to my desk" was made with the shown
+        // 08:00 to 08:30.
+        for brief in [&brief, &mail, &github, &drive] {
+            assert!(brief.contains("only for a time asked for"), "{brief}");
+            assert!(
+                !brief.contains("21:00") && !brief.contains("08:00"),
+                "{brief}"
+            );
         }
         for request in [
             "glow red when Slack has a message",
@@ -2366,6 +2372,8 @@ light = { dim = 1 }
             "create a skill that adds a meeting to my calendar",
             "write me a skill to send my mail",
             "schedule a meeting on my calendar",
+            // Heron's P3: a write before "skill" is never dropped with the ask.
+            "send my mail with a skill that reads my calendar",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_SERVICE), "{request}");
         }

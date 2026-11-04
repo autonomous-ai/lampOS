@@ -2111,8 +2111,9 @@ gone ([switches.md](switches.md)). What happens:
    request that names one such service and no write word is briefed with
    that service's one read step (a calendar's or mail's given whole; any
    other service's reads listed but whole texts and free-form reads), its
-   time of day the request's (the trigger's `during` shown only as an
-   example, 08:00 to 08:30), and its
+   time of day the request's (the trigger's `during` shown as `HH:MM`,
+   only for a time the request names: lamp-9adf's played check, 5 Nov,
+   was made with a shown 08:00 to 08:30 it never named), and its
    spoken yes names the service, what it reads and the condition, "when
    you're alone with the lamp, it reads you tomorrow's Google Calendar:
    how many events, then each time and title." Off, any request that
