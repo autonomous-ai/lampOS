@@ -4420,17 +4420,41 @@ static READ_DAYS: Mutex<std::collections::BTreeMap<String, i64>> =
 /// never: a skill's read waits a minute after any voice (#5288). The topic
 /// is an event, so the bus keeps no latest of it; [`hear_voices`] marks
 /// each line as it comes (lamp-9adf, 5 Nov 01:19: another voice's ten
-/// words, then the calendar read 20 s later).
+/// words, then the calendar read 20 s later). [`HEARD_ALWAYS`] when the
+/// lines can't be listened to.
 static VOICE_HEARD_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The mark when `voice/heard` can't be listened to: a voice heard just
+/// now, always, so every read is skipped with "a voice heard" (the gate
+/// fails closed; Thirteen's P3 on #5321).
+const HEARD_ALWAYS: u64 = u64::MAX;
+
+/// Marks a voice heard now ([`VOICE_HEARD_MS`]), unless it is
+/// [`HEARD_ALWAYS`].
+fn mark_heard() {
+    let _ = VOICE_HEARD_MS.fetch_update(
+        std::sync::atomic::Ordering::Relaxed,
+        std::sync::atomic::Ordering::Relaxed,
+        |at| (at != HEARD_ALWAYS).then(unix_ms),
+    );
+}
 
 /// A thread of its own that marks each line the voice heard
 /// ([`VOICE_HEARD_MS`]), started with a skill's reads on. Subscribed before
-/// it returns, so a line published after is never missed.
+/// it returns, so a line published after is never missed. Its start counts
+/// as a voice heard: a voice just before a restart is not known, so the
+/// first minute reads nothing (Thirteen's P3 on #5321). While the topic
+/// can't be read, every second is marked.
 fn hear_voices(bus: &Bus) {
+    mark_heard();
     let mut heard = match bus.subscribe_typed(Speech::TOPICS[0], "skills_reads", Speech::TYPE) {
         Ok(heard) => heard,
         Err(error) => {
-            eprintln!("lamp-skills: {} not subscribed: {error}", Speech::TOPICS[0]);
+            eprintln!(
+                "lamp-skills: {} not subscribed: {error}: every skill's read is skipped",
+                Speech::TOPICS[0]
+            );
+            VOICE_HEARD_MS.store(HEARD_ALWAYS, std::sync::atomic::Ordering::Relaxed);
             return;
         }
     };
@@ -4439,12 +4463,11 @@ fn hear_voices(bus: &Bus) {
         .spawn(move || {
             loop {
                 match heard.recv(Duration::from_secs(1)) {
-                    Ok(Some(_)) => {
-                        VOICE_HEARD_MS.store(unix_ms(), std::sync::atomic::Ordering::Relaxed);
-                    }
+                    Ok(Some(_)) => mark_heard(),
                     Ok(None) => {}
                     Err(error) => {
                         eprintln!("lamp-skills: {} not received: {error}", Speech::TOPICS[0]);
+                        mark_heard();
                         std::thread::sleep(Duration::from_secs(1));
                     }
                 }
@@ -4452,9 +4475,10 @@ fn hear_voices(bus: &Bus) {
         });
     if let Err(error) = spawned {
         eprintln!(
-            "lamp-skills: {} not listened to: {error}",
+            "lamp-skills: {} not listened to: {error}: every skill's read is skipped",
             Speech::TOPICS[0]
         );
+        VOICE_HEARD_MS.store(HEARD_ALWAYS, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -4842,25 +4866,44 @@ mod tests {
     use super::*;
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
-    /// latest of, is marked as it comes, so a skill's read waits a minute
-    /// after it (lamp-9adf, 5 Nov 01:19: read 20 s after another voice).
+    /// latest of, reaches the read's gate as a voice heard just now
+    /// (`LampRoom::seen`), so a skill's read waits a minute after it
+    /// (lamp-9adf, 5 Nov 01:19: read 20 s after another voice). The
+    /// listener's start counts as a voice heard (a restart forgets one).
     #[test]
-    fn a_line_the_voice_heard_is_marked_for_a_reads_gate() {
+    fn a_line_the_voice_heard_holds_a_reads_gate() {
+        use lamp_skills::service_read::Room;
         // Short path for macOS Unix sockets; no process-wide environment change.
         let dir = tempfile::Builder::new()
             .prefix("hv")
             .tempdir_in("/tmp")
             .unwrap();
         let bus = Bus::new(dir.path().join("bus")).unwrap();
-        assert!(bus.latest(Speech::TOPICS[0]).unwrap().is_none());
+        let mut room = LampRoom {
+            skill: "read-calendar".into(),
+            say: dir.path().join("say.sock"),
+            services: dir.path().join("call.sock"),
+            bus: bus.clone(),
+            known_file: None,
+            owner: None,
+            local_time: None,
+            quiet: None,
+        };
+        let heard_ago = |room: &mut LampRoom| room.seen().heard_ago;
+        assert_eq!(heard_ago(&mut room), None);
         hear_voices(&bus);
+        assert!(heard_ago(&mut room).is_some_and(|ago| ago < Duration::from_secs(5)));
+        // As if the listener started two minutes ago: no voice in the minute.
+        VOICE_HEARD_MS.store(unix_ms() - 120_000, std::sync::atomic::Ordering::Relaxed);
+        assert!(
+            heard_ago(&mut room).is_some_and(|ago| ago >= lamp_skills::service_read::VOICE_WITHIN)
+        );
         let mut voice = bus
             .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
             .unwrap();
-        let before = unix_ms();
         let deadline = Instant::now() + Duration::from_secs(10);
-        while VOICE_HEARD_MS.load(std::sync::atomic::Ordering::Relaxed) < before {
-            assert!(Instant::now() < deadline, "the line was never marked");
+        while heard_ago(&mut room).is_none_or(|ago| ago >= Duration::from_secs(5)) {
+            assert!(Instant::now() < deadline, "the line never reached the gate");
             voice
                 .publish_json(
                     clock::now_us(),
@@ -4871,6 +4914,10 @@ mod tests {
         }
         // The bus still keeps no latest of it: the mark is the only way.
         assert!(bus.latest(Speech::TOPICS[0]).unwrap().is_none());
+        // A listener that can't listen holds every read, until it can.
+        VOICE_HEARD_MS.store(HEARD_ALWAYS, std::sync::atomic::Ordering::Relaxed);
+        mark_heard();
+        assert_eq!(heard_ago(&mut room), Some(Duration::ZERO));
     }
 
     /// #5207 (Fourteen's played check on lamp-9adf): a note with
