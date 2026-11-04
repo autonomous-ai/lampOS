@@ -133,7 +133,10 @@ fn the_voices_listed_helpers_are_the_ones_it_starts() {
     let _spawning = crate::spawns::spawning();
     assert_eq!(
         lamp_voice_processes::HELPERS,
-        [lamp_turn_end_wire::WORKER_EXECUTABLE]
+        [
+            lamp_turn_end_wire::WORKER_EXECUTABLE,
+            lamp_voice::same_voice::EXECUTABLE,
+        ]
     );
 }
 
