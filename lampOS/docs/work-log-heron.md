@@ -333,3 +333,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   heron, by 17:30; taken on the PR at `7037b11e47`, gate running.
   15:33: #5217 landed in train 602 (lamp-voice `3e0b88251`): the 9980
   `held` run is in `docs/verification/4450-lamp-fc4b-20261103/`.
+- 15:37–16:3x: Friday's FIXED on #5097 (`0fcd92b262`: `explicit()` `.all`
+  over a non-empty cite list, the 512 cap counts live items, switches.md
+  rows deduplicated, two new tests); gate lib 138 / `main` 8 / `it` 187 /
+  switches 2 / notes 15; mutations (`.any` back; the privacy drop off)
+  fail the new two-source test and the two older ones; READ-OK restated
+  16:3x. 16:09: Friday's NEXT TRAIN on #5090 `5b3e198fca`, heron's read
+  carried. 15:59: #5166's full lamp-voice gate on `7037b11e47` passed
+  (4684, short TMPDIR); Thirteen's rebase `0b9fef6b8a` is the same patch
+  (range-diff: `record` beside `at_setup`, the duplicate `asks_to_spell`
+  dropped); its own checks and mutations running. 16:3x: the hour posted.
