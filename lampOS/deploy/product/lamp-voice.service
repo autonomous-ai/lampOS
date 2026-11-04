@@ -300,6 +300,10 @@ Environment=LAMP_FIRST_WORDS=kept
 # ("What did I just ask you?" heard as "Did I just ask you?"). lamp-4ace's third A/B, 25 Oct, #3411: three of ten pause
 # lines lost their first word with it off, none with it on.
 Environment=LAMP_SOFT_START=on
+# The lamp's name at a line's start is dated from the line's usual start, not the soft start's 0.3 s lead, so a
+# "Lamp, …" said first still counts as said at the start (#4226). #5234's 3+3 on lamp-c0a4 (4 Nov, busy_cook's c11
+# 1.5 s after desk talk, played from the Mac): no c11 held for a late name in 6 rounds; c11 answered 3/3 on, 2/3 off.
+Environment=LAMP_NAME_START_USUAL=on
 Environment=LAMP_TASKS_ASKED=on
 Environment=LAMP_TASKS_WHO=on
 # Work goes only to the agent named: one named who isn't set up is said so, never given to another (#1722; the

@@ -1622,6 +1622,26 @@ fn the_product_carries_a_conversation_past_a_silent_face() {
     }
 }
 
+/// The lamp's name at a line's start is dated from the line's usual start,
+/// not the soft start's lead (`LAMP_NAME_START_USUAL`, #4226), which only
+/// matters with soft starts on: #5234's 3+3 on lamp-c0a4 (4 Nov) held no
+/// "Lamp, …" for a late name in 6 rounds, answered 3/3 on and 2/3 off.
+#[test]
+fn the_product_dates_the_name_from_a_lines_usual_start() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_NAME_START_USUAL=on",
+        "Environment=LAMP_SOFT_START=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// An answer cut by a line or a stop is kept as the words that were played
 /// (`LAMP_SAID_AS_HEARD`, #4547), beside the cut-in note that tells a later
 /// "go on" where it stopped (`LAMP_CUT_IN_TOLD`): probe-cut-in on lamp-06c1
