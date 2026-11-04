@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-03 23:28 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-11-04 13:59 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1711, posted by the PM (Faye) since 4 Nov, are the live ones.
 
-**Build 92.3% over 76 rows. Quality 67.4% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
+**Build 92.3% over 76 rows. Quality 66.8% over 17 rows.** Mood, for later: 39.0% over 3 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -50,7 +50,7 @@ Written by the first builder from the team's review page at 2026-11-03 23:28 (+0
 | Eye contact: turns to you and to its name, looks away to think, nods | 1.00 | #715 | fifth | Built |
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
 | Moves with its words while it speaks | 1.00 | #933 #1067 #1365 #2030 | thirteen | 20 Oct 09:4x, built: #1759 (with #1067’s sway) merged into lamp-voice after its try on lamp-52e6 with the lead, so every lamp nods and sways while it speaks, sparse as the lead chose. |
-| Never tips itself over | 1.00 | #1072 #704 | — | Built with V1’s limits; |
+| Never tips itself over | 1.00 | #1072 #704 | hw-first | Built with V1’s limits; |
 | One inner state (mood) every behaviour reads, and familiarity *(mood, for later: not in the build figure)* | 0.72 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, sixth, seventh | 22 Oct 22:0x, up from 0.7: a say’s record keeps who it told and the familiar level (#3056 merged, Seventh), so #2831’s last bar can be read on 52e6. |
 | Music matched to your mood (for later) *(mood, for later: not in the build figure)* | 0.00 | #3504 | — | 27 Oct 08:1x, new, from the lead’s 07:58 list: music to relax plays one 48 s piece. |
 | Shows its feelings in body and light, as V1’s emotions did | 0.50 | #3504 #3691 #4020 | jarvis | 29 Oct 06:3x, up from 0: this row was stale. |
@@ -99,17 +99,17 @@ Written by the first builder from the team's review page at 2026-11-03 23:28 (+0
 | Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
 | Knows when you have finished | 0.70 | 0.85 | 27 Oct 01:3x, unchanged: a bare “Lamp.”, a pause, then the request, right after a voice start, still splits and is held in a room not yet known to be quiet. |
 | Cutting in | 0.55 | 0.75 | 31 Oct 16:1x, unchanged: on lamp-4ace’s product unit (c08b4c08f6), “Wait, hold on.” about 6 s into a story was handled 4 of 6 times. |
-| Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
+| Stop words | 0.50 | 0.75 | 4 Nov 08:3x, down from 0.55: “Stop, Lamp” over a story was dropped as policy when the yield ended, 2 of 2 on lamp-9adf at 9846 (#5111, Sixth), and a spoken “Stop.” over the answer made no yield on 52e6 (#5076). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
 | Not spoken to | 0.50 | 0.90 | 3 Nov 23:3x, down from 0.6: the core-verifier at 9868 held only 1 of 6 desk lines in a going-on thread (two called recall on talk between people), with #5034 reverted; |
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
-| Speaking up on its own | 0.80 | 0.85 | 3 Nov 23:3x, up from 0.7: the core-verifier at 9868: 4 timers set and 4 cancelled, each seen on the schedule (its revision stepped, items 0 before and after); |
-| Onboarding, as a first-time person meets it | 0.60 | 0.90 | 28 Oct 17:0x, up from 0.5: the tester’s run on 29e7 at 8187 passed every step but how you sound’s sentence. |
+| Speaking up on its own | 0.85 | 0.85 | 4 Nov 08:3x, up from 0.8: Fourteen’s pre-promote check of 9928 on lamp-9adf: a one-minute timer and a two-minute one each rang and were said about 1 s after due; |
+| Onboarding, as a first-time person meets it | 0.55 | 0.90 | 4 Nov 08:3x, down from 0.6: a tester’s lamp-0c4e (3 Nov) never saved the face at setup (a question with “okay” taken as the yes, the face wait closed early), so nothing was kept, and the second try saved a misheard name … |
 | Remembers you: your name and what you told it | 0.60 | 0.90 | 3 Nov 10:4x, down from 0.65: Fourteen on 9699 (9adf): remember and recall right for a known face (coffee, the dentist’s day moved), forget failed (it searched only the room’s; |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
-| Body | 0.70 | 0.80 | 25 Oct 17:0x, up from 0.65: the livelier postures and nods (#3387) are in the product since train 109 (04:25), and on the ship candidate (6786) lamp-4ace stood for a played question, turned and tilted its head a little b… |
+| Body | 0.65 | 0.80 | 4 Nov 08:3x, down from 0.7: in the night’s sleep on lamp-06c1 (9868), the body sat up for each of three room lines and stayed up about 80 s (Jarvis); |
 | Head and eye | 0.65 | 0.80 | 23 Oct 11:2x, up from 0.6: head touch passed with the lead’s own hand on lamp-52e6: a tap, a stroke, a 3 s hold that put it to sleep, a tap that woke it, and nothing with hands away (#2857 closed). |
 | The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live | 0.70 | 0.90 | 25 Oct 20:0x, up from 0.65: the ship build (6819) on the exact product unit: 48 of 49 lines meant for the lamp (the one miss played over a 10 s answer by the kit), the owner’s 22 of 22, desk talk 5 of 6 left alone, first… |
 | Light and all of it together | 0.85 | 0.80 | 3 Nov 23:3x, up from 0.8: the core-verifier on lamp-52e6 at stable 9868 (#4305, 22:30–23:05, one going-on thread): 19 of 19 action lines heard right called the right tool, 0 talk-only (5 of 11 and 4 talk-only on 9582 thi… |
