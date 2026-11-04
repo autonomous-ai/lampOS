@@ -58,6 +58,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut watch = true;
     let mut progress = false;
     let mut push_wait = false;
+    let mut push_watch = false;
     let mut close_told = false;
     let mut set_up_later = false;
     let mut sign_in_by_code = false;
@@ -79,6 +80,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--no-watch" => watch = false,
             "--progress" => progress = true,
             "--push-wait" => push_wait = true,
+            "--push-watch" => push_watch = true,
             "--close-told" => close_told = true,
             "--set-up-later" => set_up_later = true,
             "--sign-in-by-code" => sign_in_by_code = true,
@@ -143,6 +145,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if push_wait && !watch {
         return Err("--push-wait reads with the watch; it cannot go with --no-watch".into());
     }
+    if push_watch && !watch {
+        return Err("--push-watch reads with the watch; it cannot go with --no-watch".into());
+    }
     if !enabled {
         println!(
             "{{\"enabled\":false,\"message\":\"Tasks is off; supply --enable to start it.\"}}"
@@ -181,6 +186,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         watch,
         progress,
         push_wait,
+        push_watch,
         close_told,
         targets_newer,
         set_up_later: set_up_later.then_some(SetUpLater {
