@@ -1330,10 +1330,12 @@ impl Reply {
         let Some(say) = self.say.take() else {
             return;
         };
-        // A skill's sound is `spoken` when it was played whole, with no gap
-        // in its playback.
-        let sound = self.notice.origin() == SpeechOrigin::SkillSound
-            && self.settled(speaker_pending)
+        // A skill's sound or a computer's exact line is `spoken` when it was
+        // played whole, with no gap in its playback.
+        let sound = matches!(
+            self.notice.origin(),
+            SpeechOrigin::SkillSound | SpeechOrigin::ExactLine
+        ) && self.settled(speaker_pending)
             && self.notice.retired()
             && self.playback_gaps == 0;
         let played_whole = sound || self.heard_whole(speaker_pending, snapshot);
@@ -13860,7 +13862,7 @@ fn tell_ring_of_turn(choreography: &mut RingChoreographer, origin: Option<Speech
         Some(SpeechOrigin::HeadCue | SpeechOrigin::UnclearHum | SpeechOrigin::WakeHum)
     );
     choreography.set_listening(cue || origin == Some(SpeechOrigin::RequestedAudio));
-    choreography.set_unshown(origin.is_some_and(SpeechOrigin::unshown) && !cue);
+    choreography.set_unshown(origin.is_some_and(SpeechOrigin::ring_unshown) && !cue);
 }
 
 /// The room sees the owned turn, except for the lamp's short unshown sounds.
@@ -13948,7 +13950,7 @@ fn play_exact_line(
     let (snapshot, _) = speaker_tone::commit_sound_turn(
         owner,
         reply,
-        NoticeDelivery::sound(SpeechOrigin::SkillSound, samples),
+        NoticeDelivery::sound(SpeechOrigin::ExactLine, samples),
         "exact_line",
         "a computer's exact words: nothing heard, nothing sent to the provider",
         0,
@@ -15749,7 +15751,12 @@ fn dispatch_speaker_chunk(
     };
     let permit = owner.issue_output(permit_at, current.plan, lease)?;
     let (samples, final_chunk, first_notice) = if origin.local() {
-        current.notice.reserve_chunk(monotonic_us())?
+        let reserved = current.notice.reserve_chunk(monotonic_us())?;
+        // A computer's exact line is shown speaking, by its own level.
+        if origin == SpeechOrigin::ExactLine {
+            current.voice_level = crate::ring_face::level_of(&reserved.0);
+        }
+        reserved
     } else {
         let Some((samples, last)) = current.next_speaker_chunk() else {
             return Ok(None);
