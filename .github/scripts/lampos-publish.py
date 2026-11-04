@@ -344,6 +344,9 @@ class Publisher:
             self.updater, "manifest", "--binaries", stage, "--deploy", self.source / "lampOS/deploy",
             "--skills", self.source / "lampOS/skills", "--channel", CHANNEL, "--sequence", str(self.sequence),
             "--commit", self.sha, "--files-url", url,
+            # The product's pinned models (lampOS/docs/updates.md): a lamp fetches
+            # them only where LAMP_UPDATE_MODELS=on.
+            "--models", self.source / "lampOS/deploy/product/models.json",
         )
         key = self.work / "signing.key"
         try:
