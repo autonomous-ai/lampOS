@@ -8,9 +8,9 @@
 # line and never a picture), and it never speaks of a body or looks. Written
 # to lamp-skills' schema (docs/skills.md, "The schema, as lamp-skills reads it").
 needs = ["eyes", "body", "voice"]
-# Installable: its owner chooses it (`lamp-skills install`), and it is not in
-# the product's install (`install::NOT_PRODUCT_SKILLS`) until tried on a lamp.
-kind = "installable"
+# Core since its played check with a person on lamp-9adf (#5208, 4 Nov): in
+# the product's install (`install::PRODUCT_SKILLS`), on.
+kind = "core"
 version = "1.0.0"
 # Three nudges a day at most, counted from the local midnight. The word after
 # one (`sat_well`) is that nudge's, not counted (`follows`).

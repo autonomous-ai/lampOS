@@ -482,7 +482,7 @@ fn head_pats_response_is_chosen_in_its_file() {
 /// The owner, 19 Oct: core skills are always on the lamp, as a phone's own
 /// apps; the rest are installed. Desk tutor and its marks wait for the full
 /// look in the product. The four wellbeing nudges are core since 25 Oct
-/// (the owner: "do all of them"). Every one says its version.
+/// (the owner: "do all of them"), and Sit back since #5208. Every one says its version.
 #[test]
 fn every_skill_folder_says_its_kind_and_version() {
     let skills: Vec<_> = lamp_skills::load_each(&skills_root())
@@ -520,6 +520,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "reminders",
             "rest-your-eyes",
             "sip-of-water",
+            "sit-back",
             "smoky-air",
             "stand-up",
             "startle",
@@ -539,7 +540,6 @@ fn every_skill_folder_says_its_kind_and_version() {
             "guard-mode",
             "look-for-things",
             "meal-check",
-            "sit-back",
             "who-was-here"
         ]
     );
@@ -3204,7 +3204,8 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
     // two words in a row unnoticed rest it, as theirs do.
     assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
     assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
-    assert_eq!(skill.kind, SkillKind::Installable);
+    // Core, in the product, since its played check with a person (#5208).
+    assert_eq!(skill.kind, SkillKind::Core);
 }
 
 #[test]
