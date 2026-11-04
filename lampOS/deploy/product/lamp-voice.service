@@ -509,6 +509,13 @@ Environment=LAMP_MEMORY_FORGET_ABOUT=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on
+# Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md): a correction said in plain
+# talk comes back ahead of the line it corrects (NEWER_FIRST), a maybe or a plan comes back marked as one (STRENGTH),
+# and the session note keeps the person's tastes and kept facts first (PROFILE). The memory owner's call on 5 Nov.
+# Each needs a lamp-memory from the same build, which a product install ships.
+Environment=LAMP_MEMORY_NEWER_FIRST=on
+Environment=LAMP_MEMORY_STRENGTH=on
+Environment=LAMP_MEMORY_PROFILE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
