@@ -8181,6 +8181,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 checked: true,
                 visits: true,
                 remember_speaker: false,
+                at_setup: false,
             },
         ))
         .chain(crate::photo_faces::tools())

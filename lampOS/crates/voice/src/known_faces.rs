@@ -42,6 +42,11 @@ pub struct FaceSwitches {
     pub checked: bool,
     pub visits: bool,
     pub remember_speaker: bool,
+    /// Not a switch: the save asked for now would be the first at setup,
+    /// while the walk has not yet ended "who you are"
+    /// ([`crate::onboarding::who_you_are_open`]). With names checked, the
+    /// name is then said back for a yes, or spelled ([`run_switched`]).
+    pub at_setup: bool,
 }
 /// The exchanges before the turn in hand that a name may have been said
 /// in, to be kept once the lamp has said it back and the person agreed
@@ -263,6 +268,28 @@ fn agreed_to(name: &str, said: &Said) -> bool {
             .is_some_and(|(_, lamp)| said_by_them(name, lamp))
 }
 
+/// Whether, in the exchanges `said` holds, the person said `name`, the lamp
+/// then said it back, and the person's next line was a plain yes to it
+/// ([`plain_yes`]): the next exchange's own line, or the turn in hand if
+/// the read-back was the last. What the first save at setup needs
+/// (#5140), so the usual walk, "Marie, right?" "Yes." and then the face's
+/// question and its yes, keeps the name in one call. A correction after
+/// the read-back ("No, it's Loren.") is no yes to it. `replace` keeps
+/// [`agreed_to`], the read-back in the lamp's last answer only.
+fn said_back_and_agreed(name: &str, said: &Said) -> bool {
+    said.before.iter().enumerate().any(|(at, (_, lamp))| {
+        let next = said
+            .before
+            .get(at + 1)
+            .map_or(said.this.as_str(), |(person, _)| person.as_str());
+        said.before[..=at]
+            .iter()
+            .any(|(person, _)| said_by_them(name, person))
+            && said_by_them(name, lamp)
+            && plain_yes(name, next)
+    })
+}
+
 /// The provider worker's argument for the names switch.
 pub fn names_arguments(value: Option<&str>) -> Vec<String> {
     if value == Some("checked") {
@@ -360,6 +387,30 @@ pub fn spelled_by_them(name: &str, said: &str) -> bool {
             || name
                 .iter()
                 .all(|word| spelled.iter().any(|letters| letters == word)))
+}
+
+/// The name the person spelled letter by letter in `said`, as they spelled
+/// it: each run of two letters or more capitalised, the runs joined by a
+/// space ("L O R E N." is "Loren"). None when nothing is spelled, or the
+/// letters disagree with a count they gave ("four letters", five spelled).
+/// What a name not heard is kept as at setup (#5140 row 6).
+fn spelled_name(said: &str) -> Option<String> {
+    let runs: Vec<String> = spelled_runs(&folded_words(said))
+        .into_iter()
+        .filter(|letters| letters.chars().count() >= 2)
+        .collect();
+    let letters: usize = runs.iter().map(|run| run.chars().count()).sum();
+    if runs.is_empty() || letters_counted(said).is_some_and(|counted| counted != letters) {
+        return None;
+    }
+    let capitalised = runs.iter().map(|run| {
+        let mut chars = run.chars();
+        chars
+            .next()
+            .map(|first| first.to_uppercase().chain(chars).collect::<String>())
+            .unwrap_or_default()
+    });
+    Some(capitalised.collect::<Vec<_>>().join(" "))
 }
 
 /// Whether a name of more than one word is spelled as one run of letters
@@ -1027,6 +1078,9 @@ pub const NAME_TOLD_NOTE: &str = "If they have just told you their own name, cal
 
 /// What the model is told when the name is not in what they said.
 const NOT_HEARD: &str = "You did not hear that name in what they said. Say the name back to them and ask them to spell it, then call this again with the name as they said or spelled it.";
+/// What the model is told at setup, before the first save, when the name
+/// was not said back and agreed to (#5140 row 5).
+const SAY_IT_BACK: &str = "I have not kept their face yet. First say the name back to them and ask if you have it right. Only if they say yes, call this again with that name; if they correct it, say the new one back the same way.";
 /// What the model is told when the name was only the word that called the
 /// lamp ([`only_the_call`]).
 const ONLY_THE_CALL: &str = "That word was them calling you, not their name, so I have not remembered anyone. Ask them what their name is, then call this again with the name they give.";
@@ -1070,6 +1124,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
         checked,
         visits: false,
         remember_speaker: false,
+        at_setup: false,
     })
 }
 
@@ -1180,6 +1235,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             checked,
             visits: false,
             remember_speaker: false,
+            at_setup: false,
         },
         None,
         None,
@@ -1420,6 +1476,23 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             checked,
             visits,
             remember_speaker: false,
+            at_setup: false,
+        },
+        said,
+        None,
+    )
+}
+
+/// [`run_with`], names checked, for the first save at setup.
+#[cfg(test)]
+fn run_at_setup(socket: &Path, call: &ToolCall, said: &Said) -> (Value, bool) {
+    run_switched(
+        socket,
+        call,
+        FaceSwitches {
+            checked: true,
+            at_setup: true,
+            ..FaceSwitches::default()
         },
         said,
         None,
@@ -1446,11 +1519,35 @@ fn run_switched(
             true,
         );
     };
-    if checked && call.name == REMEMBER && !name_heard(name, said) {
-        return (json!({"error": NOT_HEARD}), true);
-    }
+    let setup = checked && switches.at_setup && call.name == REMEMBER;
+    // At setup, a name not heard is taken as they spelled it in the turn in
+    // hand: the letters are their own words, not the model's guess (#5140
+    // row 6, lamp-0c4e: a misheard name never passed this check).
+    let spelled;
+    let heard = name_heard(name, said) || (setup && said_back_and_agreed(name, said));
+    let name = if checked && call.name == REMEMBER && !heard {
+        match setup.then(|| spelled_name(&said.this)).flatten() {
+            Some(letters) => {
+                spelled = letters;
+                spelled.as_str()
+            }
+            None => return (json!({"error": NOT_HEARD}), true),
+        }
+    } else {
+        name
+    };
     if checked && call.name == REMEMBER && only_the_call(name, &said.this) {
         return (json!({"error": ONLY_THE_CALL}), true);
+    }
+    // The first save at setup: the name said back and a plain yes to it,
+    // or spelled by them now (#5140 row 5, lamp-0c4e: the first name heard
+    // was kept, misheard, without being said back).
+    if setup
+        && !spelled_by_them(name, &said.this)
+        && !agreed_to(name, said)
+        && !said_back_and_agreed(name, said)
+    {
+        return (json!({"error": SAY_IT_BACK}), true);
     }
     let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
     // A name replaces another only once the lamp said it back and they
@@ -2756,6 +2853,7 @@ mod tests {
                 checked: true,
                 visits,
                 remember_speaker: false,
+                at_setup: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -3895,6 +3993,135 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
+
+    /// #5140 row 5 (lamp-0c4e, 3 Nov): at setup the first name heard was
+    /// kept with the face without being said back, and it was misheard.
+    /// Before the first save at setup the name is said back and a plain yes
+    /// heard; a no, or a name corrected, is said back again; a name they
+    /// spelled is their own and goes as it is. The usual walk, the name said
+    /// back and agreed, then the face asked and agreed, goes in one call; a
+    /// yes to the face alone, or after a correction, is no yes to the name.
+    /// Past setup, as before.
+    #[test]
+    fn at_setup_the_first_name_is_said_back_for_a_yes_before_it_is_kept() {
+        const FACE: &str = "May I remember your face, so I know you next time?";
+        let call = |name: &str| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": name }),
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"remembered": "Lauren"}),
+            json!({"remembered": "Loren"}),
+            json!({"remembered": "Marie"}),
+            json!({"remembered": "Lauren"}),
+        ]);
+        let (words, answered) = run_at_setup(&socket, &call("Lauren"), &Said::now("I'm Lauren."));
+        assert!(answered, "{words}");
+        assert!(
+            words["error"]
+                .as_str()
+                .is_some_and(|told| told.contains("say the name back")),
+            "{words}"
+        );
+        let said_back = |this: &str| Said {
+            this: this.into(),
+            before: vec![("I'm Lauren.".into(), "Lauren, did I get that right?".into())],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Loren"), &said_back("No, it's Loren."));
+        assert!(words["error"].is_string(), "{words}");
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &said_back("Yes."));
+        assert_eq!(words, json!({"ok": true, "remembered": "Lauren"}));
+        let (words, _) = run_at_setup(&socket, &call("Loren"), &Said::now("It's L O R E N."));
+        assert_eq!(words, json!({"ok": true, "remembered": "Loren"}));
+        // The usual walk: "Marie, right?" "Yes." then the face's question
+        // and its yes: one call, no turn more.
+        let walk = Said {
+            this: "Yes.".into(),
+            before: vec![
+                ("I'm Marie.".into(), "Marie, right?".into()),
+                ("Yes.".into(), FACE.into()),
+            ],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Marie"), &walk);
+        assert_eq!(words, json!({"ok": true, "remembered": "Marie"}));
+        // Said back, then corrected: the face's yes is no yes to the name.
+        let corrected = Said {
+            this: "Yes.".into(),
+            before: vec![
+                ("I'm Lauren.".into(), "Lauren, right?".into()),
+                ("No, it's Loren.".into(), FACE.into()),
+            ],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &corrected);
+        assert!(words["error"].is_string(), "{words}");
+        // Never said back: the face's yes alone is no yes to the name.
+        let unsaid = Said {
+            this: "Yes.".into(),
+            before: vec![("I'm Marie.".into(), FACE.into())],
+        };
+        let (words, _) = run_at_setup(&socket, &call("Marie"), &unsaid);
+        assert!(words["error"].is_string(), "{words}");
+        // Past setup, a name they said goes at once, as before.
+        let (words, _) = run_with(&socket, &call("Lauren"), true, &Said::now("I'm Lauren."));
+        assert_eq!(words, json!({"ok": true, "remembered": "Lauren"}));
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Lauren", "one_face": true, "replace": false}),
+                json!({"remember": "Loren", "one_face": true, "replace": false}),
+                json!({"remember": "Marie", "one_face": true, "replace": false}),
+                json!({"remember": "Lauren", "one_face": true, "replace": false}),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #5140 row 6 (lamp-0c4e, 3 Nov): a misheard name never passed the
+    /// names check. At setup a name not heard is asked for spelled out, and
+    /// the letters they spell are their own words: the face is kept under
+    /// the name as spelled, not the model's guess. Letters that disagree
+    /// with the count they gave are not; past setup, as before.
+    #[test]
+    fn at_setup_a_misheard_name_is_asked_spelled_and_kept_as_spelled() {
+        let call = |name: &str| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": name }),
+        };
+        let (socket, asked) = eyes(vec![json!({"remembered": "Loren"})]);
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &Said::now("I'm Lord in."));
+        assert!(
+            words["error"]
+                .as_str()
+                .is_some_and(|told| told.contains("spell")),
+            "{words}"
+        );
+        let spelled = |this: &str| Said {
+            this: this.into(),
+            before: vec![(
+                "I'm Lord in.".into(),
+                "Sorry, could you spell your name for me?".into(),
+            )],
+        };
+        let (words, _) = run_at_setup(
+            &socket,
+            &call("Lauren"),
+            &spelled("Four letters. L O R E N."),
+        );
+        assert!(words["error"].is_string(), "{words}");
+        let (words, _) = run_at_setup(&socket, &call("Lauren"), &spelled("L, O, R, E, N."));
+        assert_eq!(words, json!({"ok": true, "remembered": "Loren"}));
+        // Past setup, a name not heard is refused, as before.
+        let (words, _) = run_with(&socket, &call("Lauren"), true, &spelled("L, O, R, E, N."));
+        assert!(words["error"].is_string(), "{words}");
+        assert_eq!(
+            asked.join().unwrap(),
+            [json!({"remember": "Loren", "one_face": true, "replace": false})]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
     /// On lamp-4ace on 24 October the owner's "Lamp, remember my face, and
     /// I'm …" was heard as "Man. Remember my face and do", and their face was
     /// kept as "Man": the word that called the lamp, opening the line, is no
