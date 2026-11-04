@@ -68,7 +68,7 @@ mod wire;
 
 pub use clock::{BOOT_ID_PATH, kernel_boot_id, monotonic_us};
 pub use declare::Declaration;
-pub use live::Source;
+pub use live::{Drops, Source};
 pub use name::MOST_TOPIC_BYTES;
 pub use publish::{MOST_SUBSCRIBERS, Published, Publisher, SubscriberTotals, Totals};
 pub use subscribe::{Notice, Statistics, Subscriber};
@@ -329,6 +329,16 @@ impl Bus {
     pub fn publishers(&self, topic: &str) -> io::Result<Vec<Source>> {
         name::topic(topic)?;
         live::list(&self.root.join(topic).join("pubs"), self.lease)
+    }
+
+    /// What each live publisher of the topic could not give each subscriber
+    /// since it found it, as its entry said at its last refresh (at most a
+    /// second after a drop while it publishes). A subscriber nothing was
+    /// dropped for is not listed; one that has gone may be, until its
+    /// publisher next drops. Looking removes the entry of a dead publisher.
+    pub fn drops(&self, topic: &str) -> io::Result<Vec<Drops>> {
+        name::topic(topic)?;
+        live::drops(&self.root.join(topic).join("pubs"), self.lease)
     }
 
     /// The topic's subscribers, by socket, and whether each has a process

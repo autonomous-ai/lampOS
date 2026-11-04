@@ -1,9 +1,11 @@
 //! Who publishes a topic now.
 //!
 //! A subscriber shows itself by its socket, which the kernel answers for. A
-//! publisher holds nothing a stranger could ask about, so it keeps an empty
-//! file, `<topic>/pubs/<source>.<pid>.<boot>`, and gives it a new time at
-//! most once a second for as long as it publishes or says that it is alive.
+//! publisher holds nothing a stranger could ask about, so it keeps a file,
+//! `<topic>/pubs/<source>.<pid>.<boot>`, and gives it a new time at most
+//! once a second for as long as it publishes or says that it is alive. The
+//! file is empty until the publisher drops a message for a subscriber; then
+//! it says each such subscriber's total, one `<subscriber> <count>` a line.
 //! That is ROS's liveliness with a lease: a publisher "has to indicate that
 //! it is alive" within one, and a file whose time is older than the lease is
 //! a dead publisher's. Whoever lists the publishers removes those.
@@ -14,7 +16,8 @@
 //! back.
 use crate::{FILE_MODE, name};
 use std::{
-    fs, io,
+    fs,
+    io::{self, Write},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     process,
@@ -34,10 +37,26 @@ pub struct Source {
     pub age: Duration,
 }
 
+/// What one live publisher could not give one subscriber since it found it,
+/// as its entry says at its last refresh.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Drops {
+    pub publisher: Source,
+    /// The subscriber's socket without `.sock`: its name, process and count.
+    pub subscriber: String,
+    pub dropped: u64,
+}
+
 /// Where the publisher `source` of this process, instance `boot`, shows
 /// itself in `pubs`.
 pub(crate) fn entry(pubs: &Path, source: &str, boot: &str) -> PathBuf {
     pubs.join(format!("{source}.{}.{boot}", process::id()))
+}
+
+/// Where that entry is written before it is put in place: a name no entry
+/// has, since no source begins with a dot.
+pub(crate) fn writing(pubs: &Path, source: &str, boot: &str) -> PathBuf {
+    pubs.join(format!(".{source}.{}.{boot}.new", process::id()))
 }
 
 /// `<source>.<pid>.<boot>`, or `None` for a file that is not an entry.
@@ -75,6 +94,60 @@ pub(crate) fn touch(path: &Path) -> io::Result<()> {
         Err(error) => return Err(error),
     };
     file.set_modified(SystemTime::now())
+}
+
+/// Write `said` beside the entry at `path` and put it in place: a reader
+/// sees the entry before or this one, never part of either, and its time is
+/// now. Fails with `NotFound` when `pubs/` itself is missing.
+pub(crate) fn write(path: &Path, beside: &Path, said: &[u8]) -> io::Result<()> {
+    let written = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(FILE_MODE)
+        .open(beside)
+        .and_then(|mut file| {
+            file.write_all(said)?;
+            // The mode asked for, whatever the process's umask took from it.
+            file.set_permissions(fs::Permissions::from_mode(FILE_MODE))
+        })
+        .and_then(|()| fs::rename(beside, path));
+    if written.is_err() {
+        let _ = fs::remove_file(beside);
+    }
+    written
+}
+
+/// What each live publisher in `pubs` says it could not give a subscriber:
+/// one line `<subscriber> <count>` for each that it dropped for. A line
+/// that is not one is passed over.
+pub(crate) fn drops(pubs: &Path, lease: Duration) -> io::Result<Vec<Drops>> {
+    let mut found = Vec::new();
+    for publisher in list(pubs, lease)? {
+        let file = pubs.join(format!(
+            "{}.{}.{}",
+            publisher.name, publisher.pid, publisher.boot
+        ));
+        // An entry that went since it was listed says nothing.
+        let Ok(said) = fs::read_to_string(&file) else {
+            continue;
+        };
+        for line in said.lines() {
+            let mut words = line.split(' ');
+            if let (Some(subscriber), Some(count), None) =
+                (words.next(), words.next(), words.next())
+                && !subscriber.is_empty()
+                && let Ok(dropped) = count.parse()
+            {
+                found.push(Drops {
+                    publisher: publisher.clone(),
+                    subscriber: subscriber.into(),
+                    dropped,
+                });
+            }
+        }
+    }
+    Ok(found)
 }
 
 /// The publishers in `pubs` that showed themselves within `lease`, by name.

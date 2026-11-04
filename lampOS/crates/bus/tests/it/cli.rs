@@ -636,6 +636,71 @@ fn topics_lists_each_topic_with_who_listens_and_whether_a_value_is_kept() {
 }
 
 #[test]
+fn drops_lists_each_subscriber_with_what_its_publishers_could_not_give_it() {
+    let root = Root::new();
+    let empty = run(&root, &["drops"]);
+    assert!(empty.status.success() && empty.stdout.is_empty());
+    let bus = root.bus();
+    let slow = bus.subscribe("people", "slow").unwrap();
+    let mut fast = bus.subscribe("people", "fast").unwrap();
+    let quiet = bus.subscribe("room/state", "memory").unwrap();
+    let start = Instant::now();
+    let at = Arc::new(std::sync::Mutex::new(start));
+    let now = at.clone();
+    let mut eyes = bus
+        .publisher_with_cadence_clock("people", Kind::Event, "eyes", move || *now.lock().unwrap())
+        .unwrap();
+    // `slow` never reads: publish until its queue is full, and three more.
+    let mut dropped = 0;
+    for _ in 0..1_000_000 {
+        let outcome = eyes.publish_json(1, &json!({"n": 1})).unwrap();
+        dropped += outcome.dropped as u64;
+        while fast.recv(Duration::ZERO).unwrap().is_some() {}
+        if dropped == 4 {
+            break;
+        }
+    }
+    assert_eq!(dropped, 4, "the queue never filled");
+    // The entry says the totals at the publisher's next refresh.
+    *at.lock().unwrap() = start + Duration::from_secs(2);
+    eyes.alive().unwrap();
+    let socket = |subscriber: &str| {
+        root.sockets(if subscriber == "memory" {
+            "room/state"
+        } else {
+            "people"
+        })
+        .into_iter()
+        .find(|socket| socket.starts_with(&format!("{subscriber}.")))
+        .unwrap()
+        .trim_end_matches(".sock")
+        .to_string()
+    };
+    let (slow_name, fast_name, quiet_name) = (socket("slow"), socket("fast"), socket("memory"));
+    let mut people = [
+        format!("people {fast_name} dropped=0"),
+        format!("people {slow_name} dropped=4"),
+    ];
+    people.sort();
+    let listed = run(&root, &["drops"]);
+    assert!(listed.status.success(), "{}", text(&listed.stderr));
+    assert_eq!(
+        text(&listed.stdout),
+        format!(
+            "{}\n{}\nroom/state {quiet_name} dropped=0\n",
+            people[0], people[1]
+        )
+    );
+    let one = run(&root, &["drops", "people"]);
+    assert!(one.status.success(), "{}", text(&one.stderr));
+    assert_eq!(text(&one.stdout), format!("{}\n{}\n", people[0], people[1]));
+    let unknown = run(&root, &["drops", "voice/heard"]);
+    assert_eq!(unknown.status.code(), Some(1));
+    assert!(text(&unknown.stderr).contains("voice/heard is not on the bus"));
+    drop((slow, quiet));
+}
+
+#[test]
 fn bad_input_prints_the_usage_and_is_status_2_with_nothing_touched() {
     let root = Root::new();
     let elsewhere = root.0.join("recordings");
