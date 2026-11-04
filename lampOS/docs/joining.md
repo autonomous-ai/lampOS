@@ -758,8 +758,13 @@ Slots are comments on **#3336**:
   their own gate aborts. Other builders borrow it in turn, and a builder
   never runs another's lamp without a slot.
 
-**Kits.** A kit is a script that touches a lamp. A kit runs only after the
-lead's agent's yes on **its sha256**; the yes (name, sha256, verdict) is
+**Kits.** A kit is a script that touches a lamp. A kit for lamp-52e6, lamp-4ace
+(with the owner's yes for each session) or a tester's, customer's or loaned
+lamp (29e7, 3e83, 0529, e82d, 220c) runs only after the lead's agent's yes on
+**its sha256**. A builder's own in-house lamp (9adf, 06c1, c0a4, 75c9, fc4b,
+a63e, 0c89, each by its holder) needs no such yes (the PM, on the lead's word,
+4 November): its holder still posts PLAYING, QUIET and FREE on #3336 and
+does the put-back. A yes (name, sha256, verdict) is
 posted on #3336, or on the issue, never only in a message between agents.
 (After the lead's agent's handover on 5 November 11:00, a Swarm kit-review
 agent gives the yes with the same checklist; the PM never does.) The kit
