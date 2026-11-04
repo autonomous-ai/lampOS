@@ -259,6 +259,13 @@ backend của đèn, không bao giờ đến Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | như Slack | như Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | như Slack | như Slack |
 
+Một lần đọc `events` của Calendar hỏi giờ theo múi giờ của chính đèn
+(`timeZone`, tên IANA của múi giờ hệ thống, `reads::zone_here`), nên một sự
+kiện 15:00 +07:00 trả về là 15:00 +07:00. Thiếu nó, Calendar trả lời theo múi
+giờ của chính lịch, và trên lamp-9adf ngày 5/11 lúc 00:27 một sự kiện như vậy
+trả về là 08:00Z và bị nói thành "8 to 9 AM your time". Khi múi giờ không có
+tên, không hỏi gì, như trước.
+
 Một lệnh gọi có thể gọi tên mã Gmail nào cũng được: `gmail` hay `gmail-app`
 đều đến liên kết Gmail mà đèn đang có, vì mô hình của giọng nói dùng lẫn hai
 tên (trên lamp-9adf ngày 4/11 nó gọi `gmail` ở hai trong bốn lần gửi và đèn
