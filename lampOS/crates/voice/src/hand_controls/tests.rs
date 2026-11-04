@@ -1,4 +1,5 @@
 use super::*;
+use crate::privacy::PrivacyState;
 use lamp_bus::Header;
 use lamp_msgs::{ClockStamp, ControlSource, Gesture, HoldTier};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, sync::atomic::AtomicUsize};
@@ -3980,4 +3981,241 @@ fn a_sleep_under_a_computers_mute_does_not_hear_its_name() {
     assert!(owner.control_held());
     assert!(!owner.asleep_by_choice());
     assert!(!owner.name_wake(at + 2_000));
+}
+
+/// The slide as the lamp's sleep and wake (migrate-P4): it closes on a lamp
+/// listening and asks the sleep a hold does, and opening wakes it with its
+/// "hm?", without a touch.
+#[test]
+fn the_slide_puts_the_lamp_to_sleep_and_wakes_it() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner = owner.with_test_slide_wakes();
+    owner.quiescent_at(START).unwrap();
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(START + 1_000));
+    owner.quiescent_at(START + 2_000).unwrap();
+    assert!(owner.muted() && owner.asleep_by_choice());
+    let saved = MuteRecord::load(&directory.file(), CLOCK, START + 3_000).unwrap();
+    assert!(saved.asleep());
+
+    owner.slide_said(PrivacyState::Allowed);
+    let opened = START + 1_000_000;
+    assert!(!owner.slide_look(opened));
+    assert!(owner.slide_settling());
+    assert!(!owner.quiescent_at(opened + 1).unwrap());
+    let woke = opened + crate::slide_wake::SETTLE_US;
+    assert!(owner.slide_look(woke));
+    assert!(owner.quiescent_at(woke + 1).unwrap());
+    assert!(!owner.muted());
+    assert_eq!(owner.take_woken(woke + 2), Some(woke));
+    assert_eq!(
+        owner.name_resleep_at(),
+        None,
+        "only a name's wake re-sleeps"
+    );
+    let saved = MuteRecord::load(&directory.file(), CLOCK, woke + 3).unwrap();
+    assert!(!saved.muted);
+}
+
+/// A sleep by a hold opens with the slide too: the slide is the wake,
+/// whoever put it to sleep.
+#[test]
+fn the_slide_wakes_a_sleep_by_a_hold() {
+    let directory = Directory::new();
+    let (owner, _sender, at) = asleep_by_a_hold(&directory);
+    let mut owner = owner.with_test_slide_wakes();
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(at + 1));
+    owner.slide_said(PrivacyState::Allowed);
+    assert!(!owner.slide_look(at + 2));
+    let woke = at + 2 + crate::slide_wake::SETTLE_US;
+    assert!(owner.slide_look(woke));
+    assert!(owner.quiescent_at(woke + 1).unwrap());
+    assert_eq!(owner.take_woken(woke + 2), Some(woke));
+}
+
+/// A slide closed on the restart guard's mute lies the lamp down (the person
+/// on lamp-e82d, 4 Nov 11:44: closed just after a fault, it stood with the red
+/// line), and opening wakes it with its "hm?"; a new fault arms the guard again.
+#[test]
+fn the_slide_clears_the_restart_guards_mute() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let record = MuteRecord::load(&directory.file(), CLOCK, START).unwrap();
+    let (mut restored, _sender) = from_record(head_options(Some(&directory)), record, START);
+    restored.mark_guard = true;
+    restored.restore_guard_marker(stored_identity(&directory.file()));
+    let mut restored = restored.with_test_slide_wakes();
+    assert!(restored.restored_after_fault());
+    restored.quiescent_at(START + 1).unwrap();
+    restored.slide_said(PrivacyState::Muted);
+    assert!(!restored.slide_look(START + 2));
+    restored.quiescent_at(START + 3).unwrap();
+    assert!(restored.muted() && restored.asleep_by_choice());
+    assert!(!restored.restored_after_fault());
+    assert!(
+        !directory
+            .0
+            .join(format!("mute.json{GUARD_MARKER_SUFFIX}"))
+            .exists()
+    );
+    let saved = MuteRecord::load(&directory.file(), CLOCK, START + 3).unwrap();
+    assert!(
+        saved.asleep(),
+        "a restart still sleeps, and the slide wakes it"
+    );
+    restored.slide_said(PrivacyState::Allowed);
+    assert!(!restored.slide_look(START + 4));
+    let woke = START + 4 + crate::slide_wake::SETTLE_US;
+    assert!(restored.slide_look(woke));
+    assert!(restored.quiescent_at(woke + 1).unwrap());
+    assert!(!restored.muted() && !restored.restored_after_fault());
+    assert_eq!(restored.take_woken(woke + 2), Some(woke));
+    restored.arm_active().unwrap();
+    assert!(
+        directory
+            .0
+            .join(format!("mute.json{GUARD_MARKER_SUFFIX}"))
+            .is_file()
+    );
+}
+
+/// A mute the person chose on the button stays through the slide.
+#[test]
+fn the_slide_leaves_a_mute_the_person_chose() {
+    let directory = Directory::new();
+    let (mut owner, sender) = fixture(head_options(Some(&directory)));
+    let mute = gesture(ControlIntent::SoftwareMute, 1, 4_000_000);
+    observe(
+        &mut owner,
+        &sender,
+        state(1, 4_000_000, Some(mute)),
+        4_000_100,
+    );
+    assert!(owner.muted() && !owner.asleep_by_choice());
+    let mut owner = owner.with_test_slide_wakes();
+    let at = 5_000_000;
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(at));
+    owner.quiescent_at(at + 1).unwrap();
+    assert!(owner.muted() && !owner.asleep_by_choice(), "not weakened");
+    owner.slide_said(PrivacyState::Allowed);
+    assert!(!owner.slide_look(at + 2));
+    assert!(!owner.slide_look(at + 2 + crate::slide_wake::SETTLE_US));
+    assert!(
+        !owner
+            .quiescent_at(at + 3 + crate::slide_wake::SETTLE_US)
+            .unwrap()
+    );
+    assert!(owner.muted());
+    assert_eq!(
+        owner.take_woken(at + 4 + crate::slide_wake::SETTLE_US),
+        None
+    );
+}
+
+/// The onboarding walk never sleeps (#3747), and the slide doesn't change it.
+#[test]
+fn the_slide_does_not_sleep_the_onboarding_walk() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner = owner.with_test_slide_wakes();
+    owner.set_onboarding(true);
+    owner.quiescent_at(START).unwrap();
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(START + 1));
+    assert!(owner.quiescent_at(START + 2).unwrap());
+    assert!(!owner.muted());
+}
+
+/// With the switch off nothing the slide does touches the record.
+#[test]
+fn without_the_switch_the_slide_asks_nothing() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner.quiescent_at(START).unwrap();
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(START + 1));
+    assert!(owner.quiescent_at(START + 2).unwrap());
+    assert!(!owner.muted());
+    owner.slide_said(PrivacyState::Allowed);
+    assert!(!owner.slide_settling());
+    assert!(!owner.slide_look(START + crate::slide_wake::SETTLE_US * 2));
+    assert_eq!(
+        owner.take_woken(START + crate::slide_wake::SETTLE_US * 2),
+        None
+    );
+}
+
+/// The guard's mute with the slide open all along is no person's move: it
+/// stays until a tap, or until the slide closes and opens.
+#[test]
+fn the_guards_mute_under_an_open_slide_stays_until_a_person_moves() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner.mark_guard = true;
+    owner.arm_active().unwrap();
+    drop(owner);
+    let record = MuteRecord::load(&directory.file(), CLOCK, START).unwrap();
+    let (mut restored, _sender) = from_record(head_options(Some(&directory)), record, START);
+    restored.mark_guard = true;
+    restored.restore_guard_marker(stored_identity(&directory.file()));
+    let mut restored = restored.with_test_slide_wakes();
+    restored.slide_said(PrivacyState::Allowed);
+    assert!(!restored.slide_look(START + 1));
+    assert!(!restored.slide_look(START + 1 + crate::slide_wake::SETTLE_US));
+    assert!(
+        !restored
+            .quiescent_at(START + 2 + crate::slide_wake::SETTLE_US)
+            .unwrap()
+    );
+    assert!(restored.restored_after_fault());
+}
+
+/// A computer's mute isn't the slide's to open: the slide wakes a sleep under
+/// it, and the microphones stay closed until the computer lifts it.
+#[test]
+fn the_slide_leaves_a_computers_mute() {
+    let directory = Directory::new();
+    let (owner, _head, at) = asleep_by_a_hold(&directory);
+    let mut owner = owner.with_test_slide_wakes();
+    let mutes = owner.control_mutes();
+    let hold = mutes.hold().unwrap();
+    owner.poll_at(at + 1).unwrap();
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(at + 2));
+    owner.slide_said(PrivacyState::Allowed);
+    assert!(!owner.slide_look(at + 3));
+    let woke = at + 3 + crate::slide_wake::SETTLE_US;
+    owner.slide_look(woke);
+    assert!(!owner.quiescent_at(woke + 1).unwrap(), "still closed");
+    assert!(owner.control_held());
+    hold.lift(crate::control_mute::Lift::Asked);
+    assert!(owner.quiescent_at(woke + 2).unwrap());
+}
+
+/// A wait that ends with the slide still closed (a hold clears a POWER mute)
+/// leaves nothing behind: the next close still lays the lamp down
+/// (Reviewer-lead on #5185).
+#[test]
+fn a_close_after_the_wait_ended_still_asks_sleep() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    owner = owner.with_test_slide_wakes();
+    owner.quiescent_at(START).unwrap();
+    owner.set_onboarding(true);
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(START + 500));
+    owner.quiescent_at(START + 1_000).unwrap();
+    assert!(!owner.muted(), "the walk asked no sleep");
+    owner.set_onboarding(false);
+    owner.slide_wait_ended();
+    owner.slide_said(PrivacyState::Muted);
+    assert!(!owner.slide_look(START + 1_003_000));
+    owner.quiescent_at(START + 1_004_000).unwrap();
+    assert!(owner.muted() && owner.asleep_by_choice());
 }

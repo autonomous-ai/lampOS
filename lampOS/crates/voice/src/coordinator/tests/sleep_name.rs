@@ -174,3 +174,60 @@ fn a_closed_slide_or_a_persons_mute_never_listens() {
         let _ = fs::remove_dir_all(directory);
     }
 }
+
+/// The slide through the muted wait itself (migrate-P4, `LAMP_SLIDE_WAKES`):
+/// closed it holds a sleep shut, and open it wakes after its settling, with
+/// the wake in the trace and its "hm?" at the wake's time.
+#[test]
+fn the_slide_opening_wakes_a_sleep_through_the_wait() {
+    let (controls, directory) = asleep("slide-opens");
+    {
+        let mut owner = controls.borrow_mut();
+        let woken = owner.take().unwrap().with_test_slide_wakes();
+        *owner = Some(woken);
+    }
+    let reminders = RefCell::new(None);
+    let mut trace = SessionState::default();
+    let mut waited = None;
+    let outcome = muted_wait_pulsing(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        None::<crate::ring_asleep::SleepFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        None,
+        None,
+        None,
+        None,
+        |on_state, gate| {
+            let boot = crate::process::new_boot().unwrap();
+            on_state(PrivacyState::Muted, boot, 1)?;
+            assert!(!gate(&mut |_| Ok(()))?);
+            on_state(PrivacyState::Allowed, boot, 2)?;
+            assert!(!gate(&mut |_| Ok(()))?, "not before it settles");
+            let opened = Instant::now();
+            let until = opened + Duration::from_secs(5);
+            loop {
+                if gate(&mut |_| Ok(()))? {
+                    waited = Some(opened.elapsed());
+                    return Ok(WaitOutcome::Allowed);
+                }
+                assert!(Instant::now() < until, "the slide never woke it");
+                std::thread::sleep(Duration::from_millis(3));
+            }
+        },
+    )
+    .unwrap();
+    assert_eq!(outcome, WaitOutcome::Allowed);
+    assert!(waited.unwrap() >= Duration::from_micros(crate::slide_wake::SETTLE_US - 50_000));
+    let wake = trace
+        .iter()
+        .find(|row| row["kind"] == "head_sleep_slide_wake")
+        .expect("the wake is in the trace");
+    let at = wake["at_us"].as_u64().unwrap();
+    let mut controls = controls.into_inner().unwrap();
+    assert_eq!(controls.take_woken(at + 1), Some(at));
+    assert!(controls.said_for_test().is_some_and(|said| !said.muted));
+    let _ = fs::remove_dir_all(directory);
+}
