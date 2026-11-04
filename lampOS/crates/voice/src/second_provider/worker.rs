@@ -17542,6 +17542,9 @@ mod tests {
     fn the_asked_person_is_the_same_voice_or_a_face_turned_to_the_lamp() {
         use crate::same_voice::{DIFFERENT_BELOW, SAME_FROM};
         assert!(super::asked_person_said(Some(SAME_FROM), None));
+        // The services' looser bar is not the conversation's: 0.60 alone
+        // is not the asked voice.
+        assert!(!super::asked_person_said(Some(0.60), None));
         assert!(super::asked_person_said(None, Some(true)));
         assert!(super::asked_person_said(Some(0.5), Some(true)));
         // Another voice, even with a face turned to the lamp; or nothing

@@ -73,8 +73,8 @@ không qua môi trường của chính nó), bất kể
 đầy đủ trên tuyến thứ hai, khi mắt đếm
 được đúng một khuôn mặt trong tầm nhìn (`known_faces::most_faces_lately`,
 được đếm mỗi khi `LAMP_SERVICES=on` ở đó) và câu nói ở giọng của cuộc trò
-chuyện (`same_voice::Voices::likeness_so_far` từ `same_voice::SAME_FROM`,
-0.70, trở lên; `services::read_in_full`). Các dịch vụ hỏi phép kiểm tra cùng
+chuyện (`same_voice::Voices::likeness_so_far` từ `same_voice::SERVICES_SAME_FROM`,
+0.55, trở lên; `services::read_in_full`). Các dịch vụ hỏi phép kiểm tra cùng
 giọng của tuyến thứ hai qua `services::judging_voices`, chờ tối đa 800 ms
 cho một dấu giọng. Với `LAMP_SAME_VOICE_MODEL` và
 `LAMP_SAME_VOICE_FOR=services`, tuyến thứ hai chỉ tạo dấu giọng cho các phán
@@ -639,7 +639,7 @@ only reads …").
   từ chối làm quên id trong mọi trường hợp.
 - **Giọng nói "send" là giọng đã yêu cầu.** Dấu giọng của câu gửi và của câu
   chuẩn bị được so (`same_voice::Voices::alike`). Một giọng khác đã biết (có
-  cả hai dấu giọng, giống nhau dưới `same_voice::SAME_FROM`, 0.70) hoặc một
+  cả hai dấu giọng, giống nhau dưới `same_voice::SERVICES_SAME_FROM`, 0.55, thấp hơn `SAME_FROM` 0.70 của cuộc trò chuyện vì hầu hết chủ đèn ở một mình với đèn) hoặc một
   khuôn mặt khác được thấy nói câu gửi sẽ huỷ nó: mô hình được báo
   `OTHER_VOICE`, "Not sent, and cancelled: I send only when the voice saying
   "send" is the one that asked for it. Say it was not sent." Dấu giọng chỉ
@@ -659,7 +659,7 @@ only reads …").
   `LAMP_SAME_VOICE_FOR=services`, [same-voice.md](../same-voice.md), "The
   owner's voice print"): dấu giọng của câu gửi được so với dấu giọng của chủ
   đèn, lấy trung bình từ nhiều câu của họ, thay cho dấu giọng của câu chuẩn
-  bị (`VoiceAsk::Owner`, `services::send_likeness`), với cùng `SAME_FROM`;
+  bị (`VoiceAsk::Owner`, `services::send_likeness`), với cùng `SERVICES_SAME_FROM`;
   nhật ký chỉ ghi cosine ("owner print: the send's cosine 0.82"). Mọi kiểm
   tra khác ở trên giữ nguyên. Không có dấu giọng thì như trên. Sau một lần
   gửi của chủ đèn chưa có dấu giọng, đã gửi hoặc bị từ chối là
@@ -793,7 +793,7 @@ không bao giờ lấy từ thư mục của executive hay của một kỹ năn
 - **`service_read {service, what, …}`**: `what` và các đối số của nó như
   trong bảng ở trên; câu trả lời được trích dẫn, rút gọn còn ai gửi và về
   việc gì khi chủ đèn có thể không ở một mình. Một lần đọc đầy đủ còn cần câu
-  nói bằng giọng của cuộc trò chuyện (`read_in_full`, độ giống từ 0.70 trở
+  nói bằng giọng của cuộc trò chuyện (`read_in_full`, độ giống từ 0.55 trở
   lên), mà sản phẩm không đặt `LAMP_SAME_VOICE_MODEL`, nên trên đèn sản phẩm
   mọi lần đọc đều bị rút gọn (`BRIEF_NOTE`): bao nhiêu, ai gửi và về việc gì,
   không bao giờ nội dung của một mail hay một sự kiện.
