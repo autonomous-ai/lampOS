@@ -2,9 +2,10 @@ use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{CLOSE_RETRY_MS, CLOSE_TRIES, Clock as Sample, WATCH_EARLY_MS},
+    follow::WatchLane,
     harness::{
         AccountMachine, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation,
-        SignIn, Target,
+        SignIn, Target, WatchEnd, WatchEvent,
     },
     progress::SETTLED_FOR_MS,
     runtime::{Adapter, Clock, Config, SetUpLater, WaitLane, request, serve_with_adapter},
@@ -87,6 +88,13 @@ struct Counts {
     waits: Mutex<Vec<Vec<String>>>,
     /// What the held `wait` comes back with, once set.
     wait_ends: Mutex<Option<Vec<Ended>>>,
+    /// Each `watch` held, with the agent it named (`--push-watch`).
+    watches: Mutex<Vec<String>>,
+    /// The `watch`es held now.
+    watching: AtomicUsize,
+    /// What the held `watch` says next, once set; `done` and `failed` end
+    /// it, as `Cli::watch` does.
+    watch_says: Mutex<Option<WatchEvent>>,
     /// `show` finds the agent idle with this answer while set, as Harness
     /// gives it: its `ask` is the task's own text.
     plain: Mutex<Option<String>>,
@@ -165,6 +173,36 @@ impl WaitLane for ScriptLane {
         }
     }
 }
+struct ScriptWatch(Arc<Counts>);
+impl WatchLane for ScriptWatch {
+    fn watch(
+        &self,
+        machine: &str,
+        agent: &str,
+        cancel: &AtomicBool,
+        on_event: &mut dyn FnMut(WatchEvent),
+    ) -> WatchEnd {
+        assert_eq!(machine, "0123456789abcdef0123456789abcdef");
+        self.0.watches.lock().unwrap().push(agent.to_owned());
+        self.0.watching.fetch_add(1, Ordering::SeqCst);
+        // The first line is how the harness stands now.
+        on_event(WatchEvent::Working);
+        let end = loop {
+            if cancel.load(Ordering::Acquire) {
+                break WatchEnd::Cancelled;
+            }
+            if let Some(event) = self.0.watch_says.lock().unwrap().take() {
+                on_event(event);
+                if matches!(event, WatchEvent::Done | WatchEvent::Failed) {
+                    break WatchEnd::Settled;
+                }
+            }
+            thread::sleep(Duration::from_millis(5));
+        };
+        self.0.watching.fetch_sub(1, Ordering::SeqCst);
+        end
+    }
+}
 struct Script {
     counts: Arc<Counts>,
     stop: Arc<AtomicBool>,
@@ -209,6 +247,9 @@ impl Script {
 impl Adapter for Script {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         Some(Arc::new(ScriptLane(self.counts.clone())))
+    }
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        Some(Arc::new(ScriptWatch(self.counts.clone())))
     }
     fn launch(&self, _: &Launch) -> LaunchOutcome {
         self.counts.launches.fetch_add(1, Ordering::SeqCst);
@@ -370,6 +411,7 @@ impl Running {
             watch,
             progress,
             push_wait: false,
+            push_watch: false,
             close_told,
             targets_newer: None,
             set_up_later: None,
@@ -1497,6 +1539,76 @@ fn a_held_wait_that_comes_back_reads_the_agent_at_once_and_keeps_its_idle_answer
     thread::sleep(Duration::from_millis(100));
     assert_eq!(s.counts.waits.lock().unwrap().len(), 1);
     assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+}
+
+/// #5230: with `--push-watch`, one Harness `watch` is held on the task's
+/// agent, a `working` line reads nothing, and `done` reads the agent at
+/// once and keeps its idle answer; the watch is then let go. With
+/// `--push-wait` too, the followed task is never also waited on. The
+/// injected clock never moves, so only the push reads.
+#[test]
+fn a_held_watch_reads_the_agent_at_once_on_done_and_is_let_go() {
+    let mut s = Running::unstarted(false, false, true, false);
+    s.config.push_watch = true;
+    s.config.push_wait = true;
+    s.start();
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    let start = Instant::now();
+    while s.counts.watches.lock().unwrap().is_empty() {
+        assert!(start.elapsed() < Duration::from_secs(5), "no watch held");
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(*s.counts.watches.lock().unwrap(), vec![AGENT.to_owned()]);
+    // `working`: nothing read, and once heard from, no `wait` beside it.
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 0);
+    let waited = s.counts.waits.lock().unwrap().len();
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.waits.lock().unwrap().len(), waited);
+    assert!(waited <= 1, "a wait held beside the watch: {waited}");
+    // Done: read at once, its idle answer kept, the watch let go.
+    s.counts.idle.store(true, Ordering::SeqCst);
+    *s.counts.watch_says.lock().unwrap() = Some(WatchEvent::Done);
+    let kept = s.wait(&prepared["id"], |v| v["task"]["observations"] == json!(1));
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1, "{kept}");
+    thread::sleep(Duration::from_millis(100));
+    assert_eq!(s.counts.watching.load(Ordering::SeqCst), 0);
+    assert_eq!(s.counts.watches.lock().unwrap().len(), 1);
+    assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+}
+
+/// #5230: a watch held when the part stops is ended with it.
+#[test]
+fn every_held_watch_ends_when_the_part_stops() {
+    let mut s = Running::unstarted(false, false, true, false);
+    s.config.push_watch = true;
+    s.start();
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    let start = Instant::now();
+    while s.counts.watching.load(Ordering::SeqCst) == 0 {
+        assert!(start.elapsed() < Duration::from_secs(5), "no watch held");
+        thread::sleep(Duration::from_millis(5));
+    }
+    s.stop();
+    assert_eq!(s.counts.watching.load(Ordering::SeqCst), 0);
+}
+
+/// Without `--push-watch` no watch is ever held, whatever the adapter has.
+#[test]
+fn without_push_watch_no_watch_is_held() {
+    let s = Running::configured(false, false, true);
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    thread::sleep(Duration::from_millis(100));
+    assert!(s.counts.watches.lock().unwrap().is_empty());
 }
 
 /// Without `--push-wait` no wait is ever held, whatever the adapter has.

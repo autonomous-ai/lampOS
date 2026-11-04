@@ -1274,6 +1274,7 @@ mod tests {
                     watch: false,
                     progress: false,
                     push_wait: false,
+                    push_watch: false,
                     close_told: false,
                     targets_newer: None,
                     set_up_later: None,
