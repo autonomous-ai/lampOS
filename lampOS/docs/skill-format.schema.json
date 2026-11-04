@@ -763,9 +763,6 @@
             "google_drive": {
               "const": "read"
             },
-            "notion": {
-              "const": "read"
-            },
             "figma": {
               "const": "read"
             },
@@ -1459,7 +1456,6 @@
                     "gmail",
                     "google_calendar",
                     "google_drive",
-                    "notion",
                     "figma",
                     "figma-api",
                     "github",

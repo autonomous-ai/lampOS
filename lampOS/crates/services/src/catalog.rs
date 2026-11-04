@@ -46,7 +46,7 @@ pub struct Service {
     pub mcp: Option<&'static str>,
 }
 
-use Method::{Get, Patch, Post};
+use Method::{Get, Post};
 
 /// Figma's reads, under either of its codes.
 const FIGMA_READS: &[(Method, &str)] = &[
@@ -121,24 +121,6 @@ pub const SERVICES: &[Service] = &[
             (Get, "/drive/v3/files/*/export"),
         ],
         writes: &[],
-        mcp: None,
-    },
-    Service {
-        code: "notion",
-        name: "Notion",
-        hosts: &["api.notion.com"],
-        api: Some("https://api.notion.com"),
-        graphql: false,
-        reads: &[
-            // Notion's search and a database's query are POSTs that read.
-            (Post, "/v1/search"),
-            (Post, "/v1/databases/*/query"),
-            (Get, "/v1/users/me"),
-            (Get, "/v1/pages/*"),
-            (Get, "/v1/databases/*"),
-            (Get, "/v1/blocks/*/children"),
-        ],
-        writes: &[(Patch, "/v1/blocks/*/children")],
         mcp: None,
     },
     Service {
@@ -292,12 +274,23 @@ pub const SERVICES: &[Service] = &[
         writes: &[],
         mcp: Some("https://mcp.amplitude.com/mcp"),
     },
+    // The app's Notion sign-in is Notion's MCP OAuth, and its token is good
+    // only at Notion's hosted MCP server: api.notion.com refused it (401) on
+    // every read on lamp-9adf, 4 Nov 22:19-22:21.
+    Service {
+        code: "notion",
+        name: "Notion",
+        hosts: &["mcp.notion.com"],
+        api: None,
+        graphql: false,
+        reads: &[],
+        writes: &[],
+        mcp: Some("https://mcp.notion.com/mcp"),
+    },
 ];
 
 /// The Graph API version the lamp asks Facebook with.
 pub const FACEBOOK_VERSION: &str = "v19.0";
-/// The Notion API version its requests name.
-pub const NOTION_VERSION: &str = "2022-06-28";
 
 /// The service a code names.
 pub fn service(code: &str) -> Option<&'static Service> {
@@ -513,6 +506,23 @@ mod tests {
     }
 
     #[test]
+    fn notion_is_read_and_written_through_its_own_mcp_server() {
+        // The app's Notion sign-in gives an MCP token api.notion.com refuses.
+        let notion = service("notion").unwrap();
+        assert_eq!(notion.mcp, Some("https://mcp.notion.com/mcp"));
+        assert!(notion.api.is_none() && notion.reads.is_empty() && notion.writes.is_empty());
+        assert!(host_allowed("notion", "mcp.notion.com"));
+        for host in [
+            "api.notion.com",
+            "notion.so",
+            "x.mcp.notion.com",
+            "notion.com",
+        ] {
+            assert!(!host_allowed("notion", host), "notion to {host}");
+        }
+    }
+
+    #[test]
     fn paths_match_segment_by_segment() {
         assert!(path_matches("/repos/*/*/issues", "/repos/a/b/issues"));
         assert!(path_matches("/repos/*/*/issues", "/repos/a/b/issues/"));
@@ -541,10 +551,7 @@ mod tests {
         ));
         assert!(!ok("google_calendar", Get, "/drive/v3/files"));
         assert!(ok("google_drive", Get, "/drive/v3/files/abc/export"));
-        assert!(!ok("google_drive", Patch, "/drive/v3/files/abc"));
-        assert!(ok("notion", Post, "/v1/search"));
-        assert!(!ok("notion", Patch, "/v1/blocks/x/children"));
-        assert!(!ok("notion", Post, "/v1/pages"));
+        assert!(!ok("google_drive", Method::Patch, "/drive/v3/files/abc"));
         assert!(ok("figma", Get, "/v1/files/key/comments"));
         assert!(ok("figma-api", Get, "/v1/files/key/comments"));
         assert!(host_allowed("figma-api", "api.figma.com"));

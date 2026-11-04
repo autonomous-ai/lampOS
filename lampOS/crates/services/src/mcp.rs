@@ -1,7 +1,7 @@
-//! V1's MCP connectors (Slack, monday.com, HubSpot, Amplitude): a small MCP
-//! client over Streamable HTTP. JSON-RPC 2.0 posted to the service's one
-//! endpoint: `initialize`, `notifications/initialized`, then `tools/list`
-//! and `tools/call`, the `Mcp-Session-Id` the first answer gives kept for
+//! V1's MCP connectors (Slack, monday.com, HubSpot, Amplitude) and Notion:
+//! a small MCP client over Streamable HTTP. JSON-RPC 2.0 posted to the
+//! service's one endpoint: `initialize`, `notifications/initialized`, then
+//! `tools/list` and `tools/call`, the `Mcp-Session-Id` the first answer gives kept for
 //! the rest of that one sequence. An answer is `application/json` or a
 //! `text/event-stream` holding the reply.
 //!
@@ -99,6 +99,7 @@ pub const READ_VERBS: &[(&str, &[&str], &[&str])] = &[
     ("mondaydotcom", &["monday"], READS),
     ("hubspot", &["hubspot"], READS),
     ("amplitude", &["amplitude"], READS),
+    ("notion", &["notion"], READS),
 ];
 
 /// The words of a tool's name, in lower case: split at anything not a
@@ -647,7 +648,7 @@ fn pieces(text: &str) -> Vec<String> {
 /// texts one group: one answer, read as one page.
 fn text_items(text: &str) -> Vec<(Option<String>, Value)> {
     match serde_json::from_str::<Value>(text) {
-        Ok(Value::Object(_) | Value::Array(_)) => reads::items("mcp", text)
+        Ok(Value::Object(_) | Value::Array(_)) => reads::items(text)
             .into_iter()
             .map(|item| {
                 let group = reads::group_of(&item).or_else(|| Some(reads::ANSWER.to_owned()));
@@ -966,6 +967,13 @@ mod tests {
         assert!(!is_read("hubspot", &tool("hubspot_create_contact")));
         assert!(is_read("amplitude", &tool("query_chart")));
         assert!(!is_read("amplitude", &tool("amplitude")));
+        // Notion's tools are named `notion-search`, `notion-fetch` and the like.
+        assert!(is_read("notion", &tool("notion-search")));
+        assert!(is_read("notion", &tool("notion-fetch")));
+        assert!(is_read("notion", &tool("notion-get-comments")));
+        assert!(!is_read("notion", &tool("notion-update-page")));
+        assert!(!is_read("notion", &tool("notion-create-pages")));
+        assert!(!is_read("notion", &tool("notion-duplicate-page")));
         // A read word inside another isn't one; an unknown service reads nothing.
         assert!(!is_read("slack", &tool("listen")));
         assert!(!is_read("github", &tool("get_issue")));
@@ -997,6 +1005,16 @@ mod tests {
         }
         let amplitude = catalog::service("amplitude").unwrap();
         assert!(pinned_url(amplitude, Some("https://mcp.eu.amplitude.com/mcp")).is_ok());
+        // Notion's fetched `mcp_url` is taken on its MCP host, never its REST one.
+        let notion = catalog::service("notion").unwrap();
+        assert_eq!(
+            pinned_url(notion, None).unwrap(),
+            "https://mcp.notion.com/mcp"
+        );
+        assert!(pinned_url(notion, Some("https://mcp.notion.com/mcp")).is_ok());
+        for url in ["https://api.notion.com/mcp", "https://notion.so/mcp"] {
+            assert!(pinned_url(notion, Some(url)).is_err(), "{url}");
+        }
         // A link naming another host is refused at set, nothing kept.
         let data = json!({"auth_type":"oauth","access_token":"planted-mcp-4710","credentials":{"mcp_url":"https://evil.test/mcp"}});
         let why = Entry::from_set("slack", &data, 0).unwrap_err();

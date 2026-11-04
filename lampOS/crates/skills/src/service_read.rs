@@ -561,7 +561,6 @@ mod tests {
         );
         assert_eq!(drive.named(), drive.args(None).unwrap());
         for good in [
-            r#"service = "notion", what = "search", query = "plans", count = 5"#,
             r#"service = "github", what = "issues", repo = "o/r""#,
             r#"service = "github", what = "notifications""#,
             r#"service = "linear", what = "my_issues""#,
@@ -595,9 +594,9 @@ mod tests {
         let no_reads = step(r#"service = "gmail-app", what = "recent""#).unwrap_err();
         assert!(no_reads.contains("only sends"), "{no_reads}");
         assert!(
-            step(r#"service = "notion", what = "page", id = "p""#)
+            step(r#"service = "notion", what = "search", query = "plans""#)
                 .unwrap_err()
-                .contains("whole text")
+                .contains("can't read yet")
         );
         for refused in [
             r#"service = "google_calendar", what = "events""#,

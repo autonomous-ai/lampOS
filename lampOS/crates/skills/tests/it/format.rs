@@ -378,7 +378,7 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
     };
     let calendar = "services = { google_calendar = \"read\" }";
     let mail = "services = { gmail = \"read\" }";
-    let notion = "services = { notion = \"read\" }";
+    let drive = "services = { google_drive = \"read\" }";
     for good in [
         read(
             calendar,
@@ -390,11 +390,11 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
         ),
         read(mail, "{ service = \"gmail\", what = \"recent\" }"),
         read(
-            notion,
-            "{ service = \"notion\", what = \"search\", query = \"plans\" }",
+            drive,
+            "{ service = \"google_drive\", what = \"files\", query = \"plans\" }",
         ),
         read(
-            "services = { google_drive = \"read\" }",
+            drive,
             "{ service = \"google_drive\", what = \"files\", count = 2 }",
         ),
         read(
@@ -427,12 +427,17 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
             "{ service = \"gmail-app\", what = \"recent\" }",
         ),
         read(
-            notion,
-            "{ service = \"notion\", what = \"search\", query = \"\" }",
+            drive,
+            "{ service = \"google_drive\", what = \"files\", query = \"\" }",
         ),
         read(
-            notion,
-            "{ service = \"notion\", what = \"search\", from = \"2026-11-04\" }",
+            drive,
+            "{ service = \"google_drive\", what = \"files\", from = \"2026-11-04\" }",
+        ),
+        // Notion is an MCP service since #5308: no fixed read for a skill.
+        read(
+            "services = { notion = \"read\" }",
+            "{ service = \"notion\", what = \"search\", query = \"plans\" }",
         ),
         // Free-form reads (Thirteen's P2 on #5303): no service for them, no
         // key for their shape.
@@ -458,8 +463,8 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
             "{ service = \"gmail\", what = \"message\", id = \"x\" }",
         ),
         read(
-            notion,
-            "{ service = \"notion\", what = \"page\", id = \"p\" }",
+            drive,
+            "{ service = \"google_drive\", what = \"text\", id = \"p\" }",
         ),
         read(
             calendar,
