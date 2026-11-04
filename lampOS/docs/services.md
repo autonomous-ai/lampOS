@@ -233,6 +233,12 @@ refresh goes to the lamp's backend, never to Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | as Slack | as Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | as Slack | as Slack |
 
+A call may name either Gmail code: `gmail` or `gmail-app` reaches whichever
+Gmail link the lamp has, because the voice's model mixes the two (on
+lamp-9adf on 4 Nov it named `gmail` in two of four sends and the lamp said
+Gmail wasn't linked). See [the send-only sign-in](#gmail-an-app-password-over-imap-and-smtp-or-a-google-sign-in-over-its-api)
+below.
+
 Every HTTP service also takes `get {path, params}`: a plain path the model
 names, checked against that service's read list like any other read. Figma is
 `figma-api` as the backend lists it for lamps and `figma` as V1's helper
@@ -356,6 +362,18 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
 - **With both linked**, a send may go through either; a read only through
   `gmail`. The read function's description says `gmail-app: none, it only
   sends: reads use gmail`.
+- **Either name reaches it** (`serve.rs`, `linked_code`): a call naming
+  `gmail` when only `gmail-app` is linked uses the `gmail-app` link, and one
+  naming `gmail-app` when only `gmail` is linked uses `gmail`, which also
+  sends. The voice's model mixes the two names (lamp-9adf, 4 Nov), and each
+  `gmail` send was told "Gmail isn't linked" although it was. A send's
+  second phase compares the two names as linked, so a send prepared as one
+  and confirmed as the other goes; another service's `send_id` is still
+  refused. A read naming `gmail` with only `gmail-app` linked answers that
+  this link only sends (the words above), not "isn't linked". With neither
+  linked, each name is "isn't linked" as before. Nothing else changes: the
+  send-only link still reads nothing and never goes over SMTP, and every
+  write gate holds.
 - **Refresh:** through the backend under its own code
   (`connector: "gmail-app"`), as Google Calendar's.
 

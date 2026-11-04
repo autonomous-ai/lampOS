@@ -325,12 +325,30 @@ impl<H: Http, M: Mail> Services<H, M> {
         json!({"connected": connected, "writes": self.write_on})
     }
 
+    /// The code a call naming `asked` reaches: `asked` itself, except that
+    /// either Gmail name reaches whichever Gmail link the lamp has, since
+    /// the voice's model mixes `gmail` and `gmail-app` (lamp-9adf, 4 Nov).
+    /// A `gmail-app` link still only sends, over Gmail's API only.
+    fn linked_code<'a>(&self, asked: &'a str) -> &'a str {
+        let other = match asked {
+            "gmail" => "gmail-app",
+            "gmail-app" => "gmail",
+            _ => return asked,
+        };
+        if self.store.load(asked).is_none() && self.store.load(other).is_some() {
+            other
+        } else {
+            asked
+        }
+    }
+
     /// The service a call names, linked, its token renewed if it is near
     /// its end and the backend is known.
     async fn linked(&self, args: &Value) -> Result<(&'static catalog::Service, Entry), String> {
         let service = args
             .get("service")
             .and_then(Value::as_str)
+            .map(|asked| self.linked_code(asked))
             .and_then(catalog::service)
             .ok_or("service names no service this lamp knows")?;
         let mut entry = self
@@ -599,12 +617,14 @@ impl<H: Http, M: Mail> Services<H, M> {
     }
 
     async fn read(&self, args: &Value) -> Result<Value, String> {
-        // A send-only link is answered so whether or not it is linked.
-        if let Some(why) = args
-            .get("service")
-            .and_then(Value::as_str)
-            .and_then(reads::never_read)
-        {
+        // A send-only link is answered so whether or not it is linked, and
+        // so is `gmail` when the lamp's one Gmail link is send-only.
+        let asked = args.get("service").and_then(Value::as_str);
+        if let Some(why) = asked.and_then(reads::never_read).or_else(|| {
+            asked
+                .map(|asked| self.linked_code(asked))
+                .and_then(reads::never_read)
+        }) {
             return Err(why.into());
         }
         let (service, entry) = self.linked(args).await?;
@@ -689,7 +709,10 @@ impl<H: Http, M: Mail> Services<H, M> {
         let pending = pending.ok_or(
             "nothing is waiting to be sent: it was cancelled, already sent or over two minutes old",
         )?;
-        if args.get("service").and_then(Value::as_str) != Some(pending.service) {
+        // Compared as linked: a send prepared as `gmail-app` may be
+        // confirmed as `gmail`, and the reverse, as [`Self::linked_code`].
+        let asked = args.get("service").and_then(Value::as_str);
+        if asked.map(|asked| self.linked_code(asked)) != Some(self.linked_code(pending.service)) {
             return Err("that send_id is for another service; nothing was sent".into());
         }
         let (service, entry) = self.linked(args).await?;
@@ -1869,6 +1892,150 @@ mod tests {
             run(services.tool(ask))["error"],
             format!("Gmail with Google sign-in {NOT_LINKED}")
         );
+    }
+
+    /// A `service_write` line for a send to Mom, naming `service`.
+    fn mail_ask(service: &str) -> String {
+        json!({"op":"call","name":"service_write","args":{"service":service,"action":"send_mail",
+               "to":["mom@home.test"],"subject":"Dinner","text":"Home by 7"}})
+        .to_string()
+    }
+
+    /// A `service_write` line confirming `id` with "send", naming `service`.
+    fn mail_send(service: &str, id: &str) -> String {
+        json!({"op":"call","name":"service_write","args":{"service":service,"send_id":id,"said":"send"}})
+            .to_string()
+    }
+
+    /// The one call sent, Gmail's API send with `token`.
+    fn sent_through_the_api(calls: &[Call], token: &str) {
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].method, Method::Post);
+        assert_eq!(
+            calls[0].url,
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+        );
+        assert!(
+            calls[0]
+                .headers
+                .contains(&("authorization".into(), format!("Bearer {token}")))
+        );
+    }
+
+    /// The voice's model names Gmail `gmail` or `gmail-app` as it likes
+    /// (lamp-9adf, 4 Nov): a send named `gmail` reaches the one Gmail link
+    /// the lamp has, a send-only Google sign-in.
+    #[test]
+    fn a_send_named_gmail_reaches_a_send_only_gmail_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        let answer = run(services.tool(&mail_ask("gmail")));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert!(
+            answer["result"]["read_back"]
+                .as_str()
+                .unwrap()
+                .contains("from me@work.test to mom@home.test")
+        );
+        assert!(services.http.calls().is_empty(), "called before send");
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let sent = run(services.tool(&mail_send("gmail", &id)));
+        assert_eq!(
+            sent["result"],
+            json!({"sent":true,"service":"Gmail with Google sign-in"}),
+            "{sent}"
+        );
+        sent_through_the_api(&services.http.calls(), "planted-app-4710");
+        // Never over SMTP.
+        assert!(services.mail.sent.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_send_prepared_as_gmail_app_is_sent_when_confirmed_as_gmail() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        let answer = run(services.tool(&mail_ask("gmail-app")));
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let sent = run(services.tool(&mail_send("gmail", &id)));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        sent_through_the_api(&services.http.calls(), "planted-app-4710");
+        // And the reverse: prepared as `gmail`, confirmed as `gmail-app`.
+        let answer = run(services.tool(&mail_ask("gmail")));
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let sent = run(services.tool(&mail_send("gmail-app", &id)));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        assert_eq!(services.http.calls().len(), 2);
+        // A truly other service is still refused, and nothing is sent.
+        let answer = run(services.tool(&mail_ask("gmail")));
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        assert_eq!(
+            run(services.tool(&mail_send("slack", &id)))["error"],
+            "that send_id is for another service; nothing was sent"
+        );
+        assert_eq!(services.http.calls().len(), 2);
+    }
+
+    #[test]
+    fn a_send_named_gmail_app_reaches_a_gmail_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        run(services.admin(&oauth_gmail("planted-gmail-4710")));
+        let before = services.http.calls().len();
+        let answer = run(services.tool(&mail_ask("gmail-app")));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let id = answer["result"]["send_id"].as_str().unwrap().to_owned();
+        let sent = run(services.tool(&mail_send("gmail-app", &id)));
+        assert_eq!(
+            sent["result"],
+            json!({"sent":true,"service":"Gmail"}),
+            "{sent}"
+        );
+        sent_through_the_api(&services.http.calls()[before..], "planted-gmail-4710");
+    }
+
+    #[test]
+    fn a_read_named_gmail_with_a_send_only_link_says_it_only_sends() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        run(services.admin(&gmail_app(
+            "planted-app-4710",
+            json!({"user_email":"me@work.test"}),
+        )));
+        let answer = run(services.tool(&read_line(json!({"service":"gmail","what":"recent"}))));
+        assert_eq!(answer["error"], reads::GMAIL_APP_NO_READS, "{answer}");
+        assert!(services.http.calls().is_empty());
+    }
+
+    #[test]
+    fn with_no_gmail_link_either_name_is_not_linked() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = api_services(dir.path(), true);
+        assert_eq!(
+            run(services.tool(&mail_ask("gmail")))["error"],
+            format!("Gmail {NOT_LINKED}")
+        );
+        assert_eq!(
+            run(services.tool(&mail_ask("gmail-app")))["error"],
+            format!("Gmail with Google sign-in {NOT_LINKED}")
+        );
+        assert_eq!(
+            run(services.tool(&read_line(json!({"service":"gmail","what":"recent"}))))["error"],
+            format!("Gmail {NOT_LINKED}")
+        );
+        // A read named `gmail-app` is told it only sends, linked or not.
+        assert_eq!(
+            run(services.tool(&read_line(json!({"service":"gmail-app","what":"recent"}))))["error"],
+            reads::GMAIL_APP_NO_READS
+        );
+        assert!(services.http.calls().is_empty());
     }
 
     #[test]
