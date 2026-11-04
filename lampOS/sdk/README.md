@@ -29,7 +29,7 @@ done and validated.
 
 ## Coverage map
 
-As of lamp-voice `db2f3f8174` (4 Nov). `lamp` below is a connected client:
+As of lamp-voice `acea8c2e4f` (4 Nov). `lamp` below is a connected client:
 Python names first, JavaScript where it differs.
 
 ### Connection and state
@@ -41,6 +41,7 @@ Python names first, JavaScript where it differs.
 | The light now | `get light` | `get("light")` | `lamp_state` | done | Nine | not yet |
 | The lamp's mood | `get mood` | `get("mood")` | `lamp_state` | done | Nine | not yet |
 | Talking, paused, private, asleep | `get lamp`, `lamp.changed` | `get("lamp")`, `on("lamp.changed")` | `lamp_state`, `lamp_events` | done (quiet hours not produced yet) | Nine | not yet |
+| A stored grant a build doesn't know: kept, not granted | lamp-control's start (#4936) | — | — | done | harness-reviewer | 75c9, 2 Nov, harness-reviewer's run (root steps by the local leader): an unknown stored grant kept and written back, only `light` granted |
 | The door's limits | `hello` `limits` | `lamp.limits` | — | done; policy limits lifted in PR #4579 | Nine | not yet |
 | lamp-control on every lamp | product unit | — | — | PR #4526 | Nine | not yet |
 
@@ -73,7 +74,7 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Speak a line exactly as sent, or in the lamp's own words | `say`, `rephrase` | `say(text, rephrase=…)` / `say(text, { rephrase })` | `lamp_say` | done (≤ 300 chars until PR #4579) | Eighth | 75c9 2 Nov: journal + done; not by ear |
+| Speak a line exactly as sent, or in the lamp's own words | `say`, `rephrase` | `say(text, rephrase=…)` / `say(text, { rephrase })` | `lamp_say` | done (≤ 300 chars until PR #4579) | Eighth | 75c9, 2 Nov, by the local leader: exact, journal and done (finished in 6.1 s; 4 Nov, 5.1 s). Not confirmed by ear |
 | The lamp's hum, or a computer's own clips | `sound`, `sound.upload`, `sound.list`, `sound.remove` | `sound`, `upload_sound`, `sounds`, `remove_sound` / `uploadSound`, `removeSound` | `lamp_sound`, `lamp_sounds` | done | Eighth | not yet |
 | Speaker volume | `volume`, `get volume`, `volume.changed` | `volume` | — | PR #4599 | Eighth | not yet |
 | Stop what it does | `stop` | `stop` | `lamp_stop` | done | Nine | not yet |
@@ -93,7 +94,7 @@ Python names first, JavaScript where it differs.
 |---|---|---|---|---|---|---|
 | Someone arrives, leaves, stands, faces it | `person.*` | `on("person.arrived")`… | `lamp_events` | done | Nine | not yet |
 | A hand in view | `hand` | `on("hand")` | `lamp_events` | done | Nine | not yet |
-| A camera frame, a frame stream, local only | `camera.snapshot`, `camera.stream` | `camera_snapshot`, `camera_stream` / `cameraSnapshot`, `cameraStream` | `lamp_camera_snapshot` | done | Ten | 75c9 3 Nov (snapshot 0.14 s; stream 640x480 and 1280x720, about 15 fps; the ring's mark not seen by eye) |
+| A camera frame, a frame stream, local only | `camera.snapshot`, `camera.stream` | `camera_snapshot`, `camera_stream` / `cameraSnapshot`, `cameraStream` | `lamp_camera_snapshot` | done | Ten | 75c9, 3 Nov 17:46, by the local leader: snapshot 0.14 s; stream at 640x480 and 1280x720, about 15 fps; 4 Nov 10:22, the fast path at 1280x720, 62 frames in 6 s. The ring's mark not seen by eye |
 
 ### Touch and controls
 
@@ -107,14 +108,14 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Particles, humidity, temperature, CO2 | `get air`, `air.changed` | `air()`, `on("air.changed")` | `lamp_state`, `lamp_wait_for` | done | harness-reviewer | 75c9 2 Nov: known:false, no sensor (value not validated) |
-| The lamp's processor, memory, disk, temperatures | `get device` | `device()` | `lamp_state` | done | harness-reviewer | 75c9 2 Nov (against /proc, df, thermal) |
+| Particles, humidity, temperature, CO2 | `get air`, `air.changed` | `air()`, `on("air.changed")` | `lamp_state`, `lamp_wait_for` | done | harness-reviewer | 75c9, 2 Nov, by the local leader: answers known:false, no sensor (values not validated) |
+| The lamp's processor, memory, disk, temperatures | `get device` | `device()` | `lamp_state` | done | harness-reviewer | 75c9, 2 Nov, by the local leader: against the lamp's /proc, df and thermal zones |
 
 ### Skills
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills` / `pushSkill`, `skills` | — | SDK missing: PR #4515 | blue | not yet |
+| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done | blue | not yet |
 | Check a skill folder before pushing | — | `lamp skill check` | — | done | blue | not yet |
 
 ## Never readable
