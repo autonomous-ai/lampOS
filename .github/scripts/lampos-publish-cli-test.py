@@ -127,6 +127,9 @@ class CliTests(unittest.TestCase):
         manifest = json.loads(release["assets"]["manifest.json"]["data"])
         self.assertIn("lamp-product-skills", {file["name"] for file in manifest["files"]})
         self.assertTrue(manifest["units"])
+        pinned = json.loads((SOURCE / "lampOS/deploy/product/models.json").read_text())["models"]
+        self.assertTrue(pinned)
+        self.assertEqual(manifest["models"], pinned)
         self.assertTrue(any(call[1] == "check" for call in self.fake.updater_calls))
 
     def test_real_excluded_artifact_tampering_refuses_before_execution(self):

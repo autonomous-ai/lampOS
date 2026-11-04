@@ -542,6 +542,13 @@ class PublicationTests(unittest.TestCase):
         released = self.fake.release_map[result["published"]]["assets"]
         assert_release_subset(self, self.artifact, released)
 
+    def test_manifest_carries_the_products_pinned_models(self):
+        self.publish()
+        made = [call for call in self.fake.updater_calls if call[1] == "manifest"]
+        self.assertEqual(len(made), 1)
+        options = dict(zip(made[0][2::2], made[0][3::2]))
+        self.assertEqual(Path(options["--models"]), self.root.resolve() / "lampOS/deploy/product/models.json")
+
     def test_excluded_bytes_are_verified_before_any_updater_execution(self):
         for name in sorted(EXCLUDED):
             with self.subTest(name=name):

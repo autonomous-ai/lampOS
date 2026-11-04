@@ -117,7 +117,8 @@ What else a part needs that no build carries: the voice's turn-end model
 and ONNX Runtime library (beside the voice in its folder,
 [endpoint-detection.md](endpoint-detection.md)), the eyes' models and the
 name's models, all from `deploy/product/models.json`, which install fetches
-(the publish passes no `--models`); the character file; and the voice's
+(a published build carries the same list as its manifest's models, which a
+round fetches only where `LAMP_UPDATE_MODELS=on`); the character file; and the voice's
 private `provider.json` and `second.json`, which install writes and keeps
 up to date while they are its own. Beside its binaries, a build's signed
 manifest carries the rest of `deploy/product/` (the publish's `--deploy`):

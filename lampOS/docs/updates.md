@@ -1744,6 +1744,10 @@ an optional `archive` for a file inside a pinned `.tgz`).
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
 before the field climbs first. The current `UPDATER` is 11; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
+The publish (`.github/scripts/lampos-publish.py`) passes `--models` with
+the product's `deploy/product/models.json`, so every published build
+carries its pinned models; a lamp fetches them only where
+`LAMP_UPDATE_MODELS=on`.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
 plain parts.
@@ -2955,8 +2959,9 @@ test does (#1512):
   tested with the files a cut would leave, on the Mac.
 - Models in the manifest (`LAMP_UPDATE_MODELS`, on in the product since 4
   Nov): tested on the Mac only (`tests/round.rs`). A download cut short
-  starts again from nothing; it isn't resumed. No published build carries
-  models yet.
+  starts again from nothing; it isn't resumed. Published builds now carry
+  the product's pinned models (`deploy/product/models.json`); a lamp
+  fetches them only where `LAMP_UPDATE_MODELS=on`.
 - The image's own files (`LAMP_UPDATE_IMAGE`): tested on the Mac only
   (`image.rs`, `apply.rs`, `tests/round.rs`), with lamp-update-apply called
   in the round's place of systemd and every command recorded, not run.
