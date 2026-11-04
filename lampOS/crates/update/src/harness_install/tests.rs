@@ -66,7 +66,15 @@ impl Lamp {
     fn records(&self) -> PathBuf {
         self.root.path().join("var/lib/lampos-update")
     }
+    /// Harness's link and the file it names, both under the root.
     fn harness_there(&self) {
+        let target = self.root.path().join("var/lib/lampos-tasks/.local/bin");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("harness"), "").unwrap();
+        self.harness_link();
+    }
+    /// Harness's link alone: dangling unless its target is there too.
+    fn harness_link(&self) {
         symlink(
             "/var/lib/lampos-tasks/.local/bin/harness",
             self.root.path().join("usr/local/bin/harness"),
@@ -284,6 +292,32 @@ fn the_switch_on_skips_a_harness_already_there() {
     assert_eq!(said.version.as_deref(), Some("0.4.25"));
     assert!(!runs.ran(install::HARNESS_INSTALLER));
     assert!(!runs.ran("ln -sfn"));
+}
+
+/// A link at Harness's place whose target is gone (#5241's reader) is
+/// missing, not installed: `absent` at start, and a round starts the
+/// one-shot, whose installer links it again.
+#[test]
+fn a_dangling_harness_link_counts_as_missing() {
+    let lamp = Lamp::new();
+    lamp.harness_link();
+    at_start(lamp.root(), &lamp.records(), true, 1);
+    assert_eq!(lamp.said().unwrap().install, "absent");
+    let mut systemd = Fake::default();
+    let said = after_round(
+        lamp.root(),
+        &lamp.records(),
+        &Ok(None),
+        &mut systemd,
+        2,
+        &mut quiet(),
+    );
+    assert_eq!(said.unwrap().install, "installing");
+    assert!(lamp.unit_written());
+    let runs = Runs::new();
+    assert_eq!(install(&lamp, &runs, 3).install, "installed");
+    assert!(runs.ran(install::HARNESS_INSTALLER));
+    assert!(runs.ran("ln -sfn"));
 }
 
 /// A failed install is recorded with its fixed reason, never its text, and
