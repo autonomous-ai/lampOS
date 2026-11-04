@@ -382,3 +382,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   lamp-services tests and would send from the other account with both
   links; a P3 on a `read` guard no test needs. #5283: heron takes it if
   El hasn't started by 20:45.
+- 20:0x–20:3x: #5279 READ-OK restated on `aeff9448b3` (the both-links
+  test added; the always-bridge mutation now caught). #5284 (Friday, no
+  own name from a mishear) memory read: HOLD on a P2, as the writer's
+  `seen` wiring has no test (every id seen, none seen, and `seen_by`
+  taking any speaker each pass all tests); Thirteen agreed and will
+  restate. #5272 READ-OK restated on `c95ab279b3`: another voice, earlier
+  or as judged, now takes the hits fallback back, tested by the four probe
+  rows; the second-silent-face question left to the first builder.
+  The lamp-voice flake `a_stop_said_over_the_lamps_answer_closes_the_conversation`
+  failed in two full runs tonight and passes alone (shared `THREAD`).
