@@ -28,7 +28,7 @@ case "$*" in
     case "$FAKE_MODE:$last" in
       unfinished:*poem*) ;;
       quiet:*Funk*) j "request 8 heard 0 words, the last 200 ms after the line ended" ;;
-      *:*Funk*) [[ $FAKE_MODE == normal ]] && { j "request 8 heard 0 words, the last 200 ms after the line ended"; j "request 8: a cut-in with no words ended the lamp's answer: answered \"Did someone say something?\", the model not asked (LAMP_CUT_IN_WORDLESS_ASKS)"; j "request 8 first answer audio 12 ms after the words were heard: its fixed line, rendered ahead (LAMP_CUT_IN_WORDLESS_ASKS)"; } ;;
+      *:*Funk*) [[ $FAKE_MODE == normal ]] && { j "request 8 heard 0 words, the last 200 ms after the line ended"; j "request 8: a cut-in with no words ended the lamp's answer: answered \"Um, excuse me, did anyone say something?\", the model not asked (LAMP_CUT_IN_WORDLESS_ASKS)"; j "request 8 first answer audio 12 ms after the words were heard: its fixed line, rendered ahead (LAMP_CUT_IN_WORDLESS_ASKS)"; } ;;
       silent:*) j "request 8 heard 1 words, the last 200 ms after the line ended"; j "request 8: a stop said over the lamp's answer: answered \"Okay, I'll stop there.\", the model not asked (LAMP_SPOKEN_STOP_ENDS)" ;;
       model:*) j "request 8 heard 1 words, the last 200 ms after the line ended"; j "request 8 chat round 1 first event in 800 ms" ;;
       *) if tail -n 2 "$FAKE_DIR/played" | grep -q poem; then

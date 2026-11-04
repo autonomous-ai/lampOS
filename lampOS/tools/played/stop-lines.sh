@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The lamp check for #4710's fixed lines on the second route: a stop always gets "Okay, I'll stop there."
 # (LAMP_SPOKEN_STOP_ENDS), over the lamp's answer or just after it ended, and a cut-in that ended the answer with no
-# words gets "Did someone say something?" (LAMP_CUT_IN_WORDLESS_ASKS). Run from the played kit:
+# words gets "Um, excuse me, did anyone say something?" (LAMP_CUT_IN_WORDLESS_ASKS). Run from the played kit:
 #
 #   LAMP_HOST=<lamp> lampOS/tools/played/stop-lines.sh LABEL [ROUNDS]
 #

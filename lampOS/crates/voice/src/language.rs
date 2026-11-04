@@ -323,14 +323,15 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     // Its question when a cut-in ended its answer with no words
-    // (`LAMP_CUT_IN_WORDLESS_ASKS`, off in the product).
+    // (`LAMP_CUT_IN_WORDLESS_ASKS`, on in the product): a polite opener,
+    // then the question.
     (
         crate::cut_in_wordless::LINE,
         [
-            "Có ai vừa nói gì không?",
-            "誰か何か言った？",
-            "刚才有人说话吗？",
-            "누가 뭐라고 했어요?",
+            "Ừm, xin lỗi, có ai vừa nói gì không?",
+            "あの、すみません、誰か何か言いましたか？",
+            "嗯，不好意思，刚才有人说话吗？",
+            "음, 실례지만 누가 뭐라고 했어요?",
         ],
     ),
     // What it says when a line by name gets no words twice
