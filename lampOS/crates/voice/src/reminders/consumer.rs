@@ -23,7 +23,7 @@ use lamp_schedule::{
 };
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     io,
     path::Path,
     time::{Duration, Instant},
@@ -143,9 +143,29 @@ fn late_line(late: bool, late_by_ms: Option<u64>) -> bool {
     late_by_ms.is_none_or(|ms| late && ms >= lamp_schedule::engine::SAID_LATE_MS)
 }
 
-/// A due item given up with nothing proven: it may have been heard.
+/// A due item given up with nothing proven a second time: it may have been
+/// heard twice.
 const HELD: &str = "held: an attempt may have been heard and was never proven said, \
                     so it is not offered again";
+/// A due item given up with nothing proven the first time (#5219).
+const ONCE_MORE: &str = "not completed: given up before it was proven said, \
+                         to be offered once more";
+/// Attempts given up before any of their audio came are offered again this
+/// many times for each item, without counting toward the once more; the
+/// next is held ([`NO_AUDIO_HELD`]).
+const NO_AUDIO_RETRIES: u8 = 5;
+/// Its journal line, the `n`th time of [`NO_AUDIO_RETRIES`].
+fn no_audio_again(n: u8) -> String {
+    format!(
+        "not completed: given up before any of it was played, to be offered again \
+         ({n} of {NO_AUDIO_RETRIES})"
+    )
+}
+/// A due item given up before any of its audio came more often than
+/// [`NO_AUDIO_RETRIES`] allows: whatever keeps it from being said is not
+/// passing, and it waits to be resolved.
+const NO_AUDIO_HELD: &str = "held: given up again before any of it was played, \
+                             after every try allowed, so it is not offered again";
 
 /// What the consumer did with each due item, and why due work is not
 /// available when it is not: a line in the journal when either changes,
@@ -224,6 +244,13 @@ struct Consumer<P: Persistence> {
     sequence: u64,
     current: Option<Offer>,
     retry: BTreeMap<DeliveryKey, (PreparedToken, QualifiedRetirement)>,
+    /// Items an attempt of was given up with nothing proven after some of
+    /// its audio came, in this process ([`Self::abandoned`]): a second is
+    /// held.
+    abandoned: BTreeSet<DeliveryKey>,
+    /// How often each item was offered again after an attempt given up
+    /// before any of its audio came ([`NO_AUDIO_RETRIES`]).
+    unvoiced: BTreeMap<DeliveryKey, u8>,
     next_offer_us: u64,
     cursor: u64,
     recovery: usize,
@@ -241,6 +268,8 @@ impl<P: Persistence> Consumer<P> {
             sequence: 0,
             current: None,
             retry: BTreeMap::new(),
+            abandoned: BTreeSet::new(),
+            unvoiced: BTreeMap::new(),
             next_offer_us: 0,
             cursor: 0,
             recovery: 0,
@@ -284,7 +313,7 @@ impl<P: Persistence> Consumer<P> {
         let token = match &command {
             ToWorker::Complete { token, .. }
             | ToWorker::Retire { token, .. }
-            | ToWorker::Abandon { token } => token,
+            | ToWorker::Abandon { token, .. } => token,
             ToWorker::Noticed {} => {
                 self.notice_owed = true;
                 return Ok(());
@@ -355,11 +384,11 @@ impl<P: Persistence> Consumer<P> {
                     "not completed: this attempt can no longer speak, to be offered again",
                 );
             }
-            ToWorker::Abandon { .. } => {
+            ToWorker::Abandon { no_audio, .. } => {
                 for joined in joined {
-                    self.journal.item(&joined.token.key, HELD);
+                    self.abandoned(joined.token, no_audio);
                 }
-                self.journal.item(&token.key, HELD);
+                self.abandoned(token.clone(), no_audio);
             }
             ToWorker::Noticed {} => unreachable!("answered above"),
         }
@@ -368,6 +397,53 @@ impl<P: Persistence> Consumer<P> {
             .retain(|old| !matches!(old, FromWorker::Offer { .. } | FromWorker::Withdraw { .. }));
         self.next_offer_us = now.saturating_add(PACE_US);
         self.push(FromWorker::Settled { token })
+    }
+    /// The voice gave `token`'s attempt up with nothing proven: its reply
+    /// ended, cut by talk or otherwise, with no completion and no fenced
+    /// retirement, so it may have been heard. The first time, it is offered
+    /// once more under a new attempt, after the pacing, as a retired one is
+    /// (stable 9980 on lamp-52e6, #5219: a one-minute timer cut by talk was
+    /// held and never rang); the second time it is held, so it is said
+    /// twice at most. One given up before any of its audio came (`no_audio`:
+    /// lamp-9adf, build 10012, a ring whose chat had not begun in 3 s ended
+    /// `GaveUp`) was certainly not heard: it is offered again without
+    /// counting toward that bound, [`NO_AUDIO_RETRIES`] times, then held.
+    /// Counted in this process only: a later voice offers every attempt an
+    /// earlier one left again ([`Self::retire_earlier_voices`]), held ones
+    /// too.
+    fn abandoned(&mut self, token: PreparedToken, no_audio: bool) {
+        // Only items still waiting to be said are counted, so the counts
+        // stay within the ledger's bound.
+        let ledger = &self.ledger;
+        let waiting = |key: &DeliveryKey| {
+            ledger.view(key).map_or(true, |view| {
+                view.is_some_and(|view| view.completion.is_none() && view.resolution.is_none())
+            })
+        };
+        self.abandoned.retain(|key| waiting(key));
+        self.unvoiced.retain(|key, _| waiting(key));
+        let line = if no_audio {
+            let tries = self.unvoiced.entry(token.key.clone()).or_default();
+            if *tries >= NO_AUDIO_RETRIES {
+                self.journal.item(&token.key, NO_AUDIO_HELD);
+                return;
+            }
+            *tries += 1;
+            no_audio_again(*tries)
+        } else {
+            if !self.abandoned.insert(token.key.clone()) {
+                self.journal.item(&token.key, HELD);
+                return;
+            }
+            ONCE_MORE.to_owned()
+        };
+        let proof = QualifiedRetirement {
+            correlation: token.correlation.clone(),
+            retired_by_session: self.session.clone(),
+            basis: RetirementBasis::Abandoned {},
+        };
+        self.journal.item(&token.key, line);
+        self.retry.insert(token.key.clone(), (token, proof));
     }
     /// Attempts an earlier voice prepared and never completed are offered
     /// again (the first builder, 2026-10-16: ids 12 and 26 on lamp-4ace were

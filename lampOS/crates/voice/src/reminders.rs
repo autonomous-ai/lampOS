@@ -218,8 +218,18 @@ pub(crate) enum ToWorker {
         token: PreparedToken,
         proof: QualifiedRetirement,
     },
+    /// The reply ended with neither a completion nor a qualified
+    /// retirement (#5219).
     Abandon {
         token: PreparedToken,
+        /// No audio of the reply was ever received for the speaker
+        /// (`Receipt::audio` never called): the turn gave up before a sound
+        /// of it was played (lamp-9adf, build 10012: `GaveUp` when the chat
+        /// had not begun in 3 s), so it was certainly not heard. Absent, as
+        /// from a build before it, it may have been heard. Sent only when
+        /// true, so the common packet is the same as before.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        no_audio: bool,
     },
     /// Someone said a line after a reminder was said (29e7, 2 Nov): one
     /// said late is noticed ([`lamp_schedule::protocol::Request::Noticed`]).
@@ -365,6 +375,7 @@ impl Drop for Receipt {
         if state.settlement.is_none() {
             state.settlement = Some(ToWorker::Abandon {
                 token: state.token.clone(),
+                no_audio: !state.had_audio,
             });
         }
     }

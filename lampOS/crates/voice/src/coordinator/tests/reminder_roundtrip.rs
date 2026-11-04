@@ -392,7 +392,7 @@ fn cancellation_stays_pending(microphone_denied: bool) {
     test.retire(&second);
     assert_eq!(test.fixture.settle_parent(), 1);
     assert!(
-        matches!(test.fixture.received(), [ToWorker::Abandon { token }] if token == &test.token)
+        matches!(test.fixture.received(), [ToWorker::Abandon { token, .. }] if token == &test.token)
     );
     test.fixture.tick();
     assert!(test.fixture.pending());

@@ -25,7 +25,25 @@ const KIND: &str = "lamp_schedule_delivery_ledger";
 // fields a newer build needs back after a rollback (an older save drops them)
 // must advance it. An exact saved Ack request remains strict even at this version
 // (`protocol::Request::Ack` and `Guard`).
-const SCHEMA: u32 = 1;
+// 2: an attempt retired as abandoned (`RetirementBasis::Abandoned`, #5219). A
+// ledger is written as 2 only while it holds one ([`written_schema`]);
+// otherwise as 1, which a build from before reads as it always did.
+const SCHEMA: u32 = 2;
+
+/// The oldest schema whose builds read every record in `state`: 2 with an
+/// abandoned attempt's retirement kept, else 1.
+fn written_schema(state: &State) -> u32 {
+    if state.entries.iter().any(|entry| {
+        entry
+            .previous
+            .as_ref()
+            .is_some_and(|previous| matches!(previous.proof.basis, RetirementBasis::Abandoned {}))
+    }) {
+        2
+    } else {
+        1
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Error {
@@ -134,6 +152,13 @@ pub enum RetirementBasis {
         microphone_generation: u64,
     },
     PreviousProcessExited {},
+    /// The voice gave the attempt up with nothing proven (#5219): its reply
+    /// ended, cut by talk or otherwise, with no completion and no fenced
+    /// retirement, so it may have been heard. Its turn ended with the reply
+    /// and the voice admits no new attempt until this one is settled. The
+    /// consumer retries an item on this basis once; given up again, it is
+    /// held, so it is said twice at most.
+    Abandoned {},
 }
 /// An assertion by the final owner/supervisor that the old correlation can no
 /// longer create sound. `PreviousProcessExited` requires verified old-process
@@ -410,7 +435,7 @@ impl State {
     fn check(&self) -> Result<(), Error> {
         let invalid = || error("invalid_snapshot");
         if self.kind != KIND
-            || self.schema != SCHEMA
+            || !(written_schema(self)..=SCHEMA).contains(&self.schema)
             || !identity(&self.ledger_id)
             || self.next_attempt == 0
             || self.next_attempt - 1 > self.revision
@@ -579,7 +604,7 @@ impl<P: Persistence> DeliveryLedger<P> {
             None => {
                 let state = State {
                     kind: KIND.into(),
-                    schema: SCHEMA,
+                    schema: 1,
                     ledger_id: new_ledger_id.into(),
                     revision: 0,
                     next_attempt: 1,
@@ -934,6 +959,9 @@ impl<P: Persistence> DeliveryLedger<P> {
             .revision
             .checked_add(1)
             .ok_or_else(|| error("exhausted"))?;
+        // Written as the oldest schema that reads it, so a build from before
+        // reads every ledger with no abandoned attempt's record in it.
+        next.schema = written_schema(&next);
         next.check()?;
         let bytes = bounded_json(&next, MAX_STATE_BYTES)?;
         if self.persistence.commit(&bytes).is_err() {

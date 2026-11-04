@@ -1078,7 +1078,8 @@ attempt in the ledger; the offer carries them (`Offer::also`), the provider
 is asked to say them all together, once, in one short line ("While you were
 away: …", `reminder_policy::JOINED`), and the one completion proof
 completes each, each acknowledged on its own. A retirement retries each; an
-abandon holds each. One the ledger already holds, or that can't be read or
+abandon offers each once more, and a second abandon of one holds it (below).
+One the ledger already holds, or that can't be read or
 prepared, is said on its own, as before. A late line also waits for a pause
 in the talk (`TalkPause`): nobody's line heard for `TALK_PAUSE_US` (20 s),
 besides the lamp not answering and the room quiet as for any reminder, or
@@ -1132,6 +1133,18 @@ build refuse the whole ledger, not set it aside; a test pins their saved keys.
     older build's bound is refused there, and its due reminders wait.
 
   Any other added field needs nothing more; it disappears on the next save.
+
+**Stored as schema 2, only while an abandoned attempt's record is kept
+(#5219).** `RetirementBasis::Abandoned` is a new enum value, so `SCHEMA` is 2:
+this build reads schema 1 and 2 and writes 2 only while an entry's kept
+retirement is an abandoned one (`written_schema`), otherwise 1, which a build
+from before reads as it always did. The record goes when its entry is retired
+again on another basis or compacted once resolved, and the next save writes 1
+again. A build from before that meets a schema-2 ledger sets it aside, as
+below. A ledger marked 1 that holds an abandoned record is refused. The kept
+fixture `delivery-2026-11-04.json` is one at schema 2. Test:
+`an_abandoned_attempts_record_is_written_as_schema_2_only_while_kept`
+(`tests/it/delivery_ledger.rs`).
 
 On a newer `schema`, the consumer closes and durably renames the whole database
 to `schedule.sqlite3.newer-<schema>-<unix-seconds>` under its existing directory
@@ -1216,9 +1229,15 @@ line, so a reminder deferred while people talk is said once per retry),
 `said, waiting to be acknowledged` (a completion kept from before),
 `withdrawn: <why>` or `not offered: <why>`, `said; its completion is kept, to
 be acknowledged`, `not completed: this attempt can no longer speak, to be
-offered again`, `held: an attempt may have been heard and was never proven
-said, so it is not offered again`, and `resolved (<resolution>), not
-offered`. When the due notice itself cannot be read or trusted it says
+offered again`, `not completed: given up before it was proven said, to be
+offered once more` (an abandon after some of its audio came, the first
+time), `not completed: given up before any of it was played, to be offered
+again (N of 5)` (an abandon before any of its audio came), `held: an attempt
+may have been heard and was never proven said, so it is not offered again`
+(an abandon after some audio, the second time, or an uncertain attempt this
+voice did not settle), `held: given up again before any of it was played,
+after every try allowed, so it is not offered again` (a sixth abandon before
+any audio), and `resolved (<resolution>), not offered`. When the due notice itself cannot be read or trusted it says
 `due reminders unavailable: <why>` once, and `due reminders available` once
 it can again. It remembers the last line of 64 items; past that, the item
 written longest ago is forgotten first. The parent says
@@ -1385,11 +1404,57 @@ be its final words. Conservatively this also holds a later unfinished generation
 after an earlier one retired. It does not fabricate completion or Ack.
 The same occurrence is offered after the conversation when ordinary fresh
 capture, silence, readiness and the five-second attempt pace permit it. Words
-already heard may repeat; no time limit alone authorizes replay. Failed,
-privacy-cancelled, otherwise unqualified or crash-uncertain attempts stay
-pending without re-speech while the voice that made them runs. Such an oldest
-entry does not starve other due work: a bounded page scan may select another
-pending item.
+already heard may repeat; no time limit alone authorizes replay.
+
+**An abandoned attempt is offered once more (#5219).** When a reminder's
+reply ends with neither a completion nor a qualified retirement (failed,
+privacy-cancelled, cut by talk after a generation retired, or otherwise
+unqualified), its receipt's drop sends `ToWorker::Abandon` once the reply is
+gone. Until #5219 the consumer held such an item for as long as that voice
+ran: on stable 9980 (lamp-52e6) a one-minute timer that came due while
+someone talked was cut, held and never rang. Now the first abandon of an item
+retires its attempt with `RetirementBasis::Abandoned` into the same retry
+path a retirement takes: offered again under a new attempt and correlation,
+after the five-second pace, by the late-line rule (a late one joins others
+and waits for a pause in the talk). Each reminder joined to that line is
+treated the same way, each under its own attempt. A second abandon of the same
+item holds it, with the `held` line, so an attempt heard without proof is said
+twice at most; one said once more and never again is better than one never
+said.
+
+`ToWorker::Abandon` carries `no_audio`: true when no audio of the reply ever
+came (`Receipt::audio`, called from `Reply::append_provider_audio` on the
+first non-empty provider PCM, was never called). Such an attempt was certainly
+not heard. A timer's ring is a model turn with a spoken turn's 3 s start bound
+(`BEGIN_WITHIN`); on lamp-9adf (build 10012, the same on 9980) a ring whose
+chat had not begun in 3 s ended `GaveUp` with no audio (the skill's say
+`dropped (no_audio_answer)`) and was held for good, since `ReminderDeferred`
+fires only before a turn begins. Now an abandon with `no_audio` retries the
+item without counting toward the once more: after the same pace, under a new
+attempt, at most `NO_AUDIO_RETRIES` (5) times per item; a sixth is held with
+its own line. An attempt that played some sound keeps the once-more rule,
+whatever came before. The field is sent only when true and read as false when
+absent, so a packet from a build before it is taken as possibly heard. The
+counts are kept in the consumer's memory, per item, for the items still
+waiting to be said. A voice restart forgets it, which changes nothing:
+a later voice offers every attempt an earlier one left again
+(`PreviousProcessExited`, below), held ones too. A completed or resolved item
+is never offered again: the ledger refuses a retry of one, and resolution
+drops it from the retry map. Tests:
+`abandoned_once_is_offered_again_after_the_pace_and_twice_is_held`,
+`joined_ones_in_an_abandoned_line_are_offered_once_more_then_held`,
+`an_abandoned_one_completed_or_resolved_is_never_offered_again`,
+`a_never_voiced_attempt_is_offered_again_without_using_the_once_more`,
+`never_voiced_attempts_are_offered_again_five_times_then_held`
+(`reminders/consumer/tests.rs`), `an_abandon_says_whether_any_audio_came`
+(`reminders/tests.rs`) and
+`no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording`
+(`coordinator/tests/reminders.rs`).
+
+Crash-uncertain attempts (no settlement ever sent) stay pending without
+re-speech while the voice that made them runs. Such an oldest entry does
+not starve other due work: a bounded page scan may select another pending
+item.
 
 A voice started after them offers them again (the first builder, 2026-10-16:
 on lamp-4ace two reminders prepared by voices since restarted stayed pending
@@ -1632,9 +1697,10 @@ the Schedule switches/path settings above, raw logs and actual timing boundaries
    without Ack, then may be offered after the conversation once ordinary
    admission and attempt pacing permit it; partial words can repeat. Separately
    interrupt after the final retirement, or interrupt a multi-generation
-   reminder after its first generation retired: both stay held without Ack or
-   automatic re-speech. Privacy cancellation also remains held. Explicitly
-   list and snooze/cancel to resolve those uncertain attempts.
+   reminder after its first generation retired: both are abandoned, offered
+   once more after the pace without Ack, and held if abandoned again (#5219).
+   Privacy cancellation is the same. Explicitly list and snooze/cancel to
+   resolve an uncertain attempt that is held.
 5. Restart Voice with an unknown prepared attempt; the new exclusive voice
    claim permits another attempt under the existing restart policy, so it may
    be heard again. Restart after a recorded completion but before Ack; it
