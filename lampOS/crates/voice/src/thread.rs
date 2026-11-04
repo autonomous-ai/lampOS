@@ -825,6 +825,12 @@ impl Thread {
         // A write waiting for its "send" hears what the lamp said of its
         // read-back, as said, and of any other request (`crate::services`).
         crate::services::lamp_said(request, words, now);
+        // The owner asked whether the lamp may learn their voice: the ask
+        // said, and the line after it answered (`crate::owner_voice`).
+        if crate::owner_voice::waits_for_answer() {
+            let heard = self.heard_for(request, now);
+            crate::owner_voice::lamp_answered(request, heard.as_deref(), words, now);
+        }
         let opening = self.exchanges.back().map(|last| last.request) != Some(request);
         if opening && crate::not_speech::names_a_function(text) {
             self.unsaid = Some(request);

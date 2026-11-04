@@ -624,6 +624,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "b6d434ab7281c4a4202bcd4a379f9ebe1c8ff253d315e580a9359d235b65c2a1", // the owner's voice print beside the faces
     "186a1f5ee3e57fb1db1ed9f3cdad60c38e7843711858f9087746190c6735ae1f", // #4710: linked services' tokens
     "c0984e92851125e0a4d588bd793473698ae6f918825a9cd85c3aa9b5aac7d01e", // #4514: pushed skills' developer folder
     "cf1adcb3075bff001ae625c90ddab1e956a25c9b3bcf633ce07c1228737d0adc", // #4333: the owner's place beside the name

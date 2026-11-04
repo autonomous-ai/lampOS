@@ -811,7 +811,7 @@ pub fn read_in_full(alone: bool, likeness: Option<f32>, seen_owner: bool) -> boo
 /// `request`, and whether another face was: what the eyes read of it
 /// (`speaking_faces::line_seen`), with `LAMP_SECOND_SPEAKING_FACE` and
 /// `LAMP_EYES_SPEAKING` on; with either off, neither.
-fn seen_saying_owner(request: u64, owner: &str) -> (bool, bool) {
+pub(crate) fn seen_saying_owner(request: u64, owner: &str) -> (bool, bool) {
     if !crate::speaking_faces::from_environment() || !crate::speaking_faces::eyes_from_environment()
     {
         return (false, false);
@@ -832,6 +832,9 @@ pub enum VoiceAsk {
     Alike(u64, u64),
     /// `Voices::likeness_so_far`: how like the conversation's voice a line is.
     Conversation(u64),
+    /// How like the owner's enrolled print a line is
+    /// (`crate::owner_voice::likeness`), asked only for an owner who has one.
+    Owner(u64),
 }
 
 /// The second route's answer to a [`VoiceAsk`]: a cosine, `None` while a
@@ -877,6 +880,22 @@ fn judged(judge: &VoiceJudge, ask: VoiceAsk) -> Option<f32> {
         }
         std::thread::sleep(Duration::from_millis(50));
     }
+}
+
+/// How like the voice that asked the "send" line `request` sounds: against
+/// the owner's enrolled print when they have one (`enrolled`,
+/// [`VoiceAsk::Owner`]), its cosine said in the journal; else against the
+/// line that prepared the write, `prepared` ([`VoiceAsk::Alike`]).
+fn send_likeness(judge: &VoiceJudge, prepared: u64, request: u64, enrolled: bool) -> Option<f32> {
+    if !enrolled {
+        return judged(judge, VoiceAsk::Alike(prepared, request));
+    }
+    let likeness = judged(judge, VoiceAsk::Owner(request));
+    eprintln!(
+        "lamp-voice: request {request}: owner print: the send's cosine {}",
+        likeness.map_or("unknown".into(), |likeness| format!("{likeness:.2}"))
+    );
+    likeness
 }
 
 /// A line began, as the second route hears it (`Heeding::hear`), at `now`:
@@ -937,9 +956,15 @@ pub fn run(
         .flatten()
         .is_some_and(|id| !id.is_empty());
     let prepared = kept::pending(|pending| pending.as_ref().map(|kept| kept.request));
+    // With the owner's enrolled print (`LAMP_SAME_VOICE_FOR=services`,
+    // `crate::owner_voice`), the "send" line is held to it; without one, to
+    // the line that prepared the write, as before.
+    let enrolled = owner
+        .as_deref()
+        .is_some_and(|owner| crate::owner_voice::enrolled(owner).is_some());
     let alike = match (&judge, prepared) {
         (Some(judge), Some(prepared)) if send_id && owner.is_some() && heard => {
-            judged(judge, VoiceAsk::Alike(prepared, request))
+            send_likeness(judge, prepared, request, enrolled)
         }
         _ => None,
     };
@@ -968,14 +993,33 @@ pub fn run(
         other_seen,
     };
     let gated = kept::pending(|pending| gate(pending, call, request, &turn, now));
+    // A send, sent or refused as another voice, by an owner with no
+    // enrolled print: asked once whether the lamp may learn their voice
+    // (`crate::owner_voice::ask_after_send`), not at the prepare, which
+    // the read-back and its "send" need whole.
+    let sending = call.name == WRITE && (send_id || words.as_deref().is_some_and(says_send));
+    let ask_owner = |told: &mut Value| {
+        if let Some(owner) = owner.as_deref()
+            && sending
+            && !enrolled
+            && let Some(ask) =
+                crate::owner_voice::ask_after_send(request, owner, seen_owner, Instant::now())
+            && let Some(told) = told.as_object_mut()
+        {
+            told.insert("then".into(), json!(ask));
+        }
+    };
     let call = match gated {
         Ok(call) => call,
-        Err(told) => {
+        Err(mut told) => {
             eprintln!(
                 "lamp-voice: request {request} asked for {}; refused by the voice: {}",
                 call.name,
                 told["error"].as_str().unwrap_or_default()
             );
+            if told["error"] == OTHER_VOICE {
+                ask_owner(&mut told);
+            }
             return (told, true);
         }
     };
@@ -985,6 +1029,9 @@ pub fn run(
         kept::pending(|pending| {
             self::answered(pending, &call, request, &mut told, Instant::now(), owner);
         });
+        if call.name == WRITE && told.get("sent").and_then(Value::as_bool) == Some(true) {
+            ask_owner(&mut told);
+        }
         if call.name == READ && told.get("error").is_none() {
             read_answered(request);
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
@@ -993,10 +1040,16 @@ pub fn run(
             // In full only to the owner alone in view, in the
             // conversation's voice; on the Live route, never.
             let alone = owner_alone();
-            let likeness = judge
-                .as_ref()
-                .filter(|_| alone)
-                .and_then(|judge| judged(judge, VoiceAsk::Conversation(request)));
+            let likeness = judge.as_ref().filter(|_| alone).and_then(|judge| {
+                judged(
+                    judge,
+                    if enrolled {
+                        VoiceAsk::Owner(request)
+                    } else {
+                        VoiceAsk::Conversation(request)
+                    },
+                )
+            });
             if !read_in_full(alone, likeness, seen_owner) {
                 brief(&mut told);
             }
@@ -1068,6 +1121,74 @@ mod tests {
 
     fn send(id: &str) -> ToolCall {
         call(WRITE, json!({"service":"gmail","send_id":id,"said":"send"}))
+    }
+
+    /// With the owner's enrolled print, the "send" line is held to it, and
+    /// a send the preparing line's short print would refuse (lamp-9adf:
+    /// the owner's own voice at 0.37-0.70) goes; without one, the two
+    /// lines are compared, as before. Every other check is unchanged.
+    #[test]
+    fn a_send_is_held_to_the_owners_enrolled_print_when_there_is_one() {
+        let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let into = asked.clone();
+        let judge: VoiceJudge = std::sync::Arc::new(move |ask| {
+            into.lock().unwrap().push(ask);
+            match ask {
+                VoiceAsk::Alike(..) => Some(0.45),
+                VoiceAsk::Owner(_) => Some(0.82),
+                VoiceAsk::Conversation(_) => None,
+            }
+        });
+        let now = Instant::now();
+        let send_turn = |enrolled: bool, other_seen: bool| {
+            let mut turn = heard("send it", 10);
+            turn.alike = send_likeness(&judge, 10, 11, enrolled);
+            turn.other_seen = other_seen;
+            let mut pending = waiting(now);
+            gate(&mut pending, &send("s1"), 11, &turn, at(now))
+        };
+        assert_eq!(send_turn(false, false).unwrap_err()["error"], OTHER_VOICE);
+        assert_eq!(asked.lock().unwrap().pop(), Some(VoiceAsk::Alike(10, 11)));
+        assert_eq!(send_turn(true, false).unwrap().args["said"], "send");
+        assert_eq!(asked.lock().unwrap().pop(), Some(VoiceAsk::Owner(11)));
+        // The other checks hold with it: another face seen saying it.
+        assert_eq!(send_turn(true, true).unwrap_err()["error"], OTHER_VOICE);
+    }
+
+    /// The owner with no print is asked once, after a send seen said by
+    /// them, only while the owner's print is in use.
+    #[test]
+    fn the_owner_is_asked_to_learn_their_voice_once_after_a_send() {
+        assert!(!crate::owner_voice::on());
+        assert_eq!(
+            crate::owner_voice::ask_after_send(11, "ann", true, Instant::now()),
+            None
+        );
+        let dir = std::env::temp_dir().join(format!("lamp-services-ovp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let uid = std::os::unix::fs::MetadataExt::uid(&std::fs::metadata(&dir).unwrap());
+        crate::owner_voice::enable_with(
+            crate::owner_voice::Store {
+                path: dir.join("print.json"),
+                uid,
+            },
+            std::sync::Arc::new(|_: &str| {}),
+        );
+        assert_eq!(
+            crate::owner_voice::ask_after_send(11, "ann", false, Instant::now()),
+            None,
+            "not seen saying it"
+        );
+        let ask = crate::owner_voice::ask_after_send(11, "ann", true, Instant::now()).unwrap();
+        assert!(ask.contains(crate::owner_voice::ASK));
+        assert!(crate::owner_voice::waits_for_answer());
+        assert_eq!(
+            crate::owner_voice::ask_after_send(13, "ann", true, Instant::now()),
+            None,
+            "once"
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

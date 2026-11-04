@@ -10,6 +10,8 @@
     "/var/lib/lampos-eyes/people.json.from-photos",
     "/var/lib/lampos-eyes/seems.log",
     "/var/lib/lampos-eyes/glance.log",
+    "/var/lib/lampos-eyes/owner-voice.json",
+    "/var/lib/lampos-eyes/owner-voice.json.new",
     "/var/lib/lampos-tasks/store",
     "/var/lib/lampos-tasks/targets.json",
     "/var/lib/lampos-tasks/.harness/auth",

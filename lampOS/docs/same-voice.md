@@ -693,6 +693,76 @@ Shown in tests only (`the_services_alone_start_the_same_voice_for_themselves`,
 `the_prints_are_for_the_services_only_with_services_exactly`): no unit in
 `deploy/` sets it.
 
+## The owner's voice print (`LAMP_SAME_VOICE_FOR=services`, 4 November)
+
+On lamp-9adf a "send" line's 1.8 s print against the preparing line's 1.8 s
+print scored the owner's own voice 0.37-0.70 against `SAME_FROM`, 0.70, so
+their sends were refused. With the prints for the services only, the lamp
+can learn the owner's voice from several of their lines, once they say yes,
+and hold a send to that print (`crates/voice/src/owner_voice.rs`). Nothing
+of it runs without `LAMP_SAME_VOICE_FOR=services` and the services on (the
+second route calls `owner_voice::enable` where it starts the services'
+prints).
+
+- **Asked once, of the setup owner alone.** After a `service_write` send by
+  the owner (`person::owner_ids`, as the send gate's owner), sent or
+  refused as `OTHER_VOICE`, whose face was seen saying it, with no print
+  kept, the model is told, as `then`: "Then ask, in the conversation's
+  language, exactly: "May I learn your voice, so I only send mail when it's
+  you?" (in Vietnamese "Cho tôi học giọng của bạn nhé, để tôi chỉ gửi thư
+  khi đúng là bạn?"). If they say yes, say you will learn it from the next
+  few things they say; if no, say that's fine." (`owner_voice::ask_after_send`).
+  Not again in that run for a day (`ASK_AGAIN_AFTER`), nor at the prepare,
+  whose read-back and "send" are the very next turns.
+- **Only a spoken yes.** The lamp's words in that request must hold "learn
+  your voice" (or "học giọng") in order, and the first later request's line,
+  within 60 s (`ANSWER_WITHIN`), must be a plain yes (`yes`, `yeah`, `yep`,
+  `yes please`, `sure`, `ok`, `okay`, `of course`, `go ahead`, `yes you
+  may`, `you may`, `yes go ahead`, `vâng`, `có`, `ừ`, `được`, `dạ`, `dạ
+  được`, `ừ được`, `được chứ`, `có chứ`, `vâng được`, nothing more); the
+  owner's face must be seen saying it and no other face
+  (`services::seen_saying_owner`), read at the next line's verdict. A plain
+  no (`no`, `nope`, `no thanks`, `no thank you`, `not now`, `don't`,
+  `không`, `thôi`, `không cần`, `không được`, `không nhé`, `thôi không`) is
+  kept in the same file, with no print, and the owner is not asked for a day
+  (`NO_FOR`). Anything else learns nothing (`thread::Thread::lamp_for` →
+  `owner_voice::lamp_answered`).
+- **Learnt from the owner's next lines.** At each line's verdict
+  (`Heeding`, with the services' prints, `owner_voice::offer`), each line
+  after the yes whose print has come and that the owner's face alone was
+  seen saying is taken; one under `DIFFERENT_BELOW` (0.30) against the mean
+  so far is left out, and said. The print is made from at least 4 lines
+  (`LEAST_LINES`) and 6 s of speech (`LEAST_SPEECH`): each line's print is
+  of its first 1.5 s of speech at most and 1.2 s at least, so 4 to 5 lines,
+  four times the speech either print had on lamp-9adf. It is their mean,
+  each made unit length first. Not made within 15 minutes of the yes
+  (`LEARN_WITHIN`), what was gathered is dropped, never kept.
+- **Kept on the lamp only,** beside the faces: `/var/lib/lampos-eyes/owner-voice.json`
+  (the eyes' `people.json` folder, 0700), its own file, root's, mode 0600,
+  written whole through `owner-voice.json.new` and renamed
+  (`owner_voice::Store`). A file that is not a regular root-owned 0600 one
+  is never read. Nothing else on the lamp names it, so no list sends,
+  uploads, shares or backs it up (`nothing_but_the_reset_names_the_print`).
+- **Wiped** by the reset plan (both paths, `reset-plan-product.json`, hash
+  in `RESET_PLAN_SHIPPED`; setup.md, "The person's data, which reset
+  wipes") and by the owner's "forget everything" on the second route's mark,
+  beside the owner's place and name (`tools.rs` →
+  `owner_voice::forget_with_everything`, its answer `voice_print:
+  "forgotten too"`), whether or not the switch is on. Another person's or
+  the room's forget leaves it.
+- **Used:** a send is held to it (`VoiceAsk::Owner`, at `SAME_FROM`) in
+  place of the preparing line's print, and a read in full is too in place
+  of the conversation's voice ([services.md](services.md)); with none,
+  both are as before.
+- **The journal** says "lamp-voice: owner print: …": the ask, the answer,
+  a line not used and its cosine, "N lines, S s: kept", and the send's
+  cosine. Never a print.
+
+Shown in tests only (`owner_voice::tests`,
+`a_send_is_held_to_the_owners_enrolled_print_when_there_is_one`,
+`the_owner_is_asked_to_learn_their_voice_once_after_a_send`): no unit in
+`deploy/` sets `LAMP_SAME_VOICE_FOR`.
+
 ## Not shown
 
 - **People.** Every voice was synthetic and played from one loudspeaker.

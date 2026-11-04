@@ -1851,6 +1851,14 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the owner's voice print, on the same mark and rule, its
+            // switch on or not (`crate::owner_voice`).
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::owner_voice::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             // And the name typed at setup, on the same mark and rule (#4461),
             // after the place, which finds the owner by that name.
             let (told, answered) = match lease {
