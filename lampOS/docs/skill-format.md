@@ -189,6 +189,7 @@ it) or `if_choice` (the tool's values it runs for).
 | (none) | `look = true`: the full look's picture to the model; tool only | `camera` (format 1's `look` still gives it: "The camera", below) |
 | (none) | `stand = N`: a percent of the lamp's own stand, 1 to 100, kept until the next ask; tool only | `body` |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
+| (none) | `read = { service, what, ... }`: a read of one of the owner's linked services, said to them alone behind its gate; the skill's only step, alone, from a trigger, no tool or `each`; only with `LAMP_SKILL_READS=on` ("Reading a linked service", below) | `speak` and `services = { <service> = "read" }` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,
 `blue`, `cyan`, `purple`, `orange`, `pink`, `white`, `warm`, levels 1 to 5,
@@ -204,6 +205,40 @@ caught before install.
 
 `say = { from = "schedule" | "tasks" | "onboarding" }` and
 `requested_audio` are core.
+
+### Reading a linked service
+
+Proposal #5288's read half, off unless `LAMP_SKILL_READS=on`
+([services.md](services.md), "A made skill's read"):
+
+```toml
+[permissions]
+speak = true
+services = { google_calendar = "read" }
+
+[[do]]
+read = { service = "google_calendar", what = "events", day = "tomorrow" }
+```
+
+- `service`: any linked service with reads: `gmail`, `google_calendar`,
+  `google_drive`, `notion`, `figma`, `figma-api`, `github`, `linear`,
+  `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`,
+  `amplitude`; never `gmail-app`, which only sends.
+- `what`: one of the service's reads as `service_read` lists them, but one
+  that gives a whole text (`gmail`'s `message`, `google_drive`'s `text`,
+  `notion`'s `page`, `figma`'s and `figma-api`'s `comments`).
+- `day = "today"` or `"tomorrow"`: a calendar's `events` only, and needed
+  there; `count` 1 to 10 for anything else (mail's `recent` 5 if left out);
+  `query`, `id`, `repo`, `calendar`, `project`, `workspace`, `path`,
+  `graphql`, `variables`, `tool`, `arguments` (1 to 1,000 bytes each) and
+  `params` (a table of text), as `service_read` takes them.
+- `[permissions] services` lists its service as `"read"`, and only
+  `"read"`: a skill never writes.
+
+The schema says every key but two rules, which `lamp-skills` alone holds:
+a whole text, and a calendar's `events` with no `day`. What is said is the
+count, then each event's time and title, each mail's sender and subject,
+or any other item's title or name; never a body.
 
 ### Add-ons
 
@@ -309,6 +344,7 @@ Format 1 also has, beyond the protocol's six:
 - `output_limits`: private light and volume ceilings;
 - `say = "quoted"`: an add-on's grant only, with `propose` naming `say`, for a proposed say's words;
 - `propose`: an add-on's acts;
+- `services`: a read step's linked service, as `"read"` ("Reading a linked service", above);
 - `core`: `onboarding`, `prepare_unplug`, `sleep` and `startle`, for core skills only.
 
 ### The gaps
