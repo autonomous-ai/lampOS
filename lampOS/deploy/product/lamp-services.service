@@ -13,8 +13,14 @@
 [Unit]
 Description=lampOS linked services (lamp-services)
 PartOf=lampos.target
-# Not before setup has finished (#806).
+# Not before setup has finished (#806), and only with setup's account and the voice's key, as
+# lamp-cloud: systemd fails a unit whose LoadCredential= file is missing, and on lamp-75c9 (a dev
+# lamp never set up from the app, no backend.json) on 4 Nov it failed 18 times and stayed failed.
+# Without the account lamp-cloud is off too, so no link could reach this unit anyway; skipped, it
+# stays inactive, and lampos.target starts it once both are there.
 ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/etc/lampOS/setup/backend.json
+ConditionPathExists=/etc/lampOS/voice/credential
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=600
@@ -32,7 +38,8 @@ Slice=lampos-parts.slice
 Nice=5
 UMask=0077
 # The backend's link and the lamp's key, as lamp-cloud reads them: for an OAuth token's refresh
-# through the backend (POST <base>/connector/refresh-token), nothing else. Missing: no refresh.
+# through the backend (POST <base>/connector/refresh-token), nothing else. Both are conditions
+# above, since a missing one would fail the unit.
 LoadCredential=account:/etc/lampOS/setup/backend.json
 LoadCredential=key:/etc/lampOS/voice/credential
 # Reads on (the header). Writes stay off: a "send" needs a voice print, and the product sets no

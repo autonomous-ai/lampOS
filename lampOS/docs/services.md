@@ -112,7 +112,12 @@ refused and every read is brief.
 every lamp, as `lamp-addons.service` is, but `lamp-services` opens no socket
 unless `LAMP_SERVICES=on` is in its environment (or it is started with
 `--enable`, which its unit does not pass): off, it says one line and exits 0
-at once, so the unit stays inactive and is not restarted. The product's three
+at once, so the unit stays inactive and is not restarted. It starts only once
+setup is done and setup's account (`/etc/lampOS/setup/backend.json`) and the
+voice's key (`/etc/lampOS/voice/credential`) are there, as `lamp-cloud`
+does: systemd fails a unit whose `LoadCredential=` file is missing, and on
+lamp-75c9, a dev lamp never set up from the app, it failed in a loop on
+4 Nov. Without them it is skipped and stays inactive. The product's three
 units, `lamp-services.service`, `lamp-cloud.service` and
 `lamp-voice.service`, each set `LAMP_SERVICES=on`, for reads only: read on
 lamp-9adf on build 9928's own binaries on 4 Nov. A drop-in setting
