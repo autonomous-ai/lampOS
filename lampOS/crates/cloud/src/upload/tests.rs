@@ -450,8 +450,44 @@ fn a_taken_name_is_refused() {
         &format!("{KIND_PREFIX}{upload_id}"),
         data(CARD.as_bytes(), "skill_md"),
     );
-    let (result, _) = uploads(&dir, &base, Path::new("/nowhere/make.sock")).run(&upload_id);
-    assert!(result.unwrap_err().contains("already on this lamp"));
+    let (result, journal) = uploads(&dir, &base, Path::new("/nowhere/make.sock")).run(&upload_id);
+    let why = result.unwrap_err();
+    assert!(
+        why.contains("already on this lamp") && why.contains("tea-tip"),
+        "{why}"
+    );
+    // The app is told the name; the journal never (El's P2 on #5080).
+    let journal = journal.join("\n");
+    assert!(!journal.contains("tea-tip"), "{journal}");
+    assert!(journal.contains(REFUSED_BY_ITS_CHECKS), "{journal}");
+}
+
+/// lamp-voice's own refusal, which may name the skill, goes whole to the
+/// app and as a fixed reason to the journal; a fixed reason of this module
+/// is journaled as it is.
+#[test]
+fn a_refusal_naming_the_skill_never_reaches_the_journal() {
+    let dir = folder("refused");
+    let upload_id = id(CARD.as_bytes());
+    let (base, _) = backend(
+        &format!("{KIND_PREFIX}{upload_id}"),
+        data(CARD.as_bytes(), "skill_md"),
+    );
+    let (socket, _seen) = voice(
+        "refused",
+        vec![json!({"refused": "a skill called tea-tip is already kept here"})],
+    );
+    let (result, journal) = uploads(&dir, &base, &socket).run(&upload_id);
+    assert_eq!(
+        result.unwrap_err(),
+        "a skill called tea-tip is already kept here"
+    );
+    let journal = journal.join("\n");
+    assert!(!journal.contains("tea-tip"), "{journal}");
+    assert!(journal.contains(REFUSED_BY_ITS_CHECKS), "{journal}");
+    assert_eq!(journaled(TOO_BIG), TOO_BIG);
+    assert_eq!(journaled(LEFT_OFF), LEFT_OFF);
+    assert_eq!(journaled("tea-tip is on"), REFUSED_BY_ITS_CHECKS);
 }
 
 /// Taken `starting`, one fetch at a time, its result kept for the app as

@@ -84,6 +84,38 @@ pub const VOICE_UNREACHED: &str = "adding a skill can't be reached on the lamp n
 pub const LEFT_OFF: &str = "it wasn't put on: there was no spoken yes at the lamp";
 pub const NEVER_ASKED: &str = "it was never asked about aloud, so it isn't on";
 pub const LET_GO: &str = "it is no longer kept on the lamp";
+/// What the journal says of any other reason: one that may name the skill
+/// (a name the lamp holds, lamp-voice's own refusal), told whole to the app
+/// alone (El's P2 on #5080).
+pub const REFUSED_BY_ITS_CHECKS: &str =
+    "refused by a check of its name or files; the app is told which";
+
+/// The journal's words for `why`: one of this module's fixed reasons as it
+/// is, anything else [`REFUSED_BY_ITS_CHECKS`], so a skill's name or words
+/// never reach the journal.
+pub fn journaled(why: &str) -> &str {
+    const FIXED: [&str; 14] = [
+        TOO_LONG,
+        FROM_THE_STORE,
+        NO_CODE,
+        OTHER_FILES,
+        NOT_A_SKILL,
+        MISMATCH,
+        TOO_BIG,
+        NO_MESSAGE,
+        BUSY,
+        UNCHECKED,
+        VOICE_UNREACHED,
+        LEFT_OFF,
+        NEVER_ASKED,
+        LET_GO,
+    ];
+    if FIXED.contains(&why) {
+        why
+    } else {
+        REFUSED_BY_ITS_CHECKS
+    }
+}
 
 /// Whether the switch is on.
 pub fn on_from_environment() -> bool {
@@ -203,7 +235,7 @@ impl Uploads {
                     "lamp-cloud: a skill from a file: {}",
                     match &result {
                         Ok(_) => "put on by a spoken yes".to_owned(),
-                        Err(why) => format!("not on: {why}"),
+                        Err(why) => format!("not on: {}", journaled(why)),
                     }
                 );
                 uploads.keep(Outcome {
@@ -254,7 +286,7 @@ impl Uploads {
         let result = self.kept(id, &mut journal);
         journal.push(match &result {
             Ok(_) => "a skill from a file: kept; the lamp asks about it aloud".to_owned(),
-            Err(why) => format!("a skill from a file: not added: {why}"),
+            Err(why) => format!("a skill from a file: not added: {}", journaled(why)),
         });
         (result, journal)
     }

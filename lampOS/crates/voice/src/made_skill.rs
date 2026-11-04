@@ -2248,14 +2248,14 @@ body = { gesture = "nod" }
     fn a_skill_kept_twice_is_one_entry() {
         let dir = scratch("made-once");
         let made = made_as(&dir, "water", 'a');
-        remember(&dir, "local:1", &made).unwrap();
-        remember(&dir, "local:2", &made).unwrap();
+        remember(&dir, "local:1", &made, false).unwrap();
+        remember(&dir, "local:2", &made, false).unwrap();
         assert_eq!(names(&dir), ["water"]);
         assert_eq!(kept(&dir, "local:2").unwrap().sha256, made.sha256);
         assert!(kept(&dir, "local:1").is_none());
         assert!(made.package.is_file());
         let other = made_as(&dir, "water", 'b');
-        remember(&dir, "local:3", &other).unwrap();
+        remember(&dir, "local:3", &other, false).unwrap();
         assert_eq!(names(&dir), ["water"]);
         assert_eq!(index(&dir)[0]["sha256"], other.sha256);
         assert!(!made.package.exists() && other.package.is_file());
@@ -2263,11 +2263,11 @@ body = { gesture = "nod" }
         let mut entries = index(&dir);
         entries[0]["on"] = json!(true);
         write_index(&dir, &entries).unwrap();
-        remember(&dir, "local:4", &other).unwrap();
+        remember(&dir, "local:4", &other, false).unwrap();
         assert_eq!(index(&dir).len(), 1);
         assert_eq!(index(&dir)[0]["on"], true);
         let third = made_as(&dir, "water", 'c');
-        remember(&dir, "local:5", &third).unwrap();
+        remember(&dir, "local:5", &third, false).unwrap();
         assert_eq!(names(&dir), ["water", "water"]);
         assert!(other.package.is_file() && third.package.is_file());
         let _ = fs::remove_dir_all(&dir);
@@ -2289,11 +2289,11 @@ body = { gesture = "nod" }
             ],
         )
         .unwrap();
-        remember(&dir, "local:6", &made_as(&dir, "six", '6')).unwrap();
+        remember(&dir, "local:6", &made_as(&dir, "six", '6'), false).unwrap();
         assert_eq!(names(&dir), ["on-one", "three", "shared-b", "five", "six"]);
         assert!(dir.join("on-one.tar").is_file());
         assert!(dir.join("shared.tar").is_file());
-        remember(&dir, "local:7", &made_as(&dir, "seven", '7')).unwrap();
+        remember(&dir, "local:7", &made_as(&dir, "seven", '7'), false).unwrap();
         assert!(!dir.join("three.tar").exists());
         // All on: kept, past the cap.
         let mut entries = index(&dir);
@@ -2302,7 +2302,7 @@ body = { gesture = "nod" }
         }
         write_index(&dir, &entries).unwrap();
         let eighth = made_as(&dir, "eight", '8');
-        remember(&dir, "local:8", &eighth).unwrap();
+        remember(&dir, "local:8", &eighth, false).unwrap();
         assert_eq!(index(&dir).len(), KEPT_MOST + 1);
         assert!(eighth.package.is_file());
         let _ = fs::remove_dir_all(&dir);
@@ -2326,13 +2326,14 @@ body = { gesture = "nod" }
         .unwrap();
         let water = made_as(&dir, "water-on-return", 'w');
         for at in 0..4 {
-            remember(&dir, &format!("local:{at}"), &water).unwrap();
+            remember(&dir, &format!("local:{at}"), &water, false).unwrap();
         }
         for (at, sha) in ['p', 'q', 'r'].into_iter().enumerate() {
             remember(
                 &dir,
                 &format!("app:{at}"),
                 &made_as(&dir, &format!("more-{at}"), sha),
+                false,
             )
             .unwrap();
         }
