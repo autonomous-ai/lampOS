@@ -78,3 +78,78 @@ coord_head() {
   [[ $v == "false $REPO "* ]] || return 1
   print -r -- ${v##* }
 }
+
+# ---- Build inputs and lanes (#5212 parts 2 and 3), shared by behind-unrelated.sh, merge-when-green.sh, lane.sh and
+# train-bot.sh, so "what the ARM64 run takes" is one test everywhere.
+# coord_wf_paths REF WORKFLOW: the pull_request `paths` of .github/workflows/WORKFLOW at REF, one pattern a line (the
+# block list form both workflows use). Prints nothing when it can't be read.
+coord_wf_paths() {
+  git show "$1:.github/workflows/$2" 2>/dev/null | awk '
+    /^  pull_request:/ { pr = 1; next }
+    pr && /^  [^ #]/ { pr = 0 }
+    pr && /^    paths:/ { p = 1; next }
+    pr && p && /^      - / { s = $0; sub(/^      - /, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/^'\''|'\''$/, "", s); gsub(/^"|"$/, "", s); print s; next }
+    pr && p && /^[[:space:]]*(#|$)/ { next }
+    pr && p && /^    [^ ]/ { p = 0 }'
+}
+# coord_glob_re GLOB: a GitHub path filter as an extended regex: ** any characters (**/ also none), * and ? not /.
+coord_glob_re() {
+  local g=$1 r="" c i
+  for (( i = 1; i <= ${#g}; i++ )); do
+    c=${g[i]}
+    if [[ $c == '*' && ${g[i+1]} == '*' ]]; then
+      if [[ ${g[i+2]} == / ]]; then r+='(.*/)?'; (( i += 2 )); else r+='.*'; (( i++ )); fi
+    elif [[ $c == '*' ]]; then r+='[^/]*'
+    elif [[ $c == '?' ]]; then r+='[^/]'
+    else case $c in (.|+|\(|\)|\||^|\$|\{|\}|\[|\]|\\) r+="\\$c" ;; (*) r+=$c ;; esac; fi
+  done
+  print -r -- "^$r\$"
+}
+# coord_inputs_init REF: reads lampos-arm64.yml's and lampos-sdk.yml's pull_request paths at REF into coord_arm_pats and
+# coord_sdk_pats ("+regex" or "-regex" for a "!" pattern, in order). An empty list makes coord_input fail closed.
+coord_inputs_init() {
+  local p; typeset -ga coord_arm_pats coord_sdk_pats; coord_arm_pats=(); coord_sdk_pats=()
+  for p in ${(f)"$(coord_wf_paths $1 lampos-arm64.yml)"}; do
+    if [[ $p == '!'* ]]; then coord_arm_pats+="-$(coord_glob_re ${p#!})"; else coord_arm_pats+="+$(coord_glob_re $p)"; fi
+  done
+  for p in ${(f)"$(coord_wf_paths $1 lampos-sdk.yml)"}; do
+    if [[ $p == '!'* ]]; then coord_sdk_pats+="-$(coord_glob_re ${p#!})"; else coord_sdk_pats+="+$(coord_glob_re $p)"; fi
+  done
+}
+# coord_takes FILE ARRAY: does the workflow whose patterns are in ARRAY (coord_inputs_init) take FILE? The last
+# pattern that matches decides, as GitHub's own filter does.
+coord_takes() {
+  local e t=0
+  for e in "${(@P)2}"; do [[ $1 =~ ${e:1} ]] && { [[ $e == +* ]] && t=1 || t=0; }; done
+  (( t ))
+}
+# coord_input FILE: prints why FILE is a build input, or nothing. An input is anything under lampOS/crates/, any Cargo.*,
+# anything under .github/workflows/, and anything else the ARM64 run or the SDK check takes: lampOS/** but the docs'
+# Markdown and lampOS/builders/, with the docs either workflow takes back in (lampos-arm64.yml's list; lampos-sdk.yml's
+# lampOS/docs/control* and skill-format*, Thirteen's P3 on #5289), plus the ARM64 run's .github scripts and the promote
+# tools. Needs coord_inputs_init; with either workflow's paths unread, every lampOS doc is an input (fail closed).
+coord_input() {
+  case $1 in
+    lampOS/crates/*) print "crates" ;;
+    Cargo.*|*/Cargo.*) print "Cargo" ;;
+    .github/workflows/*) print "workflows" ;;
+    lampOS/builders/*) ;;
+    lampOS/docs/*.md)
+      if (( ! ${#coord_arm_pats} )) || coord_takes $1 coord_arm_pats; then print "a doc the ARM64 run reads"
+      elif (( ! ${#coord_sdk_pats} )) || coord_takes $1 coord_sdk_pats; then print "a doc the SDK check reads"; fi ;;
+    lampOS/*) print "an ARM64 input" ;;
+    .github/scripts/lampos-*|.github/tools/lampos-promote/*) print "an ARM64 input" ;;
+  esac
+}
+# coord_lane COMMIT [LAMP_VOICE]: the train lane of a PR whose head is COMMIT (part 3). Prints "nocrates" when no file
+# it changes from its merge base with LAMP_VOICE (default origin/lamp-voice) is a build input (coord_input), else
+# "crates: <the first input> (<why>)". Files that can't be read, or none, go to the crate lane (fail closed: that lane
+# runs every check). Read-only; the caller runs coord_inputs_init first (once for many PRs).
+coord_lane() {
+  local lv=${2:-origin/lamp-voice} b files f k
+  b=$(git merge-base $lv $1 2>/dev/null) || { print -r -- "crates: its files can't be read"; return 0; }
+  files=$(git diff --no-renames --name-only $b $1 2>/dev/null) || { print -r -- "crates: its files can't be read"; return 0; }
+  [[ -n $files ]] || { print -r -- "crates: it changes no file"; return 0; }
+  for f in ${(f)files}; do k=$(coord_input $f); [[ -n $k ]] && { print -r -- "crates: $f ($k)"; return 0; }; done
+  print -r -- nocrates
+}
