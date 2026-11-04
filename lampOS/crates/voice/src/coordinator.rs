@@ -7695,10 +7695,8 @@ fn conversation_with_gate_inner(
                 // conversation: the person wins over it.
                 // Its computer ended the turn, or the person stopped the
                 // lamp: so ends the conversation ([`closes_conversation`]).
-                if closes_conversation(reason, muted)
-                    && let Ok(mut thread) = crate::thread::THREAD.lock()
-                {
-                    thread.close_conversation(Instant::now());
+                if closes_conversation(reason, muted) {
+                    crate::thread::close_now(None);
                 }
                 if !muted && reason == CONTROL_ENDED {
                     control_turns.ended_by_its_computer();

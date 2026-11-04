@@ -195,6 +195,9 @@ pub struct Thread {
     /// When the conversation was last closed ([`Self::close_conversation`]):
     /// exchanges opened at or before it no longer keep one going.
     closed_at: Option<Instant>,
+    /// A request whose exchange the last close covers even if it opens
+    /// after it ([`Self::close_conversation_with`]).
+    closed_request: Option<u64>,
 }
 
 /// What stands for the lamp's words in a request a connected service's
@@ -366,6 +369,7 @@ impl Thread {
             calling: VecDeque::new(),
             private: VecDeque::new(),
             closed_at: None,
+            closed_request: None,
         }
     }
 
@@ -511,7 +515,12 @@ impl Thread {
             std::mem::take(&mut self.admitted),
             self.note.take(),
         );
-        let (count_only, quoted, closed_at) = (self.count_only, self.quoted, self.closed_at);
+        let (count_only, quoted, closed_at, closed_request) = (
+            self.count_only,
+            self.quoted,
+            self.closed_at,
+            self.closed_request,
+        );
         let marks: Vec<_> = self
             .exchanges
             .iter()
@@ -548,6 +557,7 @@ impl Thread {
         // The close is this process's too: a thread read back keeps it, so
         // the exchanges before it stay out of a conversation going on.
         self.closed_at = closed_at;
+        self.closed_request = closed_request;
         self.held = Some(at);
         took
     }
@@ -1141,6 +1151,16 @@ impl Thread {
         self.closed_at = Some(self.closed_at.map_or(now, |closed| closed.max(now)));
     }
 
+    /// The person's own stop was answered as request `request` ("Okay, I'll
+    /// stop there.", `crate::spoken_stop`): the conversation is over at
+    /// `now`, as [`Self::close_conversation`] has it, and that request's own
+    /// exchange (the person's stop and the lamp's line) keeps none going even
+    /// if the line is written into the thread after this.
+    pub fn close_conversation_with(&mut self, request: u64, now: Instant) {
+        self.close_conversation(now);
+        self.closed_request = Some(request);
+    }
+
     /// When the conversation was last closed ([`Self::close_conversation`]).
     pub fn closed_at(&self) -> Option<Instant> {
         self.closed_at
@@ -1149,7 +1169,8 @@ impl Thread {
     /// Whether `exchange` may keep a conversation going: it opened after
     /// the last close, if any.
     fn after_close(&self, exchange: &Exchange) -> bool {
-        self.closed_at.is_none_or(|closed| exchange.at > closed)
+        self.closed_request != Some(exchange.request)
+            && self.closed_at.is_none_or(|closed| exchange.at > closed)
     }
 
     /// Whether the lamp said something to someone so lately that a
@@ -1686,6 +1707,53 @@ pub fn write_file(path: &Path, text: &str) -> std::io::Result<()> {
     file.write_all(text.as_bytes())?;
     drop(file);
     std::fs::rename(&writing, path)
+}
+
+/// Close the conversation of the voice's own thread ([`THREAD`]) now: a
+/// computer's `turn.end` or the person's stop ([`Thread::close_conversation`]),
+/// or, with `request`, the person's stop answered as that request
+/// ([`Thread::close_conversation_with`]). In tests it closes only while a
+/// test asks for it ([`closes_for_test`]): `THREAD` is the whole process's,
+/// and a session in one test closing it would end the conversation another
+/// test is judging.
+pub fn close_now(request: Option<u64>) {
+    #[cfg(test)]
+    if !test_closes::ON.load(std::sync::atomic::Ordering::Acquire) {
+        return;
+    }
+    if let Ok(mut thread) = THREAD.lock() {
+        match request {
+            Some(request) => thread.close_conversation_with(request, Instant::now()),
+            None => thread.close_conversation(Instant::now()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_closes {
+    pub(super) static ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+}
+
+/// While held, [`close_now`] closes [`THREAD`]'s conversation in tests. Hold
+/// it with `provider_worker::tests::one_thread()`, so no other test reading
+/// the thread runs meanwhile. The switch is the whole process's: while one
+/// test holds it, another test running at the same time without
+/// `one_thread()` could still close [`THREAD`] through [`close_now`], so
+/// every test that reads the thread must hold `one_thread()`.
+#[cfg(test)]
+pub(crate) struct ClosesForTest;
+
+#[cfg(test)]
+pub(crate) fn closes_for_test() -> ClosesForTest {
+    test_closes::ON.store(true, std::sync::atomic::Ordering::Release);
+    ClosesForTest
+}
+
+#[cfg(test)]
+impl Drop for ClosesForTest {
+    fn drop(&mut self) {
+        test_closes::ON.store(false, std::sync::atomic::Ordering::Release);
+    }
 }
 
 /// `told` on the thread as it stands now, for a voice route about to tell
@@ -4150,6 +4218,23 @@ mod tests {
     /// before it keep none going and give no `said_last_ago`, though they
     /// are kept; one opened after it counts again; the close survives a
     /// thread read back from the file.
+    /// The person's stop answered as its own request ("Okay, I'll stop
+    /// there."): the close covers that request's exchange even when the line
+    /// is written into the thread after the close; another request after it
+    /// counts again.
+    #[test]
+    fn a_close_with_its_request_covers_that_request_written_after_it() {
+        let now = Instant::now();
+        let at = |s: u64| now + Duration::from_secs(s);
+        let mut thread = Thread::new();
+        thread.close_conversation_with(3, at(1));
+        thread.lamp_for(3, "Okay, I'll stop there.", at(2), None);
+        assert!(!thread.going_on(at(3)));
+        assert_eq!(thread.said_last_ago(at(3)), None);
+        thread.lamp_for(4, "It's three o'clock.", at(4), None);
+        assert!(thread.going_on(at(5)));
+    }
+
     #[test]
     fn a_closed_conversation_is_over_until_the_lamp_speaks_again() {
         let now = Instant::now();

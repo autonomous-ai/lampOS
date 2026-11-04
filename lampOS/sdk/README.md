@@ -85,6 +85,8 @@ Python names first, JavaScript where it differs.
 | Its own phrases heard | `phrase.heard` | `on("phrase.heard", phrases=…)` | `lamp_events`, `lamp_wait_for` | done | Nine | not yet |
 | Its name called | `name.heard` | `on("name.heard")` | `lamp_events` | done | Nine | not yet |
 | Kinds of sound | `sound.heard` | `on("sound.heard")` | `lamp_events` | done | Nine | not yet |
+| Open a conversation turn, or end its own | `turn.start`, `turn.end` | `start_turn`, `end_turn` / `startTurn`, `endTurn` | `lamp_start_turn`, `lamp_end_turn` | PR #4944 | Nine | 75c9 3–4 Nov, combined builds: turn answered, same computer continuing, own end cutting a story (by ear) |
+| A computer's own mute | `listen.set` | `set_listening` / `setListening` | `lamp_set_listening` | PR #4944 | Nine | not yet |
 | The microphone's audio, local only | `microphone` grant only, not routed yet | — | — | missing | harness-reviewer | not yet |
 
 ### Eyes and camera

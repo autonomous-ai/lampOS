@@ -545,7 +545,11 @@ listening"; `crates/voice/src/control_turn.rs`): the skill `control` alone
 (`say::TURN_SKILL`; any other, root's helpers too, is refused `turn is
 lamp-control's only`) may ask the voice to open a conversation turn, or to
 end one it opened. The door serves them as `turn.start` and `turn.end`
-(`crates/control/src/parts.rs`); this is the voice's side.
+(`crates/control/src/parts.rs`); this is the voice's side. "lamp-control's
+only" rests on the self-declared `skill: "control"`, with no peer check:
+every unit in the `lampos` group reaches the say socket as the same `lampos`
+user, so the voice trusts any `lampos` peer that names it, as it does for
+exact says and clips.
 
     {"skill": "control", "turn": "start", "expires_in_ms": 10000}
     {"skill": "control", "turn": "start", "text": "Shall we go over today's list?", "expires_in_ms": 10000}
@@ -639,7 +643,10 @@ own call, so the next room line needs the lamp's name, a turn or a tap to
 be answered (lamp-75c9 on 3 Nov: a room line 36 s after an end was
 answered as the conversation going on). The person's own stop closes it
 the same way, the button's Stop or "stop" said over the lamp's voice
-(`coordinator::closes_conversation`); a touch on the head while the lamp
+(`coordinator::closes_conversation`), and so does a stop said over the
+lamp's answer that `LAMP_SPOKEN_STOP_ENDS` answers "Okay, I'll stop there."
+(`Thread::close_conversation_with`: the line stays in the thread but keeps
+no conversation going); a touch on the head while the lamp
 speaks, the voice's own cuts and a mute don't (a mute ends the whole
 conversation its own way). The person wins: the privacy switch, the button, sleep and "stop"
 end a computer's turn as any other.
