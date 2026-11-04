@@ -99,14 +99,23 @@ pub enum Event {
 const MOST_MESSAGE_BYTES: usize = 200;
 
 /// Harness's `message` as the app may show it: plain, bounded text, with
-/// no address in it.
+/// no address in it and no code: no run of eight digits (the privacy
+/// reader's P3 on #5236), so a quoted code never reaches the broker.
 fn message(value: Option<&Value>) -> Option<String> {
     let message = value?.as_str()?.trim();
     (!message.is_empty()
         && message.len() <= MOST_MESSAGE_BYTES
         && !message.contains('@')
+        && !has_eight_digits(message)
         && !message.chars().any(char::is_control))
     .then(|| message.to_owned())
+}
+
+/// Whether `text` holds a run of exactly eight digits, a sign-in code's
+/// shape: `(^|[^0-9])[0-9]{8}([^0-9]|$)`.
+fn has_eight_digits(text: &str) -> bool {
+    text.split(|c: char| !c.is_ascii_digit())
+        .any(|run| run.len() == 8)
 }
 
 /// How a sign-in ended. Its `Debug` hides the email.
@@ -457,7 +466,15 @@ impl Session {
                     message,
                     already_signed_in,
                 }) => {
-                    self.message = message;
+                    // Not one that quotes the open code, whatever its
+                    // shape (the privacy reader's P3 on #5236).
+                    let open_code = match &self.state {
+                        State::Code { code, .. } => Some(code.as_str()),
+                        _ => self.code_given.as_deref(),
+                    };
+                    self.message = message.filter(|message| {
+                        open_code.is_none_or(|code| code.is_empty() || !message.contains(code))
+                    });
                     self.already_signed_in = already_signed_in;
                     said.push(match &done {
                         Done::Success { .. } if already_signed_in => "already signed in".into(),
@@ -1232,6 +1249,36 @@ mod tests {
                 code: "DENIED".into()
             })))
         );
+        // A quoted code is dropped too (the privacy reader's P3 on #5236):
+        // any run of eight digits, but not a longer or shorter one.
+        for quoted in [
+            "Code 12345678 has expired.",
+            "12345678",
+            "Code (12345678).",
+        ] {
+            assert_eq!(
+                parse_line(
+                    &json!({"type":"result","status":"error","code":"EXPIRED","message":quoted})
+                        .to_string()
+                ),
+                Ok(Some(Event::Result(Done::Error {
+                    code: "EXPIRED".into()
+                }))),
+                "{quoted}"
+            );
+        }
+        for kept in ["Try again in 60 minutes.", "Reference 123456789."] {
+            assert!(
+                matches!(
+                    parse_line(
+                        &json!({"type":"result","status":"error","code":"DENIED","message":kept})
+                            .to_string()
+                    ),
+                    Ok(Some(Event::ResultWith { message: Some(_), .. }))
+                ),
+                "{kept}"
+            );
+        }
         assert_eq!(
             parse_line(
                 r#"{"type":"qr","url":"https://harness.autonomous.ai/signin#k=x","expiresIn":120}"#
@@ -1254,6 +1301,25 @@ mod tests {
         assert!(view["revision"].as_u64().unwrap() > before);
         assert_eq!(session.app_view(now)["revision"], view["revision"]);
         assert_eq!(session.view(now), json!({"sign_in": "in_app", "id": 1}));
+
+        // A message quoting the open code, whatever its shape, is not kept
+        // (the privacy reader's P3 on #5236); the app shows its own words.
+        let (session, lines, _) = scripted(now);
+        let mut session = session.started_by(By::App, Method::Code);
+        lines.lock().unwrap().extend([
+            code("AB12CD"),
+            Some(Ok(Event::ResultWith {
+                done: Done::Error {
+                    code: "EXPIRED".into(),
+                },
+                message: Some("Code AB12CD has expired.".into()),
+                already_signed_in: false,
+            })),
+        ]);
+        session.tend(now);
+        let view = session.app_view(now);
+        assert_eq!(view["result"], "error");
+        assert!(!view.to_string().contains("AB12CD"), "{view}");
 
         // The PM's privacy rule: no journal line of an app-started sign-in,
         // nor a refusal, holds the code or the email.
