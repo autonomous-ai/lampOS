@@ -359,3 +359,10 @@ Ready for lamp-voice: yes (#4645, behind `LAMP_NAME_REPEAT_NOT_A_CALL`, off; Par
 - Gate: voice lib 4331/3 (known motor flakes, #1569); after the HOLD fixes the voice modules touched, 1048/0; lamp-update 352/0; promote notes 9/0; clippy, fmt, workspace build clean. Merged in train 429.
 - Played check (busy set, off against on) asked as `4ACE RUN #4645`.
 - Ask 1 (c11's opening "Lamp" missed by the detector): the 1 s hold-off rules out First's refractory reading; a `lamp-name check` of c11.wav is asked.
+
+## 2026-11-04
+
+- Taken: #5231 (the rest of #3743 and #4141: the notices release with the retimed Wi-Fi pair, its `models.json` pin, a played check), #5232 (the rest of #3923: G' trained on cleared voices only, scored beside G, busy rounds), #5233 (the rest of #3945: `LAMP_NAME_SAID_TO_A_PERSON` with a real person's "Ma'am" at 1.5–2 m, then the PM's call on the product default).
+- #5140: #5159 merged in train 601 (lamp-voice `bc32d2d19`). Its build's lamp check on c0a4 follows when it is published.
+- #5141: #5166 rebased onto lamp-voice `bc32d2d191` (only conflicts: the switch list in `process.rs`, and the `at_setup` and `record` fields beside each other in `FaceSwitches`).
+- #5231's pin waits on #5221's order: once builds carry models, a re-pin refuses builds on lamps with `LAMP_UPDATE_MODELS` off (my HOLD on #5221).
