@@ -12,7 +12,8 @@ Each script keeps its dated comments. They are the history of each rule.
 | Tool | What it does |
 |---|---|
 | `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back. It picks every eligible PR, cherry-picks its commits, pushes `first/train-N`, opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints what one round would carry and stops. |
-| `merge-when-green.sh PR [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Green: at least two ARM64 build-and-test and clippy checks, every one completed with `SUCCESS`; any other completed conclusion (a null one too) fails it. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
+| `merge-when-green.sh PR [--behind-unrelated] [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Green: at least two ARM64 build-and-test and clippy checks, every one completed with `SUCCESS`; any other completed conclusion (a null one too) fails it. With `--behind-unrelated` (the bot passes it), a PR behind `lamp-voice` goes on waiting and merges as it is when `behind-unrelated.sh` says so; a merge as is that GitHub refuses exits 3, not 4. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. `DRY=1`: waits and decides as usual, but skips `lv-quiet.sh` and the merge and prints what it would do; `LV_AT=<sha>` (dry only) stands in for `lamp-voice`'s tip, to replay a past case. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
+| `behind-unrelated.sh TRAIN_HEAD [LAMP_VOICE]` | Used by `merge-when-green.sh --behind-unrelated`. Read-only. Prints `merge as is: ...` (exit 0) or `rebuild: <reason>` (exit 1); see "A green train behind lamp-voice" below. |
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
 | `markers.py [--writers FILE] [PR]` | Reads a PR's comments as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. |
@@ -20,6 +21,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
 | `lib.sh` | Sourced by `train-bot.sh` and `still-eligible.sh`: the writers list and the fetches, each failing closed. |
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
+| `tests/test_behind_unrelated.py` | Tests for `behind-unrelated.sh` and `merge-when-green.sh --behind-unrelated`, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
 | `gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON PRIVATE_NAMES` | The generator `build-rows-pr.sh` calls. |
@@ -98,6 +100,30 @@ Stop: `kill "$(cat "$S/train-bot.pid")"`. Restart: stop, check no train is open,
 
 The bot stops by itself (exit 2) when two trains in a row time out, or a run fails with no failing test named.
 It says so on the Queue (#4710).
+
+## A green train behind lamp-voice
+
+A train that went green while `lamp-voice` moved used to be closed and built again (about 30 min).
+Train 597 (#5201) was thrown away for `f5f3dda32`, which changed only `robots/lamp/hardware/test/tools/factory-run.sh`.
+
+Now `behind-unrelated.sh` decides, from the train's base (its merge base with `lamp-voice`).
+The train merges as it is, by rebase and pinned to its head, after the same precheck, only when both hold:
+
+- the files `lamp-voice` gained and the files the train changes share none (a rename counts as both paths);
+- no gained file is a build input: nothing under `lampOS/crates/`, no `Cargo.*` anywhere, nothing under `.github/workflows/`, and no other file the lampOS ARM64 run takes (`lampOS/**` except the docs' Markdown and `lampOS/builders/`, with the docs `lampos-arm64.yml` takes back in, plus its `.github/scripts/lampos-*` and `.github/tools/lampos-promote/`).
+
+The crates' tests read files in `lampOS/deploy`, `lampOS/skills`, `lampOS/etc` and those docs, so a gain there rebuilds.
+Anything else rebuilds as before, and so does any error (fail closed).
+
+Replay a case without changing anything:
+
+```sh
+DRY=1 .github/tools/coordination/behind-unrelated.sh <train head> <lamp-voice then>
+DRY=1 LV_AT=<lamp-voice then> .github/tools/coordination/merge-when-green.sh <train PR> --behind-unrelated
+```
+
+For train 597: `DRY=1 LV_AT=f5f3dda325 .github/tools/coordination/merge-when-green.sh 5201 --behind-unrelated` prints
+`dry: merge as is: gained 1 files since 762487b1d (robots/lamp/hardware/test/tools/factory-run.sh), none overlapping the train's 35, ...`.
 
 ## Marker rules
 

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# merge-when-green.sh PR [--precheck PR...] (22 Oct 23:4x, the owner: "do the reviewer job yourself too ... so we can move faster"): wait for
+# merge-when-green.sh PR [--behind-unrelated] [--precheck PR...] (22 Oct 23:4x, the owner: "do the reviewer job yourself too ... so we can move faster"): wait for
 # the PR's required checks to finish; merge it by rebase, pinned to its head, only when every check passed and the head
 # already contains lamp-voice's latest commit (the owner's 22 Oct rule). Otherwise say why and stop. Never pushes.
 # Paths from the environment (README.md): TOOLS_DIR (default: this folder), REPO_DIR (default: the repo holding it).
@@ -8,7 +8,16 @@
 # that variable is ignored now.
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"; R="${REPO_DIR:-$(git -C $TOOLS_DIR rev-parse --show-toplevel)}"; P=${1:?PR}; cd $R || exit 1
 unset PRECHECK; typeset -a pre; pre=()
+# 4 Nov (#5212 part 2): --behind-unrelated (the train bot's trains) lets a PR behind lamp-voice go on waiting and merge
+# as it is when behind-unrelated.sh says lamp-voice gained only files the PR doesn't touch and no build input; the
+# owner's 22 Oct "contains lamp-voice's tip" rule stands for every other case, and for every PR without the flag.
+unrelated=0; [[ $2 == --behind-unrelated ]] && { unrelated=1; argv[2]=(); }
 [[ $2 == --precheck ]] && pre=("${@[3,-1]}")
+# DRY=1 (#5212): wait and decide as usual but change nothing: no lv-quiet wait, no merge; print what it would do. LV_AT
+# (dry only) stands in for lamp-voice's tip in the behind decision, to replay a past case.
+lvat=origin/lamp-voice; [[ ${DRY:-0} == 1 && -n $LV_AT ]] && lvat=$LV_AT
+# behind_ok: behind-unrelated.sh's decision on this PR's head, printed; true only with --behind-unrelated and "merge as is".
+behind_ok() { local d; (( unrelated )) || return 1; d=$($TOOLS_DIR/behind-unrelated.sh refs/remotes/pr/$P $lvat); local rc=$?; echo "$(date +%T) #$P behind lamp-voice: $d"; return $rc; }
 # A PR whose every file the lampOS workflows skip (lampOS/docs/**/*.md and lampOS/builders/**, but not the seven docs
 # they take back in) gets no checks at all, so waiting for them timed out trains 41 and 44 (23 Oct): it merges on the
 # same current-base and precheck rules, with nothing to wait for.
@@ -52,7 +61,13 @@ for i in {1..90}; do
   # moved past this PR's base ends the wait at once, rather than after a full green run that can't merge.
   if (( i % 2 == 0 )); then
     git fetch -q origin lamp-voice "+refs/pull/$P/head:refs/remotes/pr/$P"
-    if ! git merge-base --is-ancestor origin/lamp-voice refs/remotes/pr/$P; then echo "$(date +%T) #$P behind lamp-voice while its checks ran; not merged"; exit 3; fi
+    if ! git merge-base --is-ancestor origin/lamp-voice refs/remotes/pr/$P; then
+      # 4 Nov (#5212): behind only by unrelated files, the wait goes on (said once per lamp-voice head).
+      lvh=$(git rev-parse origin/lamp-voice)
+      if [[ $lvh == $ok_lv ]]; then :
+      elif behind_ok; then ok_lv=$lvh
+      else echo "$(date +%T) #$P behind lamp-voice while its checks ran; not merged"; exit 3; fi
+    fi
   fi
   green=0
   if (( armless )); then
@@ -78,11 +93,20 @@ for i in {1..90}; do
     [[ $nochecks == 1 ]] && echo "$(date +%T) #$P is docs the workflows skip: no checks to wait for"
     # 28 Oct 20:4x (first builder): never move lamp-voice under a build still to publish (#3906's 403); the
     # ancestry check below runs after the wait, on the lamp-voice the merge will meet.
-    $TOOLS_DIR/lv-quiet.sh
+    [[ ${DRY:-0} == 1 ]] || $TOOLS_DIR/lv-quiet.sh
     git fetch -q origin lamp-voice "+refs/pull/$P/head:refs/remotes/pr/$P"
-    if ! git merge-base --is-ancestor origin/lamp-voice refs/remotes/pr/$P; then echo "$(date +%T) #$P green but behind lamp-voice; not merged"; exit 3; fi
+    asis=0
+    if ! git merge-base --is-ancestor $lvat refs/remotes/pr/$P; then
+      # 4 Nov (#5212): train 597 (#5201) was green and thrown away for a factory script alone. Behind only by unrelated
+      # files, it merges as it is: by rebase, pinned to its head, after the same precheck.
+      if behind_ok; then asis=1
+      else echo "$(date +%T) #$P green but behind lamp-voice; not merged"; exit 3; fi
+    fi
     if (( ${#pre} )) && ! $TOOLS_DIR/still-eligible.sh "${pre[@]}"; then echo "$(date +%T) #$P precheck failed: not merged"; exit 6; fi
-    gh pr merge $P -R autonomous-ai/lampOS --rebase --match-head-commit $head && echo "$(date +%T) #$P merged at ${head:0:9}" && exit 0
+    if [[ ${DRY:-0} == 1 ]]; then echo "$(date +%T) dry: #$P would merge by rebase at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')"; exit 0; fi
+    gh pr merge $P -R autonomous-ai/lampOS --rebase --match-head-commit $head && echo "$(date +%T) #$P merged at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')" && exit 0
+    # A refused merge as is goes back to the old path (exit 3, rebuild), never the failed-run path.
+    (( asis )) && { echo "$(date +%T) #$P merge as is refused; rebuilding as behind lamp-voice"; exit 3; }
     echo "$(date +%T) #$P merge refused"; exit 4
   fi
   sleep 30
