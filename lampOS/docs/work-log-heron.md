@@ -316,3 +316,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   `heron/4450-9980-held`; READ ASK to Faye/Thirteen at 14:4x. The replay
   script's own request attribution was off by one for d07/d08 here; the
   README says the journal's numbers are the ones used.
+- 14:36–14:40: Thirteen read #5217 (READ-OK `f61a6a27af`, two P3s on
+  wording: the third restart between the passes, the one-word tie
+  sentence); fixed in the README only, `abbd70139d`, restated at 14:40.
+  14:4x: NEXT TRAIN posted to Faye.
