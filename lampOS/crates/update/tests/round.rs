@@ -3949,6 +3949,57 @@ fn a_changed_model_is_fetched_checked_and_switched_with_its_part() {
     );
 }
 
+/// Same-voice step 2, as the product's updater meets CAM++: the voice's
+/// folder already holds its pinned model, and the build adds one beside it
+/// that the lamp lacks. A copy that doesn't match refuses the build with
+/// nothing switched and nothing of it kept; the next build fetches only the
+/// new model, keeps the other from the old folder, and switches the voice.
+#[test]
+fn a_model_new_beside_a_part_is_the_only_one_fetched_and_a_bad_copy_switches_nothing() {
+    let campplus = "/opt/lampOS/releases/current/campplus.onnx";
+    let mut lamp = Lamp::new().with_models();
+    let turn = lamp.model(TURN, "turn model 2");
+    lamp.publish_with_models(2, "eyes 1", vec![turn.clone()]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let voice = lamp.read("/etc/systemd/system/lamp-voice.service");
+    let fetched = lamp.fetched_models().len();
+
+    let same_voice = lamp.model(campplus, "campplus 1");
+    lamp.channel
+        .files
+        .insert(same_voice.url.clone(), b"campplus 1, damaged".to_vec());
+    lamp.publish_with_models(3, "eyes 1", vec![turn.clone(), same_voice.clone()]);
+    let before = lamp.lamp_files();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why) if why.contains(campplus)),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-voice.service"), voice);
+    assert!(!lamp.stored().contains(&same_voice.sha256));
+
+    lamp.channel
+        .files
+        .insert(same_voice.url.clone(), b"campplus 1".to_vec());
+    lamp.publish_with_models(4, "eyes 1", vec![turn, same_voice.clone()]);
+    assert_eq!(lamp.round(), Outcome::Switched(4), "{:?}", lamp.said);
+    // The damaged copy and the good one: the new model's URL only.
+    assert_eq!(
+        lamp.fetched_models()[fetched..],
+        [same_voice.url.clone(), same_voice.url]
+    );
+    let now = lamp.read("/etc/systemd/system/lamp-voice.service");
+    assert_ne!(now, voice);
+    let folder = unit::program(&now).unwrap().folder();
+    assert_eq!(lamp.read(&format!("{folder}campplus.onnx")), "campplus 1");
+    assert_eq!(
+        lamp.read(&format!("{folder}smart-turn.onnx")),
+        "turn model 2"
+    );
+    assert_eq!(lamp.read(&format!("{folder}lamp-voice")), "voice 1");
+}
+
 #[test]
 fn an_unchanged_model_is_not_fetched_and_its_file_stays() {
     let mut lamp = Lamp::new().with_models();
