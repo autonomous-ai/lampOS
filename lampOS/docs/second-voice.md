@@ -3260,21 +3260,44 @@ after a take-over, but now for every turn:
   while I take your face in" with no `remember_my_face` call, and no face
   was saved. With the switch, a reply whose opening says the lamp is
   saving or saved their face is also a claim (`remember::KeepClaim::Face`:
-  "hold still while I take your face in", "let me learn your face",
-  "I'll remember your face", "I've saved your face", "saving your face";
-  each says "your face", with "hold still/stay still while/so/," allowed
-  before it). It is the same miss on the same path, not a second counter.
+  "hold still while I take your face in", "let me take your face in",
+  "I've saved your face, Lauren", "Okay, I've saved your face"; each says
+  "your face", with "hold still/stay still while/so/," or "I'll do it
+  now:" allowed before it). A save counts only when the rest of its
+  sentence has no "?" and is only filler ("in", "now", "already", "for
+  you"…) or, after a comma, at most two words; an offer that waits for a
+  name ("I'll remember your face once you tell me your name"), a forget
+  ("I'm taking your face off my list now"), recognition ("I remember your
+  face, Sam!"), ability ("I can save your face if you'd like") and a "let
+  me …" offer with a "?" anywhere after it ("Let me learn your face. What
+  name should I keep it under?") are not claims. A rename said done counts ("I've renamed your face to Sam",
+  "Your face is now known as Sam"), but a record told ("Your face is
+  known as Loren", "Your face is saved as Loren"), which a known person
+  may be told of their own face, counts only when its sentence says
+  "now" or that the old name is gone, or after "I'll do it now:". In
+  Vietnamese, "đã lưu khuôn mặt", "đã ghi nhớ khuôn mặt", "đang ghi nhớ
+  khuôn mặt", "đang lưu khuôn mặt" and "mình sẽ ghi nhớ khuôn mặt" (after
+  "bạn giữ yên nhé," or "giữ yên nhé,") are face claims ahead of the older
+  "đã lưu" keep claim, so a real `remember_my_face` clears them; "Mình nhớ
+  khuôn mặt của bạn" is none. While it streams, a face claim's sentence is
+  held to its end before it is decided. It is the same miss on the same path, not a second counter.
   It shares the request's one ask again (`keep_claim_asked`), and the
   journal line is the same one with the function named: "its reply says
   it kept something, with no remember_my_face call: …", so a count of
   "says it kept something" counts both. What keeps a face is a
-  `remember_my_face` call in that round or an earlier round of the
-  request. A `remember` keeps no face. Asked again, the model is told
+  `remember_my_face` call in that round, or one the eyes answered ok
+  earlier in the same request; a refused one (not theirs, not heard, not
+  agreed, the eyes down) keeps nothing, so a later "I've saved your face"
+  is held and asked again (Friday's P1 on #5166). A `remember` keeps no
+  face. Asked again, the model is told
   `remember::FACE_CLAIMED_UNSAVED`, and a second such reply is said as
   `FACE_NOT_SAVED_LINE` ("I haven't saved your face yet. Ask me again and
   I'll take it in."). Off, a face claim is said as it comes, as before.
-  Test: `a reply that says it saves their face with no call is the keep
-  miss`.
+  Tests: `a reply that says it saves their face with no call is the keep
+  miss`, `a face said saved after a refused call is the face miss`,
+  `a rename said done after a yes with no call is the face miss`,
+  `remember::tests::a_rename_said_done_is_a_face_claim` and
+  `remember::tests::a_vietnamese_face_save_is_a_face_claim`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
   Kept — library now, not the bakery." in one breath). On by default, on

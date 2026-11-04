@@ -518,7 +518,8 @@ pub fn keep_claim_or_face(reply: &str, faces: bool) -> Option<KeepClaim> {
 }
 
 /// What may stand before a face claim's own words ([`FACE_CLAIMS`]): "Hold
-/// still while I take your face in."
+/// still while I take your face in.", "Bạn giữ yên nhé, mình đang ghi nhớ
+/// khuôn mặt bạn."
 const FACE_LEADS: &[&str] = &[
     "hold still while ",
     "hold still so ",
@@ -531,78 +532,217 @@ const FACE_LEADS: &[&str] = &[
     "i'll do it now, ",
     "i'll do that now: ",
     "i'll do that now, ",
+    "b\u{1ea1}n gi\u{1eef} y\u{ea}n nh\u{e9}, ",
+    "gi\u{1eef} y\u{ea}n nh\u{e9}, ",
     "",
 ];
+
+/// How a face claim's words ([`FACE_CLAIMS`]) are judged by what follows
+/// them in their sentence (up to `.`, `!`, `?` or the reply's end). A
+/// sentence ended by `?` claims nothing ("Saved your face? No, not yet.").
+#[derive(Clone, Copy)]
+enum FaceSaid {
+    /// A save said done or under way ("I've saved your face.", "Let me take
+    /// your face in."): a claim only when what follows is filler
+    /// ([`FACE_FILLER`]: "in", "now", "already"…) and, after a comma, at
+    /// most two words ("I've saved your face, Lauren."). An offer that waits
+    /// for a name ("I'll remember your face once you tell me your name."),
+    /// a forget ("I'm taking your face off my list now.") and other talk
+    /// ("Got your face in view, smile!", "Saving your face for later isn't
+    /// possible right now.") are not, nor a "let me …" offer with a "?"
+    /// anywhere after it ("Let me learn your face. What name should I keep
+    /// it under?").
+    Save,
+    /// A record told ("Your face is known as Loren.", "Your face is saved
+    /// as Loren."), which a known person may be told of their own face: a
+    /// claim only when the sentence says "now" ("known as Sam now") or that
+    /// the old name is gone, or after a lead that says it is done now
+    /// ("I'll do it now: your face is known as Sam.").
+    Record,
+    /// A rename said done ("I've renamed your face to Sam.", "Your face is
+    /// now known as Sam."), or a Vietnamese save: a claim whatever follows.
+    Done,
+}
+
+/// What may follow a save's words in its sentence ([`FaceSaid::Save`]).
+const FACE_FILLER: &[&str] = &["in", "now", "right", "away", "already", "too", "for", "you"];
+
 /// The words that say the lamp is saving or saved their face, after a lead
-/// ([`FACE_LEADS`]), whatever follows: lamp-0c4e, 3 Nov, "hold still while
-/// I take your face in" with no `remember_my_face` call (#5141 row 8). Each
-/// says "your face", so no memory claim is one.
-const FACE_CLAIMS: &[&str] = &[
-    "i take your face",
-    "i learn your face",
-    "i save your face",
-    "i remember your face",
-    "i get your face",
-    "i can take your face",
-    "i can learn your face",
-    "i can save your face",
-    "i can remember your face",
-    "let me take your face",
-    "let me learn your face",
-    "let me save your face",
-    "let me remember your face",
-    "i'll take your face",
-    "i'll learn your face",
-    "i'll save your face",
-    "i'll remember your face",
-    "i will remember your face",
-    "i'm taking your face",
-    "i'm learning your face",
-    "i'm saving your face",
-    "i've saved your face",
-    "i have saved your face",
-    "i've learned your face",
-    "i've learnt your face",
-    "i've got your face",
-    "i've taken your face",
-    "taking your face",
-    "learning your face",
-    "saving your face",
-    "saved your face",
-    "got your face",
+/// ([`FACE_LEADS`]), and how what follows them is judged ([`FaceSaid`]):
+/// lamp-0c4e, 3 Nov, "hold still while I take your face in" with no
+/// `remember_my_face` call (#5141 row 8). Each says "your face" (or
+/// "khuôn mặt"), so no memory claim is one. Recognition ("I remember your
+/// face, Sam!") and ability ("I can save your face if you'd like.") are no
+/// claim (Friday's P2 on #5166).
+const FACE_CLAIMS: &[(&str, FaceSaid)] = &[
+    ("i take your face", FaceSaid::Save),
+    ("i learn your face", FaceSaid::Save),
+    ("i save your face", FaceSaid::Save),
+    ("let me take your face", FaceSaid::Save),
+    ("let me learn your face", FaceSaid::Save),
+    ("let me save your face", FaceSaid::Save),
+    ("let me remember your face", FaceSaid::Save),
+    ("i'll take your face", FaceSaid::Save),
+    ("i'll learn your face", FaceSaid::Save),
+    ("i'll save your face", FaceSaid::Save),
+    ("i'll remember your face", FaceSaid::Save),
+    ("i will remember your face", FaceSaid::Save),
+    ("i'm taking your face", FaceSaid::Save),
+    ("i'm learning your face", FaceSaid::Save),
+    ("i'm saving your face", FaceSaid::Save),
+    ("i've saved your face", FaceSaid::Save),
+    ("i have saved your face", FaceSaid::Save),
+    ("i've learned your face", FaceSaid::Save),
+    ("i've learnt your face", FaceSaid::Save),
+    ("i've got your face", FaceSaid::Save),
+    ("i've taken your face", FaceSaid::Save),
+    ("taking your face", FaceSaid::Save),
+    ("learning your face", FaceSaid::Save),
+    ("saving your face", FaceSaid::Save),
+    ("saved your face", FaceSaid::Save),
+    ("got your face", FaceSaid::Save),
     // A rename said done (lamp-9adf, 4 Nov, Fourteen's check on #4710:
     // "your face is known as Sam now, and the old name is gone" after a
     // "yes" with no call; the first builder's case on #5141 row 8).
-    "your face is known as",
-    "your face is now known as",
-    "your face is now called",
-    "your face is renamed",
-    "your face is saved",
-    "your face is now saved",
-    "i've renamed your face",
-    "i have renamed your face",
-    "renamed your face",
+    ("your face is known as", FaceSaid::Record),
+    ("your face is saved", FaceSaid::Record),
+    ("your face is now known as", FaceSaid::Done),
+    ("your face is now called", FaceSaid::Done),
+    ("your face is renamed", FaceSaid::Done),
+    ("your face is now saved", FaceSaid::Done),
+    ("i've renamed your face", FaceSaid::Done),
+    ("i have renamed your face", FaceSaid::Done),
+    ("renamed your face", FaceSaid::Done),
+    // Vietnamese saves (Friday's P3 on #5166), ahead of the older "đã lưu"
+    // keep claim, whose keeper is `remember`: "Đã lưu khuôn mặt của bạn
+    // rồi." "Mình nhớ khuôn mặt của bạn." (recognition) is none.
+    (
+        "\u{111}\u{e3} l\u{1b0}u khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
+    (
+        "\u{111}\u{e3} ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
+    (
+        "\u{111}ang ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
+    ("\u{111}ang l\u{1b0}u khu\u{f4}n m\u{1eb7}t", FaceSaid::Done),
+    (
+        "m\u{ec}nh s\u{1ebd} ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
+    (
+        "m\u{ec}nh \u{111}\u{e3} l\u{1b0}u khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
+    (
+        "m\u{ec}nh \u{111}\u{e3} ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
+    (
+        "m\u{ec}nh \u{111}ang ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
+    (
+        "m\u{ec}nh \u{111}ang l\u{1b0}u khu\u{f4}n m\u{1eb7}t",
+        FaceSaid::Done,
+    ),
 ];
 
 /// Whether `rest`, a reply past its opening words, says it saves their
 /// face ([`FACE_CLAIMS`]): `Some(true)` for a claim, `Some(false)` for
-/// none, `None` while it could still become one.
-fn face_claim(rest: &str) -> Option<bool> {
+/// none, `None` while it could still become one (unless `whole`, the reply
+/// is all there is). A claim's sentence is read to its end before it is
+/// decided, so while it streams the hold is that sentence at most.
+fn face_claim(rest: &str, whole: bool) -> Option<bool> {
     let mut maybe = false;
     for lead in FACE_LEADS {
         match rest.strip_prefix(lead) {
             Some(after) => {
-                for claim in FACE_CLAIMS {
-                    if after.starts_with(claim) {
-                        return Some(true);
+                let now_lead = lead.contains("now");
+                for (claim, said) in FACE_CLAIMS {
+                    if let Some(follows) = after.strip_prefix(claim) {
+                        // An offer ("let me …") with a question anywhere
+                        // after it waits for an answer: "Let me learn your
+                        // face. What name should I keep it under?" (El's
+                        // HOLD on #5166).
+                        if claim.starts_with("let me ") && follows.contains('?') {
+                            continue;
+                        }
+                        match face_follows(follows, *said, now_lead, whole) {
+                            Some(true) => return Some(true),
+                            None => maybe = true,
+                            Some(false) => {}
+                        }
+                    } else {
+                        maybe |= claim.starts_with(after);
                     }
-                    maybe |= claim.starts_with(after);
                 }
             }
             None => maybe |= lead.starts_with(rest),
         }
     }
-    if maybe { None } else { Some(false) }
+    if maybe && !whole { None } else { Some(false) }
+}
+
+/// Whether what `follows` a face claim's words makes it one ([`FaceSaid`]),
+/// `None` while its sentence is still coming. `now_lead`: the lead said it
+/// is done now ("I'll do it now: ").
+fn face_follows(follows: &str, said: FaceSaid, now_lead: bool, whole: bool) -> Option<bool> {
+    // The claim's last word ends ("your faces" is not "your face").
+    if follows.starts_with(|c: char| c.is_alphanumeric()) {
+        return Some(false);
+    }
+    let (sentence, ended) = match follows.find(['.', '!', '?']) {
+        Some(at) => (&follows[..at], Some(&follows[at..=at])),
+        None => (follows, None),
+    };
+    if ended == Some("?") {
+        return Some(false);
+    }
+    let decided = ended.is_some() || whole;
+    let words = |text: &str| -> Vec<String> {
+        text.split(|c: char| !c.is_alphanumeric() && c != '\'')
+            .filter(|word| !word.is_empty())
+            .map(str::to_owned)
+            .collect()
+    };
+    match said {
+        FaceSaid::Save => {
+            let (before, vocative) = match sentence.split_once(',') {
+                Some((before, vocative)) => (before, Some(vocative)),
+                None => (sentence, None),
+            };
+            let filler = words(before);
+            // While streaming, the last word of the part before a comma may
+            // be cut short ("i", on its way to "in").
+            let cut = !decided
+                && vocative.is_none()
+                && before.ends_with(|c: char| c.is_alphanumeric() || c == '\'');
+            let fits = filler.iter().enumerate().all(|(at, word)| {
+                FACE_FILLER.contains(&word.as_str())
+                    || (cut
+                        && at + 1 == filler.len()
+                        && FACE_FILLER
+                            .iter()
+                            .any(|fill| fill.starts_with(word.as_str())))
+            }) && vocative.is_none_or(|vocative| words(vocative).len() <= 2);
+            match (fits, decided) {
+                (false, _) => Some(false),
+                (true, true) => Some(true),
+                (true, false) => None,
+            }
+        }
+        FaceSaid::Record if decided => Some(
+            now_lead
+                || words(sentence).iter().any(|word| word == "now")
+                || sentence.contains("old name"),
+        ),
+        FaceSaid::Done if decided => Some(true),
+        FaceSaid::Record | FaceSaid::Done => None,
+    }
 }
 
 /// [`claims_a_keep`] with the kind of claim: `None` while undecided,
@@ -673,7 +813,7 @@ fn keep_claim_of(reply: &str, whole: bool, faces: bool) -> Option<Option<KeepCla
     }
     let mut maybe = rest.is_empty() || OPENING.iter().any(|opening| opening.starts_with(&rest));
     if faces {
-        match face_claim(&rest) {
+        match face_claim(&rest, whole) {
             Some(true) => return Some(Some(KeepClaim::Face)),
             None => maybe = true,
             Some(false) => {}
@@ -12238,7 +12378,12 @@ mod tests {
             "Done, your face is now known as Sam.",
             "I'll do it now: your face is known as Sam.",
             "Got it, I've renamed your face to Sam.",
-            "Yes, your face is saved as Sam.",
+            // Friday's P2 on #5166: saves said done or under way.
+            "Hold still while I take your face in.",
+            "Okay, I've saved your face.",
+            "I've saved your face, Lauren.",
+            "Got it, I've saved your face, Lauren.",
+            "Let me take your face in.",
         ] {
             assert_eq!(
                 keep_claim_or_face(reply, true),
@@ -12253,12 +12398,100 @@ mod tests {
             "Your name is Sam.",
             "I'll do it now: the lights are off.",
             "Your face is in view.",
+            // Friday's P2 on #5166: recall or a record told.
+            "I remember your face, Sam!",
+            "Yes, I remember your face.",
+            "Your face is saved as Loren.",
+            "Yes, your face is saved as Sam.",
+            "Right, your face is saved under Loren.",
+            "Your face is known as Loren, so say that name to forget it.",
+            // Offers that wait for a name.
+            "I can save your face if you'd like. What's your name?",
+            "I can learn your face, just tell me your name.",
+            "Sure, I can remember your face. What should I call you?",
+            "Let me take your face in once you tell me your name.",
+            "I'll remember your face once you tell me your name.",
+            "I'll take your face in after you spell your name.",
+            // Forgets and other talk of a face.
+            "I'm taking your face off my list now.",
+            "Taking your face out of my memory.",
+            "I get your face mixed up with your brother's.",
+            "Got your face in view, smile!",
+            "Saving your face for later isn't possible right now.",
+            "Saved your face? No, not yet.",
+            // El's HOLD on #5166: records told, offers and questions.
+            "Your face is known as Rosa.",
+            "Yes, your face is saved as Rosa.",
+            "I can remember your face once you tell me your name.",
+            "Let me learn your face. What name should I keep it under?",
+            "Your face is saved as Rosa, right?",
         ] {
             assert_eq!(keep_claim_or_face(reply, true), None, "{reply}");
         }
         // Undecided while it could still become the claim.
         assert_eq!(claims_a_keep_or_face("Your face is kn", false, true), None);
         assert_eq!(claims_a_keep_or_face("I'll do it now:", false, true), None);
+        // A save's sentence is read to its end: undecided while it comes,
+        // decided at the first word that is no filler.
+        assert_eq!(
+            claims_a_keep_or_face("Let me take your face i", false, true),
+            None
+        );
+        assert_eq!(
+            claims_a_keep_or_face("Let me take your face in", false, true),
+            None
+        );
+        assert_eq!(
+            claims_a_keep_or_face("I've saved your face, Laur", false, true),
+            None
+        );
+        assert_eq!(
+            claims_a_keep_or_face("Let me take your face in once", false, true),
+            Some(false)
+        );
+        assert_eq!(
+            claims_a_keep_or_face("Let me take your face in.", false, true),
+            Some(true)
+        );
+        assert_eq!(
+            claims_a_keep_or_face("Your face is known as Sam", false, true),
+            None
+        );
+        assert_eq!(
+            claims_a_keep_or_face("Your face is known as Sam now.", false, true),
+            Some(true)
+        );
+    }
+
+    /// Friday's P3 on #5166: a Vietnamese face save is a face claim, ahead
+    /// of the older "đã lưu" keep claim (whose keeper is `remember`), so a
+    /// real `remember_my_face` clears it. Recognition is none. Off, as
+    /// before.
+    #[test]
+    fn a_vietnamese_face_save_is_a_face_claim() {
+        for reply in [
+            "B\u{1ea1}n gi\u{1eef} y\u{ea}n nh\u{e9}, m\u{ec}nh \u{111}ang ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n.",
+            "\u{110}\u{e3} l\u{1b0}u khu\u{f4}n m\u{1eb7}t c\u{1ee7}a b\u{1ea1}n r\u{1ed3}i.",
+            "\u{110}\u{e3} ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t c\u{1ee7}a b\u{1ea1}n.",
+            "Gi\u{1eef} y\u{ea}n nh\u{e9}, m\u{ec}nh s\u{1ebd} ghi nh\u{1edb} khu\u{f4}n m\u{1eb7}t b\u{1ea1}n.",
+        ] {
+            assert_eq!(
+                keep_claim_or_face(reply, true),
+                Some(KeepClaim::Face),
+                "{reply}"
+            );
+        }
+        // Off, the older "đã lưu" keep claim, as before.
+        assert_eq!(
+            keep_claim_or_face(
+                "\u{110}\u{e3} l\u{1b0}u khu\u{f4}n m\u{1eb7}t c\u{1ee7}a b\u{1ea1}n r\u{1ed3}i.",
+                false
+            ),
+            Some(KeepClaim::Hard)
+        );
+        let known = "M\u{ec}nh nh\u{1edb} khu\u{f4}n m\u{1eb7}t c\u{1ee7}a b\u{1ea1}n.";
+        assert_eq!(keep_claim_or_face(known, true), None);
+        assert_eq!(keep_claim_or_face(known, false), None);
     }
 
     #[test]
