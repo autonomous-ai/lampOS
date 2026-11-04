@@ -278,7 +278,7 @@ pub(crate) fn plain_agreement(turn: &str) -> bool {
 /// Whether the lamp said `name` back in the exchange just before the turn
 /// in hand, and the person said a plain yes to it now ([`plain_yes`]):
 /// what `replace` needs, and a name kept from an earlier exchange.
-fn agreed_to(name: &str, said: &Said) -> bool {
+pub(crate) fn agreed_to(name: &str, said: &Said) -> bool {
     plain_yes(name, &said.this)
         && said
             .before
