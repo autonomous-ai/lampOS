@@ -991,7 +991,7 @@ fn an_exact_line_waits_for_the_person_then_is_played_to_spoken() {
     ));
     assert_eq!(
         reply.as_ref().unwrap().notice.origin(),
-        SpeechOrigin::SkillSound
+        SpeechOrigin::ExactLine
     );
     assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
     let mut played = play_sound(&mut owner, &mut reply, &mut pending, &mut trace, 2);
@@ -1051,7 +1051,7 @@ fn an_exact_line_plays_through_the_rooms_speech() {
     ));
     assert_eq!(
         reply.as_ref().unwrap().notice.origin(),
-        SpeechOrigin::SkillSound
+        SpeechOrigin::ExactLine
     );
     assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
 }
@@ -1325,6 +1325,58 @@ fn the_ring_prepares_no_frame_for_a_skill_sound() {
     tell_ring_of_turn(&mut ring, Some(origin));
     assert!(ring.prepare(&mut owner, now()).unwrap().is_none());
     assert!(ring.prepare(&mut owner, now()).unwrap().is_none());
+}
+
+/// The local leader's lamp-29e7 finding, 4 Nov: a computer's exact line
+/// is shown speaking on the ring. The ring prepares its frames while the line plays,
+/// with the line's own level, so the camera's mark is drawn on them and a
+/// computer's camera stream goes on (lamp-control ends it when the mark
+/// hasn't been drawn for a second). A skill's chime stays unshown.
+#[test]
+fn an_exact_line_is_shown_speaking_with_its_own_level() {
+    let (mut says, _answered) = crate::say::Says::exact_for_test("control", vec![4_000; 4_800]);
+    let mut owner = resting_owner();
+    let (mut reply, mut pending, mut trace) = (None, None, SessionState::default());
+    let now_is = crate::say::SoundNow {
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &InputAdmission::default(), &says)
+    };
+    assert!(take_exact(
+        &mut says, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    let origin = reply.as_ref().unwrap().notice.origin();
+    assert_eq!(origin, SpeechOrigin::ExactLine);
+    // Shown on the ring alone: still unshown to the head, the room and the
+    // voice's state, so `voice/state` doesn't say speaking and a computer's
+    // lease isn't suspended by its own say (the local leader's P2).
+    assert!(origin.unshown() && !origin.ring_unshown());
+    assert!(SpeechOrigin::SkillSound.ring_unshown());
+    // The voice's state, which lamp-control reads as talking (and suspends
+    // every lease for), the head and the room follow: resting, not speaking.
+    let folder =
+        std::env::temp_dir().join(format!("lamp-voice-exact-state-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&folder);
+    let bus = lamp_bus::Bus::new(&folder).unwrap();
+    let mut out = crate::bus_out::BusOut::on(&bus).unwrap();
+    tell_voice_of_turn(
+        &mut out,
+        owner.snapshot(now()).unwrap(),
+        Some(origin),
+        monotonic_us(),
+    );
+    let message = bus.latest(lamp_msgs::VoiceState::TOPIC).unwrap().unwrap();
+    assert_eq!(
+        message.parse::<lamp_msgs::VoiceState>().unwrap().state,
+        lamp_msgs::Voice::Resting
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+    // Told as the loop tells it: a frame, and another later in the line.
+    let mut ring = crate::choreography::RingChoreographer::new(40).unwrap();
+    tell_ring_of_turn(&mut ring, Some(origin));
+    assert!(ring.prepare(&mut owner, now()).unwrap().is_some());
+    // Played, the line's own level is what the speaking face follows.
+    let _played = play_sound(&mut owner, &mut reply, &mut pending, &mut trace, 2);
+    assert!(reply.as_ref().unwrap().voice_level > 0);
 }
 
 /// #2530 part 2, the first builder's 22:25: an add-on's quoted say is the
