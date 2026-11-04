@@ -8182,6 +8182,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 visits: true,
                 remember_speaker: false,
                 at_setup: false,
+                record: false,
             },
         ))
         .chain(crate::photo_faces::tools())
@@ -9053,6 +9054,248 @@ async fn a_reply_never_says_it_kept_something_with_no_remember_call() {
             !said.iter().any(|said| said.starts_with("said:Kept that")),
             "{labels:?}"
         );
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+    }
+}
+
+/// #5141 row 8 (lamp-0c4e, 3 Nov: "hold still while I take your face in"
+/// with no `remember_my_face` call, and no face was saved): with
+/// `LAMP_MEMORY_KEEP_ASKED`'s face claims a reply that says it saves their
+/// face is the same miss as a keep claimed with no `remember`, judged on the
+/// same path with the same one ask again: said only beside a
+/// `remember_my_face` call, or after one in the same request; with none,
+/// not said and asked again once, then the plain line. Off, it is said as
+/// it comes.
+#[tokio::test]
+async fn a_reply_that_says_it_saves_their_face_with_no_call_is_the_keep_miss() {
+    let face = || {
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            crate::known_faces::REMEMBER,
+            json!({"name":"Lauren"}),
+        )]))
+    };
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let hold_still = "Hold still while I take your face in.";
+    let cases: Vec<(bool, Chats, usize, &str)> = vec![
+        // Claimed with no call, then called when asked again.
+        (
+            true,
+            vec![
+                vec![text(hold_still), Ok(ChatEvent::Done)],
+                vec![face(), Ok(ChatEvent::Done)],
+                vec![text("Got it, Lauren."), Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:Got it, Lauren.",
+        ),
+        // Claimed twice with no call: the plain line.
+        (
+            true,
+            vec![
+                vec![text(hold_still), Ok(ChatEvent::Done)],
+                vec![text("Okay, I've saved your face."), Ok(ChatEvent::Done)],
+            ],
+            0,
+            "said:I haven't saved your face yet.",
+        ),
+        // Said beside its call, or after it in the same request.
+        (
+            true,
+            vec![
+                vec![text(hold_still), face(), Ok(ChatEvent::Done)],
+                vec![Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:Hold still while I take your face in.",
+        ),
+        (
+            true,
+            vec![
+                vec![face(), Ok(ChatEvent::Done)],
+                vec![text("I've saved your face, Lauren."), Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:I've saved your face",
+        ),
+        // A keep claim's `remember` keeps no face.
+        (
+            true,
+            vec![
+                vec![
+                    text(hold_still),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        "remember",
+                        json!({"text":"Lauren"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Ask me to learn your face."), Ok(ChatEvent::Done)],
+            ],
+            0,
+            "said:Ask me to learn your face.",
+        ),
+        // No face claim: said as it comes.
+        (
+            true,
+            vec![vec![text("Hold on, let me check."), Ok(ChatEvent::Done)]],
+            0,
+            "said:Hold on, let me check.",
+        ),
+        // Off: as before, said as it comes.
+        (
+            false,
+            vec![vec![text(hold_still), Ok(ChatEvent::Done)]],
+            0,
+            "said:Hold still while I take your face in.",
+        ),
+    ];
+    // Whether each case's model is told of the face claim: asked again, or
+    // told beside another call.
+    let told_of = [true, true, false, false, true, false, false];
+    assert_eq!(told_of.len(), cases.len());
+    for ((on, chats, faces, first_said), told_of_the_face) in cases.into_iter().zip(told_of) {
+        let rounds = chats.len();
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Remember my face, I'm Lauren.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let saved = Arc::new(AtomicUsize::new(0));
+        let counted = saved.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, name, _| {
+            counted.fetch_add(
+                usize::from(name == crate::known_faces::REMEMBER),
+                Ordering::SeqCst,
+            );
+            Box::pin(async { json!({"ok": true, "remembered": "Lauren"}) })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false)
+        .claiming_faces(on);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(first_said)),
+            "{first_said}: {labels:?}"
+        );
+        assert_eq!(saved.load(Ordering::SeqCst), faces, "{labels:?}");
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+        // Asked again, the model is told of the face, not of a keep.
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::FACE_CLAIMED_UNSAVED))
+        });
+        assert_eq!(told, told_of_the_face, "{labels:?}");
+    }
+}
+
+/// #5141 row 8, the first builder's case (lamp-9adf, 4 Nov, Fourteen's
+/// check on #4710): "rename my face to Sam", the lamp asked to confirm, and
+/// the "yes" made no call, yet the lamp said "your face is known as Sam now,
+/// and the old name is gone", then "I'll do it now: your face is known as
+/// Sam". A rename said done with no `remember_my_face` call is held and
+/// asked again, as a save is, and is never said before a call answers.
+#[tokio::test]
+async fn a_rename_said_done_after_a_yes_with_no_call_is_the_face_miss() {
+    let rename = || {
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            crate::known_faces::REMEMBER,
+            json!({"name":"Sam","replace":true}),
+        )]))
+    };
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let known = "Your face is known as Sam now, and the old name is gone.";
+    let now = "I'll do it now: your face is known as Sam.";
+    let cases: Vec<(Chats, usize, &str)> = vec![
+        // Said done with no call, then called when asked again.
+        (
+            vec![
+                vec![text(known), Ok(ChatEvent::Done)],
+                vec![rename(), Ok(ChatEvent::Done)],
+                vec![text("Done, Sam."), Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:Done, Sam.",
+        ),
+        // Said done twice with no call: the plain line, never the claim.
+        (
+            vec![
+                vec![text(known), Ok(ChatEvent::Done)],
+                vec![text(now), Ok(ChatEvent::Done)],
+            ],
+            0,
+            "said:I haven't saved your face yet.",
+        ),
+        // After the call answers, said as it comes.
+        (
+            vec![
+                vec![rename(), Ok(ChatEvent::Done)],
+                vec![text(known), Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:Your face is known as Sam now",
+        ),
+    ];
+    for (chats, renames, first_said) in cases {
+        let rounds = chats.len();
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Yes.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let called = Arc::new(AtomicUsize::new(0));
+        let counted = called.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, name, _| {
+            counted.fetch_add(
+                usize::from(name == crate::known_faces::REMEMBER),
+                Ordering::SeqCst,
+            );
+            Box::pin(async { json!({"ok": true, "remembered": "Sam"}) })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false)
+        .claiming_faces(true);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(first_said)),
+            "{first_said}: {labels:?}"
+        );
+        if renames == 0 {
+            assert!(
+                !said.iter().any(|said| said.contains("known as Sam")),
+                "{labels:?}"
+            );
+        }
+        assert_eq!(called.load(Ordering::SeqCst), renames, "{labels:?}");
         assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
     }
 }

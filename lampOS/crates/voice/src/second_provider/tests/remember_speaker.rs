@@ -192,6 +192,7 @@ async fn remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enro
         crate::known_faces::FaceSwitches {
             checked: true,
             remember_speaker: true,
+            record: false,
             ..Default::default()
         },
         None,
@@ -317,6 +318,7 @@ async fn late_room_publish_after_epoch_change(privacy: bool) {
         crate::known_faces::FaceSwitches {
             checked: true,
             remember_speaker: true,
+            record: false,
             ..Default::default()
         },
         None,
