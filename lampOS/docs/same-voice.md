@@ -643,6 +643,56 @@ Shown in tests only (`like_asker_is_against_the_line_that_began_the_conversation
 no unit in `deploy/` sets `LAMP_SAME_VOICE_MODEL` or `LAMP_ADDRESSED`
 yet, and the voice says `like_asker` only with both.
 
+## For the services only (`LAMP_SAME_VOICE_FOR=services`, 4 November)
+
+The linked services judge two lines by their prints ([services.md](services.md)):
+a write's "send" must be in the voice that asked (`VoiceAsk::Alike`, at
+`SAME_FROM` or over), and a read is said in full only for a line in the
+conversation's voice (`VoiceAsk::Conversation`). Both need the model, and
+until now the model came with every conversation rule that reads a print.
+`LAMP_SAME_VOICE_FOR=services`, beside `LAMP_SAME_VOICE_MODEL`, makes the
+prints for the services alone:
+
+- **Where it starts.** On the second route as the only voice, and only
+  while the linked services are on (its worker is given the services'
+  folder): then the child starts whatever `LAMP_SPOKEN_TO` and the other
+  rules say. With no services it is not started, and the journal says so.
+  The Live route, which has no services' judge, starts none. The
+  coordinator passes it as `--same-voice-for-services`, right after the
+  model's path.
+- **What is fed.** The prints are kept apart from the rules'
+  (`Heeding::for_services`, beside `Heeding::voices`, which stays empty).
+  Each line's sound and each verdict feed them as before
+  (`Heeding::kept_voices`: `began`, `heard`, `ended`, `decided`,
+  `seen_from_the_caller`, `sure_of_another_only`), so the conversation's
+  voice the read asks about is kept as it would be. With no other hook on
+  the line's sound, its own hook feeds only the prints and the waiting
+  write's "a line began" (`Heeding::hear_for_services`), so nothing a rule
+  reads, such as which line began over the lamp, is marked that would not
+  be without the model. A print come late in another voice is not kept as
+  the conversation's and ends nothing (`Voices::for_services_only`).
+- **What reads nothing.** Every conversation decision reads
+  `Heeding::voices`, and so sees no print, exactly as without a model:
+  #829's check and the rules on `voice_going_on_in` (`LAMP_SPOKEN_TO`,
+  `LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`, someone else's
+  sign), joining a cut line (`same_speaker`, `LAMP_JOIN_CUT_WORDS`), the
+  same speaker's carry and its held colleagues
+  (`LAMP_SAME_SPEAKER_CARRIES`), a line kept unjudged, the turned face's
+  sign (`LAMP_TURNED_FACE_SPEAKS`), the asked person's answer
+  (`LAMP_ANSWER_ASK_AGAIN`), the Policy's `like_asker` (`addressed.rs`),
+  the memory that follows a face (`LAMP_MEMORY_FOLLOWS_FACE`), and
+  `LAMP_CONVERSATION_CARRIES_PAST_SILENT`'s voice heard.
+  `LAMP_SAME_VOICE_CALLER_ONLY` shapes only which prints are the
+  conversation's voice.
+- **Any other value** is as unset (every use, as before), said once in the
+  journal. The journal holds counts and cosines only, never a print.
+
+Shown in tests only (`the_services_alone_start_the_same_voice_for_themselves`,
+`prints_for_the_services_alone_feed_their_judge_and_no_conversation_rule`,
+`a_late_other_voice_ends_no_conversation_for_the_services_alone`,
+`the_prints_are_for_the_services_only_with_services_exactly`): no unit in
+`deploy/` sets it.
+
 ## Not shown
 
 - **People.** Every voice was synthetic and played from one loudspeaker.

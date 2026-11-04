@@ -76,7 +76,11 @@ không qua môi trường của chính nó), bất kể
 chuyện (`same_voice::Voices::likeness_so_far` từ `same_voice::SAME_FROM`,
 0.70, trở lên; `services::read_in_full`). Các dịch vụ hỏi phép kiểm tra cùng
 giọng của tuyến thứ hai qua `services::judging_voices`, chờ tối đa 800 ms
-cho một dấu giọng. Chủ đèn không được thấy nói câu đó, có nhiều khuôn mặt hơn, không có số đếm, một giọng khác
+cho một dấu giọng. Với `LAMP_SAME_VOICE_MODEL` và
+`LAMP_SAME_VOICE_FOR=services`, tuyến thứ hai chỉ tạo dấu giọng cho các phán
+đoán này, và chỉ khi các dịch vụ đang bật: khi đó mọi quy tắc hội thoại không
+đọc dấu giọng nào, như khi không có mô hình
+([same-voice.md](../same-voice.md), "For the services only"). Chủ đèn không được thấy nói câu đó, có nhiều khuôn mặt hơn, không có số đếm, một giọng khác
 hay không có dấu giọng (camera tắt, một câu dưới 1.5 s của dấu giọng, và luôn
 luôn trên tuyến Live, vốn không có dấu giọng), câu trả lời chỉ giữ `id`, `from`,
 `subject`, `title`, `name`, `summary`, `date`, `start` và `end` của mỗi mục,
