@@ -486,3 +486,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   the rest of the batch; forget 162, short_done 21, config 42; four
   mutations caught, `seeing` equivalent; P3 a held forget with carried
   rounds is untested.
+- 03:0x — #5321 trained before my READ-OK's lamp row (2+ item read
+  alone) was played; it's off behind LAMP_SKILL_READS, so the row is now a
+  condition for turning the switch on (asked of Faye). Fourteen plays it
+  at 07:00 when lamp-9adf's backend allowance returns.
