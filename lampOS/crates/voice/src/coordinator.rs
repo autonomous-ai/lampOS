@@ -1822,6 +1822,10 @@ fn muted_wait_pulsing<
             let mut calls = calls.borrow_mut();
             let pass = calls.state.begin();
             slide.set(Some(state));
+            // The slide as the lamp's sleep and wake (migrate-P4).
+            if let Some(controls) = controls.borrow_mut().as_mut() {
+                controls.slide_said(state);
+            }
             // The slide read anything but open and fresh: the sleep's name
             // grant is revoked here, at the look that read it (migrate-P2).
             if let Some(name) = sleep_name.borrow_mut().as_mut() {
@@ -1907,13 +1911,21 @@ fn muted_wait_pulsing<
                             json!({"kind":"head_sleep_name_wake","at_us":at}),
                         )?;
                     }
+                    let now = monotonic_us();
+                    if controls.slide_look(now) {
+                        eprintln!("lamp-voice: the slide opened and stayed open: wakes");
+                        record(
+                            &mut trace.borrow_mut(),
+                            json!({"kind":"head_sleep_slide_wake","at_us":now}),
+                        )?;
+                    }
                     let (allowed, observation) = controls.quiescent_observation()?;
                     // Started, kept or closed by this look: only a sleep by
                     // choice with the slide open listens, and it is closed
                     // before a wake's cycle can open its rig (migrate-P2).
                     if let Some(name) = sleep_name.borrow_mut().as_mut() {
                         name.want(
-                            controls.asleep_by_choice() && !allowed,
+                            controls.asleep_by_choice() && !allowed && !controls.slide_settling(),
                             slide_open,
                             &mut || {
                                 keep("sleep-capture")
@@ -2006,6 +2018,11 @@ fn muted_wait_pulsing<
             Ok(allowed)
         },
     );
+    // The next wait reads the slide afresh: one left mid-settle, or closed
+    // when a hold cleared a mute, owes nothing to the next close (migrate-P4).
+    if let Some(controls) = controls.borrow_mut().as_mut() {
+        controls.slide_wait_ended();
+    }
     // Closed, whatever ended the wait, before the next cycle opens anything.
     if let Some(mut name) = sleep_name.into_inner() {
         let closed = name.close(&mut || Ok(()));

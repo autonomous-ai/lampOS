@@ -551,6 +551,12 @@ pub struct HandControls {
     /// A wake by name, until the conversation it opens takes it for the
     /// lines begun in its wait ([`Self::take_name_wake`]).
     name_wake_open: Option<u64>,
+    /// The slide as the lamp's sleep and wake (migrate-P4,
+    /// [`crate::slide_wake`]); none without its switch.
+    slide_wake: Option<crate::slide_wake::SlideWake>,
+    /// A slide's wake asked and not yet saved ([`Self::slide_look`]): its
+    /// time, for the "hm?" once the clear is committed.
+    slide_woke: Option<u64>,
     /// A line or a reply is open ([`Self::set_line_open`]).
     line_open: bool,
     /// When a wake by name goes back to sleep if the lamp hasn't answered by
@@ -905,6 +911,13 @@ impl HandControls {
         Ok(owner)
     }
 
+    /// With `LAMP_SLIDE_WAKES=on` (migrate-P4).
+    #[cfg(test)]
+    pub(crate) fn with_test_slide_wakes(mut self) -> Self {
+        self.slide_wake = Some(crate::slide_wake::SlideWake::default());
+        self
+    }
+
     /// A listening lamp with its mute record at `record` (in a private
     /// directory) and `LAMP_GUARD_NEVER_LISTENED=on` (#1567).
     #[cfg(test)]
@@ -1092,6 +1105,9 @@ impl HandControls {
             hears_name: false,
             name_woke: None,
             line_open: false,
+            slide_wake: crate::slide_wake::enabled_from_environment()
+                .then(crate::slide_wake::SlideWake::default),
+            slide_woke: None,
             name_wake_open: None,
             name_resleep_at: None,
             onboarding: false,
@@ -1312,6 +1328,84 @@ impl HandControls {
             self.name_woke = Some(now_us);
         }
         asked
+    }
+
+    /// The wait read the slide (migrate-P4, `LAMP_SLIDE_WAKES`).
+    pub fn slide_said(&mut self, state: crate::privacy::PrivacyState) {
+        if let Some(slide) = &mut self.slide_wake {
+            slide.said(state);
+        }
+    }
+
+    /// The muted wait returned: what it followed of the slide ends with it.
+    pub fn slide_wait_ended(&mut self) {
+        if let Some(slide) = &mut self.slide_wake {
+            *slide = crate::slide_wake::SlideWake::default();
+        }
+    }
+
+    /// A slide that opened is waiting out its settling: a sleep it is about
+    /// to wake doesn't start listening for its name.
+    pub fn slide_settling(&self) -> bool {
+        self.slide_wake
+            .as_ref()
+            .is_some_and(crate::slide_wake::SlideWake::settling)
+    }
+
+    /// What the slide asks at this look (migrate-P4): closing asks the sleep
+    /// a hold does, which leaves a person's own mute, and turns the restart
+    /// guard's mute into that sleep, so the lamp lies down whatever closed it;
+    /// opening asks the wake a tap does ([`Self::head_wake`]), so it clears a
+    /// sleep and the guard's mute, and a person's own mute stays. Whether a
+    /// wake is pending.
+    pub fn slide_look(&mut self, now_us: u64) -> bool {
+        let asked = self
+            .slide_wake
+            .as_mut()
+            .and_then(|slide| slide.look(now_us));
+        match asked {
+            Some(crate::slide_wake::Asked::Sleep) => {
+                if self.restored_after_fault() {
+                    self.sleep_over_guard(now_us);
+                } else {
+                    self.ask_sleep();
+                }
+                false
+            }
+            Some(crate::slide_wake::Asked::Wake) => {
+                let pending = self.head_wake(now_us, now_us, now_us);
+                if pending {
+                    self.slide_woke = Some(now_us);
+                }
+                pending
+            }
+            None => false,
+        }
+    }
+
+    /// The guard's mute becomes a sleep under a closed slide: saved, then its
+    /// marker goes, and a marker a cut leaves no longer matches the record. A
+    /// save that fails leaves the guard's mute, which the slide still clears.
+    fn sleep_over_guard(&mut self, now_us: u64) {
+        if !self.options.head_sleep() || self.onboarding || self.persistence_failed {
+            return;
+        }
+        let Some(path) = self.options.mute_record.clone() else {
+            return;
+        };
+        match self.receiver.sleep_over_guard(now_us, &path) {
+            Ok(true) => {
+                if let Err(error) = self.drop_guard_marker() {
+                    eprintln!("lamp-voice: the restart guard's marker stays: {error}");
+                }
+                eprintln!("lamp-voice: the slide closed on the restart guard's mute: it sleeps");
+            }
+            Ok(false) => {}
+            Err(error) => {
+                add(&self.shared.rejected, 1);
+                eprintln!("lamp-voice: the slide's sleep was not saved: {error}");
+            }
+        }
     }
 
     /// The lamp began to answer in the conversation a wake by name opened:
@@ -1843,11 +1937,18 @@ impl HandControls {
         observation.asleep = self.asleep();
         // Open again after a hand's sleep, by the person's tap or button:
         // the next conversation says its "hm?" (#1362).
-        if was_asleep && allowed && !observation.muted {
+        // A slide's wake says it too, also of the guard's mute (migrate-P4).
+        let by_slide = if allowed && !observation.muted {
+            self.slide_woke.take()
+        } else {
+            None
+        };
+        if (was_asleep || by_slide.is_some()) && allowed && !observation.muted {
             // A wake by name is the wake's own time, and only it is taken
             // back to sleep when no line follows (migrate-P2).
             let by_name = self.name_woke.take();
             self.woken = by_name
+                .or(by_slide)
                 .or(observation.head_tap_at_us)
                 .or(observation.acquired_at_us)
                 .or(observation.observed_at_us);

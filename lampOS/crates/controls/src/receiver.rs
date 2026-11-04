@@ -254,6 +254,23 @@ impl Receiver {
         Ok(())
     }
 
+    /// The mute its restart guard left becomes a sleep, saved before the
+    /// live record changes (the privacy slide, migrate-P4). Call only when the
+    /// owner has established it is the guard's, as for
+    /// [`Self::request_wake_after_fault`]. Whether it changed; a failed save
+    /// leaves the live mute as it was.
+    pub fn sleep_over_guard(&mut self, now_us: u64, path: &Path) -> io::Result<bool> {
+        self.clock(now_us)?;
+        let mut proposed = self.record.clone();
+        if !proposed.sleep_over_guard(now_us) {
+            return Ok(false);
+        }
+        proposed.save(path)?;
+        self.advance_generation()?;
+        self.record = proposed;
+        Ok(true)
+    }
+
     fn clock(&mut self, now_us: u64) -> io::Result<()> {
         if self.exhausted || self.last_now.is_some_and(|last| now_us < last) {
             self.exhausted = true;

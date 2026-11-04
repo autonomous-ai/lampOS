@@ -178,6 +178,7 @@ pub mod skill_words;
 pub mod sleep_asked;
 pub mod sleep_capture;
 pub mod sleep_worker;
+pub mod slide_wake;
 pub mod speak_up;
 pub mod speaker_check;
 pub mod speaking_faces;
