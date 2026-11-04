@@ -41,6 +41,12 @@ pub const ADMIN_ASKER_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-clou
 /// Where it puts `lamp-voice.service`, the tools' one caller
 /// (`Slice=lampos-voice.slice`).
 pub const TOOLS_ASKER_CGROUP: &str = "/lampos.slice/lampos-voice.slice/lamp-voice.service";
+/// Where it puts `lamp-skills.service` (`Slice=lampos-parts.slice`): with
+/// `LAMP_SKILL_READS=on`, a second caller of the tools' socket, for a made
+/// skill's read alone ([`Services::skill_tool`], #5288).
+pub const SKILLS_ASKER_CGROUP: &str = "/lampos.slice/lampos-parts.slice/lamp-skills.service";
+/// What a skill's call to anything but a read is told.
+pub const SKILL_READS_ONLY: &str = "a skill may only read a linked service";
 
 /// Whether `/proc/<pid>/cgroup`'s text puts the process in `asker` (or a
 /// cgroup under it): the unified hierarchy's line (`0::…`), or systemd's
@@ -176,6 +182,9 @@ pub struct Services<H, M> {
     pub backend: Option<Backend>,
     /// `LAMP_SERVICES_WRITE=on`.
     pub write_on: bool,
+    /// `LAMP_SKILL_READS=on`: `lamp-skills` may call the tools' socket, for
+    /// `service_read` alone ([`Services::skill_tool`]).
+    pub skill_reads: bool,
     pub desk: Desk,
 }
 
@@ -204,8 +213,15 @@ impl<H: Http, M: Mail> Services<H, M> {
             mail,
             backend,
             write_on,
+            skill_reads: false,
             desk: Desk::default(),
         }
+    }
+
+    /// With `LAMP_SKILL_READS` as `on` gives it.
+    pub fn with_skill_reads(mut self, on: bool) -> Self {
+        self.skill_reads = on;
+        self
     }
 
     /// The admin socket's answer to one line, and the journal's words for
@@ -304,6 +320,18 @@ impl<H: Http, M: Mail> Services<H, M> {
             answer
         } else {
             json!({"ok": false, "error": "the answer was too long to give"})
+        }
+    }
+
+    /// A made skill's call (`lamp-skills`, #5288): `service_read` alone,
+    /// answered as the voice's read is, with the same allow-lists, quoting
+    /// and security filter. Anything else, the list of what is linked too,
+    /// is refused and nothing is called.
+    pub async fn skill_tool(&self, line: &str) -> Value {
+        match parse_tool(line.trim_end_matches(['\r', '\n'])) {
+            Ok((name, _)) if name == tools::READ => self.tool(line).await,
+            Ok(_) => json!({"ok": false, "error": SKILL_READS_ONLY}),
+            Err(why) => json!({"ok": false, "error": why}),
         }
     }
 
@@ -813,7 +841,14 @@ fn answer_one<H: Http, M: Mail>(
 ) -> io::Result<()> {
     stream.set_read_timeout(Some(PEER_WITHIN))?;
     stream.set_write_timeout(Some(PEER_WITHIN))?;
-    if !peer_is(stream, door.asker()) {
+    // A made skill's read (#5288): `lamp-skills`, only with its switch on,
+    // and then only `service_read` ([`Services::skill_tool`]).
+    let asker = peer_is(stream, door.asker());
+    let skill = !asker
+        && door == Door::Tools
+        && services.skill_reads
+        && peer_is(stream, SKILLS_ASKER_CGROUP);
+    if !asker && !skill {
         return writeln!(&*stream, "{}", door.refusal());
     }
     let mut line = String::new();
@@ -828,6 +863,7 @@ fn answer_one<H: Http, M: Mail>(
             eprintln!("lamp-services: {said}");
             answer
         }
+        Door::Tools if skill => runtime.block_on(services.skill_tool(&line)),
         Door::Tools => runtime.block_on(services.tool(&line)),
     };
     writeln!(&*stream, "{answer}")
@@ -985,6 +1021,62 @@ mod tests {
             "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service",
             TOOLS_ASKER_CGROUP
         ));
+    }
+
+    /// #5288: a made skill's caller, `lamp-skills.service`, is its own
+    /// cgroup, never the voice's or the cloud's.
+    #[test]
+    fn a_skill_is_told_by_its_own_cgroup() {
+        assert!(from_asker(
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+            SKILLS_ASKER_CGROUP
+        ));
+        for other in [
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+        ] {
+            assert!(!from_asker(other, TOOLS_ASKER_CGROUP), "{other}");
+        }
+        assert!(!from_asker(
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills-manage@1.service\n",
+            SKILLS_ASKER_CGROUP
+        ));
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true);
+        assert!(!services.skill_reads);
+        assert!(services.with_skill_reads(true).skill_reads);
+    }
+
+    /// #5288: a skill reads as the voice does, quoted and with security
+    /// mail left out; anything else is refused and nothing is called, the
+    /// list of what is linked and a write too, even with writes on.
+    #[test]
+    fn a_skill_may_only_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "[]", true).with_skill_reads(true);
+        run(services.admin(&set_line(
+            "gmail",
+            json!({"auth_type":"pat","api_key":"goodpassword","credentials":{"email":"me@home.test"}}),
+        )));
+        let read = run(services.skill_tool(&read_line(json!({"service":"gmail","what":"recent"}))));
+        let text = read.to_string();
+        assert_eq!(read["ok"], true, "{text}");
+        assert!(text.contains("a security mail, left out"));
+        assert!(!text.contains("551234") && !text.contains("goodpassword"));
+        for line in [
+            json!({"op":"call","name":"services_connected"}).to_string(),
+            json!({"op":"call","name":"service_write","args":{"service":"gmail","action":"send_mail",
+                   "to":["a@b.test"],"subject":"s","text":"t"}})
+            .to_string(),
+        ] {
+            assert_eq!(
+                run(services.skill_tool(&line)),
+                json!({"ok": false, "error": SKILL_READS_ONLY}),
+                "{line}"
+            );
+        }
+        assert!(services.mail.sent.lock().unwrap().is_empty());
+        assert_eq!(run(services.skill_tool("not json"))["ok"], false);
     }
 
     #[test]
