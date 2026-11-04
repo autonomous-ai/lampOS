@@ -39,6 +39,15 @@ def body_asks(body):
     return bool(ASK_LINE.search(body) or ASK_READERS.search(body))
 
 
+# 4 Nov 23:4x (Thirteen's P3 on #5305): the patterns fail open. A body that does ask, in words they don't take
+# ("This PR needs TWO READS (privacy).", "Readers: TWO READS (privacy and tests)"), asks nothing, and a privacy PR could
+# go on one read. A body that names TWO READS without asking is said in the bot's log, once per head
+# (`reads2.py --unasked`), so an ask that wasn't taken is seen before the merge, not after.
+def body_names_unasked(body):
+    """Whether a PR body names TWO READS but doesn't ask for them by body_asks."""
+    return "TWO READS" in body and not body_asks(body)
+
+
 def two_reads(items, heads, writers):
     """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. heads: the head sha, or a list of it
     and earlier heads with the same patch. Returns "none", "met N" or "short N"."""
@@ -66,6 +75,12 @@ def two_reads(items, heads, writers):
 
 
 def main():
+    if sys.argv[1:] == ["--unasked"]:
+        # stdin: the PR body line (lib.sh's coord_body). Prints "unasked" or nothing.
+        items = [json.loads(line) for line in sys.stdin if line.strip()]
+        if any(c.get("pr_body") and body_names_unasked(c["body"]) for c in items):
+            print("unasked")
+        return
     writers, args = writers_from_args(sys.argv[1:], "reads2")
     items = [json.loads(line) for line in sys.stdin if line.strip()]
     print(two_reads(items, args, writers))
