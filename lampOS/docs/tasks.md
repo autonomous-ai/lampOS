@@ -2396,7 +2396,16 @@ finish?" for any recent piece of work.
   a working agent was last active 3 or more minutes ago, `last_step` as
   `{"untrusted": "…"}` (at most 160 characters, quoted), and, for settled
   work, `told`. `not_listed` counts what the record left out. No task
-  number, store or machine id.
+  number, store or machine id. Every word of `asked` and `last_step` that
+  looks like a path (it holds `/` or `\`, or starts with `~`) is given as
+  "a file", so a folder or a username never reaches the model
+  (`without_paths`).
+- **Anyone who asks hears it.** The voice does not know who is asking, and
+  tasks have no owner. So a guest who asks "what is Claude doing?" hears
+  every recent piece of work and its ask, the owner's included, where
+  `check_agent_task` told only the newest. That is why the switch stays
+  off until answers are kept to the person who asked for the work, or to
+  the lamp's owner (the reviewer-lead's P2 on #5118).
 
   ```json
   {"tasks":[{"who":"Claude Code","where":"their computer","asked":"Fix the parser",
