@@ -2837,7 +2837,7 @@ fn missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept() {
 /// worker checks, and `name.onnx` the one the lamps run (the first builder
 /// on #811, 13:58). The same-voice check's CAM++ (#829) is the one
 /// docs/same-voice.md pins, placed beside the voice, and no product unit names
-/// it or turns on models in a round.
+/// it; the product's updater turns on models in a round (same-voice step 2).
 #[test]
 fn the_pinned_models_are_the_ones_their_parts_check() {
     let all = install::models().unwrap();
@@ -2874,13 +2874,20 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
         same_voice.sha256,
         "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"
     );
-    for unit in [
-        include_str!("../../../deploy/product/lamp-voice.service"),
-        include_str!("../../../deploy/product/lamp-update.service"),
-    ] {
+    let voice_unit = include_str!("../../../deploy/product/lamp-voice.service");
+    let update_unit = include_str!("../../../deploy/product/lamp-update.service");
+    for unit in [voice_unit, update_unit] {
         assert!(!unit.contains("Environment=LAMP_SAME_VOICE_MODEL"));
-        assert!(!unit.contains("Environment=LAMP_UPDATE_MODELS"));
     }
+    // Same-voice step 2: the product's updater fetches the pinned models,
+    // CAM++ among them, so the switch is on in its own unit, once, and is
+    // never carried in the voice's.
+    assert!(!voice_unit.contains("LAMP_UPDATE_MODELS"));
+    assert_eq!(update_unit.matches("LAMP_UPDATE_MODELS").count(), 1);
+    assert_eq!(
+        lamp_update::unit::environment(update_unit, lamp_update::models::SWITCH).as_deref(),
+        Some("on")
+    );
     let wire = include_str!("../../turn-end-wire/src/lib.rs");
     let fast = include_str!("../../turn-end/src/fast.rs");
     let find = |name: &str| models.iter().find(|m| m.path.ends_with(name)).unwrap();

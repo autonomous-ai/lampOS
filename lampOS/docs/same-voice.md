@@ -31,9 +31,12 @@ until its model is put there and the voice is told where.
   `/opt/lampOS/voice/current/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`,
   beside the voice's binary, so `lamp-update install` places it where
   missing ([install.md](install.md)). A round fetches models only with
-  `LAMP_UPDATE_MODELS=on`, which no product unit sets, and the voice reads
-  the model only when `LAMP_SAME_VOICE_MODEL` names it, which no product
-  unit sets either.
+  `LAMP_UPDATE_MODELS=on`, which the product's `lamp-update.service` sets
+  since 4 November (this work's step 2), so a round fetches CAM++ where it is missing,
+  checks it by size and SHA-256 and places it beside the voice in the
+  voice's new folder ([updates.md](updates.md), "Models in the manifest").
+  The voice reads the model only when `LAMP_SAME_VOICE_MODEL` names it,
+  which no product unit sets.
 - **The front end:** 80 Kaldi filter banks a frame, computed in Rust as
   `torchaudio.compliance.kaldi.fbank` computes them with no dither, with
   the utterance's mean taken off each band, as 3D-Speaker does.
