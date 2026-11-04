@@ -792,11 +792,13 @@ rebases its pull requests and keeps going ("Never end your turn").
 promotes. A hotfix is promoted the same day, not batched; a clearly better
 hotfix ships and the rest becomes a follow-up issue. The steps:
 
-1. **A pre-promote lamp check** at the build's feed sequence, on lamp-52e6
-   (Fifth), lamp-9adf (Fourteen) when 52e6 is booked, or lamp-4ace (the first
-   builder): every unit active, `listening_ready`, a spoken turn answered,
-   not muted, and the rows the build's changes need. The promoted build is
-   the one the check ran on, never a newer one.
+1. **A pre-promote lamp check** at the build's feed sequence, on the **first
+   free lamp**: the PM asks on #4710, and whichever lamp holder answers
+   "taking PRE-PROMOTE N" first runs it, among lamp-9adf, 52e6, 06c1, c0a4,
+   0c89 and 4ace (the lead, 4 November). It is not tied to one lamp. The
+   check: every unit active, `listening_ready`, a spoken turn answered, not
+   muted, and the rows the build's changes need. The promoted build is the
+   one the check ran on, never a newer one.
 2. **Dispatch:** `gh workflow run lampos-arm64.yml --repo
    autonomous-ai/lampOS --ref lamp-voice -f promote_sequence=N`.
 3. **Verify:** decode the base64 `manifest` in the `lampos-stable` release's
