@@ -20,6 +20,10 @@
 //!   - `{"counts": {}}`: what became of the skills made by voice, running
 //!     totals ([`crate::made_counts::counts`]): numbers for the opt-in
 //!     health report, never a name, a word or a package.
+//!   - `{"upload": {"skill_md", "skill_toml"?}}`: a skill added from a file
+//!     in the app, with `LAMP_SKILL_UPLOAD=on` ([`crate::upload_skill`]):
+//!     `{"kept": {...}}` once checked and kept, its ask then said aloud as
+//!     a made-here skill's is, or `{"refused": WHY}`.
 //! - **Made here.** A `make` is written by the lamp's own chat with the
 //!   voice's own example, check and one repair
 //!   ([`crate::make_skill_local::make_kept`], [`make_here`]), kept as made
@@ -60,9 +64,10 @@ pub const MOST_ASKS: usize = made_skill::KEPT_MOST;
 pub const MAKING_LONGEST_MS: u64 = 30 * 60_000;
 
 /// A client has this long to send its line, and the line is at most
-/// [`MOST_LINE_BYTES`].
+/// [`MOST_LINE_BYTES`]: room for a skill added from a file's two files,
+/// each at most 8 KiB, escaped (`crate::upload_skill`).
 const LINE_WAIT: Duration = Duration::from_secs(2);
-const MOST_LINE_BYTES: u64 = 2_048;
+const MOST_LINE_BYTES: u64 = 64 * 1_024;
 const MOST_REQUEST_ID_BYTES: usize = 64;
 
 /// Now, as `made.json`'s times are kept.
@@ -567,6 +572,9 @@ fn accept(
     asks: Option<&crate::say::OwnAsks>,
     chat: ChatFrom,
 ) {
+    // A skill added from a file (`LAMP_SKILL_UPLOAD=on`), on this socket.
+    let upload = crate::upload_skill::from_environment();
+    let upload_place = crate::upload_skill::Place::product();
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else {
             continue;
@@ -578,6 +586,28 @@ fn accept(
             .read_line(&mut line)
             .is_err()
         {
+            continue;
+        }
+        if let Some((told, ask)) = serde_json::from_str::<Value>(line.trim_end())
+            .ok()
+            .and_then(|asked| {
+                crate::upload_skill::line(
+                    &asked,
+                    upload,
+                    asks.is_some(),
+                    &upload_place,
+                    keeping,
+                    now_unix_ms(),
+                )
+            })
+        {
+            let _ = writeln!(stream, "{told}");
+            if let (Some((said, sha256)), Some(asks)) = (ask, asks.cloned()) {
+                let directory = keeping.directory.clone();
+                let _ = std::thread::Builder::new()
+                    .name("lamp-voice-upload-ask".into())
+                    .spawn(move || say_ask(&asks, &directory, &sha256, &said));
+            }
             continue;
         }
         let making = keeping.clone();

@@ -1164,8 +1164,15 @@ pub fn install_made_at(
             .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
             .unwrap_or_default()
     };
-    lamp_voice::made_skill::capped(&card("skill.toml"))
-        .map_err(|refused| format!("not installed: {}", refused.0))?;
+    // A skill added from a file (`lamp_voice::upload_skill`) is held to its
+    // own cap: asked for only, never started on its own.
+    let added = added_from_file(&card("SKILL.md"));
+    if added {
+        lamp_voice::made_skill::capped_added(&card("skill.toml"))
+    } else {
+        lamp_voice::made_skill::capped(&card("skill.toml"))
+    }
+    .map_err(|refused| format!("not installed: {}", refused.0))?;
     if !made_here(&card("SKILL.md")) {
         return Err("not installed: its SKILL.md doesn't say it was made here".into());
     }
@@ -1182,6 +1189,13 @@ pub fn install_made_at(
     // a store) without a word (the reviewer's P3 on #2414): only one made
     // here is replaced, and the one in the way is named.
     let there = skills.join(&name);
+    // One added from a file never takes any skill's place, a made one's
+    // neither: a name the lamp holds is refused, never replaced.
+    if added && fs::symlink_metadata(&there).is_ok() {
+        return Err(format!(
+            "not installed: {name} is already on the lamp, and a skill added from a file never takes its place"
+        ));
+    }
     if there.exists()
         && !fs::read_to_string(there.join("SKILL.md")).is_ok_and(|card| made_here(&card))
     {
@@ -2128,6 +2142,13 @@ const NO_SIGNATURE: &str = "it carries no signature: a package installed by hand
 /// (`made: here` in its front matter, `lamp_voice::made_skill`).
 fn made_here(card: &str) -> bool {
     card.lines().any(|line| line.trim() == "made: here")
+}
+
+/// Whether a `SKILL.md` says it was added from a file
+/// (`lamp_voice::made_skill::ADDED_FROM_FILE`).
+fn added_from_file(card: &str) -> bool {
+    card.lines()
+        .any(|line| line.trim() == lamp_voice::made_skill::ADDED_FROM_FILE)
 }
 
 /// The skill `name` of these `files` put together beside the live skills,
