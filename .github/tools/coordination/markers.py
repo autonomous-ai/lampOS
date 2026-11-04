@@ -1,4 +1,5 @@
 # markers.py (23 Oct 10:1x): a PR's review markers, read from its comments as JSON lines {login, body} on stdin.
+# 4 Nov: with its reviews' bodies merged in by time (lib.sh's coord_pr_comments, merge_reviews below; #5212 part 1).
 # A comment's first line `READ-OK <sha>` or `HOLD ...` (or, in its first 400 characters, a marker with a commit right after
 # it); a HOLD is keyed on the account plus the signature in the comment's first 800 characters ("reviewer-two, 09:16"),
 # and stands until that same reader posts a later READ-OK (the train bot's own "HOLD train N" clears on any later
@@ -145,9 +146,11 @@ def is_writer(c, writers):
 
 def read_markers(comments, writers, pr=None, lifted_path=None):
     """comments: dicts {login, body} in posting order. Returns "HELD", "READ-OK <sha>" or ""."""
-    holds = {}; ok = ""
-    for n, c in enumerate(comments):
+    holds = {}; ok = ""; n = -1
+    for c in comments:
         # The index n counts every comment, a skipped one too, so holds-lifted.tsv's "unsigned#N" keys stay put.
+        # 4 Nov (#5212 part 1): reviews merged in (merge_reviews) don't count, so a review never shifts a comment's N.
+        if not c.get("review"): n += 1
         if not is_writer(c, writers):
             continue
         body = c["body"].lstrip()
@@ -160,7 +163,10 @@ def read_markers(comments, writers, pr=None, lifted_path=None):
         if kind == "HOLD":
             if rest.startswith("train "): holds["bot"] = sha
             # Unsigned: nobody's later READ-OK can be told to be its reader's, so it stands (fail closed).
-            else: holds[who if name else c["login"] + "/unsigned#" + str(n)] = sha
+            # An unsigned review HOLD is keyed on its submit time: "<login>/unsigned-review#<submitted_at>".
+            elif name: holds[who] = sha
+            elif c.get("review"): holds[c["login"] + "/unsigned-review#" + (c.get("created_at") or "")] = sha
+            else: holds[c["login"] + "/unsigned#" + str(n)] = sha
         else:
             ok = sha; holds.pop(who, None)
             # 3 Nov 15:4x: the bot's own "HOLD train N" clears only on a READ-OK marker for a commit; a quoted,
@@ -168,7 +174,7 @@ def read_markers(comments, writers, pr=None, lifted_path=None):
             if sha: holds.pop("bot", None)
             # An account's unsigned HOLD clears only on that account's READ-OK saying so ("my P2 is fixed; HOLD lifted", #3138).
             if LIFT_RE.search(body[:400]):
-                for k in [k for k in holds if k.startswith(c["login"] + "/unsigned#")]: holds.pop(k)
+                for k in [k for k in holds if k.startswith((c["login"] + "/unsigned#", c["login"] + "/unsigned-review#"))]: holds.pop(k)
     # 29 Oct 18:0x: "HOLD b9bb97e67a, Third, 16:45" (a comma after the commit) read as unsigned, and "this lifts my 16:45 HOLD"
     # didn't clear it, so #4353 sat out trains 363 and 364 with three READ-OKs. Both read now.
     # 25 Oct 20:0x: a HOLD its own reader closed in writing but never cleared with a READ-OK (Second's on #3437, closed in
@@ -188,7 +194,29 @@ def read_markers(comments, writers, pr=None, lifted_path=None):
     return "HELD" if holds else ("READ-OK " + ok if ok else "")
 
 
+def merge_reviews(comments, reviews):
+    """4 Nov (#5212 part 1): a PR's comments plus its reviews' bodies, as one list in time order. reviews: dicts
+    {login, body, created_at (submitted_at), state}. A review with an empty body, not submitted (PENDING) or
+    DISMISSED is dropped; its state is never a read, only its body's marker, read as a comment's. The sort is stable, so items with
+    the same time keep comments before reviews."""
+    items = list(comments)
+    for r in reviews:
+        if not (r.get("body") or "").strip() or not r.get("created_at") or r.get("state") in ("PENDING", "DISMISSED"):
+            continue
+        items.append({"login": r.get("login") or "", "body": r["body"], "created_at": r["created_at"], "review": True})
+    return sorted(items, key=lambda c: c.get("created_at") or "")
+
+
 def main():
+    # markers.py --merge COMMENTS_JSONL REVIEWS_JSONL: prints merge_reviews' list as JSON lines (lib.sh).
+    if sys.argv[1:2] == ["--merge"]:
+        lists = []
+        for path in sys.argv[2:4]:
+            with open(path) as f:
+                lists.append([json.loads(line) for line in f if line.strip()])
+        for c in merge_reviews(*lists):
+            print(json.dumps(c))
+        return
     # markers.py [--writers FILE] [PR]
     writers, args = writers_from_args(sys.argv[1:])
     comments = [json.loads(line) for line in sys.stdin if line.strip()]

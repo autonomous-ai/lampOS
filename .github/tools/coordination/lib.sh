@@ -28,6 +28,19 @@ coord_comments() {
     --jq '.[]|{login:.user.login,body:.body,created_at:.created_at}' > $2.new 2>/dev/null && mv $2.new $2
 }
 
+# coord_pr_comments PR OUT: the PR's comments and its reviews' bodies as one list of JSON lines {login, body,
+# created_at}, in time order (markers.py --merge). 4 Nov (#5212 part 1): El posts its reads as reviews, and #5080, #5180,
+# #5096 and #5159 each counted one read short; a review body now reads exactly as a comment does (same writers, same
+# marker rules, a later HOLD still beats an earlier READ-OK whichever kind each is). A review's state (APPROVED, ...)
+# is never a read; an empty body, an unsubmitted (pending) or a dismissed review counts for nothing. Either fetch failing fails.
+coord_pr_comments() {
+  rm -f $2
+  coord_comments $1 $2.c || return 1
+  gh api "repos/$REPO/pulls/$1/reviews?per_page=100" --paginate \
+    --jq '.[]|{login:.user.login,body:.body,created_at:.submitted_at,state:.state}' > $2.r 2>/dev/null || { rm -f $2.c $2.r; return 1; }
+  $PYTHON -I $TOOLS_DIR/markers.py --merge $2.c $2.r > $2.new && mv $2.new $2; local e=$?; rm -f $2.c $2.r; return $e
+}
+
 # coord_queue OUT: the Queue's (#4710) comments of the last 3 days, where Queue HOLDs are posted.
 coord_queue() { coord_comments 4710 $1 "$(date -u -v-3d +%Y-%m-%dT%H:%M:%SZ)"; }
 
