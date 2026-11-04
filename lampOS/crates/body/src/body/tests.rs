@@ -3085,6 +3085,7 @@ fn gesture_run(
                 aim: None,
                 unseat: false,
                 night: false,
+                night_woke: false,
                 asleep: false,
                 woken: false,
             }
@@ -3162,6 +3163,7 @@ fn expression_run_with(
             aim: None,
             unseat: false,
             night: false,
+            night_woke: false,
             asleep: false,
             woken: false,
         },
@@ -3329,6 +3331,7 @@ fn speaking_run_with(
             aim: None,
             unseat: false,
             night: false,
+            night_woke: false,
             asleep: false,
             woken: false,
         },
@@ -4039,6 +4042,7 @@ fn rest_glances_watched(
             aim: None,
             unseat: false,
             night: false,
+            night_woke: false,
             asleep: false,
             woken: false,
         },
@@ -4460,6 +4464,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             aim: None,
             unseat: false,
             night: false,
+            night_woke: false,
             asleep: false,
             woken: false,
         },
@@ -4528,6 +4533,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             aim: None,
             unseat: false,
             night: false,
+            night_woke: false,
             asleep: false,
             woken: false,
         },
@@ -4614,6 +4620,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 aim: None,
                 unseat: false,
                 night: false,
+                night_woke: false,
                 asleep: false,
                 woken: false,
             }
@@ -5039,6 +5046,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     aim: None,
                     unseat: false,
                     night: false,
+                    night_woke: false,
                     asleep: false,
                     woken: false,
                 }
@@ -5120,6 +5128,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 aim: None,
                 unseat: false,
                 night: false,
+                night_woke: false,
                 asleep: false,
                 woken: false,
             }
@@ -5208,6 +5217,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 aim: None,
                 unseat: false,
                 night: false,
+                night_woke: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -8046,6 +8056,7 @@ fn called_run(
                 aim: None,
                 unseat: false,
                 night: false,
+                night_woke: false,
                 asleep: false,
                 woken: false,
             }
@@ -8900,11 +8911,13 @@ fn without_the_night_switch_a_room_line_stands_it_up_as_before() {
     );
 }
 
-/// Its name heard at the line's start stirs it: it rises at once.
+/// Its name heard at the line's start, taken by Expression (it says
+/// waking), stirs it: it rises at once.
 #[test]
 fn asleep_at_night_its_name_rises_it() {
     let steps = night_run(20, room_line, asleep_until_five, nobody, |now| Asked {
         called: (Duration::from_secs(5)..Duration::from_millis(5_020)).contains(&now),
+        night_woke: (Duration::from_secs(5)..Duration::from_millis(5_400)).contains(&now),
         ..Asked::default()
     });
     assert_eq!(highest(&steps, Duration::ZERO, Duration::from_secs(5)), 0.0);
@@ -8912,6 +8925,30 @@ fn asleep_at_night_its_name_rises_it() {
     assert_eq!(
         highest(&steps, Duration::from_secs(5), Duration::from_secs(20)),
         1.0
+    );
+}
+
+/// A bare name hit Expression refused (no person's speech beside it, so it
+/// never says waking) leaves it folded, in an empty room or mid-talk:
+/// lamp-name alone sat 06c1 up 7 times in 2 h of an empty room, about 90 s
+/// each (#5158's night check, 00:03 to 01:04).
+#[test]
+fn asleep_at_night_a_bare_name_hit_leaves_it_folded() {
+    let hit = |now: Duration| Asked {
+        called: [5, 14].iter().any(|&at| {
+            (Duration::from_secs(at)..Duration::from_millis(at * 1_000 + 20)).contains(&now)
+        }),
+        ..Asked::default()
+    };
+    let empty_room = night_run(20, |_| Mood::Resting, |_| true, nobody, hit);
+    assert_eq!(
+        highest(&empty_room, Duration::ZERO, Duration::from_secs(20)),
+        0.0
+    );
+    let mid_talk = night_run(20, room_line, asleep_until_five, nobody, hit);
+    assert_eq!(
+        highest(&mid_talk, Duration::ZERO, Duration::from_secs(20)),
+        0.0
     );
 }
 

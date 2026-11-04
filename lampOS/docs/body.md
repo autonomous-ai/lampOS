@@ -853,7 +853,9 @@ the shoulder (servo 2) and the elbow (servo 3):
   all.
 - Asleep for the night with `LAMP_NIGHT_STAYS_FOLDED=on` (#5156, "On the
   bus" below), a folded lamp is not raised by the voice listening or
-  thinking alone; its name, a tap, a face or an answer still raise it.
+  thinking alone, nor by a bare name hit Expression refused; a tap, a
+  face, an answer, or its name once Expression says `waking` still raise
+  it (#5158).
 - The way is one number from 0, folded, to 1, stood up. It moves at most the
   whole way in `--stand-seconds` (5 without it; 2 to 20), reaching that speed
   in half a second, and the two joints follow it eased at both ends, so
