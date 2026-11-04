@@ -547,11 +547,18 @@ speakers, both judged right.)
   journal line. One that ends 3 times in a row before it is ready
   (`MOST_UNREADY`: a missing program or model, a broken file) is not
   started again, and the journal says once that the check is off.
-- **Updates don't install it yet.** `lamp-update` puts `lamp-turn-end`
-  beside `lamp-voice` (`crates/update/src/install.rs`), and not
-  `lamp-same-voice`. Until it does, after each update the binary is copied
-  beside `lamp-voice` by hand, or the check is off after its three
-  starts. That's for the update's owner.
+- **Shipped in the voice's folder, off.** `lamp-same-voice` is an
+  `optional` binary in `deploy/package-binaries.json`, so a published build
+  carries it, and `lamp-update install` puts it beside `lamp-voice` when the
+  build carries it (`install::BESIDE_IF_CARRIED`; a build from before it
+  still installs, and install says once that it was left out). Nothing
+  turns it on: the voice starts it only when `LAMP_SAME_VOICE_MODEL` is set,
+  and no product unit sets it. A round carries a voice folder's files
+  forward and replaces the build's own, but adds none the old folder lacks
+  (`round::wants_of`), so a lamp installed before this gets the binary at
+  its next `lamp-update install`, not from a round; until then, a lamp that
+  sets the model copies it beside `lamp-voice` by hand, or the check is off
+  after its three starts.
 
 Tests: `same_voice::tests` (which lines are judged and when, the
 conversation's voice, a line judged once, a late print, a refused one and a
