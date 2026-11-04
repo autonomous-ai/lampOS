@@ -740,7 +740,8 @@ prints).
   no (`no`, `nope`, `no thanks`, `no thank you`, `not now`, `don't`,
   `không`, `thôi`, `không cần`, `không được`, `không nhé`, `thôi không`) is
   kept in the same file, with no print, and the owner is not asked for a day
-  (`NO_FOR`). Anything else learns nothing (`thread::Thread::lamp_for` →
+  (`NO_FOR`); a no older than that is dropped (the file removed) when it is
+  next read, so the owner's id and the time are not kept longer. Anything else learns nothing (`thread::Thread::lamp_for` →
   `owner_voice::lamp_answered`).
 - **Learnt from the owner's next lines.** At each line's verdict
   (`Heeding`, with the services' prints, `owner_voice::offer`), each line
@@ -761,9 +762,17 @@ prints).
 - **Kept on the lamp only,** beside the faces: `/var/lib/lampos-eyes/owner-voice.json`
   (the eyes' `people.json` folder, 0700), its own file, root's, mode 0600,
   written whole through `owner-voice.json.new` and renamed
-  (`owner_voice::Store`). A file that is not a regular root-owned 0600 one
-  is never read. Nothing else on the lamp names it, so no list sends,
-  uploads, shares or backs it up (`nothing_but_the_reset_names_the_print`).
+  (`owner_voice::Store`). The folder is `lampos`'s, who can unlink or swap
+  the file though not read it, so it is opened without following a link or
+  waiting on a FIFO (`O_NOFOLLOW | O_NONBLOCK`) and its type, owner and mode
+  are checked on the open file (`fstat`). A file that is not a regular
+  root-owned 0600 one is never read and is removed, so a copy chowned to
+  `lampos` (as systemd's `StateDirectory=` does) is not left readable; the
+  journal says only a fixed reason ("the kept file was not its owner's 0600:
+  removed"). Nothing else on the lamp names it, so no list sends, uploads,
+  shares or backs it up, and its path and the lamp's store are private to
+  the module, whose naming files are pinned to today's seven
+  (`nothing_but_the_reset_names_the_print`).
 - **Wiped** by the reset plan (both paths, `reset-plan-product.json`, hash
   in `RESET_PLAN_SHIPPED`; setup.md, "The person's data, which reset
   wipes") and by the owner's "forget everything" on the second route's mark,
