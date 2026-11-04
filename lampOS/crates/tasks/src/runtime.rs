@@ -69,6 +69,11 @@ pub const WAIT_BACKOFF: Duration = Duration::from_secs(30);
 fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
+/// A file error that names its path, `<path>: <error>`, and keeps the kind
+/// a caller matches on (a missing targets file is `NotFound`).
+pub(crate) fn at(path: &Path) -> impl FnOnce(io::Error) -> io::Error + '_ {
+    move |error| io::Error::new(error.kind(), format!("{}: {error}", path.display()))
+}
 fn refusal(code: &str, message: &str) -> Value {
     json!({"ok":false,"error":code,"message":message})
 }
@@ -84,7 +89,8 @@ impl SystemClock {
         let boot_id = match boot_id {
             Some(value) => value.to_owned(),
             None if cfg!(target_os = "linux") => {
-                fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+                fs::read_to_string("/proc/sys/kernel/random/boot_id")
+                    .map_err(at(Path::new("/proc/sys/kernel/random/boot_id")))?
                     .trim()
                     .into()
             }
@@ -268,8 +274,9 @@ pub fn read_targets_or_newer(path: &Path) -> io::Result<Result<BTreeMap<String, 
     let file = OpenOptions::new()
         .read(true)
         .custom_flags((rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32)
-        .open(path)?;
-    let metadata = file.metadata()?;
+        .open(path)
+        .map_err(at(path))?;
+    let metadata = file.metadata().map_err(at(path))?;
     if !metadata.is_file()
         || metadata.nlink() != 1
         || metadata.uid() != rustix::process::geteuid().as_raw()
@@ -769,9 +776,12 @@ fn bind(path: &Path) -> io::Result<(UnixListener, Binding)> {
         .parent()
         .ok_or_else(|| invalid("socket needs a parent"))?;
     if !parent.exists() {
-        fs::DirBuilder::new().mode(0o700).create(parent)?;
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(parent)
+            .map_err(at(parent))?;
     }
-    let parent_meta = fs::symlink_metadata(parent)?;
+    let parent_meta = fs::symlink_metadata(parent).map_err(at(parent))?;
     if !parent_meta.is_dir()
         || parent_meta.permissions().mode() & 0o077 != 0
         || parent_meta.uid() != rustix::process::geteuid().as_raw()
@@ -795,7 +805,8 @@ fn bind(path: &Path) -> io::Result<(UnixListener, Binding)> {
         .write(true)
         .mode(0o600)
         .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
-        .open(lock_path)?;
+        .open(&lock_path)
+        .map_err(at(&lock_path))?;
     lock.try_lock().map_err(io::Error::other)?;
     match fs::symlink_metadata(path) {
         Ok(m) if m.file_type().is_socket() && m.uid() == parent_meta.uid() => {
@@ -1755,8 +1766,9 @@ pub fn read_target_names(path: &Path) -> io::Result<BTreeMap<String, String>> {
     let file = OpenOptions::new()
         .read(true)
         .custom_flags((rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32)
-        .open(path)?;
-    let metadata = file.metadata()?;
+        .open(path)
+        .map_err(at(path))?;
+    let metadata = file.metadata().map_err(at(path))?;
     if !metadata.is_file()
         || metadata.nlink() != 1
         || metadata.uid() != rustix::process::geteuid().as_raw()

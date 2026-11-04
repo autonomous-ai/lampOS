@@ -500,6 +500,39 @@ fn full_unread_stderr_cannot_hold_storage_failure_exit_or_socket_cleanup() {
     );
 }
 
+/// Without `--set-up-later`, a missing targets file stops the part at start
+/// with an error naming that file, not a bare "No such file or directory".
+#[test]
+fn a_missing_targets_file_stops_serve_with_its_path() {
+    let root = private_root();
+    let config = config(root.path());
+    let targets = root.path().join("targets.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_lamp-tasks"))
+        .args(["serve", "--enable", "--boot-id", "missing-targets", "--dir"])
+        .arg(&config.dir)
+        .arg("--socket")
+        .arg(&config.socket)
+        .arg("--voice-socket")
+        .arg(&config.voice_socket)
+        .arg("--bus-root")
+        .arg(&config.bus_root)
+        .arg("--targets")
+        .arg(&targets)
+        .arg("--harness")
+        .arg(root.path().join("no-harness"))
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "started with no targets file");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("{}: No such file or directory", targets.display())),
+        "{stderr}"
+    );
+}
+
 /// #1676: with `--set-up-later`, the part starts on a lamp that has neither
 /// Harness nor a targets file yet, and refuses a task with why. Without
 /// it, the same lamp's part stops at start, as before.
