@@ -1479,6 +1479,27 @@ fn the_product_keeps_what_was_heard() {
     );
 }
 
+/// The memory's corrections, forget-about and recall v2 are on in the
+/// product (#2510, #2176): each passed its check on lamp-06c1 on 4 Nov
+/// (build 10012): "green now, not violet" with `replaces`, both bicycle
+/// things forgotten with the coffee kept, and "last week" a span answer.
+#[test]
+fn the_product_corrects_forgets_about_and_recalls_by_span() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_REPLACES=on",
+        "Environment=LAMP_MEMORY_FORGET_ABOUT=on",
+        "Environment=LAMP_MEMORY_RECALL_V2=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still

@@ -205,6 +205,13 @@ giữ chính câu nghe được, dạng "They said: …" (tối đa 300 byte). M
 
 ## Truy xuất theo khoảng ngày
 
+`LAMP_MEMORY_RECALL_V2=on` (#2176; tắt nếu không đặt, chỉ với client Days, cả
+hai đường voice) bật trong bản sản phẩm từ 4/11, sau lần kiểm tra trên
+lamp-06c1 (build 10012): chỉ "my" thì không tìm thấy gì, "last week" có câu
+trả lời theo khoảng ngày. Cùng ngày, `LAMP_MEMORY_REPLACES` (#2510, lời sửa
+thay thế điều đang giữ) và `LAMP_MEMORY_FORGET_ABOUT` (#2176, quên những gì đã
+nói về một thứ) cũng bật trong bản sản phẩm sau lần kiểm tra của chúng.
+
 Khi `recall_v2` hỏi một ngày hay một khoảng ngày mà không có từ khóa, các ghi
 chú đang giữ được ưu tiên chiếm chỗ trong số kết quả có hạn trước các lượt hội
 thoại mới hơn, để một ngày bận không che hết các ghi chú cũ (lamp-06c1, 26/10:

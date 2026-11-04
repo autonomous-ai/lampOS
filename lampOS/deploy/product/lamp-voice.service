@@ -464,6 +464,15 @@ Environment=LAMP_MEMORY_STABLE_ID=on
 # mango lines were kept as said on lamp-06c1 (22 Oct) and a yes after a second keep offer kept the first offer's line,
 # never "They said: Yes." (#5276, N6).
 Environment=LAMP_MEMORY_KEEP_HEARD=on
+# A correction replaces the kept thing (#2510): on lamp-06c1 on 4 Nov (build 10012) "my favourite colour is green
+# now" after a kept violet called remember with replaces (answer=replaced), one green kept, violet gone from recall.
+Environment=LAMP_MEMORY_REPLACES=on
+# "Forget what I said about my bicycle" forgets just those things (#2176): on lamp-06c1 on 4 Nov (build 10012) both
+# bicycle things were forgotten by forget's about, and the coffee one was still found.
+Environment=LAMP_MEMORY_FORGET_ABOUT=on
+# Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
+# alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
+Environment=LAMP_MEMORY_RECALL_V2=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
