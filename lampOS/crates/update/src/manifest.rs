@@ -37,8 +37,9 @@ pub const SCHEMA: u32 = 1;
 /// (crate::added). 9: a round stops the voice first and starts it again
 /// after the parts it reads (#4431), which every product build asks for
 /// ([`ORDER_UPDATER`]). 10: the Skills Store's switch file among the
-/// settings ([`STORE_ENV_UPDATER`]).
-pub const UPDATER: u64 = 10;
+/// settings ([`STORE_ENV_UPDATER`]). 11: the models switch file among the
+/// settings ([`MODELS_ENV_UPDATER`]).
+pub const UPDATER: u64 = 11;
 /// Reserved lamp marker for the product's ordinary service templates.
 pub const PRODUCT_LAMP: &str = "product";
 /// Older updaters do not select product-marked units.
@@ -66,6 +67,15 @@ pub const STORE_ENV_UPDATER: u64 = 10;
 /// writes the build's while the lamp's copy is the build's before, and
 /// keeps one changed on the lamp.
 pub const STORE_ENV: &str = "/etc/lampOS/skills/store.env";
+/// The level a build that carries the models switch file ([`MODELS_ENV`])
+/// needs: an older updater refuses its path among the settings, so it
+/// climbs first.
+pub const MODELS_ENV_UPDATER: u64 = 11;
+/// The models switch as a file a round carries (same-voice step 2): read by
+/// lamp-update itself (crate::models::file_on), never by systemd, so a lamp
+/// in a home turns `LAMP_UPDATE_MODELS` on without its own unit changing.
+/// Outside `/etc/lampOS/update/`, which the settings writer may not write.
+pub const MODELS_ENV: &str = "/etc/lampOS/models.env";
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
@@ -116,6 +126,7 @@ pub const SETTING_FILES: &[&str] = &[
     "/etc/lampOS/records.json",
     "/etc/tmpfiles.d/lampos.conf",
     STORE_ENV,
+    MODELS_ENV,
 ];
 pub const SETTING_FOLDERS: &[&str] = &[
     "/etc/lampOS/expression/",

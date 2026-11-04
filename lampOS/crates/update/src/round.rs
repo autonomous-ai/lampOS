@@ -105,6 +105,11 @@ pub struct Config {
     /// `LAMP_UPDATE_MODELS=on`: the models a build carries are fetched,
     /// checked and switched with the parts (crate::models, #1680).
     pub models: bool,
+    /// `LAMP_UPDATE_MODELS` not set in the environment at all: the switch
+    /// file a round carries (`manifest::MODELS_ENV`) decides instead, as
+    /// this round leaves it. Any value set there, `off` or another, leaves
+    /// this false, so the environment always wins over the file.
+    pub models_file: bool,
     /// `LAMP_UPDATE_APPLY=on`: the settings and tmpfiles a build carries
     /// are written at the switch by `lamp-update-apply` (crate::apply).
     pub settings: bool,
@@ -1124,7 +1129,7 @@ impl Run<'_, '_> {
             .iter()
             .map(|part| part.program.builds.as_str())
             .collect();
-        if !self.config.models {
+        if !self.models_on(manifest, state) {
             // What a lamp's own file is follows the rule of the switch on:
             // kept, and said. Any other model that differs waits for it.
             let mut differs = None;
@@ -1158,10 +1163,11 @@ impl Run<'_, '_> {
             }
             if let Some(model) = differs {
                 return Err(Outcome::WaitsForModels(format!(
-                    "build {} carries another {} than this lamp's, and {}=on is not set",
+                    "build {} carries another {} than this lamp's, and {}=on is not set (in lamp-update's environment, or in {})",
                     manifest.sequence,
                     model.path,
-                    models::SWITCH
+                    models::SWITCH,
+                    manifest::MODELS_ENV
                 )));
             }
             return Ok(Vec::new());
@@ -1181,6 +1187,44 @@ impl Run<'_, '_> {
             }
         }
         Ok(taken)
+    }
+
+    /// Whether this round takes the build's models: `LAMP_UPDATE_MODELS=on`
+    /// in the environment; any other value set there, off; not set at all,
+    /// the switch file as this round leaves it. That is the build's own
+    /// [`manifest::MODELS_ENV`] when the round writes it (its settings
+    /// written here and the lamp's copy still the build's before, or none),
+    /// so the build that first carries the file takes its models too; and
+    /// otherwise the lamp's file, which a missing or garbled one leaves off.
+    fn models_on(&self, manifest: &Manifest, state: &State) -> bool {
+        if self.config.models {
+            return true;
+        }
+        if !self.config.models_file {
+            return false;
+        }
+        let carried = manifest
+            .settings
+            .iter()
+            .find(|setting| setting.path == manifest::MODELS_ENV);
+        if let Some(setting) = carried
+            && (self.config.settings || self.product_settings_of(manifest))
+            && apply::plan(
+                &self.config.root,
+                std::slice::from_ref(setting),
+                &state.settings,
+                &state.settings_writing,
+                &BTreeMap::new(),
+            )
+            .is_ok_and(|steps| apply::writes(&steps).contains(&setting.path))
+        {
+            return !setting.removed
+                && setting
+                    .text
+                    .as_deref()
+                    .is_some_and(|text| models::file_on(text.as_bytes()));
+        }
+        models::lamp_file_on(&self.config.root)
     }
 
     /// Product auto-apply is scoped to the managed updater's current link;
@@ -1331,20 +1375,20 @@ impl Run<'_, '_> {
                 // put back. The build waits until this round's refresh made
                 // the writer this lamp-update. Only in a round that applies: a
                 // dry one (a climbed updater's confirm) writes nothing.
+                // So is the models switch file, from updater 11
+                // (`manifest::MODELS_ENV_UPDATER`).
                 if self.config.apply
                     && !these.is_empty()
-                    && manifest
-                        .settings
-                        .iter()
-                        .any(|setting| setting.path == manifest::STORE_ENV)
+                    && let Some(newer) = manifest.settings.iter().find(|setting| {
+                        setting.path == manifest::STORE_ENV || setting.path == manifest::MODELS_ENV
+                    })
                     && let Some(running) = &self.config.writer_from
                     && fs::read(self.config.on(crate::own::BACK))
                         .is_ok_and(|there| there != running.bytes())
                 {
                     return Err(Outcome::Refused(format!(
                         "build {} carries {}, and this lamp's settings writer is older than this lamp-update: waiting for it to be refreshed",
-                        manifest.sequence,
-                        manifest::STORE_ENV
+                        manifest.sequence, newer.path
                     )));
                 }
                 self.say_kept(&steps);
