@@ -773,6 +773,133 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
     assert_eq!(engine.topics(), ["humans/faces/tracked", "voice/state"]);
 }
 
+/// A skill's read of a linked service (#5288): the skill's only step, from
+/// a trigger, its service listed as a read and its voice granted; never a
+/// write, never another service, never with a tool or another step.
+#[test]
+fn a_read_step_reads_only_what_its_permissions_list() {
+    let dir = tempfile::tempdir().unwrap();
+    let read = |name: &str, permissions: &str, rest: &str, step: &str| {
+        let toml = format!(
+            "{rest}[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+             [ask]\npolicy = \"nudge\"\n[permissions]\ntopics = [\"voice/state\"]\n{permissions}\
+             [[do]]\n{step}\n"
+        );
+        load(&skill_with(dir.path(), name, &toml))
+    };
+    const CALENDAR: &str =
+        "read = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }";
+    const GRANT: &str = "speak = true\nservices = { google_calendar = \"read\" }\n";
+    let skill = read("evening-calendar", GRANT, "", CALENDAR).unwrap();
+    assert_eq!(
+        skill
+            .permissions
+            .services
+            .get("google_calendar")
+            .map(String::as_str),
+        Some("read")
+    );
+    let step = lamp_skills::service_read::ReadStep {
+        service: "google_calendar".into(),
+        what: "events".into(),
+        day: Some("tomorrow".into()),
+        args: serde_json::Map::new(),
+        quiet: None,
+    };
+    let call = Call::ServiceRead(Box::new(step));
+    assert_eq!(skill.permissions.refuses(&call), None);
+    assert_eq!(
+        call.named(),
+        (
+            "read",
+            serde_json::json!({"service": "google_calendar", "what": "events", "day": "tomorrow"})
+        )
+    );
+    // Any linked service with reads: a Notion search, a Drive list.
+    read(
+        "notion-plans",
+        "speak = true\nservices = { notion = \"read\" }\n",
+        "",
+        "read = { service = \"notion\", what = \"search\", query = \"plans\" }",
+    )
+    .unwrap();
+    read(
+        "drive-files",
+        "speak = true\nservices = { google_drive = \"read\" }\n",
+        "",
+        "read = { service = \"google_drive\", what = \"files\", count = 3 }",
+    )
+    .unwrap();
+    for (name, permissions, rest, step, why) in [
+        (
+            "no-grant",
+            "speak = true\n",
+            "",
+            CALENDAR,
+            "read of google_calendar needs services = { google_calendar = \"read\" }",
+        ),
+        (
+            "no-voice",
+            "services = { google_calendar = \"read\" }\n",
+            "",
+            CALENDAR,
+            "read needs speak = true",
+        ),
+        (
+            "other-service",
+            "speak = true\nservices = { gmail = \"read\" }\n",
+            "",
+            CALENDAR,
+            "read of google_calendar needs",
+        ),
+        (
+            "a-write",
+            "speak = true\nservices = { google_calendar = \"write\" }\n",
+            "",
+            CALENDAR,
+            "only \"read\"; a skill never writes to a service",
+        ),
+        (
+            "send-only",
+            "speak = true\nservices = { \"gmail-app\" = \"read\" }\n",
+            "",
+            "read = { service = \"gmail-app\", what = \"recent\" }",
+            "\"gmail-app\" only sends mail, so it has nothing to read",
+        ),
+        (
+            "drive-text",
+            "speak = true\nservices = { google_drive = \"read\" }\n",
+            "",
+            "read = { service = \"google_drive\", what = \"text\", id = \"f\" }",
+            "gives a whole text, which a skill never reads",
+        ),
+        (
+            "with-light",
+            GRANT,
+            "",
+            &format!("{CALENDAR}\nlight = {{ colour = \"warm\" }}"),
+            "read is its skill's only step",
+        ),
+        (
+            "with-tool",
+            GRANT,
+            "tool = \"evening_calendar\"\n",
+            CALENDAR,
+            "read is its skill's only step",
+        ),
+        (
+            "a-message",
+            "speak = true\nservices = { gmail = \"read\" }\n",
+            "",
+            "read = { service = \"gmail\", what = \"message\" }",
+            "gives a whole text, which a skill never reads",
+        ),
+    ] {
+        let error = read(name, permissions, rest, step).unwrap_err();
+        assert!(error.contains(why), "{name}: {error}");
+    }
+}
+
 /// The camera's picture is its own grant, `camera` (#3822's gap 1, the
 /// helper's decision on #3504, 27 Oct): `look` is presence and face
 /// position only, as the protocol's. A format 1 skill that said `look = true`
