@@ -420,3 +420,11 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   `THREAD` flake heron reported): READ-OK; full lamp-voice lib 4834/0.
   `image_ramlog::ramlogs_copies_leave_the_journal_out` fails on this Mac
   on lamp-voice's base too (environment).
+- 22:3x–22:5x: #5304 (a linked-service turn takes no picture, the root
+  fix of heron's #5287 P3) first read: READ-OK, four mutations caught.
+  #5293 READ-OK restated on `27f0cfd1f` (docs merge only), still after
+  #5294. Correction posted on #5301: a zsh filter (an unsplit variable)
+  left two of the close tests out of the 3-run repeat; they passed in
+  the full run once. #5303's second read waits on Fourteen's fix of
+  Thirteen's P2. For 5 Nov: #4526, #4579, #4568 second reads after the
+  Reviewer-lead.
