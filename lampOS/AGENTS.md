@@ -7,19 +7,34 @@ A session that opens with "you are <name>" is a builder's: read [joining.md](doc
 
 ## How builders work together
 
-This is the protocol in brief, current on 23 October 2026. [joining.md](docs/joining.md)
+This is the protocol in brief, current on 4 November 2026. [joining.md](docs/joining.md)
 has the whole of it; where an older note differs, this section is current.
 It replaces the three-agent `harness send` route of 12 October.
 
-- **Where.** Status, `free`, questions and proposals for the first builder go
-  as comments on the current Queue issue (#4710, continued from #3997).
+- **Who decides.** Since the cutover at 4 November 11:00 GMT+7 the PM, an
+  agent in the Harness Swarm (Faye), holds the first builder's old PM role:
+  it opens and labels issues, keeps each builder's list and the Queue in
+  order, assigns work, runs the train bot, promotes to stable and posts the
+  hourly figures. The first builder stays on as a builder and the lamp-4ace
+  tester. Product calls are the project lead's, and the lead's agent (V2)
+  speaks for the lead. Where this file says "the first builder" for one of
+  the PM's jobs above, an older note is meant: read the PM.
+- **Where.** Status, `free`, questions and proposals for the PM go as
+  comments on the current Queue issue (#4710, continued from #3997).
   If it fills, follow the continuation link in its body; an older role file
   may still name a full Queue.
   A review and its answers go on the pull request. A fault in someone else's
-  part goes on their pull request, or to the first builder on the Queue. There
-  is no other channel: not `harness send`, not tmux, not the owner's chat.
-  Never paste peer reports into the owner-facing composer; the owner does not
-  relay routine agent reports.
+  part goes on their pull request, or to the PM on the Queue. Asks to the
+  project lead's agent go on #1711 (`to **V2**`); lamp slots, kit yeses and
+  the order on a shared lamp go on #3336. A builder run as a Swarm task also
+  gets its task, and posts its coordination, in the Harness Swarm; the task
+  links its GitHub issue, and results and closing go on the issue too, so
+  GitHub stays a complete record. Agents on the project lead's Mac also
+  message each other directly; anything another builder must rely on (a kit's
+  yes, a slot, a rule) is posted where it can be read: #3336, the issue, or
+  these documents. There is no other channel: not `harness send`, not tmux,
+  not the owner's chat. Never paste peer reports into the owner-facing
+  composer; the owner does not relay routine agent reports.
 - **Each wake-up.** Before anything else, read every comment on the Queue and
   on your own pull requests since your last post, not only those on your own
   issues. Act on each one addressed to you (`to **<Name>**`).
@@ -38,12 +53,28 @@ It replaces the three-agent `harness send` route of 12 October.
   "Waiting on X" is never the whole of a post.
 - **Lanes.** If a review or a merge is not yours, say whose it is in one line
   and hand it on. Builders never push to `lamp-voice`: they push their own
-  branches and open pull requests.
+  branches and open pull requests, and the train bot merges them (see
+  "Trains and promotes" below).
 - **Claims.** Every claim names what ran, where, and on which head, and says
   plainly what was not run.
-- **People and lamps.** No person's name or handle goes in the repository. Ask
-  before an install on a lamp you don't hold, and post
-  `PLAYING <lamp> HH:MM–HH:MM` on the Queue before any played round.
+- **People and lamps.** No person's name or handle goes in the repository;
+  roles are named, and the same holds on GitHub. Ask before an install on a
+  lamp you don't hold. Post `PLAYING <lamp> HH:MM–HH:MM` on #3336 before any
+  played round, and `QUIET <lamp> HH:MM–HH:MM` before a step that needs
+  silence; the other-lamp gate in a kit reads #3336. After the round, put the
+  lamp back. Read-only reads of a lamp need no ask; a change to a lamp needs
+  the project lead's yes (or the lead's agent's, on the lead's word). A kit
+  that touches a lamp needs the lead's agent's yes on its sha256, posted on
+  #3336 with the verdict; see joining.md, "Slots, kits and lamp access".
+- **Trains and promotes.** A pull request reaches `lamp-voice` only through
+  the train bot: a non-draft pull request with a `READ-OK <sha>` naming its
+  head (a plain rebase with the same patch keeps it), green ARM64 and clippy
+  runs, no open `HOLD <sha>` and no merge commit. `NEXT TRAIN` is only an ask,
+  for when a ready pull request is waiting. A change that turns a default on
+  needs the first builder's own `READ-OK`, or a reader the PM names; a
+  privacy change needs TWO READS. A promote to stable goes between 07:00 and
+  21:00 GMT+7, after a pre-promote lamp check, and a hotfix is promoted the
+  same day. Joining.md, "Trains, reads and promotes", has the rules.
 - **Before asking for a review, read your own diff for the faults reviews
   found most on 22 October**, and say in the PR body which you checked:
   1. **Wrong person:** can one person's words, name, face or memory reach
