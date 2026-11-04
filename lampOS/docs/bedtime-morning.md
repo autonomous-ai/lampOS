@@ -303,6 +303,15 @@ Bedtime's rest step says so:
   woke and that it settled again (`woke at a night sound; the voice has
   rested 30 s again and no face is in view, so it settles again (1 of 3)`).
   A fourth sound leaves it awake, and leaving the window ends the waiting.
+- **The body through the sound.** With `LAMP_NIGHT_STAYS_FOLDED=on` in
+  lamp-body (#5156; off by default and in the product until a lamp check),
+  a folded lamp asleep for the night stays folded while the voice listens
+  or thinks, though Expression has already ended its rest: the body
+  latched the sleep before the line. Its name, a tap, a face or the lamp
+  answering stand it as ever, and the latch lets go once Expression has
+  not said asleep for 120 s ([body.md](body.md), "Asleep for the night").
+  Without it, the body stands at the sound and stays up for its awake
+  time (90 s on the product).
 - **The daily chance.** A re-settle makes no run and no daily claim: the
   bedtime trigger stays spent for the night, so it cannot fire twice. The
   skill's own next operation (a morning wake, a cancel), a reload that
