@@ -3170,6 +3170,21 @@ pub fn serve(
     {
         engine = engine.noting_turn_tools(true);
     }
+    // A held face forget lasts through the question asking them to spell
+    // their name (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7).
+    if crate::known_faces::record_told_on() {
+        eprintln!(
+            "lamp-voice second: a refused face request is told the face record as it stands, and a held face forget lasts through one spelling question ({})",
+            crate::known_faces::RECORD_TOLD_ENVIRONMENT
+        );
+        engine = engine.holding_forgets_through_spelling(true);
+    }
+    // A reply that says it saved their face with no remember_my_face call
+    // is judged as a keep claim with no keep (`LAMP_MEMORY_KEEP_ASKED`,
+    // #5141 row 8).
+    if crate::remember::asked::on() {
+        engine = engine.claiming_faces(true);
+    }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
             crate::agent_tasks::named_ask(&place, words)

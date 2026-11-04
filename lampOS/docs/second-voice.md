@@ -3255,6 +3255,26 @@ after a take-over, but now for every turn:
   reviewer-lead's P2 on #3628). Tests: `a reply never says it kept something with no remember
   call`, `a turn offered no function is never held for a claim` and
   `remember::tests::a_reply_that_says_it_kept_something_is_known_by_its_opening`.
+  **A face said saved counts the same** (`LAMP_MEMORY_KEEP_ASKED=on`, its
+  switch; #5141 row 8). On lamp-0c4e on 3 Nov the model said "hold still
+  while I take your face in" with no `remember_my_face` call, and no face
+  was saved. With the switch, a reply whose opening says the lamp is
+  saving or saved their face is also a claim (`remember::KeepClaim::Face`:
+  "hold still while I take your face in", "let me learn your face",
+  "I'll remember your face", "I've saved your face", "saving your face";
+  each says "your face", with "hold still/stay still while/so/," allowed
+  before it). It is the same miss on the same path, not a second counter.
+  It shares the request's one ask again (`keep_claim_asked`), and the
+  journal line is the same one with the function named: "its reply says
+  it kept something, with no remember_my_face call: …", so a count of
+  "says it kept something" counts both. What keeps a face is a
+  `remember_my_face` call in that round or an earlier round of the
+  request. A `remember` keeps no face. Asked again, the model is told
+  `remember::FACE_CLAIMED_UNSAVED`, and a second such reply is said as
+  `FACE_NOT_SAVED_LINE` ("I haven't saved your face yet. Ask me again and
+  I'll take it in."). Off, a face claim is said as it comes, as before.
+  Test: `a reply that says it saves their face with no call is the keep
+  miss`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
   Kept — library now, not the bakery." in one breath). On by default, on

@@ -1867,6 +1867,8 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
                 asker: asker.clone(),
                 at: now,
                 asked: true,
+                spelling: false,
+                carried: false,
             });
         }
         let taken = take_held_forget(

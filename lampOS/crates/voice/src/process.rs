@@ -1766,6 +1766,9 @@ fn second_route_worker_environment(
         // A line asking to remember the person's face, with their name,
         // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
         crate::known_faces::ASKED_ENVIRONMENT,
+        // A refused face request is told the face record as it stands, and a
+        // held face forget lasts through a spelling question (#5141).
+        crate::known_faces::RECORD_TOLD_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         // The owner's place for a question that needs one, and cleared
@@ -1934,6 +1937,7 @@ mod tests {
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
+            crate::known_faces::RECORD_TOLD_ENVIRONMENT,
             crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
@@ -2628,6 +2632,7 @@ mod tests {
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
+                    || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                     || name == crate::owner_place::ENVIRONMENT
                 {
@@ -2750,6 +2755,7 @@ mod tests {
                     "LAMP_MEMORY_STABLE_ID=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_NAMED_ALWAYS=on",
+                    "LAMP_NAMES_RECORD_TOLD=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_REPEAT_NOT_A_CALL=on",
                     "LAMP_NAME_SAID_TO_A_PERSON=on",

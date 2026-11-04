@@ -76,6 +76,12 @@ async fn run_seen(turns: &[Turn], sight: Option<&[Sight]>) -> Ran {
 /// [`run_seen`], its first turn request `first`: lines seen are kept for
 /// the whole process, so a test that reads them takes numbers of its own.
 async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> Ran {
+    run_switched(turns, sight, first, false).await
+}
+
+/// [`run_seen_from`], a held face forget lasting through a spelling
+/// question when `spelling` (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7).
+async fn run_switched(turns: &[Turn], sight: Option<&[Sight]>, first: u64, spelling: bool) -> Ran {
     use crate::speaking_faces::{SpeakingFaces, known_face_of};
     use std::sync::atomic::{AtomicBool, Ordering};
     let mut chats = VecDeque::new();
@@ -143,7 +149,8 @@ async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> R
                 Told::from("SYSTEM".to_owned())
             })),
         )
-        .announcing(false);
+        .announcing(false)
+        .holding_forgets_through_spelling(spelling);
     if sight.is_some() {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
@@ -1290,4 +1297,78 @@ async fn a_lines_end_records_who_was_seen_saying_it() {
     assert_eq!(ran.lines, [seen(3_037_002, "f2")]);
     let ran = run_seen_from(&[asks], None, 3_037_003).await;
     assert_eq!(ran.lines, [(3_037_003, None)]);
+}
+
+/// lamp-0c4e, 3 Nov (#5141 row 7): a face saved under a misheard name, and
+/// the forget the model held for their yes was dropped when the lamp's
+/// answer asked them to spell their name, so the wrong record stuck. With
+/// `LAMP_NAMES_RECORD_TOLD` their spelling carries it once, and their plain
+/// yes to the lamp's question about it then runs it; every other guard
+/// stands. Off, it is dropped as before.
+#[tokio::test]
+async fn with_the_record_switch_a_held_face_forget_lasts_through_the_spelling_question() {
+    let held = (
+        "A",
+        "That's not my name.",
+        Lamp::Calls(FACE, "Sorry. How do you spell your name?"),
+        0,
+    );
+    let spelled = (
+        "A",
+        "L, A, U, R, E, N.",
+        Lamp::Says("Thanks. Shall I forget your face?"),
+        5,
+    );
+    let yes = ("A", "Yes.", Lamp::Says("Done."), 5);
+    let face = || vec![(FACE.to_owned(), json!({"name": "A"}))];
+    // Each case: its turns, whether the switch is on, and the forgets run.
+    type Case<'a> = (&'a [Turn], bool, Vec<(String, Value)>);
+    let cases: &[Case] = &[
+        (&[held, spelled, yes], true, face()),
+        // Off: dropped at the spelling question, as before.
+        (&[held, spelled, yes], false, Vec::new()),
+        // Someone else spells, or their spelling's answer asks nothing
+        // about the forget, or asks them to spell again: dropped.
+        (
+            &[held, ("B", "L, A, U, R, E, N.", spelled.2, 5), yes],
+            true,
+            Vec::new(),
+        ),
+        (
+            &[
+                held,
+                ("A", "L, A, U, R, E, N.", Lamp::Says("Nice to meet you."), 5),
+                yes,
+            ],
+            true,
+            Vec::new(),
+        ),
+        (
+            &[
+                held,
+                (
+                    "A",
+                    "L, A, U, R, E, N.",
+                    Lamp::Says("Can you spell it again?"),
+                    5,
+                ),
+                spelled,
+                yes,
+            ],
+            true,
+            Vec::new(),
+        ),
+        // A yes in place of the spelling runs nothing, and the minute still
+        // counts from the held turn.
+        (&[held, yes, yes], true, Vec::new()),
+        (
+            &[held, spelled, ("A", "Yes.", Lamp::Says("Done."), 56)],
+            true,
+            Vec::new(),
+        ),
+    ];
+    for (at, (turns, on, want)) in cases.iter().enumerate() {
+        let ran = run_switched(turns, None, 1, *on).await;
+        assert_eq!(&ran.forgets, want, "case {at}");
+    }
 }

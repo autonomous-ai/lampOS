@@ -47,7 +47,25 @@ pub struct FaceSwitches {
     /// ([`crate::onboarding::who_you_are_open`]). With names checked, the
     /// name is then said back for a yes, or spelled ([`run_switched`]).
     pub at_setup: bool,
+    /// A refused `remember_my_face` or `forget_my_face` tells the model the
+    /// face record as it stands, and the journal the refusal's reason name
+    /// ([`RECORD_TOLD_ENVIRONMENT`], #5141 rows 9 and 10).
+    pub record: bool,
 }
+
+/// A refused face request tells the model the face record as it stands
+/// ([`record_now`]) and the journal its reason's name ([`refusal_reason`]),
+/// and a held `forget_my_face` lasts through one question asking them to
+/// spell their name (`second_provider::HeldForget`): #5141, rows 7, 9 and
+/// 10, from lamp-0c4e on 3 Nov. The second route only; `on` only, off
+/// unless set.
+pub const RECORD_TOLD_ENVIRONMENT: &str = "LAMP_NAMES_RECORD_TOLD";
+
+/// Whether [`RECORD_TOLD_ENVIRONMENT`] is on.
+pub fn record_told_on() -> bool {
+    std::env::var(RECORD_TOLD_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// The exchanges before the turn in hand that a name may have been said
 /// in, to be kept once the lamp has said it back and the person agreed
 /// ([`name_heard`]).
@@ -305,7 +323,8 @@ fn said_back(name: &str, lamp: &str) -> bool {
 
 /// Whether the lamp's `answer` asks them to spell their name: a word of
 /// spelling ("spell", "spelling", "spelled", "letter by letter", "đánh
-/// vần") anywhere in it.
+/// vần") anywhere in it. Also what keeps a held `forget_my_face` through
+/// that question (`second_provider::HeldForget`, #5141 row 7).
 pub fn asks_to_spell(answer: &str) -> bool {
     let words = lower_words(answer);
     words.iter().any(|word| {
@@ -1166,6 +1185,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
         visits: false,
         remember_speaker: false,
         at_setup: false,
+        record: false,
     })
 }
 
@@ -1277,6 +1297,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
             visits: false,
             remember_speaker: false,
             at_setup: false,
+            record: false,
         },
         None,
         None,
@@ -1320,6 +1341,19 @@ pub fn run_for_fenced(
 
 /// [`run_for`], fenced on `fence` when one is given ([`run_for_fenced`]).
 fn run_for_with(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    fence: Option<&dyn Fn() -> bool>,
+) -> (Value, bool) {
+    let told = run_face(socket, call, switches, person, line, fence);
+    record_told(socket, call, told, switches, person, line)
+}
+
+/// [`run_for_with`] before a refusal is told the record ([`record_told`]).
+fn run_face(
     socket: &Path,
     call: &ToolCall,
     switches: FaceSwitches,
@@ -1384,6 +1418,20 @@ pub fn run_scoped(
     if call.name != REMEMBER || !switches.remember_speaker {
         return run_for(socket, call, switches, person, line);
     }
+    let told = run_speaker(socket, call, switches, line, request, lease);
+    record_told(socket, call, told, switches, person, line)
+}
+
+/// [`run_scoped`]'s own enrollment, before a refusal is told the record
+/// ([`record_told`]).
+fn run_speaker(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> (Value, bool) {
     let proof = line
         .filter(|line| line.request == request)
         .and_then(|line| line.enrollment.as_ref());
@@ -1459,6 +1507,116 @@ pub const AUTHORITY_GONE: &str =
 /// ([`forget_name`]): nothing is sent.
 pub const NOT_THEIRS: &str = "I can only forget the face of the person asking, while I can see them at the lamp. They should look at me and ask again.";
 
+/// What a refused face request is told when no face kept is the asker's
+/// ([`record_now`]).
+pub const RECORD_UNKNOWN: &str =
+    "Nothing was changed, and no face I keep is the one asking right now.";
+
+/// With [`FaceSwitches::record`] (`LAMP_NAMES_RECORD_TOLD`, #5141 rows 9
+/// and 10): a refused `remember_my_face` or `forget_my_face` is told the
+/// face record as it stands ([`record_now`], as `kept`), and the journal
+/// says its reason's name ([`refusal_reason`]), never the person's words,
+/// their name or an id. On lamp-0c4e on 3 Nov a face saved under a
+/// misheard name could not be forgotten (`NOT_THEIRS`, asked under the
+/// name they said) and nothing said what the lamp kept. Anything else, or
+/// off, is as it was.
+fn record_told(
+    socket: &Path,
+    call: &ToolCall,
+    told: (Value, bool),
+    switches: FaceSwitches,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+) -> (Value, bool) {
+    if !switches.record || !matches!(call.name.as_str(), REMEMBER | FORGET) {
+        return told;
+    }
+    let (mut value, answered) = told;
+    let Some(error) = value.get("error").and_then(Value::as_str) else {
+        return (value, answered);
+    };
+    eprintln!("{}", refusal_line(&call.name, refusal_reason(error)));
+    value["kept"] = json!(record_now(socket, person, line));
+    (value, answered)
+}
+
+/// The face record as it stands, for the one asking: the name their face is
+/// kept under, when it is theirs, else [`RECORD_UNKNOWN`]. Theirs is the
+/// known face at the lamp when the line is that person's
+/// (`person`, the admitted scope); on a room's line, the known face the
+/// eyes saw saying it, and no other ([`forget_name`]'s rule). So it never
+/// names someone else, who may only be in view.
+pub fn record_now(
+    socket: &Path,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+) -> String {
+    let theirs = match person {
+        Some(person) => FaceObservation::read(&known_file_of(socket))
+            .filter(|known| known.person() == person)
+            .map(|known| known.name().to_owned()),
+        None => line.and_then(|line| {
+            let (name, _) = line.known.as_ref()?;
+            crate::speaking_faces::seen_saying(
+                &line.speakers,
+                &memory_person(name),
+                line.known.clone(),
+            )
+            .then(|| name.clone())
+        }),
+    };
+    match theirs {
+        Some(name) => format!(
+            "Nothing was changed: the face of the one asking is kept as {name}. Use that name to forget or rename it."
+        ),
+        None => RECORD_UNKNOWN.to_owned(),
+    }
+}
+
+/// The name of a face refusal's reason, for the journal: each refusal's
+/// words to the model have one, the eyes' by their own code. Never words.
+pub fn refusal_reason(error: &str) -> &'static str {
+    const REASONS: &[(&str, &str)] = &[
+        (NOT_HEARD, "not_heard"),
+        (ONLY_THE_CALL, "only_the_call"),
+        (NOT_OWN_NAME, "not_own_name"),
+        (NAME_UNCHANGED, "name_unchanged"),
+        (NOT_AGREED, "not_agreed"),
+        (NEAR_TO, "near_to"),
+        (NOT_LIKE_THEM, "not_like_them"),
+        (NOT_THEIRS, "not_theirs"),
+        (AUTHORITY_GONE, "authority_gone"),
+        (NO_NAME, "no_name"),
+        (NOT_KNOWN, "not_known"),
+        (NOT_KNOWN_SOME_KEPT_APART, "not_known_some_kept_apart"),
+        (EYES_NOT_ANSWERING, "eyes_not_answering"),
+        (NOT_CONFIRMED, "not_confirmed"),
+        (EYES_COULD_NOT, "eyes_could_not"),
+        (crate::remember_speaker::NOT_SEEN, "speaker_not_seen"),
+    ];
+    if error.starts_with(KNOWN_AS) {
+        return "known_as";
+    }
+    REASONS
+        .iter()
+        .chain(EYES_REFUSALS)
+        .find(|(words, _)| *words == error)
+        .map_or("other", |(_, reason)| *reason)
+}
+
+/// The journal's line for a refused face request: the function and the
+/// reason's name ([`refusal_reason`]), nothing of the person.
+pub fn refusal_line(function: &str, reason: &str) -> String {
+    let function = if matches!(function, REMEMBER | FORGET) {
+        function
+    } else {
+        "other"
+    };
+    format!(
+        "lamp-voice: {function} refused: {reason}; the model is told the face record as it stands (LAMP_NAMES_RECORD_TOLD)"
+    )
+}
+
 /// The name "forget my face" asks the eyes to forget, on a line whose
 /// admitted scope is the known person `person`'s (#2850). The model's
 /// `asked` name is a guess: on the second route it is told the person's
@@ -1518,6 +1676,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             visits,
             remember_speaker: false,
             at_setup: false,
+            record: false,
         },
         said,
         None,
@@ -1826,6 +1985,57 @@ fn told_asking(answer: &Value, visits: bool) -> Value {
     };
     json!({"error": words})
 }
+
+/// The eyes' refusals by their own code, as `told_asking` words them: each
+/// one's words, then its code, which is also its reason's name in the
+/// journal ([`refusal_reason`]). Beside `told_asking`'s own words, not in
+/// place of them, so that code is left as it was; a test pins that they
+/// agree. The other refusal words below are the same: each is the text of a
+/// refusal written where it is made.
+const EYES_REFUSALS: &[(&str, &str)] = &[
+    (
+        "I could not see a face. They should look at me and ask again.",
+        "no_face",
+    ),
+    (
+        "Their face was too far away. They should come closer and ask again.",
+        "too_far",
+    ),
+    (
+        "There was more than one face in front of me. Only they should be in front of me when they ask again.",
+        "two_faces",
+    ),
+    (
+        "My eye is shut just now, so I could not see them.",
+        "eyes_shut",
+    ),
+    (
+        "That request ended before I could confirm a face was saved.",
+        "peer_closed",
+    ),
+    (
+        "I was already remembering someone. They should ask again in a moment.",
+        "busy",
+    ),
+    (
+        "I already know as many faces as I can keep. Someone has to be forgotten first.",
+        "full",
+    ),
+    ("That is not a name I can keep.", "not_a_name"),
+];
+/// The eyes' refusal with a code not in [`EYES_REFUSALS`], or none.
+const EYES_COULD_NOT: &str = "My eye could not do that just now.";
+/// A face request with no name.
+const NO_NAME: &str = "There was no name in that for me to keep.";
+/// A forget of a name the eyes keep no face under.
+const NOT_KNOWN: &str = "I did not know a face by that name.";
+/// The eyes did not answer in time.
+const EYES_NOT_ANSWERING: &str = "My eye is not answering right now, so I could not do that.";
+/// A scoped enrollment the eyes never confirmed.
+const NOT_CONFIRMED: &str =
+    "I could not finish remembering that face. I have not confirmed that it was saved.";
+/// How the eyes' `known_as` refusal begins, the known name after it.
+const KNOWN_AS: &str = "You already know this face as ";
 
 /// A fresh source-file observation, with expiry anchored to the source age.
 /// This identifies a visible face, not the speaker, and never extends session
@@ -2902,6 +3112,7 @@ mod tests {
                 visits,
                 remember_speaker: false,
                 at_setup: false,
+                record: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -4783,5 +4994,189 @@ mod tests {
         );
         assert_eq!(told, (json!({"error": NOT_THEIRS}), true));
         std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// #5141 rows 7, 9 and 10 (lamp-0c4e, 3 Nov): with the record switch a
+    /// refused face request is told the face record as it stands, so a face
+    /// saved under a misheard name can be forgotten under the name it is
+    /// kept by; never someone else's, who is only in view. Off, the refusal
+    /// is byte for byte as before.
+    #[test]
+    fn with_the_record_switch_a_face_refusal_says_the_record_as_it_stands() {
+        use crate::speaking_faces::{LineSeen, known_face_of, known_with_face};
+        let directory =
+            std::env::temp_dir().join(format!("lamp-voice-record-told-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        // No eyes listen: none of these refusals asks them anything.
+        let socket = directory.join("who.sock");
+        let known = known_file_of(&socket);
+        let forget = |name: &str| ToolCall {
+            id: "1".into(),
+            name: FORGET.into(),
+            args: json!({ "name": name }),
+        };
+        let on = FaceSwitches {
+            record: true,
+            ..FaceSwitches::default()
+        };
+        // The face was saved as "Loren"; they ask under the name they say.
+        std::fs::write(&known, "Loren\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        let heard = |speakers: &[&str]| LineSeen {
+            request: 1,
+            speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
+            known: known_with_face(&known),
+            enrollment: None,
+        };
+        let theirs = heard(&["f1"]);
+        let kept = "Nothing was changed: the face of the one asking is kept as Loren. Use that name to forget or rename it.";
+        assert_eq!(
+            run_for(&socket, &forget("Lauren"), on, None, Some(&theirs)),
+            (json!({"error": NOT_THEIRS, "kept": kept}), true)
+        );
+        // Loren in view while another face says it: theirs is not told.
+        let visitor = heard(&["f2"]);
+        assert_eq!(
+            run_for(&socket, &forget("Lauren"), on, None, Some(&visitor)),
+            (json!({"error": NOT_THEIRS, "kept": RECORD_UNKNOWN}), true)
+        );
+        // The line is Loren's own: a face request refused before the eyes
+        // are asked says so too; someone else's line hears nothing of it.
+        let loren = crate::remember::person_id("Loren");
+        let speaker = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": "Lauren" }),
+        };
+        let speaker_on = FaceSwitches {
+            remember_speaker: true,
+            ..on
+        };
+        assert_eq!(
+            run_for(&socket, &speaker, speaker_on, Some(&loren), None),
+            (
+                json!({"error": crate::remember_speaker::NOT_SEEN, "kept": kept}),
+                true
+            )
+        );
+        let bo = crate::remember::person_id("Bo");
+        assert_eq!(
+            run_for(&socket, &speaker, speaker_on, Some(&bo), None),
+            (
+                json!({"error": crate::remember_speaker::NOT_SEEN, "kept": RECORD_UNKNOWN}),
+                true
+            )
+        );
+        // Off: as before.
+        let off = FaceSwitches::default();
+        assert_eq!(
+            run_for(&socket, &forget("Lauren"), off, None, Some(&theirs)),
+            (json!({"error": NOT_THEIRS}), true)
+        );
+        assert_eq!(
+            run_for(
+                &socket,
+                &speaker,
+                FaceSwitches {
+                    remember_speaker: true,
+                    ..off
+                },
+                Some(&loren),
+                None
+            ),
+            (json!({"error": crate::remember_speaker::NOT_SEEN}), true)
+        );
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// #5141 row 10: each refusal's words have a reason name for the
+    /// journal, the eyes' by their own code, and the journal line says the
+    /// function and that name only: no words, no name, no id.
+    #[test]
+    fn each_face_refusal_has_a_reason_name_and_the_journal_says_only_it() {
+        for (error, reason) in [
+            (NOT_HEARD, "not_heard"),
+            (ONLY_THE_CALL, "only_the_call"),
+            (NOT_OWN_NAME, "not_own_name"),
+            (NAME_UNCHANGED, "name_unchanged"),
+            (NOT_AGREED, "not_agreed"),
+            (NEAR_TO, "near_to"),
+            (NOT_LIKE_THEM, "not_like_them"),
+            (NOT_THEIRS, "not_theirs"),
+            (AUTHORITY_GONE, "authority_gone"),
+            (NO_NAME, "no_name"),
+            (NOT_KNOWN, "not_known"),
+            (crate::remember_speaker::NOT_SEEN, "speaker_not_seen"),
+        ] {
+            assert_eq!(refusal_reason(error), reason, "{error}");
+        }
+        // The eyes' refusals, by the words the model is told of each code.
+        for code in [
+            "no_face",
+            "too_far",
+            "two_faces",
+            "eyes_shut",
+            "peer_closed",
+            "busy",
+            "full",
+            "not_a_name",
+        ] {
+            let told = told(&json!({ "error": code }));
+            assert_eq!(refusal_reason(told["error"].as_str().unwrap()), code);
+        }
+        let known_as = told(&json!({"error": "known_as", "known_as": "Loren"}));
+        assert_eq!(
+            refusal_reason(known_as["error"].as_str().unwrap()),
+            "known_as"
+        );
+        // The words where they are made, as the journal names them.
+        assert_eq!(
+            refusal_reason(told(&json!({}))["error"].as_str().unwrap()),
+            "eyes_could_not"
+        );
+        let not_known = told(&json!({"forgot": false}));
+        assert_eq!(
+            refusal_reason(not_known["error"].as_str().unwrap()),
+            "not_known"
+        );
+        let socket =
+            std::env::temp_dir().join(format!("lamp-voice-no-name-{}", std::process::id()));
+        let nameless = ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": " " }),
+        };
+        let (no_name, _) = run_with(&socket, &nameless, false, &Said::default());
+        assert_eq!(
+            refusal_reason(no_name["error"].as_str().unwrap()),
+            "no_name"
+        );
+        assert_eq!(refusal_reason("something new"), "other");
+        assert_eq!(
+            refusal_line(FORGET, "not_theirs"),
+            "lamp-voice: forget_my_face refused: not_theirs; the model is told the face record as it stands (LAMP_NAMES_RECORD_TOLD)"
+        );
+        assert!(refusal_line("Loren's own", "near_to").starts_with("lamp-voice: other refused"));
+    }
+
+    /// #5141 row 7: what keeps a held face forget through the lamp's
+    /// question asking them to spell their name.
+    #[test]
+    fn an_answer_asking_them_to_spell_their_name_is_told_apart() {
+        for answer in [
+            "Sorry. How do you spell your name?",
+            "Could you spell it for me, letter by letter?",
+            "Bạn đánh vần tên giúp mình nhé?",
+        ] {
+            assert!(asks_to_spell(answer), "{answer}");
+        }
+        for answer in [
+            "Shall I forget your face?",
+            "What's your name?",
+            "That was a spellbinding story.",
+        ] {
+            assert!(!asks_to_spell(answer), "{answer}");
+        }
     }
 }

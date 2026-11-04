@@ -1066,6 +1066,7 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
     crate::known_faces::FaceSwitches {
         checked: settings.names_checked,
         remember_speaker: settings.remember_speaker,
+        record: crate::known_faces::record_told_on(),
         visits: settings.who_visits && settings.memory.is_some(),
         at_setup: false,
     }
@@ -2605,6 +2606,7 @@ mod tests {
             visits: true,
             remember_speaker: false,
             at_setup: false,
+            record: false,
         };
         let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
