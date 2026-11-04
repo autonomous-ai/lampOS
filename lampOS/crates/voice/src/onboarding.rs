@@ -6989,7 +6989,7 @@ mod tests {
             report(&room.walk, "who_you_are", "done");
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard("Quiet from 10PM, please.", room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
             room.walk.heard("Yes, that's fine.", room.at);
             assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [done], "{switch}");
