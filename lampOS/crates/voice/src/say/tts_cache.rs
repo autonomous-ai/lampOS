@@ -561,7 +561,7 @@ mod tests {
         let (off, _) = counted(&dir, "Rachel");
         let off = off.speaking(Some(Language::Vietnamese));
         assert!(!off.warm_lines().contains(&"Dạ?"));
-        assert_eq!(off.warm_lines().len(), 21 + WARM.len());
+        assert_eq!(off.warm_lines().len(), 22 + WARM.len());
         let (vietnamese, calls) = counted(&dir, "Rachel");
         let vietnamese = vietnamese
             .speaking(Some(Language::Vietnamese))
