@@ -1141,7 +1141,12 @@ retirement is an abandoned one (`written_schema`), otherwise 1, which a build
 from before reads as it always did. The record goes when its entry is retired
 again on another basis or compacted once resolved, and the next save writes 1
 again. A build from before that meets a schema-2 ledger sets it aside, as
-below. A ledger marked 1 that holds an abandoned record is refused. The kept
+below. **The rollback window:** the ledger stays at 2 from a reminder's first
+abandon until that entry is resolved or retired on another basis, and a `HELD`
+item keeps its abandoned record all that time, so a put-back to a build from
+before #5258 in that window takes the newer-schema path: what is still due is
+offered fresh, and a held or said but unacknowledged one may ring once more
+(#5258's reads). A ledger marked 1 that holds an abandoned record is refused. The kept
 fixture `delivery-2026-11-04.json` is one at schema 2. Test:
 `an_abandoned_attempts_record_is_written_as_schema_2_only_while_kept`
 (`tests/it/delivery_ledger.rs`).
