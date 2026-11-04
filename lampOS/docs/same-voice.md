@@ -24,7 +24,16 @@ until its model is put there and the voice is told where.
   `357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b`, from
   the `speaker-recongition-models` release of k2-fsa/sherpa-onnx). It has
   7.2 M weights and reports 0.73% EER on VoxCeleb1-O. It is not in the
-  repository.
+  repository. Since 4 November `deploy/product/models.json` pins it, by
+  that size and SHA-256, from our own release `models-2026-11-04` (with
+  its licence, `3dspeaker_speech_campplus_sv_en_voxceleb_16k.LICENSE.txt`,
+  beside it), at
+  `/opt/lampOS/voice/current/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`,
+  beside the voice's binary, so `lamp-update install` places it where
+  missing ([install.md](install.md)). A round fetches models only with
+  `LAMP_UPDATE_MODELS=on`, which no product unit sets, and the voice reads
+  the model only when `LAMP_SAME_VOICE_MODEL` names it, which no product
+  unit sets either.
 - **The front end:** 80 Kaldi filter banks a frame, computed in Rust as
   `torchaudio.compliance.kaldi.fbank` computes them with no dither, with
   the utterance's mean taken off each band, as 3D-Speaker does.
