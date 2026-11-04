@@ -2536,6 +2536,14 @@ lamp-name heard as the name (1.00, begun 0.9 s in) was held, the other
 London?" and "Hey Lamp, are you there?" said to the lamp were answered. Off
 unless set.
 
+`LAMP_NAME_AS_A_SENTENCE` (#5277, off unless set, with `LAMP_NAME_NEAR`)
+takes a misheard first word said as a sentence of its own ("Lamp. I'm
+going out later. Do I need an umbrella?", its "Lamp." written as another
+word) as the lamp's name when lamp-name heard the name near at the line's
+start, and so loosens none of this: a word on the list is never taken, as
+a sentence of its own ("Ma'am. Could you …") or set off by a comma
+([second-voice.md](second-voice.md)).
+
 ## Switch
 
 `LAMP_ATTENTION=on` in the voice unit (the worker's `--attention`). Off by

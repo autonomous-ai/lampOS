@@ -1764,6 +1764,40 @@ order is kept. A written turn is the same from the chat on.
     `worker::tests::a_near_hearing_counts_only_around_the_lines_start`,
     and lamp-name's
     `a_near_bar_says_hearings_under_the_bar_and_changes_nothing_else`.
+- **With `LAMP_NAME_AS_A_SENTENCE=on` beside `LAMP_NAME_NEAR=on`, a first
+  word said as a sentence of its own, heard near, is the name** (off unless
+  set; #5277). On lamp-52e6 on 4 Nov (sw5008f, request 24, the product's
+  switches and no other) the owner's "Lamp. I'm going out later. Do I need
+  an umbrella?", the relay's speech to text writing the name a sentence of
+  its own 3 times of 3, went unanswered: lamp-name heard the name near at
+  0.67 by the line's start, but the lamp's own transcript wrote its first
+  word as one that doesn't sound like the name, so `named_near` left it,
+  `LAMP_NAME_SECOND_SIGN` dropped the room's hearing ("its words not
+  calling it"), and the model declined. Off, as before, byte for byte.
+  With it, `named_near` also takes a first word that doesn't sound like
+  the name (`LikeTheName::Not`) when it is said as a sentence of its own
+  (`a_sentence_of_its_own`): a full stop, a question mark or an
+  exclamation mark right after it, more words after that, letters only,
+  and lamp-name's near hearing at 0.5 or more by the line's start, with no
+  face asked. "Lamp" takes its place, as above, so the rule and the model
+  read the call. Never a word said to a person
+  (`attention::SAID_TO_A_PERSON`: "Ma'am. Could you …", "Sir. …", "Dad? …"
+  stay #3945's), a person's name of the name's shape
+  (`NAMES_OF_ITS_SHAPE`), a greeting, or a word a line opens with that is
+  said (`OPENS_SET_OFF`, `NOT_A_NAME`: "Thanks. …", "Tomorrow. …"). A word
+  set off by a comma only ("Daniel, …") is unchanged: a person is called
+  so as often as the lamp. A word of the name's shape still needs a face
+  ("Leon. Pass me that."). The journal names the switch with the near
+  score, never the word. Written "Lamp." the line already calls by its
+  text, switch or not.
+  - **What it costs:** a person called by another name as a sentence of
+    its own ("Anna. Can you …") with lamp-name's near hearing at 0.5 by the
+    line's start is taken as the lamp called. Not yet counted on a lamp.
+  - **Lamp check:** the owner set on lamp-52e6 (sw5008 lines) with the
+    switch on: the umbrella line answered, the desk lines held as before.
+  - **Tests:** `second_provider::tests::name_near::the_umbrella_line_with_the_name_said_as_a_sentence_is_asked_as_the_name`,
+    `with_the_name_as_a_sentence_a_line_said_to_a_person_is_still_held` and
+    `a_first_word_is_a_sentence_of_its_own_only_before_a_stop_and_more_words`.
 - **With `LAMP_SECOND_QUIET_HELD=on` the quiet after a pause isn't sent**
   (off unless set; needs `LAMP_SECOND_EARLY_FINALIZE=on`; the backend on
   #2135 and the first builder on #1722, 21 Oct 13:1x). Deepgram bills each

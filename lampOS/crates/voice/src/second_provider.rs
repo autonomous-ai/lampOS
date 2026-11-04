@@ -650,6 +650,15 @@ pub const WINDOW_FROM_START_ENVIRONMENT: &str = "LAMP_WINDOW_FROM_START";
 /// #4226).
 pub const NAME_START_USUAL_ENVIRONMENT: &str = "LAMP_NAME_START_USUAL";
 
+/// Where the worker reads whether, with `LAMP_NAME_NEAR=on`, a line's first
+/// word said as a sentence of its own ("Lamp. I'm going out later. Do I
+/// need an umbrella?") is the lamp's name when lamp-name heard it near at
+/// the line's start, whatever the word was written as (`on`, and nothing
+/// else; [`a_sentence_of_its_own`], #5277). On lamp-52e6 on 4 Nov the
+/// owner's "Lamp. …", heard near at 0.67, had its first word written as
+/// one that doesn't sound like the name, and went unanswered.
+pub const NAME_AS_A_SENTENCE_ENVIRONMENT: &str = "LAMP_NAME_AS_A_SENTENCE";
+
 /// Where the worker reads whether a line that begins with the lamp's name,
 /// said to a face turned to the lamp, is always answered (#2191): `on`, and
 /// nothing else. In a busy room the rule does not hold it, and the model's
@@ -1572,6 +1581,9 @@ struct Shared {
     /// lamp-name's near hearings, for a line's first word
     /// ([`Engine::hearing_the_name_near`]).
     name_near: Option<NameNear>,
+    /// With `name_near`, a first word said as a sentence of its own is the
+    /// name by its near hearing alone ([`Engine::taking_the_name_as_a_sentence`]).
+    name_as_a_sentence: bool,
     /// A line of nothing but the lamp's own words heard back is held, and
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
@@ -2035,7 +2047,18 @@ pub(crate) fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
 /// put in the word's place, so the rule and the model read the call. Any
 /// sign missing changes nothing, and the journal says which held, counts
 /// only.
-fn named_near(request: u64, text: String, window: (u64, u64), near: &NameNear) -> String {
+///
+/// With `as_a_sentence` (`LAMP_NAME_AS_A_SENTENCE=on`, #5277), a first word
+/// that doesn't sound like the name is the name too when it is said as a
+/// sentence of its own, with more said after it ([`a_sentence_of_its_own`]),
+/// and lamp-name heard it near by the line's start.
+fn named_near(
+    request: u64,
+    text: String,
+    window: (u64, u64),
+    near: &NameNear,
+    as_a_sentence: bool,
+) -> String {
     let Some((start, end)) = first_word_set_off(&text) else {
         return text;
     };
@@ -2068,6 +2091,13 @@ fn named_near(request: u64, text: String, window: (u64, u64), near: &NameNear) -
             );
             None
         }
+        (LikeTheName::Not, Some(score))
+            if as_a_sentence && a_sentence_of_its_own(&text, start, end) =>
+        {
+            Some(format!(
+                "its first word is a sentence of its own, more is said after it, and lamp-name heard it near, at {score:.2}, by the line's start (LAMP_NAME_AS_A_SENTENCE)"
+            ))
+        }
         (LikeTheName::Not, Some(score)) => {
             eprintln!(
                 "lamp-voice second: request {request}: lamp-name heard the name near, at {score:.2}, by the line's start, but its first word, set off, doesn't sound like it: not the name (LAMP_NAME_NEAR)"
@@ -2085,6 +2115,43 @@ fn named_near(request: u64, text: String, window: (u64, u64), near: &NameNear) -
         }
         None => text,
     }
+}
+
+/// `LAMP_NAME_AS_A_SENTENCE` (#5277): whether `text`'s first word, at
+/// `start..end` ([`first_word_set_off`]), is said as a sentence of its own,
+/// as the lamp's name is called before what is asked of it ("Lamp. I'm
+/// going out later. Do I need an umbrella?", lamp-52e6, 4 Nov): a full
+/// stop, a question mark or an exclamation mark right after it, more words
+/// after that, and a word of letters only that is no word said to a person
+/// ([`crate::attention::SAID_TO_A_PERSON`]: "Ma'am. Could you …" stays
+/// #3945's), no person's name of the name's shape ([`NAMES_OF_ITS_SHAPE`]),
+/// no greeting, and none of the words a line opens with that are said
+/// ([`OPENS_SET_OFF`], [`NOT_A_NAME`]: "Thanks. …", "Tomorrow. …"). A word
+/// set off by a comma only ("Daniel, …") is not one: there a person is
+/// called as often as the lamp.
+fn a_sentence_of_its_own(text: &str, start: usize, end: usize) -> bool {
+    let word = &text[start..end];
+    if word.is_empty() || !word.chars().all(char::is_alphabetic) {
+        return false;
+    }
+    let Some(rest) = text[end..].trim_start().strip_prefix(['.', '?', '!']) else {
+        return false;
+    };
+    if !rest.chars().any(char::is_alphanumeric) {
+        return false;
+    }
+    let lower = unicode_normalization::UnicodeNormalization::nfc(word)
+        .collect::<String>()
+        .to_lowercase();
+    let spoken = spoken_form(&lower);
+    !(crate::attention::SAID_TO_A_PERSON.contains(&lower.as_str())
+        || NAMES_OF_ITS_SHAPE
+            .iter()
+            .any(|name| spoken_form(name) == spoken)
+        || GREETINGS.contains(&lower.as_str())
+        || crate::attention::is_greeting(&lower)
+        || OPENS_SET_OFF.contains(&lower.as_str())
+        || NOT_A_NAME.contains(&lower.as_str()))
 }
 
 /// Words a line often opens with, set off, that are said, not a wake heard
@@ -3398,6 +3465,7 @@ impl Engine {
                 name_refused: Mutex::new(None),
                 one_speaker: None,
                 name_near: None,
+                name_as_a_sentence: false,
                 own_echo: false,
                 spare: Mutex::new(None),
                 spares: AtomicU64::new(0),
@@ -4087,6 +4155,18 @@ impl Engine {
     pub fn hearing_the_name_near(mut self, near: NameNear) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_near = Some(near);
+        }
+        self
+    }
+
+    /// `LAMP_NAME_AS_A_SENTENCE=on`, with [`Self::hearing_the_name_near`]:
+    /// a line's first word said as a sentence of its own, more said after
+    /// it, is the name when lamp-name heard it near at the line's start,
+    /// even when it doesn't sound like the name ([`a_sentence_of_its_own`],
+    /// #5277). Without it, as before. Before any turn only.
+    pub fn taking_the_name_as_a_sentence(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_as_a_sentence = on;
         }
         self
     }
@@ -7249,6 +7329,7 @@ async fn spoken(
             text,
             said.lock().map_or((0, 0), |said| *said),
             near,
+            shared.name_as_a_sentence,
         ),
         _ => text,
     };
