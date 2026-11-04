@@ -100,7 +100,7 @@ connected apps.
 | Switch | Read by | Off (the default) |
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
-| `LAMP_SERVICES_WRITE=on` | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
+| `LAMP_SERVICES_WRITE=on` (on in the product's `lamp-services.service`) | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
 | `LAMP_SKILL_READS=on` | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
@@ -119,12 +119,18 @@ does: systemd fails a unit whose `LoadCredential=` file is missing, and on
 lamp-75c9, a dev lamp never set up from the app, it failed in a loop on
 4 Nov. Without them it is skipped and stays inactive. The product's three
 units, `lamp-services.service`, `lamp-cloud.service` and
-`lamp-voice.service`, each set `LAMP_SERVICES=on`, for reads only: read on
-lamp-9adf on build 9928's own binaries on 4 Nov. A drop-in setting
-`LAMP_SERVICES=off` turns them off. `LAMP_SERVICES_WRITE` is set by no
-product unit: a "send" needs a voice print, and the product sets no
-`LAMP_SAME_VOICE_MODEL`, so on lamp-9adf every send was refused for its
-voice ([switches.md](switches.md)). A lamp updated by a `lamp-update` older than
+`lamp-voice.service`, each set `LAMP_SERVICES=on`: read on lamp-9adf on
+build 9928's own binaries on 4 Nov. A drop-in setting `LAMP_SERVICES=off`
+turns them off. Since 4 November `lamp-services.service` also sets
+`LAMP_SERVICES_WRITE=on`, and `lamp-voice.service` sets
+`LAMP_SAME_VOICE_MODEL` (CAM++, pinned in `deploy/product/models.json`) with
+`LAMP_SAME_VOICE_FOR=services`, so a "send" and a read in full have a voice
+print, made for the services alone; every conversation rule reads none.
+Before it, with no print, every send on lamp-9adf was refused for its voice
+([switches.md](switches.md)). Without the model or `lamp-same-voice` in the
+voice's folder the check is off after three starts (`MOST_UNREADY`), and
+every send is refused and every read brief, as before. A drop-in setting
+`LAMP_SERVICES_WRITE=off` leaves reads only. A lamp updated by a `lamp-update` older than
 the one that installs `lamp-services` has no tools folder until its next
 switch, and the voice then declares no services' functions.
 
@@ -974,13 +980,14 @@ and never taken from the executive's or a skill's folder.
 - **`service_read {service, what, …}`**: `what` and its arguments as in the
   table above; the answer quoted, cut to who and what about when the owner
   may not be alone. A read in full also needs the line in the
-  conversation's voice (`read_in_full`, a likeness of 0.55 or more), and
-  the product sets no `LAMP_SAME_VOICE_MODEL`, so on a product lamp every
-  read is cut (`BRIEF_NOTE`): how many, who from and what about, never what
-  a mail or an event says. Its description tells the model: 'Never say "let
-  me look" for it.', since the lamp's own "Let me look." opens its eyes
-  (`speak_up::asks_to_look`): on lamp-9adf on 4 Nov a calendar read after it
-  was followed by an unasked description of the room. Every time field
+  conversation's voice (`read_in_full`, a likeness of 0.55 or more), from
+  the prints the product makes for the services alone
+  (`LAMP_SAME_VOICE_MODEL` with `LAMP_SAME_VOICE_FOR=services`); with no
+  print the read is cut (`BRIEF_NOTE`): how many, who from and what about,
+  never what a mail or an event says. Its description tells the model: 'Never
+  say "let me look" for it.', since the lamp's own "Let me look." opens its
+  eyes (`speak_up::asks_to_look`): on lamp-9adf on 4 Nov a calendar read after
+  it was followed by an unasked description of the room. Every time field
   (`from`, `to`, `start`, `end`) says it is RFC 3339 with this lamp's own
   UTC offset, its example at the lamp's offset when lamp-services wrote
   `tools.json` (`tools::time_field`, from the system zone; "+HH:MM" with no
@@ -1125,5 +1132,6 @@ query, `get`, `call`, or their keys),
 the schema and the loader agreeing; a Drive read said by name; the gate waiting for 5 s steady, skipping
 after 60 minutes, stopping before a word, stopping with "I'll tell you the
 rest later." when someone comes, and the lines said. `-p lamp-update` (the unit installed with `LAMP_SERVICES=on` in it, as in
-`lamp-cloud.service` and `lamp-voice.service`, no `LAMP_SERVICES_WRITE` and
-no `--enable`, the reset plan's hash) and `-p lamp-setup` (`tests/it/reset.rs`).
+`lamp-cloud.service` and `lamp-voice.service`, `LAMP_SERVICES_WRITE=on` in
+`lamp-services.service` alone, `LAMP_SAME_VOICE_FOR=services` beside the
+pinned model in `lamp-voice.service`, no `--enable`, the reset plan's hash) and `-p lamp-setup` (`tests/it/reset.rs`).

@@ -1436,8 +1436,10 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
 /// What a caller said before their face was known becomes theirs once it is
 /// (`LAMP_MEMORY_FOLLOWS_FACE`, #2176): the memory owner's call on 4 Nov. It
 /// moves nothing without the Days memory, the second route and the eyes'
-/// speaking faces, so the unit sets all four; with no voice model in the
-/// product, only a line seen spoken by the caller's one known face moves.
+/// speaking faces, so the unit sets all four. The product's voice print is
+/// for the linked services only (`LAMP_SAME_VOICE_FOR=services`), so no
+/// print reaches this rule: only a line seen spoken by the caller's one
+/// known face moves.
 #[test]
 fn the_product_lets_what_a_caller_said_follow_their_face() {
     let voice = install::PRODUCT
@@ -1454,11 +1456,19 @@ fn the_product_lets_what_a_caller_said_follow_their_face() {
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
-    assert!(
-        !service
-            .iter()
-            .any(|line| line.starts_with("Environment=LAMP_SAME_VOICE_MODEL=")),
-        "the voice sets LAMP_SAME_VOICE_MODEL"
+    let model: Vec<_> = service
+        .iter()
+        .filter(|line| line.starts_with("Environment=LAMP_SAME_VOICE_MODEL="))
+        .collect();
+    assert_eq!(model.len(), 1, "the voice sets one LAMP_SAME_VOICE_MODEL");
+    let uses: Vec<_> = service
+        .iter()
+        .filter(|line| line.starts_with("Environment=LAMP_SAME_VOICE_FOR="))
+        .collect();
+    assert_eq!(
+        uses,
+        [&"Environment=LAMP_SAME_VOICE_FOR=services"],
+        "a print in the product is for the services alone"
     );
 }
 
@@ -1497,6 +1507,47 @@ fn the_product_corrects_forgets_about_and_recalls_by_span() {
         "Environment=LAMP_MEMORY_RECALL_V2=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// The linked services send in the product (Queue #4710), held to the
+/// owner's voice: `lamp-services` has `LAMP_SERVICES_WRITE=on`, and the
+/// voice makes its prints for the services alone, from the pinned CAM++
+/// model, so no conversation rule reads a print.
+#[test]
+fn the_product_sends_to_the_linked_services_held_to_the_owners_voice() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let services = section(unit("lamp-services.service"), "Service");
+    let writes: Vec<_> = services
+        .iter()
+        .filter(|line| line.starts_with("Environment=LAMP_SERVICES_WRITE="))
+        .collect();
+    assert_eq!(writes, [&"Environment=LAMP_SERVICES_WRITE=on"]);
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_SERVICES=on",
+        "Environment=LAMP_SAME_VOICE_MODEL=/opt/lampOS/voice/current/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+        "Environment=LAMP_SAME_VOICE_FOR=services",
+        "Environment=LAMP_VOICE_ROUTE=second",
+    ] {
+        assert_eq!(
+            voice.iter().filter(|set| **set == line).count(),
+            1,
+            "the voice lacks {line}"
+        );
+    }
+    for other in ["lamp-cloud.service", "lamp-update.service"] {
+        assert!(!unit(other).contains("LAMP_SAME_VOICE_"), "{other}");
+        assert!(
+            !unit(other).contains("Environment=LAMP_SERVICES_WRITE"),
+            "{other}"
+        );
     }
 }
 
@@ -3052,9 +3103,24 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
     );
     let voice_unit = include_str!("../../../deploy/product/lamp-voice.service");
     let update_unit = include_str!("../../../deploy/product/lamp-update.service");
-    for unit in [voice_unit, update_unit] {
-        assert!(!unit.contains("Environment=LAMP_SAME_VOICE_MODEL"));
-    }
+    // The voice names the pinned model, at the path install and a round
+    // place it; the updater's own unit never sets it.
+    assert_eq!(
+        voice_unit
+            .matches(&format!(
+                "\nEnvironment=LAMP_SAME_VOICE_MODEL={}\n",
+                same_voice.path
+            ))
+            .count(),
+        1
+    );
+    assert_eq!(
+        voice_unit
+            .matches("Environment=LAMP_SAME_VOICE_MODEL")
+            .count(),
+        1
+    );
+    assert!(!update_unit.contains("Environment=LAMP_SAME_VOICE_MODEL"));
     // Same-voice step 2: the product's updater fetches the pinned models,
     // CAM++ among them, so the switch is on in its own unit, once, and is
     // never carried in the voice's.

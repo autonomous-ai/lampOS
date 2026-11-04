@@ -94,7 +94,7 @@ differs. Folders are what the unit makes or names.
 | tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder (none at first: the product unit's `--set-up-later --targets-from-machines claude` writes it from the person's machines once Harness is signed in); the Harness program in the user's home | `request.sock`, `voice.sock` |
 | mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
 | addons | `lamp-addons serve` (off unless `LAMP_ADDONS=on`, `addons.md`) | lampos | none | none | the bus (`addon/proposal` and the lamp's state in, `light/request` out) |
-| services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on for reads in the product unit, `LAMP_SERVICES=on`; writes off unless `LAMP_SERVICES_WRITE=on`, `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
+| services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
@@ -416,7 +416,9 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   a step runs a tool that install does not put there. The voice's same-voice
   check `lamp-same-voice` ([same-voice.md](same-voice.md)) goes beside
   `lamp-voice` the same way, when the build carries it; it runs only when
-  `LAMP_SAME_VOICE_MODEL` is set, which no product unit sets. A round fills
+  `LAMP_SAME_VOICE_MODEL` is set, which the product's `lamp-voice.service`
+  sets since 4 November, for the linked services alone
+  (`LAMP_SAME_VOICE_FOR=services`). A round fills
   a part's new folder from what is beside its binary now plus the build's
   files (`round::wants_of`), so a lamp whose voice folder has no
   `lamp-same-voice` yet gets it only from its next `lamp-update install`,
@@ -1507,8 +1509,9 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   check's CAM++ (`3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`,
   `357a834f…`, 29,596,978 bytes, Apache-2.0) is in `models-2026-11-04`
   with its licence beside it, placed beside the voice through `current/`;
-  the voice reads it only where `LAMP_SAME_VOICE_MODEL` names it, which no
-  product unit sets ([same-voice.md](same-voice.md)). The voice's five
+  the voice reads it only where `LAMP_SAME_VOICE_MODEL` names it, as the
+  product's `lamp-voice.service` does at that path since 4 November, for
+  the linked services alone ([same-voice.md](same-voice.md)). The voice's five
   recorded lines and their manifest are in `notices-2026-11-03`, placed in
   `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). Those three
   releases are published (`models-2026-10-16` since 26 Oct). A model that cannot be

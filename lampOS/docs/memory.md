@@ -2827,8 +2827,9 @@ then use that person's scope:
 - **What the caller said before their face was known**
   (`LAMP_MEMORY_FOLLOWS_FACE=on`, with Days, the second route only; off
   unless set, on in the product by the memory owner's call on 4 Nov, where
-  with no `LAMP_SAME_VOICE_MODEL` only a line seen spoken by the caller's
-  one known face moves; #2176; `crates/voice/src/follows_face.rs`). "My name is
+  the voice prints are for the linked services alone
+  (`LAMP_SAME_VOICE_FOR=services`), so this rule reads none and only a line
+  seen spoken by the caller's one known face moves; #2176; `crates/voice/src/follows_face.rs`). "My name is
   Bramble" said before "remember my face" was the room's, so a new
   session's "what's my name?" found nothing. With the switch, when a face is
   saved (`remember_my_face` answered, in a line of the room's) or known in a
@@ -2849,8 +2850,8 @@ then use that person's scope:
     saved, never fills that face's memory. The line's print matching itself
     proves nothing.
   - **Only the caller's own lines.** Each line is kept at its verdict with
-    its voice print (`LAMP_SAME_VOICE_MODEL`) and the faces the eyes saw
-    speaking it (`LAMP_EYES_SPEAKING`). A line with a print moves only when
+    its voice print (`LAMP_SAME_VOICE_MODEL`, not for the services alone)
+    and the faces the eyes saw speaking it (`LAMP_EYES_SPEAKING`). A line with a print moves only when
     its voice is the caller's, a cosine at or over `same_voice::SAME_FROM`
     (0.70) against the saving line's, whatever face was seen: the caller's
     lips moving under a TV's voice (0.30 to 0.70) don't make it theirs. A
