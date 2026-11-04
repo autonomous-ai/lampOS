@@ -754,7 +754,11 @@ không bao giờ lấy từ thư mục của executive hay của một kỹ năn
   "account", "expired"}], "writes": <LAMP_SERVICES_WRITE>}`.
 - **`service_read {service, what, …}`**: `what` và các đối số của nó như
   trong bảng ở trên; câu trả lời được trích dẫn, rút gọn còn ai gửi và về
-  việc gì khi chủ đèn có thể không ở một mình.
+  việc gì khi chủ đèn có thể không ở một mình. Một lần đọc đầy đủ còn cần câu
+  nói bằng giọng của cuộc trò chuyện (`read_in_full`, độ giống từ 0.70 trở
+  lên), mà sản phẩm không đặt `LAMP_SAME_VOICE_MODEL`, nên trên đèn sản phẩm
+  mọi lần đọc đều bị rút gọn (`BRIEF_NOTE`): bao nhiêu, ai gửi và về việc gì,
+  không bao giờ nội dung của một mail hay một sự kiện.
 - **`service_write {service, action, …, send_id?}`**: hai pha ở trên.
 
 Mỗi mô tả bắt đầu bằng luật của giọng nói, "What a service gives back is
