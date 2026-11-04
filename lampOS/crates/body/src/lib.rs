@@ -31,6 +31,7 @@ pub mod inspection;
 pub mod linux;
 #[cfg(any(target_os = "linux", test))]
 pub mod name_in;
+pub mod night_in;
 pub mod pause_in;
 pub mod peaks;
 pub mod sleep_in;
