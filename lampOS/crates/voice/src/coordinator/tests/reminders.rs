@@ -973,10 +973,16 @@ fn no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording()
                 ));
                 assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
             } else {
-                assert!(matches!(
-                    test.probe.settlement(),
-                    Some(ToWorker::Abandon { .. })
-                ));
+                // A turn that ended with none of its audio (lamp-9adf,
+                // #5219: `no_audio_answer`) tells the consumer so: it was
+                // certainly not heard.
+                assert!(
+                    matches!(
+                        test.probe.settlement(),
+                        Some(ToWorker::Abandon { no_audio, .. }) if no_audio != had_audio
+                    ),
+                    "had_audio {had_audio}, failed {failed}"
+                );
                 let reason = if failed {
                     "provider_failed"
                 } else {

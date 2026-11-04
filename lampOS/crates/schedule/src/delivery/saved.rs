@@ -60,6 +60,7 @@ enum Basis {
         microphone_generation: u64,
     },
     PreviousProcessExited {},
+    Abandoned {},
 }
 
 #[derive(Deserialize)]

@@ -1334,13 +1334,65 @@ fn newer_schema_is_preserved_once_and_current_pending_reminders_can_complete() {
     assert_eq!(disk.0.lock().unwrap().kept.len(), 1);
 }
 
+/// An attempt the voice gave up with nothing proven is retired as abandoned
+/// (#5219). A build from before can't read that basis, so the ledger is
+/// written as schema 2 only while it keeps one; before and after, as 1,
+/// which every earlier build reads as it always did.
+#[test]
+fn an_abandoned_attempts_record_is_written_as_schema_2_only_while_kept() {
+    let (_, pending) = timer();
+    let disk = Disk::default();
+    let mut first = ledger(disk.clone());
+    let cut = first.prepare(&pending, correlation(1)).unwrap();
+    assert_eq!(disk.json()["schema"], 1);
+    let abandoned = QualifiedRetirement {
+        correlation: cut.correlation.clone(),
+        retired_by_session: "consumer-one".into(),
+        basis: RetirementBasis::Abandoned {},
+    };
+    let again = first
+        .retry_interrupted(&cut, &pending, &abandoned, correlation(2))
+        .unwrap();
+    assert!(again.attempt > cut.attempt);
+    let saved = disk.json();
+    assert_eq!(saved["schema"], 2);
+    assert_eq!(
+        saved["entries"][0]["previous"]["proof"]["basis"],
+        json!({"kind": "abandoned"})
+    );
+    // This build reads it back as it was, not rewritten.
+    let before = disk.bytes();
+    let mut reopened = ledger(disk.clone());
+    assert!(reopened.set_aside().is_none());
+    assert_eq!(disk.bytes(), before);
+    assert_eq!(
+        reopened.view(pending.key()).unwrap().unwrap().prepared,
+        again
+    );
+    // Retired again on another basis, it holds no abandoned record: 1.
+    reopened
+        .retry_interrupted(&again, &pending, &retirement(&again), correlation(3))
+        .unwrap();
+    assert_eq!(disk.json()["schema"], 1);
+    // A ledger marked 1 that holds one is not one any build wrote: refused,
+    // untouched.
+    let mut wrong = saved.clone();
+    wrong["schema"] = json!(1);
+    disk.replace(&wrong);
+    let before = disk.bytes();
+    let writes = disk.writes();
+    assert!(DeliveryLedger::open(disk.clone(), LEDGER).is_err());
+    assert_eq!(disk.bytes(), before);
+    assert_eq!(disk.writes(), writes);
+}
+
 #[test]
 fn failed_preservation_or_wrong_ledger_kind_never_overwrites_a_newer_snapshot() {
     for wrong_kind in [false, true] {
         let disk = Disk::default();
         let _ = ledger(disk.clone());
         let mut snapshot = disk.json();
-        snapshot["schema"] = json!(2);
+        snapshot["schema"] = json!(3);
         if wrong_kind {
             snapshot["kind"] = json!("other_store");
         } else {
@@ -1362,7 +1414,7 @@ fn failed_fresh_commit_keeps_the_newer_ledger_and_returns_no_usable_owner() {
         let disk = Disk::default();
         let _ = ledger(disk.clone());
         let mut snapshot = disk.json();
-        snapshot["schema"] = json!(2);
+        snapshot["schema"] = json!(3);
         disk.replace(&snapshot);
         let newer_bytes = disk.bytes();
         disk.fail(failure);
@@ -1387,7 +1439,7 @@ fn real_sqlite_preserves_newer_ledger_before_starting_a_reopenable_current_one()
     let root = tempfile::tempdir().unwrap();
     let directory = root.path().join("consumer-ledger");
     let bytes =
-        br#"{"kind":"lamp_schedule_delivery_ledger","schema":2,"later_metadata":{"keep":"whole"}}"#;
+        br#"{"kind":"lamp_schedule_delivery_ledger","schema":3,"later_metadata":{"keep":"whole"}}"#;
     let mut store = Store::open(&directory).unwrap();
     store.commit(bytes).unwrap();
     drop(store);
@@ -1422,10 +1474,16 @@ fn real_sqlite_preserves_newer_ledger_before_starting_a_reopenable_current_one()
 /// V5").
 #[test]
 fn each_kept_delivery_ledger_opens_with_every_delivery_where_it_was() {
-    let kept: [(&str, &str); 1] = [(
-        "2026-10-21",
-        include_str!("../fixtures/stores/delivery-2026-10-21.json"),
-    )];
+    let kept: [(&str, &str); 2] = [
+        (
+            "2026-10-21",
+            include_str!("../fixtures/stores/delivery-2026-10-21.json"),
+        ),
+        (
+            "2026-11-04",
+            include_str!("../fixtures/stores/delivery-2026-11-04.json"),
+        ),
+    ];
     for (day, text) in kept {
         let saved: Value = serde_json::from_str(text).unwrap();
         // The fixture holds each stage, the retried attempt's record too.
@@ -1513,9 +1571,10 @@ fn missing(kept: &serde_json::Value, read: &serde_json::Value, path: &str) -> Op
 
 /// Writes this build's delivery ledger to the path in
 /// `LAMP_SCHEDULE_DELIVERY_FIXTURE`: three timers at three stages, one said
-/// with its acknowledgement planned, one tried again after an interrupted
-/// attempt, and one only prepared. Run by hand when the ledger's shape
-/// changes, keeping the ones kept.
+/// with its acknowledgement planned, one tried again after an attempt given
+/// up with nothing proven (abandoned, schema 2, since 2026-11-04; retired as
+/// its voice's exit before), and one only prepared. Run by hand when the
+/// ledger's shape changes, keeping the ones kept.
 #[test]
 #[ignore = "writes a delivery ledger fixture: run by hand with LAMP_SCHEDULE_DELIVERY_FIXTURE set"]
 fn write_a_delivery_ledger_fixture() {
@@ -1535,10 +1594,14 @@ fn write_a_delivery_ledger_fixture() {
     let said = ledger.prepare(&due[0], correlation(1)).unwrap();
     let done = ledger.complete(&said, &proof(&said)).unwrap();
     ledger.plan_ack(&done, &due[0]).unwrap();
-    // An interrupted attempt, retired and tried again.
+    // An attempt given up with nothing proven, retired and tried again.
     let cut = ledger.prepare(&due[1], correlation(2)).unwrap();
+    let abandoned = QualifiedRetirement {
+        basis: RetirementBasis::Abandoned {},
+        ..retirement(&cut)
+    };
     ledger
-        .retry_interrupted(&cut, &due[1], &retirement(&cut), correlation(3))
+        .retry_interrupted(&cut, &due[1], &abandoned, correlation(3))
         .unwrap();
     // Only prepared.
     ledger.prepare(&due[2], correlation(4)).unwrap();

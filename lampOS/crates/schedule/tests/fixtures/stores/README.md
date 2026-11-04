@@ -8,8 +8,9 @@ timers behind.
 
 `delivery-<day>.json` is the voice's delivery ledger (`src/delivery.rs`), as
 the build of its day saved it in its own store: three timers, one said with
-its acknowledgement planned, one tried again after an interrupted attempt,
-and one only prepared. Every later build must open each where it was, as
+its acknowledgement planned, one tried again after an interrupted attempt
+(from 2026-11-04, an attempt given up with nothing proven, which a ledger
+keeps as schema 2), and one only prepared. Every later build must open each where it was, as
 `tests/it/delivery_ledger.rs`'s
 `each_kept_delivery_ledger_opens_with_every_delivery_where_it_was` checks, so
 an update never says a reminder twice or loses one that's due. It holds no
