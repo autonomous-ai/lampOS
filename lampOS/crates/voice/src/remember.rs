@@ -6686,26 +6686,71 @@ pub fn hits_note_counted(
     Some((note, count))
 }
 
+/// Which rule chose the scope a turn's hits were asked in (the memory
+/// owner's order of 4 Nov), for the journal's counts ([`hits_journal_line`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HitsPath {
+    /// The person whose own face was seen speaking the line: the request's
+    /// lease kept as theirs (`LAMP_PERSON_SCOPE_SEEN`).
+    Speaking,
+    /// No face seen speaking it, the known face the only face in view and the person the
+    /// turn is for agreeing: the fallback whose off-camera risk the owner
+    /// accepted (reviewer-two on #3371; `ScopeLease::hits_by_face`, or
+    /// without a lease [`hits_scope`]).
+    Face,
+    /// The room's: nobody named, or someone else seen speaking it.
+    Room,
+}
+
+impl HitsPath {
+    /// The journal's word for it.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Speaking => "speaking",
+            Self::Face => "face",
+            Self::Room => "room",
+        }
+    }
+}
+
+/// Turns whose hits told something, by [`HitsPath`], since the voice
+/// started: counts only, for the journal ([`hits_journal_line`]).
+static HITS_BY_PATH: [AtomicU64; 3] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
+
 /// A turn's hits journal line: whether memory told anything, how long it
-/// took, whose, and what it told as counts ([`HitsCount`], #2510 take 1 c),
-/// so a day's disclosure can be added up from the journal. No words.
+/// took, whose, by which rule ([`HitsPath`]), and what it told as counts
+/// ([`HitsCount`], #2510 take 1 c), so a day's disclosure can be added up
+/// from the journal, with the turns told so far by each rule. No names, ids
+/// or words.
 pub fn hits_journal_line(
     request: u64,
     told: Option<HitsCount>,
     millis: u128,
-    theirs: bool,
+    path: HitsPath,
 ) -> String {
     let count = told.unwrap_or_default();
+    if told.is_some() {
+        HITS_BY_PATH[path as usize].fetch_add(1, Ordering::Relaxed);
+    }
+    let so_far = |path: HitsPath| HITS_BY_PATH[path as usize].load(Ordering::Relaxed);
     format!(
-        "request {request}: memory {} in {millis} ms ({}) hits_told={} bytes_told={}",
+        "request {request}: memory {} in {millis} ms ({}) hits_told={} bytes_told={} hits_path={} hits_turns_speaking={} hits_turns_face={} hits_turns_room={}",
         if told.is_some() {
             "told"
         } else {
             "had nothing told"
         },
-        if theirs { "theirs" } else { "the room's" },
+        if path == HitsPath::Room {
+            "the room's"
+        } else {
+            "theirs"
+        },
         count.told,
-        count.bytes
+        count.bytes,
+        path.word(),
+        so_far(HitsPath::Speaking),
+        so_far(HitsPath::Face),
+        so_far(HitsPath::Room),
     )
 }
 
@@ -19562,6 +19607,51 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// The memory owner's order of 4 Nov: each hits line says which rule
+    /// chose its scope (speaking, the face in view, the room's) and counts
+    /// the turns told by each so far, as counts only: no name, id or word.
+    /// A turn told nothing is not counted.
+    #[test]
+    fn the_hits_line_says_its_path_and_counts_each_path() {
+        let count = |line: &str, path: &str| -> u64 {
+            let key = format!("hits_turns_{path}=");
+            line.split(' ')
+                .find_map(|part| part.strip_prefix(key.as_str()))
+                .unwrap()
+                .parse()
+                .unwrap()
+        };
+        let told = Some(HitsCount { told: 2, bytes: 40 });
+        let before = hits_journal_line(1, None, 1, HitsPath::Face);
+        assert!(before.contains("hits_path=face"), "{before}");
+        assert!(before.contains("(theirs)"), "{before}");
+        let face = hits_journal_line(2, told, 4, HitsPath::Face);
+        assert!(face.contains(" hits_path=face "), "{face}");
+        // Other tests may count too: never fewer, and this one at least.
+        assert!(count(&face, "face") > count(&before, "face"), "{face}");
+        let room = hits_journal_line(3, told, 4, HitsPath::Room);
+        assert!(room.contains("(the room's)") && room.contains(" hits_path=room "));
+        assert!(count(&room, "room") >= 1 && count(&room, "face") >= 1);
+        let speaking = hits_journal_line(4, told, 4, HitsPath::Speaking);
+        assert!(speaking.ends_with(&format!(
+            "hits_path=speaking hits_turns_speaking={} hits_turns_face={} hits_turns_room={}",
+            count(&speaking, "speaking"),
+            count(&speaking, "face"),
+            count(&speaking, "room")
+        )));
+        for line in [&before, &face, &room, &speaking] {
+            assert!(
+                line.split(' ').all(|part| !part.contains('=')
+                    || part
+                        .split('=')
+                        .nth(1)
+                        .is_some_and(|value| value.parse::<u64>().is_ok()
+                            || ["speaking", "face", "room"].contains(&value))),
+                "counts and paths only: {line}"
+            );
+        }
+    }
+
     /// #2510 take 1 (c): a turn's journal line counts what its hits told,
     /// how many and how many bytes of kept text, and never says the text.
     #[test]
@@ -19583,17 +19673,20 @@ mod tests {
                 bytes: "Màu yêu thích là xanh.".len()
             }
         );
-        let line = hits_journal_line(7, Some(count), 3, true);
-        assert_eq!(
-            line,
-            "request 7: memory told in 3 ms (theirs) hits_told=1 bytes_told=26"
+        let line = hits_journal_line(7, Some(count), 3, HitsPath::Speaking);
+        assert!(
+            line.starts_with(
+                "request 7: memory told in 3 ms (theirs) hits_told=1 bytes_told=26 hits_path=speaking hits_turns_speaking="
+            ),
+            "{line}"
         );
-        for word in ["xanh", "Màu", "mau", "Ossa"] {
+        for word in ["xanh", "Màu", "mau", "Ossa", "p-1"] {
             assert!(!line.contains(word), "{line}");
         }
-        assert_eq!(
-            hits_journal_line(8, None, 1, false),
-            "request 8: memory had nothing told in 1 ms (the room's) hits_told=0 bytes_told=0"
+        assert!(
+            hits_journal_line(8, None, 1, HitsPath::Room).starts_with(
+                "request 8: memory had nothing told in 1 ms (the room's) hits_told=0 bytes_told=0 hits_path=room "
+            )
         );
         assert_eq!(
             hits_note_counted(&socket, None, "what is the weather", NOW, None),

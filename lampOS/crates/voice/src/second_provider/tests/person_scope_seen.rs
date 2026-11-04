@@ -114,6 +114,8 @@ fn feed_faces(
 /// round was told.
 /// A memory note asked: whose and on which words.
 type Noted = (Option<String>, String);
+/// A memory hits ask: whose scope it read and by which rule; none, revoked.
+type HitsRead = Option<(Option<String>, crate::remember::HitsPath)>;
 
 struct Outcome {
     calls: Vec<Option<String>>,
@@ -130,6 +132,9 @@ struct Outcome {
     held: bool,
     /// Every chat round, as asked.
     rounds: Vec<Vec<Message>>,
+    /// Whose scope, and by which rule, each memory hits ask read
+    /// (`worker::hits_of_lease`, as the product's callback reads it).
+    hits: Vec<HitsRead>,
 }
 
 async fn one_line(
@@ -301,6 +306,8 @@ async fn lines_past_silent(
     let engine = engine.preparing(early.is_some());
     let noted: Arc<Mutex<Vec<Noted>>> = Arc::default();
     let seen_noted = noted.clone();
+    let hits: Arc<Mutex<Vec<HitsRead>>> = Arc::default();
+    let seen_hits = hits.clone();
     let cache = Arc::new(FaceCache::default());
     let calls: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
     let leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
@@ -387,6 +394,10 @@ async fn lines_past_silent(
                     words.to_owned(),
                 ));
                 seen_leases.lock().unwrap().extend(lease.cloned());
+                seen_hits
+                    .lock()
+                    .unwrap()
+                    .push(lease.and_then(super::super::worker::hits_of_lease));
                 None
             },
         ))
@@ -444,6 +455,7 @@ async fn lines_past_silent(
         labels,
         held,
         rounds,
+        hits: hits.lock().unwrap().clone(),
     }
 }
 
@@ -1943,4 +1955,206 @@ async fn a_line_seen_said_by_its_person_is_kept_for_a_services_write() {
         Some(crate::remember::person_id("A"))
     );
     assert!(services_sight(false, 5_126_302).await.is_none());
+}
+
+/// One line said with `in_view` in the eyes' looks, admitted as A's (the
+/// face cache names A, face `f1`), and the scope each of its memory hits
+/// asks read, with the rule that chose it (`LAMP_SECOND_MEMORY_HITS`, the
+/// memory owner's order of 4 Nov).
+async fn hits_for(what: &str, in_view: Vec<(&'static str, bool)>) -> Vec<HitsRead> {
+    let chats = vec![vec![text("Pretzels?"), Ok(ChatEvent::Done)]];
+    one_line_with(
+        what,
+        "Lamp, I'm hungry, any ideas?",
+        chats,
+        in_view,
+        BOOT,
+        true,
+        true,
+        None,
+        None,
+        true,
+    )
+    .await
+    .hits
+}
+
+/// (a) A's own face `f1` seen speaking the line while another face, `f2`
+/// (B, or anyone), sits silent in view: A's hits, read as seen speaking,
+/// never B's.
+#[tokio::test]
+async fn a_line_seen_spoken_by_a_gets_as_hits_with_b_silent_in_view() {
+    let a = crate::remember::person_id("A");
+    let hits = hits_for("hits-a-speaks", vec![("f1", true), ("f2", false)]).await;
+    assert_eq!(
+        hits,
+        [Some((Some(a), crate::remember::HitsPath::Speaking))],
+        "A's, by the face seen speaking"
+    );
+}
+
+/// (b) A's known face silent and alone in view, no face seen speaking the line at
+/// all: no speaking evidence, so the hits fall back to the known face's
+/// scope (the off-camera risk of #3371 the owner accepted on 4 Nov). Only
+/// the hits: the line's lease, its context and every call stay the room's.
+#[tokio::test]
+async fn a_line_with_one_silent_known_face_and_no_speaking_evidence_gets_the_faces_hits() {
+    let a = crate::remember::person_id("A");
+    for (what, in_view) in [("hits-silent", vec![("f1", false)])] {
+        let chats = vec![vec![text("Pretzels?"), Ok(ChatEvent::Done)]];
+        let got = one_line_with(
+            what,
+            "Lamp, I'm hungry, any ideas?",
+            chats,
+            in_view,
+            BOOT,
+            true,
+            true,
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert_eq!(
+            got.hits,
+            [Some((Some(a.clone()), crate::remember::HitsPath::Face))],
+            "{what}: the face's hits, by the fallback"
+        );
+        assert_eq!(got.lease, None, "{what}: all else the room's");
+        assert_eq!(got.told, Message::system("for None"), "{what}");
+    }
+}
+
+/// The first builder's call on #5272: the fallback needs A's face to be
+/// the only face in view. Two silent faces, A's among them, and no other
+/// voice heard (with or without the one-face rule): a guest sitting there
+/// would hear A's kept notes, so the hits are the room's. A alone, as the
+/// control: A's, by the face.
+#[tokio::test]
+async fn a_second_silent_face_in_view_keeps_the_hits_the_rooms() {
+    let hits = hits_for("hits-two-silent", vec![("f1", false), ("f2", false)]).await;
+    assert_eq!(
+        hits,
+        [Some((None, crate::remember::HitsPath::Room))],
+        "two silent faces: the room's, never A's"
+    );
+    let got = one_face_line(
+        "hits-two-silent-one-voice",
+        "Lamp, I'm hungry, any ideas?",
+        vec![vec![text("Pretzels?"), Ok(ChatEvent::Done)]],
+        vec![("f1", false), ("f2", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(
+        got.hits,
+        [Some((None, crate::remember::HitsPath::Room))],
+        "two silent faces, no other voice: the room's"
+    );
+    assert_eq!(got.lease, None);
+    let hits = hits_for("hits-alone-control", vec![("f1", false)]).await;
+    assert_eq!(
+        hits,
+        [Some((
+            Some(crate::remember::person_id("A")),
+            crate::remember::HitsPath::Face
+        ))],
+        "A alone: the face's hits"
+    );
+}
+
+/// (c) A's known face silent in view while another face, unknown (or
+/// another known person's), is seen speaking the line: the speaking
+/// evidence says someone else said it, so the silent face's scope is never
+/// read. The room's, as the line's lease and every other read of it are:
+/// the owner accepted the fallback only where nothing was seen speaking.
+#[tokio::test]
+async fn a_line_seen_spoken_by_another_face_never_gets_the_silent_known_faces_hits() {
+    let hits = hits_for("hits-other-speaks", vec![("f1", false), ("f2", true)]).await;
+    assert_eq!(
+        hits,
+        [Some((None, crate::remember::HitsPath::Room))],
+        "the room's, never A's"
+    );
+    // Two faces seen speaking it, A's among them: not A's alone, the room's.
+    let hits = hits_for("hits-both-speak", vec![("f1", true), ("f2", true)]).await;
+    assert_eq!(hits, [Some((None, crate::remember::HitsPath::Room))]);
+}
+
+/// No known face in view (an unknown face silent, or nobody): nobody to
+/// fall back to, the room's.
+#[tokio::test]
+async fn a_line_with_no_known_face_in_view_gets_the_rooms_hits() {
+    for (what, in_view) in [
+        ("hits-stranger", vec![("f2", false)]),
+        ("hits-empty", vec![]),
+    ] {
+        let hits = hits_for(what, in_view).await;
+        assert_eq!(
+            hits,
+            [Some((None, crate::remember::HitsPath::Room))],
+            "{what}"
+        );
+    }
+}
+
+/// Heron's P2 on #5272: another voice the one-face rule
+/// (`LAMP_PERSON_SCOPE_ONE_FACE`) heard in the conversation, earlier or as
+/// the line was judged, takes the face-in-view fallback back, with A's face
+/// alone in view or beside a second silent face: any sign of someone else
+/// wins. With no other voice heard, the fallback still holds.
+#[tokio::test]
+async fn another_voice_heard_takes_the_face_in_view_hits_back() {
+    for (what, in_view, voice) in [
+        (
+            "hits-voice-before",
+            vec![("f1", false)],
+            Voice::AnotherBefore,
+        ),
+        ("hits-voice-in-it", vec![("f1", false)], Voice::AnotherInIt),
+        (
+            "hits-two-voice-before",
+            vec![("f1", false), ("f2", false)],
+            Voice::AnotherBefore,
+        ),
+        (
+            "hits-two-voice-in-it",
+            vec![("f1", false), ("f2", false)],
+            Voice::AnotherInIt,
+        ),
+    ] {
+        let got = one_face_line(
+            what,
+            "Lamp, I'm hungry, any ideas?",
+            vec![vec![text("Pretzels?"), Ok(ChatEvent::Done)]],
+            in_view,
+            None,
+            voice,
+        )
+        .await;
+        assert_eq!(
+            got.hits,
+            [Some((None, crate::remember::HitsPath::Room))],
+            "{what}: the room's, never A's"
+        );
+        assert_eq!(got.lease, None, "{what}");
+    }
+    let got = one_face_line(
+        "hits-one-voice",
+        "Lamp, I'm hungry, any ideas?",
+        vec![vec![text("Pretzels?"), Ok(ChatEvent::Done)]],
+        vec![("f1", false)],
+        None,
+        Voice::One,
+    )
+    .await;
+    assert_eq!(
+        got.hits,
+        [Some((
+            Some(crate::remember::person_id("A")),
+            crate::remember::HitsPath::Face
+        ))],
+        "no other voice: the face's hits"
+    );
 }

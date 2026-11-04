@@ -2814,12 +2814,12 @@ pub fn serve(
         engine = engine.noting_the_place(place);
     }
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
-    // `LAMP_SECOND_MEMORY_HITS=on`, Days only): searched in the scope the
-    // turn's note is told for, the known face's or the room's, within
-    // `HITS_WITHIN`, and told as notes, never as sources. With
-    // `LAMP_SECOND_SCOPED_CONTEXT`, in the request's own admitted scope (its
-    // lease, narrowed to the room when another face spoke it), as its context
-    // is told: never the sticky session's person.
+    // `LAMP_SECOND_MEMORY_HITS=on`, Days only, on in the product since the
+    // memory owner's call of 4 Nov): searched within `HITS_WITHIN` and told
+    // as notes, never as sources. With `LAMP_SECOND_SCOPED_CONTEXT`, the
+    // face seen speaking it first, else the known face in view with no face
+    // seen speaking it, else the room's (`hits_whose_by`): never the sticky
+    // session's person.
     match (crate::remember::hits_on(), hits_socket) {
         (true, Some(socket)) if days => {
             eprintln!(
@@ -2829,7 +2829,8 @@ pub fn serve(
             let who = hits_who;
             engine = engine.remembering(Arc::new(move |request, heard, lease| {
                 let started = Instant::now();
-                let person = hits_whose(request, lease, &hits_sessions, who.as_deref(), started)?;
+                let (person, path) =
+                    hits_whose_by(request, lease, &hits_sessions, who.as_deref(), started)?;
                 let now_unix_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map_or(0, |since| since.as_millis() as u64);
@@ -2849,7 +2850,7 @@ pub fn serve(
                         request,
                         note.as_ref().map(|(_, count)| *count),
                         started.elapsed().as_millis(),
-                        person.is_some(),
+                        path,
                     )
                 );
                 note.map(|(note, _)| note)
@@ -10141,6 +10142,53 @@ fn hits_whose(
         );
     }
     person
+}
+
+/// Whose kept things a spoken turn's memory hits are asked in, and by which
+/// rule (the memory owner's order of 4 Nov, `LAMP_SECOND_MEMORY_HITS` on in
+/// the product): with a request's lease, (a) the person whose own face was
+/// seen speaking it (the lease kept as theirs, `LAMP_PERSON_SCOPE_SEEN`);
+/// else (b) the admitted person when no face at all was seen speaking it and
+/// their known face was in view, the face and the person the turn was
+/// admitted for agreeing (`ScopeLease::hits_by_face`, the off-camera risk of
+/// #3371 the owner accepted); else (c) the room's, a line someone else was
+/// seen speaking included, never the silent face's; nothing for a revoked
+/// lease. Without a lease, [`hits_whose`]'s face-and-session rule, its
+/// person's by the face.
+fn hits_whose_by(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    sessions: &Mutex<Sessions>,
+    who: Option<&Path>,
+    now: Instant,
+) -> Option<(Option<String>, crate::remember::HitsPath)> {
+    use crate::remember::HitsPath;
+    if let Some(lease) = lease {
+        return hits_of_lease(lease);
+    }
+    let person = hits_whose(request, None, sessions, who, now)?;
+    let path = if person.is_some() {
+        HitsPath::Face
+    } else {
+        HitsPath::Room
+    };
+    Some((person, path))
+}
+
+/// [`hits_whose_by`] for a request's lease: (a), (b), (c) in that order, and
+/// nothing for a revoked one.
+pub(super) fn hits_of_lease(
+    lease: &crate::memory_scope::ScopeLease,
+) -> Option<(Option<String>, crate::remember::HitsPath)> {
+    use crate::remember::HitsPath;
+    let scope = lease.scope()?;
+    Some(if let Some(person) = scope.person() {
+        (Some(person.to_owned()), HitsPath::Speaking)
+    } else if let Some(person) = lease.hits_by_face() {
+        (Some(person.to_owned()), HitsPath::Face)
+    } else {
+        (None, HitsPath::Room)
+    })
 }
 
 /// Whether a line was judged where talk not for the lamp may be
@@ -21480,6 +21528,64 @@ mod tests {
             Some(Some(crate::remember::person_id("Kesh"))),
             "without a lease, the session's person"
         );
+    }
+
+    /// The memory owner's order of 4 Nov for a turn's hits: the face seen
+    /// speaking it (the lease kept as theirs), else the admitted known face
+    /// in view with no face seen speaking it (the fallback whose off-camera
+    /// risk, #3371, the owner accepted), else the room's; a later sign of
+    /// someone else (any later narrow) takes the fallback back, and a revoked
+    /// lease asks nothing.
+    #[test]
+    fn a_turns_hits_go_to_the_face_seen_speaking_then_the_face_in_view_then_the_room() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        use crate::remember::HitsPath;
+        let sessions = Mutex::new(Sessions::default());
+        let now = Instant::now();
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([8; 16]).unwrap(),
+            session: 1,
+            request: 4,
+        };
+        let a = crate::remember::person_id("A");
+        let whose = |lease: &crate::memory_scope::ScopeLease| {
+            hits_whose_by(4, Some(lease), &sessions, None, now)
+        };
+        // (a) Seen speaking: the lease stays theirs.
+        let speaking = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert_eq!(
+            whose(&speaking.lease()),
+            Some((Some(a.clone()), HitsPath::Speaking))
+        );
+        // (b) No face seen speaking it, their face in view: narrowed, the
+        // hits alone fall back to their scope.
+        let silent = RequestScope::new(key, ScopeSnapshot::of("A"));
+        let lease = silent.lease();
+        assert!(!lease.fall_back_to_face_for_hits(), "only once narrowed");
+        lease.narrow_to_room();
+        assert!(lease.fall_back_to_face_for_hits());
+        assert_eq!(whose(&lease), Some((Some(a.clone()), HitsPath::Face)));
+        assert_eq!(
+            lease.scope().and_then(|scope| scope.person()),
+            None,
+            "everything else stays the room's"
+        );
+        // A later sign of someone else (another voice, another person's
+        // words) takes it back: the room's.
+        lease.narrow_to_room();
+        assert_eq!(whose(&lease), Some((None, HitsPath::Room)));
+        // (c) Someone else seen speaking it: narrowed, no fallback taken.
+        let other = RequestScope::new(key, ScopeSnapshot::of("A"));
+        other.lease().narrow_to_room();
+        assert_eq!(whose(&other.lease()), Some((None, HitsPath::Room)));
+        // Admitted as the room's: no face to fall back to.
+        let room = RequestScope::new(key, ScopeSnapshot::room());
+        room.lease().narrow_to_room();
+        assert!(!room.lease().fall_back_to_face_for_hits());
+        assert_eq!(whose(&room.lease()), Some((None, HitsPath::Room)));
+        // Revoked: nothing.
+        silent.revoke();
+        assert_eq!(whose(&lease), None);
     }
 
     /// #1712: as the lamp's only voice, the rule judges in the room this

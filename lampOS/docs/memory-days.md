@@ -365,8 +365,11 @@ sources and stops journalling past it, a forget still stops journalling until
 a fresh worker, and the per-turn ids are never more than the union. Nothing
 is said or sent while the context is held (#2186): the words are worked out
 before, and the filter is in memory. The memory's per-turn notes
-(`LAMP_SECOND_MEMORY_HITS`) are told as notes, never as sources, so they are
-not linked either way; a kept thing that is also a note line is linked by the
+(`LAMP_SECOND_MEMORY_HITS`, on in the product since the memory owner's call
+on 4 Nov; their scope is the face seen speaking the line, else the known face
+alone in view when no face was seen speaking it, an accepted off-camera risk, #3371,
+else the room's: memory.md, "Told on each turn") are told as notes, never as
+sources, so they are not linked either way; a kept thing that is also a note line is linked by the
 words rule. A `remember`'s own `source_ids` (`LAMP_MEMORY_FORGET_ALL`, #1693:
 the conversation's exchanges so far) are unchanged. On lamp-06c1 (21 Oct,
 build 4510) the two exchanges after a kept colour (id 14) were journalled

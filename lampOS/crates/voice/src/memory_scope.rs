@@ -468,6 +468,12 @@ struct RequestContext {
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
+    /// Narrowed to the room for want of a face seen speaking it, no face
+    /// seen speaking it at all and the admitted person's own known face the
+    /// only face in view: memory's hits alone may still read their scope
+    /// (`LAMP_SECOND_MEMORY_HITS`, the memory owner's accepted risk of 4 Nov,
+    /// [`ScopeLease::hits_by_face`]). Set and cleared under `one_face`'s lock.
+    hits_face: AtomicBool,
     /// Carried as a person's conversation going on, no face seen speaking
     /// it (#4339, [`ScopeLease::carry_conversation`]): that person's scope
     /// held ([`ScopeSnapshot::held`]) from then on, unless narrowed.
@@ -578,6 +584,7 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
+                hits_face: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late: None,
@@ -625,6 +632,7 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 named: AtomicBool::new(false),
+                hits_face: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late,
@@ -683,9 +691,47 @@ impl ScopeLease {
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         self.context.narrowed.store(true, Ordering::Release);
+        self.context.hits_face.store(false, Ordering::Release);
         if one_face.take().is_some() {
             mark_one_face_line(self.context.key.request, None);
         }
+    }
+
+    /// A line narrowed to the room ([`Self::narrow_to_room`]) with no face
+    /// seen speaking it at all, the admitted person's own known face the only
+    /// face in view through it: memory's hits on it may read that person's scope, the
+    /// face in view and the person it was admitted for agreeing
+    /// (`LAMP_SECOND_MEMORY_HITS`'s fallback, the memory owner's call on 4
+    /// Nov, accepting reviewer-two's off-camera risk on #3371: a voice off
+    /// camera while they sit silent is told their hits). Nothing else reads
+    /// it: the line's scope, keeps, recall, notes, forgets and yes stay the
+    /// room's. Taken after the narrow, and undone by any later one (another
+    /// voice, another person's words): any sign of someone else wins.
+    /// `false`, and nothing changed, for a revoked line, one not narrowed,
+    /// or one admitted as nobody's.
+    pub fn fall_back_to_face_for_hits(&self) -> bool {
+        let _one_face = self
+            .context
+            .one_face
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if !self.is_current()
+            || !self.context.narrowed.load(Ordering::Acquire)
+            || self.context.scope.person().is_none()
+        {
+            return false;
+        }
+        self.context.hits_face.store(true, Ordering::Release);
+        true
+    }
+
+    /// The person whose scope memory's hits may read by the face in view
+    /// ([`Self::fall_back_to_face_for_hits`]), while the lease is current.
+    /// Never authority for anything but the hits.
+    pub fn hits_by_face(&self) -> Option<&str> {
+        (self.is_current() && self.context.hits_face.load(Ordering::Acquire))
+            .then(|| self.context.scope.person())
+            .flatten()
     }
 
     /// A line no face was seen speaking, with nothing to say it was anyone
