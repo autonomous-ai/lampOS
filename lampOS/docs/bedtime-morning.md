@@ -307,8 +307,12 @@ Bedtime's rest step says so:
   lamp-body (#5156; off by default and in the product until a lamp check),
   a folded lamp asleep for the night stays folded while the voice listens
   or thinks, though Expression has already ended its rest: the body
-  latched the sleep before the line. Its name, a tap, a face or the lamp
-  answering stand it as ever, and the latch lets go once Expression has
+  latched the sleep before the line. A tap, a face, the lamp answering, or
+  its name once Expression has taken it (Expression says `waking`, which
+  with `name_requires_speech` needs a person's speech beside the name)
+  stand it as ever. A bare name hit Expression refused does not: lamp-name
+  alone sat lamp-06c1 up about 7 times in 2 h of an empty room (#5158).
+  The latch lets go once Expression has
   not said asleep for 120 s with the voice at rest, so a long night talk
   doesn't end it ([body.md](body.md), "Asleep for the night").
   Without it, the body stands at the sound and stays up for its awake

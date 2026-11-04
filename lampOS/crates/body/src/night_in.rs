@@ -37,16 +37,24 @@ pub fn enabled_from_environment() -> bool {
 /// Whether `message` is Expression, enabled, saying at `now_us` (this
 /// boot's monotonic clock) that it is asleep or falling asleep.
 pub fn asleep_in(message: &Message, now_us: u64) -> bool {
+    said_in(message, now_us).is_some_and(|state| state.says_asleep())
+}
+
+/// Whether `message` is Expression, enabled, saying at `now_us` that it is
+/// waking: its name taken or a touch, never a line alone (#5158).
+pub fn waking_in(message: &Message, now_us: u64) -> bool {
+    said_in(message, now_us).is_some_and(|state| state.says_waking())
+}
+
+fn said_in(message: &Message, now_us: u64) -> Option<ExpressionState> {
     if message.expired
         || message.header.source != ExpressionState::SOURCE
         || message.header.at_us > now_us
         || now_us - message.header.at_us > ExpressionState::LASTS_US
     {
-        return false;
+        return None;
     }
-    message
-        .parse::<ExpressionState>()
-        .is_ok_and(|state| state.says_asleep())
+    message.parse::<ExpressionState>().ok()
 }
 
 /// The body's end of `expression/state`, for the night's sleep.
@@ -54,6 +62,7 @@ pub struct NightIn {
     bus: Bus,
     looked: Option<Instant>,
     asleep: bool,
+    waking: bool,
 }
 
 impl NightIn {
@@ -62,6 +71,7 @@ impl NightIn {
             bus,
             looked: None,
             asleep: false,
+            waking: false,
         }
     }
 
@@ -72,14 +82,21 @@ impl NightIn {
         if self.looked.is_none_or(|at| now - at >= LOOK_EVERY) {
             self.looked = Some(now);
             let now_us = lamp_ipc::monotonic_us();
-            self.asleep = self
-                .bus
-                .latest(ExpressionState::TOPIC)
-                .ok()
-                .flatten()
-                .is_some_and(|message| asleep_in(&message, now_us));
+            let latest = self.bus.latest(ExpressionState::TOPIC).ok().flatten();
+            self.asleep = latest
+                .as_ref()
+                .is_some_and(|message| asleep_in(message, now_us));
+            self.waking = latest
+                .as_ref()
+                .is_some_and(|message| waking_in(message, now_us));
         }
         self.asleep
+    }
+
+    /// Whether Expression said it was waking at the last
+    /// [`NightIn::asleep`]'s read.
+    pub fn waking(&self) -> bool {
+        self.waking
     }
 
     /// The next [`NightIn::asleep`] reads the topic again, whenever it last
@@ -191,6 +208,47 @@ mod tests {
             ),
         ] {
             assert!(!asleep_in(&message, now), "{label}");
+        }
+    }
+
+    /// Waking is Expression's own word for leaving sleep (a name it took, or
+    /// a touch), read with the same freshness and source as asleep; a rest
+    /// a line ended, or asleep itself, is not waking (#5158).
+    #[test]
+    fn only_a_fresh_enabled_expression_saying_waking_is_waking() {
+        let at = 10_000_000;
+        let with = |behaviours: &[&str], enabled: bool| ExpressionState {
+            behaviours: behaviours.iter().map(|b| (*b).into()).collect(),
+            ..state(Some(false), enabled)
+        };
+        assert!(waking_in(
+            &said("expression", at, &with(&["waking"], true)),
+            at + LASTS_US
+        ));
+        for (message, now, label) in [
+            (
+                said("expression", at, &state(Some(true), true)),
+                at,
+                "asleep",
+            ),
+            (said("expression", at, &with(&[], true)), at, "a rest ended"),
+            (
+                said("expression", at, &with(&["waking"], false)),
+                at,
+                "shadow",
+            ),
+            (
+                said("skills", at, &with(&["waking"], true)),
+                at,
+                "another source",
+            ),
+            (
+                said("expression", at, &with(&["waking"], true)),
+                at + LASTS_US + 1,
+                "old",
+            ),
+        ] {
+            assert!(!waking_in(&message, now), "{label}");
         }
     }
 

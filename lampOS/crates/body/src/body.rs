@@ -645,6 +645,12 @@ pub struct Asked {
     /// `LAMP_NIGHT_STAYS_FOLDED=on`; the body latches it while folded, so a
     /// line not meant for it leaves it folded (see [`NIGHT_LAPSE`]).
     pub night: bool,
+    /// Expression says now that it is waking (`expression/state`
+    /// `behaviours` has `waking`): from its name, taken only beside a
+    /// person's speech, or a touch, never a line alone. The night's latch
+    /// lets go on this, not on a bare name heard (#5158). Only with
+    /// `LAMP_NIGHT_STAYS_FOLDED=on`.
+    pub night_woke: bool,
 }
 
 impl Asked {
@@ -669,6 +675,7 @@ impl Asked {
         aim: None,
         unseat: false,
         night: false,
+        night_woke: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -693,6 +700,7 @@ impl Asked {
         aim: None,
         unseat: false,
         night: false,
+        night_woke: false,
     };
 }
 
@@ -3906,6 +3914,7 @@ pub(crate) fn run_looking(
         aim: None,
         unseat: false,
         night: false,
+        night_woke: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5393,8 +5402,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // leaves it folded, as a sleeping creature stays curled up at a
         // sound in the room (CLAUDE.md rule 8). Expression ends its rest the
         // moment the voice listens, so what it says now cannot be waited
-        // for: the latch was set before the line. Its name, a tap, a face
-        // or the lamp answering let go of it and stand it as ever, and so
+        // for: the latch was set before the line. A tap, a face, the lamp
+        // answering, or Expression waking (its name, taken only beside a
+        // person's speech, `name_requires_speech`) let go of it and stand
+        // it as ever. A bare name hit does not: lamp-name alone sat 06c1 up
+        // 7 times in 2 h of an empty room, each one Expression refused
+        // (#5158's night check). And so
         // does Expression not saying asleep for `NIGHT_LAPSE`, gone quiet
         // or awake for the morning. `Asked::night` is never true without
         // the switch, and then nothing here changes.
@@ -5410,8 +5423,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             Some("a face is in front of it")
         } else if asked_now.woken {
             Some("a tap woke it")
-        } else if asked_now.called {
+        } else if asked_now.called && !night_latched {
             Some("its name was heard")
+        } else if asked_now.night_woke {
+            Some("Expression woke it: its name, taken, or a touch")
         } else if matches!(mood, Mood::Speaking | Mood::Reading) {
             Some("it is answering")
         } else if night_said.is_none_or(|at| now.saturating_sub(at) >= NIGHT_LAPSE) {
@@ -5461,6 +5476,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // rising takes is added to the wait for it.
         if limits.look_at_name
             && asked_now.called
+            && !night_latched
             && leaving.is_none()
             && mood != Mood::Speaking
             && called_at.is_none_or(|at| now.saturating_sub(at) >= CALLED_EVERY)
