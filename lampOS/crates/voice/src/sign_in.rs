@@ -262,8 +262,9 @@ pub fn tools() -> Vec<Tool> {
         Tool {
             name: START.into(),
             description: "Sign this lamp in to the person's Harness, so it can hand work to \
-                          their own computer. Call it only when the person asks to sign the lamp \
-                          in, or to set up hand-overs to their computer. It gives a code to say \
+                          their own computer. Call it when the person asks to sign the lamp in, to \
+                          connect the lamp to their computer or to Harness, or to set up \
+                          hand-overs to their computer. It gives a code to say \
                           and where they type it. If they ask for the code again, call it again: \
                           while the sign-in is open it gives back the same code. Never say a \
                           sign-in code's digits from memory."
