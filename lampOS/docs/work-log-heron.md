@@ -362,3 +362,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   switches 2, notes 15; mutations on the once-more, the five-retry cap and
   `written_schema` each caught. READ-OK posted with a P3 on rollback.
   17:5x: #5097 restated on Friday's rebase `fe9808bb86` by range-diff.
+- 18:4x–19:2x: #5272 (Friday, `LAMP_SECOND_MEMORY_HITS` on in the
+  product) memory read taken. Gate: fmt, clippy clean; lamp-voice lib
+  4749 passed, 1 timing failure that passed 3 of 3 alone; install 133.
+  Mutations on the narrow clearing the fallback, the speakers check, the
+  face-in-view check and the narrowed check each caught. A scratch probe
+  showed another voice heard earlier, or a second silent face, leaves the
+  face-in-view hits fallback in place, though the doc comment, memory.md
+  and the privacy READ-OK say another voice takes it back. HOLD on a P2
+  posted, fix the code or the claim. #5271's second read went to
+  Thirteen. Hourly line to Faye posted.
