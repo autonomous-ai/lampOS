@@ -3447,6 +3447,16 @@ pub fn serve(
         );
     }
     engine = engine.answering_short(short_done);
+    // After an answer the lamp may open the talk a little further, as a
+    // companion does, outside commands, stops and busy rooms
+    // (`LAMP_OPENS_FURTHER=on`, #5194).
+    let opens_further = crate::opens_further::on();
+    if opens_further {
+        eprintln!(
+            "lamp-voice second: a spoken line outside a command, a stop, a busy room, a close or another person's conversation is told its answer may end with one short opening (LAMP_OPENS_FURTHER)"
+        );
+    }
+    engine = engine.opening_further(opens_further);
     // A search begun with nothing said is begun with the lamp's own "Let me
     // check." (`LAMP_SECOND_CHECKING_LINE=on`, #4684).
     let checking_line = std::env::var(crate::second_provider::CHECKING_LINE_ENVIRONMENT)

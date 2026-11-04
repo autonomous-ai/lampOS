@@ -5425,6 +5425,59 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   count (#2733). Nothing of the read is kept past the note: no person, no
   picture. The journal, at that first audio: `request N is told how the
   person seems`.
+- **An answer may leave a soft door** (`LAMP_OPENS_FURTHER=on`, #5194;
+  [`opens_further`](../crates/voice/src/opens_further.rs)). The lead's
+  testers, 4 Nov: "whatever you ask the lamp, it only answers that; it never
+  opens the conversation further." The character
+  ([`deploy/character/lamp.txt`](../deploy/character/lamp.txt)) tells it not
+  to end by offering more ("When you have said the thing, stop.") and to ask
+  back only when curious, as V1's Gemini realtime prompt forbade "extra
+  offers/follow-up questions". V1's own persona had the rule wanted here
+  (`robots/lamp/SOUL.md`, "Leave a soft door, not a questionnaire"; the PM
+  on #5194). With the switch, a spoken line the gates let through is told
+  `opens_further::NOTE` beside it: that rule, easing the character's "stop"
+  for that answer only. If a feeling, or something of the person's own day
+  or plans, sits under their words, the answer may end with one short line:
+  a small noticing, a quiet offer of something the lamp can do itself right
+  now, or a gentle thread back to what they said. Never an interview
+  question, never "want me to do that?" or "tell me more!" tacked onto a
+  complete answer, and none for a plain fact, after a request it carried
+  out, or when the answer already fills its two sentences. The character
+  file is unchanged. The gates are in code (`opens_further::note`): no note
+  for a command (a doing word first past a greeting, the name and "could
+  you", but not remember, play or light(s) followed by "when", "is",
+  "look" and the like: "Remember when…", "Lights look nice tonight" are
+  talk; or a short line naming a timer, alarm, reminder, the volume or the
+  light with on, off, up or down), a stop (`says_stop`, or the first line
+  after a hand's stop), a busy room (the rule's or the room's as it is now),
+  a person leaving, busy, on a call or only closing ("Okay, thanks.", also
+  past a greeting and the lamp's name: "Hey Lamp, okay, thanks."; busy, a
+  meeting, a call or leaving only of the speaker, "I'm busy", "I'm on a
+  call", or as the whole short line, "In a meeting.", so "I have a meeting
+  tomorrow and I'm nervous" still opens), a
+  conversation with two or more people in it (the known people with an
+  exchange in it, the person the line itself was admitted for, and anyone
+  known with a line admitted in the last 45 s; beside a known person, the
+  room's exchanges count as one more, since two known people taking turns
+  are answered in the room's scope), a line let out only
+  as the conversation going on (the ambient case), a line told something
+  else first (a cut-in, the name alone, a misheard line, a task waiting for
+  a yes, a search pushed), right after an answer that ended with a question
+  or an offer (at most one, then it waits), and after two in one
+  conversation (`Thread::conversation_so_far`: exchanges each within the
+  thread's 45 s of the next). A question back or an offer already made in
+  the conversation is told as made, so the next is of another kind. Written
+  turns (sensing, news, reminders) are never told it. The door is the
+  reply's own last sentence: no second request, and the first sentence
+  streams as before, so it adds 0 ms to the first sound (the note adds about
+  200 tokens to the request); a chat begun on the early words
+  (`LAMP_SECOND_PREPARED`) is begun with the same note, so it still fits the
+  final words. The journal says, for each spoken line, `may end with one
+  short opening` or `no opening further: <why>`. Without the switch nothing
+  is told. Tests (`opens_further.rs`, `second_provider/tests/opens_further.rs`);
+  off until the issue's played before/after on lamp-06c1: 20 everyday lines,
+  at least 8 with a fitting door, none on the command, stop and busy-room
+  lines.
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
   start. As a standby it stays Ready: an outage shows only as failed turns.
   As the only voice it goes down and back with the network (below, "The
