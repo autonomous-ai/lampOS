@@ -29,7 +29,7 @@ done and validated.
 
 ## Coverage map
 
-As of lamp-voice `68f78709e1` (4 Nov). `lamp` below is a connected client:
+As of lamp-voice `780b2000fb` (4 Nov). `lamp` below is a connected client:
 Python names first, JavaScript where it differs.
 
 ### Connection and state
@@ -76,7 +76,7 @@ Python names first, JavaScript where it differs.
 |---|---|---|---|---|---|---|
 | Speak a line exactly as sent, or in the lamp's own words | `say`, `rephrase` | `say(text, rephrase=…)` / `say(text, { rephrase })` | `lamp_say` | done (≤ 300 chars until PR #4579) | Eighth | 75c9, 2 Nov, by the local leader: exact, journal and done (finished in 6.1 s; 4 Nov, 5.1 s). Not confirmed by ear |
 | The lamp's hum, or a computer's own clips | `sound`, `sound.upload`, `sound.list`, `sound.remove` | `sound`, `upload_sound`, `sounds`, `remove_sound` / `uploadSound`, `removeSound` | `lamp_sound`, `lamp_sounds` | done | Eighth | not yet |
-| Speaker volume | `volume`, `get volume`, `volume.changed` | `volume` | — | PR #4599 | Eighth | not yet |
+| Speaker volume: a level, a step, mute | `volume`, `get volume`, `volume.changed` | `volume(to=…, step=…, mute=…)`, `get("volume")`, `on("volume.changed")` / `volume({ to, step, mute })` | `lamp_volume`, `lamp_state` | done | Eighth | not yet |
 | Stop what it does | `stop` | `stop` | `lamp_stop` | done | Nine | not yet |
 
 ### Ears and microphone
@@ -117,7 +117,7 @@ Python names first, JavaScript where it differs.
 
 | Capability | lamp-control | Python / JS | lamp-mcp | Status | Owner | Validated |
 |---|---|---|---|---|---|---|
-| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done | blue | not yet |
+| Put a skill on the lamp, list, remove | `skill.push`, `skill.list`, `skill.remove` | `push_skill`, `skills`, `remove_skill` / `pushSkill`, `skills`, `removeSkill`; `lamp skill push/list/remove` | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | done | blue | 75c9, 4 Nov, build 10114, by the local leader: check, push, list, remove. Needs lamp-control started with `--manage-socket` |
 | Check a skill folder before pushing | — | `lamp skill check` | — | done | blue | not yet |
 
 ## Never readable
