@@ -216,7 +216,9 @@ while true; do
   tp=$(gh pr create -R $REPO --base lamp-voice --head first/train-$n --title "lampOS: merge train $n: $refs" --body-file $SP/pr-train$n.md --label builder:first 2>&1 | grep -oE '[0-9]+$')
   say "train $n (#$tp): ${carried[*]} on $LV"
   # 3 Nov 15:4x: the PRs to recheck go as arguments; merge-when-green.sh runs still-eligible.sh on them (no eval).
-  $TOOLS_DIR/merge-when-green.sh $tp --precheck $carried >> $LOG 2>&1; rc=$?
+  # 4 Nov (#5212 part 2): --behind-unrelated, so a green train behind lamp-voice only by files it doesn't touch, and no
+  # build input (behind-unrelated.sh), merges as it is instead of being rebuilt.
+  $TOOLS_DIR/merge-when-green.sh $tp --behind-unrelated --precheck $carried >> $LOG 2>&1; rc=$?
   if [[ $rc == 6 ]]; then
     # A carried PR was held while the train ran: it sits out, the rest go again on the same head at once.
     gh pr close $tp -R $REPO -c "Train bot: closed before merging, a carried PR was held while it ran (see the log line); the rest go again." >/dev/null
