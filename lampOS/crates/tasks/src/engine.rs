@@ -1107,6 +1107,11 @@ pub struct Engine<P: Persistence> {
     /// The computers' own names, by alias (`targets.names.json`, #1676):
     /// a label told with the targets, never part of a task.
     names: BTreeMap<String, String>,
+    /// What is known of each target's computer, by alias
+    /// (`targets.engines.json`, `serve --engines-from-machines`, #5199):
+    /// a `prepare` it refuses is refused at once. Empty without the
+    /// switch, and then nothing is refused from it.
+    readiness: BTreeMap<String, crate::readiness::Computer>,
     state: State,
     last_clock: Clock,
     failed: bool,
@@ -1295,6 +1300,7 @@ impl<P: Persistence> Engine<P> {
             targets_newer: None,
             no_harness: false,
             names: BTreeMap::new(),
+            readiness: BTreeMap::new(),
         })
     }
 
@@ -1329,6 +1335,14 @@ impl<P: Persistence> Engine<P> {
     /// targets that have one (`serve --set-up-later`, #1676).
     pub fn set_names(&mut self, names: BTreeMap<String, String>) {
         self.names = names;
+    }
+
+    /// What is known of each target's computer, by alias, as last read
+    /// (`serve --engines-from-machines`, #5199): a `prepare` to a computer
+    /// known offline, or to an engine not found there or known not signed in, is
+    /// refused at once; anything unknown hands over as before.
+    pub fn set_readiness(&mut self, readiness: BTreeMap<String, crate::readiness::Computer>) {
+        self.readiness = readiness;
     }
 
     /// There is no Harness program to hand over with: every hand-over is
@@ -1473,10 +1487,19 @@ impl<P: Persistence> Engine<P> {
             ),
             // In alias order, as loaded. The machine and project stay here.
             // A name only where it has one (#1676).
+            // `installed: false` only where its engine wasn't found on that
+            // computer (#5199, `installed` null with `installable` true),
+            // so the voice names only agents some computer has.
             Request::Targets {} => Some(json!({"targets":self.targets.iter()
-                .map(|(alias, target)| match self.names.get(alias) {
-                    Some(name) => json!({"alias":alias,"engine":target.engine,"name":name}),
-                    None => json!({"alias":alias,"engine":target.engine}),
+                .map(|(alias, target)| {
+                    let mut told = match self.names.get(alias) {
+                        Some(name) => json!({"alias":alias,"engine":target.engine,"name":name}),
+                        None => json!({"alias":alias,"engine":target.engine}),
+                    };
+                    if self.readiness.get(alias).is_some_and(|known| known.missing(target.engine)) {
+                        told["installed"] = false.into();
+                    }
+                    told
                 })
                 .collect::<Vec<_>>()})),
             Request::List { after_id, limit } => {
@@ -1621,6 +1644,15 @@ impl<P: Persistence> Engine<P> {
                     .targets
                     .get(target)
                     .ok_or_else(|| err("target", "Choose a provisioned target alias."))?;
+                // Known to fail on that computer (#5199): refused now, with
+                // why, rather than after the person's yes.
+                if let Some((code, message)) = self
+                    .readiness
+                    .get(target)
+                    .and_then(|known| known.refusal(target_value.engine))
+                {
+                    return Err(err(code, message));
+                }
                 let id = take(&mut next.next_task_id)?;
                 let launch = Launch {
                     name: task_label(&next.store_id, id),

@@ -2,9 +2,10 @@
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
-    Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT,
-    SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent, WatchLine, iso_unix_ms,
-    parse_auth_status, parse_machines, parse_ps, parse_wait, parse_watch_line,
+    EngineRow, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
+    PS_STDOUT_LIMIT, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent, WatchLine,
+    iso_unix_ms, parse_auth_status, parse_engines, parse_machines, parse_ps, parse_wait,
+    parse_watch_line,
 };
 use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
 use serde_json::{Value, json};
@@ -1323,6 +1324,99 @@ fn a_known_no_from_the_computer_is_not_sent_and_anything_else_hands_over() {
             "machines", "engines", MACHINE, "--engine", "codex", "--json"
         ])
     );
+}
+
+/// #5199: `harness machines engines <id> --json` read whole, one call, as
+/// Harness gives it: each engine's `installed` and `signedIn` `true`,
+/// `false` or `null` (unknown, never missing), other machines' rows and
+/// other fields passed over. Exit 1 is `unreachable`, 2 `usage`; a reply
+/// that isn't one, or has no row of this computer, is no answer.
+#[test]
+fn a_computers_engines_are_one_call_read_as_harness_gives_them() {
+    let rows = [
+        json!({"machineId":MACHINE,"engine":"claude","installed":true,"signedIn":false,"installable":true,"firstPrompt":true}),
+        json!({"machineId":MACHINE,"engine":"hermes","installed":null,"signedIn":null,"installable":null,"firstPrompt":null}),
+        json!({"machineId":MACHINE.to_uppercase(),"engine":"opencode","installed":false}),
+        // A computer without Codex, as Harness prints it.
+        json!({"machineId":MACHINE,"engine":"codex","installed":null,"signedIn":null,"installable":true,"firstPrompt":null}),
+        json!({"machineId":"fedcba9876543210fedcba9876543210","engine":"cursor","installed":true}),
+    ];
+    let stdout: String = rows.iter().map(|row| format!("{row}\n")).collect();
+    let rig = Rig::new();
+    rig.plan(json!({"engines":{"stdout":stdout}}));
+    assert_eq!(
+        rig.cli().engines(MACHINE).unwrap(),
+        [
+            EngineRow {
+                engine: "claude".into(),
+                installed: Some(true),
+                installable: Some(true),
+                signed_in: Some(false),
+            },
+            EngineRow {
+                engine: "hermes".into(),
+                installed: None,
+                installable: None,
+                signed_in: None,
+            },
+            EngineRow {
+                engine: "opencode".into(),
+                installed: Some(false),
+                installable: None,
+                signed_in: None,
+            },
+            EngineRow {
+                engine: "codex".into(),
+                installed: None,
+                installable: Some(true),
+                signed_in: None,
+            },
+        ]
+    );
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(
+        calls[0]["args"],
+        json!(["machines", "engines", MACHINE, "--json"])
+    );
+    for (plan, code) in [
+        (
+            json!({"exit":1,"stderr":"machine unreachable\n"}),
+            "unreachable",
+        ),
+        (
+            json!({"exit":2,"stderr":"Usage: harness machines\n"}),
+            "usage",
+        ),
+        (json!({"exit":3}), "engines_failed"),
+        (json!({"stdout":"not json\n"}), "engines_invalid_reply"),
+        // An older Harness's machine list.
+        (
+            json!({"stdout":format!("{}\n", json!({"machineId":MACHINE,"current":false}))}),
+            "engines_invalid_reply",
+        ),
+        (json!({"stdout":""}), "engines_none"),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"engines":plan}));
+        assert_eq!(rig.cli().engines(MACHINE), Err(code.into()), "{plan}");
+    }
+    assert_eq!(
+        Rig::new().cli().engines("not a machine"),
+        Err("invalid_machine".into())
+    );
+    // Strict past those: an engine twice, or a name Harness doesn't give.
+    for bad in [
+        json!({"machineId":MACHINE,"engine":"claude","installed":"yes"}),
+        json!({"machineId":MACHINE,"engine":"Claude Code","installed":true}),
+    ] {
+        assert!(
+            parse_engines(format!("{bad}\n").as_bytes(), MACHINE).is_err(),
+            "{bad}"
+        );
+    }
+    let twice = format!("{}\n{}\n", rows[0], rows[0]);
+    assert!(parse_engines(twice.as_bytes(), MACHINE).is_err());
 }
 
 /// One computer's answer for one engine that refuses nothing is kept
@@ -2708,17 +2802,21 @@ fn the_machines_are_one_call_read_as_harness_lists_them() {
             AccountMachine {
                 machine_id: MACHINE.into(),
                 label: "Office iMac".into(),
-                current: false
+                current: false,
+                // A word Harness doesn't give (#5199): unknown.
+                status: None,
             },
             AccountMachine {
                 machine_id: other.into(),
                 label: "lamp".into(),
-                current: true
+                current: true,
+                status: None,
             },
             AccountMachine {
                 machine_id: "0123456789abcdef0123456789abcdee".into(),
                 label: "".into(),
-                current: false
+                current: false,
+                status: Some("offline".into()),
             },
         ]
     );
@@ -3186,6 +3284,7 @@ fn from_the_machines() -> Launch {
         machine_id: MACHINE.into(),
         label: "Office Mac".into(),
         current: false,
+        status: None,
     }];
     let targets = targets_from_machines(&machines, EngineKind::Claude);
     Launch {
