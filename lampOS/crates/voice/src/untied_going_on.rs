@@ -269,6 +269,12 @@ const ASK_LEADS: &[&str] = &[
 /// [`ASKS_OF_A_KNOWER`] in a question, or [`LAMP_ASKS`] after any of
 /// [`ASK_LEADS`]; and it shows no desk talk ([`desk_talk`]).
 pub fn asks_the_lamp(heard: &str) -> bool {
+    asks_the_lamp_read(heard, false)
+}
+
+/// [`asks_the_lamp`], with `no_name_set_off` as [`desk_talk_read`] reads
+/// it.
+pub fn asks_the_lamp_read(heard: &str, no_name_set_off: bool) -> bool {
     let question = heard.contains('?');
     let asks = |part: &str| {
         let words = plain_words(part);
@@ -283,7 +289,7 @@ pub fn asks_the_lamp(heard: &str) -> bool {
                 .iter()
                 .any(|phrase| rest.starts_with(&format!(" {phrase} ")))
     };
-    heard.split([',', '.', ';', '!', '?']).any(asks) && !desk_talk(heard)
+    heard.split([',', '.', ';', '!', '?']).any(asks) && !desk_talk_read(heard, no_name_set_off)
 }
 
 /// Words a line opens with that set off no name: "Okay, play some music.",
@@ -303,6 +309,31 @@ const TO_A_NAME: &[&str] = &["tell", "ask", "remind"];
 /// someone at its start, sets off a name before a comma at its start
 /// ("Sam, should I bring an umbrella?"), or tells or asks someone by name.
 pub fn desk_talk(heard: &str) -> bool {
+    desk_talk_read(heard, false)
+}
+
+/// Whether `heard` opens with a word set off before a comma that may be
+/// someone's name: one word, in capitals, not one of [`NOT_NAMES`] ("Sam,
+/// …", but not "Okay, …" or "Lamp, …").
+pub fn opens_with_a_set_off_name(heard: &str) -> bool {
+    heard.split_once(',').is_some_and(|(start, _)| {
+        let start = start.trim();
+        !start.contains(' ')
+            && start.chars().next().is_some_and(char::is_uppercase)
+            && !NOT_NAMES.contains(&start.to_lowercase().as_str())
+    })
+}
+
+/// [`desk_talk`], where with `no_name_set_off` a word set off at the
+/// line's start ([`opens_with_a_set_off_name`]) is no sign of it: the
+/// worker says so when the rule's own reading of names finds no one else
+/// called there ([`crate::attention::addresses_someone_else_on`]), so the
+/// word is the lamp's name written as another ("Ma'am, tell me a joke.",
+/// "Look, …"). #5110, lamp-52e6 on 5 Nov 00:07: owner_b-2 ("its first
+/// word, set off, doesn't sound like it: not the name") and owner_b-3 were
+/// let out as the conversation going on, and held as untied. Its other
+/// signs stand.
+pub fn desk_talk_read(heard: &str, no_name_set_off: bool) -> bool {
     let words = plain_words(heard);
     // "Anh Minh", "Chị Lan": a title, then a name; "Em muốn …" is the
     // speaker's own "I".
@@ -317,12 +348,7 @@ pub fn desk_talk(heard: &str) -> bool {
         .collect::<Vec<_>>()
         .windows(2)
         .any(|pair| pair[0] == "hey" && words_of(pair[1]).trim() != "lamp");
-    let set_off_name = heard.split_once(',').is_some_and(|(start, _)| {
-        let start = start.trim();
-        !start.contains(' ')
-            && start.chars().next().is_some_and(char::is_uppercase)
-            && !NOT_NAMES.contains(&start.to_lowercase().as_str())
-    });
+    let set_off_name = !no_name_set_off && opens_with_a_set_off_name(heard);
     let tells_a_name = heard
         .split_whitespace()
         .collect::<Vec<_>>()
@@ -505,8 +531,9 @@ const ASKS_FOR_ADVICE: &[&str] = &[
 /// ([`REPLIES`], after any of [`REPLY_LEADS`]), says no one's name right
 /// after ("Thanks Sam, …") and shows no desk talk ([`desk_talk`]). The
 /// worker asks it only of a line said right after the lamp's own answer:
-/// after a held desk line, a thanks may be a person's to another.
-pub fn replies_to_the_lamp(heard: &str) -> bool {
+/// after a held desk line, a thanks may be a person's to another. With
+/// `no_name_set_off`, desk talk as [`desk_talk_read`] reads it.
+pub fn replies_to_the_lamp(heard: &str, no_name_set_off: bool) -> bool {
     let words = words_of(heard);
     let mut rest = words.as_str();
     while let Some(lead) = REPLY_LEADS
@@ -541,14 +568,15 @@ pub fn replies_to_the_lamp(heard: &str) -> bool {
             && next.chars().next().is_some_and(char::is_uppercase)
             && !["i", "i'm", "i'll", "i've", "i'd", "lamp"].contains(&word.trim())
     });
-    !names_someone && !desk_talk(heard)
+    !names_someone && !desk_talk_read(heard, no_name_set_off)
 }
 
 /// Whether `heard` asks for advice ([`ASKS_FOR_ADVICE`] opening any part
 /// of a question, after any of [`ASK_LEADS`]) with no sign of desk talk
 /// ([`desk_talk`]). The worker asks it only of a line said right after
-/// the lamp's own answer.
-pub fn asks_for_advice(heard: &str) -> bool {
+/// the lamp's own answer. With `no_name_set_off`, desk talk as
+/// [`desk_talk_read`] reads it.
+pub fn asks_for_advice(heard: &str, no_name_set_off: bool) -> bool {
     let asks = |part: &str| {
         let words = words_of(part);
         let rest = ASK_LEADS
@@ -560,7 +588,9 @@ pub fn asks_for_advice(heard: &str) -> bool {
             .iter()
             .any(|phrase| rest.starts_with(&format!(" {phrase} ")))
     };
-    heard.contains('?') && heard.split([',', '.', ';', '!', '?']).any(asks) && !desk_talk(heard)
+    heard.contains('?')
+        && heard.split([',', '.', ';', '!', '?']).any(asks)
+        && !desk_talk_read(heard, no_name_set_off)
 }
 
 /// Whether a line let out only as the conversation going on is tied to the
@@ -570,7 +600,12 @@ pub fn asks_for_advice(heard: &str) -> bool {
 /// ([`asks_the_lamp`]). The worker adds the lamp's question and its own
 /// work.
 pub fn tied(heard: &str, said: &[&str]) -> bool {
-    refers_back(heard) || shares_a_word(heard, said) || asks_the_lamp(heard)
+    tied_read(heard, said, false)
+}
+
+/// [`tied`], with `no_name_set_off` as [`desk_talk_read`] reads it.
+pub fn tied_read(heard: &str, said: &[&str], no_name_set_off: bool) -> bool {
+    refers_back(heard) || shares_a_word(heard, said) || asks_the_lamp_read(heard, no_name_set_off)
 }
 
 #[cfg(test)]
@@ -813,7 +848,7 @@ mod tests {
             "Thanks Lamp.",
             "Cảm ơn nhé.",
         ] {
-            assert!(replies_to_the_lamp(line), "{line}");
+            assert!(replies_to_the_lamp(line, false), "{line}");
         }
         for line in [
             "Thanks Sam, I'll send it after lunch.",
@@ -825,7 +860,7 @@ mod tests {
             "Did you send the slides to Sam yet?",
             "Not yet, I'll do it after lunch.",
         ] {
-            assert!(!replies_to_the_lamp(line), "{line}");
+            assert!(!replies_to_the_lamp(line, false), "{line}");
         }
     }
 
@@ -840,7 +875,7 @@ mod tests {
             "So what should I eat before a run?",
             "What would you recommend?",
         ] {
-            assert!(asks_for_advice(line), "{line}");
+            assert!(asks_for_advice(line, false), "{line}");
         }
         for line in [
             "Any tips are welcome.",
@@ -849,7 +884,42 @@ mod tests {
             "Are you coming to the meeting at four?",
             "Can you pass me the charger? The white one.",
         ] {
-            assert!(!asks_for_advice(line), "{line}");
+            assert!(!asks_for_advice(line, false), "{line}");
+        }
+    }
+
+    /// #5110 (lamp-52e6, 5 Nov 00:07): a word set off at a line's start
+    /// that is no one's name, as the worker reads it, is no desk talk, and
+    /// the line's words tie it; its other signs of desk talk stand.
+    #[test]
+    fn a_set_off_word_that_is_no_name_ties_by_the_words() {
+        let said = [
+            "Lamp, what time is it in London?",
+            "Twenty-seven past ten at night in London, still Saturday.",
+        ];
+        for line in [
+            "Ma'am, tell me a joke.",
+            "Ma'am, I'm going out later. Do I need an umbrella?",
+            "Look, tell me a joke.",
+        ] {
+            assert!(opens_with_a_set_off_name(line), "{line}");
+            assert!(desk_talk(line) && !tied(line, &said), "{line}");
+            assert!(!desk_talk_read(line, true), "{line}");
+            assert!(tied_read(line, &said, true), "{line}");
+        }
+        for line in [
+            "Ma'am, did you send the slides to Sam yet?",
+            "Look, hey Sam, play some music.",
+            "Look, tell Sam the meeting moved to four.",
+        ] {
+            assert!(!tied_read(line, &said, true), "{line}");
+        }
+        for line in [
+            "Okay, tell me a joke.",
+            "Lamp, tell me a joke.",
+            "Tell me a joke.",
+        ] {
+            assert!(!opens_with_a_set_off_name(line), "{line}");
         }
     }
 }
