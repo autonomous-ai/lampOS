@@ -428,3 +428,11 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   the full run once. #5303's second read waits on Fourteen's fix of
   Thirteen's P2. For 5 Nov: #4526, #4579, #4568 second reads after the
   Reviewer-lead.
+- 23:0x — #5303 READ-OK at c8a300f144 (second read, beside Thirteen's
+  restate): one refusal check held by lamp-services, lamp-skills and the
+  voice; fmt, clippy, lamp-services 66, lamp-skills all targets,
+  lamp-voice made_skill 36; six of seven mutations caught, the door's
+  `spoken::items` wiring untested (P3, gone with #5308). #5308 (Notion via
+  MCP) had El's and Thirteen's reads, so not taken; merge order with
+  #5303 is Thirteen's note 2. Fourteen put #5293, #5303 and #5308's calls
+  to Faye.
