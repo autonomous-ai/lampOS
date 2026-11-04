@@ -392,3 +392,11 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   rows; the second-silent-face question left to the first builder.
   The lamp-voice flake `a_stop_said_over_the_lamps_answer_closes_the_conversation`
   failed in two full runs tonight and passes alone (shared `THREAD`).
+- 20:3x–20:4x: #5272: Friday's 20:36 line said two silent faces give no
+  fallback; the head's `hits-two-silent` row asserts A's hits by `Face`,
+  so heron posted the fact for the first builder's call. #5221 (Fourteen,
+  the publish carries the pinned models) second read: READ-OK. The
+  models.json history shows no pinned file changed its SHA-256 across a
+  published build, so a switch-off lamp is stuck only with a hand-placed
+  different CAM++ (P3, a recovery line). lamp-fc4b's own files are not
+  checked: it waits on the person's yes for a read-only ssh.
