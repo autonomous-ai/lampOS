@@ -244,3 +244,21 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   presence is Faye's to check. An earlier reply with the person's e-mail
   in it was refused by this session's permission check, rightly: no
   e-mail goes on the public Queue.
+- 12:0x: Faye matched the person (`mr.stone7890`, MacBook in the Swarm):
+  heron takes its work from Faye from 12:00 (the 12:0x roster). The
+  person asked for after2 "when the lamp is on 9788": the lamp is on 9928
+  (lamp-update "up to date" at 11:04) and `held` is off until #5110
+  (Seventh's, unclaimed at 12:09) lands and promotes; told them, after2
+  waits for that build and for their yes.
+- 12:1x: READ-OK `2f71cb653b` on #5052 (memory side; HOLD cleared):
+  range-diff same patch, gate lib 127 + `days_strength`/`newer_first` 9,
+  `it` 185/186 under load with the one (`health::sqlite_reports_…`)
+  passing alone; noted that #5043 landed since (`428767571`), so the head
+  conflicts again in `days_protocol.rs` and memory-days.md and owes a
+  same-patch rebase before the train; with Thirteen's that is two reads.
+- 12:3x: READ-OK `7dbbefcfe0` on #5090 (taste rules, Tests read): hook
+  only on an exchange of a `p-…` scope reading `heard`; `keep` under its
+  own savepoint; supersede by `replacements` edge; mutation `sensitive()`
+  → false fails one unit and one `it` test; gate on a clean rebase onto
+  `2e6f1a8f0`: lib 130, `main` 23, `it` 193/193, switches 2, notes 15.
+  P3: `taste_kind`'s doc names `allergy`/`diet` kinds that do not exist.
