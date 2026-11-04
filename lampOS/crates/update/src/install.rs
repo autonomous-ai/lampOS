@@ -298,9 +298,9 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twenty keep their folders'
-/// own default: nineteen enabled, Bedtime and Morning disabled by its own
-/// `enabled = false` until its lamp comparison (#1672), and Comfort break
+/// `tests/install.rs` holds the two lists equal). Twenty-one keep their
+/// folders' own default: twenty enabled, Bedtime and Morning disabled by its
+/// own `enabled = false` until its lamp comparison (#1672), and Comfort break
 /// by its own until `LAMP_NUDGES_PRESENT=on` (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
@@ -347,6 +347,10 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // `LAMP_NUDGES_PRESENT=on` (its `[present]`), until its played check.
     // Its function is the nudges' one `wellbeing_nudges`, no new one.
     "comfort-break",
+    // Sit back (#3694, #5208): V1's posture reminder brought back, a core
+    // skill since its played check with a person on lamp-9adf (4 Nov). It
+    // shares the wellbeing nudges' function and their hour.
+    "sit-back",
     // A pet on the head (#3997, Part of #4133): Head pat's line, now and
     // then, and its wiggle at every pet, on `controls/pet`, which the
     // product's lamp-controls says (`LAMP_HEAD_PET=on`); the design owner's
@@ -469,11 +473,6 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          owner chooses; a played check on a lamp comes first",
     ),
     (
-        "sit-back",
-        "an installable skill, not yet tried on a lamp (#3694): V1's posture reminder, which its \
-         owner chooses; a played check on a lamp with a person comes first",
-    ),
-    (
         "who-was-here",
         "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
          eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \
@@ -573,6 +572,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("wind-down", "SKILL.md"),
     skill_file!("comfort-break", "skill.toml"),
     skill_file!("comfort-break", "SKILL.md"),
+    skill_file!("sit-back", "skill.toml"),
+    skill_file!("sit-back", "SKILL.md"),
     skill_file!("head-pat", "skill.toml"),
     skill_file!("head-pat", "SKILL.md"),
     skill_file!("head-pat", "README.md"),
