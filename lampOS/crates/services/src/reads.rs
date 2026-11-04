@@ -90,20 +90,39 @@ fn count(args: &Value) -> usize {
         .map_or(COUNT_DEFAULT, |count| (count as usize).clamp(1, COUNT_MOST))
 }
 
-/// A time a calendar takes: RFC 3339's characters only.
+/// A time a calendar takes: RFC 3339's characters only, with its zone.
 fn time<'a>(args: &'a Value, key: &str) -> Result<Option<&'a str>, String> {
     match text(args, key) {
         None => Ok(None),
-        Some(time)
-            if time.len() <= 40
-                && time
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || "TZ:+-.".contains(c)) =>
-        {
-            Ok(Some(time))
-        }
+        Some(time) if calendar_time(time) => Ok(Some(time)),
         Some(_) => Err(format!("{key} is a time like 2026-11-03T09:00:00+07:00")),
     }
+}
+
+/// Whether `time` is one Google Calendar takes: RFC 3339's characters
+/// only, its clock ending in `Z` or an offset such as `+07:00`. Without
+/// one Calendar refuses the call (lamp-9adf, 4 Nov: an event at
+/// `2026-11-05T09:00:00` read back and confirmed, then refused), so it is
+/// refused before the read-back instead, where the model can ask again.
+pub fn calendar_time(time: &str) -> bool {
+    // RFC 3339's characters first: no other string is a time.
+    if time.len() > 40
+        || !time
+            .chars()
+            .all(|c| c.is_ascii_digit() || "TZ:+-.".contains(c))
+    {
+        return false;
+    }
+    time.split_once('T').is_some_and(|(_, clock)| {
+        clock.ends_with('Z')
+            || clock.len() > 6 && {
+                let zone = &clock.as_bytes()[clock.len() - 6..];
+                matches!(zone[0], b'+' | b'-')
+                    && zone[1..3].iter().all(u8::is_ascii_digit)
+                    && zone[3] == b':'
+                    && zone[4..].iter().all(u8::is_ascii_digit)
+            }
+    })
 }
 
 /// RFC 3339 for a Unix time, in UTC.
@@ -769,6 +788,34 @@ mod tests {
 
     fn entry() -> Entry {
         Entry::default()
+    }
+
+    /// lamp-9adf, 4 Nov: Calendar refused an event at
+    /// `2026-11-05T09:00:00`, confirmed by the owner; a time needs its zone.
+    #[test]
+    fn a_calendar_time_has_its_zone() {
+        for good in [
+            "2026-11-05T09:00:00+07:00",
+            "2026-11-05T09:00:00-05:30",
+            "2026-11-05T02:00:00Z",
+            "2026-11-05T09:00:00.5+07:00",
+        ] {
+            assert!(calendar_time(good), "{good}");
+        }
+        for bad in [
+            "2026-11-05T09:00:00",
+            "2026-11-05",
+            "2026-11-05T09:00",
+            "2026-11-05T09:00:00+0700",
+            "2026-11-05T09:00:00+07:0x",
+            "2026-11-05T09:00:00 +07:00",
+            "2026-11-05T09:00:00+07:00\u{e9}",
+            "T+07:00",
+        ] {
+            assert!(!calendar_time(bad), "{bad}");
+        }
+        let args = json!({"from": "2026-11-05T00:00:00"});
+        assert!(time(&args, "from").is_err());
     }
 
     #[test]

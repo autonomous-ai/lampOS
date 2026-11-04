@@ -432,7 +432,9 @@ are POSTs that read and are on its list; Ahrefs reads with `GET` only.
 
 Bounds: `count` 1 to 10 (5 when not given), search words one line of at most
 300 characters, a GraphQL query at most 4,000 bytes, an id one path segment
-of at most 256 bytes, a time RFC 3339's characters only. A request is HTTPS
+of at most 256 bytes, a time RFC 3339's characters only with its zone (`Z` or
+an offset such as `+07:00`: Calendar refuses one without, so it is refused
+before the read-back, `reads::calendar_time`). A request is HTTPS
 only, to the service's own hosts, no redirect followed, 5 s to connect, 15 s
 in all, and at most 1 MiB of the answer read. An error status is said
 plainly: 401 or 403 "<Service> refused the lamp's link: it may need linking
