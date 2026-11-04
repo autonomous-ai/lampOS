@@ -289,3 +289,18 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   one-source so the mutation could not see it. 13:3x: said so on the PR,
   withdrew that line, asked a two-source `private_kind` test on the FIXED
   head; my gate on `de822e4c0d` stopped. 13:4x: the hour posted to Faye.
+- 14:1x: Faye's 14:1x list: #5159 (Thirteen) owed heron's second read since
+  12:34, asked on the PR, which heron's watch (Queue only) missed; taken on
+  the PR, due 15:00. The person asked why after2 waits for a stable with
+  `held` rather than a local build: no build is needed, the switch's code
+  is in 9980 and only its unit line went; they said yes to one after2 run
+  with `held` set by a drop-in (`heron-held.conf`), put back after; the
+  heads-up went to Faye at 14:1x for a slot at about 15:05.
+- 14:2x: READ-OK `594db1fdc2` on #5159 (voice side): `at_setup` only for
+  a checked `remember_my_face` while "who you are" is open; said back
+  outside the face question and a plain yes; spelled only after the lamp
+  asked and as many runs as the name has words; mutation on `said_back`
+  caught by El's HOLD test; gate fmt/clippy clean, `known_faces` 37,
+  lib 4641/4645 with the 4 `ring_mark` fails Mac-only (long TMPDIR,
+  untouched file), switches 2, notes 15. P3: `SAID_EXCHANGES` is 2, the
+  usual walk fills it exactly, one exchange more costs a second read-back.
