@@ -349,6 +349,19 @@ phòng:
   Long today.») được xét như trước. Nhật ký chỉ đếm, không có lời nào. Test:
   `remember::named::tests`.
 
+## Ý tưởng của Tiers trong Days, bật trong bản sản phẩm
+
+`LAMP_MEMORY_NEWER_FIRST`, `LAMP_MEMORY_STRENGTH` và `LAMP_MEMORY_PROFILE`
+(kế hoạch ý tưởng Tiers của người phụ trách trí nhớ, 3/11; mỗi công tắc chỉ
+nhận `on`, chỉ với Days) bật trong unit voice của bản sản phẩm từ 5/11, theo
+quyết định của người phụ trách trí nhớ. Một lời sửa nói trong lúc trò chuyện
+("thật ra bây giờ là trà xanh") được trả về trước câu cũ mà nó sửa, và câu cũ
+mang `earlier`; một điều nói như "có lẽ" hay một dự định được đánh dấu
+`maybe` hay `plan`, nên đèn không nói như thể nó đã xong hay đã đặt; và ghi chú
+phiên dành 600 byte đầu cho sở thích và các điều đã giữ của người đó. Cần
+lamp-memory cùng bản build, điều mà bản cài sản phẩm luôn mang theo
+([memory-days.md](../memory-days.md)).
+
 ## Gọi `recall` trước khi nói không biết
 
 Mô tả `recall` của voice bảo mô hình gọi nó trước khi nói không nhớ một sở
