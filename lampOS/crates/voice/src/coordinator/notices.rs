@@ -276,6 +276,15 @@ pub(super) enum SpeechOrigin {
     WakeHum,
     /// A skill's own sound (`crate::say`, #938): local PCM, no answer.
     SkillSound,
+    /// A paired computer's exact line or clip (`crate::say`'s `exact` and
+    /// `clip`): local PCM, no answer. Unshown to the head, the room and the
+    /// voice's state, as a skill's sound is, so a computer's lease isn't
+    /// suspended by its own say; but shown on the ring ([`Self::ring_unshown`]),
+    /// its speaking face from the line's own level with the camera's mark on
+    /// it (the local leader's lamp-29e7 finding, 4 Nov: a line the ring
+    /// didn't show left it unwritten, the mark undrawn, and `camera.stream`
+    /// ended).
+    ExactLine,
     /// A person's bounded recording, after its spoken confirmation retired.
     RequestedAudio,
 }
@@ -289,8 +298,18 @@ impl SpeechOrigin {
     pub(super) fn unshown(self) -> bool {
         matches!(
             self,
-            Self::HeadCue | Self::UnclearHum | Self::SleepBreath | Self::WakeHum | Self::SkillSound
+            Self::HeadCue
+                | Self::UnclearHum
+                | Self::SleepBreath
+                | Self::WakeHum
+                | Self::SkillSound
+                | Self::ExactLine
         )
+    }
+    /// A turn the ring asks no frame for: an unshown one, but a computer's
+    /// exact line, which the ring shows speaking ([`Self::ExactLine`]).
+    pub(super) fn ring_unshown(self) -> bool {
+        self.unshown() && self != Self::ExactLine
     }
     /// The trace's name for what plays.
     pub(super) fn trace_name(self) -> &'static str {
@@ -302,6 +321,7 @@ impl SpeechOrigin {
             Self::SleepBreath => "head_sleep_breath",
             Self::WakeHum => "head_wake_cue",
             Self::SkillSound => "skill_sound",
+            Self::ExactLine => "exact_line",
             Self::RequestedAudio => "requested_audio",
         }
     }
@@ -316,7 +336,7 @@ pub(super) enum NoticeDelivery {
     Skipped(Missing),
     Selected {
         /// `FailureNotice`, `HeadCue`, `UnclearHum`, `SleepBreath`,
-        /// `WakeHum` or `SkillSound`.
+        /// `WakeHum`, `SkillSound` or `ExactLine`.
         origin: SpeechOrigin,
         recording: Arc<Recording>,
         cursor: usize,
