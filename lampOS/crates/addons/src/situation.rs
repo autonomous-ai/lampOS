@@ -417,6 +417,7 @@ mod tests {
             reason: None,
             muted_by: None,
             control: false,
+            hears_name: false,
         };
         watcher.mute(&mute(false), 1_000_000);
         assert!(!watcher.situation(1_000_000).asleep.unwrap().value);
@@ -457,6 +458,7 @@ mod tests {
                 reason: None,
                 muted_by: None,
                 control: false,
+                hears_name: false,
             },
             5_000_000,
         );
@@ -481,6 +483,7 @@ mod tests {
                 reason: None,
                 muted_by: None,
                 control: false,
+                hears_name: false,
             },
             1_000_000,
         );
@@ -517,6 +520,7 @@ mod tests {
                     reason: Some(lamp_msgs::MuteReason::Sleep),
                     muted_by: None,
                     control: false,
+                    hears_name: false,
                 },
                 2_000_000,
             );
@@ -562,6 +566,7 @@ mod tests {
                     reason: None,
                     muted_by: None,
                     control: false,
+                    hears_name: false,
                 },
                 1_000_000,
             );

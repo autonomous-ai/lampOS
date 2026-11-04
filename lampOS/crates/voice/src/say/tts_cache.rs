@@ -16,7 +16,7 @@
 //! cache makes room by its oldest files, never the owner's current lines
 //! (#4883, [`MOST_FILES`]).
 use super::SOUND_RATE;
-use crate::language::Language;
+use crate::language::{Language, WOKEN_BY_NAME_LINE};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -61,6 +61,10 @@ pub struct TtsCache {
     render: Render,
     /// The owner's language, when not English (#4473 (c)).
     owners: Option<Language>,
+    /// `LAMP_SLEEP_HEARS_NAME=on` (migrate-P2): the line a wake by name says
+    /// is warmed ([`Self::wake_line`]). Off, it is neither warmed nor kept
+    /// from going.
+    hears_name: bool,
     /// One render at a time, so a line asked while it warms is rendered once.
     /// Held while rendering, so a line asked while it warms is rendered
     /// once. It holds the lines that rendered empty or past [`MOST_FRAMES`]:
@@ -88,6 +92,7 @@ impl TtsCache {
             identity: format!("{voice}|{model}|{language}"),
             render,
             owners: None,
+            hears_name: false,
             rendering: Mutex::new(std::collections::HashSet::new()),
         }
     }
@@ -99,14 +104,37 @@ impl TtsCache {
         self
     }
 
+    /// The lamp hears its name while it sleeps (migrate-P2): the line that
+    /// wake says is warmed too.
+    pub fn hearing_its_name(mut self, on: bool) -> Self {
+        self.hears_name = on;
+        self
+    }
+
     /// The lines warmed at start: the owner's fixed lines first, when the
-    /// owner's language is not English, then [`WARM`], the English fallback.
+    /// owner's language is not English, then [`WARM`], the English fallback,
+    /// and with [`Self::hearing_its_name`] the wake's English on an English
+    /// lamp. Without it the wake's line is no line of this cache's.
     pub fn warm_lines(&self) -> Vec<&'static str> {
         self.owners
             .into_iter()
             .flat_map(Language::fixed_lines)
             .chain(WARM.iter().copied())
+            .chain(self.hears_name.then(|| self.wake_words()))
             .collect()
+    }
+
+    /// What a wake by name says, if it is kept (migrate-P2): one file read,
+    /// never rendered, so a wake never waits on the network. In the owner's
+    /// words only: a line not kept yet is the "hm?", not English to someone
+    /// who speaks another language.
+    pub fn wake_line(&self) -> Option<Vec<i16>> {
+        self.kept(self.wake_words())
+    }
+
+    fn wake_words(&self) -> &'static str {
+        self.owners
+            .map_or(WOKEN_BY_NAME_LINE, Language::woken_by_name)
     }
 
     /// The fixed line `english` in the owner's language, if it is kept:
@@ -246,7 +274,7 @@ impl TtsCache {
     /// lines this cache warms, and every other file may go. A switch of
     /// voice or language writes the new lines after the old ones, so oldest
     /// first drops the other voices' and languages' lines before a line
-    /// asked since. The owner's lines are at most 21, so room is always
+    /// asked since. The owner's lines are at most 22, so room is always
     /// found.
     fn make_room(&self) -> std::io::Result<()> {
         let owners: std::collections::HashSet<_> = self
@@ -355,7 +383,11 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
         })
     });
     let cache = Arc::new(
-        TtsCache::new(DIR, &voice, &model, &language, render).speaking(crate::language::at_start()),
+        TtsCache::new(DIR, &voice, &model, &language, render)
+            .speaking(crate::language::at_start())
+            .hearing_its_name(
+                crate::sleep_capture::Mode::from_environment() == crate::sleep_capture::Mode::On,
+            ),
     );
     let warming = Arc::clone(&cache);
     let _ = std::thread::Builder::new()
@@ -507,6 +539,45 @@ mod tests {
             );
             assert_eq!(cache.owners_kept("Hello."), None, "not a fixed line");
         }
+    }
+
+    /// migrate-P2: the wake's line is warmed only for a lamp that hears its
+    /// name, in the owner's words or the English on an English lamp. Off, the
+    /// lines warmed are as before. Never rendered to be said, and a line only
+    /// in English on another language's lamp is not said.
+    #[test]
+    fn the_wake_by_names_line_is_warmed_only_with_the_switch_and_read_not_rendered() {
+        let dir = scratch("wake-en");
+        let (english, calls) = counted(&dir, "Rachel");
+        assert_eq!(english.warm_lines(), WARM);
+        let english = english.hearing_its_name(true);
+        assert_eq!(english.wake_line(), None);
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "not kept: nothing asked");
+        assert_eq!(english.warm_lines()[..WARM.len()], *WARM);
+        assert_eq!(english.warm_lines()[WARM.len()], "Yes?");
+        english.warm(&["Yes?"]).unwrap();
+        assert_eq!(english.wake_line(), Some(vec![4; 2_400]));
+        let dir = scratch("wake-vi");
+        let (off, _) = counted(&dir, "Rachel");
+        let off = off.speaking(Some(Language::Vietnamese));
+        assert!(!off.warm_lines().contains(&"Dạ?"));
+        assert_eq!(off.warm_lines().len(), 21 + WARM.len());
+        let (vietnamese, calls) = counted(&dir, "Rachel");
+        let vietnamese = vietnamese
+            .speaking(Some(Language::Vietnamese))
+            .hearing_its_name(true);
+        assert_eq!(vietnamese.warm_lines().last(), Some(&"Dạ?"));
+        assert!(!vietnamese.warm_lines().contains(&"Yes?"));
+        vietnamese.warm(&["Yes?"]).unwrap();
+        assert_eq!(vietnamese.wake_line(), None, "the English isn't said");
+        calls.store(0, Ordering::SeqCst);
+        assert_eq!(vietnamese.wake_line(), None);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        vietnamese.warm(&["Dạ?"]).unwrap();
+        assert_eq!(
+            vietnamese.wake_line(),
+            Some(vec!["Dạ?".len() as i16; 2_400])
+        );
     }
 
     /// One line that cannot be kept never keeps the rest from being kept.

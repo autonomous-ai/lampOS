@@ -121,6 +121,7 @@ fn request_of(command: &ProviderInput) -> u64 {
         | ProviderInput::StepCall { request, .. }
         | ProviderInput::Onboarding { request, .. }
         | ProviderInput::TurnOpened { request, .. }
+        | ProviderInput::WokenByName { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }

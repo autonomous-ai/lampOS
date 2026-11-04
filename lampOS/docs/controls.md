@@ -1731,6 +1731,39 @@ closed, and an older reader would refuse the whole message. Tests:
 `a_computers_lift_never_opens_sleep_or_the_restart_guard`,
 `a_computers_mute_keeps_the_muted_wait_closed_until_it_is_lifted`.
 
+**A sleep that hears its name** (migrate-P2, `LAMP_SLEEP_HEARS_NAME`, off
+unless set; the Queue comment
+<https://github.com/autonomous-ai/lampOS/issues/3997#issuecomment-6526292114>).
+With it `on` or `shadow`, a sleep by choice (`HandControls::asleep_by_choice`:
+a hand's hold or a sleep asked aloud; never the guard's mute, an unreadable
+record, a person's own mute or the onboarding walk) keeps `muted: true`,
+`reason: sleep`, `muted_by: sleep` on `voice/mute`, and adds `hears_name:
+true` while the muted wait's sleep capture runs (`HandControls::set_hears_name`).
+The capture runs only while the wait reads the slide open and fresh, under a
+name-only grant of its own (`lamp_turn_owner::NameGrant`): the wait's
+controller keeps microphone and camera `Denied`, so `voice/privacy` still says
+not permitted and Ears stays closed. The wake (`HandControls::name_wake`) is
+a tap's: the receiver's `request_wake`, the clear saved before the latch
+opens, and at the wake's time, as the "hm?" would be, its fixed line from the
+speech cache (`TtsCache::wake_line`), or the "hm?" while the line isn't kept.
+Only a wake by name
+has a re-sleep guard: with no answer begun within `NAME_RESLEEP_AFTER_US` (15 s,
+to watch it stand and then speak), the next poll asks the same sleep a hold
+does, and the wait listens again. A line or reply open at that time holds it
+until its end (`set_line_open`), and only an answer's first sound ends the guard
+(`answer_began`): a line attention holds doesn't, and nor does a tap in those
+15 s. The first line let out in that time needs no
+name (`attention::NAME_WOKE_LISTENS_US`, its length; a tap's window stays 2 s).
+See [name.md](name.md#while-it-sleeps-migrate-p2).
+Tests: `a_sleep_by_a_hold_hears_its_name_and_a_wake_by_name_is_saved_as_a_taps`,
+`a_wake_by_name_that_no_line_follows_goes_back_to_sleep`,
+`a_line_keeps_a_wake_by_name_and_a_taps_wake_has_no_guard`,
+`a_line_in_the_wait_after_a_wake_by_name_is_said_to_the_lamp`,
+`a_line_marked_in_a_name_wakes_wait_is_answered_on_the_second_route`,
+`woken_by_its_name_the_lamp_says_its_line_in_the_owners_language`,
+`a_taps_wake_still_says_hm_with_the_line_kept`,
+`a_line_not_kept_yet_is_the_hm_and_asks_the_network_for_nothing`.
+
 **A power cut is not a fault of this run** (#4332). Pulling the plug is how
 most people turn a lamp off, and lamp-220c (29 Oct) came back from one muted
 by the guard, deaf until a head tap, with nothing telling the person to tap.

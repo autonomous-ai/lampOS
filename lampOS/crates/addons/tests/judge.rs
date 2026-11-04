@@ -179,6 +179,7 @@ fn calm(bus: &Bus, persons_light: bool, product: bool) -> Privacy {
                     reason: None,
                     muted_by: None,
                     control: false,
+                    hears_name: false,
                 },
             )
             .unwrap();

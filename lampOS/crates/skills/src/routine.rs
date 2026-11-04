@@ -3187,6 +3187,7 @@ mod tests {
                         reason: Some(lamp_msgs::MuteReason::Sleep),
                         muted_by: None,
                         control: false,
+                        hears_name: false,
                     },
                 ),
                 "muted" => mute.publish_json(
@@ -3196,6 +3197,7 @@ mod tests {
                         reason: None,
                         muted_by: None,
                         control: false,
+                        hears_name: false,
                     },
                 ),
                 _ => privacy.publish_json(f.now, &closed),
@@ -3219,6 +3221,7 @@ mod tests {
                         reason: None,
                         muted_by: None,
                         control: false,
+                        hears_name: false,
                     },
                 )
                 .unwrap();

@@ -89,11 +89,32 @@ pub fn pulse_enabled_from_environment() -> bool {
 
 /// What the muted wait tells the asleep face at each look (#1545): since
 /// when the reminder owed has been owed, while its pulse may show now, and
-/// nothing otherwise. The painter reads it each frame.
+/// nothing otherwise; and whether its sleep still hears its name
+/// (migrate-P2, [`Owed::hear_name`]). The painter reads it each frame.
 #[derive(Debug, Default)]
-pub struct Owed(Mutex<Option<Instant>>);
+pub struct Owed(Mutex<Option<Instant>>, AtomicBool);
+
+/// One breath of the ember a sleep that hears its name shows (migrate-P2):
+/// slower than nothing else on the ring, so it reads as resting.
+pub const EMBER_BREATH: Duration = Duration::from_secs(4);
+
+/// How far up its own breath (0 to 1) the ember is `since` the face began.
+pub fn ember_at(since: Duration) -> f32 {
+    let phase = since.as_secs_f32() / EMBER_BREATH.as_secs_f32();
+    0.5 - 0.5 * (std::f32::consts::TAU * phase).cos()
+}
 
 impl Owed {
+    /// Whether the sleep this face shows still hears its name: the face
+    /// then shows its ember ([`lamp_ring::asleep::hearing_name_pixels`]).
+    pub fn hear_name(&self, on: bool) {
+        self.1.store(on, Ordering::SeqCst);
+    }
+
+    pub fn hearing_name(&self) -> bool {
+        self.1.load(Ordering::SeqCst)
+    }
+
     pub fn tell(&self, showing_since: Option<Instant>) {
         if let Ok(mut owed) = self.0.lock() {
             *owed = showing_since;
@@ -256,8 +277,8 @@ impl Asleep {
     {
         let leave = Arc::new(AtomicBool::new(false));
         let leaving = leave.clone();
-        let mut asleep = Self::spawn(STOP_DEADLINE, move |stop, _| {
-            paint_light(open, ceiling, lit, stop, &leaving)
+        let mut asleep = Self::spawn(STOP_DEADLINE, move |stop, owed| {
+            paint_light(open, ceiling, lit, (stop, &leaving), owed)
         });
         asleep.leave = Some(leave);
         asleep
@@ -396,6 +417,8 @@ fn paint<S: FrameSink>(
             .and_then(|since| pulses.around(since, Instant::now()));
         let shown = match around {
             Some(around) => ring.show_owed(breath, around, under),
+            // A sleep that hears its name keeps an ember lit (migrate-P2).
+            None if owed.hearing_name() => ring.show_hearing_name(breath, ember_at(since), under),
             None => ring.show(breath, under),
         };
         if let Err(error) = shown {
@@ -501,21 +524,32 @@ fn paint_light<S: FrameSink>(
     open: impl FnOnce() -> io::Result<AsleepRing<S>>,
     ceiling: ChannelCeiling,
     lit: crate::ring_face::Lit,
-    stop: &AtomicBool,
-    leave: &AtomicBool,
+    (stop, leave): (&AtomicBool, &AtomicBool),
+    owed: &Owed,
 ) -> io::Result<()> {
     let mut ring = open()?;
     let mut face = crate::ring_face::Face::new();
     face.light(lit);
     let began = Instant::now();
     while !stop.load(Ordering::SeqCst) {
-        let pixels = light_pixels(
+        let mut pixels = light_pixels(
             &mut face,
             lit,
             began.elapsed(),
             lamp_ipc::monotonic_us(),
             ceiling,
         );
+        // Over the person's light too, where it is brighter (migrate-P2).
+        if owed.hearing_name() {
+            let ember = lamp_ring::asleep::hearing_name_pixels(0.0, ember_at(began.elapsed()))
+                [lamp_ring::asleep::EMBER];
+            let pixel = &mut pixels[lamp_ring::asleep::EMBER];
+            *pixel = lamp_ring::Rgb::new(
+                pixel.red.max(ember.red),
+                pixel.green.max(ember.green),
+                pixel.blue.max(ember.blue),
+            );
+        }
         if let Err(error) = ring.show_light(&pixels, ceiling) {
             let _ = ring.shutdown();
             return Err(error);
@@ -580,6 +614,8 @@ pub struct SleepFace<F: FnMut() -> Option<Asleep>> {
     showing: Option<Asleep>,
     yields: bool,
     gave_way: bool,
+    /// The sleep hears its name (migrate-P2): its face shows the ember.
+    hears_name: bool,
 }
 
 impl<F: FnMut() -> Option<Asleep>> SleepFace<F> {
@@ -589,6 +625,16 @@ impl<F: FnMut() -> Option<Asleep>> SleepFace<F> {
             showing: None,
             yields,
             gave_way: false,
+            hears_name: false,
+        }
+    }
+
+    /// Whether the sleep hears its name (migrate-P2): told at each look of
+    /// the wait, and to each face it begins.
+    pub fn hears_name(&mut self, on: bool) {
+        self.hears_name = on;
+        if let Some(showing) = &self.showing {
+            showing.owed().hear_name(on);
         }
     }
 
@@ -609,6 +655,9 @@ impl<F: FnMut() -> Option<Asleep>> SleepFace<F> {
         }
         if self.showing.is_none() && !self.gave_way {
             self.showing = (self.start)();
+            if let Some(showing) = &self.showing {
+                showing.owed().hear_name(self.hears_name);
+            }
             return self.showing.is_some();
         }
         false

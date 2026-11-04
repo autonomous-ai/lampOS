@@ -174,6 +174,12 @@ impl Audio {
     pub const TYPE: &str = "lamp_msgs/Audio";
     pub const VERSION: u32 = 1;
     pub const TOPICS: [&str; 2] = ["mic1/audio", "mic2/audio"];
+    /// The second microphone's sound while the lamp sleeps and listens for
+    /// its name alone (migrate-P2, `LAMP_SLEEP_HEARS_NAME`): the same 20 ms
+    /// blocks, from the voice's sleep capture, never on `mic2/audio`. The
+    /// voice publishes here only while every subscriber is the name
+    /// listener (`lamp-name --sleep-source`); any other stops it.
+    pub const SLEEP_TOPIC: &str = "mic2/sleep_audio";
     /// The bus's label for a payload made by [`Audio::block`].
     pub const ENCODING: &str = "json+pcm";
     pub const S16LE: &str = "S16LE";
@@ -1459,6 +1465,16 @@ pub struct VoiceMute {
     /// voice before it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub control: bool,
+    /// Only while asleep from a hand held on the head: the lamp still
+    /// listens for its name, and for nothing else, until the privacy slide
+    /// closes (migrate-P2, `LAMP_SLEEP_HEARS_NAME`). True only while its
+    /// sleep capture actually runs. The mute, its reason and `muted_by` are
+    /// unchanged, so every reader of a sleep (the updater's quiet check,
+    /// the body, Expression, the add-ons) reads it as before; an app can
+    /// say "asleep, wakes to its name", never "muted". Absent is false, and
+    /// a voice before it, or a reader that does not know it, skips it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hears_name: bool,
 }
 
 impl VoiceMute {
@@ -1481,6 +1497,11 @@ impl VoiceMute {
             && (self.reason == Some(MuteReason::Sleep)) != (self.muted_by == Some(MutedBy::Sleep))
         {
             return Err(Invalid("a sleep's mute is muted by sleep".into()));
+        }
+        // Hearing its name is a sleep's alone (migrate-P2): never a lamp
+        // listening as usual, a person's mute or the restart guard's.
+        if self.hears_name && !self.asleep() {
+            return Err(Invalid("only a sleeping lamp hears its name alone".into()));
         }
         Ok(())
     }
@@ -1731,6 +1752,13 @@ pub fn stop_topics() -> Vec<(&'static str, Declaration)> {
     vec![(StopHeard::TOPIC, StopHeard::declaration())]
 }
 
+/// The second microphone's sound while the lamp sleeps and listens for its
+/// name alone (`mic2/sleep_audio`, migrate-P2), separate from the original
+/// seventeen, where `mic2/audio` is.
+pub fn sleep_audio_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(Audio::SLEEP_TOPIC, Audio::declaration())]
+}
+
 /// Semantic room sound is separate from the original topics and level/onset.
 pub fn sound_class_topics() -> Vec<(&'static str, Declaration)> {
     vec![(SoundClasses::TOPIC, SoundClasses::declaration())]
@@ -1750,6 +1778,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(arbitration_topics())
         .chain(name_topics())
         .chain(stop_topics())
+        .chain(sleep_audio_topics())
         .chain(mute_topics())
         .chain(tasks_topics())
         .chain(logging_topics())
@@ -2693,6 +2722,7 @@ mod tests {
             reason: Some(MuteReason::Sleep),
             muted_by: None,
             control: false,
+            hears_name: false,
         };
         round_trip(&asleep, "{\"muted\":true,\"reason\":\"sleep\"}");
         assert!(asleep.check().is_ok() && asleep.asleep());
@@ -2702,6 +2732,7 @@ mod tests {
             reason: None,
             muted_by: None,
             control: false,
+            hears_name: false,
         };
         round_trip(&muted, "{\"muted\":true}");
         assert!(muted.check().is_ok() && !muted.asleep());
@@ -2711,6 +2742,7 @@ mod tests {
             reason: Some(MuteReason::Sleep),
             muted_by: None,
             control: false,
+            hears_name: false,
         };
         assert!(wrong.check().is_err() && !wrong.asleep());
         assert!(serde_json::from_str::<VoiceMute>("{\"muted\":true,\"reason\":\"nap\"}").is_err());
@@ -2730,6 +2762,81 @@ mod tests {
         );
     }
 
+    /// `hears_name` (migrate-P2) is written only when true, read as false
+    /// when absent, and belongs to a sleep alone: never a lamp listening as
+    /// usual, a person's mute or the restart guard's. A reader before it
+    /// skips it, and the sleep it rides on reads as before.
+    #[test]
+    fn the_voice_mute_says_a_sleep_hears_its_name_only_while_asleep() {
+        let asleep = VoiceMute {
+            muted: true,
+            reason: Some(MuteReason::Sleep),
+            muted_by: Some(MutedBy::Sleep),
+            control: false,
+            hears_name: false,
+        };
+        round_trip(
+            &asleep,
+            "{\"muted\":true,\"reason\":\"sleep\",\"muted_by\":\"sleep\"}",
+        );
+        let hearing = VoiceMute {
+            hears_name: true,
+            ..asleep
+        };
+        round_trip(
+            &hearing,
+            "{\"muted\":true,\"reason\":\"sleep\",\"muted_by\":\"sleep\",\"hears_name\":true}",
+        );
+        assert!(hearing.check().is_ok() && hearing.asleep());
+        for wrong in [
+            VoiceMute {
+                muted: false,
+                reason: None,
+                muted_by: None,
+                control: false,
+                hears_name: true,
+            },
+            VoiceMute {
+                muted: true,
+                reason: None,
+                muted_by: Some(MutedBy::Button),
+                control: false,
+                hears_name: true,
+            },
+            VoiceMute {
+                muted: true,
+                reason: None,
+                muted_by: Some(MutedBy::RestartGuard),
+                control: false,
+                hears_name: true,
+            },
+        ] {
+            assert!(wrong.check().is_err(), "{wrong:?}");
+        }
+        #[derive(Deserialize)]
+        struct Before {
+            muted: bool,
+            reason: Option<MuteReason>,
+        }
+        let before: Before =
+            serde_json::from_str(&serde_json::to_string(&hearing).unwrap()).unwrap();
+        assert!(before.muted && before.reason == Some(MuteReason::Sleep));
+        let declared = declaration_of(Audio::SLEEP_TOPIC).unwrap();
+        assert_eq!(
+            (
+                declared.type_name.as_str(),
+                declared.kind,
+                declared.period_ms
+            ),
+            (Audio::TYPE, Kind::Event, Some(20))
+        );
+        assert!(
+            !first_topics()
+                .iter()
+                .any(|(name, _)| *name == Audio::SLEEP_TOPIC)
+        );
+    }
+
     /// `muted_by` (#4332) is said in snake_case, only while muted, and
     /// agrees with a sleep's reason. A voice before it, without the field,
     /// still parses, and a reader that knows only `muted` and `reason`
@@ -2746,6 +2853,7 @@ mod tests {
                 reason: None,
                 muted_by: Some(by),
                 control: false,
+                hears_name: false,
             };
             round_trip(
                 &said,
@@ -2758,6 +2866,7 @@ mod tests {
             reason: Some(MuteReason::Sleep),
             muted_by: Some(MutedBy::Sleep),
             control: false,
+            hears_name: false,
         };
         round_trip(
             &asleep,
@@ -2770,18 +2879,21 @@ mod tests {
                 reason: None,
                 muted_by: Some(MutedBy::Button),
                 control: false,
+                hears_name: false,
             },
             VoiceMute {
                 muted: true,
                 reason: Some(MuteReason::Sleep),
                 muted_by: Some(MutedBy::Button),
                 control: false,
+                hears_name: false,
             },
             VoiceMute {
                 muted: true,
                 reason: None,
                 muted_by: Some(MutedBy::Sleep),
                 control: false,
+                hears_name: false,
             },
         ] {
             assert!(wrong.check().is_err(), "{wrong:?}");
@@ -2818,6 +2930,7 @@ mod tests {
             reason: None,
             muted_by: None,
             control: true,
+            hears_name: false,
         };
         round_trip(&alone, "{\"muted\":true,\"control\":true}");
         assert!(alone.check().is_ok() && !alone.asleep());
@@ -2826,6 +2939,7 @@ mod tests {
             reason: None,
             muted_by: Some(MutedBy::Button),
             control: true,
+            hears_name: false,
         };
         round_trip(
             &under_the_persons,
@@ -2837,6 +2951,7 @@ mod tests {
             reason: None,
             muted_by: None,
             control: true,
+            hears_name: false,
         };
         assert!(unmuted.check().is_err());
         // A voice before the field.

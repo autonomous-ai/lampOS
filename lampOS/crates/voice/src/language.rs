@@ -159,6 +159,15 @@ pub const SIGNED_OUT: &str = "I've been signed out. Please set me up again in th
 /// lamp still plays the sigh (`docs/failure-notices.md`).
 pub const TURN_LOST: &str = "Sorry, I couldn't answer that. Could you ask me again?";
 
+/// What a lamp woken by its name says in place of its "hm?"
+/// (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2, the design owner on #4877): only
+/// from the speech cache ([`crate::say::tts_cache::TtsCache::wake_line`]).
+pub const WOKEN_BY_NAME_LINE: &str = "Yes?";
+
+/// [`WOKEN_BY_NAME_LINE`] in Vietnamese, Japanese, Chinese and Korean. Kept
+/// out of [`FIXED_LINES`]: a say of "Yes?" isn't this line, and stays "Yes?".
+const WOKEN_BY_NAME_WORDS: [&str; 4] = ["Dạ?", "はい？", "嗯？", "네?"];
+
 /// The lamp's fixed lines (#4473 (c)), by their English words, in
 /// Vietnamese, Japanese, Chinese and Korean, in that order: said from the
 /// speech cache in the owner's language, English where a line is not kept.
@@ -387,6 +396,11 @@ impl Language {
             .iter()
             .find(|(line, _)| *line == english)
             .map(|(_, words)| words[self.column()])
+    }
+
+    /// What a lamp woken by its name says in this language (migrate-P2).
+    pub fn woken_by_name(self) -> &'static str {
+        WOKEN_BY_NAME_WORDS[self.column()]
     }
 
     /// Every fixed line in this language, for the speech cache to warm.
@@ -743,6 +757,9 @@ mod tests {
             }
             assert_eq!(language.fixed("Hello."), None);
         }
+        assert_eq!(Language::Vietnamese.woken_by_name(), "Dạ?");
+        // A say of "Yes?" is no wake's line: it stays as it was asked.
+        assert_eq!(Language::Vietnamese.fixed(WOKEN_BY_NAME_LINE), None);
         assert_eq!(
             Language::Vietnamese.fixed(lamp_msgs::SLEEP_LINE),
             Some("Mình ngủ đây. Chạm vào đầu mình để đánh thức nhé.")

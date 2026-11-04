@@ -203,6 +203,11 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::WokenByName {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -296,7 +301,11 @@ impl Gate {
                     self.install(monotonic_us(), snapshot, engine)?
                 }
                 Some(Control::ProviderOutputCapacity { through }) => self.flow.grant(through)?,
-                Some(Control::StartCapture | Control::ConnectReference { .. }) => {
+                Some(
+                    Control::StartCapture
+                    | Control::ConnectReference { .. }
+                    | Control::NameGrant { .. },
+                ) => {
                     return Err(invalid("invalid second route provider control"));
                 }
                 None => {
@@ -8901,6 +8910,11 @@ impl Heeding {
     ) -> Option<&'static str> {
         self.said_over(request, (began_us, ended_us));
         let attention = &mut self.attention;
+        // Woken by its name, and this line began in the wait for one: told
+        // before its start is judged against the window (migrate-P2).
+        if let Some(woke) = crate::attention::marked_woken_by_name(request) {
+            attention.woken_by_name(woke);
+        }
         // What the engine gave: a request going on from one cut short has
         // that one's words in front of its own (#1168).
         let whole = heard;
@@ -12088,6 +12102,52 @@ mod tests {
         assert!(note(7).is_some() && note(8).is_some(), "due for both");
         heard(7);
         assert_eq!(note(9), None, "the earlier one's answer spent it");
+    }
+
+    /// migrate-P2, the product's route: with the coordinator's mark, a line
+    /// begun 8 s after a wake by name is answered in a busy room, with no
+    /// name, nobody turned and nothing going on; unmarked, or begun past the
+    /// wait, it is held as before. A mark for another request says nothing.
+    #[test]
+    fn a_line_marked_in_a_name_wakes_wait_is_answered_on_the_second_route() {
+        let busy = || Signs {
+            room: crate::room_told::Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let woke = 100_000_000;
+        let line = "What time is it now";
+        let judged = |began: u64, marked: Option<u64>, request: u64| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            if let Some(marked) = marked {
+                crate::attention::mark_woken_by_name(marked, woke);
+            }
+            heeding.judge(request, (began, began + 1_000_000), line, busy())
+        };
+        assert_eq!(judged(woke + 8_000_000, Some(9_700_001), 9_700_001), None);
+        assert_eq!(
+            judged(
+                woke + crate::attention::NAME_WOKE_LISTENS_US,
+                Some(9_700_002),
+                9_700_002
+            ),
+            None
+        );
+        assert!(
+            judged(
+                woke + crate::attention::NAME_WOKE_LISTENS_US + 1,
+                Some(9_700_003),
+                9_700_003
+            )
+            .is_some()
+        );
+        assert!(judged(woke + 8_000_000, None, 9_700_004).is_some());
+        assert!(judged(woke + 8_000_000, Some(9_700_005), 9_700_006).is_some());
     }
 
     /// #1712, the first builder at 16:43: the route's lines are judged as

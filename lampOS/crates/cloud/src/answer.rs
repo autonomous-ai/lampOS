@@ -22,7 +22,10 @@ pub struct Volume {
 /// there is none), `available` whether the voice is running. `muted_by`
 /// (#4332), only while muted, says who or what muted it, so a setup screen
 /// can tell the restart guard's mute after a fault from one the person
-/// chose; absent from a voice that does not say it.
+/// chose; absent from a voice that does not say it. `hears_name`
+/// (migrate-P2, `LAMP_SLEEP_HEARS_NAME`), only while true: asleep from a
+/// hand's hold and still listening for its name alone, so the app can say
+/// "asleep, wakes to its name", never "muted".
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Mic {
     pub muted: bool,
@@ -30,6 +33,8 @@ pub struct Mic {
     pub available: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub muted_by: Option<MutedBy>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub hears_name: bool,
 }
 
 /// What the answers read from and ask of the lamp.
@@ -743,6 +748,7 @@ pub mod tests {
                 hw_switch_muted: Some(true),
                 available: true,
                 muted_by: Some(MutedBy::Button),
+                hears_name: false,
             })
         }
         fn health(&mut self) -> Result<Value, String> {
