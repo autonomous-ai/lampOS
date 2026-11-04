@@ -2944,6 +2944,27 @@ then use that person's scope:
     "Do you know I like tea?" and "Asked the lamp to remind them …" are kept
     (`tidy::only_asked`, [memory-days.md](memory-days.md)). Test:
     `it::days::a_question_is_never_kept_as_a_fact`.
+  - **The observation pass keeps a name only as its person gave it**
+    (lamp-06c1, 4 Nov: with the owner's face at the lamp, silent, a
+    coworker's "... Connie Long ..." was kept as "Their name is Connie
+    Long." in the owner's scope). Always on, a tightening with no switch: a
+    proposal giving the person's own name ("Their name is X.", "Name is
+    X.", "They go by X.", "Prefers to be called X.", "Tên của họ là X.";
+    `remember::named::name_in`) is kept only when an exchange it cites was
+    seen spoken by that person (one face, theirs, the eyes' reading of the
+    line, as a room line's speaker needs, `remember::seen_by`) and in it
+    they introduced themselves with that name ("My name is X", "I'm X",
+    "Call me X", "Tên tôi là X", not a question), spelled it, or the lamp
+    read it back and their next line, seen spoken by them too, was a plain
+    yes (the checked-names path, #1057). An exchange whose own answer
+    doubts what was heard (#3504 N5), or a name that is the lamp's own or a
+    word written for it (#3504 N4), gives none. A name sentence about
+    someone else ("Their friend's name is Connie.", "Talked to Connie Long
+    today.") is judged as before. Without the eyes' speaking reading, no
+    name is kept this way; `remember_my_face` and `remember` are
+    unchanged. The journal counts it, no words: "observation pass: a name
+    not introduced by its person, seen speaking, left out (dropped=N)".
+    Tests: `remember::named::tests`.
   - **A single-item forget** from a speaker whose face is still unknown
     runs against what the room remembers. Older room observations can contain
     a guest's own words, so the lamp may remove a matching room item and

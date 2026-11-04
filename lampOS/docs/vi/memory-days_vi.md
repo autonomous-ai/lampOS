@@ -315,6 +315,22 @@ phòng:
 - **Lượt quan sát** được đọc ghi chú như `"summary"`, là lời của đèn, chỉ
   được dẫn các bản ghi; voice bỏ một đề xuất không có từ nào trong lời người
   đó nói ở các bản ghi được dẫn mà lại có trong ghi chú.
+- **Lượt quan sát chỉ giữ một cái tên khi chính người đó nói ra**
+  (lamp-06c1, 4/11: mặt chủ ở trước đèn, im lặng, một đồng nghiệp nói
+  «... Connie Long ...», và đèn giữ «Their name is Connie Long.» vào phạm vi
+  của chủ). Luôn bật, chỉ siết lại, không công tắc: một đề xuất nêu tên của
+  chính người đó («Their name is X.», «Name is X.», «They go by X.», «Tên
+  của họ là X.»; `remember::named::name_in`) chỉ được giữ khi một lượt nó
+  dẫn được thấy chính người đó nói (một khuôn mặt, của họ, như người nói của
+  một dòng phòng cần, `remember::seen_by`) và trong lượt đó họ tự giới thiệu
+  bằng tên ấy («My name is X», «I'm X», «Call me X», «Tên tôi là X», không
+  phải câu hỏi), đánh vần nó, hoặc đèn đọc lại và câu kế tiếp của họ, cũng
+  được thấy họ nói, là một tiếng «có» rõ ràng (đường tên đã kiểm, #1057).
+  Lượt mà câu trả lời của đèn nghi mình nghe nhầm (#3504 N5), hay tên là
+  tên của đèn hoặc từ bị viết thay cho nó (#3504 N4), không cho tên nào.
+  Câu về tên người khác («Their friend's name is Connie.», «Talked to Connie
+  Long today.») được xét như trước. Nhật ký chỉ đếm, không có lời nào. Test:
+  `remember::named::tests`.
 
 ## Gọi `recall` trước khi nói không biết
 

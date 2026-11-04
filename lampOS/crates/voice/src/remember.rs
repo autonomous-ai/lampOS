@@ -57,6 +57,7 @@ use unicode_normalization::UnicodeNormalization;
 pub mod asked;
 pub mod doubted;
 pub mod heard;
+pub mod named;
 pub mod needs_face;
 pub mod noted;
 pub mod on;
@@ -1690,7 +1691,9 @@ static OBSERVING: OnceLock<SyncSender<ObserveJob>> = OnceLock::new();
 /// A job for the observation pass: whose, the frozen job, [`OBSERVE_FORGETS`]
 /// as its conversation began, and that person's kept things the session was
 /// shown, by id ([`observations_replacing`]).
-type ObserveJob = (Option<String>, Value, u64, Vec<(u64, String)>);
+/// And the ids of its exchanges seen spoken by its person ([`seen_by`]),
+/// for a name of theirs ([`named`]).
+type ObserveJob = (Option<String>, Value, u64, Vec<(u64, String)>, Vec<u64>);
 /// Forgets asked of this process's memory (`forget`, `forget_everything`,
 /// named or not, kept or refused), counted as each is asked. A job waiting for the model, or with it, from
 /// before a forget is closed with nothing kept: its words are never sent,
@@ -9998,6 +10001,22 @@ struct Conversation {
     /// and reviewer-two's P2 on `208e376a3`: read at its end, a forget said
     /// during it was already counted, and its job was sent).
     forgets: Option<u64>,
+    /// The ids of its exchanges seen spoken by its person, one face and
+    /// theirs ([`seen_by`]): only these may give a name of theirs to the
+    /// observation pass ([`named`]).
+    seen: Vec<u64>,
+}
+
+/// Whether request `request`'s line was seen spoken by `person`, a known
+/// person's memory id: the one face the eyes saw saying it, theirs
+/// ([`speaker_of`]). The room's (`None`), a line not read, a face only in
+/// view or two faces speaking is not.
+fn seen_by(person: Option<&str>, request: u64) -> bool {
+    person.is_some_and(|person| {
+        request != 0
+            && speaker_of(crate::speaking_faces::line_seen(request).as_ref()).as_deref()
+                == Some(person)
+    })
 }
 
 /// A face saved in the room's conversation as `to`'s, in the request
@@ -10041,6 +10060,7 @@ impl Conversation {
             finished: self.finished,
             incomplete: std::mem::take(&mut self.incomplete),
             forgets: self.forgets,
+            seen: std::mem::take(&mut self.seen),
             ..Conversation::default()
         };
         self.kept.clear();
@@ -10071,6 +10091,7 @@ fn observe(
     input: Value,
     forgets: u64,
     shown: Vec<(u64, String)>,
+    seen: Vec<u64>,
 ) {
     let jobs = OBSERVING.get_or_init(|| {
         let (jobs, work) = sync_channel(OBSERVE_QUEUE);
@@ -10084,9 +10105,9 @@ fn observe(
         jobs
     });
     if let Err(
-        std::sync::mpsc::TrySendError::Full((person, input, _, _))
-        | std::sync::mpsc::TrySendError::Disconnected((person, input, _, _)),
-    ) = jobs.try_send((person, input, forgets, shown))
+        std::sync::mpsc::TrySendError::Full((person, input, ..))
+        | std::sync::mpsc::TrySendError::Disconnected((person, input, ..)),
+    ) = jobs.try_send((person, input, forgets, shown, seen))
     {
         let job = input["job"].as_str().unwrap_or_default();
         let closed = close_job(socket, person.as_deref(), job);
@@ -10122,7 +10143,7 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
     // its proposals are not given (`OBSERVE_FORGETS`).
     let forgotten = |forgets: u64| OBSERVE_FORGETS.load(Ordering::Acquire) != forgets;
     let replaces = replaces_on();
-    for (person, input, forgets, shown) in jobs {
+    for (person, input, forgets, shown, seen) in jobs {
         #[cfg(any(test, lamp_memory_probe))]
         if probe::observe_barrier_reached(&input) {
             continue;
@@ -10177,6 +10198,13 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
             needs_face::kept_proposals(observations, person.as_deref(), needs_face);
         if dropped > 0 {
             eprintln!("{}", needs_face::dropped_line(dropped));
+        }
+        // A name of theirs only as they gave it, seen speaking (lamp-06c1,
+        // 4 Nov: a coworker's "Connie Long" kept as the owner's name).
+        let records = input["records"].as_array().map_or(&[][..], Vec::as_slice);
+        let (observations, unnamed) = named::kept(observations, records, &seen);
+        if unnamed > 0 {
+            eprintln!("{} (dropped={unnamed})", named::DROPPED);
         }
         // With `LAMP_MEMORY_REPLACES`, one that clearly corrects a kept
         // thing of theirs retires it (finding N11 on #3504).
@@ -10801,7 +10829,7 @@ fn days_writer(
                     if let Some(summary) = summary {
                         input["summary"] = json!(summary);
                     }
-                    observe(socket, ended.person, input, forgets, shown);
+                    observe(socket, ended.person, input, forgets, shown, ended.seen);
                 }
                 None => {
                     // The memory's refusal, by its own fixed code: a pass
@@ -10963,6 +10991,9 @@ fn days_writer(
                         end(&mut piece);
                     }
                     conversation.add(id, finished, observe_forgets);
+                    if seen_by(conversation.person.as_deref(), request) {
+                        conversation.seen.push(id);
+                    }
                     if let Ok(mut current) = current.lock() {
                         *current = (conversation.person.clone(), conversation.sources.clone());
                     }
@@ -24253,6 +24284,31 @@ mod tests {
             assert_eq!(speaker.of(None, Some(0)), None);
             speaker.refused.store(true, Ordering::Release);
             assert_eq!(speaker.of(None, Some(request)), None, "refused");
+        }
+
+        /// The observation pass's name evidence (lamp-06c1, 4 Nov): a line
+        /// is seen spoken by its conversation's person only when their one
+        /// face was seen saying it. Their face silent while an unseen voice
+        /// spoke ("... Connie Long ..."), another face, another known
+        /// person's face seen speaking, or the room's: not.
+        #[test]
+        fn a_line_is_seen_spoken_by_its_person_only_on_their_one_face() {
+            let mai_face = Some(("Mai", "b1/f1"));
+            let request = 4_110_400;
+            saw_line(seen(request, &["b1/f1"], mai_face));
+            saw_line(seen(request + 1, &[], mai_face));
+            saw_line(seen(request + 2, &["b1/f2"], mai_face));
+            saw_line(seen(request + 4, &["b1/f3"], Some(("Bao", "b1/f3"))));
+            assert!(seen_by(Some(&mai()), request));
+            assert!(!seen_by(Some(&mai()), request + 1), "silent face");
+            assert!(!seen_by(Some(&mai()), request + 2), "another face");
+            assert!(!seen_by(Some(&mai()), request + 3), "not read");
+            assert!(
+                !seen_by(Some(&mai()), request + 4),
+                "another known person seen speaking"
+            );
+            assert!(!seen_by(None, request), "the room's");
+            assert!(!seen_by(Some(&mai()), 0));
         }
 
         fn speaking_client(socket: &Path, on: bool) -> DaysClient {
