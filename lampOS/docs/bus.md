@@ -18,7 +18,7 @@ Under a root, `/run/lampos-bus` unless `LAMP_BUS_ROOT` or the caller names
 another (an absolute path, on a filesystem with hard links):
 
     <root>/<topic>/subs/<subscriber>.<pid>.<count>.sock   one for each subscriber
-    <root>/<topic>/pubs/<publisher>.<pid>.<boot>          one for each publisher that is alive
+    <root>/<topic>/pubs/<publisher>.<pid>.<boot>          one for each publisher that is alive, with its drops
     <root>/<topic>/declaration                            what the topic carries, if a publisher said
     <root>/<topic>/latest                                 the newest message, kind `latest` only
 
@@ -38,8 +38,9 @@ only names publishers look at: a socket's file is there a moment before the
 socket can be sent to, and on the Mac 61 of 400 bound directly were removed
 as dead by a publisher that looked with every message.
 
-A publisher's entry in `pubs/` is an empty file whose time says when the
-publisher last showed that it was alive. It is there from the publisher's
+A publisher's entry in `pubs/` is a file whose time says when the
+publisher last showed that it was alive. It is empty unless the publisher
+has dropped a message for a subscriber (below). It is there from the publisher's
 first message, or from the start if the publisher declared the topic. The
 publisher gives it a new time at most once a second while it publishes, and
 when it calls `Publisher::alive()` with nothing to publish, and removes it
@@ -253,6 +254,38 @@ stepped by more than the lease makes every publisher look dead until its
 next refresh, at most a second later, and a topic quiet for a lease is then
 reported gone and back.
 
+### Drops are said and counted
+
+A subscriber whose queue is full loses messages without a sound of its own,
+so its publisher says it, and only with what identifies the subscriber,
+never a payload:
+
+- **A line on standard error** (the part's journal through
+  `lamp_ipc::log_relay`) at the subscriber's first drop, then at most one a
+  minute for that subscriber by the publisher's cadence clock:
+
+      lamp-bus: drops topic=mic2/audio publisher=ears subscriber=voice.420.0 dropped=37 total=412 (dropped since this subscriber's last line; at most one line a minute)
+
+  `subscriber` is its socket without `.sock` (name, process, count),
+  `dropped` how many since that subscriber's last line, `total` how many
+  since the publisher found it. Drops within the minute after a line are
+  counted and said by the first publish after the minute has passed,
+  whether or not that one drops. A guarded event's drops are said by the
+  next `prepare_guarded_event`, never during the guarded send.
+- **The totals in the publisher's entry**: at its next refresh after a drop
+  (at most a second later while it publishes, or at `alive()`), the entry
+  is written beside and put in place with one line `<subscriber> <total>`
+  for each subscriber it has dropped for. A publisher that never drops
+  keeps the empty entry it always had, touched as before. `Bus::drops`
+  and `lamp-bus drops` read it; a subscriber that has gone may be listed
+  until its publisher next drops, and the totals go with the publisher.
+
+Nothing about delivery changes: the same non-blocking send and the same
+queues. The cost on the publish path is a comparison per message, a scan of
+at most 64 counts per publish while a drop waits to be said, one formatted
+line a minute per dropping subscriber, and, after a drop, the entry's
+refresh writing a small file instead of touching it.
+
 The queue is where this differs from ROS on purpose for now: each
 subscriber's socket is its own queue and the kernel cannot evict from it, so
 a full one loses the newest message, where ROS drops the oldest.
@@ -262,6 +295,7 @@ a full one loses the newest message, where ROS drops the oldest.
     lamp-bus topics                                 # body/joint_states subscribers=2 latest=yes type=lamp_msgs/JointState
     lamp-bus info body/joint_states                 # declaration, publishers, subscribers, the kept value
     lamp-bus hz mic2/audio --seconds 5              # rate, gaps between messages, age, what was missed
+    lamp-bus drops                                  # mic2/audio voice.420.0 dropped=412, for every subscriber
     lamp-bus tap voice/heard --count 5              # header, then the payload if JSON, else <N bytes>
     lamp-bus logs --part body --level warn           # validated operational logs, warn and above
     lamp-bus keep-logs /var/lib/lampos/logs          # the same, kept on disk in bounded files (logging.md)
@@ -295,6 +329,11 @@ published, subscribed to or declared. Its shape, with numbers made up:
 `alive_ms` is how long ago the publisher refreshed its entry. A subscriber
 whose process died is `stale`. What is missing is `declaration none`,
 `publishers none`, `subscribers none` or `latest none`.
+
+`drops [TOPIC]` prints one line for each subscriber of every topic, or of
+TOPIC: `<topic> <subscriber> dropped=<n>`, the sum of what the topic's live
+publishers say they dropped for it since each found it (above), `0` for a
+subscriber none dropped for. It exits 1 for a TOPIC that is not on the bus.
 
 `hz` listens for `--seconds` (5) and prints one line, and exits 1 if no
 message came. The gaps are between one message's arrival and the next,
@@ -347,7 +386,9 @@ finally:
 A publisher in another language sends that datagram to every `*.sock` in
 `subs/`, without waiting. To be listed, and to be there while it is silent,
 it keeps an empty file `pubs/<name>.<pid>.<16 hex>` and gives it a new time
-every second; to be held to a type it puts `type` in each header.
+every second (lines `<subscriber> <count>` in it, if it keeps any, are its
+drops for `lamp-bus drops`); to be held to a type it puts `type` in each
+header.
 
 ## What is taken from ROS
 

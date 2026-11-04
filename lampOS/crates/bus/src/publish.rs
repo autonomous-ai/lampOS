@@ -18,6 +18,13 @@
 //! from its first message, or from the start if it declared the topic, given
 //! a new time at most once a second while it publishes (`live.rs`). That is
 //! one file touched a second and nothing a subscriber could hold up.
+//!
+//! A subscriber whose queue is full loses messages without a sound to
+//! itself, so the publisher says it: a line on standard error at the first
+//! drop, then at most one a minute for that subscriber, with the count since
+//! its last line and never a payload. The entry in `pubs/` carries each
+//! subscriber's total since the publisher began, rewritten only at a refresh
+//! after a drop, for `lamp-bus drops` (`Bus::drops`) to read.
 use crate::{
     Bus, FILE_MODE,
     declare::{self, Declaration},
@@ -40,6 +47,9 @@ use std::{
 /// The longest a publisher goes between two refreshes of its entry while it
 /// publishes, whatever the lease: a third of the lease if that is less.
 const SHOW_EVERY: Duration = Duration::from_secs(1);
+
+/// A subscriber's drops are said at most this often.
+const SAY_DROPS_EVERY: Duration = Duration::from_secs(60);
 
 /// The most subscribers one publisher sends to on a topic. A subscriber
 /// that binds socket after socket would otherwise cost every publisher a
@@ -88,6 +98,9 @@ struct Link {
     delivered: u64,
     dropped: u64,
     guarded_dead: bool,
+    /// When this subscriber's drops were last said, and its count then.
+    said_at: Option<Instant>,
+    dropped_said: u64,
 }
 
 enum Sent {
@@ -265,6 +278,14 @@ pub struct Publisher {
     /// The bus's clocks: the wall clock for `at_unix_ms`, and the boot a
     /// monotonic stamp names.
     clocks: crate::clock::Clocks,
+    /// Where a line about a subscriber's drops goes: standard error.
+    say_drop: Box<dyn Fn(&str) + Send + Sync>,
+    /// A subscriber has drops that no line has said yet.
+    drops_unsaid: bool,
+    /// The total dropped that the entry says.
+    drops_shown: u64,
+    /// Where the entry is written before it is put in place.
+    entry_writing: PathBuf,
 }
 
 /// Sixteen hex characters no other publisher instance is likely to have:
@@ -308,6 +329,7 @@ impl Publisher {
             // have one `boot`.
             writing: directory.join(format!(".latest.{boot}.new")),
             entry: live::entry(&pubs, source, &boot),
+            entry_writing: live::writing(&pubs, source, &boot),
             pubs,
             directory,
             header: wire::Header {
@@ -339,6 +361,9 @@ impl Publisher {
             unlisted: false,
             cadence_now: Box::new(now),
             clocks: bus.clocks.clone(),
+            say_drop: Box::new(|line| eprintln!("{line}")),
+            drops_unsaid: false,
+            drops_shown: 0,
         })
     }
 
@@ -454,17 +479,69 @@ impl Publisher {
     /// Give the entry a new time, creating it and `pubs/` if need be.
     fn show(&mut self, now: Instant) -> io::Result<()> {
         self.shown = Some(now);
-        let done = match live::touch(&self.entry) {
+        let dropped = self.totals.dropped;
+        let done = match self.refresh(dropped) {
             // The first publisher of the topic.
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 crate::make_directory(&self.pubs, self.directory_mode)
-                    .and_then(|()| live::touch(&self.entry))
+                    .and_then(|()| self.refresh(dropped))
             }
             done => done,
         };
         self.unlisted = done.is_err();
         self.listed |= done.is_ok();
+        if done.is_ok() {
+            self.drops_shown = dropped;
+        }
         done
+    }
+
+    /// Give the entry a new time: by touching it, or, when something was
+    /// dropped since it last said, by writing each subscriber's total in it.
+    /// A publisher that never drops keeps an empty entry.
+    fn refresh(&self, dropped: u64) -> io::Result<()> {
+        if dropped == self.drops_shown {
+            return live::touch(&self.entry);
+        }
+        let mut said = String::new();
+        for link in self.links.iter().filter(|link| link.dropped > 0) {
+            said.push_str(&format!(
+                "{} {}\n",
+                link.name.trim_end_matches(".sock"),
+                link.dropped
+            ));
+        }
+        live::write(&self.entry, &self.entry_writing, said.as_bytes())
+    }
+
+    /// Say each subscriber that dropped since its last line, unless that
+    /// line is less than a minute old: then it waits for a later publish.
+    fn say_drops(&mut self, now: Instant) {
+        let mut unsaid = false;
+        for link in &mut self.links {
+            if link.dropped == link.dropped_said {
+                continue;
+            }
+            if link
+                .said_at
+                .is_some_and(|at| now.saturating_duration_since(at) < SAY_DROPS_EVERY)
+            {
+                unsaid = true;
+                continue;
+            }
+            (self.say_drop)(&format!(
+                "lamp-bus: drops topic={} publisher={} subscriber={} dropped={} total={} \
+                 (dropped since this subscriber's last line; at most one line a minute)",
+                self.header.topic,
+                self.header.source,
+                link.name.trim_end_matches(".sock"),
+                link.dropped - link.dropped_said,
+                link.dropped
+            ));
+            link.said_at = Some(now);
+            link.dropped_said = link.dropped;
+        }
+        self.drops_unsaid = unsaid;
     }
 
     pub fn totals(&self) -> Totals {
@@ -529,6 +606,10 @@ impl Publisher {
         }
         self.links.retain(|link| !link.guarded_dead);
         let now = (self.cadence_now)();
+        // Drops of guarded sends are said here, never while sending.
+        if self.drops_unsaid {
+            self.say_drops(now);
+        }
         if self
             .scanned
             .is_none_or(|last| now.saturating_duration_since(last) >= self.rescan_every)
@@ -629,6 +710,7 @@ impl Publisher {
         });
         self.totals.delivered += outcome.delivered as u64;
         self.totals.dropped += outcome.dropped as u64;
+        self.drops_unsaid |= outcome.dropped > 0;
         match error {
             Some(error) => Err(error),
             None => Ok(outcome),
@@ -702,6 +784,10 @@ impl Publisher {
         self.totals.published += 1;
         self.totals.delivered += outcome.delivered as u64;
         self.totals.dropped += outcome.dropped as u64;
+        self.drops_unsaid |= outcome.dropped > 0;
+        if self.drops_unsaid {
+            self.say_drops(now);
+        }
         if self.header.kind == wire::Kind::Latest
             && let Err(error) = self.keep(datagram)
         {
@@ -785,6 +871,8 @@ impl Publisher {
                         delivered: 0,
                         dropped: 0,
                         guarded_dead: false,
+                        said_at: None,
+                        dropped_said: 0,
                     });
                     found += 1;
                 }
@@ -905,3 +993,7 @@ mod clock_tests;
 #[cfg(test)]
 #[path = "guarded_publish_tests.rs"]
 mod guarded_tests;
+
+#[cfg(test)]
+#[path = "drop_report_tests.rs"]
+mod drop_tests;
