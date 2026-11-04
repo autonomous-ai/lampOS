@@ -304,7 +304,8 @@ giờ có tên, lời hay tệp của một kỹ năng.
   chạy giữa chúng. Số kỹ năng đang bật và đang tắt chỉ đi kèm ngày đó, theo
   lần đọc cuối của ngày, nên cũng không lộ một kỹ năng vừa tạo, bật hay tắt
   giữa hai báo cáo. Khi đồng hồ chưa được đặt (`clock_synced: false`) thì
-  không đếm gì.
+  không đếm gì. Một ngày đã được xác nhận không bao giờ được đếm thêm:
+  đổi múi giờ về phía tây qua nửa đêm thì số đếm được dồn sang ngày sau.
 - **Khi người dùng nói không** với báo cáo, `lamp-cloud` nhờ trình quản lý
   (`{"forget_counts": {}}`, của root, sở hữu cả hai tệp) xóa `runs.json` và
   `counts.json`, mỗi tệp dưới khóa của bên ghi nó (`usage::forget`,

@@ -1310,7 +1310,10 @@ words or files, nor a made skill's SHA-256.
   tell a skill made, put on or turned off between them either; with no day
   over the field is `{}`. Every day read is sent once over, its counts 0
   or not. A day is let go when the broker acknowledges the report that
-  carried it, and the next day goes with the next health.
+  carried it, and the next day goes with the next health. A day
+  acknowledged is never counted on again: a zone moved west across
+  midnight puts what comes on it on the next date instead
+  (`an_acknowledged_day_is_never_counted_on_again`).
 - **A clock not set yet** (`clock_synced: false`) counts nothing: its
   reading would put the counts on a wrong date, even one already sent. The
   next reading with the clock set counts the change since the last one
