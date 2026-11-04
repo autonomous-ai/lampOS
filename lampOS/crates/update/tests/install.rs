@@ -1462,6 +1462,23 @@ fn the_product_lets_what_a_caller_said_follow_their_face() {
     );
 }
 
+/// A kept thing is what the person said (`LAMP_MEMORY_KEEP_HEARD`, #2176):
+/// the memory owner's call on 5 Nov, after #5276 (N6) kept a yes from
+/// ever being kept as "They said: Yes.".
+#[test]
+fn the_product_keeps_what_was_heard() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_KEEP_HEARD=on"),
+        "the voice lacks LAMP_MEMORY_KEEP_HEARD"
+    );
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still

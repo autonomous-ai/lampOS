@@ -455,6 +455,11 @@ Environment=LAMP_MEMORY_FOLLOWS_FACE=on
 # known keeps the id their memory has today, `person_id` of their name. The memory owner's yes on 4 Nov, after
 # lamp-0c4e's rename to an empty memory (#4710).
 Environment=LAMP_MEMORY_STABLE_ID=on
+# A kept thing is what the person said (#2176, docs/memory.md): a `remember` whose sentence has a key word the heard
+# line did not keeps the heard line instead, "They said: ...". The memory owner's call on 5 Nov, after the jasmine and
+# mango lines were kept as said on lamp-06c1 (22 Oct) and a yes after a second keep offer kept the first offer's line,
+# never "They said: Yes." (#5276, N6).
+Environment=LAMP_MEMORY_KEEP_HEARD=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
