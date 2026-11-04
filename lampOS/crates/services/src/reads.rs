@@ -1,15 +1,19 @@
 //! What `service_read` asks of each service, and how its answer is given
 //! to the model: trimmed, and wrapped as quoted data from the service,
-//! never as instructions, under the voice's 8 KB answer cap.
+//! never as instructions, under the voice's 4 KB answer cap.
 use crate::catalog::{self, FACEBOOK_VERSION, Method};
 use crate::mail::{self, MailAsk, MailItem};
 use crate::store::Entry;
 use serde_json::{Map, Value, json};
 
-/// The most a tool's whole answer line may be (the voice's cap).
-pub const ANSWER_MOST: usize = 8_192;
-/// The most the quoted result may be, leaving room for the answer's frame.
-pub const RESULT_MOST: usize = 7_600;
+/// The most a tool's whole answer line may be: the voice carries a result
+/// to its model only under `lamp_gemini::MAX_TOOL_JSON_BYTES` (4 KB), and
+/// a longer one is "not running right now". On lamp-9adf on 4 Nov at 23:23
+/// a Notion read answered 4 to 8 KB under the old 8 KB cap and was so lost.
+pub const ANSWER_MOST: usize = 4_096;
+/// The most the quoted result may be, leaving room for the answer's frame
+/// and what the voice adds to it (a brief, an ask after a send).
+pub const RESULT_MOST: usize = 3_600;
 /// How many items a list asks for when it isn't told.
 pub const COUNT_DEFAULT: usize = 5;
 /// The most a list asks for.

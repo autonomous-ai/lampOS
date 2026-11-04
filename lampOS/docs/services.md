@@ -161,7 +161,12 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   `call.sock` (0660), served as `lamp-skills --tools-dir` serves its folder
   ([tools.md](tools.md)): `{"op":"call","name":...,"args":{...}}` in, at most
   8 KB, and `{"ok":true,"result":...}` or `{"ok":false,"error":"..."}` back
-  in one line under 8 KB (a longer one is "the answer was too long to give").
+  in one line under 4 KB (`reads::ANSWER_MOST`; a longer one is "the answer
+  was too long to give"). 4 KB is what the voice carries to its model
+  (`lamp_gemini::MAX_TOOL_JSON_BYTES`): under the old 8 KB cap, a Notion
+  read of 4 to 8 KB on lamp-9adf (4 Nov, 23:23) reached the voice and was
+  told to the person as "not running right now". A list is cut to fit, with
+  how many were left out.
   Only a process at `/lampos.slice/lampos-voice.slice/lamp-voice.service`
   may call; any other gets "only the voice may use the lamp's services".
   With `LAMP_SKILL_READS=on`, a process at
