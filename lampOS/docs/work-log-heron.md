@@ -469,3 +469,8 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   (tried). Asked the lamp check for a 2+ item read alone: the lamp's own
   reading may now mark "a voice heard" and stop it after one line. This
   is #5303's second gap my read passed.
+- 01:5x — #5321 READ-OK restated at ad2009778: the gate test asks
+  `LampRoom::seen()` and the shipped-bug mutation now fails; fails
+  closed and a restart counts as a voice; P3 the HEARD_ALWAYS latch
+  test can't tell 0 ms from now. Before the train: Fourteen's lamp row,
+  a 2+ item read with the owner alone, all said.
