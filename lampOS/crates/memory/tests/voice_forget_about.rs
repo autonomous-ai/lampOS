@@ -235,3 +235,71 @@ fn forget_about_in_the_room_reaches_only_this_conversations_kept_things() {
         ["synthetic: the bicycle pump is in the shed"]
     );
 }
+
+/// The Core-verifier's GATE 23 FAIL on lamp-52e6 (stable 9980, 4 Nov), with
+/// `LAMP_PERSON_SCOPE_ONE_FACE`: a room session, the one known face's keep
+/// written to their scope, and the next line's answer, which says it, to the
+/// room's log. Their "forget my favorite drink" takes the kept thing and
+/// that room line, which cites it; another room line with the same word,
+/// citing nothing of theirs, stays. A made-up name.
+#[test]
+fn a_one_face_forget_about_takes_the_room_line_that_says_their_keep() {
+    assert!(switch_forget_about(true));
+    const HENRY: &str = "p-927a0000000000aa";
+    let fixture = Fixture::new("one-face");
+    let client = DaysClient::new(fixture.socket.clone()).unwrap();
+    let _ = client.told_for_session_within(1, None, false, BUDGET);
+    remember(
+        &client,
+        Some(HENRY),
+        "Their favorite drink is jasmine cheese.",
+    );
+    // Line 2 is Henry's keep by the one-face rule, as its lease marks it;
+    // line 3, a guest's, another voice heard, is no one's.
+    lamp_voice::memory_scope::mark_one_face_line(2, Some(HENRY));
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    assert!(client.finished_exchange_of(
+        2,
+        now,
+        "What's my favorite stuff?",
+        "Jasmine cheese, that's the favorite I have for you, Henry.",
+        None
+    ));
+    assert!(client.finished_exchange_of(
+        3,
+        now + 1,
+        "Do you have jasmine tea?",
+        "I can't make tea.",
+        None
+    ));
+    let rows = |person: &str| -> u64 {
+        let db = rusqlite::Connection::open_with_flags(
+            fixture.root.join("store").join(lamp_memory::days::DATABASE),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        db.query_row(
+            "SELECT count(*) FROM entries WHERE person=?1 AND (heard||' '||said||' '||text) LIKE '%jasmine%'",
+            [person],
+            |row| row.get(0),
+        )
+        .unwrap()
+    };
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while rows("everyone") < 2 && std::time::Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(rows("everyone"), 2, "both room lines written");
+    assert_eq!(rows(HENRY), 1, "his kept thing");
+    let (told, ok) = client.run_for(
+        &call(FORGET, json!({"about":"favorite drink"})),
+        BUDGET,
+        Some(HENRY),
+    );
+    assert!(ok && told["forgotten"] == true, "{told}");
+    assert_eq!(rows(HENRY), 0, "his kept thing is gone");
+    assert_eq!(rows("everyone"), 1, "only the guest's room line stays");
+}
