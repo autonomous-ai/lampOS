@@ -9,6 +9,7 @@ pub mod beat;
 pub mod chat;
 pub mod faces;
 pub mod guard;
+pub mod harness_sign_in;
 pub mod lamp;
 pub mod light;
 pub mod make_skill;

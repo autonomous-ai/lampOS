@@ -10,7 +10,7 @@ use crate::{
     },
     progress::{Reads, Tracker},
     protocol::{Answer, MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
-    sign_in::{Session as SignInSession, Starter},
+    sign_in::{By as SignInBy, Method as SignInMethod, Session as SignInSession, Starter},
     store::Store,
 };
 use lamp_bus::{Bus, Publisher};
@@ -158,6 +158,12 @@ pub struct Config {
     /// code, and passes on the person's answer, all on the trusted route.
     /// Off unless set.
     pub sign_in_by_code: bool,
+    /// The owner's app's own route (`serve --app-socket`, #5198): a third
+    /// socket that takes only the app's sign-in operations
+    /// (`app_sign_in_start`, `app_sign_in_state`, `app_sign_in_answer`),
+    /// with `--sign-in-by-code`. lamp-cloud hands the app's
+    /// `harness.sign_in.*` here. Off unless set.
+    pub app_socket: Option<PathBuf>,
     /// How often the part says how it is on `diagnostics` while nothing
     /// changes: [`REPORT_EVERY`] on a lamp. A change in readiness is said
     /// at once, whatever this is. Tests pass less, so a test that reads the
@@ -449,7 +455,7 @@ impl Adapter for Cli {
     }
     fn sign_in_starter(&self) -> Option<Starter> {
         match self.lane() {
-            Ok(lane) => Some(Box::new(move || lane.sign_in_by_code())),
+            Ok(lane) => Some(Box::new(move |method| lane.sign_in(method))),
             Err(error) => {
                 eprintln!("tasks: no lane for the sign-in: {error}");
                 None
@@ -536,7 +542,7 @@ impl Adapter for Production {
     fn sign_in_starter(&self) -> Option<Starter> {
         match self {
             Self::Cli(cli) => Adapter::sign_in_starter(&**cli),
-            Self::Absent => Some(Box::new(|| Err("no_harness".into()))),
+            Self::Absent => Some(Box::new(|_| Err("no_harness".into()))),
         }
     }
     fn start_daemon(&self) -> Result<(), String> {
@@ -600,9 +606,19 @@ fn close_line(job: &CloseJob, result: &Result<Closed, String>) -> String {
     }
 }
 
+/// Which socket a request came on: the public one, the voice's trusted
+/// one, or the owner's app's (`--app-socket`, #5198). Each route's
+/// authority is its socket's, never a field in the request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Route {
+    Public,
+    Voice,
+    App,
+}
+
 struct Work {
     request: Request,
-    trusted: bool,
+    route: Route,
     deadline: Instant,
     response: SyncSender<Result<Value, EngineError>>,
 }
@@ -782,7 +798,8 @@ fn owner<C: Clock>(
     incoming: Receiver<Work>,
     (jobs, outcomes): (SyncSender<Job>, Receiver<Outcome>),
     current: Arc<Mutex<Report>>,
-    stop: Arc<AtomicBool>,
+    // When to stop, and the file keeping the newest sign-in id (#5198).
+    (stop, sign_in_ids): (Arc<AtomicBool>, PathBuf),
     (watch, progress, lane, close_told, set_up_later, mut sign_in_starter, daemon_retry_after): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
@@ -816,9 +833,16 @@ fn owner<C: Clock>(
     let mut daemon_tries: u32 = 0;
     // The last sign-in's id. Counted from the clock, so a sign-in after a
     // restart isn't taken for one before it (the reviewer's P3 on #2174).
+    // This run's id for the app (#5198): views are ordered by `revision`
+    // within one run only.
+    let instance_id = random_id()?;
+    // Never below the newest one kept (#5198): the backend tells an ended
+    // sign-in from one not put yet by its id, which must only grow, across
+    // restarts too, and a lamp's clock may start behind before it is set.
     let mut sign_ins: u64 = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_millis() as u64);
+        .map_or(0, |since| since.as_millis() as u64)
+        .max(newest_sign_in_id(&sign_in_ids));
     while !stop.load(Ordering::Acquire) {
         if let Some(session) = sign_in.as_mut() {
             let was_open = session.open();
@@ -968,6 +992,41 @@ fn owner<C: Clock>(
                         code: "timeout",
                         message: "The queued request expired before it started.",
                     }));
+                } else if work.route == Route::App && !work.request.app() {
+                    // The app's route takes the app's sign-in alone: never a
+                    // hand-over's confirm, nor the voice's sign-in.
+                    let _ = work.response.try_send(Err(EngineError {
+                        code: "not_on_this_route",
+                        message: "The app's route takes only the app's sign-in operations.",
+                    }));
+                } else if work.request.app() && work.route != Route::App {
+                    let _ = work.response.try_send(Err(EngineError {
+                        code: "untrusted",
+                        message: "This operation requires the app's route.",
+                    }));
+                } else if let (Some(starter), true) = (sign_in_starter.as_mut(), work.request.app())
+                {
+                    // Not `identified`: its store revision is not the
+                    // app's, and the app orders views by this run's
+                    // `instance_id` and the sign-in's own `revision`.
+                    let before = sign_ins;
+                    let answer = app_sign_in_operation(
+                        &work.request,
+                        starter,
+                        &mut sign_in,
+                        &mut sign_ins,
+                        Instant::now(),
+                    );
+                    if sign_ins != before {
+                        keep_sign_in_id(&sign_in_ids, sign_ins);
+                    }
+                    let answer = answer.map(|mut body| {
+                        body["ok"] = true.into();
+                        body["instance_id"] = instance_id.as_str().into();
+                        body
+                    });
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
                 } else if let (Some(starter), true) = (
                     sign_in_starter.as_mut(),
                     matches!(
@@ -979,15 +1038,19 @@ fn owner<C: Clock>(
                             | Request::SignInAnswer { .. }
                     ),
                 ) {
+                    let before = sign_ins;
                     let answer = sign_in_operation(
                         &work.request,
-                        work.trusted,
+                        work.route == Route::Voice,
                         starter,
                         &mut sign_in,
                         &mut sign_ins,
                         Instant::now(),
-                    )
-                    .and_then(|body| engine.identified(body));
+                    );
+                    if sign_ins != before {
+                        keep_sign_in_id(&sign_in_ids, sign_ins);
+                    }
+                    let answer = answer.and_then(|body| engine.identified(body));
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                 } else if let (Request::GetProgress { id }, Some(tracker)) =
@@ -1015,7 +1078,8 @@ fn owner<C: Clock>(
                     let _ = work.response.try_send(answer);
                 } else {
                     moved = true;
-                    let answer = engine.handle(&work.request, &clock.sample()?, work.trusted);
+                    let answer =
+                        engine.handle(&work.request, &clock.sample()?, work.route == Route::Voice);
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                     if engine.failed() {
@@ -1171,9 +1235,20 @@ fn sign_in_operation(
     }
     match request {
         Request::SignInStart {} => {
+            // An app-started sign-in open is never given to the voice: its
+            // code is not to be said in the room (#5198).
+            if sign_in
+                .as_ref()
+                .is_some_and(|session| session.open() && session.by() == SignInBy::App)
+            {
+                return Err(EngineError {
+                    code: "started_in_app",
+                    message: "A sign-in started in the app is open; it is answered there.",
+                });
+            }
             if !sign_in.as_ref().is_some_and(SignInSession::open) {
                 *sign_ins += 1;
-                let session = match starter() {
+                let session = match starter(SignInMethod::Code) {
                     Ok(link) => {
                         eprintln!("tasks: sign-in {sign_ins}: started");
                         SignInSession::new(*sign_ins, link, now)
@@ -1233,6 +1308,7 @@ fn sign_in_operation(
                     code: "not_this_sign_in",
                     message: "That sign-in is not the one open.",
                 }),
+                Err("started_in_app") => Err(started_in_app()),
                 Err(_) => Err(EngineError {
                     code: "not_asking",
                     message: "The sign-in is not asking for an answer now.",
@@ -1259,6 +1335,7 @@ fn sign_in_operation(
                     // heard.
                     eprintln!("tasks: sign-in {}: {said} not taken: {code}", session.id());
                     Err(match code {
+                        "started_in_app" => started_in_app(),
                         "not_asking" => EngineError {
                             code: "not_asking",
                             message: "The sign-in is not asking for an answer now.",
@@ -1280,6 +1357,174 @@ fn sign_in_operation(
             }
         }
         _ => unreachable!("only the sign-in's operations"),
+    }
+}
+
+/// The file, in the state folder beside the store's, keeping the newest
+/// sign-in id (#5198): each new id is past both the clock and it.
+pub const SIGN_IN_ID_FILE: &str = "sign-in-id";
+
+/// The newest sign-in id kept, or 0.
+fn newest_sign_in_id(file: &Path) -> u64 {
+    fs::read_to_string(file)
+        .ok()
+        .and_then(|text| text.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+/// Keeps `id` as the newest, whole or not at all; a failure is said and
+/// the clock still counts the next one up.
+fn keep_sign_in_id(file: &Path, id: u64) {
+    let written = file.with_extension("new");
+    let kept = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .mode(0o600)
+        .open(&written)
+        .and_then(|mut out| {
+            out.write_all(format!("{id}\n").as_bytes())?;
+            out.sync_all()
+        })
+        .and_then(|()| fs::rename(&written, file));
+    if let Err(error) = kept {
+        eprintln!("tasks: sign-in {id}: its id not kept: {error}");
+    }
+}
+
+fn started_in_app() -> EngineError {
+    EngineError {
+        code: "started_in_app",
+        message: "That sign-in was started in the app; it is answered there.",
+    }
+}
+
+/// One of the app's sign-in operations (#5198), on the app's route only
+/// (`serve --app-socket`). A start while the app's own is open gives it
+/// back; one while the voice's is open is refused, and the app reads the
+/// voice's code with `app_sign_in_state`. The app answers only its own,
+/// once it was given the question. Journal lines name the id, the method
+/// and the state, never the code, the link or the email.
+fn app_sign_in_operation(
+    request: &Request,
+    starter: &mut Starter,
+    sign_in: &mut Option<SignInSession>,
+    sign_ins: &mut u64,
+    now: Instant,
+) -> Result<Value, EngineError> {
+    if let Some(session) = sign_in.as_mut() {
+        for said in session.tend(now) {
+            eprintln!("tasks: sign-in {}: {said}", session.id());
+        }
+    }
+    match request {
+        Request::AppSignInStart { method } => {
+            match sign_in.as_ref() {
+                Some(session) if session.open() && session.by() == SignInBy::Voice => {
+                    return Err(EngineError {
+                        code: "voice_sign_in_open",
+                        message: "A sign-in started by voice is open; read its state.",
+                    });
+                }
+                Some(session) if session.open() => {}
+                _ => {
+                    *sign_ins += 1;
+                    let session = match starter(*method) {
+                        Ok(link) => {
+                            eprintln!(
+                                "tasks: sign-in {sign_ins}: started from the app ({})",
+                                method.name()
+                            );
+                            SignInSession::new(*sign_ins, link, now)
+                        }
+                        Err(code) => {
+                            eprintln!(
+                                "tasks: sign-in {sign_ins}: not started from the app: {code}"
+                            );
+                            SignInSession::failed(*sign_ins, &code)
+                        }
+                    };
+                    let mut session = session.started_by(SignInBy::App, *method);
+                    for said in session.tend(now) {
+                        eprintln!("tasks: sign-in {}: {said}", session.id());
+                    }
+                    *sign_in = Some(session);
+                }
+            }
+            Ok(sign_in.as_mut().expect("just set").app_view(now))
+        }
+        Request::AppSignInState {} => Ok(sign_in.as_mut().map_or_else(
+            || json!({"sign_in": "none", "revision": 0}),
+            |session| session.app_view(now),
+        )),
+        Request::AppSignInAnswer { id, answer } => {
+            let session = sign_in.as_mut().ok_or(EngineError {
+                code: "not_asking",
+                message: "No sign-in is asking for an answer.",
+            })?;
+            let said = if *answer == Answer::Yes { "yes" } else { "no" };
+            match session.answer_from_app(*id, *answer == Answer::Yes, now) {
+                Ok(()) => {
+                    eprintln!(
+                        "tasks: sign-in {}: answered {said} in the app",
+                        session.id()
+                    );
+                    Ok(session.app_view(now))
+                }
+                Err(code) => {
+                    eprintln!(
+                        "tasks: sign-in {}: {said} from the app not taken: {code}",
+                        session.id()
+                    );
+                    Err(match code {
+                        "not_this_sign_in" => EngineError {
+                            code: "not_this_sign_in",
+                            message: "That sign-in is not the one open.",
+                        },
+                        "started_by_voice" => EngineError {
+                            code: "started_by_voice",
+                            message: "That sign-in was started by voice; it is answered aloud.",
+                        },
+                        "not_asking" => EngineError {
+                            code: "not_asking",
+                            message: "The sign-in is not asking for an answer now.",
+                        },
+                        "not_read" => EngineError {
+                            code: "not_read",
+                            message: "The app has not been given the question yet.",
+                        },
+                        "too_late" => EngineError {
+                            code: "too_late",
+                            message: "The question was given more than two minutes ago.",
+                        },
+                        _ => EngineError {
+                            code: "ended",
+                            message: "Harness's sign-in ended before the answer reached it.",
+                        },
+                    })
+                }
+            }
+        }
+        Request::AppSignInRelay { id, delivered } => {
+            let session = sign_in.as_mut().ok_or(EngineError {
+                code: "not_this_sign_in",
+                message: "No sign-in is open.",
+            })?;
+            if session.relayed(*id, *delivered).is_err() {
+                return Err(EngineError {
+                    code: "not_this_sign_in",
+                    message: "That sign-in is not the one open.",
+                });
+            }
+            if !*delivered {
+                eprintln!(
+                    "tasks: sign-in {}: not handed to the app's backend",
+                    session.id()
+                );
+            }
+            Ok(session.app_view(now))
+        }
+        _ => unreachable!("only the app's sign-in operations"),
     }
 }
 
@@ -2015,12 +2260,7 @@ fn write_bytes(stream: &mut UnixStream, bytes: &[u8], deadline: Instant) -> io::
     Ok(())
 }
 
-fn serve_client(
-    mut stream: UnixStream,
-    accepted: Instant,
-    trusted: bool,
-    owner: &SyncSender<Work>,
-) {
+fn serve_client(mut stream: UnixStream, accepted: Instant, route: Route, owner: &SyncSender<Work>) {
     if stream.set_nonblocking(true).is_err() {
         return;
     }
@@ -2031,7 +2271,7 @@ fn serve_client(
                 let deadline = accepted + REQUEST_DEADLINE;
                 match owner.try_send(Work {
                     request,
-                    trusted,
+                    route,
                     deadline,
                     response: tx,
                 }) {
@@ -2194,6 +2434,13 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     if config.socket == config.voice_socket {
         return Err(invalid("public and trusted sockets must differ"));
     }
+    if config
+        .app_socket
+        .as_ref()
+        .is_some_and(|app| *app == config.socket || *app == config.voice_socket)
+    {
+        return Err(invalid("the app's socket must differ from the others"));
+    }
     let began = Instant::now();
     let sample = clock.sample()?;
     let mut engine = Engine::open(
@@ -2245,6 +2492,18 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     }));
     let (public, _public_binding) = bind(&config.socket)?;
     let (trusted, _trusted_binding) = bind(&config.voice_socket)?;
+    // The app's route (#5198): with `--sign-in-by-code` only, as the part
+    // without it has no sign-in to give.
+    let app = match config.app_socket.as_ref() {
+        Some(path) if config.sign_in_by_code => Some(bind(path)?),
+        Some(_) => {
+            eprintln!(
+                "tasks: --app-socket asked without --sign-in-by-code; the app's route stays off"
+            );
+            None
+        }
+        None => None,
+    };
     let bus = Bus::new(&config.bus_root)?;
     let mut diagnostic =
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), "tasks")?;
@@ -2300,6 +2559,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     let daemon_retry_after = config.daemon_retry_after;
     let set_up_later = config.set_up_later.clone();
     let report = current.clone();
+    // In the state folder beside the store's (`/var/lib/lampos-tasks`).
+    let sign_in_ids = config
+        .dir
+        .parent()
+        .unwrap_or(&config.dir)
+        .join(SIGN_IN_ID_FILE);
     let owner = thread::Builder::new()
         .name("tasks-store".into())
         .spawn(move || {
@@ -2309,7 +2574,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 owner_rx,
                 (jobs_tx, outcomes_rx),
                 report,
-                owner_stop,
+                (owner_stop, sign_in_ids),
                 (
                     switches.0,
                     switches.1,
@@ -2321,7 +2586,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 ),
             )
         })?;
-    let (clients_tx, clients_rx) = mpsc::sync_channel::<(UnixStream, Instant, bool)>(CLIENT_QUEUE);
+    let (clients_tx, clients_rx) = mpsc::sync_channel::<(UnixStream, Instant, Route)>(CLIENT_QUEUE);
     let clients_rx = Arc::new(Mutex::new(clients_rx));
     let rejected = Arc::new(AtomicU64::new(0));
     let mut workers = Vec::new();
@@ -2334,10 +2599,10 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 .name(format!("tasks-client-{number}"))
                 .spawn(move || {
                     while !stopped.load(Ordering::Acquire) {
-                        if let Some((client, accepted, trusted)) =
+                        if let Some((client, accepted, route)) =
                             incoming.lock().ok().and_then(|r| r.try_recv().ok())
                         {
-                            serve_client(client, accepted, trusted, &writer);
+                            serve_client(client, accepted, route, &writer);
                         } else {
                             thread::sleep(Duration::from_millis(5));
                         }
@@ -2352,12 +2617,17 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     while !stop.load(Ordering::Acquire)
         && config.run_for.is_none_or(|limit| began.elapsed() < limit)
     {
-        for (listener, trusted) in [(&public, false), (&trusted, true)] {
+        let listeners = [
+            Some((&public, Route::Public)),
+            Some((&trusted, Route::Voice)),
+            app.as_ref().map(|(listener, _)| (listener, Route::App)),
+        ];
+        for (listener, route) in listeners.into_iter().flatten() {
             for _ in 0..WORKERS + CLIENT_QUEUE {
                 match listener.accept() {
                     Ok((stream, _)) => {
                         if clients_tx
-                            .try_send((stream, Instant::now(), trusted))
+                            .try_send((stream, Instant::now(), route))
                             .is_err()
                         {
                             rejected.fetch_add(1, Ordering::Relaxed);
@@ -3044,6 +3314,7 @@ mod tests {
             targets_newer: None,
             set_up_later: None,
             sign_in_by_code: false,
+            app_socket: None,
             report_every: REPORT_EVERY,
             daemon_retry_after: DAEMON_RETRY_AFTER,
         };

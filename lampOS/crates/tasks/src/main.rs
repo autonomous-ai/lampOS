@@ -46,6 +46,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut dir = None;
     let mut socket = None;
     let mut voice_socket = None;
+    let mut app_socket = None;
     let mut executable = None;
     let mut targets = None;
     let mut boot_id = None;
@@ -99,6 +100,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--dir" => dir = Some(PathBuf::from(args.next().ok_or("--dir needs a path")?)),
             "--socket" => socket = Some(PathBuf::from(args.next().ok_or("--socket needs a path")?)),
+            "--app-socket" => {
+                app_socket = Some(PathBuf::from(
+                    args.next().ok_or("--app-socket needs a path")?,
+                ))
+            }
             "--voice-socket" => {
                 voice_socket = Some(PathBuf::from(
                     args.next().ok_or("--voice-socket needs a path")?,
@@ -130,6 +136,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     if from_machines.is_some() && !set_up_later {
         return Err("--targets-from-machines writes targets only with --set-up-later".into());
+    }
+    if app_socket.is_some() && !sign_in_by_code {
+        return Err("--app-socket takes the app's sign-in, only with --sign-in-by-code".into());
     }
     if push_wait && !watch {
         return Err("--push-wait reads with the watch; it cannot go with --no-watch".into());
@@ -180,6 +189,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             from_machines,
         }),
         sign_in_by_code,
+        app_socket,
         report_every: REPORT_EVERY,
         daemon_retry_after: DAEMON_RETRY_AFTER,
     };

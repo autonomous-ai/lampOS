@@ -179,6 +179,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -290,6 +291,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -447,6 +449,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -569,6 +572,7 @@ fn face_remove_entirely_cancels_the_persons_reminders() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let removed = answer(&mut real, "face.remove", &json!({"name": "Lan"}))
         .unwrap()
@@ -626,6 +630,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -860,6 +865,7 @@ fn a_restart_from_the_app_is_the_helpers_answered_first_and_refused_under_an_upd
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -933,6 +939,7 @@ fn a_shutdown_from_the_app_is_the_helpers_answered_once_and_refused_under_an_upd
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -1034,6 +1041,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -1144,6 +1152,7 @@ fn system_info_and_health_say_signed_out_only_while_the_bus_says_so() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     let said = |real: &mut Real, kind: &str| answer(real, kind, &Value::Null).unwrap().unwrap();
     assert!(said(&mut real, "system.info").get("account").is_none());

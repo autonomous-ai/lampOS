@@ -179,6 +179,8 @@ enum Wake {
 #[derive(Clone)]
 struct SignInFollow {
     on: bool,
+    /// The code said more slowly (`LAMP_TASKS_SIGN_IN_APP=on`, #5198).
+    slow: bool,
     heard: Arc<Mutex<BTreeSet<u64>>>,
     again_after: Duration,
 }
@@ -660,6 +662,7 @@ impl TaskNews {
         // A sign-in by voice is followed only with its switch (#1676).
         let sign_in = SignInFollow {
             on: std::env::var(crate::agent_tasks::SIGN_IN_ENVIRONMENT).as_deref() == Ok("on"),
+            slow: std::env::var(crate::agent_tasks::SIGN_IN_APP_ENVIRONMENT).as_deref() == Ok("on"),
             heard: Arc::new(Mutex::new(BTreeSet::new())),
             again_after: crate::sign_in::ASK_AGAIN_AFTER,
         };
@@ -987,7 +990,7 @@ fn read_forever(
 ) {
     let socket = directory.join("request.sock");
     let mut offered = BTreeSet::new();
-    let mut follow = crate::sign_in::Follow::default();
+    let mut follow = crate::sign_in::Follow::saying_slowly(sign_in.slow);
     let mut again = crate::sign_in::AskAgain::default();
     // Told: kept in the file, but a sign-in's question only followed, so
     // that one not heard whole is offered again (`AskAgain`).
@@ -3762,6 +3765,7 @@ mod tests {
         let told_file = root.join("told");
         let follow = SignInFollow {
             on: true,
+            slow: false,
             heard: Arc::new(Mutex::new(BTreeSet::new())),
             again_after: Duration::from_millis(150),
         };
@@ -3857,6 +3861,7 @@ mod tests {
                     woken_gap,
                     &SignInFollow {
                         on: false,
+                        slow: false,
                         heard: Arc::new(Mutex::new(BTreeSet::new())),
                         again_after: crate::sign_in::ASK_AGAIN_AFTER,
                     },

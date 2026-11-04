@@ -177,7 +177,16 @@ pub fn reply(
                 }
                 return Some(starting.to_string());
             }
-            identity.data(now, &kind, &answered)
+            let mut data = identity.data(now, &kind, &answered);
+            // Harness's sign-in from the app (#5198): a refusal carries
+            // plain words the app shows as is, beside its code.
+            if let Err(why) = &answered
+                && (crate::harness_sign_in::KINDS.contains(&kind.as_str())
+                    || kind == crate::harness_sign_in::CAN)
+            {
+                data["message"] = crate::harness_sign_in::message_for(why).into();
+            }
+            data
         }
         Command::Other(cmd) => identity.refused(now, &cmd),
     };
@@ -542,6 +551,11 @@ async fn session(
     // Pieces of the answers to texts, looked for between the broker's
     // events (#1673, `crate::chat`).
     let mut tick = tokio::time::interval(crate::chat::TICK);
+    // Harness's sign-in, followed for the app with its switch (#5198): its
+    // view pushed unasked whenever it changes.
+    let mut harness_sign_in = lamp
+        .harness_sign_in()
+        .map(crate::harness_sign_in::Follow::new);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // What was last said, so a state is said once.
     let mut said = String::new();
@@ -579,8 +593,19 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if texting || changes.is_some() || services.is_some() || uploads.is_some() => {
+                    _ = tick.tick(), if texting || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() => {
                         let me = identity.borrow().clone();
+                        // Only while connected: the app asks `state` on its
+                        // screen's open for what it missed.
+                        if connected
+                            && let Some(follow) = harness_sign_in.as_mut()
+                            && let Some(view) = follow.due(std::time::Instant::now())
+                        {
+                            let pushed = me
+                                .data(&now(), crate::harness_sign_in::PUSHED, &Ok(Some(view)))
+                                .to_string();
+                            handed.publish(&client, account.fd_channel.as_str(), pushed, None);
+                        }
                         if texting {
                             for data in lamp.chat_events(crate::chat::now_ms()) {
                                 let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();

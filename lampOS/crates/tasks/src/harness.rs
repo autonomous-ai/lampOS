@@ -1286,6 +1286,15 @@ impl Cli {
     /// kept for the person's answer and its lines read as they come. Never
     /// takes the operation lock: a sign-in waits minutes on a person.
     pub fn sign_in_by_code(&self) -> Result<Box<dyn crate::sign_in::Link>, String> {
+        self.sign_in(crate::sign_in::Method::Code)
+    }
+
+    /// Harness's own sign-in by `method` (#5198): `harness login --code
+    /// --json`, the only method for now.
+    pub fn sign_in(
+        &self,
+        method: crate::sign_in::Method,
+    ) -> Result<Box<dyn crate::sign_in::Link>, String> {
         if self.poisoned.load(Ordering::Acquire) {
             return Err("cleanup_incomplete".into());
         }
@@ -1296,7 +1305,13 @@ impl Cli {
         }
         let mut command = Command::new(&self.config.executable);
         command
-            .args(["login", "--code", "--json"])
+            .args([
+                "login",
+                match method {
+                    crate::sign_in::Method::Code => "--code",
+                },
+                "--json",
+            ])
             .env_clear()
             .envs(&self.config.environment);
         if !self.config.as_person {

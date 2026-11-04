@@ -262,6 +262,9 @@ fn main() -> ExitCode {
         shutdown: lamp_cloud::lamp::Shutdown::from_environment(),
         // Guard mode on and off from the owner's app (#2562): only with LAMP_GUARD_FROM_APP=on.
         guard: lamp_cloud::guard::from_environment(),
+        // Harness signed in from the app (#5198): only with LAMP_TASKS_SIGN_IN_APP=on, and the
+        // backend there for the code, which never goes on the broker.
+        harness_sign_in: lamp_cloud::harness_sign_in::Place::product(&account, &key),
         // A skill typed in the app (#2813): only with LAMP_APP_MAKE_SKILL=on and the skills page.
         make_skill: skills::on_from_environment()
             .then(lamp_cloud::make_skill::from_environment)
@@ -319,6 +322,7 @@ fn main() -> ExitCode {
         update_checks: Default::default(),
         restart: None,
         guard: None,
+        harness_sign_in: None,
         make_skill: None,
         write_skill: None,
         share: None,
