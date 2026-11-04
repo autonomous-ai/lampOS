@@ -14,7 +14,7 @@ tmp=$(mktemp -d $SP/still.XXXXXX) || exit 1; trap 'rm -rf $tmp' EXIT
 coord_queue $tmp/q || { echo "the Queue's comments can't be fetched"; exit 1; }
 for p in "$@"; do
   head=$(coord_head $p) || { echo "#$p: its head can't be read, or is in another repository"; exit 1; }
-  coord_comments $p $tmp/c || { echo "#$p: its comments can't be fetched"; exit 1; }
+  coord_pr_comments $p $tmp/c || { echo "#$p: its comments can't be fetched"; exit 1; }
   coord_body $p $tmp/b || { echo "#$p: its body can't be fetched"; exit 1; }
   r=$($PYTHON -I $TOOLS_DIR/markers.py --writers $wf $p < $tmp/c)
   [[ $r == READ-OK* ]] || { echo "#$p is now ${r:-unread}"; exit 1; }

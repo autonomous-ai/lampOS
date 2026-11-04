@@ -4,5 +4,6 @@
 # One HOLD a line, tab-separated, at least four fields:
 #   PR  key  commit-prefix  link-to-the-reader's-closing-comment  [note]
 # key is what markers.py keys the HOLD on: <login>/<signed name, lowercase>, or <login>/unsigned#<comment index>.
+# An unsigned HOLD posted as a review: <login>/unsigned-review#<submitted_at> (reviews never count in the comment index).
 # Example (tabs between fields):
 # 1234	some-login/reviewer-two	0123abcd9	https://github.com/autonomous-ai/lampOS/pull/1234#issuecomment-1	lifted by the first builder
