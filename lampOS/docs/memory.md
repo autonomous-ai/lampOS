@@ -2646,7 +2646,9 @@ then use that person's scope:
   (the Reviewer-lead's P3 on #4530).
 - **What the caller said before their face was known**
   (`LAMP_MEMORY_FOLLOWS_FACE=on`, with Days, the second route only; off
-  unless set; #2176; `crates/voice/src/follows_face.rs`). "My name is
+  unless set, on in the product by the memory owner's call on 4 Nov, where
+  with no `LAMP_SAME_VOICE_MODEL` only a line seen spoken by the caller's
+  one known face moves; #2176; `crates/voice/src/follows_face.rs`). "My name is
   Bramble" said before "remember my face" was the room's, so a new
   session's "what's my name?" found nothing. With the switch, when a face is
   saved (`remember_my_face` answered, in a line of the room's) or known in a

@@ -1433,6 +1433,35 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// What a caller said before their face was known becomes theirs once it is
+/// (`LAMP_MEMORY_FOLLOWS_FACE`, #2176): the memory owner's call on 4 Nov. It
+/// moves nothing without the Days memory, the second route and the eyes'
+/// speaking faces, so the unit sets all four; with no voice model in the
+/// product, only a line seen spoken by the caller's one known face moves.
+#[test]
+fn the_product_lets_what_a_caller_said_follow_their_face() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_FOLLOWS_FACE=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_EYES_SPEAKING=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_SAME_VOICE_MODEL=")),
+        "the voice sets LAMP_SAME_VOICE_MODEL"
+    );
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story). The wordless cut-in's question stays
 /// off: the lamp's own echo commits as a cut-in with 0 words (7 of 15
