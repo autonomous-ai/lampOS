@@ -3330,6 +3330,16 @@ pub fn serve(
         );
     }
     engine = engine.saying_at_once(say_at_once);
+    // A reply that claims a light, volume or Schedule action in the acting
+    // part's own words, with no call of that kind, is never said as it is
+    // (`LAMP_ACTION_CLAIM_CHECKED=on`, #5215).
+    let action_claims = crate::action_claim::on();
+    if action_claims {
+        eprintln!(
+            "lamp-voice second: a reply claiming a light, volume or timer action no call made is asked again once, then said not done (LAMP_ACTION_CLAIM_CHECKED)"
+        );
+    }
+    engine = engine.checking_action_claims(action_claims);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)

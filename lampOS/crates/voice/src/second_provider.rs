@@ -1377,6 +1377,8 @@ struct Shared {
     checking_line: bool,
     /// [`Engine::saying_at_once`] (#2135).
     say_at_once: bool,
+    /// [`Engine::checking_action_claims`] (#5215).
+    action_claims: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -3256,6 +3258,7 @@ impl Engine {
                 short_done: false,
                 checking_line: false,
                 say_at_once: false,
+                action_claims: false,
                 no_words_again: false,
                 answer_again: false,
                 asked_person: None,
@@ -4177,6 +4180,21 @@ impl Engine {
     pub fn saying_at_once(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.say_at_once = on;
+        }
+        self
+    }
+
+    /// `LAMP_ACTION_CLAIM_CHECKED=on` ([`crate::action_claim`], #5215): a
+    /// reply that is or opens with the acting part's own line for a light,
+    /// volume or Schedule action ("Louder.", "Timer set. It rings at 9:39
+    /// am."), in a turn that made no call of that kind, is not said: the
+    /// model is asked once more ([`crate::action_claim::NOTE`]), and a
+    /// second such claim is said as [`crate::action_claim::NOT_DONE_LINE`].
+    /// A step word alone, held without the switch too, takes the same one
+    /// ask and then the line. Before any turn only.
+    pub fn checking_action_claims(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.action_claims = on;
         }
         self
     }
@@ -10159,6 +10177,43 @@ fn offered(
     said
 }
 
+/// `piece` added to a round's held claim (`LAMP_ACTION_CLAIM_CHECKED`,
+/// #5215) while one is held, so nothing of it is said before the claim is
+/// judged at the round's end; else `piece` as it is.
+fn held_for_a_claim(held: &mut Option<String>, piece: String) -> String {
+    match held {
+        Some(held) => {
+            held.push_str(&piece);
+            String::new()
+        }
+        None => piece,
+    }
+}
+
+/// A turn whose reply claimed an action again with no call of its kind,
+/// after one ask again (`LAMP_ACTION_CLAIM_CHECKED`, #5215): what an earlier
+/// round held is said, then [`crate::action_claim::NOT_DONE_LINE`], and the
+/// turn ends. The journal line says why and how many calls the turn made,
+/// never the words.
+async fn said_not_done(
+    shared: &Shared,
+    queue: &mut Queue<'_>,
+    offer_hold: &mut crate::remember::OfferHold,
+    (request, round): (u64, usize),
+    why: &str,
+    called: usize,
+) -> Result<(), Stop> {
+    eprintln!(
+        "lamp-voice second: request {request} chat round {round}: its reply claims again an action no call made ({why}; {called} call(s) in the turn): said it wasn't done (LAMP_ACTION_CLAIM_CHECKED)"
+    );
+    for sentence in offered(offer_hold, false, request, round) {
+        queue.push(sentence).await?;
+    }
+    queue
+        .push(shared.fixed(crate::action_claim::NOT_DONE_LINE).to_owned())
+        .await
+}
+
 /// Chat, speech and the turn's last events, for the person's `said`, with
 /// the picture of a look (`looking`). The picture goes in this request only,
 /// never into the thread or a later turn's history.
@@ -10536,6 +10591,20 @@ async fn answer(
         // A held line answering cut words goes on from the rounds their
         // answer finished (#5026).
         let rounds = carried_rounds(shared, request);
+        // The functions the turn called, by name: a claim in the acting
+        // part's own words stands only beside one of its kind
+        // (`LAMP_ACTION_CLAIM_CHECKED`, #5215). A cut answer's finished
+        // rounds carried here are the turn's own.
+        let mut turn_called: Vec<String> = rounds
+            .iter()
+            .flat_map(|message| &message.tool_calls)
+            .filter_map(|call| call["function"]["name"].as_str().map(str::to_owned))
+            .collect();
+        // Whether a claim with no call (or a step word alone, with the
+        // switch) was asked again once already, and whether the next round
+        // is told one went unsaid beside other calls.
+        let mut action_claim_asked = false;
+        let mut action_claim_note = false;
         if !rounds.is_empty() {
             eprintln!(
                 "lamp-voice second: request {request} goes on from {} messages of the cut answer's finished rounds",
@@ -10584,6 +10653,9 @@ async fn answer(
             if let Some(note) = keep_claim_note.take() {
                 messages.push(Message::system(note));
             }
+            if std::mem::take(&mut action_claim_note) {
+                messages.push(Message::system(crate::action_claim::NOTE));
+            }
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                 return Err(Stop::Gone);
             }
@@ -10630,6 +10702,14 @@ async fn answer(
             // The reply, when it was only a step's own word ("Louder.",
             // `not_speech::step_word_alone`): the same, told so.
             let mut step_alone: Option<String> = None;
+            // A reply's opening, held until it is known whether it claims an
+            // action in the acting part's own words ("Timer set.",
+            // "Louder."); one that does, with no call of its kind earlier in
+            // the turn, is held to the round's end, when its calls say
+            // whether it stands (`LAMP_ACTION_CLAIM_CHECKED`, #5215). Not on
+            // a turn offered no function.
+            let mut action_held =
+                (shared.action_claims && !quoted && asked != Asker::Reminder).then(String::new);
             loop {
                 let next = if first && round == 1 {
                     let at = |after: Duration| from + after;
@@ -10885,6 +10965,22 @@ async fn answer(
                                 }
                             }
                         };
+                        let piece = match action_held.as_mut() {
+                            None => piece,
+                            Some(held) => {
+                                held.push_str(&piece);
+                                match crate::action_claim::claim(held, false) {
+                                    Some(None) => action_held.take().unwrap_or_default(),
+                                    Some(Some(kind))
+                                        if turn_called.iter().any(|name| kind.made_by(name)) =>
+                                    {
+                                        action_held.take().unwrap_or_default()
+                                    }
+                                    // Undecided, or a claim with no call yet.
+                                    _ => continue,
+                                }
+                            }
+                        };
                         // The model has chosen to speak: the announcement
                         // need not wait for its first sentence.
                         // A call written as words opens nothing: no
@@ -10965,7 +11061,7 @@ async fn answer(
                         (Some(opening), _) => opening.push_str(&held),
                         (None, Some(claim)) => claim.push_str(&held),
                         (None, None) => {
-                            for sentence in split.push(&held) {
+                            for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                                 if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
                                     queue.push(sentence).await?;
                                 }
@@ -11001,12 +11097,33 @@ async fn answer(
                     if name == NOT_FOR_ME && !named {
                         return Err(Stop::Declined);
                     }
-                    if round < MAX_ROUNDS && !std::mem::replace(&mut aloud_asked_again, true) {
+                    // With `LAMP_ACTION_CLAIM_CHECKED` a step word alone is a
+                    // claim with no call: it shares the turn's one ask again
+                    // with the other claims, and a second is said as the
+                    // plain line that it wasn't done (#5215).
+                    let claimed = shared.action_claims && step_alone.is_some();
+                    let asked_again = if claimed {
+                        &mut action_claim_asked
+                    } else {
+                        &mut aloud_asked_again
+                    };
+                    if round < MAX_ROUNDS && !std::mem::replace(asked_again, true) {
                         messages.push(Message::system(match step_alone.take() {
                             Some(word) => step_alone_note(&word),
                             None => CALL_ALOUD_NOTE.to_owned(),
                         }));
                         continue;
+                    }
+                    if claimed {
+                        return said_not_done(
+                            shared,
+                            &mut queue,
+                            &mut offer_hold,
+                            (request, round),
+                            "a step word alone",
+                            turn_called.len(),
+                        )
+                        .await;
                     }
                 }
             }
@@ -11025,7 +11142,7 @@ async fn answer(
                 match decline_held.as_mut() {
                     Some(declined) => declined.push_str(&held),
                     None => {
-                        for sentence in split.push(&held) {
+                        for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                             if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
                                 queue.push(sentence).await?;
                             }
@@ -11069,6 +11186,7 @@ async fn answer(
                             }
                         }
                     };
+                    let piece = held_for_a_claim(&mut action_held, piece);
                     if piece.chars().any(char::is_alphanumeric)
                         && !crate::not_speech::names_a_function(&text)
                     {
@@ -11154,10 +11272,72 @@ async fn answer(
                         return Ok(());
                     }
                 } else {
-                    for sentence in split.push(&held) {
+                    for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                         if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
                             queue.push(sentence).await?;
                         }
+                    }
+                }
+            }
+            // A reply that claims an action in the acting part's own words
+            // (#5215: lamp-52e6 at 9928, "Timer set. It rings at 9:39 am."
+            // with no call; earlier, "Louder.", "Brighter.", "Cooler." with
+            // none): said only beside a call of its kind, this round's or an
+            // earlier one's (`LAMP_ACTION_CLAIM_CHECKED`). Beside other calls
+            // its words are not said, those run, and the next round is told.
+            // Alone, the model is told once and asked again; a second such
+            // reply, or one in the last round, is said as the plain line that
+            // it wasn't done.
+            if let Some(held) = action_held.take().filter(|held| !held.is_empty()) {
+                let unmade = crate::action_claim::claim(&held, true)
+                    .flatten()
+                    .filter(|kind| {
+                        !turn_called
+                            .iter()
+                            .map(String::as_str)
+                            .chain(calls.iter().map(|call| call.name.as_str()))
+                            .any(|name| kind.made_by(name))
+                    });
+                match unmade {
+                    None => {
+                        for sentence in split.push(&held) {
+                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                                queue.push(sentence).await?;
+                            }
+                        }
+                    }
+                    Some(kind) if !calls.is_empty() => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply claims a {} action with no such call: not said, its {} other call(s) run (LAMP_ACTION_CLAIM_CHECKED)",
+                            kind.label(),
+                            calls.len()
+                        );
+                        action_claim_asked = true;
+                        action_claim_note = true;
+                        text.clear();
+                    }
+                    Some(kind)
+                        if round < MAX_ROUNDS
+                            && !std::mem::replace(&mut action_claim_asked, true) =>
+                    {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply claims a {} action no call made ({} call(s) in the turn): not said, asked again (LAMP_ACTION_CLAIM_CHECKED)",
+                            kind.label(),
+                            turn_called.len()
+                        );
+                        messages.push(Message::system(crate::action_claim::NOTE));
+                        continue;
+                    }
+                    Some(kind) => {
+                        return said_not_done(
+                            shared,
+                            &mut queue,
+                            &mut offer_hold,
+                            (request, round),
+                            kind.label(),
+                            turn_called.len(),
+                        )
+                        .await;
                     }
                 }
             }
@@ -11210,6 +11390,7 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
+            turn_called.extend(calls.iter().map(|call| call.name.clone()));
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared

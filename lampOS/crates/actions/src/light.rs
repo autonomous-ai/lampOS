@@ -108,7 +108,7 @@ pub fn colour<L: Light>(light: &mut L, name: &str) -> Outcome {
                 colour: name.to_owned(),
                 level: now.level,
             },
-            format!("My light is {} now.", spoken(name)),
+            colour_line(name),
         ),
     }
 }
@@ -193,6 +193,15 @@ fn spoken(colour: &str) -> &str {
     }
 }
 
+/// What a light made `colour` is answered with: "My light is blue now.".
+/// The voice reads a reply that is or opens with one of these, in a turn
+/// that made no light call, as a claim of a change never made
+/// (`LAMP_ACTION_CLAIM_CHECKED`, #5215); a test of the voice's holds its
+/// copy equal to this for each of the ten colours.
+pub fn colour_line(colour: &str) -> String {
+    format!("My light is {} now.", spoken(colour))
+}
+
 /// One step warmer: white to warm, warm to orange. A light in another
 /// colour, asked for warmth, becomes warm. It comes on, at its level.
 pub fn warmer<L: Light>(light: &mut L) -> Outcome {
@@ -237,7 +246,7 @@ fn warmth<L: Light>(light: &mut L, warmer: bool) -> Outcome {
             spoken(colour)
         )
     } else {
-        format!("My light is {} now.", spoken(colour))
+        colour_line(colour)
     };
     set(
         light,
