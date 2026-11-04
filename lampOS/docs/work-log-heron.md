@@ -400,3 +400,12 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   published build, so a switch-off lamp is stuck only with a hand-placed
   different CAM++ (P3, a recovery line). lamp-fc4b's own files are not
   checked: it waits on the person's yes for a read-only ssh.
+- 20:5x–21:1x: #5283 (a plain send with no id has its voice judged)
+  second read: READ-OK; `run` back to the id-only check survives as a P3,
+  since `run` has no direct test; Fourteen's 9adf check passed; NEXT
+  TRAIN. #5287 (a Calendar time needs its zone) on `d75e80ae34`: READ-OK
+  with a P2 owed before the writes switch: the fixed `+07:00` example
+  can make a lamp outside UTC+7 write an event hours off. #5291's memory
+  read went to Thirteen. The first builder ruled on #5272: the fallback
+  needs the person's face to be the only face in view; heron restates
+  on Friday's head.
