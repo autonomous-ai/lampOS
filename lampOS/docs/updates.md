@@ -1761,8 +1761,9 @@ again.
 What the release lists today (`models-2026-10-16`, unpacked): the voice's
 57.5 MB (turn-end model 32.4, ONNX Runtime 25.1, from a 10.3 MB `.tgz`),
 the eyes' 38.9 MB (0.2 and 38.7) and the name's 3.0 MB (1.1, 1.3 and 0.6):
-99.5 MB in all. With two builds kept, only a model that changed costs a
-second copy. If every model changed at once, that would be 99.5 MB beside
+99.5 MB in all. `models-2026-11-04` adds the same-voice check's CAM++
+beside the voice, 29.6 MB, for 129.1 MB. With two builds kept, only a model that changed costs a
+second copy. If every model changed at once, that would be 129.1 MB beside
 the old ones, plus the archive while it is unpacked, plus
 `--keep-free-mb`.
 

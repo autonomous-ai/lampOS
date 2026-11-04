@@ -2808,25 +2808,54 @@ fn missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept() {
     );
 }
 
-/// The pinned list itself: every model under `/opt/lampOS`, from our one
-/// release, pinned by a whole SHA-256; the voice's two the ones the turn-end
+/// The pinned list itself: every model under `/opt/lampOS`, from our models
+/// releases, pinned by a whole SHA-256; the voice's two the ones the turn-end
 /// worker checks, and `name.onnx` the one the lamps run (the first builder
-/// on #811, 13:58).
+/// on #811, 13:58). The same-voice check's CAM++ (#829) is the one
+/// docs/same-voice.md pins, placed beside the voice, and no product unit names
+/// it or turns on models in a round.
 #[test]
 fn the_pinned_models_are_the_ones_their_parts_check() {
     let all = install::models().unwrap();
     let (notices, models): (Vec<_>, Vec<_>) = all
         .iter()
         .partition(|model| model.path.starts_with(NOTICES));
-    assert_eq!((models.len(), notices.len()), (9, 5));
+    assert_eq!((models.len(), notices.len()), (10, 5));
     let release = "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/";
+    let same_voice_release =
+        "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-11-04/";
     for model in &all {
         assert!(model.path.starts_with("/opt/lampOS/"), "{}", model.path);
         assert_eq!(model.sha256.len(), 64);
         assert!(model.bytes > 0);
     }
+    let campplus = "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx";
     for model in &models {
-        assert!(model.url.starts_with(release), "{}", model.url);
+        let from = if model.path.ends_with(campplus) {
+            same_voice_release
+        } else {
+            release
+        };
+        assert!(model.url.starts_with(from), "{}", model.url);
+    }
+    let same_voice = models.iter().find(|m| m.path.ends_with(campplus)).unwrap();
+    assert_eq!(
+        same_voice.path,
+        format!("/opt/lampOS/voice/current/{campplus}")
+    );
+    assert_eq!(same_voice.url, format!("{same_voice_release}{campplus}"));
+    assert_eq!(same_voice.bytes, 29_596_978);
+    assert!(same_voice.archive.is_none());
+    assert_eq!(
+        same_voice.sha256,
+        "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"
+    );
+    for unit in [
+        include_str!("../../../deploy/product/lamp-voice.service"),
+        include_str!("../../../deploy/product/lamp-update.service"),
+    ] {
+        assert!(!unit.contains("Environment=LAMP_SAME_VOICE_MODEL"));
+        assert!(!unit.contains("Environment=LAMP_UPDATE_MODELS"));
     }
     let wire = include_str!("../../turn-end-wire/src/lib.rs");
     let fast = include_str!("../../turn-end/src/fast.rs");
