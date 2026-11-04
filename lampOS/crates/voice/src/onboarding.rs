@@ -57,6 +57,10 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_ONBOARDING_FILE";
 const FACE_SAVE_WAIT_US: u64 = 15_000_000;
 
 pub const NUDGE_ENVIRONMENT: &str = "LAMP_ONBOARDING_NUDGE";
+/// The walk's done line also names a few things to try first, once per
+/// setup, with `on` exactly (#5316, first customers' stage 2 on #5296);
+/// off, the done line is as before.
+pub const FIRST_TRIES_ENVIRONMENT: &str = "LAMP_ONBOARDING_FIRST_TRIES";
 /// The provider worker's flag: the onboarding file, whose mailbox it writes.
 pub const FLAG: &str = "--onboarding-file";
 /// The provider worker's flags after [`FLAG`]: this lamp offers room sounds
@@ -442,6 +446,24 @@ pub struct Progress {
     /// most [`MOST_TOLD_IDS`]; an older build reads past it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub face_again_names: Vec<String>,
+    /// The done line that names a few things to try first was handed out
+    /// ([`FIRST_TRIES_ENVIRONMENT`], #5316): said once, so a later
+    /// "preferences" done, or a redo of the whole walk, gets the plain done
+    /// line. A reset wipes it with the file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tries_said: bool,
+}
+
+impl Progress {
+    /// What a redo of the whole walk starts from: nothing kept but whether
+    /// the things to try were said ([`Self::tries_said`]), so they are
+    /// never said twice to the same owner.
+    fn redone(&self) -> Self {
+        Self {
+            tries_said: self.tries_said,
+            ..Self::default()
+        }
+    }
 }
 
 /// [`Progress::face_again_names`]' bound: a name whole and its first word,
@@ -874,6 +896,8 @@ pub struct Onboarding {
     gesture: Option<&'static str>,
     /// [`NUDGE_ENVIRONMENT`].
     nudge: bool,
+    /// [`FIRST_TRIES_ENVIRONMENT`].
+    first_tries: bool,
     /// The model service refusing turns (#4265, `LAMP_SECOND_REFUSED_HOLD`):
     /// a step that fails meanwhile is held as `later`.
     model_refusing: bool,
@@ -1034,6 +1058,7 @@ impl Onboarding {
         let mut walk = Self::with_definition(file, client, definition);
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
+        walk.first_tries = std::env::var(FIRST_TRIES_ENVIRONMENT).as_deref() == Ok("on");
         walk.face_kept =
             std::env::var(crate::known_faces::ENVIRONMENT).is_ok_and(|socket| !socket.is_empty());
         // The head pads' touches, from `--touch` Controls, only with the
@@ -1119,6 +1144,7 @@ impl Onboarding {
             goals: None,
             body_heard: false,
             nudge: false,
+            first_tries: false,
             model_refusing: false,
             model_held: false,
             face_kept: false,
@@ -3306,7 +3332,7 @@ impl Onboarding {
         // the walk says its done line as soon as the lamp may speak, never
         // waiting for the person's next line (lamp-29e7, 29 Oct, 8545).
         if outcome == Outcome::Done && step == Step::Preferences {
-            self.owed = Some(skill::PREFERENCES_DONE.to_owned());
+            self.owed = Some(self.preferences_done().to_owned());
         }
         if self.led.as_ref().is_some_and(|led| led.step == step) {
             self.led = None;
@@ -3399,6 +3425,19 @@ impl Onboarding {
         );
         eprintln!("lamp-voice: onboarding: who_you_are: the face asked for once more");
         Some(skill::FACE_AGAIN.to_owned())
+    }
+
+    /// "Preferences"' done line: with [`FIRST_TRIES_ENVIRONMENT`] on, the
+    /// first time only, the one that also names a few things to try first
+    /// (#5316); kept as said once handed to [`Self::owed`], so a cut line
+    /// offered again is the same line, and nothing later says it again.
+    fn preferences_done(&mut self) -> &'static str {
+        if self.first_tries && !self.desired.tries_said {
+            self.desired.tries_said = true;
+            skill::PREFERENCES_DONE_TRIES
+        } else {
+            skill::PREFERENCES_DONE
+        }
     }
 
     /// One step asked for again: its outcome and its own counts go, and
@@ -3510,7 +3549,7 @@ impl Onboarding {
                 self.privacy_flow.no_receipt_since = None;
                 self.privacy_flow.waited_out = false;
                 self.privacy_flow.generation = 0;
-                self.desired = Progress::default();
+                self.desired = self.desired.redone();
                 self.opener_turn = None;
                 self.opener_unsaid = 0;
                 self.led = None;
@@ -6932,6 +6971,61 @@ mod tests {
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_DONE]);
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
         assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
+    }
+
+    /// #5316: with `LAMP_ONBOARDING_FIRST_TRIES` on, the walk ends on its
+    /// done line that names a few things to try first, said once as the
+    /// walk's own line; the switch off, the done line is as before.
+    #[test]
+    fn the_first_walk_ends_by_naming_a_few_things_to_try() {
+        for (switch, done) in [
+            (true, skill::PREFERENCES_DONE_TRIES),
+            (false, skill::PREFERENCES_DONE),
+        ] {
+            let mut room = Room::new(&format!("first-tries-{switch}"));
+            room.walk.first_tries = switch;
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk.heard("Quiet from 10PM, please.", room.at);
+            room.walk.lamp_said();
+            assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
+            room.walk.heard("Yes, that's fine.", room.at);
+            assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [done], "{switch}");
+            assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+            assert_eq!(room.walk.desired.tries_said, switch);
+            // Said once: nothing more follows it.
+            assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
+            assert!(fixed_words(done).is_some());
+        }
+    }
+
+    /// #5316: the things to try are never said twice to the same owner: a
+    /// later "preferences" done says the plain done line, and a redo of the
+    /// whole walk keeps that they were said (a reset wipes the file).
+    #[test]
+    fn the_things_to_try_are_said_once_per_setup() {
+        let mut room = Room::new("first-tries-once");
+        room.walk.first_tries = true;
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE_TRIES);
+        assert_eq!(room.walk.preferences_done(), skill::PREFERENCES_DONE);
+        let redone = room.walk.desired.redone();
+        assert!(redone.tries_said);
+        assert_eq!(
+            redone,
+            Progress {
+                tries_said: true,
+                ..Progress::default()
+            }
+        );
+        // An older file without the field reads as not yet said.
+        let old: Progress = serde_json::from_str(r#"{"steps":{}}"#).unwrap();
+        assert!(!old.tries_said);
+        // And a file that has it said keeps it across a save and a read.
+        let kept: Progress =
+            serde_json::from_str(&serde_json::to_string(&room.walk.desired).unwrap()).unwrap();
+        assert!(kept.tries_said);
     }
 
     /// Reviewer-two's P2 on #4326: the hello is owed after the first answer

@@ -1362,6 +1362,12 @@ pub(super) const LINES: &[Line] = &[
         "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。",
         "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요.",
     ]),
+    ("Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can even teach me something new, just by telling me.", [
+        "Rồi, vậy là xong hết. Lúc nào bạn cũng có thể bảo mình cài đặt lại. Muốn biết các nút và cách chạm vào mình, bạn mở app Autonomous, chọn mình, rồi vào General, About, Buttons and gestures nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn còn có thể dạy mình điều mới, chỉ cần nói với mình thôi.",
+        "はい、これで全部です。設定はいつでもやり直せるので、言ってくださいね。ボタンやタッチの使い方は、Autonomous アプリで私を選んで、General、About、Buttons and gestures の順に開くと見られますよ。まずは、タイマーや天気、気になることを何でも聞いてみてください。話しかけるだけで、新しいことを教えてもらうこともできますよ。",
+        "好的，全部完成了。你随时可以让我重新设置。想知道我的按键和触摸怎么用，可以打开 Autonomous App，选中我，再依次打开 General、About、Buttons and gestures。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你甚至可以直接告诉我，教我做新的事。",
+        "좋아요. 이걸로 설정이 모두 끝났어요. 다시 설정하고 싶으시면 언제든 말씀해 주세요. 제 버튼이랑 터치 사용법은 Autonomous 앱에서 저를 선택하고 General, About, Buttons and gestures 순서로 들어가면 볼 수 있어요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 말로 알려 주시기만 하면 새로운 것도 배울 수 있어요.",
+    ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
         "大丈夫です、設定はあとでやり直せます。「設定をやり直して」と言ってください。",
@@ -1446,6 +1452,7 @@ mod tests {
             [
                 super::super::skill::PREFERENCES_HELLO,
                 super::super::skill::PREFERENCES_DONE,
+                super::super::skill::PREFERENCES_DONE_TRIES,
                 super::super::skill::FACE_EXPRESSIONS_YES,
                 super::super::skill::FACE_EXPRESSIONS_NO,
                 super::super::skill::LATER,
@@ -1524,6 +1531,26 @@ mod tests {
             let told = said(done.to_owned(), language);
             let words = super::super::fixed_words(&told).unwrap();
             assert!(words.ends_with(line), "{language:?}: {words}");
+        }
+    }
+
+    /// #5316: the done line that names things to try is the done line, word
+    /// for word, then the tries, in English and in each language, so the
+    /// introduction ends the same way with something to do next.
+    #[test]
+    fn the_done_line_with_tries_is_the_done_line_then_the_tries() {
+        let plain = super::super::skill::PREFERENCES_DONE;
+        let tries = super::super::skill::PREFERENCES_DONE_TRIES;
+        for language in std::iter::once(None).chain(ALL.into_iter().map(Some)) {
+            let plain = said(plain.to_owned(), language);
+            let plain = super::super::fixed_words(&plain).unwrap();
+            let told = said(tries.to_owned(), language);
+            let words = super::super::fixed_words(&told).unwrap();
+            let rest = words.strip_prefix(plain);
+            assert!(rest.is_some_and(|rest| rest.len() > 20), "{language:?}: {words}");
+            if language.is_some() {
+                assert!(!words.contains("anything you're curious"), "{language:?}: {words}");
+            }
         }
     }
 
