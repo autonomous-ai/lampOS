@@ -245,14 +245,15 @@ struct Lamp {
     said: Vec<String>,
 }
 
-/// Every binary the product starts, the voice's worker and the body's
-/// factory tools: a line of text each.
+/// Every binary the product starts, the voice's worker and same-voice
+/// check, and the body's factory tools: a line of text each.
 fn binaries() -> Vec<String> {
     let mut names: Vec<String> = install::parts()
         .into_iter()
         .map(|part| part.binary)
         .collect();
     names.push("lamp-turn-end".into());
+    names.push("lamp-same-voice".into());
     names.push("lamp-body-measure".into());
     names.push("lamp-body-mood".into());
     names
@@ -403,6 +404,11 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
     }
     // The voice's worker beside the voice, where the voice starts it.
     assert!(lamp.on("/opt/lampOS/voice/current/lamp-turn-end").is_file());
+    // The same-voice check beside the voice, where the voice starts it.
+    assert!(
+        lamp.on("/opt/lampOS/voice/current/lamp-same-voice")
+            .is_file()
+    );
     // The body's factory tools beside the body, where steps.sh runs them (#2189).
     for tool in ["lamp-body-measure", "lamp-body-mood"] {
         assert!(
@@ -6176,4 +6182,30 @@ fn a_servo_port_not_there_never_fails_a_unit_that_hides_it() {
     // The product's, the generic package's, the two per-lamp copies and the
     // attended pilot's: a check that found none would pass on nothing.
     assert!(hiding.len() >= 5, "only {hiding:?} hide the servo port");
+}
+
+/// A build from before the voice carried its same-voice check still
+/// installs every part; the check is said missing, once, and not put beside
+/// the voice, while the turn-end worker still is.
+#[test]
+fn a_build_without_the_same_voice_check_still_installs() {
+    let mut lamp = Lamp::new(188, &["lamp-same-voice"]);
+    lamp.install().unwrap();
+    assert!(lamp.on("/opt/lampOS/voice/current/lamp-voice").is_file());
+    assert!(lamp.on("/opt/lampOS/voice/current/lamp-turn-end").is_file());
+    assert!(
+        !lamp
+            .on("/opt/lampOS/voice/current/lamp-same-voice")
+            .exists()
+    );
+    let said: Vec<&String> = lamp
+        .said
+        .iter()
+        .filter(|line| line.contains("lamp-same-voice"))
+        .collect();
+    assert_eq!(said.len(), 1, "{:?}", lamp.said);
+    assert!(
+        said[0].contains("build 188 carries no lamp-same-voice"),
+        "{said:?}"
+    );
 }

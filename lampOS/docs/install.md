@@ -410,7 +410,14 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   before they were made (19 Oct) still installs every part, and install says
   once for each tool that it was left out, so a lamp can be put back on an
   older build (#2249). A test reads steps.sh's `*_BIN` defaults and fails when
-  a step runs a tool that install does not put there.
+  a step runs a tool that install does not put there. The voice's same-voice
+  check `lamp-same-voice` ([same-voice.md](same-voice.md)) goes beside
+  `lamp-voice` the same way, when the build carries it; it runs only when
+  `LAMP_SAME_VOICE_MODEL` is set, which no product unit sets. A round fills
+  a part's new folder from what is beside its binary now plus the build's
+  files (`round::wants_of`), so a lamp whose voice folder has no
+  `lamp-same-voice` yet gets it only from its next `lamp-update install`,
+  not from a round.
 - **What a build does not carry**, never inside a build's folder: models in
   `/opt/lampOS/<part>/models/` (the eyes' two, the name's), beside
   `current`; the product's settings in `/etc/lampOS/<part>/` (decided by the
