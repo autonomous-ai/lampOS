@@ -836,7 +836,10 @@ Off unless `LAMP_STOP_WORDS=heard` in the voice's environment, with
 (`LAMP_VOICE_SECOND_CONFIG`); built by the fourth builder
 (`crates/voice/src/stop_words.rs`). On in the product unit since #5032 (b):
 on lamp-06c1 a short "Stop." over the answer read as neither talk nor quiet,
-and the answer went on, 9 of 9.
+and the answer went on, 9 of 9. It also hears #5111's case: on lamp-9adf
+"Stop, Lamp" yielded late, on "Lamp", the rest in the lamp's own dying tail,
+and sound alone resumed the answer some 0.74 s on (its candidate dropped as
+`policy`).
 
 The duplex rule stops the lamp when someone is plainly over it, and then
 knows only sound and timing. A short "Stop." is over by the time the lamp
@@ -1212,7 +1215,11 @@ Tests:
 - `coordinator::tests::duplex::the_product_uses_a_yields_words_only_to_judge_a_stop`
   (the first builder's condition on #5032): a line that is not a stop, with
   a made-up secret in it, resumes the answer, makes no request, leaves no
-  word of it in the trace, and its yield's stream is forgotten.
+  word of it in the trace, and its yield's stream is forgotten;
+- `coordinator::tests::duplex::the_product_hears_a_stop_in_a_late_yield_over_its_own_tail`
+  (#5111): "Stop, Lamp" yielded late and heard over the lamp's dying tail,
+  never plainly, then quiet, commits with the product unit; without the
+  unit's line it resumed.
 
 - through the relay's real thread against a stand-in speech-to-text on an
   in-memory socket: `audio_queued_for_a_yield_never_goes_once_it_is_forgotten_rested_or_dropped`
