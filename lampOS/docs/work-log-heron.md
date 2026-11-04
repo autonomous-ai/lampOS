@@ -441,3 +441,11 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   (`one_face_in_view`), the first builder's call; fmt, clippy,
   person_scope 41, hits 12, remember 320, another_voice 18; putting
   `face_seen_between` back fails the new two-silent-faces test.
+- 23:5x–00:1x — #5276 READ-OK at 749bf3f030 (second read, after
+  Thirteen's): KEEP_HEARD's yes after a second offer, a bare answer never
+  kept; fmt, clippy, remember 322; full lamp-voice lib on a loaded Mac
+  had 40 timing failures, all 40 pass rerun exactly; the heard/thread
+  filtered groups fail the same way on the base (old interference); five
+  mutations caught; P3 the journal's YES_ALONE_LINE still says "only a
+  yes". #5312 let go: Thirteen and El read it first. #5272 has the first
+  builder's privacy READ-OK at d55c259ef4.
