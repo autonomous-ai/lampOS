@@ -240,6 +240,13 @@ refresh goes to the lamp's backend, never to Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | as Slack | as Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | as Slack | as Slack |
 
+A Calendar `events` read asks for its times in the lamp's own zone
+(`timeZone`, the system zone's IANA name, `reads::zone_here`), so a
+15:00 +07:00 event comes back as 15:00 +07:00. Without it Calendar answers
+in the calendar's own zone, and on lamp-9adf on 5 Nov at 00:27 such an
+event came back as 08:00Z and was said as "8 to 9 AM your time". With the
+zone unnamed, nothing is asked, as before.
+
 A call may name either Gmail code: `gmail` or `gmail-app` reaches whichever
 Gmail link the lamp has, because the voice's model mixes the two (on
 lamp-9adf on 4 Nov it named `gmail` in two of four sends and the lamp said
