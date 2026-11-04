@@ -203,10 +203,17 @@ Environment=LAMP_OWN_LINE_OVER_TALK=on
 # A few emotion tags in the second route's speech ([laughs], [sighs], [whispers], [excited]), read by
 # LAMP_SECOND_SPEECH_MODEL's eleven_v4_turbo (#2901): the owner's pick at lamp-52e6 on 28 Oct, first sound unchanged.
 Environment=LAMP_SECOND_SPEECH_TAGS=on
-# The weather for any place and day. LAMP_SECOND_FACE_NAME and LAMP_SECOND_MEMORY_HITS, on in the A/B, stay off
-# until a request is bound to the person seen speaking it (reviewer-two on #3371): a silent face in view would
-# otherwise give its name and kept notes to an off-camera caller's answer.
+# The weather for any place and day. LAMP_SECOND_FACE_NAME, on in the A/B, stays off until a request is bound to the
+# person seen speaking it (reviewer-two on #3371): a silent face in view would otherwise give its name to an
+# off-camera caller's answer.
 Environment=LAMP_SECOND_WEATHER=on
+# Each spoken turn is told up to three kept things that fit its words, as notes (#2176 row 5c): the memory owner's
+# call on 4 Nov, "on by default ... and accept the privacy leak". Its scope: the person whose own face was seen
+# speaking the line first (since 4 Nov), else the known face in view when no face at all was seen speaking it, else
+# the room's; a line another face was seen speaking never reads the silent face's. Accepted risk (reviewer-two on
+# #3371): with their face in view and silent, an off-camera caller's answer is told that person's kept notes. Needs
+# LAMP_MEMORY_DAYS and the second route, both on here; the journal counts each turn's path (hits_path=).
+Environment=LAMP_SECOND_MEMORY_HITS=on
 # The owner's approximate place from the app, city level (#4333): told only beside a line that needs a place
 # ("near me", the weather). The lead's yes on 3 Nov; shown on lamp-0c89 on 30 Oct (asked nothing back, and asked after a clear).
 Environment=LAMP_OWNER_PLACE=on

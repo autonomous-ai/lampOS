@@ -1808,6 +1808,12 @@ async fn line_sight(
 /// (`boot/f3`), the one face the eyes saw through it
 /// ([`crate::speaking_faces::SpeakingFaces::one_face_in_view`]). No face of
 /// theirs known, or the switch off: `false`.
+/// Whether the one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`) has recorded
+/// another voice in the conversation. `false` with the rule off.
+fn another_voice_heard(another_voice: Option<&AtomicBool>) -> bool {
+    another_voice.is_some_and(|another| another.load(Ordering::Acquire))
+}
+
 fn one_face_theirs(
     another_voice: Option<&AtomicBool>,
     eyes: &crate::speaking_faces::SpeakingFaces,
@@ -6686,6 +6692,10 @@ async fn spoken(
     // once the rule has heard it.
     let mut carried_past_silent = false;
     let mut one_face = false;
+    // No face seen speaking it at all and the admitted person's own known
+    // face the only face in view through it: memory's hits may fall back to their scope
+    // (`LAMP_SECOND_MEMORY_HITS`, the memory owner's call of 4 Nov).
+    let mut hits_face = false;
     if let Some(scope) = scope.as_ref()
         && let Some(person) = scope
             .scope()
@@ -6757,6 +6767,21 @@ async fn spoken(
                 // the same (reviewer-three's P1 on #4584, option 2). Taken
                 // below, once narrowed; checked again once the line is
                 // judged, for its own voice.
+                // Memory's hits only, and only with no speaking evidence:
+                // a face seen speaking it, known or not, that isn't theirs
+                // leaves the silent face's scope unread. Their own known
+                // face the only face in view through the line, by the
+                // one-face keep's count (`SpeakingFaces::one_face_in_view`):
+                // a second face, even silent, may be the off-camera voice's
+                // listener or the voice itself, and no looks is not alone
+                // (the first builder's call on #5272). Never with another
+                // voice the one-face rule recorded in the conversation: any
+                // sign of someone else wins (Heron's P2 on #5272).
+                hits_face = !carried
+                    && shared.remembered.is_some()
+                    && speakers.is_empty()
+                    && !another_voice_heard(shared.one_face.as_deref())
+                    && own_face.is_some_and(|face| eyes.one_face_in_view(face, begun, finishing));
                 one_face = !carried
                     && shared.scope_seen
                     && speakers.is_empty()
@@ -6809,6 +6834,11 @@ async fn spoken(
         if one_face && scope.take_by_one_face() {
             eprintln!(
                 "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: told and read as the room's, its keep theirs (LAMP_PERSON_SCOPE_ONE_FACE)"
+            );
+        }
+        if hits_face && scope.fall_back_to_face_for_hits() {
+            eprintln!(
+                "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the only face in view: memory's hits may read their scope, all else the room's (LAMP_SECOND_MEMORY_HITS)"
             );
         }
         if named {
@@ -7345,18 +7375,17 @@ async fn spoken(
     // `LAMP_PERSON_SCOPE_ONE_FACE`: a line whose keep was theirs by their
     // face alone in view, whose own judging showed another person (another
     // voice, or two faces seen speaking it), keeps nothing for them after
-    // all, before the model is asked: the room's, keeps and all.
-    if one_face
-        && shared
-            .one_face
-            .as_ref()
-            .is_some_and(|another| another.load(Ordering::Acquire))
+    // all, before the model is asked: the room's, keeps and all. So too a
+    // line whose hits fell back to the face in view (`LAMP_SECOND_MEMORY_HITS`):
+    // the narrow takes the fallback back (Heron's P2 on #5272).
+    if (one_face || hits_face)
+        && another_voice_heard(shared.one_face.as_deref())
         && let Some(scope) = scope.as_ref()
-        && scope.by_one_face()
+        && (scope.by_one_face() || scope.hits_by_face().is_some())
     {
         scope.narrow_to_room();
         eprintln!(
-            "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: its keep is the room's too (LAMP_PERSON_SCOPE_ONE_FACE)"
+            "lamp-voice second: request {request}: another voice in the conversation, heard as it was judged: its keep and hits are the room's too (LAMP_PERSON_SCOPE_ONE_FACE)"
         );
     }
     // A stop said over the lamp's own answer (#3985: on lamp-29e7 "Stop"
