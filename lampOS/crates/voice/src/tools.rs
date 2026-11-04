@@ -1930,8 +1930,7 @@ fn run_call_with_scope(
             // A rename of the setup owner's face moves the owner with it,
             // counted in flight before the eyes are asked so the owner's
             // refresh never drops them meanwhile (`OwnerRename`).
-            let renaming =
-                crate::known_faces::OwnerRename::begin(socket, call, onboarding.as_deref());
+            let renaming = crate::known_faces::OwnerRename::begin(call, onboarding.as_deref());
             // The first save at setup, while the walk has not yet ended "who
             // you are": the name is said back for a yes, or spelled (#5140).
             // One read of the small local onboarding file, only for a save
@@ -1944,7 +1943,9 @@ fn run_call_with_scope(
                         .is_some_and(crate::onboarding::who_you_are_open),
                 ..*switches
             };
-            let told = crate::known_faces::run_scoped(
+            // Whom the eyes replaced goes to the rename only, never to the
+            // model (Reviewer-three's P1 on #5149).
+            let (told, replaced) = crate::known_faces::run_scoped_replacing(
                 socket,
                 call,
                 switches,
@@ -1954,7 +1955,7 @@ fn run_call_with_scope(
                 lease,
             );
             if let Some(renaming) = renaming {
-                renaming.answered(&told.0);
+                renaming.answered(&told.0, replaced.as_deref());
             }
             // "Forget my face" by the known person whose line it is: their
             // memory goes with it (`LAMP_MEMORY_FORGET_ALL`, #2850).
