@@ -27,7 +27,9 @@ lúc 14:11 ngày 3 Nov 2026):
 - **Các hàng rào**: chỉ câu nói được nghe của chính chủ đèn mới chạm đến một
   dịch vụ ("Ai dùng được chúng", bên dưới); token chỉ đi đến các host của
   chính dịch vụ của nó, qua HTTPS, không theo chuyển hướng; các lượt chạy
-  theo lịch và các kỹ năng tự tạo không chạm đến dịch vụ nào; lời từ một thư,
+  theo lịch không chạm đến dịch vụ nào, và các kỹ năng tự tạo cũng không, trừ
+  khi `LAMP_SKILL_READS` cho một kỹ năng đọc một dịch vụ liên kết cho bạn lúc
+  bạn ở một mình với đèn ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới); lời từ một thư,
   một trang hay một giọng khác không bao giờ trở thành một lần ghi hay bất kỳ
   hành động nào khác; mã dùng một lần và nội dung bảo mật không bao giờ được
   nói ra, chuyển tiếp hay lưu giữ, dù từ dịch vụ nào; những gì một dịch vụ
@@ -107,6 +109,7 @@ dịch vụ.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
 | `LAMP_SERVICES_WRITE=on` | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
+| `LAMP_SKILL_READS=on` | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -165,7 +168,11 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   `{"ok":false,"error":"..."}` trả về trong một dòng dưới 8 KB (dài hơn thì là
   "the answer was too long to give"). Chỉ một tiến trình tại
   `/lampos.slice/lampos-voice.slice/lamp-voice.service` được gọi; mọi tiến
-  trình khác nhận "only the voice may use the lamp's services".
+  trình khác nhận "only the voice may use the lamp's services". Với
+  `LAMP_SKILL_READS=on`, một tiến trình tại
+  `/lampos.slice/lampos-parts.slice/lamp-skills.service` cũng được gọi, nhưng
+  chỉ `service_read`: mọi tên khác nhận "a skill may only read a linked
+  service" (`serve::Services::skill_tool`).
 
 Mỗi cửa trả lời tối đa 8 kết nối cùng lúc ("busy" khi vượt quá), và một peer
 có 5 s để gửi dòng của nó và nhận câu trả lời. Unit là một service thường,
@@ -733,8 +740,8 @@ only reads …").
 
 Một lần ghi đang chờ được dùng chung cho cả hai tuyến giọng nói. Một lệnh gọi
 dịch vụ được giữ chờ quyết định của Policy như các lệnh của executive, với
-`LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Kỹ năng tự tạo không
-chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
+`LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Khi `LAMP_SKILL_READS`
+tắt (mặc định), kỹ năng tự tạo không chạm đến dịch vụ nào cả: một bước của kỹ năng tự tạo nêu một hàm dịch vụ
 không bao giờ được nói thẳng ra, và một hàm riêng cùng tên của kỹ năng tự tạo
 bị từ chối (`made_skill::plainly`, `made_skill::capped`). Một yêu cầu tạo
 kỹ năng có nêu bất kỳ dịch vụ liên kết nào (thư và lịch: "mail", "email",
@@ -747,11 +754,129 @@ possible yet: a skill can't use your mail, calendar or other services, even
 ones already linked. You can ask me for it yourself any time.", là lời nói với
 người dùng, vì app hiện đúng nguyên văn. Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf
 ngày 4/11 mô hình bảo chủ liên kết một lịch đã được liên kết (#5288, nơi các
-skill đọc dịch vụ được lên kế hoạch).
+skill đọc dịch vụ được lên kế hoạch). Khi bật, xem
+phần "Một kỹ năng tự tạo đọc dịch vụ".
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
 to this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
+
+## Một kỹ năng tự tạo đọc dịch vụ (đề xuất #5288, `LAMP_SKILL_READS`, tắt trừ khi được bật)
+
+Nửa "đọc" của đề xuất #5288: một kỹ năng tự tạo có thể đọc một dịch vụ liên
+kết của chủ đèn, bất kỳ dịch vụ nào có thứ để đọc, khi chủ đèn ở một mình với
+đèn. Nó không bao giờ ghi. Tất cả đều tắt trừ khi `LAMP_SKILL_READS=on` (đúng
+`on`) có trong môi trường của `lamp-services`, `lamp-skills`,
+`lamp-skills-manage@` và `lamp-voice`; không unit sản phẩm nào đặt nó.
+
+**Ai đọc.** Chính `lamp-skills`, như một bên gọi riêng của socket tools của
+`lamp-services` (`/run/lampos-services/tools/call.sock`, hoặc
+`LAMP_SKILLS_SERVICES_SOCKET`): `lamp-services` nhận ra nó qua cgroup và chỉ
+nhận `service_read` từ nó ("Ba phần và các socket của chúng", bên trên). Những
+gì dịch vụ trả về không đến mô hình nào: `lamp-skills` nói nó như văn bản
+chính xác qua socket say của giọng nói (không bao giờ là một lượt của mô hình,
+chờ khi có người đang nói với đèn, bị từ chối khi đèn tạm dừng hay tắt tiếng),
+nên nó vẫn là dữ liệu trích dẫn và không gì hành động theo nó được, đúng như
+`AFTER_READ` đòi hỏi. Cổng gửi của giọng nói không nằm trên đường này; cổng
+của kỹ năng bên dưới thay cho nó.
+
+**Dịch vụ nào.** Mọi dịch vụ trong catalogue có việc đọc (một danh sách cho
+phép các đường dẫn, hoặc các tool đọc của một máy chủ MCP), và không dịch vụ
+nào chỉ gửi (`lamp_services::spoken::not_readable`): `gmail`,
+`google_calendar`, `google_drive`, `notion`, `figma`, `figma-api`, `github`,
+`linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot` và
+`amplitude`. `gmail-app` không đọc gì ("\"gmail-app\" only sends mail, so it
+has nothing to read"). Dịch vụ có được liên kết hay không là câu trả lời của
+chính `lamp-services` lúc chạy (`NOT_LINKED`), ghi vào journal là "not read:
+...". Một lần đọc trả về toàn văn của một mục không bao giờ là của kỹ năng
+(`spoken::WHOLE_TEXTS`): `message` của `gmail`, `text` của `google_drive`,
+`page` của `notion`, và `comments` của `figma` và `figma-api`.
+
+**Bước.** Trong `skill.toml` ([skills.md](../skills.md)):
+
+```toml
+[permissions]
+speak = true
+services = { google_calendar = "read" }   # một dịch vụ bất kỳ có việc đọc; chỉ "read"
+
+[[do]]
+read = { service = "google_calendar", what = "events", day = "tomorrow" }  # hoặc "today"
+# read = { service = "gmail", what = "recent", count = 5 }               # count 1..10, mặc định 5
+# read = { service = "notion", what = "search", query = "plans" }
+# read = { service = "google_drive", what = "files", count = 3 }
+```
+
+`read` là bước duy nhất của kỹ năng, đứng một mình (không `on`, `after` hay
+`if_choice`), trong một kỹ năng do trigger khởi động, không có `each` và không
+có tool, và cần `[permissions] services` ghi dịch vụ của nó là `"read"` cùng
+`speak = true`. `what` là một trong các việc đọc của dịch vụ như
+`service_read` liệt kê (`reads::WHATS`; với dịch vụ MCP là `tools` hoặc
+`call`), trừ việc đọc toàn văn. Các khoá khác là của chính `service_read`:
+`count` (1 đến 10), `query`, `id`, `repo`, `calendar`, `project`,
+`workspace`, `path`, `graphql`, `variables`, `tool`, `arguments` (mỗi khoá 1
+đến 1.000 byte) và `params` (một bảng văn bản); không bao giờ `from` hay `to`.
+`events` của lịch lấy `day = "today"` hoặc `"tomorrow"` (ngày địa phương, tối
+đa 10 sự kiện) và không có `count`; `day` không dùng cho gì khác.
+`lamp-services` giữ lần đọc trong danh sách cho phép như với giọng nói.
+
+**Cổng** (`service_read::judge`), đọc từ những gì đèn đã công bố, mỗi 250 ms:
+
+| Đạt khi | Đọc từ | Nếu không |
+|---|---|---|
+| Đã đăng ký khuôn mặt chủ đèn | Tên chủ đèn gõ lúc cài đặt (`LAMP_SKILLS_OWNER_FILE`, dự định là `LoadCredential=owner:/etc/lampOS/person/name`) và tệp known của mắt | "no owner's face enrolled": bỏ qua ngay |
+| Không riêng tư: micro được biết là mở, đèn không ngủ hay tắt tiếng | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
+| Không tạm dừng (thay cho chế độ không làm phiền) | `lamp/pause` | "paused" |
+| Không trong giờ yên lặng: 22:00–07:00 địa phương, hoặc `[quiet]` của kỹ năng; giờ địa phương không rõ thì tính là yên lặng | `lamp_local_time::quiet_hours` | "quiet hours" |
+| Tối đa một khuôn mặt trong tầm nhìn (`faces_at_most = 1`) | `humans/faces/tracked`, mới trong 3 s | "not alone" |
+| Khuôn mặt đó là khuôn mặt quen của chủ đèn | Tệp known của mắt (mới trong 2 s), tên là tên chủ đèn, không phân biệt hoa thường | "not the owner" / "the owner not in view" |
+| Không nghe giọng nào trong một phút qua | Tin nhắn mới nhất của `voice/heard` | "a voice heard" |
+
+Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
+rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>"). Mỗi kỹ năng đọc một lần
+mỗi ngày địa phương (giữ trong bộ nhớ của `lamp-skills`, nên khởi động lại thì
+quên).
+
+**Những gì được nói**: một quy tắc, theo dịch vụ (`lamp_services::spoken`,
+`SPOKEN`, để một phán quyết sau cho một dịch vụ chỉ đổi một bảng), mỗi dòng là
+một lần say chính xác riêng:
+
+| Dịch vụ (và việc đọc) | Được nói |
+|---|---|
+| `events` của `google_calendar` (phán quyết của first builder) | "Nothing is on your calendar tomorrow." / "You have one event today." / "You have 3 events tomorrow.", rồi từng "At 9:30, Title." hoặc "All day, Title." |
+| `gmail` (phán quyết) | "You have no recent mail." / "You have one recent mail." / "You have 5 recent mails.", rồi từng "From Name: Subject." hoặc "From Name, with no subject." |
+| `notion` | "Nothing from Notion." / "One item from Notion." / "3 items from Notion.", rồi văn bản thuần của từng mục, mà với một lần tìm kiếm là tiêu đề của nó |
+| Mọi dịch vụ và việc đọc khác (mặc định) | "Nothing from Google Drive." / "One item from GitHub." / "3 items from Asana.", rồi tiêu đề hoặc tên của từng mục, khoá đầu tiên nó có trong `title`, `name`, `subject` và `full_name` (dạng văn bản, hoặc `title` hay `name` của một object); mục không có khoá nào thì được đếm mà không được nói |
+
+Không bao giờ nói phần thân, nội dung tin nhắn, nội dung tệp hay bình luận.
+Thư bảo mật và mã dùng một lần bị `lamp-services` bỏ ra trước khi câu trả lời
+rời nó ("Thư bảo mật và mã", bên trên) và không được nói cũng không được đếm.
+Một tiêu đề, người gửi hay chủ đề bị cắt còn 100 ký tự. Cổng được xét lại
+trước mỗi dòng. Nếu có người đến (khuôn mặt thứ hai, một khuôn mặt khác, một
+giọng nói), đèn dừng sau dòng đang nói và chỉ nói "I'll tell you the rest
+later."; nếu cổng đóng vì lý do khác (riêng tư, tạm dừng, giờ yên lặng, chủ
+đèn rời đi), nó dừng mà không nói gì.
+
+**Journal** chỉ giữ kết quả: "read 4", "skipped: not alone", "stopped:
+someone came in, 2 of 5 read", "not read: <lỗi rõ ràng của dịch vụ>", không
+bao giờ một tiêu đề, người gửi hay chủ đề.
+
+**Tạo bằng giọng nói.** Khi bật công tắc trong `lamp-voice`,
+`made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
+đọc và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
+hai dịch vụ, hoặc một lần ghi, vẫn là `NOT_A_SERVICE`. Bước của lịch được cho
+trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư cũng vậy
+(`recent`); với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
+toàn văn (`spoken::whats`) và mô hình chọn một. Kỹ năng tự tạo bị giữ ở
+`services = { <service> = "read" }` (`made_skill::capped`: mọi mục services
+khác bị từ chối, "it asks to use linked services other than by reading one
+that has something to read, which a made skill can't"), và câu "có" nói ra
+của nó nêu dịch vụ, thứ nó đọc và điều kiện: "When the lamp goes quiet,
+between 21:00 and 21:30, when you're alone with the lamp, it reads you
+tomorrow's Google Calendar: how many events, then each time and title." (với
+Drive: "it reads you Google Drive's files: how many, then each name, never
+the text."). Một bước đọc mà câu "có" không nói được (toàn văn, việc đọc dịch
+vụ không liệt kê) làm kỹ năng bị từ chối. Phần uses của nó thêm "reading your
+<service>".
 
 ## Làm mới
 
@@ -849,10 +974,14 @@ chờ thì phát âm thanh đó, như một cuộc trò chuyện chậm.
 
 ## Những gì chưa làm
 
-- **Một kỹ năng tự tạo đọc một dịch vụ.** Đã duyệt (một kỹ năng tự tạo chỉ
-  đọc, câu "có" nói ra của nó nêu dịch vụ và thứ nó đọc), chưa xây:
-  `skill.toml` không có bước nào cho nó, nên hiện nay một kỹ năng tự tạo hoàn
-  toàn không chạm được đến dịch vụ.
+- **Việc đọc của kỹ năng tự tạo chưa bật, chưa chạy trên đèn nào.** Đã xây
+  sau `LAMP_SKILL_READS` (tắt): chỉ thư và lịch có lời nói riêng, mọi dịch vụ
+  khác nói tiêu đề hoặc tên theo những khoá mà một mục có thể không có (một
+  câu trả lời GraphQL của Linear hay GitHub là một mục không có khoá nào, nên
+  chỉ số đếm được nói); chủ đèn chỉ là tên gõ lúc cài đặt, nên một khuôn mặt
+  được `who_you_are` lưu dưới tên khác không bao giờ được tính; "một lần mỗi
+  ngày" giữ trong bộ nhớ và mất khi khởi động lại; không unit sản phẩm nào đặt
+  công tắc hay tệp tên chủ đèn. Việc ghi từ một kỹ năng tự tạo chưa được xây.
 - **Đọc dịch vụ theo lịch** (một bản tóm tắt thư buổi sáng) được bỏ ra cho
   đến khi có thiết kế riêng: một yêu cầu không được nghe trực tiếp không chạm
   đến dịch vụ nào.
@@ -938,7 +1067,20 @@ phòng, một câu bị giữ hay thu hẹp, không có phạm vi và một lư�
 lịch đều bị từ chối, cả đọc lẫn ghi), không gì khác chạy sau một lần đọc
 trong cùng yêu cầu, một lần đọc rút gọn còn ai gửi và về việc gì khi có thể có
 người khác, lời của một lần đọc không được giữ ở đâu trong luồng hay bản tóm
-tắt, một kỹ năng tự tạo không bao giờ chạm đến dịch vụ. `-p lamp-update` (unit được
+tắt, một kỹ năng tự tạo không bao giờ chạm đến dịch vụ khi `LAMP_SKILL_READS`
+tắt, và khi bật thì một lần đọc lịch, thư, Notion hay Drive được đưa vào brief
+(không bao giờ liệt kê toàn văn), bị giữ ở một lần đọc một dịch vụ và được nói
+cùng điều kiện của nó. `-p lamp-services` thêm: một kỹ năng được nhận ra qua
+cgroup riêng và chỉ được `service_read`; `spoken` (mọi dịch vụ có việc đọc đều
+đọc được và `gmail-app` thì không, mỗi toàn văn là một việc đọc dịch vụ có
+liệt kê, thư và lịch theo phán quyết, còn Drive, Notion, GitHub, một Facebook
+Page và Asana theo tiêu đề hoặc tên, không bao giờ phần thân). `-p lamp-skills`
+(`service_read`, `tests/it/skills.rs`, `tests/it/format.rs`): bước đọc chỉ
+nạp khi có quyền, đứng một mình và trong kỹ năng có trigger, cho mọi dịch vụ
+có việc đọc (Notion, Drive) và không cho `gmail-app` hay toàn văn, schema và
+bộ nạp khớp nhau; một lần đọc Drive được nói theo tên; cổng chờ 5 s liên tục,
+bỏ qua sau 60 phút, dừng trước một lời, dừng với "I'll tell you the rest
+later." khi có người đến, và các dòng được nói. `-p lamp-update` (unit được
 cài với `LAMP_SERVICES=on` trong đó, như trong `lamp-cloud.service` và
 `lamp-voice.service`, không có `LAMP_SERVICES_WRITE` và không có `--enable`,
 hash của kế hoạch reset) và `-p lamp-setup`
