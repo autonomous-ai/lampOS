@@ -409,3 +409,14 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   read went to Thirteen. The first builder ruled on #5272: the fallback
   needs the person's face to be the only face in view; heron restates
   on Friday's head.
+- 21:2x–22:3x: #5293 (sends on in the product, the print for the services
+  only) second read: READ-OK, conditional on #5294 landing first; every
+  `for_services` use in the second route is bookkeeping, so no
+  conversation rule reads a print. #5294 (Fourteen, the Calendar example
+  in the lamp's own offset, heron's #5287 P2): READ-OK, with a P3 that
+  `tools.json` keeps the offset from its start. #5284 READ-OK restated on
+  `b798fdca13`: the writer test and the known-face row catch all three
+  `seen` mutations; NEXT TRAIN. #5301 (the first builder, the
+  `THREAD` flake heron reported): READ-OK; full lamp-voice lib 4834/0.
+  `image_ramlog::ramlogs_copies_leave_the_journal_out` fails on this Mac
+  on lamp-voice's base too (environment).
