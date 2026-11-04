@@ -8730,7 +8730,7 @@ fn conversation_with_gate_inner(
                     if request.is_some()
                         && let Some(walk) = onboarding.as_mut()
                     {
-                        walk.lamp_said();
+                        walk.lamp_said(monotonic_us());
                     }
                     // What the lamp says is its own, not a stop said over it
                     // (#828, `heard-always`), stamped with when it will be

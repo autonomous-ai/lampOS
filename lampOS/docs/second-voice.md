@@ -4522,10 +4522,17 @@ after a take-over, but now for every turn:
   has no typed name: there the owner is the name `remember_my_face` saved
   with the face that ended "who you are", kept as `owner` in the onboarding
   file (`onboarding::owner_of`; a face saved once the step is done, a
-  guest's, never changes it, and a reset wipes it with the file), and named
+  guest's, never changes it; the face asked for once more after a setup
+  that ended with the name only sets it only when saved under the name told
+  at setup ([onboarding.md](onboarding.md), "The face asked for once more",
+  #5139), and a reset wipes it with the file), and named
   only while the eyes still know that person (`known_faces::still_known`,
   `{"list":true}`), refreshed every 10 s on a thread of its own
-  (`known_faces::keep_owner_fresh`), so no reply waits on the eyes. Any face
+  (`known_faces::keep_owner_fresh`), so no reply waits on the eyes. With
+  neither name there is no owner and no reply is named; the journal says so
+  once, at the first reply of each stretch with none ("lamp-voice second: no
+  owner: nobody to name by default (LAMP_PERSON_NAME_BY_DEFAULT)", #5139:
+  on a tester's lamp-0c4e on 3 Nov it was skipped with no word). Any face
   forgotten by voice, whoever's, clears it at once
   (`known_faces::owner_forgotten`) and the walk drops the mark from the file;
   one the eyes answer they no longer know (removed in the app, or any other
