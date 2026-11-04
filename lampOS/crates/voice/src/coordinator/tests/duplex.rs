@@ -2094,6 +2094,21 @@ struct OverTheReply {
 /// nor plain blocks), with the stop words the product unit sets up, the
 /// yield's words heard as `words`.
 fn said_over_a_reply_in_the_product(words: &'static str) -> OverTheReply {
+    over_a_reply_in_the_product(words, |h| {
+        h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+        for quiet in 1..=29 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+    })
+}
+
+/// The recording said over a reply in the shape `line` gives its blocks,
+/// with the product unit's stop words, the yield's words heard as `words`,
+/// then still until the yield settles.
+fn over_a_reply_in_the_product(
+    words: &'static str,
+    line: impl FnOnce(&mut Harness),
+) -> OverTheReply {
     let handed = std::sync::Arc::default();
     let forgotten = std::sync::Arc::default();
     let value = PRODUCT_UNIT
@@ -2115,10 +2130,7 @@ fn said_over_a_reply_in_the_product(words: &'static str) -> OverTheReply {
     let old = h.old();
     h.blocks(20, 0.99, Some(evidence(0, OWN)));
     h.recording = Some((h.sequence + 1, stop_recording()));
-    h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
-    for quiet in 1..=29 {
-        h.block(0.1, Some(evidence(quiet, None)));
-    }
+    line(&mut h);
     let mut settled = None;
     for _ in 0..150 {
         h.block(0.1, Some(evidence(40, None)));
@@ -2182,6 +2194,32 @@ fn the_product_hears_a_stop_said_over_its_answer() {
         over.handed[..],
         "the stop words heard more than the commit sends"
     );
+}
+
+/// #5111, lamp-9adf: "Stop, Lamp" over a story, the yield coming late on
+/// "Lamp" and the rest heard in the lamp's own dying tail, over the lamp but
+/// never plainly, then quiet. Sound alone resumed it and dropped its
+/// candidate as `policy` some 0.74 s on; with the product unit its words are
+/// heard and the stop commits it.
+#[test]
+fn the_product_hears_a_stop_in_a_late_yield_over_its_own_tail() {
+    let over = over_a_reply_in_the_product("Stop, Lamp.", |h| {
+        h.blocks(ONSET + 5, 0.9, Some(evidence(0, OVER)));
+        assert_eq!(h.events("duplex_yield").len(), 1);
+        for quiet in 1..=25 {
+            h.block(0.9, Some(evidence(quiet, OVER)));
+        }
+        for quiet in 26..=29 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+    });
+    let h = &over.h;
+    assert_eq!(over.settled["kind"], "duplex_commit", "{}", over.settled);
+    assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+    assert_ne!(h.old(), over.old);
+    let judged = h.events("stop_words");
+    assert_eq!(judged.len(), 1, "{judged:?}");
+    assert_eq!(judged[0]["stop"], true);
 }
 
 /// The first builder's condition on #5032 (b): words heard in a yield are
