@@ -59,10 +59,11 @@ pub const ASK_AGAIN_AFTER: Duration = Duration::from_secs(30);
 pub const ASKED_MOST: u32 = 3;
 
 /// Each sign-in's question taken to be told, by id: when it was last taken
-/// (`None` once offered again) and how many times ([`ASK_AGAIN_AFTER`]).
+/// (`None` once offered again), how many times ([`ASK_AGAIN_AFTER`]), and
+/// whether that telling was talked over (#5198), so it is due at once.
 #[derive(Debug, Default)]
 pub struct AskAgain {
-    told: std::collections::BTreeMap<u64, (Option<Instant>, u32)>,
+    told: std::collections::BTreeMap<u64, (Option<Instant>, u32, bool)>,
 }
 
 impl AskAgain {
@@ -72,9 +73,10 @@ impl AskAgain {
         let Some(id) = asked_of(key) else {
             return false;
         };
-        let (at, times) = self.told.entry(id).or_insert((None, 0));
+        let (at, times, cut) = self.told.entry(id).or_insert((None, 0, false));
         *at = Some(now);
         *times += 1;
+        *cut = false;
         true
     }
 
@@ -97,30 +99,49 @@ impl AskAgain {
     }
 
     /// The questions to offer again at `now`: taken to be told `after` ago
-    /// or more, not heard whole (call [`Self::heard`] first), and taken
-    /// fewer than [`ASKED_MOST`] times. Each is given once a telling. One
-    /// told the last time is let go once its wait has passed (the
-    /// reviewer-lead's P3 2 on #2702): it is in `offered` and never
-    /// offered again.
+    /// or more, or talked over ([`Self::cut`]), not heard whole (call
+    /// [`Self::heard`] first), and taken fewer than [`ASKED_MOST`] times.
+    /// Each is given once a telling. One told the last time is let go once
+    /// its wait has passed (the reviewer-lead's P3 2 on #2702): it is in
+    /// `offered` and never offered again.
     pub fn due(&mut self, after: Duration, now: Instant) -> Vec<String> {
         let waited =
             |at: &Option<Instant>| at.is_some_and(|at| now.saturating_duration_since(at) >= after);
         self.told
-            .retain(|_, (at, times)| *times < ASKED_MOST || !waited(at));
+            .retain(|_, (at, times, _)| *times < ASKED_MOST || !waited(at));
         let mut due = Vec::new();
-        for (id, (at, _)) in &mut self.told {
-            if waited(at) {
+        for (id, (at, _, cut)) in &mut self.told {
+            if waited(at) || (at.is_some() && *cut) {
                 *at = None;
+                *cut = false;
                 due.push(key(*id, "asking"));
             }
         }
         due
     }
 
-    /// The question `key` was talked over or cut short (#5198). STUB.
+    /// The question `key`, taken to be told, was talked over or cut short
+    /// as its turn ended (#5198): due at once, to be asked at the next
+    /// pause, not [`ASK_AGAIN_AFTER`] later. Whether it was a telling
+    /// followed here and not offered again yet: not news not followed
+    /// here. The last of [`ASKED_MOST`] tellings cut is let go, never asked
+    /// again.
     pub fn cut(&mut self, key: &str) -> bool {
-        let _ = key;
-        false
+        let Some(id) = asked_of(key) else {
+            return false;
+        };
+        let Some((at, times, cut)) = self.told.get_mut(&id) else {
+            return false;
+        };
+        if at.is_none() {
+            return false;
+        }
+        if *times >= ASKED_MOST {
+            self.told.remove(&id);
+            return true;
+        }
+        *cut = true;
+        true
     }
 
     /// How many questions are followed: for a test.
