@@ -625,3 +625,10 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - The first builder closed #4175 on it: the three switches stay off. #5125 records the run in their switches.md rows (docs only). The caller's lines after desk talk losing the conversation's tie (c04–c06, held 13 of 18 on both arms) is proposal #5124, to be compared with Seventh's #5110 before anything is built.
 - Reads: #5117 (lamp-tasks journal lines): HOLD on a P2, a failed `new` or `reply` could journal Harness's own words; fixed at `4a020820f9`, READ-OK. #5121 (`--new-folder`): READ-OK with two P3s. #5073 (`LAMP_OWNER_PLACE` on in the product): second READ-OK, no findings, restated on the head's full sha after my first post named a wrong one.
 - Next: #5061 once it is placed with me.
+
+## 4 Nov, morning: #5124 taken, reads, moved to the PM
+
+- From 11:00 Twelve takes its work from the PM (Faye), as the 11:00 cutover on #4710 gives it.
+- #5124 taken (4 Nov). It is the tie proposal: in a busy room the caller's lines lose the tie after desk talk. The first builder placed it on #5161, after Seventh's #5110 count on 9928, so both use the same played lines. It is queued behind that count.
+- #5061 went to the updater's builder (Second), not to me.
+- Reads: #5117 restated READ-OK twice on SubDarren's clean rebases (`9cf74d0c85`, then `9acb33a33c`). Each range-diff changed only context lines.
