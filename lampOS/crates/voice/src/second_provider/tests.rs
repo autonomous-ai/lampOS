@@ -11235,6 +11235,23 @@ async fn a_line_begun_over_the_lamps_answer_is_told_it_cut_in() {
     assert!(after_stop[0].contains(&stopped), "{:?}", after_stop[0]);
 }
 
+/// Holds the voice's process-wide thread for a test whose stop may close its
+/// conversation (`Thread::close_conversation_with`), and leaves it new when
+/// the test ends, so no other test reads it closed.
+struct ThreadHeld(#[allow(dead_code)] crate::provider_worker::tests::OneThread);
+
+impl Drop for ThreadHeld {
+    fn drop(&mut self) {
+        if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            *thread = crate::thread::Thread::new();
+        }
+    }
+}
+
+fn thread_held() -> ThreadHeld {
+    ThreadHeld(crate::provider_worker::tests::one_thread())
+}
+
 /// #3985 (`LAMP_SPOKEN_STOP_ENDS`): on lamp-29e7 "Stop" heard as "Stop
 /// them." over a story was asked of the model ("Stop who?"). A short stop
 /// said over the lamp's answer is answered with the fixed line and the model
@@ -11242,6 +11259,8 @@ async fn a_line_begun_over_the_lamps_answer_is_told_it_cut_in() {
 /// more than a stop, it is asked as before.
 #[tokio::test]
 async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
     for stop in [
         "Stop them.",
         "Stop telling story.",
@@ -11287,11 +11306,46 @@ async fn a_stop_said_over_the_lamps_answer_is_answered_without_the_model() {
     assert_eq!(more.len(), 1, "{more:?}");
 }
 
+/// The local leader (4 Nov): a stop said over the lamp's answer, answered
+/// "Okay, I'll stop there.", closes the conversation, as the button's Stop
+/// does: the line stays in the thread but keeps no conversation going. A
+/// stop asked of the model (the switch off) closes nothing.
+#[tokio::test]
+async fn a_stop_said_over_the_lamps_answer_closes_the_conversation() {
+    let _thread = crate::provider_worker::tests::one_thread();
+    let _closes = crate::thread::closes_for_test();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let asked = asked_with(
+        "Stop them.",
+        |engine| engine.telling_cut_ins(true).ending_spoken_stops(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert!(asked.is_empty(), "{asked:?}");
+    assert!(crate::thread::THREAD.lock().unwrap().closed_at().is_some());
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let off = asked_with(
+        "Stop them.",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(off.len(), 1, "{off:?}");
+    assert!(crate::thread::THREAD.lock().unwrap().closed_at().is_none());
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
 /// #4473 (Tests' P3 on #4723): with an owner's language, the answer to a
 /// stop said over the lamp is in it, its words and its clip, never English,
 /// and the model is still not asked.
 #[tokio::test]
 async fn a_stop_said_over_the_lamp_is_answered_in_the_owners_language() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
     use crate::language::{Language, fixed_in};
     let script = Arc::new(Script {
         heard: Mutex::new([Ok("Stop them.".to_owned())].into()),
@@ -15988,6 +16042,8 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
 /// stop there.": its words are the lamp's own answer's.
 #[tokio::test(start_paused = true)]
 async fn the_lamps_own_stop_heard_back_is_held_not_answered_as_a_stop() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
     let script = Arc::new(Script {
         heard: Mutex::new(
             [

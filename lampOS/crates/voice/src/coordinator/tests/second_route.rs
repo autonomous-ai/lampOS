@@ -4851,6 +4851,8 @@ fn computers_turn_with_an_end(
     // The thread is the whole voice's: hold it from the other tests that
     // read or reset it (`provider_worker::tests::one_thread`).
     let _thread = crate::provider_worker::tests::one_thread();
+    // Its end closes the conversation on the voice's own thread.
+    let _closes = crate::thread::closes_for_test();
     // A conversation another loop test left with the lamp would refuse
     // the turn: none goes on here.
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
