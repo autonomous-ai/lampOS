@@ -112,12 +112,12 @@ socket nào trừ khi `LAMP_SERVICES=on` có trong môi trường của nó (ho�
 khởi động với `--enable`, mà unit của nó không truyền vào): khi tắt, nó ghi
 một dòng và thoát 0 ngay, nên unit ở trạng thái inactive và không bị khởi động
 lại. Ba unit sản phẩm, `lamp-services.service`, `lamp-cloud.service` và
-`lamp-voice.service`, mỗi unit đặt `LAMP_SERVICES=on` (đã đọc thử trên
-lamp-9adf bằng chính các binary của bản 9928 ngày 4/11), và
-`lamp-services.service` còn đặt `LAMP_SERVICES_WRITE=on`. Một drop-in đặt
-`LAMP_SERVICES=off` sẽ tắt chúng, và một drop-in đặt `LAMP_SERVICES_WRITE=off`
-trên `lamp-services.service` chỉ để lại việc đọc
-([switches.md](../switches.md)). Một đèn được cập nhật bởi một `lamp-update`
+`lamp-voice.service`, mỗi unit đặt `LAMP_SERVICES=on`, chỉ để đọc: đã đọc thử
+trên lamp-9adf bằng chính các binary của bản 9928 ngày 4/11. Một drop-in đặt
+`LAMP_SERVICES=off` sẽ tắt chúng. Không unit sản phẩm nào đặt
+`LAMP_SERVICES_WRITE`: một lệnh "send" cần mẫu giọng, mà sản phẩm không đặt
+`LAMP_SAME_VOICE_MODEL`, nên trên lamp-9adf mọi lần gửi đều bị từ chối vì
+giọng ([switches.md](../switches.md)). Một đèn được cập nhật bởi một `lamp-update`
 cũ hơn bản cài `lamp-services` sẽ chưa có thư mục tools cho tới lần chuyển bản
 kế tiếp, và khi đó giọng nói không khai báo hàm nào của dịch vụ.
 
@@ -866,6 +866,6 @@ trong cùng yêu cầu, một lần đọc rút gọn còn ai gửi và về vi�
 người khác, lời của một lần đọc không được giữ ở đâu trong luồng hay bản tóm
 tắt, một kỹ năng tự tạo không bao giờ chạm đến dịch vụ. `-p lamp-update` (unit được
 cài với `LAMP_SERVICES=on` trong đó, như trong `lamp-cloud.service` và
-`lamp-voice.service`, có `LAMP_SERVICES_WRITE=on` và không có `--enable`,
+`lamp-voice.service`, không có `LAMP_SERVICES_WRITE` và không có `--enable`,
 hash của kế hoạch reset) và `-p lamp-setup`
 (`tests/it/reset.rs`).
