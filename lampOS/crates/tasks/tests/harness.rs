@@ -3,7 +3,8 @@
 use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
     Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT,
-    SignIn, Target, iso_unix_ms, parse_auth_status, parse_machines, parse_ps, parse_wait,
+    SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent, WatchLine, iso_unix_ms,
+    parse_auth_status, parse_machines, parse_ps, parse_wait, parse_watch_line,
 };
 use lamp_tasks::runtime::{HarnessSwitches, NEW_FOLDER_FILE, targets_from_machines};
 use serde_json::{Value, json};
@@ -3741,4 +3742,165 @@ fn a_runtime_folder_made_after_the_start_reaches_the_next_harness_call() {
     address.push(folder.join("bus").as_os_str());
     assert_eq!(after["DBUS_SESSION_BUS_ADDRESS"], address);
     assert_eq!(after["HOME"], before["HOME"]);
+}
+
+/// One `harness watch --json` line as openharness prints it.
+fn watched_line(event: &str, id: &str) -> String {
+    json!({"event":event,"at":"2026-11-04T09:00:00.000Z","name":"lamp-task-1","id":id,"agent":"claude","state":"idle"}).to_string()
+}
+
+/// #5230: `watch` hands on each event as it comes, and on `done` kills the
+/// watch itself, which would otherwise stay held on an idle pane harness.
+#[test]
+fn watch_hands_on_each_event_and_ends_itself_on_done() {
+    let rig = Rig::new();
+    rig.plan(json!({"watch":{"lines":[
+        {"text":watched_line("working", AGENT)},
+        {"text":"not json"},
+        {"text":watched_line("needs_person", AGENT),"delay_ms":50},
+        {"text":watched_line("done", AGENT),"delay_ms":50},
+    ],"after_output_ms":5000}}));
+    let cancel = AtomicBool::new(false);
+    let mut events = Vec::new();
+    let began = Instant::now();
+    let end = rig
+        .cli()
+        .watch(MACHINE, AGENT, &cancel, &mut |event| events.push(event));
+    assert_eq!(end, WatchEnd::Settled);
+    assert_eq!(
+        events,
+        vec![
+            WatchEvent::Working,
+            WatchEvent::NeedsPerson,
+            WatchEvent::Done
+        ]
+    );
+    // Killed at `done`, not held for the fixture's five seconds.
+    assert!(
+        began.elapsed() < Duration::from_secs(4),
+        "{:?}",
+        began.elapsed()
+    );
+    let call = rig
+        .calls()
+        .into_iter()
+        .find(|call| call["args"][0] == "watch")
+        .unwrap();
+    assert_eq!(
+        call["args"],
+        json!([
+            "watch",
+            "--machine",
+            MACHINE,
+            AGENT,
+            "--chars",
+            "200",
+            "--timeout",
+            "10m",
+            "--json"
+        ])
+    );
+}
+
+/// #5230: each way `watch` ends, by its exit.
+#[test]
+fn watch_reads_each_exit() {
+    let rig = Rig::new();
+    let cancel = AtomicBool::new(false);
+    let run = |plan: Value| {
+        rig.plan(json!({ "watch": plan }));
+        let mut events = Vec::new();
+        let end = rig
+            .cli()
+            .watch(MACHINE, AGENT, &cancel, &mut |event| events.push(event));
+        (end, events)
+    };
+    assert_eq!(
+        run(json!({"stdout":format!("{}\n", watched_line("stopped", AGENT)),"exit":4})),
+        (WatchEnd::Stopped, vec![WatchEvent::Stopped])
+    );
+    assert_eq!(
+        run(json!({"stdout":format!("{}\n", watched_line("working", AGENT)),"exit":124})),
+        (WatchEnd::Timeout, vec![WatchEvent::Working])
+    );
+    // An older Harness: a usage error.
+    assert_eq!(run(json!({"stdout":"","exit":2})).0, WatchEnd::Missing);
+    // An error ends it with Harness's code; its detail is never kept.
+    assert_eq!(
+        run(
+            json!({"stdout":"{\"error\":\"DISCONNECTED\",\"detail\":\"/home/someone\"}\n","exit":1})
+        )
+        .0,
+        WatchEnd::Failed("DISCONNECTED".into())
+    );
+    assert_eq!(
+        run(json!({"stdout":"","exit":1})).0,
+        WatchEnd::Failed("watch_failed".into())
+    );
+    // A line for another agent is passed over.
+    assert_eq!(
+        run(json!({"stdout":format!("{}\n", watched_line("done", OTHER)),"exit":124})),
+        (WatchEnd::Timeout, vec![])
+    );
+    // `failed` ends it, as `done` does.
+    assert_eq!(
+        run(json!({"lines":[{"text":watched_line("failed", AGENT)}],"after_output_ms":5000})),
+        (WatchEnd::Settled, vec![WatchEvent::Failed])
+    );
+}
+
+/// #5230: a cancel ends a held `watch`, and its process is killed with it.
+#[test]
+fn watch_is_cancelled_and_its_process_killed() {
+    let rig = Rig::new();
+    rig.plan(json!({"watch":{"lines":[{"text":watched_line("working", AGENT)}],"held_descendant":true,"after_output_ms":5000}}));
+    let cli = Arc::new(rig.cli());
+    let cancel = Arc::new(AtomicBool::new(false));
+    let (lane, flag) = (cli.clone(), cancel.clone());
+    let held = thread::spawn(move || lane.watch(MACHINE, AGENT, &flag, &mut |_| {}));
+    rig.wait_operation("watch");
+    thread::sleep(Duration::from_millis(100));
+    cancel.store(true, Ordering::Release);
+    assert_eq!(held.join().unwrap(), WatchEnd::Cancelled);
+    rig.assert_descendant_killed();
+}
+
+/// #5230: a watch line is read for its event and id only, and one longer
+/// than the bound is refused.
+#[test]
+fn a_watch_line_is_read_for_its_event_only() {
+    assert_eq!(
+        parse_watch_line(watched_line("working", AGENT).as_bytes(), AGENT),
+        Ok(WatchLine::Event(WatchEvent::Working))
+    );
+    assert_eq!(
+        parse_watch_line(watched_line("working", AGENT).as_bytes(), OTHER),
+        Err("watch_agent_mismatch")
+    );
+    assert_eq!(
+        parse_watch_line(watched_line("exploded", AGENT).as_bytes(), AGENT),
+        Err("watch_invalid_line")
+    );
+    assert_eq!(
+        parse_watch_line(br#"{"error":"lowercase words"}"#, AGENT),
+        Ok(WatchLine::Error("?".into()))
+    );
+    let long = vec![b' '; WATCH_LINE_LIMIT + 1];
+    assert_eq!(parse_watch_line(&long, AGENT), Err("watch_invalid_line"));
+    for event in [
+        "started",
+        "working",
+        "needs_person",
+        "done",
+        "idle",
+        "failed",
+        "stopped",
+    ] {
+        let read = parse_watch_line(watched_line(event, AGENT).as_bytes(), AGENT).unwrap();
+        let WatchLine::Event(read) = read else {
+            panic!()
+        };
+        assert_eq!(read.name(), event);
+        assert_eq!(read.settled(), !matches!(event, "started" | "working"));
+    }
 }

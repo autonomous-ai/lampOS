@@ -164,6 +164,19 @@ pub fn main() -> io::Result<()> {
     if let Some(ms) = step["delay_ms"].as_u64() {
         thread::sleep(Duration::from_millis(ms.min(5000)));
     }
+    // `{"lines": [{"text": "...", "delay_ms": N}, …]}`: each line written
+    // and flushed on its own after its delay, as `harness watch --json`
+    // prints one event at a time.
+    if let Some(lines) = step["lines"].as_array() {
+        for line in lines {
+            if let Some(ms) = line["delay_ms"].as_u64() {
+                thread::sleep(Duration::from_millis(ms.min(5000)));
+            }
+            let mut out = io::stdout();
+            writeln!(out, "{}", line["text"].as_str().unwrap_or_default())?;
+            out.flush()?;
+        }
+    }
     if let Some(count) = step["stderr_bytes"].as_u64() {
         io::stderr().write_all(&vec![b's'; count.min(128 * 1024) as usize])?;
     }

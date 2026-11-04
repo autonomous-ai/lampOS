@@ -4,6 +4,7 @@ use crate::{
         CLOSE_TRIES, Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob,
         ObservationJob, Watched,
     },
+    follow::{CliWatch, Follows, WatchLane},
     harness::{
         AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, Launch,
         LaunchOutcome, Listed, MOST_WAITED, Observation, SignIn, Target,
@@ -144,6 +145,12 @@ pub struct Config {
     /// --push-wait`, #560). The watch's looks stay, as the backstop. Off
     /// unless set.
     pub push_wait: bool,
+    /// Hold Harness's own `watch` on each task the watch looks at, one a
+    /// task and at most `follow::MOST_FOLLOWED`, and read a task at once
+    /// when its agent settles (`serve --push-watch`, #5230). The watch's
+    /// looks stay, as the backstop, and `--push-wait` keeps the tasks no
+    /// watch follows. Off unless set.
+    pub push_watch: bool,
     /// Close the harness each task started once its answer is told and a
     /// read just before finds it idle on that turn (`serve --close-told`,
     /// #1390). Off unless set.
@@ -370,6 +377,11 @@ pub trait Adapter: Send + 'static {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         None
     }
+    /// A lane for `watch`, apart from this adapter's own (`serve
+    /// --push-watch`); none when the adapter has no such thing.
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        None
+    }
     /// Close a harness this lamp started, its result told (#1390). An
     /// adapter without it says so, and nothing is closed.
     fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
@@ -432,6 +444,15 @@ impl Adapter for Cli {
             }
         }
     }
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        match self.lane() {
+            Ok(lane) => Some(Arc::new(CliWatch(lane))),
+            Err(error) => {
+                eprintln!("tasks: no lane for watch: {error}");
+                None
+            }
+        }
+    }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
         Cli::launch(self, launch)
     }
@@ -486,6 +507,12 @@ impl Adapter for Production {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         match self {
             Self::Cli(cli) => Adapter::wait_lane(&**cli),
+            Self::Absent => None,
+        }
+    }
+    fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
+        match self {
+            Self::Cli(cli) => Adapter::watch_lane(&**cli),
             Self::Absent => None,
         }
     }
@@ -852,11 +879,12 @@ const LOOK_ASIDE_EVERY: Duration = Duration::from_secs(60);
 
 /// The owner's switches: `serve --watch`, `--progress`, the `wait` lane
 /// (`--push-wait`), `--close-told`, `--set-up-later` and what starts a
-/// sign-in (`--sign-in-by-code`).
+/// sign-in (`--sign-in-by-code`), and the `watch` lane (`--push-watch`).
 type Switches = (
     bool,
     bool,
     Option<Arc<dyn WaitLane>>,
+    Option<Arc<dyn WatchLane>>,
     bool,
     Option<SetUpLater>,
     Option<Starter>,
@@ -872,10 +900,22 @@ fn owner<C: Clock>(
     current: Arc<Mutex<Report>>,
     // When to stop, and the file keeping the newest sign-in id (#5198).
     (stop, sign_in_ids): (Arc<AtomicBool>, PathBuf),
-    (watch, progress, lane, close_told, set_up_later, mut sign_in_starter, daemon_retry_after): Switches,
+    (
+        watch,
+        progress,
+        lane,
+        watch_lane,
+        close_told,
+        set_up_later,
+        mut sign_in_starter,
+        daemon_retry_after,
+    ): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
+    // Dropped before `waits` and the engine: every `watch` child is killed
+    // and reaped when the owner ends, however it ends.
+    let mut follows = Follows::new(watch_lane);
     let mut waits = Waits::new(lane);
     // Progress lives here, beside the engine, and only in memory: what an
     // agent says while it works is not part of the durable record.
@@ -956,9 +996,18 @@ fn owner<C: Clock>(
         }
         // Something that may have changed which tasks are watched.
         let mut moved = false;
+        if follows.on() {
+            let now = clock.sample()?;
+            follows.tend(&engine.watched(&now), &engine.pushed(), Instant::now());
+        }
         if waits.lane.is_some() {
             let now = clock.sample()?;
-            waits.tend(&engine.watched(&now), &engine.pushed(), Instant::now());
+            waits.tend(
+                &engine.watched(&now),
+                &engine.pushed(),
+                &follows.followed(),
+                Instant::now(),
+            );
         }
         if let Ok(outcome) = outcomes.try_recv() {
             moved = true;
@@ -1247,8 +1296,9 @@ fn owner<C: Clock>(
             let next = match launch {
                 Some(job) => Some(job),
                 None => {
-                    // An agent Harness's `wait` says ended is read first,
-                    // and its idle answer kept at once.
+                    // An agent Harness's `watch` or `wait` says ended is
+                    // read first, and its idle answer kept at once.
+                    follows.push(&mut engine, &now).map_err(io::Error::other)?;
                     waits.push(&mut engine, &now).map_err(io::Error::other)?;
                     if watch {
                         engine.watch(&now).map_err(io::Error::other)?;
@@ -2157,8 +2207,15 @@ impl Waits {
     /// yet read, or whose latest read was a push (`pushed`), is left out
     /// until the watch's own next read of it: one agent Harness keeps
     /// calling done never holds up the others on its machine (the reviewer
-    /// on #1157).
-    fn tend(&mut self, watched: &[Watched], pushed: &BTreeSet<u64>, now: Instant) {
+    /// on #1157). A task a held `watch` follows (`followed`, `serve
+    /// --push-watch`) is left out too.
+    fn tend(
+        &mut self,
+        watched: &[Watched],
+        pushed: &BTreeSet<u64>,
+        followed: &BTreeSet<u64>,
+        now: Instant,
+    ) {
         let Some(lane) = self.lane.clone() else {
             return;
         };
@@ -2201,10 +2258,11 @@ impl Waits {
             }
         }
         let mut wanted: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
-        for task in watched
-            .iter()
-            .filter(|task| !pushed.contains(&task.task_id) && !self.pushes.contains(&task.task_id))
-        {
+        for task in watched.iter().filter(|task| {
+            !pushed.contains(&task.task_id)
+                && !self.pushes.contains(&task.task_id)
+                && !followed.contains(&task.task_id)
+        }) {
             wanted
                 .entry(task.machine_id.as_str())
                 .or_default()
@@ -2652,6 +2710,17 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     } else {
         None
     };
+    let watch_lane = if config.push_watch {
+        let lane = adapter.watch_lane();
+        if lane.is_none() {
+            eprintln!(
+                "tasks: --push-watch asked, but this adapter has no watch; the watch looks as before"
+            );
+        }
+        lane
+    } else {
+        None
+    };
     let current = Arc::new(Mutex::new(Report {
         updated: Instant::now(),
         summary: engine.summary(),
@@ -2750,6 +2819,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     switches.0,
                     switches.1,
                     lane,
+                    watch_lane,
                     switches.2,
                     set_up_later,
                     sign_in_starter,
@@ -3345,16 +3415,36 @@ mod tests {
     fn a_cancelled_waits_late_answer_never_untracks_the_wait_that_replaced_it() {
         let lane = Arc::new(SlowLane::default());
         let mut waits = Waits::new(Some(lane.clone()));
-        waits.tend(&watched(&["a"]), &BTreeSet::new(), Instant::now());
+        waits.tend(
+            &watched(&["a"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            Instant::now(),
+        );
         settle(&lane, 1);
-        waits.tend(&watched(&["a", "b"]), &BTreeSet::new(), Instant::now());
+        waits.tend(
+            &watched(&["a", "b"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            Instant::now(),
+        );
         settle(&lane, 2);
-        waits.tend(&watched(&["a"]), &BTreeSet::new(), Instant::now());
+        waits.tend(
+            &watched(&["a"]),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            Instant::now(),
+        );
         settle(&lane, 3);
         // Long enough for the first to answer, tending all the while.
         let until = Instant::now() + Duration::from_millis(600);
         while Instant::now() < until {
-            waits.tend(&watched(&["a"]), &BTreeSet::new(), Instant::now());
+            waits.tend(
+                &watched(&["a"]),
+                &BTreeSet::new(),
+                &BTreeSet::new(),
+                Instant::now(),
+            );
             thread::sleep(Duration::from_millis(5));
         }
         assert_eq!(
@@ -3429,7 +3519,7 @@ mod tests {
                     "asked: {:?}",
                     lane.asked.lock().unwrap()
                 );
-                waits.tend(&both, pushed, at);
+                waits.tend(&both, pushed, &BTreeSet::new(), at);
                 thread::sleep(Duration::from_millis(2));
             }
         };
@@ -3642,6 +3732,7 @@ mod tests {
             watch: false,
             progress: false,
             push_wait: false,
+            push_watch: false,
             close_told: false,
             targets_newer: None,
             set_up_later: None,

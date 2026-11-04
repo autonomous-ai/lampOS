@@ -133,6 +133,11 @@ ends, so a result is known within seconds rather than at the watch's next
 look: ["Watching"](#the-lamp-as-chief-of-staff-watching-and-telling-2026-10-15)
 below. It reads with the watch, so it refuses to go with `--no-watch`.
 
+`--push-watch` (off unless set; #5230) holds one Harness `watch --json` on
+each task the watch looks at, at most four, and reads a task as soon as
+its agent settles: ["Following by watch"](#following-by-watch-serve---push-watch-5230)
+below. It reads with the watch, so it refuses to go with `--no-watch`.
+
 `--bus-root ABS` selects an isolated bus for qualification. `--run-for-ms N`
 bounds an operator run to 1–86,400,000 ms; it does not cancel remote work.
 Linux reads its boot identity itself; development hosts require `--boot-id ID`.
@@ -260,7 +265,8 @@ for a mutation. It is not evidence that no commit or dispatch occurred.
 ## Harness adapter
 
 These argv forms are constructed, without a shell; `ps` only with
-`serve --progress` and `wait` only with `serve --push-wait`. The adapter
+`serve --progress`, `wait` only with `serve --push-wait` and `watch` only
+with `serve --push-watch`. The adapter
 also builds `route`, `machines engines`, `reply`, `auth status`, `start`
 and `login --code` (`crates/tasks/src/harness.rs`), each in its own
 section below:
@@ -271,6 +277,7 @@ harness new codex --machine <full-machine-id> <project> --name <unique-label> --
 harness show --machine <full-machine-id> <full-agent-id> --chars 4000 --json
 harness ps --machine <full-machine-id> --json
 harness wait --machine <full-machine-id> <agent-id>[,<agent-id>…] --any --timeout 600s --json
+harness watch --machine <full-machine-id> <full-agent-id> --chars 200 --timeout 10m --json
 harness close --machine <full-machine-id> <full-agent-id> --json
 ```
 
@@ -817,6 +824,7 @@ started once its answer is told:
 | CLI capture | 64 KiB stdout, 16 KiB stderr; individual poll waits capped at 10 ms |
 | Progress (`--progress`) | One `ps` per machine per watch period, 10 s each; 256 KiB stdout; 256 harnesses a reply; a progress line cut to 2 KiB; memory only, at most 16 tasks |
 | Tasks now (`tasks_now`, with `--progress`) | Memory only; at most 8 tasks, newest first; the reply under 2 KiB (body at most 1,900 bytes); a last step at most 160 characters, cut at a whole character, control characters removed; a settled task kept 30 min after it was told and at most 2 h after it settled; no Harness call of its own |
+| Follow (`--push-watch`) | One `watch` per watched task, at most 4 at once (`MOST_FOLLOWED`), each on its own thread and its own adapter beside the CLI worker, 600 s each (killed at 630 s) and started again at once; 64 KiB a line, each line dropped once read; killed on `done`/`failed`, when its task leaves the watch, and when the part stops (the owner joins every one before it ends); a failed one started again after 3, then 10 s, given up for its task after 3 in a row; a task settled by it not followed again for 3 s |
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |
 | Private persistence | 8 MiB snapshot, 32 MiB database, 40 MiB journal; 4,096-byte pages |
 | SQLite | DELETE journal, FULL sync, fullfsync requested, 2 MiB cache, 50 ms busy wait, no mmap/WAL |
@@ -824,7 +832,8 @@ started once its answer is told:
 
 There are seven service threads including main: four clients, the storage
 owner and the CLI worker; with `--push-wait` (the product's), one
-`tasks-wait` thread more for each machine, and sign-in's reader threads
+`tasks-wait` thread more for each machine; with `--push-watch`, one
+`tasks-follow` thread more for each followed task, four at most, and sign-in's reader threads
 while one runs. Clients never run Harness. The CLI worker never
 holds the ledger. Main publishes the standard `diagnostics` type as `tasks`,
 with readiness, CLI-busy, counts, queue refusals and publication failures.
@@ -1932,6 +1941,50 @@ used only to say it.
   11.2 %, `lamp-tasks` about 4 % of one core, and the held `wait` one Node
   process of about 130 MB while a task is watched. One line in the journal
   for each `wait` that comes back or fails.
+- **Following by watch** (`serve --push-watch`, #5230,
+  `crates/tasks/src/follow.rs`). <a id="following-by-watch-serve---push-watch-5230"></a>
+  Each task the watch looks at gets its own `harness watch --machine M
+  <agent> --chars 200 --timeout 10m --json`, held on a lane of its own (a fresh
+  adapter per watch, so a child that can't be cleaned up stops only its
+  own), at most four at once, the tasks already followed first, then the
+  watch's order. `watch` prints one JSON line when the event or the turn
+  changes (Harness looks every 3 s); only `event` and `id` are read, never
+  the summary, ask or question, and a line for another id is passed over.
+  `started` and `working` read nothing. `done`, `failed`, `needs_person`,
+  `idle` and `stopped` read the task at once (`Engine::push`, the same read
+  as `--push-wait`'s, which keeps an idle answer on the spot: `done` comes
+  after Harness's two idle looks). `watch` exits by itself only on
+  `stopped` (exit 4); on `done` and `failed` the part kills it itself,
+  since a pane harness stays idle and its watch would go on. A watch is
+  also killed when its task leaves the watch (settled, closed with
+  `--close-told`, or let go), and every one is killed and joined when the
+  part stops. Exit 124 (its 10 minutes passed) starts it again at once; a start
+  again is safe, its first line being how the harness stands then. Exit 1
+  (`GONE`, `DISCONNECTED`, `MACHINE_UNAVAILABLE` …; only the code is
+  journaled) starts it again after 3, then 10 s, and after three failures
+  in a row the task is given up to the fallback. Exit 2, a usage error, is
+  taken for a Harness without `watch`: no watch is started again while the
+  part runs. A task settled by its watch is not followed again for 3 s,
+  and not while its latest read was a push (`Engine::pushed`), so a watch
+  started again on an agent still idle never reads it in a loop.
+  - **Fallback:** a task once heard from by its watch is left out of
+    `--push-wait`'s `wait`; one past the cap, given up, or under a Harness
+    without `watch` stays on `wait` when that is on. The watch's own looks
+    go on for every task whatever this does, so a result is never later
+    than without it.
+  - **Journal:** one call line for each `watch` (`tasks: harness watch:
+    machine=… agent=… exit=… ms=…`, `exit=ended` when killed on `done`),
+    and one line for each event (`tasks: watch of task N: done after N ms`).
+  - **Cost:** each `watch` is one Node process, about as big as the held
+    `wait` (~130 MB on lamp-75c9), hence the cap of four.
+  - **Listing:** Harness has no SDK `get tasks`; the list is `harness ps
+    --machine <id> --json` (`{you, machine, context, harnesses, next}`),
+    which `--progress` already reads ([Progress on the
+    bus](#progress-on-the-bus-serve---progress-732)). `ps` filters only by
+    `--machine` and `--all`, so the part keeps only its own tasks' rows.
+  - **Not yet shown:** any lamp run. The 5-minute played check on
+    lamp-c0a4 (a voice task that stays quiet while it works and says its
+    result once) is left for #5230.
 - **Telling** (`crates/voice/src/task_news.rs`). A thread of the voice reads
   `list`, `get_task` and `get_observation` every 10 s, and at once when
   `tasks/status` lists a task newly settled (#560: the tasks part publishes
