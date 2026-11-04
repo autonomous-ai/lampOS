@@ -1526,12 +1526,14 @@ impl Reports {
         let mut body = health_body(seen);
         let mut skill_day = None;
         if let Some(reading) = &seen.skills {
-            self.kept.skills.add(now_s, reading);
+            // A clock not set yet would put the counts on a wrong day, even
+            // one already sent: they wait for the next reading.
+            if seen.board.as_ref().and_then(|board| board.clock_synced) != Some(false) {
+                self.kept.skills.add(now_s, reading);
+            }
             let day = self.kept.skills.oldest(now_s);
             skill_day = day.as_ref().map(|(_, number)| *number);
             body.skills = Some(skills::SkillsBody {
-                on: reading.on.clone(),
-                kept_off: reading.kept_off.clone(),
                 day: day.map(|(day, _)| day),
             });
         }
@@ -3035,6 +3037,23 @@ pub(crate) mod tests {
                "made_ids": {"b".repeat(64): 1, "HomeWiFi-5G": 1}})
     }
 
+    /// El's P3 on #5096: a clock not set yet puts nothing on a day, so a
+    /// day already sent is never opened again; the next reading counts it.
+    #[test]
+    fn a_clock_not_set_counts_no_skills() {
+        let places = places("skills-clock");
+        yes(&places);
+        let mut reports = Reports::open(places);
+        let mut seen = planted();
+        seen.board.as_mut().unwrap().clock_synced = Some(false);
+        seen.skills = Some(skills::Reading::default());
+        reports.health(NOW, None, &seen).unwrap();
+        assert_eq!(reports.kept.skills, skills::Days::default());
+        seen.board.as_mut().unwrap().clock_synced = Some(true);
+        reports.health(NOW + 900, None, &seen).unwrap();
+        assert_ne!(reports.kept.skills, skills::Days::default());
+    }
+
     /// The canary, for the skills' field: secrets in a skill's name and
     /// words, the off file, the runs' totals and the voice's answer reach
     /// no report, while the counts do.
@@ -3058,9 +3077,9 @@ pub(crate) mod tests {
         assert_eq!(
             sent["skills"],
             json!({
-                "on": {"core": 1, "store": 1, "made_app": 1, "other": 1},
-                "kept_off": {"made_unknown": 1},
                 "day": {"date": "2026-10-17",
+                        "on": {"core": 1, "store": 1, "made_app": 1, "other": 1},
+                        "kept_off": {"made_unknown": 1},
                         "made_by_voice": {}, "made_by_app": {},
                         "runs": {"core": 4, "store": 4, "made_app": 4,
                                                       "pushed": 4, "other": 4},
@@ -3119,7 +3138,8 @@ pub(crate) mod tests {
         let (seq, day) = health(&mut reports, NOW + 86_400, 15);
         assert_eq!(
             day,
-            json!({"date": "2026-10-18", "made_by_voice": {}, "made_by_app": {},
+            json!({"date": "2026-10-18", "on": {}, "kept_off": {},
+                   "made_by_voice": {}, "made_by_app": {},
                    "runs": {"core": 3},
                    "store": {}, "store_rest": 0})
         );
@@ -3215,7 +3235,7 @@ pub(crate) mod tests {
         .unwrap()
         .len();
         // Each "voice" adds 8 bytes: room for `skills` without its day
-        // (about 55 bytes), not with it (about 95 more).
+        // (about 11 bytes), not with it (about 150 more).
         let room = MOST_BYTES - ID_ROOM - base - 90;
         missing.extend(vec!["voice".to_owned(); room / 8]);
         reports.kept.skills.add(NOW, &reading(&|n| n as u64 + 2));
@@ -3224,8 +3244,8 @@ pub(crate) mod tests {
         let bytes = reports.due(&id).remove(0).1;
         assert!(bytes.len() <= MOST_BYTES, "{}", bytes.len());
         let sent: Value = serde_json::from_str(&bytes).unwrap();
-        assert_eq!(sent["skills"]["on"], json!({"core": 12, "store": 60}));
-        assert_eq!(sent["skills"].get("day"), None, "{}", sent["skills"]);
+        // The day left out takes its skills on and off with it.
+        assert_eq!(sent["skills"], json!({}));
         reports.acked(sent["seq"].as_u64().unwrap());
         assert!(reports.kept.skills.oldest(NOW + 86_400).is_some());
     }

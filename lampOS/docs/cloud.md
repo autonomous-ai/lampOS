@@ -1258,10 +1258,10 @@ words or files, nor a made skill's SHA-256.
 
 ```json
 "skills": {
-  "on": {"core": 12, "store": 2, "made_voice": 1},
-  "kept_off": {"made_app": 1},
   "day": {
     "date": "2026-11-03",
+    "on": {"core": 12, "store": 2, "made_voice": 1},
+    "kept_off": {"made_app": 1},
     "made_by_voice": {"kept": 2, "on": 1, "refused": 1, "left_off": 1},
     "made_by_app": {"kept": 1, "refused": 1},
     "runs": {"core": 40, "store": 9, "made_voice": 3},
@@ -1273,7 +1273,7 @@ words or files, nor a made skill's SHA-256.
 
 | Field | What | Read from |
 |---|---|---|
-| `on`, `kept_off` | skills on now, and kept on the lamp but not on (turned off, shipped off, an add-on with add-ons off, or one that does not load), by source | the skills folder with `lamp-skills`' own loader and its off file, as the skills page reads them; a made skill's maker from its own card |
+| `day.on`, `day.kept_off` | skills on at the day's last reading, and kept on the lamp but not on (turned off, shipped off, an add-on with add-ons off, or one that does not load), by source | the skills folder with `lamp-skills`' own loader and its off file, as the skills page reads them; a made skill's maker from its own card |
 | `day.runs` | runs that day (the lamp's local day), by source | `lamp-skills`' running totals, `runs.json` in its `--state-dir` (`skills.md`, "Runs, counted"), made skills' by the maker on each card |
 | `day.store`, `day.store_rest` | the Store's runs that day by package SHA-256 (`installed_from`), the 50 most run, the rest summed | the same file |
 | `day.made_by_voice`, `day.made_by_app` | asks to make a skill that day, by voice and from the owner's app: `kept` (a made skill kept), `on` (put on by a spoken yes), `refused` (made nothing), `left_off` (asked about and not put on) | the voice's running totals per maker (`counts.json` beside the made skills), asked on its app-make socket with `{"counts": {}}`, within 1 s; a voice from before it counted the app's says only `made_by_voice` |
@@ -1305,9 +1305,16 @@ words or files, nor a made skill's SHA-256.
 - **Sent only once over:** each health carries the oldest local day that
   is over (by the zone of the last reading) and not yet acknowledged,
   whole; today is never sent, so two reports 15 minutes apart never tell a
-  run between them. A day is let go when the
-  broker acknowledges the report that carried it, and the next day goes
-  with the next health.
+  run between them. The skills on and kept off go only inside the day, as
+  they were at its last reading (El's HOLD on #5096), so two reports never
+  tell a skill made, put on or turned off between them either; with no day
+  over the field is `{}`. Every day read is sent once over, its counts 0
+  or not. A day is let go when the broker acknowledges the report that
+  carried it, and the next day goes with the next health.
+- **A clock not set yet** (`clock_synced: false`) counts nothing: its
+  reading would put the counts on a wrong date, even one already sent. The
+  next reading with the clock set counts the change since the last one
+  (`a_clock_not_set_counts_no_skills`).
 - **A no** deletes the days with everything else, and asks the manage
   helper (`{"forget_counts": {}}`, root's, which owns both files) to
   delete `lamp-skills`' `runs.json` and the voice's `counts.json`, each
@@ -1318,8 +1325,8 @@ words or files, nor a made skill's SHA-256.
   anew from its first reading.
 - **Within 4 KiB** (with room for the longest `id`): the Store list is cut
   first, the least run summed into `store_rest`, so the Store's total stays
-  whole; with none left, the day is left out (and kept for the next
-  report). Tested at the limit
+  whole; with none left, the day is left out, its skills on and off with
+  it (and kept for the next report). Tested at the limit
   (`the_skills_field_is_cut_to_the_report_limit`).
 - **Not read:** with no skills folder the field is left out; with no runs
   file there are no runs, and with no answer from the voice (its app-make

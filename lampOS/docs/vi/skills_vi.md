@@ -281,7 +281,10 @@ giờ có tên, lời hay tệp của một kỹ năng.
   giờ địa phương của đèn (múi giờ hệ thống, UTC khi không đọc được) từ chênh lệch giữa hai lần đọc, giữ trong trạng thái của báo cáo, và chỉ
   gửi ngày đã kết thúc, ngày cũ nhất chưa được xác nhận; ngày hôm nay không
   bao giờ được gửi, nên hai báo cáo cách nhau 15 phút không để lộ một lần
-  chạy giữa chúng.
+  chạy giữa chúng. Số kỹ năng đang bật và đang tắt chỉ đi kèm ngày đó, theo
+  lần đọc cuối của ngày, nên cũng không lộ một kỹ năng vừa tạo, bật hay tắt
+  giữa hai báo cáo. Khi đồng hồ chưa được đặt (`clock_synced: false`) thì
+  không đếm gì.
 - **Khi người dùng nói không** với báo cáo, `lamp-cloud` nhờ trình quản lý
   (`{"forget_counts": {}}`, của root, sở hữu cả hai tệp) xóa `runs.json` và
   `counts.json`, mỗi tệp dưới khóa của bên ghi nó (`usage::forget`,
