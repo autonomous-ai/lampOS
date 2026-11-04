@@ -21,6 +21,16 @@ use std::{
 /// change the one-shot writes between rounds is said within this.
 pub const HARNESS_LOOK: Duration = Duration::from_secs(2);
 
+/// How long the status thread sleeps between looks: [`HARNESS_LOOK`] at
+/// most with Harness's switch on, else its `every`, as before #5197.
+fn look_every(every: Duration, harness: bool) -> Duration {
+    if harness {
+        HARNESS_LOOK.min(every)
+    } else {
+        every
+    }
+}
+
 /// The status now: the build the records say the lamp runs, the phase, and
 /// the last round's end.
 pub fn status(records: &Path, now: &'static str, last: Option<&UpdateResult>) -> UpdateStatus {
@@ -106,8 +116,15 @@ pub struct Telling {
 }
 
 impl Telling {
-    pub fn start(bus_root: &Path, records: &Path, say: &mut dyn FnMut(&str)) -> Self {
-        Self::start_every(bus_root, records, UpdateStatus::EVERY, say)
+    /// `harness`: Harness's switch is on, so its record is looked at
+    /// every [`HARNESS_LOOK`] (#5197); off, the thread wakes each `every`.
+    pub fn start(
+        bus_root: &Path,
+        records: &Path,
+        harness: bool,
+        say: &mut dyn FnMut(&str),
+    ) -> Self {
+        Self::start_every(bus_root, records, UpdateStatus::EVERY, harness, say)
     }
 
     /// As [`Telling::start`], said again every `every` (shorter in tests).
@@ -115,6 +132,7 @@ impl Telling {
         bus_root: &Path,
         records: &Path,
         every: Duration,
+        harness: bool,
         say: &mut dyn FnMut(&str),
     ) -> Self {
         let last = last_in_records(records);
@@ -137,7 +155,7 @@ impl Telling {
                     .spawn(move || {
                         let mut waited = Duration::ZERO;
                         loop {
-                            let step = HARNESS_LOOK.min(every);
+                            let step = look_every(every, harness);
                             std::thread::sleep(step);
                             waited += step;
                             let Some(said) = again.upgrade() else {
@@ -148,9 +166,12 @@ impl Telling {
                                 // Harness's one-shot writes its record
                                 // between rounds (#5197): said as soon as
                                 // it changes, and with the rest each `every`.
-                                let harness = crate::harness_install::record(&folder);
-                                let changed = harness != status.harness;
-                                status.harness = harness;
+                                let mut changed = false;
+                                if harness {
+                                    let now = crate::harness_install::record(&folder);
+                                    changed = now != status.harness;
+                                    status.harness = now;
+                                }
                                 if changed || waited >= every {
                                     waited = Duration::ZERO;
                                     let _ = publisher.publish_json(0, &*status);
@@ -366,6 +387,7 @@ mod tests {
             bus_root.path(),
             records.path(),
             Duration::from_millis(50),
+            false,
             &mut |line| said.push(line.to_owned()),
         );
         assert!(said.is_empty(), "{said:?}");
@@ -432,6 +454,7 @@ mod tests {
             bus_root.path(),
             records.path(),
             Duration::from_secs(600),
+            true,
             &mut |_| {},
         );
         let kept = || {
@@ -449,6 +472,17 @@ mod tests {
         }
         let said = kept().harness.expect("said within three looks");
         assert_eq!((said.install.as_str(), said.revision), ("absent", 1));
+    }
+
+    /// #5241's reader: with Harness's switch off the thread sleeps its
+    /// `every` as before #5197, not waking each [`HARNESS_LOOK`].
+    #[test]
+    fn the_status_thread_wakes_for_harness_only_with_its_switch_on() {
+        assert_eq!(look_every(UpdateStatus::EVERY, false), UpdateStatus::EVERY);
+        assert_eq!(look_every(UpdateStatus::EVERY, true), HARNESS_LOOK);
+        let short = Duration::from_millis(500);
+        assert_eq!(look_every(short, true), short);
+        assert_eq!(look_every(short, false), short);
     }
 
     #[test]
