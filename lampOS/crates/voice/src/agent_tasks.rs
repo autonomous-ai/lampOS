@@ -1206,6 +1206,13 @@ fn staff_from(answer: &Value) -> Option<Vec<Member>> {
         let Some(kind) = KINDS.iter().find(|kind| kind.engine == engine) else {
             continue;
         };
+        // An engine the tasks part didn't find on that computer
+        // (`lamp-tasks --engines-from-machines`, #5199): not named as one
+        // of the staff, so neither the descriptions nor the staff's note
+        // offer an agent no computer has.
+        if target.get("installed") == Some(&json!(false)) {
+            continue;
+        }
         // One member a name: Devin and Devin Cloud are both "Devin", so
         // with both targets the first is kept and the other left out, and
         // "Devin" names it (the reviewer's P3 3 on #2240).
@@ -1902,6 +1909,43 @@ pub const NO_HARNESS: &str = "I can't hand work on to another computer yet: that
 /// (Eighth's P3 on #3131).
 pub const TARGETS_NEWER: &str = "I can't hand work on to another computer right now: its settings on this lamp need newer software. It will work again once the lamp is updated.";
 
+/// What the model is told when the tasks part refused a hand-over at once,
+/// from what it knows of the computer (`lamp-tasks
+/// --engines-from-machines`, #5199): `who` is the agent as the person
+/// calls them, `place` where the work would go ("your MacBook", "the
+/// office computer"). One plain line a code, that nothing was handed over,
+/// and what would let it go; `None` for any other code. Not a failure of
+/// the moment, so no "just now" for the model to offer a retry on.
+pub(crate) fn refused_early(code: &str, who: &str, place: &str) -> Option<String> {
+    let (line, after) = match code {
+        // "Not found", never "not installed": a computer whose shell was
+        // slow to answer reads the same (openharness `engineProbe.ts`).
+        "engine_missing" => (
+            format!("{who} wasn't found on {place}."),
+            "It may need setting up there first.",
+        ),
+        "computer_offline" => {
+            let mut said = place.to_owned();
+            if let Some(first) = said.get(..1) {
+                let upper = first.to_uppercase();
+                said.replace_range(..1, &upper);
+            }
+            (
+                format!("{said} seems to be asleep or offline."),
+                "It can go once that computer is awake.",
+            )
+        }
+        "engine_not_signed_in" => (
+            format!("{who} isn't signed in on {place}."),
+            "It can go once they sign in there.",
+        ),
+        _ => return None,
+    };
+    Some(format!(
+        "{line} Nothing was handed over. Say so plainly in a few words. {after}"
+    ))
+}
+
 /// What the model is told when the tasks part did not answer: not set up
 /// only while the file it needs is missing, as its unit's condition decides
 /// (the reviewer on #1063: a crashed part's socket is gone too, since systemd
@@ -2108,10 +2152,16 @@ fn run_for(
                     // can't follow (Eighth's P3 on #3131): not failures of
                     // the moment, so no "just now" for the model to offer a
                     // retry on.
-                    let told = match answer.get("error").and_then(Value::as_str) {
-                        Some("no_harness") => NO_HARNESS,
-                        Some("targets_newer") => TARGETS_NEWER,
-                        _ => "The work could not be prepared just now.",
+                    let code = answer.get("error").and_then(Value::as_str);
+                    let told = match code {
+                        Some("no_harness") => NO_HARNESS.to_owned(),
+                        Some("targets_newer") => TARGETS_NEWER.to_owned(),
+                        // Refused early from what the tasks part knows of
+                        // that computer (#5199): said plainly, naming who
+                        // and where, with nothing handed over.
+                        Some(code) => refused_early(code, who, &where_done(place, &sent_to))
+                            .unwrap_or_else(|| "The work could not be prepared just now.".into()),
+                        None => "The work could not be prepared just now.".to_owned(),
                     };
                     (json!({"error": told}), true)
                 }
@@ -3476,7 +3526,7 @@ pub(crate) mod tests {
         let seen = tasks_part(
             &directory,
             vec![
-                ("request.sock", status),
+                ("request.sock", status.clone()),
                 ("request.sock", refused("targets_newer")),
             ],
         );
@@ -3484,6 +3534,40 @@ pub(crate) mod tests {
         assert_eq!(told, json!({"error": TARGETS_NEWER}));
         assert!(TARGETS_NEWER.contains("updated") && !TARGETS_NEWER.contains("just now"));
         assert_eq!(seen.try_iter().count(), 2);
+        // Refused early from what the tasks part knows of the computer
+        // (#5199): a plain line naming who and where, nothing read after.
+        for (code, said) in [
+            (
+                "engine_missing",
+                "Claude Code wasn't found on the office computer. Nothing was handed over. \
+                 Say so plainly in a few words. It may need setting up there first.",
+            ),
+            (
+                "computer_offline",
+                "The office computer seems to be asleep or offline. Nothing was handed over. \
+                 Say so plainly in a few words. It can go once that computer is awake.",
+            ),
+            (
+                "engine_not_signed_in",
+                "Claude Code isn't signed in on the office computer. Nothing was handed over. \
+                 Say so plainly in a few words. It can go once they sign in there.",
+            ),
+        ] {
+            let _ = std::fs::remove_dir_all(&directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let seen = tasks_part(
+                &directory,
+                vec![
+                    ("request.sock", status.clone()),
+                    ("request.sock", refused(code)),
+                ],
+            );
+            let (told, answered) = run(&place, &call, 3, true, PEER_WAIT);
+            assert!(answered, "{code}");
+            assert_eq!(told, json!({"error": said}), "{code}");
+            assert!(!said.contains("just now"));
+            assert_eq!(seen.try_iter().count(), 2, "{code}");
+        }
         if let Ok(mut pending) = PENDING.lock() {
             *pending = None;
         }
@@ -5776,6 +5860,57 @@ pub(crate) mod tests {
         // A form two members could share names neither.
         let muddled = [member("codex", "claude"), member("office-codex", "codex")];
         assert_eq!(named(&muddled, "codex"), None);
+    }
+
+    /// #5199: each early refusal's line names the agent and the computer as
+    /// the read-back does; any other code is none.
+    #[test]
+    fn an_early_refusal_is_one_plain_line_a_code() {
+        assert_eq!(
+            refused_early("engine_missing", "Codex", "your MacBook").as_deref(),
+            Some(
+                "Codex wasn't found on your MacBook. Nothing was handed over. \
+                 Say so plainly in a few words. It may need setting up there first."
+            )
+        );
+        assert_eq!(
+            refused_early("computer_offline", "Codex", "your MacBook").as_deref(),
+            Some(
+                "Your MacBook seems to be asleep or offline. Nothing was handed over. \
+                 Say so plainly in a few words. It can go once that computer is awake."
+            )
+        );
+        assert_eq!(
+            refused_early("engine_not_signed_in", "Claude Code", "your MacBook").as_deref(),
+            Some(
+                "Claude Code isn't signed in on your MacBook. Nothing was handed over. \
+                 Say so plainly in a few words. It can go once they sign in there."
+            )
+        );
+        for other in ["target", "bad_text", "engine_signed_out", "no_harness", ""] {
+            assert_eq!(
+                refused_early(other, "Codex", "your MacBook"),
+                None,
+                "{other}"
+            );
+        }
+    }
+
+    /// #5199: a target whose engine the tasks part didn't find on that
+    /// computer (`installed: false` in its answer) is not one of the staff;
+    /// one found there, or unknown, is.
+    #[test]
+    fn an_agent_no_computer_has_is_not_one_of_the_staff() {
+        let answer = json!({"ok":true,"targets":[
+            {"alias":"laptop","engine":"codex","installed":false},
+            {"alias":"office","engine":"claude"},
+            {"alias":"studio","engine":"codex"}]});
+        let staff = staff_from(&answer).unwrap();
+        let aliases: Vec<&str> = staff.iter().map(|member| member.alias.as_str()).collect();
+        assert_eq!(aliases, ["office", "studio"]);
+        let none =
+            json!({"ok":true,"targets":[{"alias":"laptop","engine":"codex","installed":false}]});
+        assert_eq!(staff_from(&none), Some(vec![]));
     }
 
     #[test]

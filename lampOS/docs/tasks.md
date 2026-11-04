@@ -1091,8 +1091,9 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     hand-over to a fresh computer failed `CWD_NOT_FOUND`, lamp-a63e on 6
     Nov). A refusal for it is said with `--folder-missing`) and
     `ENGINE`
-    (`claude`, `codex` or `opencode`), until Harness says which engines a
-    machine has (openharness#1410's question 2).
+    (`claude`, `codex` or `opencode`); with `--engines-from-machines`, one
+    that computer has (openharness#1888 answers #1410's question 2; see
+    "Which agents each computer has" below).
 
   **Never over someone else's file.** The part writes only where there's
   no file, or the file is one it wrote: `targets.json.from-machines`
@@ -1142,6 +1143,84 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     (two computers, one with none, the switch off; a read-back that
     ignores the names fails it) and
     `agent_tasks::tests::the_machine_names_switch_is_taken_on_its_own`.
+- **Which agents each computer has** (`--engines-from-machines`, only with
+  `--targets-from-machines`; off unless set, #5199). Without it every
+  target written from the machines gets `ENGINE`, and a hand-over to an
+  agent the computer lacks, one not signed in there, or a computer that is
+  asleep fails only after the person's yes, on the computer.
+  - **Asked:** after each look at the machines, each computer listed (the
+    lamp left out, at most 8) and each a target names is asked `harness
+    machines engines <id> --json` (openharness#1888), which probes it live
+    over its link (Harness's own 30 s bound; the part allows 35 s). One
+    computer at a time, on a thread and a Harness lane of their own: a
+    computer that takes its 30 s never holds up a hand-over or a read.
+    Exit 1 is `unreachable`, 2 `usage` (an older Harness). One journal line
+    a look, each engine and what it said, never the computer's name.
+  - **Kept**, by machine: its `status` from `harness machines --json`
+    (`running`, which is online, `offline`, `unknown` or
+    `payment_pending`; any other word is unknown; its `engine` field is
+    legacy and never read), and each engine's `installed`, `installable` and
+    `signedIn`, each with when it was read. Harness's CLI turns the
+    computer's `installed: false` into `null` and passes `installable`
+    through (the computer's `!installed && command && recipe`); `signedIn`
+    is read for Claude Code and Codex only. A look that failed keeps what
+    was known. `null` is unknown, never missing: it forgets a value that
+    would refuse (that may no longer hold) and keeps one that wouldn't, so
+    one shell that timed out doesn't move a target to another engine. A
+    reading more than 15 minutes old is unknown.
+  - **Targets from what is there:** a target written from the machines
+    gets `ENGINE` where it is known installed on that computer, else the
+    first known installed of claude, codex and opencode, else `ENGINE` as
+    before. A file someone else wrote is still never written over.
+  - **Its own file,** `targets.engines.json` beside the targets:
+    `{"version":1,"computers":{ALIAS:{"status":{"value":WORD,"read_ms":MS},
+    "engines":{ENGINE:{"installed":{"value":BOOL,"read_ms":MS},
+    "installable":{…},"signed_in":{…}}}}}}`, each field only when known, for the targets the
+    file names now, whoever wrote it. An older build never reads it, as with
+    the names. Read at each look as strictly as the names (owned, 0600,
+    version 1, nothing else in it); a missing or bad file is nothing known,
+    and refuses nothing. A file there that isn't this part's is left as it
+    is. Nothing known: the file is removed.
+  - **Refused at `prepare`,** at once, with nothing made: the computer known
+    `offline` is `computer_offline`; the engine not found there
+    (`installed` null with `installable` true, as Harness prints an engine
+    a computer lacks) is `engine_missing`; known `signedIn: false` (Claude
+    Code and Codex only) is `engine_not_signed_in`, in that order. Unknown
+    always proceeds, as today: `installed` null with `installable` false
+    goes, and Harness's own `ENGINE_NOT_INSTALLED` decides. A computer
+    whose shell took over 5 s reads as not found too, so it is said as
+    "not found", never as "not installed". Devin Cloud, which works in
+    Devin's cloud, is never refused. A refusal has the machines and their
+    engines looked at again at once (at most once in 30 s), so a computer
+    woken or an agent signed in since is known by the next ask.
+  - **Said:** the voice tells the model one plain line a code, naming the
+    agent and the computer as the read-back does ("your MacBook" with
+    `LAMP_TASKS_MACHINE_NAMES`, else "the office computer"): "Codex wasn't
+    found on your MacBook.", "Your MacBook seems to be asleep or offline.",
+    "Claude Code isn't signed in on your MacBook.", each with "Nothing was
+    handed over." and what would let it go, never "just now".
+  - **The staff:** `{"op":"targets"}` gives `installed: false` beside a
+    target whose engine wasn't found on that computer, and the voice leaves
+    it out of the staff, so the descriptions and the staff's note name only
+    agents some computer has. With the engine chosen above, a target
+    written from the machines names one its computer has.
+  - **Without the switch** nothing is asked, kept, read or refused: an
+    engines file beside the targets is never read.
+  - **Tests:** `readiness::tests` (a null is unknown, each refusal and
+    unknown proceeds, the engine chosen, the file written, read back and
+    read strictly), `tests/harness.rs`:
+    `a_computers_engines_are_one_call_read_as_harness_gives_them`,
+    `runtime::tests::targets_from_machines_take_the_engine_each_computer_has`,
+    `tests/runtime.rs`: `engines_from_machines_choose_an_engine_there_and_refuse_early`
+    (a failed look keeps the old), `an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds`,
+    `without_engines_from_machines_nothing_is_asked_or_refused`,
+    `targets_from_machines_needs_an_engine_and_set_up_later`, the voice's
+    `agent_tasks::tests::an_early_refusal_is_one_plain_line_a_code`,
+    `agent_tasks::tests::an_agent_no_computer_has_is_not_one_of_the_staff`
+    and `agent_tasks::tests::a_target_the_tasks_part_lacks_is_answered_from_who_is_there`.
+  - **Not yet shown on a lamp:** a played before/after count on lamp-c0a4,
+    hand-overs to a missing, a signed-out and an offline agent each refused
+    at once with a plain line, and a good one unchanged.
 
 Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
 (openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
