@@ -1,0 +1,5 @@
+# LAMP_NUDGES_PRESENT=on (#5207): 10:00, an hour, three minutes away, 70
+# minutes more: neither sitting is 90 minutes.
+clock = "10:00"
+present = true
+none = true

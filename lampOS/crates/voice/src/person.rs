@@ -751,9 +751,29 @@ pub fn told_who(
 /// when its skill asked (`who`: Welcome back alone), whether or not anyone
 /// is at the lamp; the first builder, 30 Oct, on the launch testers'
 /// findings. Any other skill's note: the turn as it came, and `hello` is
-/// never worked out.
-pub fn told_hello(turn: String, who: bool, hello: impl FnOnce() -> String) -> String {
-    if who { turn + &hello() } else { turn }
+/// never worked out. With `question` (the say asked it, #5207: Welcome
+/// back's day's first hello), the hello-only line gives way to
+/// [`crate::local_time::HELLO_AND_QUESTION`]: the one question its note
+/// asks, and still no weather, day, date, time or offer.
+pub fn told_hello(
+    turn: String,
+    who: bool,
+    question: bool,
+    hello: impl FnOnce() -> String,
+) -> String {
+    if !who {
+        return turn;
+    }
+    let hello = hello();
+    let hello = if question {
+        hello.replace(
+            crate::local_time::HELLO_ONLY,
+            crate::local_time::HELLO_AND_QUESTION,
+        )
+    } else {
+        hello
+    };
+    turn + &hello
 }
 
 /// What a say's `skill_says` record keeps of [`told_who`] (#2831): whether
@@ -1037,11 +1057,37 @@ mod tests {
     fn only_a_note_that_asked_is_told_the_part_of_the_day() {
         let hello = || "\n\n(It is the afternoon here now.)".to_owned();
         assert_eq!(
-            told_hello("Greet them.".into(), true, hello),
+            told_hello("Greet them.".into(), true, false, hello),
             "Greet them.\n\n(It is the afternoon here now.)"
         );
         assert_eq!(
-            told_hello("Watch the room.".into(), false, || unreachable!()),
+            told_hello("Watch the room.".into(), false, false, || unreachable!()),
+            "Watch the room."
+        );
+    }
+
+    /// #5207 (Fourteen's played check on lamp-9adf): the day's first hello,
+    /// whose say asked its one question, is told it may ask it, never "no
+    /// question"; every other hello is still told a hello and the name
+    /// only, and a note that did not ask who is told nothing.
+    #[test]
+    fn only_a_hello_that_asked_its_question_may_ask_it() {
+        use crate::local_time::{HELLO_AND_QUESTION, HELLO_ONLY};
+        let hello = || format!("\n\n(It is the morning here now. {HELLO_ONLY})");
+        let first = told_hello("Greet them, ask what's first.".into(), true, true, hello);
+        assert!(
+            first.ends_with(&format!("{HELLO_AND_QUESTION})")),
+            "{first}"
+        );
+        assert!(!first.contains(HELLO_ONLY), "{first}");
+        assert!(!first.contains("no question"), "{first}");
+        // Every other hello is told exactly what it was before: the turn,
+        // then the hello line, byte for byte.
+        let plain = told_hello("Greet them.".into(), true, false, hello);
+        assert_eq!(plain, format!("Greet them.{}", hello()));
+        assert!(plain.ends_with(&format!("{HELLO_ONLY})")), "{plain}");
+        assert_eq!(
+            told_hello("Watch the room.".into(), false, true, || unreachable!()),
             "Watch the room."
         );
     }

@@ -1043,6 +1043,7 @@ impl Watch {
                     exact: true,
                     priority: crate::SAY_PRIORITY,
                     expires_ms: crate::SAY_EXPIRES_MS,
+                    question: false,
                 }),
                 Out::Said("off: the person who asked is back".into()),
             ];

@@ -500,6 +500,7 @@ fn every_skill_folder_says_its_kind_and_version() {
         named(SkillKind::Core),
         [
             "bedtime-morning",
+            "comfort-break",
             "dance",
             "dusty-air",
             "feelings",
@@ -533,7 +534,6 @@ fn every_skill_folder_says_its_kind_and_version() {
     assert_eq!(
         named(SkillKind::Installable),
         [
-            "comfort-break",
             "desk-tutor",
             "desk-tutor-marks",
             "guard-mode",
@@ -552,8 +552,8 @@ fn every_skill_folder_says_its_kind_and_version() {
             .filter(|skill| !skill.enabled)
             .map(|skill| skill.name.as_str())
             .collect::<Vec<_>>(),
-        ["bedtime-morning"],
-        "every existing scene and skill retains its enabled default"
+        ["bedtime-morning", "comfort-break"],
+        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207)"
     );
 }
 
@@ -1127,6 +1127,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 exact: true,
                 priority: 8,
                 expires_ms: 3_600_000,
+                question: false,
             }),
             "speak",
         ),
@@ -2855,7 +2856,13 @@ fn a_comfort_break_never_names_the_bathroom() {
     let toml: toml::Value =
         toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
     let mut told = vec![skill.name.clone(), markdown];
-    for step in toml["do"].as_array().unwrap() {
+    // Its steps, and those its `[present]` gives with LAMP_NUDGES_PRESENT=on (#5207).
+    for step in toml["do"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(toml["present"]["do"].as_array().unwrap())
+    {
         if let Some(say) = step.get("say").and_then(toml::Value::as_str) {
             told.push(say.to_owned());
         }
@@ -2874,7 +2881,7 @@ fn a_comfort_break_never_names_the_bathroom() {
             );
         }
     }
-    assert_eq!(skill.kind, SkillKind::Installable);
+    assert_eq!(skill.kind, SkillKind::Core);
 }
 
 /// A meal check (#3504) asks one open question: it names no food or dish
@@ -11680,6 +11687,250 @@ fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
 /// your eyes again. Wind down is outside its hours. The four share one
 /// `[stop]`, `wellbeing_nudges`: one function in the tools file, which
 /// stops the one that came last, or with `all` every one of them.
+/// With `LAMP_NUDGES_PRESENT=on` (#5207): every wellbeing skill names two
+/// an hour, never within 30 minutes of each other, and over five hours at
+/// the desk the six product nudges come more often than one an hour, never
+/// two within 30 minutes, nor more than two in any hour.
+#[test]
+fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minutes() {
+    let names = [
+        "comfort-break",
+        "meal-check",
+        "rest-your-eyes",
+        "sip-of-water",
+        "sit-back",
+        "stand-up",
+        "stretch-break",
+        "wind-down",
+    ];
+    for name in names {
+        let skill = lamp_skills::load_with(&skills_root().join(name), true).unwrap();
+        assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 2)), "{name}");
+        assert_eq!(skill.budget_gap_us, 30 * 60_000_000, "{name}");
+        assert!(skill.enabled, "{name}");
+        // Without it, as before: one an hour, no gap.
+        let own = lamp_skills::load_with(&skills_root().join(name), false).unwrap();
+        assert_eq!(own.budget, Some(("wellbeing".to_owned(), 1)), "{name}");
+        assert_eq!(own.budget_gap_us, 0, "{name}");
+    }
+    let skills: Vec<lamp_skills::Skill> = [
+        "comfort-break",
+        "rest-your-eyes",
+        "sip-of-water",
+        "stand-up",
+        "stretch-break",
+        "wind-down",
+    ]
+    .iter()
+    .map(|name| lamp_skills::load_with(&skills_root().join(name), true).unwrap())
+    .collect();
+    let mut engine = Engine::new(skills, true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut nudged: Vec<(u64, String)> = Vec::new();
+    for second in 0..=5 * 3_600u64 {
+        let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        for run in engine.observe(
+            "humans/faces/tracked",
+            second * 1_000_000,
+            faces.as_bytes(),
+            None,
+        ) {
+            if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
+                nudged.push((second / 60, run.skill));
+            }
+        }
+    }
+    let minutes: Vec<u64> = nudged.iter().map(|(minute, _)| *minute).collect();
+    assert!(
+        minutes.windows(2).all(|two| two[1] - two[0] >= 30),
+        "{nudged:?}"
+    );
+    assert!(
+        minutes.windows(3).all(|three| three[2] - three[0] >= 60),
+        "{nudged:?}"
+    );
+    // More than the five an hour's budget let through over these five
+    // hours without the switch.
+    assert!(minutes.len() > 5, "{nudged:?}");
+    let said: Vec<&str> = nudged.iter().map(|(_, skill)| skill.as_str()).collect();
+    for skill in ["comfort-break", "rest-your-eyes", "sip-of-water"] {
+        assert!(said.contains(&skill), "{nudged:?}");
+    }
+}
+
+/// With `LAMP_NUDGES_PRESENT=on` (#5207, Fourteen's finding on #5208): a
+/// wellbeing nudge that said nothing (its say expired unheard) gives its
+/// place in the group's hour, and its gap, back, so the next nudge due is
+/// not held back by one the person never heard. Without the switch the
+/// group gives nothing back, as before.
+#[test]
+fn with_the_switch_an_unsaid_nudge_gives_its_place_in_the_hour_back() {
+    let sitting = |present: bool, unsaid_first: bool| -> (Vec<(u64, String)>, Option<String>) {
+        let skills: Vec<lamp_skills::Skill> = ["rest-your-eyes", "sip-of-water"]
+            .iter()
+            .map(|name| lamp_skills::load_with(&skills_root().join(name), present).unwrap())
+            .collect();
+        let mut engine = Engine::new(skills, true);
+        // 10:00 local at 0 s.
+        engine.clock(0, 0, 36_000_000);
+        engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+        let (mut nudged, mut given_back) = (Vec::new(), None);
+        for second in 0..=90 * 60u64 {
+            let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
+            let faces = format!(
+                r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+                left + 0.3
+            );
+            let now = second * 1_000_000;
+            for run in engine.observe("humans/faces/tracked", now, faces.as_bytes(), None) {
+                if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
+                    if unsaid_first && nudged.is_empty() {
+                        // Its say expired unheard: the program tells it so
+                        // when the run is done.
+                        given_back = engine.unsaid(&run.skill, now);
+                    }
+                    nudged.push((second / 60, run.skill));
+                }
+            }
+        }
+        (nudged, given_back)
+    };
+    // Heard: Rest your eyes at 45, and Sip of water held to the gap, at 75.
+    let (heard, _) = sitting(true, false);
+    assert_eq!(
+        heard[..2],
+        [
+            (45, "rest-your-eyes".to_owned()),
+            (75, "sip-of-water".to_owned())
+        ]
+    );
+    // Unheard: its place is given back, and Sip of water comes when due, at 50.
+    let (unheard, given_back) = sitting(true, true);
+    assert_eq!(given_back.as_deref(), Some("wellbeing"));
+    assert_eq!(
+        unheard[..2],
+        [
+            (45, "rest-your-eyes".to_owned()),
+            (50, "sip-of-water".to_owned())
+        ]
+    );
+    // Without the switch nothing is given back: one an hour as before.
+    let (before, given_back) = sitting(false, true);
+    assert_eq!(given_back, None);
+    assert_eq!(before[..1], [(45, "rest-your-eyes".to_owned())]);
+    assert!(
+        before
+            .iter()
+            .all(|(minute, _)| *minute == 45 || *minute >= 105),
+        "{before:?}"
+    );
+}
+
+/// #5207, Fourteen's and Thirteen's P2 on #5237: Sit back's warm word (a
+/// `follows` run, which spends no hour) said nothing; the leaned-in nudge
+/// before it was heard and keeps its place in the hour and its gap. Only
+/// the run that spent the hour, while it is the skill's latest, is given
+/// back; a tool's run clears it too.
+#[test]
+fn with_the_switch_an_unsaid_word_after_a_heard_nudge_gives_nothing_back() {
+    let skill = lamp_skills::load_with(&skills_root().join("sit-back"), true).unwrap();
+    let mut engine = Engine::new(vec![skill], true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    let mut runs: Vec<(u64, String)> = Vec::new();
+    let mut given_back = Vec::new();
+    for second in 0..=40 * 60u64 {
+        let now = second * 1_000_000;
+        // Two minutes at the desk, leaned in from 2 to 20 minutes, then
+        // sat back.
+        let state = if (120..1_200).contains(&second) {
+            "leaning_in"
+        } else {
+            "at_desk"
+        };
+        engine.observe("voice/state", now, br#"{"state":"resting"}"#, None);
+        engine.observe(
+            "humans/faces/tracked",
+            now,
+            br#"{"faces":[{"id":"a1","xmin":0.3,"ymin":0.2,"xmax":0.6,"ymax":0.6,"confidence":0.9}]}"#,
+            None,
+        );
+        let activity = format!(r#"{{"state":"{state}","baseline":true,"sitting_s":{second}}}"#);
+        for run in engine.observe("room/activity", now, activity.as_bytes(), None) {
+            if run
+                .calls
+                .iter()
+                .any(|call| matches!(call, Call::Say(_) | Call::Words(_)))
+            {
+                runs.push((second / 60, run.skill.clone()));
+                // The first (the leaned-in nudge) was heard; the second
+                // (the warm word) expired unsaid.
+                if runs.len() == 2 {
+                    given_back.push(engine.unsaid(&run.skill, now));
+                }
+            }
+        }
+    }
+    assert_eq!(runs.len(), 2, "{runs:?}");
+    assert_eq!(
+        given_back,
+        [None],
+        "the heard nudge keeps its place: {runs:?}"
+    );
+}
+
+/// #5207: `say.question` (the hello's one question) goes with a note in a
+/// skill given `who`; with exact words, without `who`, or not a boolean,
+/// the skill is refused.
+#[test]
+fn a_says_question_needs_a_note_and_who() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |permissions: &str, say: &str| {
+        format!(
+            "[permissions]\ntopics = [\"humans/faces/tracked\"]\nspeak = true\n{permissions}\n[trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n\n[ask]\npolicy = \"hello\"\n\n[[do]]\nsay = {say}\n"
+        )
+    };
+    let fine = skill_with(
+        dir.path(),
+        "fine",
+        &toml(
+            "who = true",
+            r#"{ note = "Greet them, ask what's first.", question = true }"#,
+        ),
+    );
+    load(&fine).unwrap();
+    for (name, permissions, say, why) in [
+        (
+            "no-who",
+            "",
+            r#"{ note = "Ask.", question = true }"#,
+            "only in a skill given who",
+        ),
+        (
+            "exact",
+            "who = true",
+            r#"{ text = "What's first?", question = true }"#,
+            "goes with a note",
+        ),
+        (
+            "word",
+            "who = true",
+            r#"{ note = "Ask.", question = "yes" }"#,
+            "true or false",
+        ),
+    ] {
+        let skill = skill_with(dir.path(), name, &toml(permissions, say));
+        let error = load(&skill).unwrap_err();
+        assert!(error.contains(why), "{name}: {error}");
+    }
+}
+
 #[test]
 fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
     let names = [

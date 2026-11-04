@@ -30,8 +30,10 @@ What it says and when:
 It keeps nothing about you: only, in memory, how many times it went today
 and whether it is resting; off is one line with its name.
 
-An installable skill: its owner puts it on the lamp (`lamp-skills install`)
-and takes it off. Not in the product yet.
+It comes with the lamp, off (#5207). With the lamp's `LAMP_NUDGES_PRESENT`
+switch on it is on, after about an hour and a half rather than two hours,
+three times a day at most, and the wellbeing nudges share two an hour, never
+within half an hour of each other.
 
 If asked about it, the lamp says something like: "When you've sat a long
 while, and it's just us, I'll mention it's a good moment for a short break.

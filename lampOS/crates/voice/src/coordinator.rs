@@ -12366,6 +12366,7 @@ fn conversation_with_gate_inner(
                 let turn = crate::person::told_hello(
                     turn,
                     ticket.told_who(),
+                    ticket.asks_question(),
                     crate::local_time::hello_told_here,
                 );
                 snapshot = commit_written_turn(

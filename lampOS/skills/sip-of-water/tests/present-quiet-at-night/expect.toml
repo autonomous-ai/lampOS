@@ -1,0 +1,5 @@
+# LAMP_NUDGES_PRESENT=on (#5207): 21:20, 100 minutes at the desk: its 50
+# minutes come at 22:10, in the quiet hours: nothing.
+clock = "21:20"
+present = true
+none = true
