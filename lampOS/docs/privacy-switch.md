@@ -487,7 +487,11 @@ also targets 100 ms, but follows verified active-runtime cleanup and process
 startup. A stalled writer can exhaust the shared 300 ms wait-cleanup grace;
 incomplete indicator startup retains the existing three-second startup bound.
 Forced exit or an unverified black write is a failure, never permission to
-resume. These bounds can exceed the normal indication target. Kernel I/O and
+resume. In the muted wait an indicator failure with its black write verified
+and its writer reaped keeps the wait muted and starts the writer once more,
+then goes on with no light; one that comes with the service's stop, or at most
+1 s before it, is the stop's, and the voice ends with 0 (#4332,
+[pilot faults](pilot-faults.md)). These bounds can exceed the normal indication target. Kernel I/O and
 kill/wait are not hard realtime deadlines.
 
 ## First's lamp handoff

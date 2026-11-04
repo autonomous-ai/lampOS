@@ -32,6 +32,12 @@ impl Termination {
             registrations: Vec::new(),
         }
     }
+    /// What SIGTERM coming later does, for another thread to call.
+    #[cfg(test)]
+    pub(crate) fn later(&self) -> impl Fn() + Send + 'static {
+        let signal = Arc::clone(&self.signal);
+        move || signal.store(SIGTERM as usize, Ordering::SeqCst)
+    }
     pub(crate) fn install() -> io::Result<Self> {
         let mut request = Self {
             signal: Arc::new(AtomicUsize::new(0)),

@@ -597,7 +597,7 @@ impl Worker {
         }
     }
 
-    fn cleanup_ring_paths(&mut self) -> io::Result<()> {
+    pub(crate) fn cleanup_ring_paths(&mut self) -> io::Result<()> {
         match &mut self.ring_resources {
             Some(resources) => resources.cleanup_after_exit(),
             None => Ok(()),

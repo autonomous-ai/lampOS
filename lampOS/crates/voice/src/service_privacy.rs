@@ -342,7 +342,7 @@ pub(crate) mod tests {
         mock_with_slide(directory, script, muted_seen, None)
     }
 
-    fn mock_with_slide(
+    pub(crate) fn mock_with_slide(
         directory: &Path,
         script: Script,
         muted_seen: Arc<AtomicBool>,
