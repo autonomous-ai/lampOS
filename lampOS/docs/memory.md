@@ -1147,9 +1147,28 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     words. The `on` check and the REPLACES journal line use the same words.
     A line that says more than yes ("Yes, my dog is called Moe") is its own,
     as ever. No extra round: one thread lookup in the call.
+  - **A yes after a second offer.** On lamp-06c1 on 4 Nov (build 10012),
+    the lamp offered to keep "My shoe size is nine", a carried "Yes." was
+    met with a second offer ("Want me to keep that shoe size for you?")
+    and the `remember` held for that yes, and the next "Yes." ran it held
+    against the line of the second offer, the first "Yes.": "They said:
+    Yes." was kept and the shoe size was not. Now when the offer's own line
+    is only a yes (`only_a_yes`), `Thread::offered_line` walks back to the
+    offer before it, each held to the same tests, and keeps the line that
+    first offer was about; with none, nothing is kept. It never walks past
+    a no: a yes to "Want me to keep anything else?" after a "No." keeps
+    nothing, never the declined line (Thirteen's P2 on #5276). A line
+    that is only a no (`only_a_no`: no, nope, nah, không, thôi, with a short
+    tail such as thanks, not now, cần, đâu) keeps nothing, offer or not. A
+    heard line that is only a yes, no or okay is never kept as "They said:
+    …", and with the switch on the observation pass drops a proposal whose
+    text is only one (`observations_for_memory`); off, the pass is as
+    before.
   - Tests: `remember::heard::tests` (the two lamp-06c1 lines, a paraphrase,
     off, nothing heard, the lead-in, the cap, the line's own words, the yes
-    forms, a yes to an offer and to none, a correction after a yes).
+    forms, a yes to an offer and to none, a yes after a second offer, a no,
+    a yes after a no and a second offer, a correction after a yes);
+    `remember::tests` for the observation pass's bare answers, on and off.
 - **A note for each new session.** Every session is told that it has a
   memory and when to consult it ("when someone asks about an earlier
   conversation, or about something they told you before that you do not
