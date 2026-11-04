@@ -8970,36 +8970,83 @@ fn asleep_at_night_a_face_rises_it() {
 }
 
 /// Expression gone quiet after saying asleep holds it folded no longer
-/// than `NIGHT_LAPSE`: a line within it leaves it folded, one after it
-/// stands it up.
+/// than `NIGHT_LAPSE` once the voice rests: a line within it leaves it
+/// folded, one after it stands it up. A line it slept through holds the
+/// lapse while the voice listens (#5158 P2), so the bound runs from the
+/// end of that line.
 #[test]
 fn the_night_latch_lets_go_when_expression_goes_quiet() {
     let lapse = NIGHT_LAPSE.as_secs();
+    let later = 33 + lapse + 5;
     let line = move |now: Duration| {
         let at =
             |from: u64| (Duration::from_secs(from)..Duration::from_secs(from + 3)).contains(&now);
-        if at(30) || at(lapse + 5) {
+        if at(30) || at(later) {
             Mood::Listening
         } else {
             Mood::Resting
         }
     };
     let steps = night_run(
-        lapse + 15,
+        later + 10,
         line,
         |now| now < Duration::from_secs(2),
         nobody,
         nothing,
     );
     assert_eq!(
-        highest(&steps, Duration::ZERO, Duration::from_secs(lapse)),
+        highest(&steps, Duration::ZERO, Duration::from_secs(33 + lapse)),
         0.0
     );
     assert_eq!(
         highest(
             &steps,
-            Duration::from_secs(lapse + 5),
-            Duration::from_secs(lapse + 15)
+            Duration::from_secs(later),
+            Duration::from_secs(later + 10)
+        ),
+        1.0
+    );
+}
+
+/// A night talk longer than `NIGHT_LAPSE` (a TV, two people up) leaves it
+/// folded throughout: Expression is awake while the voice listens, so the
+/// lapse waits for the voice to rest (the Reviewer-lead's P2 on #5158).
+/// Once it has rested for `NIGHT_LAPSE` with no sleep said, a line stands
+/// it as before.
+#[test]
+fn a_night_talk_longer_than_the_lapse_leaves_it_folded() {
+    let lapse = NIGHT_LAPSE.as_secs();
+    let talk_ends = 5 + lapse + 60;
+    let line = move |now: Duration| {
+        let secs = Duration::from_secs;
+        if (secs(5)..secs(talk_ends)).contains(&now)
+            || (secs(talk_ends + lapse + 5)..secs(talk_ends + lapse + 8)).contains(&now)
+        {
+            Mood::Listening
+        } else {
+            Mood::Resting
+        }
+    };
+    let steps = night_run(
+        talk_ends + lapse + 15,
+        line,
+        asleep_until_five,
+        nobody,
+        nothing,
+    );
+    assert_eq!(
+        highest(
+            &steps,
+            Duration::ZERO,
+            Duration::from_secs(talk_ends + lapse)
+        ),
+        0.0
+    );
+    assert_eq!(
+        highest(
+            &steps,
+            Duration::from_secs(talk_ends + lapse + 5),
+            Duration::from_secs(talk_ends + lapse + 15)
         ),
         1.0
     );

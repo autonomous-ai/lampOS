@@ -36,23 +36,25 @@ pub fn enabled() -> bool {
 
 /// Expression says its state every 200 ms and a state lasts 500 ms.
 const LOOK_EVERY: Duration = Duration::from_millis(100);
-/// How long after it was said a state still counts.
-const LASTS_US: u64 = 500_000;
+/// How long after it was said a state still counts, shared with the body's
+/// night latch.
+#[cfg(test)]
+const LASTS_US: u64 = ExpressionState::LASTS_US;
 
 /// Whether `message` is Expression, enabled, saying now that it is asleep
 /// (or falling asleep). Anything else, old, from another source or not
 /// valid, is awake.
 pub fn asleep_in(message: &Message, now_us: u64) -> bool {
     if message.expired
-        || message.header.source != "expression"
+        || message.header.source != ExpressionState::SOURCE
         || message.header.at_us > now_us
-        || now_us - message.header.at_us > LASTS_US
+        || now_us - message.header.at_us > ExpressionState::LASTS_US
     {
         return false;
     }
     message
         .parse::<ExpressionState>()
-        .is_ok_and(|state| state.check().is_ok() && state.enabled && state.asleep == Some(true))
+        .is_ok_and(|state| state.says_asleep())
 }
 
 /// How much of the asleep face shows, 0 to 1: rising over [`FADE_IN`] once

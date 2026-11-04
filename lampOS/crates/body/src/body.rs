@@ -5398,7 +5398,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // does Expression not saying asleep for `NIGHT_LAPSE`, gone quiet
         // or awake for the morning. `Asked::night` is never true without
         // the switch, and then nothing here changes.
-        if asked_now.night {
+        // While the voice listens or thinks, Expression is kept awake (its
+        // rest ends at a line and settles 30 s after the voice rests), so
+        // the lapse doesn't run through a long night talk: the latch would
+        // let go mid-talk and the lamp sit up (the Reviewer-lead's P2 on
+        // #5158). It runs again once the voice rests.
+        if asked_now.night || (night_latched && matches!(mood, Mood::Listening | Mood::Thinking)) {
             night_said = Some(now);
         }
         let stirred = if company {
