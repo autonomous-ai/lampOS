@@ -347,6 +347,9 @@ impl Harness {
                 }),
                 at,
                 &samples,
+                self.reply.as_ref().map(|current| current.owner.turn()),
+                &mut self.provider_queue,
+                self.snapshot.microphone_generation(),
                 &mut self.trace,
             )
             .unwrap();
@@ -1348,6 +1351,162 @@ fn a_short_word_heard_by(
         committed,
         settled,
     )
+}
+
+/// #5076, from lamp-52e6 on 4 November (14:16 and 18:31), with
+/// `LAMP_STOP_WORDS=heard` and `LAMP_STOP_WORDS_COMMIT_WAITS` as `on` says:
+/// "Stop, Lamp." over the story yields, and the speech goes on and commits
+/// the yield before the stop stream, still connecting, has any words. Its
+/// words (`words`) come `after` blocks of 2 ms after the commit. Then 1.2 s
+/// more is heard. The harness, the cut-in's request and the commit's block.
+fn a_commit_before_its_words(words: &'static str, after: usize, on: bool) -> (Harness, u64, u64) {
+    /// How many times the stop stream is asked for its words between the
+    /// ask in the yield's stillness and the commit: once a block.
+    const BEFORE_COMMIT: usize = 25;
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.stop_words = Some(
+        crate::stop_words::StopWords::new(Box::new(Ears {
+            words: Some(words),
+            asked: false,
+            heard: std::sync::Arc::default(),
+            wait: BEFORE_COMMIT + after,
+        }))
+        .with_commit_waits(on),
+    );
+    let old = h.old();
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+    for quiet in 1..=29 {
+        h.block(0.1, Some(evidence(quiet, None)));
+    }
+    // "…, Lamp.": speech in the clear commits the yield.
+    h.blocks(25, 0.9, Some(evidence(40, None)));
+    let commit = h.events("duplex_commit");
+    assert_eq!(commit.len(), 1, "the speech commits the yield");
+    assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+    assert!(
+        h.events("stop_words")
+            .iter()
+            .all(|event| event["stop"] == false),
+        "no words before the commit"
+    );
+    let cut_in = h.old();
+    assert_ne!(cut_in, old);
+    // The route takes what is queued for it; only the stop words are kept,
+    // to be looked at.
+    for _ in 0..600 {
+        h.block(0.1, Some(evidence(40, None)));
+        h.provider_queue
+            .retain(|input| matches!(input, ProviderInput::StopWords { .. }));
+    }
+    let at = commit[0]["at_us"].as_u64().unwrap();
+    (h, cut_in.turn(), at)
+}
+
+/// The stop words queued for the cut-in (`ProviderInput::StopWords`).
+fn stop_words_told(h: &Harness) -> Vec<(u64, String)> {
+    h.provider_queue
+        .iter()
+        .filter_map(|input| match input {
+            ProviderInput::StopWords { request, words, .. } => Some((*request, words.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+/// #5076: with the switch, the commit still cuts the story at once (above),
+/// and its words, "Stop, Lamp." 0.5 s after it, are the cut-in's: queued
+/// for it, so that the second route ends it with the stop line. Without the
+/// switch the words are dropped at the commit, as before.
+#[test]
+fn a_stop_heard_after_its_yield_committed_is_the_cut_ins_with_the_switch() {
+    let (h, cut_in, _) = a_commit_before_its_words("Stop, Lamp.", 250, true);
+    assert_eq!(stop_words_told(&h), [(cut_in, "Stop, Lamp.".to_owned())]);
+    let waited = h.events("stop_words_waited");
+    assert_eq!(waited.len(), 1, "{waited:?}");
+    assert_eq!(waited[0]["outcome"], "stop");
+    assert_eq!(waited[0]["turn"], cut_in);
+    assert_eq!(waited[0]["told"], true);
+    let waited_ms = waited[0]["waited_ms"].as_u64().unwrap();
+    assert!((400..=600).contains(&waited_ms), "{waited_ms}");
+    assert!(
+        h.events("stop_words")
+            .iter()
+            .all(|event| !event["words"].is_null())
+    );
+
+    let (h, _, _) = a_commit_before_its_words("Stop, Lamp.", 250, false);
+    assert!(stop_words_told(&h).is_empty());
+    assert!(h.events("stop_words_waited").is_empty());
+    let unheard = h.events("stop_words");
+    assert_eq!(unheard.len(), 1);
+    assert!(unheard[0]["words"].is_null());
+}
+
+/// #5076: words that come only after the bound, or that are no stop, change
+/// nothing: the cut-in goes on as it would have, told nothing.
+#[test]
+fn a_committed_yields_late_or_other_words_change_nothing() {
+    let bound_ms = crate::stop_words::COMMIT_WAIT_US / 1_000;
+    let (h, _, _) = a_commit_before_its_words("Stop, Lamp.", 560, true);
+    assert!(stop_words_told(&h).is_empty());
+    let waited = h.events("stop_words_waited");
+    assert_eq!(waited.len(), 1, "{waited:?}");
+    assert_eq!(waited[0]["outcome"], "bound");
+    assert_eq!(waited[0]["told"], false);
+    let waited_ms = waited[0]["waited_ms"].as_u64().unwrap();
+    assert!(
+        (bound_ms..bound_ms + 10).contains(&waited_ms),
+        "{waited_ms}"
+    );
+
+    let (h, cut_in, _) = a_commit_before_its_words("Tell me more.", 250, true);
+    assert!(stop_words_told(&h).is_empty());
+    let waited = h.events("stop_words_waited");
+    assert_eq!(waited.len(), 1, "{waited:?}");
+    assert_eq!(waited[0]["outcome"], "no_stop");
+    assert_eq!(waited[0]["words"], 3);
+    assert_eq!(waited[0]["turn"], cut_in);
+}
+
+/// #5076: while the commit waits, the cut-in's End is kept back, and given
+/// back after anything queued meanwhile once the wait is over; dropped if
+/// another request is in hand by then.
+#[test]
+fn a_cut_ins_end_waits_with_its_commit_and_follows_its_words() {
+    let end = |request| ProviderInput::End {
+        request,
+        privacy_generation: 1,
+        sound: false,
+        cut_in: true,
+    };
+    let mut queue = VecDeque::from([end(7)]);
+    let mut held = None;
+    hold_cut_in_end(Some(7), Some(7), &mut queue, &mut held);
+    assert!(queue.is_empty());
+    hold_cut_in_end(Some(7), Some(7), &mut queue, &mut held);
+    assert!(held.is_some());
+    queue.push_back(ProviderInput::StopWords {
+        request: 7,
+        privacy_generation: 1,
+        words: "Stop.".into(),
+    });
+    hold_cut_in_end(None, Some(7), &mut queue, &mut held);
+    assert!(held.is_none());
+    assert!(matches!(
+        queue[0],
+        ProviderInput::StopWords { request: 7, .. }
+    ));
+    assert!(matches!(queue[1], ProviderInput::End { request: 7, .. }));
+    // Another request's End is never held, and one held for a request no
+    // longer in hand is dropped.
+    let mut queue = VecDeque::from([end(8)]);
+    hold_cut_in_end(Some(7), Some(8), &mut queue, &mut held);
+    assert_eq!(queue.len(), 1);
+    let mut queue = VecDeque::from([end(7)]);
+    hold_cut_in_end(Some(7), Some(7), &mut queue, &mut held);
+    hold_cut_in_end(None, Some(8), &mut queue, &mut held);
+    assert!(queue.is_empty() && held.is_none());
 }
 
 /// What `LAMP_STOP_WORDS=heard-always` hears (#828): one stream for the

@@ -4113,6 +4113,7 @@ fn flush_provider_input_with(
             | ProviderInput::Called { request, .. }
             | ProviderInput::Paused { request, .. }
             | ProviderInput::PauseJoin { request, .. }
+            | ProviderInput::StopWords { request, .. }
             | ProviderInput::CountOnly { request, .. }
             | ProviderInput::StepCall { request, .. }
             | ProviderInput::Onboarding { request, .. }
@@ -6904,6 +6905,7 @@ fn conversation_with_gate_inner(
                             .with_language(language.as_deref())
                             .with_backchannel_debug(crate::stop_words::debugs_backchannels())
                             .with_asides(crate::stop_words::holds_asides())
+                            .with_commit_waits(crate::stop_words::commit_waits_from_environment())
                     }
                 })
                 .map_err(|error| eprintln!("lamp-voice: stop words are not heard: {error}"))
@@ -6927,6 +6929,9 @@ fn conversation_with_gate_inner(
     // speech-to-text. Without its configuration the wait is `on`'s alone.
     // A waited sound whose words only said to stop stops the answer it
     // waited for on the next pass, as a spoken stop does.
+    // A cut-in's End kept back while its commit waits for its yield's
+    // words (`LAMP_STOP_WORDS_COMMIT_WAITS`, [`hold_cut_in_end`]).
+    let mut held_cut_in_end: Option<ProviderInput> = None;
     let mut waited_stop = false;
     let mut wait_words = wait_hears_words
         // Heard in the owner's language when set (#4473), as the stop stream.
@@ -9462,6 +9467,9 @@ fn conversation_with_gate_inner(
                     sounding,
                     captured_at_us,
                     words_block.as_deref().unwrap_or(&samples),
+                    reply.as_ref().map(|current| current.owner.turn()),
+                    &mut provider_queue,
+                    snapshot.microphone_generation(),
                     trace,
                 )?;
             }
@@ -11159,6 +11167,17 @@ fn conversation_with_gate_inner(
             rig.publish(snapshot)?;
             last_publish = monotonic_us();
         }
+        // A cut-in's End waits with its commit for its yield's words
+        // (`LAMP_STOP_WORDS_COMMIT_WAITS`, #5076).
+        let turn = reply.as_ref().map(|current| current.owner.turn());
+        hold_cut_in_end(
+            stop_words
+                .as_mut()
+                .and_then(|words| words.commit_waits_for(turn)),
+            turn,
+            &mut provider_queue,
+            &mut held_cut_in_end,
+        );
         if provider_control_empty {
             second::flush(
                 rig,
@@ -13539,6 +13558,11 @@ fn stop_words_block(frame: &mut MicrophoneFrame) -> Option<Vec<i16>> {
 /// One block for a yield's words (#828, `LAMP_STOP_WORDS=heard`): its held
 /// audio when it begins, each block while it is in force, and the duplex
 /// rule told when they come. Nothing but what is said in a yield is heard.
+///
+/// With `LAMP_STOP_WORDS_COMMIT_WAITS=on` (#5076) a yield committed before
+/// its words came waits for them, the reply in hand (`turn`) telling it the
+/// cut-in's request: a stop phrase among them is queued for that request
+/// (`ProviderInput::StopWords`), before its End ([`hold_cut_in_end`]).
 #[allow(clippy::too_many_arguments)]
 fn hear_stop_words(
     words: &mut crate::stop_words::StopWords,
@@ -13549,6 +13573,9 @@ fn hear_stop_words(
     sounding: bool,
     captured_at_us: u64,
     samples: &[i16],
+    turn: Option<u64>,
+    queue: &mut VecDeque<ProviderInput>,
+    privacy_generation: u64,
     trace: &mut SessionState,
 ) -> Result<()> {
     let held = match step {
@@ -13557,6 +13584,7 @@ fn hear_stop_words(
         }
         _ => None,
     };
+    words.yield_committed(mask.last_yield_committed());
     let tell = words.block(
         replying,
         sounding,
@@ -13566,6 +13594,7 @@ fn hear_stop_words(
         captured_at_us,
         samples,
     );
+    words.commit_waits_for(turn);
     if words.take_asked() {
         mask.words_asked();
     }
@@ -13611,8 +13640,88 @@ fn hear_stop_words(
                 json!({"kind":"stop_words","stop":false,"words":null,"at_us":monotonic_us()}),
             )?;
         }
+        // A commit waited for its yield's words (#5076): a stop phrase goes
+        // to the cut-in as its words, for the stop line; anything else, or
+        // nothing by the bound, and it goes on as before.
+        crate::stop_words::Tell::Waited {
+            heard,
+            waited_ms,
+            request,
+        } => {
+            let stop = heard.is_some_and(|(stop, _)| stop);
+            let stop_words = words.take_waited_words();
+            let told = match (request, stop_words) {
+                (Some(request), Some(words)) if stop => {
+                    queue.push_back(ProviderInput::StopWords {
+                        request,
+                        privacy_generation,
+                        words,
+                    });
+                    true
+                }
+                _ => false,
+            };
+            let outcome = match heard {
+                Some((true, _)) => "stop",
+                Some((false, _)) => "no_stop",
+                None => "bound",
+            };
+            eprintln!(
+                "lamp-voice: a committed yield's words were waited for {waited_ms} ms: {}",
+                match heard {
+                    Some((true, _)) if told => format!(
+                        "a stop phrase: request {} is told it (LAMP_STOP_WORDS_COMMIT_WAITS)",
+                        request.unwrap_or_default()
+                    ),
+                    Some((true, _)) => "a stop phrase, but no cut-in was in hand".to_owned(),
+                    Some((false, count)) => format!(
+                        "{count} {}, not a stop phrase: the cut-in goes on",
+                        if count == 1 { "word" } else { "words" }
+                    ),
+                    None => "none came by the bound: the cut-in goes on".to_owned(),
+                }
+            );
+            record(
+                trace,
+                json!({"kind":"stop_words_waited","turn":request,"waited_ms":waited_ms,
+                "outcome":outcome,"words":heard.map(|(_, count)| count),"told":told,
+                "at_us":monotonic_us(),
+                "boundary":"commit's block to the block the yield's words came at (or the bound), on the capture clock; told: queued for the cut-in before its End"}),
+            )?;
+        }
     }
     Ok(())
+}
+
+/// While a commit waits for its yield's words (`LAMP_STOP_WORDS_COMMIT_WAITS`,
+/// #5076), the cut-in's End (`waiting_for`, its request) is kept back from
+/// the route, so that a stop phrase heard in time reaches it first: its
+/// words are judged only once its End is in. Given back, after anything
+/// queued meanwhile, once the wait is over, if its request is still the
+/// one in hand (`turn`); dropped otherwise.
+fn hold_cut_in_end(
+    waiting_for: Option<u64>,
+    turn: Option<u64>,
+    queue: &mut VecDeque<ProviderInput>,
+    held: &mut Option<ProviderInput>,
+) {
+    let ends = |command: &ProviderInput, of: u64| matches!(command, ProviderInput::End { request, .. } if *request == of);
+    match waiting_for {
+        Some(of) => {
+            if held.is_none()
+                && let Some(at) = queue.iter().position(|command| ends(command, of))
+            {
+                *held = queue.remove(at);
+            }
+        }
+        None => {
+            if let Some(end) = held.take()
+                && turn.is_some_and(|turn| ends(&end, turn))
+            {
+                queue.push_back(end);
+            }
+        }
+    }
 }
 
 /// [`observe_prospective_heard`] for a block heard as its own score.

@@ -631,6 +631,7 @@ fn run_with_notice_policy(
                                     | ProviderInput::Called { .. }
                                     | ProviderInput::Paused { .. }
                                     | ProviderInput::PauseJoin { .. }
+                                    | ProviderInput::StopWords { .. }
                                     | ProviderInput::CountOnly { .. }
                                     | ProviderInput::StepCall { .. }
                                     | ProviderInput::Onboarding { .. }

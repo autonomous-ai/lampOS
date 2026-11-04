@@ -1083,6 +1083,7 @@ impl Peers {
                     | ProviderInput::Called { .. }
                     | ProviderInput::Paused { .. }
                     | ProviderInput::PauseJoin { .. }
+                    | ProviderInput::StopWords { .. }
                     | ProviderInput::CountOnly { .. }
                     | ProviderInput::StepCall { .. }
                     | ProviderInput::Onboarding { .. }
