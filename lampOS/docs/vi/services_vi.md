@@ -871,7 +871,7 @@ hay `to`, cũng không bao giờ `graphql`, `variables`, `path`, `params`,
 | Không trong giờ yên lặng: 22:00–07:00 địa phương, hoặc `[quiet]` của kỹ năng; giờ địa phương không rõ thì tính là yên lặng | `lamp_local_time::quiet_hours` | "quiet hours" |
 | Tối đa một khuôn mặt trong tầm nhìn (`faces_at_most = 1`) | `humans/faces/tracked`, mới trong 3 s | "not alone" |
 | Khuôn mặt đó là khuôn mặt quen của chủ đèn | Tệp known của mắt (mới trong 2 s), tên là tên chủ đèn, không phân biệt hoa thường | "not the owner" / "the owner not in view" |
-| Không nghe giọng nào trong một phút qua | Tin nhắn mới nhất của `voice/heard` | "a voice heard" |
+| Không nghe giọng nào trong một phút qua | Mỗi dòng trên `voice/heard`, được một luồng riêng của `lamp-skills` đánh dấu khi đến (topic này là event: bus không giữ bản mới nhất, nên trước bản sửa này dòng này chưa từng giữ lại lần đọc nào; lamp-9adf, 5/11) | "a voice heard" |
 
 Tất cả phải đạt liên tục trong 5 s. Trước đó lượt chạy chờ, tối đa 60 phút,
 rồi bỏ qua ngày đó mà không nói gì ("skipped: <why>"). Mỗi kỹ năng đọc một lần
