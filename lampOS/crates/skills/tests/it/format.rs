@@ -363,6 +363,126 @@ fn the_schema_refuses_what_lamp_skills_refuses_in_shape() {
     }
 }
 
+/// A read step (#5288): the schema and the loader take a read of any
+/// linked service with reads, and refuse the same changes to it. A read of
+/// a whole text, and a calendar's events with no day, the loader alone
+/// refuses (the schema has no word for them).
+#[test]
+fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
+    let read = |permissions: &str, step: &str| {
+        format!(
+            "version = \"1.0.0\"\n[trigger]\ntopic = \"voice/state\"\nfield = \"state\"\n\
+             equals = \"resting\"\n[ask]\npolicy = \"nudge\"\n[permissions]\nspeak = true\n\
+             topics = [\"voice/state\"]\n{permissions}\n[[do]]\nread = {step}\n"
+        )
+    };
+    let calendar = "services = { google_calendar = \"read\" }";
+    let mail = "services = { gmail = \"read\" }";
+    let notion = "services = { notion = \"read\" }";
+    for good in [
+        read(
+            calendar,
+            "{ service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }",
+        ),
+        read(
+            mail,
+            "{ service = \"gmail\", what = \"recent\", count = 3 }",
+        ),
+        read(mail, "{ service = \"gmail\", what = \"recent\" }"),
+        read(
+            notion,
+            "{ service = \"notion\", what = \"search\", query = \"plans\" }",
+        ),
+        read(
+            "services = { google_drive = \"read\" }",
+            "{ service = \"google_drive\", what = \"files\", count = 2 }",
+        ),
+        read(
+            "services = { ahrefs = \"read\" }",
+            "{ service = \"ahrefs\", what = \"get\", path = \"/v3/x\", params = { target = \"a.com\" } }",
+        ),
+    ] {
+        assert_eq!(loads(&good), Ok(()), "{good}");
+        assert_eq!(check(&as_json(&good)), Vec::<String>::new(), "{good}");
+    }
+    for bad in [
+        read(
+            "services = { google_calendar = \"write\" }",
+            "{ service = \"google_calendar\", what = \"events\", day = \"today\" }",
+        ),
+        read(
+            calendar,
+            "{ service = \"google_calendar\", what = \"events\", day = \"monday\" }",
+        ),
+        read(
+            calendar,
+            "{ service = \"google_calendar\", what = \"events\", day = \"today\", count = 2 }",
+        ),
+        read(
+            mail,
+            "{ service = \"gmail\", what = \"recent\", count = 11 }",
+        ),
+        read(
+            "services = { \"gmail-app\" = \"read\" }",
+            "{ service = \"gmail-app\", what = \"recent\" }",
+        ),
+        read(
+            notion,
+            "{ service = \"notion\", what = \"search\", query = \"\" }",
+        ),
+        read(
+            notion,
+            "{ service = \"notion\", what = \"search\", from = \"2026-11-04\" }",
+        ),
+    ] {
+        assert!(!check(&as_json(&bad)).is_empty(), "the schema took {bad}");
+        assert!(loads(&bad).is_err(), "lamp-skills loaded {bad}");
+    }
+    for loader_only in [
+        read(
+            mail,
+            "{ service = \"gmail\", what = \"message\", id = \"x\" }",
+        ),
+        read(
+            notion,
+            "{ service = \"notion\", what = \"page\", id = \"p\" }",
+        ),
+        read(
+            calendar,
+            "{ service = \"google_calendar\", what = \"events\" }",
+        ),
+    ] {
+        assert!(
+            loads(&loader_only).is_err(),
+            "lamp-skills loaded {loader_only}"
+        );
+    }
+    // The schema's services are lamp-services' readable ones, in both lists.
+    let readable: Vec<String> = lamp_services::spoken::readable()
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    let mut granted: Vec<String> =
+        schema()["$defs"]["permissions"]["properties"]["services"]["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+    granted.sort();
+    let mut sorted = readable.clone();
+    sorted.sort();
+    assert_eq!(granted, sorted);
+    let named: Vec<String> = schema()["$defs"]["step"]["properties"]["read"]["oneOf"][1]
+        ["properties"]["service"]["enum"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|code| code.as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(named, readable);
+}
+
 fn listed(path: &[&str]) -> Vec<String> {
     let mut at = &schema();
     let owned;

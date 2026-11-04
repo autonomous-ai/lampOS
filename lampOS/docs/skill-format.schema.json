@@ -748,6 +748,58 @@
               "startle"
             ]
           }
+        },
+        "services": {
+          "description": "The owner's linked services a read step may read, each as \"read\" (a skill never writes): every service with reads, not the send-only gmail-app. Read only with LAMP_SKILL_READS=on.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "gmail": {
+              "const": "read"
+            },
+            "google_calendar": {
+              "const": "read"
+            },
+            "google_drive": {
+              "const": "read"
+            },
+            "notion": {
+              "const": "read"
+            },
+            "figma": {
+              "const": "read"
+            },
+            "figma-api": {
+              "const": "read"
+            },
+            "github": {
+              "const": "read"
+            },
+            "linear": {
+              "const": "read"
+            },
+            "asana": {
+              "const": "read"
+            },
+            "ahrefs": {
+              "const": "read"
+            },
+            "facebook": {
+              "const": "read"
+            },
+            "slack": {
+              "const": "read"
+            },
+            "mondaydotcom": {
+              "const": "read"
+            },
+            "hubspot": {
+              "const": "read"
+            },
+            "amplitude": {
+              "const": "read"
+            }
+          }
         }
       }
     },
@@ -1382,6 +1434,133 @@
         },
         "propose": {
           "$ref": "#/$defs/propose"
+        },
+        "read": {
+          "description": "A read of one of the owner's linked services, said to them alone behind its gate: its skill's only step, from a trigger, with the service in [permissions] services. A calendar's events take day; any other read takes what the service lists (lamp-services' reads), but one that gives a whole text (gmail message, google_drive text, notion page, figma comments), which lamp-skills refuses. Said: the count, then each event's time and title, each mail's sender and subject, or each other item's title or name.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "service",
+                "what",
+                "day"
+              ],
+              "properties": {
+                "service": {
+                  "const": "google_calendar"
+                },
+                "what": {
+                  "const": "events"
+                },
+                "day": {
+                  "enum": [
+                    "today",
+                    "tomorrow"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "service",
+                "what"
+              ],
+              "properties": {
+                "service": {
+                  "enum": [
+                    "gmail",
+                    "google_calendar",
+                    "google_drive",
+                    "notion",
+                    "figma",
+                    "figma-api",
+                    "github",
+                    "linear",
+                    "asana",
+                    "ahrefs",
+                    "facebook",
+                    "slack",
+                    "mondaydotcom",
+                    "hubspot",
+                    "amplitude"
+                  ]
+                },
+                "what": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "query": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "repo": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "calendar": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "project": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "workspace": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "graphql": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "variables": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "tool": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "arguments": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "params": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     },
