@@ -467,6 +467,8 @@ mod tests {
         after_read: Option<(usize, Seen)>,
         /// How many looks after the read see the owner's mark late.
         blinks: usize,
+        /// What those looks see, if not one face whose mark is late.
+        blink_as: Option<Seen>,
     }
 
     impl Lamp {
@@ -480,6 +482,7 @@ mod tests {
                 said: Vec::new(),
                 after_read: None,
                 blinks: 0,
+                blink_as: None,
             }
         }
     }
@@ -488,9 +491,11 @@ mod tests {
         fn seen(&mut self) -> Seen {
             if !self.reads.is_empty() && self.blinks > 0 {
                 self.blinks -= 1;
-                let mut late = alone();
-                late.owner_in_view = false;
-                return late;
+                return self.blink_as.clone().unwrap_or_else(|| {
+                    let mut late = alone();
+                    late.owner_in_view = false;
+                    late
+                });
             }
             if !self.reads.is_empty()
                 && let Some((at, then)) = &self.after_read
@@ -847,7 +852,7 @@ mod tests {
         lamp.blinks = 8;
         assert_eq!(run(&drive, &mut lamp), "read 2");
         assert_eq!(lamp.said.len(), 3);
-        let mut lamp = Lamp::new(vec![alone()], answer);
+        let mut lamp = Lamp::new(vec![alone()], answer.clone());
         lamp.blinks = usize::MAX;
         let read_at = lamp.now;
         assert_eq!(
@@ -855,7 +860,25 @@ mod tests {
             "stopped: not the owner before a word"
         );
         assert!(lamp.said.is_empty());
-        assert!(lamp.now - read_at >= BLINK.as_millis() as u64);
+        assert!(lamp.now - read_at >= (STEADY + BLINK).as_millis() as u64);
+        // Thirteen's P3: the eyes' list not said lately (nobody) is waited
+        // out too.
+        let mut unsaid = alone();
+        unsaid.faces = None;
+        let mut lamp = Lamp::new(vec![alone()], answer.clone());
+        lamp.blinks = 8;
+        lamp.blink_as = Some(unsaid);
+        assert_eq!(run(&drive, &mut lamp), "read 2");
+        // And a second face mid-blink stops it at once, not after BLINK.
+        let mut two = alone();
+        two.faces = Some(2);
+        let mut lamp = Lamp::new(vec![alone()], answer);
+        lamp.blinks = 2;
+        lamp.after_read = Some((0, two));
+        let read_at = lamp.now;
+        assert_eq!(run(&drive, &mut lamp), "stopped: not alone before a word");
+        assert!(lamp.said.is_empty());
+        assert!(lamp.now - read_at < (STEADY + BLINK).as_millis() as u64);
     }
 
     /// A read refused by `lamp-services` says nothing.
