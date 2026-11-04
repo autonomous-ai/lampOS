@@ -125,6 +125,7 @@ fn uploads(dir: &Path, base: &str, socket: &Path) -> Arc<Uploads> {
     uploads.https_only = false;
     uploads.settle_every = Duration::from_millis(10);
     uploads.settle_within = Duration::from_secs(5);
+    uploads.retry_within = Duration::from_secs(5);
     Arc::new(uploads)
 }
 
@@ -406,6 +407,30 @@ fn a_store_signed_package_is_refused() {
             &dir.join("store-key.pub")
         ),
         Ok((Some(TOML.to_owned()), CARD.to_owned()))
+    );
+}
+
+/// A bare `SKILL.md` saved with Windows line endings is read as a card,
+/// as one with `\n` is, not sent down the package path.
+#[test]
+fn a_bare_card_with_crlf_is_read_as_a_card() {
+    let dir = folder("crlf");
+    let crlf = CARD.replace('\n', "\r\n");
+    assert_eq!(
+        files_of(
+            crlf.as_bytes(),
+            &dir.join("skills"),
+            &dir.join("store-key.pub")
+        ),
+        Ok((None, crlf.clone()))
+    );
+    assert_eq!(
+        files_of(
+            CARD.as_bytes(),
+            &dir.join("skills"),
+            &dir.join("store-key.pub")
+        ),
+        Ok((None, CARD.to_owned()))
     );
 }
 
@@ -707,4 +732,37 @@ fn a_restart_while_fetching_fetches_it_again() {
     state_file_holds_no_words(&state);
     uploads.acked(&done[0]);
     assert!(!state.exists());
+}
+
+/// A restart while it is fetched, lamp-voice not yet up (a reboot): the
+/// hand-over is tried again until it answers, the file fetched once.
+#[test]
+fn a_restart_before_the_voice_is_up_hands_it_over_once_it_is() {
+    let dir = folder("restart-early");
+    let state = dir.join(STATE_FILE);
+    let upload_id = id(CARD.as_bytes());
+    let kind = format!("{KIND_PREFIX}{upload_id}");
+    std::fs::write(
+        &state,
+        json!([{"upload_id": upload_id, "kind": kind, "sha256": null, "state": FETCHING}])
+            .to_string(),
+    )
+    .unwrap();
+    let (base, heads) = backend(&kind, data(CARD.as_bytes(), "skill_md"));
+    let socket = PathBuf::from(format!(
+        "/tmp/up-restart-early-{}/make.sock",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    let uploads = uploads_kept_in(&dir, &base, &socket, &state);
+    uploads.resume();
+    assert!(heads.recv().unwrap().contains(&kind));
+    std::thread::sleep(Duration::from_millis(200));
+    let (up, seen) = voice("restart-early", vec![kept(), json!({"state": "on"})]);
+    assert_eq!(up, socket);
+    let done = done_within(&uploads);
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0].result.clone().unwrap().unwrap()["state"], "on");
+    assert_eq!(seen.recv().unwrap(), json!({"upload": {"skill_md": CARD}}));
+    assert!(heads.try_recv().is_err(), "fetched once");
 }
