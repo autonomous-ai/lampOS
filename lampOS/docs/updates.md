@@ -3163,6 +3163,21 @@ refreshed", below). The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
 
+### Harness's one-shot unit (#5197, `LAMP_HARNESS_AT_ONBOARDING`, off)
+
+The same pattern puts Harness on a lamp before its sign-in
+(`docs/install.md`, "Harness before the sign-in"). After each `serve` round
+that reached the channel, with the switch on and nothing at
+`/usr/local/bin/harness`, the round writes `lamp-update-harness.service`
+(`harness_install::TEXT`) beside the writer's, checks systemd's view of it
+the same way (`writer_unit::loaded_as`), and starts it with `--no-block`:
+the round never waits for Harness's download. Its sandbox differs:
+`ProtectSystem=full` with `/usr/local/bin` writable, since Harness's home
+may not exist yet under `/var/lib`; network on; 1500 s. It runs
+`lamp-update harness-install`. `check-units` compares it with its own text
+as "the updater's", and a round never takes it for a part's unit. Its
+record, `harness-install.json`, is said on `update/status` as `harness`.
+
 ### A fixed copy, checked (#3689)
 
 `fixed_copy::place` is the step that puts a copy of lamp-update at a fixed

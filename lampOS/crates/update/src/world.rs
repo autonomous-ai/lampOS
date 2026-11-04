@@ -53,6 +53,18 @@ pub trait Systemd {
     fn start_writer_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot start the writer's unit".to_owned())
     }
+    /// `systemctl show` of [`crate::writer_unit::PROPERTIES`] for Harness's
+    /// one-shot, [`crate::harness_install::UNIT`], and only it (#5197). A
+    /// systemd that cannot say refuses: the unit is then never started.
+    fn harness_unit_properties(&mut self) -> Result<String, String> {
+        Err("this systemd cannot show the Harness unit".to_owned())
+    }
+    /// `systemctl start --no-block` of [`crate::harness_install::UNIT`], and
+    /// only it: returns once systemd has the job, never waiting for
+    /// Harness's download. A systemd that cannot refuses.
+    fn start_harness_unit(&mut self) -> Result<(), String> {
+        Err("this systemd cannot start the Harness unit".to_owned())
+    }
     /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
     /// milliseconds to the second below (`ExecMainStartTimestamp`): none
     /// when it never began, or when systemd cannot say. A `failed` from a
@@ -186,6 +198,27 @@ impl Systemd for Systemctl {
         )
         .ok()?;
         began_unix_ms(&stdout)
+    }
+
+    fn harness_unit_properties(&mut self) -> Result<String, String> {
+        use crate::{harness_install::UNIT, writer_unit::PROPERTIES};
+        show_within(
+            Command::new("systemctl").args([
+                "show",
+                "--no-pager",
+                &format!("--property={PROPERTIES}"),
+                "--",
+                UNIT,
+            ]),
+            JOURNAL_WITHIN,
+        )
+    }
+
+    fn start_harness_unit(&mut self) -> Result<(), String> {
+        run(
+            &["start", "--no-block", crate::harness_install::UNIT],
+            JOURNAL_WITHIN,
+        )
     }
 
     fn start_writer_unit(&mut self) -> Result<(), String> {

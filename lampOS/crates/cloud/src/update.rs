@@ -38,7 +38,8 @@ pub fn from_environment() -> bool {
 /// "started_at_unix_ms"?} | null, "stale": flag}`, `last` as lamp-update said
 /// it (`lamp_msgs::UpdateResult`).
 /// Before lamp-update has said anything, `now` is `unknown` and the rest
-/// null; a value lamp-update could not have said is refused.
+/// null; a value lamp-update could not have said is refused. With
+/// `harness` said (#5197), it is given as `lamp_msgs::HarnessInstall`.
 pub fn status(kept: Option<lamp_bus::Message>) -> Result<Option<Value>, String> {
     let Some(message) = kept else {
         return Ok(Some(json!({
@@ -54,12 +55,19 @@ pub fn status(kept: Option<lamp_bus::Message>) -> Result<Option<Value>, String> 
     if !UpdateStatus::NOW.contains(&status.now.as_str()) {
         return Err("lamp-update said something unreadable".into());
     }
-    Ok(Some(json!({
+    let mut reply = json!({
         "running": status.running,
         "now": status.now,
         "last": status.last,
         "stale": message.expired,
-    })))
+    });
+    // Harness's install (#5197), only when lamp-update says one (its
+    // `LAMP_HARNESS_AT_ONBOARDING=on`): a value it could not have said is
+    // left out, not the whole page refused.
+    if let Some(harness) = status.harness.filter(lamp_msgs::HarnessInstall::check) {
+        reply["harness"] = json!(harness);
+    }
+    Ok(Some(reply))
 }
 
 /// Refused with [`RUNNING`] while `status` (as [`status`] answers it) says a
