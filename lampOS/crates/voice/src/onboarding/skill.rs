@@ -49,6 +49,12 @@ pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: 
 /// save end it, a no or silence leaves it, and it is never asked again.
 pub(crate) const FACE_AGAIN: &str = "(Nobody has spoken. Ask exactly this: \"One more thing: may I remember your face now, so I can remember things for you?\" Only after a clear yes call remember_my_face with the name they told you; if you don't know it, ask it first. Never use remember for this. If they would rather not, say only: \"That's fine.\")";
 
+/// [`PREFERENCES_DONE`] that also names a few things to try first, said
+/// once per setup with `LAMP_ONBOARDING_FIRST_TRIES` on (#5316, the first
+/// customers' stage 2 on #5296): the introduction ends on what to do next,
+/// a few everyday things, never a list of features.
+pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can even teach me something new, just by telling me.\")";
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Definition {

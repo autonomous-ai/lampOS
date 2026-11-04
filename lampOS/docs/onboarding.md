@@ -241,7 +241,7 @@ said before the next step's invitation:
 | `who_you_are`, led by the model | `first`/`reoffer`: "What should I call you?" (then, with `remember_my_face`, "May I remember your face, so I know you next time?") | `who_again`: "Sorry, what should I call you?" | no fixed line: the model greets them by name itself, and a fixed one would be a third greeting (#4151) | skipped or failed: "That's fine. You can tell me your name any time." |
 | `room_sounds`, led by the model | `first`/`reoffer`: "May I notice music and laughter in the room? Nothing is recorded. Just say yes or no." | an answer it can't tell, asked once: "Sorry, was that a yes or a no?" | after its `setup_step`: "Got it, I'll notice music and laughter." after a yes, "Okay, I won't." otherwise | (90 s, `failed`, unsaid) |
 | `face_expressions`, led by the model | `first`/`reoffer`: "May I notice when people look happy or upset, …? … Just say yes or no." | as `room_sounds`: "Sorry, was that a yes or a no?" | a plain yes or no is the walk's: the note tells the model to say nothing and call nothing, and the walk says "Got it, I'll notice how people look." or "Okay, I won't." (`FACE_EXPRESSIONS_YES`, `FACE_EXPRESSIONS_NO`, in the code, said by the route, never the model), so the line is said once; for any other answer the model calls `setup_step` and says the same words | (90 s, `failed`, unsaid) |
-| `preferences`, led by the model | `first`/`reoffer`: "Are there hours when I should keep quiet? …"; then the walk's own "May I say hello when you sit down?" (`PREFERENCES_HELLO`, in the code), once the quiet hours are first answered | none: any first answer is the quiet hours' answer, so the model never re-asks and the hello follows its few words (the Reviewer-lead's P2 on #4346) | the walk's own, once the step is done (its answers heard or the model's `setup_step`): "Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures." (`PREFERENCES_DONE`; its last sentence points to the app's guide, #1711 item 1, in the code) | (90 s, `failed`, unsaid) |
+| `preferences`, led by the model | `first`/`reoffer`: "Are there hours when I should keep quiet? …"; then the walk's own "May I say hello when you sit down?" (`PREFERENCES_HELLO`, in the code), once the quiet hours are first answered | none: any first answer is the quiet hours' answer, so the model never re-asks and the hello follows its few words (the Reviewer-lead's P2 on #4346) | the walk's own, once the step is done (its answers heard or the model's `setup_step`): "Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures." (`PREFERENCES_DONE`; its last sentence points to the app's guide, #1711 item 1, in the code). With `LAMP_ONBOARDING_FIRST_TRIES=on`, the first time only, it goes on to name a few things to try (`PREFERENCES_DONE_TRIES`, #5316; "The walk's last words name a few things to try" below) | (90 s, `failed`, unsaid) |
 
 Giving way's lines never mention sleep: the step never puts the lamp to
 sleep (#3747).
@@ -290,6 +290,25 @@ goes to the model as above. Tests:
 `onboarding::near_flow_tests::the_sentence_prompts_are_the_walks_own_lines`,
 `second_provider::tests::a_walk_owned_onboarding_line_is_said_in_its_words_and_never_asked_of_the_model`,
 `onboarding::skill::tests::a_walk_owned_line_carries_its_exact_words_and_only_a_fixed_line_is_marked`.
+
+**The walk's last words name a few things to try** (#5316, the first
+customers' stage 2 on #5296), with `LAMP_ONBOARDING_FIRST_TRIES=on` exactly
+(off unless set; not in the product unit until #5296's run 3). The done line
+goes on, after the app's guide: "If you'd like somewhere to start, ask me for
+a timer, the weather, or anything you're curious about. You can even teach me
+something new, just by telling me." (`skill::PREFERENCES_DONE_TRIES`; the four
+other languages in `in_language::LINES`). It is a few everyday things a new
+owner can say at once (a timer, the weather on `LAMP_SECOND_WEATHER`, any
+question, a skill made by voice on `LAMP_MAKE_SKILL`), said as the end of an
+introduction, never a list of features (CLAUDE.md rule 8). It is the walk's
+own line, so it is said, cut or offered again as the done line is: cut while
+it is said, it is not said again. Said once per setup: `Progress::tries_said`
+is saved when the line is handed out, a later "preferences" done says the
+plain done line, a redo of the whole walk keeps it (`Progress::redone`), and
+a reset wipes it with the file. An older voice reads past the field. Tests:
+`onboarding::tests::the_first_walk_ends_by_naming_a_few_things_to_try`,
+`the_things_to_try_are_said_once_per_setup`, and
+`in_language::tests::the_done_line_with_tries_is_the_done_line_then_the_tries`.
 
 The conversational steps keep their tool calls and consent clauses, but say
 their questions exactly: `who_you_are` asks "What should I call you?", then
