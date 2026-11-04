@@ -20,11 +20,10 @@ use std::time::{Duration, Instant};
 /// The switch, the body's alone: off unless exactly `on`.
 pub const SWITCH: &str = "LAMP_NIGHT_STAYS_FOLDED";
 const LOOK_EVERY: Duration = Duration::from_millis(250);
-/// The topic's one publisher.
-const PUBLISHER: &str = "expression";
-/// How long after it was said a state still counts: Expression says its
-/// state every 200 ms and a state lasts 500 ms.
-const LASTS_US: u64 = 500_000;
+/// How long after it was said a state still counts (Expression says its
+/// state every 200 ms), shared with the voice's night face.
+#[cfg(test)]
+const LASTS_US: u64 = ExpressionState::LASTS_US;
 
 /// Whether the switch's value turns it on: only `on`.
 pub fn enabled(value: Option<&str>) -> bool {
@@ -39,15 +38,15 @@ pub fn enabled_from_environment() -> bool {
 /// boot's monotonic clock) that it is asleep or falling asleep.
 pub fn asleep_in(message: &Message, now_us: u64) -> bool {
     if message.expired
-        || message.header.source != PUBLISHER
+        || message.header.source != ExpressionState::SOURCE
         || message.header.at_us > now_us
-        || now_us - message.header.at_us > LASTS_US
+        || now_us - message.header.at_us > ExpressionState::LASTS_US
     {
         return false;
     }
     message
         .parse::<ExpressionState>()
-        .is_ok_and(|state| state.check().is_ok() && state.enabled && state.asleep == Some(true))
+        .is_ok_and(|state| state.says_asleep())
 }
 
 /// The body's end of `expression/state`, for the night's sleep.
