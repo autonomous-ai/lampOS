@@ -654,7 +654,7 @@ yet, and the voice says `like_asker` only with both.
 
 The linked services judge two lines by their prints ([services.md](services.md)):
 a write's "send" must be in the voice that asked (`VoiceAsk::Alike`, at
-`SAME_FROM` or over), and a read is said in full only for a line in the
+`SERVICES_SAME_FROM`, 0.55, or over), and a read is said in full only for a line in the
 conversation's voice (`VoiceAsk::Conversation`). Both need the model, and
 until now the model came with every conversation rule that reads a print.
 `LAMP_SAME_VOICE_FOR=services`, beside `LAMP_SAME_VOICE_MODEL`, makes the
@@ -737,12 +737,18 @@ prints).
 - **Learnt from the owner's next lines.** At each line's verdict
   (`Heeding`, with the services' prints, `owner_voice::offer`), each line
   after the yes whose print has come and that the owner's face alone was
-  seen saying is taken; one under `DIFFERENT_BELOW` (0.30) against the mean
-  so far is left out, and said. The print is made from at least 4 lines
-  (`LEAST_LINES`) and 6 s of speech (`LEAST_SPEECH`): each line's print is
-  of its first 1.5 s of speech at most and 1.2 s at least, so 4 to 5 lines,
-  four times the speech either print had on lamp-9adf. It is their mean,
-  each made unit length first. Not made within 15 minutes of the yes
+  seen saying is taken, unless its print is unlike the mean of those so far
+  (cosine under `same_voice::DIFFERENT_BELOW`, 0.30): being seen saying a
+  line proves the face moved, not whose voice it was, so another voice from
+  off camera is not used, and the next line is waited for. The owner's own
+  lines scored 0.37-0.70 against each other on lamp-9adf, above the cut. If
+  the first line taken is another voice, the owner's later lines are the
+  ones left out, and no print is made unless enough of that voice follows.
+  The print is made from at least 2 lines (`LEAST_LINES`) and
+  3 s of speech (`LEAST_SPEECH`): each line's print is of its first 1.5 s
+  of speech at most and 1.2 s at least, so 2 to 3 lines (the owner, 4
+  November: most owners are alone with the lamp, so the print need not be
+  strict). It is their mean, each made unit length first. Not made within 15 minutes of the yes
   (`LEARN_WITHIN`), what was gathered is dropped, never kept.
 - **Kept on the lamp only,** beside the faces: `/var/lib/lampos-eyes/owner-voice.json`
   (the eyes' `people.json` folder, 0700), its own file, root's, mode 0600,
@@ -757,17 +763,25 @@ prints).
   `owner_voice::forget_with_everything`, its answer `voice_print:
   "forgotten too"`), whether or not the switch is on. Another person's or
   the room's forget leaves it.
-- **Used:** a send is held to it (`VoiceAsk::Owner`, at `SAME_FROM`) in
-  place of the preparing line's print, and a read in full is too in place
+- **Used:** a send is held to it (`VoiceAsk::Owner`, at
+  `SERVICES_SAME_FROM`, 0.55) in place of the preparing line's print, and a read in full is too in place
   of the conversation's voice ([services.md](services.md)); with none,
   both are as before.
+- **The services' bar, 0.55** (`same_voice::SERVICES_SAME_FROM`): the
+  send gate and a read in full pass at 0.55 or over, looser than the
+  conversation's `SAME_FROM`, 0.70, which every conversation rule keeps.
+  Most owners are alone with the lamp, so a lower bar keeps the owner from
+  being refused while still turning away a clearly different voice: CAM++
+  cosine for one speaker usually runs above 0.6, for two 0.2-0.4.
 - **The journal** says "lamp-voice: owner print: …": the ask, the answer,
-  a line not used and its cosine, "N lines, S s: kept", and the send's
+  a line not seen said by the owner alone, "N lines, S s: kept", and the send's
   cosine. Never a print.
 
 Shown in tests only (`owner_voice::tests`,
 `a_send_is_held_to_the_owners_enrolled_print_when_there_is_one`,
-`the_owner_is_asked_to_learn_their_voice_once_after_a_send`): no unit in
+`the_owner_is_asked_to_learn_their_voice_once_after_a_send`,
+`two_lines_and_three_seconds_make_a_print`,
+`a_services_likeness_of_0_6_passes_and_0_4_is_refused`): no unit in
 `deploy/` sets `LAMP_SAME_VOICE_FOR`.
 
 ## Not shown

@@ -140,6 +140,14 @@ pub const DIFFERENT_BELOW: f32 = 0.30;
 /// 0.95 (`docs/same-voice.md`). The same proof moves a line into one
 /// person's memory (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
 pub const SAME_FROM: f32 = 0.70;
+/// The linked services' bar (`LAMP_SAME_VOICE_FOR=services`): a send's
+/// voice against the owner's (`services::gate`) and a read said in full
+/// (`services::read_in_full`) pass at or over this. Looser than
+/// [`SAME_FROM`], which the conversation's rules keep, because most owners
+/// are alone with the lamp (the owner, 4 Nov): a lower bar keeps the owner
+/// from being refused while still turning away a clearly different voice.
+/// CAM++ cosine for one speaker usually runs above 0.6, for two 0.2-0.4.
+pub const SERVICES_SAME_FROM: f32 = 0.55;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
 /// A child that ends this many times in a row before it is ready is not
@@ -1975,6 +1983,16 @@ exec sleep 30"#,
         assert_eq!(model.as_deref(), Some(Path::new("/m.onnx")));
         assert_eq!(take_for_services(rest), (true, &flags[3..]));
         assert_eq!(take_for_services(&flags[3..]), (false, &flags[3..]));
+    }
+
+    /// The conversation's rules keep their bar of 0.70; only the linked
+    /// services' send gate and read in full take the looser 0.55.
+    #[test]
+    fn the_conversation_keeps_0_70_and_the_services_take_0_55() {
+        assert_eq!(SAME_FROM, 0.70);
+        assert_eq!(SERVICES_SAME_FROM, 0.55);
+        const { assert!(SERVICES_SAME_FROM < SAME_FROM) };
+        const { assert!(SERVICES_SAME_FROM > DIFFERENT_BELOW) };
     }
 
     /// With the prints for the services only, a late print in another
