@@ -139,7 +139,7 @@ def _where(path: Any) -> str:
     return "".join(f"[{part}]" if isinstance(part, int) else f".{part}" for part in path).lstrip(".") or "(top)"
 
 
-def _skill_toml(folder: Path, report: Report) -> dict[str, Any] | None:
+def _skill_toml(folder: Path, report: Report, shape_required: bool = True) -> dict[str, Any] | None:
     text = _read(folder, "skill.toml", report)
     if text is None:
         return None
@@ -151,7 +151,12 @@ def _skill_toml(folder: Path, report: Report) -> dict[str, Any] | None:
     try:
         from jsonschema import Draft202012Validator
     except ImportError:
-        report.errors.append("skill.toml: its shape needs jsonschema: pip install 'lampos[check]'")
+        if shape_required:
+            report.errors.append("skill.toml: its shape needs jsonschema: pip install 'lampos[check]'")
+        else:
+            # A push without the check extra: the lamp checks the shape itself,
+            # so this computer is never stricter than the lamp.
+            report.warnings.append("skill.toml: its shape not checked here (pip install 'lampos[check]'); the lamp checks it")
         return rules
     validator = Draft202012Validator(format_schema())
     for error in sorted(validator.iter_errors(rules), key=lambda e: list(map(str, e.absolute_path))):
@@ -332,15 +337,17 @@ def _permissions(rules: dict[str, Any], report: Report) -> None:
         )
 
 
-def check(folder: str | Path) -> Report:
-    """Check one skill folder; never raises for what's in it."""
+def check(folder: str | Path, *, shape_required: bool = True) -> Report:
+    """Check one skill folder; never raises for what's in it. With
+    `shape_required=False` (a push), a missing `jsonschema` is a warning,
+    not an error: the lamp checks skill.toml's shape again."""
     folder = Path(folder).resolve()
     report = Report(folder)
     if not folder.is_dir():
         report.errors.append("not a folder")
         return report
     _skill_md(folder, report)
-    rules = _skill_toml(folder, report)
+    rules = _skill_toml(folder, report, shape_required)
     _files(folder, report)
     if isinstance(rules, dict):
         _permissions(rules, report)
