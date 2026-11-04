@@ -13,15 +13,16 @@
 //!   [`ASK`] (in Vietnamese [`ASK_VI`]) once ([`ask_after_send`]); a plain
 //!   yes to it, the owner's face seen saying it, starts learning from the
 //!   owner's next lines ([`offer`]); nothing else does. A plain no is kept
-//!   for [`NO_FOR`], with no print.
+//!   for [`NO_FOR`], with no print, and dropped once older.
 //! - **On the lamp only, root's, 0600, beside the faces** ([`PATH`], in the
 //!   folder of the eyes' [`FACES`]), its own file, written whole through
 //!   [`Store::write`]; one that is not a root-owned 0600 regular file is
-//!   never read.
+//!   never read, and is removed ([`Store::read`]).
 //! - **Wiped by the reset plan** (`crates/setup/fixtures/reset-plan-product.json`)
 //!   and by the owner's "forget everything" ([`forget_with_everything`]).
 //! - **Never sent anywhere or backed up:** nothing names it but this module
-//!   and the reset plans (`nothing_but_the_reset_names_the_print`).
+//!   and the reset plans, and no part but the voice's own callers names this
+//!   module (`nothing_but_the_reset_names_the_print`).
 //! - **The journal holds counts and cosines only,** never a print.
 use crate::same_voice::{self, Journal};
 use serde::{Deserialize, Serialize};
@@ -37,10 +38,13 @@ use std::{
 /// The eyes' known faces (`lamp-eyes --people` in the product unit): the
 /// print is kept in the same folder, `/var/lib/lampos-eyes`, 0700.
 pub const FACES: &str = "/var/lib/lampos-eyes/people.json";
-/// The owner's voice print, its own file beside [`FACES`].
-pub const PATH: &str = "/var/lib/lampos-eyes/owner-voice.json";
-/// Where it is written before it is put in place.
-pub const NEW_PATH: &str = "/var/lib/lampos-eyes/owner-voice.json.new";
+/// The owner's voice print, its own file beside [`FACES`]. Private, as
+/// [`Store::product`] is: no other module can name it.
+const PATH: &str = "/var/lib/lampos-eyes/owner-voice.json";
+/// Where it is written before it is put in place ([`Store::new_path`] of
+/// [`PATH`]), as the reset plans name it.
+#[cfg(test)]
+const NEW_PATH: &str = "/var/lib/lampos-eyes/owner-voice.json.new";
 /// Its owner: root, as `lamp-voice` runs.
 pub const ROOT: u32 = 0;
 /// Its mode.
@@ -52,7 +56,8 @@ pub const ASK_VI: &str = "Cho tôi học giọng của bạn nhé, để tôi ch
 /// The words that show the lamp said the ask, in order: an ask cut before
 /// them, or never said, takes no yes.
 const ASKED_WORDS: [&str; 2] = ["learn your voice", "học giọng"];
-/// A no is kept this long: the owner is not asked again meanwhile.
+/// A no is kept this long: the owner is not asked again meanwhile, and an
+/// older one is dropped when read ([`State::kept`]).
 pub const NO_FOR: Duration = Duration::from_secs(24 * 60 * 60);
 /// Asked and not answered: not asked again in this run for this long.
 pub const ASK_AGAIN_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
@@ -69,6 +74,8 @@ pub const LEAST_LINES: usize = 2;
 /// (`same_voice::ASKED_AT`), 1.2 s at least (`same_voice::LEAST_SAMPLES`),
 /// so it is 2 to 3 lines.
 pub const LEAST_SPEECH: usize = same_voice::RATE * 3;
+/// The most a kept file may be.
+const MOST_BYTES: u64 = 1 << 20;
 /// Lines whose print is still to come, waited for.
 const WAITING_LINES: usize = 8;
 /// The most of the lamp's words kept to find the ask in.
@@ -187,13 +194,13 @@ struct Kept {
 /// Where the print is kept, and whose the file must be.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Store {
-    pub path: PathBuf,
-    pub uid: u32,
+    pub(crate) path: PathBuf,
+    pub(crate) uid: u32,
 }
 
 impl Store {
     /// The lamp's: [`PATH`], root's.
-    pub fn product() -> Self {
+    fn product() -> Self {
         Self {
             path: PathBuf::from(PATH),
             uid: ROOT,
@@ -206,18 +213,65 @@ impl Store {
         PathBuf::from(name)
     }
 
-    /// What is kept, only from a regular file of [`MODE`] owned by
-    /// [`Self::uid`]: anything else is as none.
+    /// [`Self::read_saying`], saying nothing.
+    #[cfg(test)]
     fn read(&self) -> Option<Kept> {
-        let metadata = std::fs::symlink_metadata(&self.path).ok()?;
-        if !metadata.file_type().is_file()
-            || metadata.mode() & 0o7777 != MODE
-            || metadata.uid() != self.uid
-            || metadata.len() > 1 << 20
+        self.read_saying(|_| {})
+    }
+
+    /// What is kept, only from a regular file of [`MODE`] owned by
+    /// [`Self::uid`]: anything else is as none. The folder is the eyes'
+    /// (`lampos`), who can unlink or swap the file though not read it, so
+    /// it is opened without following a link or waiting on a FIFO
+    /// (`O_NOFOLLOW | O_NONBLOCK`) and checked on the open file itself
+    /// (`fstat`), never by its path again. One that fails is removed, so
+    /// that a copy given to `lampos` (systemd's `StateDirectory=` chowns the
+    /// folder's files) is not left for them to read; `refused` is told a
+    /// fixed reason, never what the file holds.
+    fn read_saying(&self, refused: impl FnOnce(&'static str)) -> Option<Kept> {
+        use std::io::Read;
+        let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
+        let file = match std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(flags.bits() as i32)
+            .open(&self.path)
         {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return None,
+            Err(error) if error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) => {
+                // A link, refused by `O_NOFOLLOW`: the link goes, not what
+                // it names.
+                return self.refuse("a link", refused);
+            }
+            Err(_) => {
+                refused("not readable");
+                return None;
+            }
+        };
+        let Ok(metadata) = file.metadata() else {
+            refused("not readable");
             return None;
+        };
+        if !metadata.file_type().is_file() {
+            return self.refuse("not a regular file", refused);
         }
-        serde_json::from_slice(&std::fs::read(&self.path).ok()?).ok()
+        if metadata.mode() & 0o7777 != MODE || metadata.uid() != self.uid {
+            return self.refuse("not its owner's 0600", refused);
+        }
+        if metadata.len() > MOST_BYTES {
+            return self.refuse("too large", refused);
+        }
+        let mut bytes = Vec::new();
+        file.take(MOST_BYTES).read_to_end(&mut bytes).ok()?;
+        serde_json::from_slice(&bytes).ok()
+    }
+
+    /// A file that failed [`Self::read_saying`]'s checks: removed, and
+    /// `refused` told `why`.
+    fn refuse(&self, why: &'static str, refused: impl FnOnce(&'static str)) -> Option<Kept> {
+        refused(why);
+        let _ = std::fs::remove_file(&self.path);
+        None
     }
 
     /// Write `kept` whole: a new file of [`MODE`], given to [`Self::uid`],
@@ -315,10 +369,30 @@ impl State {
         (self.journal)(&format!("lamp-voice: owner print: {line}"));
     }
 
+    /// What is kept, as of `now_ms`: a file refused is journaled by its
+    /// reason, and a no older than [`NO_FOR`] is dropped, so no owner id and
+    /// time are kept for longer.
+    fn kept(&self, now_ms: u64) -> Option<Kept> {
+        let kept = self
+            .store
+            .read_saying(|why| self.say(&format!("the kept file was {why}: removed")))?;
+        let no_for = u64::try_from(NO_FOR.as_millis()).unwrap_or(u64::MAX);
+        if kept.declined && now_ms.saturating_sub(kept.at_unix_ms) >= no_for {
+            match self.store.wipe() {
+                Ok(_) => self.say("a no over a day old: dropped"),
+                Err(error) => self.say(&format!(
+                    "a no over a day old, not dropped: {}",
+                    error.kind()
+                )),
+            }
+            return None;
+        }
+        Some(kept)
+    }
+
     /// The owner's print, when one is kept for `owner`.
-    fn enrolled(&self, owner: &str) -> Option<Vec<f32>> {
-        self.store
-            .read()
+    fn enrolled(&self, owner: &str, now_ms: u64) -> Option<Vec<f32>> {
+        self.kept(now_ms)
             .filter(|kept| kept.owner == owner && !kept.declined && !kept.print.is_empty())
             .map(|kept| kept.print)
     }
@@ -335,14 +409,12 @@ impl State {
         {
             return false;
         }
-        if let Some(kept) = self.store.read().filter(|kept| kept.owner == owner) {
-            if !kept.declined && !kept.print.is_empty() {
-                return false;
-            }
-            let no_for = u64::try_from(NO_FOR.as_millis()).unwrap_or(u64::MAX);
-            if kept.declined && now_ms.saturating_sub(kept.at_unix_ms) < no_for {
-                return false;
-            }
+        // A no older than a day is dropped by the read, so one kept is
+        // recent.
+        if let Some(kept) = self.kept(now_ms).filter(|kept| kept.owner == owner)
+            && (kept.declined || !kept.print.is_empty())
+        {
+            return false;
         }
         self.asked_at = Some(now);
         self.stage = Stage::Asked {
@@ -658,7 +730,7 @@ pub fn on() -> bool {
 
 /// The owner `owner`'s print, when one is kept and in use.
 pub fn enrolled(owner: &str) -> Option<Vec<f32>> {
-    with(|state| state.enrolled(owner)).flatten()
+    with(|state| state.enrolled(owner, now_ms())).flatten()
 }
 
 /// The cosine of a line's `print` against `owner`'s print.
@@ -844,8 +916,9 @@ mod tests {
     }
 
     /// Written 0600 and given to the store's owner (root on a lamp); a file
-    /// of any other mode or owner, or a link, is never read; one that can't
-    /// be given to its owner is not left behind.
+    /// of any other mode or owner, a link or a FIFO, is never read and is
+    /// removed (a link, not what it names); one that can't be given to its
+    /// owner is not left behind.
     #[test]
     fn the_print_is_written_0600_to_its_owner_and_read_only_so() {
         use std::os::unix::fs::PermissionsExt;
@@ -865,23 +938,40 @@ mod tests {
         assert_eq!(metadata.uid(), store.uid);
         assert!(!store.new_path().exists());
         assert_eq!(store.read(), Some(kept.clone()));
-        // Any other mode is not read.
+        // Any other mode is not read, and is removed.
         std::fs::set_permissions(&store.path, std::fs::Permissions::from_mode(0o644)).unwrap();
         assert_eq!(store.read(), None);
-        std::fs::set_permissions(&store.path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(!store.path.exists());
         // Nor anyone else's.
+        store.write(&kept).unwrap();
         let elsewhere = Store {
             uid: store.uid.wrapping_add(1),
             ..store.clone()
         };
         assert_eq!(elsewhere.read(), None);
-        // Nor a link to it.
+        assert!(!store.path.exists());
+        // Nor a link to it: the link goes, the file it names stays.
+        store.write(&kept).unwrap();
         let link = Store {
             path: dir.join("link.json"),
             ..store.clone()
         };
         std::os::unix::fs::symlink(&store.path, &link.path).unwrap();
         assert_eq!(link.read(), None);
+        assert!(std::fs::symlink_metadata(&link.path).is_err());
+        assert_eq!(store.read(), Some(kept.clone()));
+        // Nor a FIFO, which is not waited on.
+        let fifo = Store {
+            path: dir.join("fifo.json"),
+            ..store.clone()
+        };
+        let made = std::process::Command::new("mkfifo")
+            .arg(&fifo.path)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        assert_eq!(fifo.read(), None);
+        assert!(std::fs::symlink_metadata(&fifo.path).is_err());
         // A write that can't give it to its owner leaves nothing (unless
         // the test runs as root, who can).
         if store.uid != ROOT {
@@ -894,6 +984,20 @@ mod tests {
         }
         assert!(store.wipe().unwrap());
         assert!(!store.wipe().unwrap());
+    }
+
+    /// A file refused is journaled by a fixed reason, never what it holds.
+    #[test]
+    fn a_refused_file_is_journaled_by_its_reason_alone() {
+        let dir = folder("refused");
+        let (state, said) = journaled(store(&dir));
+        std::fs::write(&state.store.path, br#"{"owner":"secret-owner-id"}"#).unwrap();
+        assert!(state.kept(1_000).is_none());
+        assert!(!state.store.path.exists());
+        assert_eq!(
+            *said.lock().unwrap(),
+            ["lamp-voice: owner print: the kept file was not its owner's 0600: removed"]
+        );
     }
 
     /// The ask is made only after a send the owner's face was seen saying,
@@ -937,16 +1041,23 @@ mod tests {
         state.lamp_answered(11, Some("Yes."), "Okay.", now, 1_000);
         offer_lines(&mut state, 12..20, now, &owner_seen);
         assert!(state.store.read().is_none());
-        // A no: kept with no print, and no ask for a day.
-        let (mut state, _) = journaled(store(&dir));
+        // A no: kept with no print, and no ask for a day; then dropped.
+        let (mut state, said) = journaled(store(&dir));
         asked_and_answered(&mut state, "No thanks.", now);
         let kept = state.store.read().unwrap();
         assert!(kept.declined && kept.print.is_empty());
         state.asked_at = None;
         assert!(!state.ask(30, OWNER, true, now, 1_000 + 3_600_000));
         let day = u64::try_from(NO_FOR.as_millis()).unwrap();
+        assert!(state.kept(1_000 + day - 1).is_some());
         assert!(state.ask(30, OWNER, true, now, 1_000 + day));
-        state.store.wipe().unwrap();
+        assert!(!state.store.path.exists(), "the old no is dropped");
+        assert!(
+            said.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line.ends_with("a no over a day old: dropped"))
+        );
         // A yes: learnt, and in Vietnamese too.
         for words in ["Yes.", "Vâng, được."] {
             let (mut state, _) = journaled(store(&dir));
@@ -984,9 +1095,9 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("request 13: not seen said by the owner alone"))
         );
-        // Only the owner's print is theirs.
-        assert!(state.enrolled(OWNER).is_some());
-        assert!(state.enrolled("bo").is_none());
+        // Only the owner's print is theirs, and it is not dropped with age.
+        assert!(state.enrolled(OWNER, u64::MAX).is_some());
+        assert!(state.enrolled("bo", 2_000).is_none());
     }
 
     /// From 2 lines and 3 s of speech: two whole lines of 1.5 s each make
@@ -1143,7 +1254,9 @@ mod tests {
     /// shares, keeps in the update's records or backs up can hold it: the
     /// update's records keep only the files a build writes, the Store's
     /// share only a made skill's folder, the reports typed fields, and the
-    /// eyes' folder is no one's whole.
+    /// eyes' folder is no one's whole. And no file but these names this
+    /// module at all, so no new part can reach the store through it
+    /// unseen: [`PATH`], [`NEW_PATH`] and [`Store::product`] are private.
     #[test]
     fn nothing_but_the_reset_names_the_print() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -1159,6 +1272,18 @@ mod tests {
             "/var/lib/lampos-eyes/*",
             "/var/lib/lampos-eyes ",
         ];
+        // Today's: the module, its declaration, its callers in the voice,
+        // and the reset test's comment.
+        let callers = [
+            "crates/setup/tests/it/reset.rs",
+            "crates/voice/src/lib.rs",
+            "crates/voice/src/owner_voice.rs",
+            "crates/voice/src/second_provider/worker.rs",
+            "crates/voice/src/services.rs",
+            "crates/voice/src/thread.rs",
+            "crates/voice/src/tools.rs",
+        ];
+        let mut naming = Vec::new();
         let mut stack = vec![root.join("crates"), root.join("deploy")];
         let mut read = 0;
         while let Some(at) = stack.pop() {
@@ -1176,6 +1301,9 @@ mod tests {
                 };
                 read += 1;
                 let relative = path.strip_prefix(&root).unwrap().to_string_lossy();
+                if text.contains("owner_voice") {
+                    naming.push(relative.to_string());
+                }
                 if allowed.iter().any(|allowed| relative == *allowed) {
                     continue;
                 }
@@ -1186,5 +1314,7 @@ mod tests {
             }
         }
         assert!(read > 100, "{read}");
+        naming.sort();
+        assert_eq!(naming, callers, "the files that name `owner_voice`");
     }
 }
