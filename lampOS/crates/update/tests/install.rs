@@ -2936,7 +2936,7 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
     let (notices, models): (Vec<_>, Vec<_>) = all
         .iter()
         .partition(|model| model.path.starts_with(NOTICES));
-    assert_eq!((models.len(), notices.len()), (10, 5));
+    assert_eq!((models.len(), notices.len()), (10, 6));
     let release = "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/";
     let same_voice_release =
         "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-11-04/";
@@ -3087,12 +3087,13 @@ const NOTICES: &str = "/opt/lampOS/voice/notices/";
 
 /// #1844 (lamp-06c1, 20 Oct): the product unit named a notice folder
 /// nothing filled, so the offline line and "back online" were silent. Now
-/// install places the four recordings and their manifest, from their own
-/// release, in the folder the product voice reads.
+/// install places the recordings and their manifest, from their own
+/// release, in the folder the product voice reads: since #3743 five, with
+/// the Wi-Fi helper's recovery line.
 #[test]
 fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them() {
     let all = install::models().unwrap();
-    let release = "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/";
+    let release = "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-11-03/";
     let mut placed: Vec<&str> = all
         .iter()
         .filter_map(|model| model.path.strip_prefix(NOTICES))
@@ -3106,6 +3107,7 @@ fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them()
             "provider-unavailable.en-US.wav",
             "voice-service-unreachable.en-US.wav",
             "wifi-lost.en-US.wav",
+            "wifi-recovering.en-US.wav",
         ]
     );
     for model in all.iter().filter(|model| model.path.starts_with(NOTICES)) {
@@ -3229,9 +3231,10 @@ fn prepare_places_the_recorded_lines_a_moved_lamps_voice_reads() {
 }
 
 /// The pinned lines `lamp-keeper prepare` places are install's own: the
-/// five under the product's folder, nothing else.
+/// six under the product's folder (five lines and their manifest, #3743),
+/// nothing else.
 #[test]
-fn a_moved_lamp_is_given_the_product_voices_five_lines() {
+fn a_moved_lamp_is_given_the_product_voices_lines() {
     let root = tempfile::tempdir().unwrap();
     let mut channel = FakeChannel::default();
     let mut said = Vec::new();
@@ -3239,7 +3242,7 @@ fn a_moved_lamp_is_given_the_product_voices_five_lines() {
         said.push(line.to_owned())
     });
     assert!(wrote.is_empty());
-    assert_eq!(said.len(), 5, "{said:?}");
+    assert_eq!(said.len(), 6, "{said:?}");
     for line in &said {
         assert!(line.starts_with(install::NOTICES_MOVED), "{line}");
     }
