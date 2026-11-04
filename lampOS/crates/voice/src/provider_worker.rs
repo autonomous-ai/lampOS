@@ -11025,6 +11025,7 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 sign_in: false,
+                sign_in_app: false,
             }),
             ..Default::default()
         });
@@ -11173,6 +11174,7 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 sign_in: false,
+                sign_in_app: false,
             }),
             ..Default::default()
         });

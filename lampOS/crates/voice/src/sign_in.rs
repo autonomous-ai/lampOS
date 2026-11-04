@@ -300,6 +300,39 @@ pub fn code_to_say(code: &str) -> String {
     format!("{}, {}", digits[..half].join(" "), digits[half..].join(" "))
 }
 
+/// The code's digits said more slowly (#5198, `LAMP_TASKS_SIGN_IN_APP=on`):
+/// one by one, a comma after each for a short pause and a full stop
+/// between the two groups for a longer one ("1, 2, 3, 4. 5, 6, 7, 8.").
+pub fn code_to_say_slowly(code: &str) -> String {
+    let digits: Vec<String> = code.chars().map(String::from).collect();
+    if digits.len() < 6 {
+        return format!("{}.", digits.join(", "));
+    }
+    let half = digits.len().div_ceil(2);
+    format!(
+        "{}. {}.",
+        digits[..half].join(", "),
+        digits[half..].join(", ")
+    )
+}
+
+/// How the code is said, and the model told to say it: today's two
+/// groups, or with the switch more slowly, offering to say it again.
+fn code_said(code: &str, slow: bool) -> (String, &'static str) {
+    if slow {
+        (
+            code_to_say_slowly(code),
+            "Say the code one digit at a time, slowly, pausing after each digit and a little \
+             longer between the two groups, exactly as given",
+        )
+    } else {
+        (
+            code_to_say(code),
+            "Say the code digit by digit, slowly, in the two groups given",
+        )
+    }
+}
+
 /// An email as it is read back, slowly and clearly, as Harness asks:
 /// "someone at example dot com"; a dash, an underscore and a plus said.
 pub fn spoken_email(email: &str) -> String {
@@ -327,8 +360,19 @@ const WHERE: &str = "they type it into Harness on their computer: in the Harness
 
 /// What the model is told of a sign-in in this state (the tasks part's
 /// `sign_in_state`), as the answer to [`START`].
-fn told(state: &Value) -> Value {
+fn told(state: &Value, slow: bool) -> Value {
     match state["sign_in"].as_str() {
+        Some("code") if slow => {
+            let (said, how) = code_said(state["code"].as_str().unwrap_or_default(), true);
+            json!({
+                "code_to_say": said,
+                "next": format!(
+                    "{how}, then that {WHERE}. Then say you will ask them to confirm their email \
+                     once they have approved it, and that you can say the code again if they \
+                     ask. Never write the code down any other way."
+                ),
+            })
+        }
         Some("code") => {
             let code = state["code"].as_str().unwrap_or_default();
             json!({
@@ -394,6 +438,12 @@ fn start_refused(answer: &Value) -> Value {
         Some("timeout" | "busy") => {
             "The lamp's hand-over part is busy just now. Say to ask again in a moment."
         }
+        // A sign-in the owner started in the app (#5198): its code is shown
+        // there, never said here.
+        Some("started_in_app") => {
+            "A sign-in was started in the app and is finished there. Say so in a few words, \
+             without any code."
+        }
         _ => "The sign-in could not be started just now. Say to ask again later.",
     };
     json!({"error": why})
@@ -421,6 +471,7 @@ pub fn run(
     request: u64,
     heard: bool,
     deadline: Duration,
+    slow: bool,
 ) -> (Value, bool) {
     if !heard {
         return (
@@ -516,7 +567,7 @@ pub fn run(
                 // The lamp says it in this request's answer.
                 mark(request);
             }
-            (told(&state), true)
+            (told(&state, slow), true)
         }
         ANSWER => {
             let yes = match call.args.get("answer").and_then(Value::as_str) {
@@ -574,6 +625,18 @@ fn asking_note(email: &str) -> String {
 #[derive(Debug, Default)]
 pub struct Follow {
     seen: std::collections::BTreeMap<u64, Seen>,
+    /// The code said more slowly (`LAMP_TASKS_SIGN_IN_APP=on`, #5198).
+    pub slow: bool,
+}
+
+impl Follow {
+    /// A follow with the code said more slowly or not (#5198).
+    pub fn saying_slowly(slow: bool) -> Self {
+        Self {
+            slow,
+            ..Self::default()
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -656,13 +719,22 @@ pub fn news(
                     && let Some(code) = claim["code"].as_str()
                 {
                     keep_said(Some(code), None);
-                    news.push(SignInNews {
-                        key: key(id, "code"),
-                        note: format!(
+                    let note = if follow.slow {
+                        let (said, how) = code_said(code, true);
+                        format!(
+                            "The code to sign this lamp in to Harness is ready: {said} {how}, \
+                             then that {WHERE}, and that you can say it again if they ask."
+                        )
+                    } else {
+                        format!(
                             "The code to sign this lamp in to Harness is ready: {}. Say it digit by \
                              digit, slowly, in the two groups given, then that {WHERE}.",
                             code_to_say(code)
-                        ),
+                        )
+                    };
+                    news.push(SignInNews {
+                        key: key(id, "code"),
+                        note,
                         until: Some(until),
                     });
                 }
@@ -1169,7 +1241,7 @@ mod tests {
             fn sign_in_starter(&self) -> Option<Starter> {
                 let mut link = self.link.lock().unwrap().take();
                 let starts = self.starts.clone();
-                Some(Box::new(move || {
+                Some(Box::new(move |_| {
                     starts.fetch_add(1, Ordering::SeqCst);
                     link.take()
                         .map(|link| Box::new(link) as Box<dyn Link>)
@@ -1206,6 +1278,7 @@ mod tests {
                     targets_newer: None,
                     set_up_later: None,
                     sign_in_by_code: true,
+                    app_socket: None,
                     report_every: REPORT_EVERY,
                     daemon_retry_after: DAEMON_RETRY_AFTER,
                 };
@@ -1545,6 +1618,7 @@ mod tests {
                 correct: false,
                 questions: false,
                 sign_in: true,
+                sign_in_app: false,
             }
         }
 
@@ -1973,18 +2047,21 @@ mod tests {
 
     #[test]
     fn each_state_is_told_as_the_model_needs_it() {
-        let code = told(&json!({"sign_in": "code", "code": "12345678", "expires_in": 120}));
+        let code = told(
+            &json!({"sign_in": "code", "code": "12345678", "expires_in": 120}),
+            false,
+        );
         assert_eq!(code["code_to_say"], "1 2 3 4, 5 6 7 8");
         assert!(code["next"].as_str().unwrap().contains("Approve a device"));
         assert!(code.get("error").is_none());
         assert!(
-            told(&json!({"sign_in": "starting"}))["next"]
+            told(&json!({"sign_in": "starting"}), false)["next"]
                 .as_str()
                 .unwrap()
                 .contains("in a moment")
         );
         assert_eq!(
-            told(&json!({"sign_in": "done", "result": "success"}))["result"],
+            told(&json!({"sign_in": "done", "result": "success"}), false)["result"],
             "The lamp is signed in to Harness. Say so in a few words."
         );
         for (code, why) in [
@@ -1993,7 +2070,10 @@ mod tests {
             ("harness_too_old", "needs updating"),
             ("BACKEND_ERROR", "could not sign it in"),
         ] {
-            let told = told(&json!({"sign_in": "done", "result": "error", "code": code}));
+            let told = told(
+                &json!({"sign_in": "done", "result": "error", "code": code}),
+                false,
+            );
             assert!(told["error"].as_str().unwrap().contains(why), "{code}");
         }
     }
@@ -2029,6 +2109,7 @@ mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -2178,6 +2259,7 @@ mod tests {
             correct: false,
             questions: false,
             sign_in: true,
+            sign_in_app: false,
         };
         // `bad_request`: a tasks part too old for the sign-in's ops.
         let refusals = [
@@ -2243,6 +2325,94 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// #5198, `LAMP_TASKS_SIGN_IN_APP=on`: the code said more slowly, one
+    /// digit at a time, and "say the code again" (a new heard START) gives
+    /// it again while it is alive. A sign-in started in the app is never
+    /// said: its START is refused without a digit, and the news, reading
+    /// only `in_app`, tells nothing.
+    #[test]
+    fn with_the_app_switch_the_code_is_said_slowly_and_again_and_an_app_sign_in_never() {
+        let _thread = crate::provider_worker::tests::one_thread();
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        forget();
+        assert_eq!(code_to_say_slowly("12345678"), "1, 2, 3, 4. 5, 6, 7, 8.");
+        assert_eq!(code_to_say_slowly("1234"), "1, 2, 3, 4.");
+        let directory =
+            std::env::temp_dir().join(format!("voice-sign-in-slow-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let capable = json!({"ok":true,"sign_in":"none","code_claims":1});
+        let code = json!({"ok":true,"sign_in":"code","id":7,"code":"12345678","expires_in":110,"code_told":true});
+        let in_app = json!({"ok":true,"sign_in":"in_app","id":8,"code_claims":1});
+        let replies = CodeReplies::new(
+            &directory,
+            vec![
+                capable.clone(),
+                code.clone(),
+                capable,
+                code,
+                in_app.clone(),
+                json!({"ok":false,"error":"started_in_app"}),
+                in_app,
+            ],
+        );
+        let call = ToolCall {
+            id: "slow".into(),
+            name: START.into(),
+            args: json!({}),
+        };
+        let deadline = crate::agent_tasks::DEADLINE;
+        let (first, _) = run(&directory, &call, 41, true, deadline, true);
+        assert_eq!(first["code_to_say"], "1, 2, 3, 4. 5, 6, 7, 8.", "{first}");
+        let next = first["next"].as_str().unwrap();
+        assert!(
+            next.contains("one digit at a time") && next.contains("again"),
+            "{next}"
+        );
+        // "Say the code again": the same code, while it is alive.
+        let (again, _) = run(&directory, &call, 42, true, deadline, true);
+        assert_eq!(again["code_to_say"], first["code_to_say"]);
+        // Started in the app: nothing to say, no digit.
+        let (refused, handled) = run(&directory, &call, 43, true, deadline, true);
+        assert!(handled);
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains("started in the app"),
+            "{refused}"
+        );
+        assert!(!refused.to_string().contains("1234"));
+        let mut follow = Follow {
+            slow: true,
+            ..Default::default()
+        };
+        let (told_news, open) = news(&directory, &BTreeSet::new(), &mut follow);
+        assert!(told_news.is_empty() && !open, "{told_news:?}");
+        let ops: Vec<Value> = replies
+            .seen
+            .try_iter()
+            .map(|seen| seen["op"].clone())
+            .collect();
+        assert_eq!(
+            ops,
+            [
+                "sign_in_state",
+                "sign_in_start",
+                "sign_in_state",
+                "sign_in_start",
+                "sign_in_state",
+                "sign_in_start",
+                "sign_in_state"
+            ]
+        );
+        drop(replies);
+        forget();
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// The new protocol matrices own their one trusted listener. Iterate
@@ -2439,7 +2609,14 @@ mod tests {
                 name: START.into(),
                 args: json!({}),
             };
-            let (answer, handled) = run(&directory, &call, 41, true, crate::agent_tasks::DEADLINE);
+            let (answer, handled) = run(
+                &directory,
+                &call,
+                41,
+                true,
+                crate::agent_tasks::DEADLINE,
+                false,
+            );
             assert!(handled, "case {index}: {answer}");
             assert_eq!(
                 answer.get("code_to_say").is_some(),
@@ -2858,6 +3035,21 @@ mod tests {
             .map(|tool| tool.name)
             .collect();
         assert!(names.contains(&START.to_owned()) && names.contains(&ANSWER.to_owned()));
+        // #5198: `LAMP_TASKS_SIGN_IN_APP=on` follows it, only with it; off,
+        // the worker's place is as before.
+        assert!(!place.sign_in_app);
+        use crate::agent_tasks::{SIGN_IN_APP_FLAG, sign_in_app};
+        assert!(sign_in_app(&flags, Some("on")));
+        let without = crate::agent_tasks::tests::arguments_for_sign_in(None);
+        assert!(!sign_in_app(&without, Some("on")));
+        for value in [None, Some("ON"), Some("yes")] {
+            assert!(!sign_in_app(&flags, value), "{value:?}");
+        }
+        let mut with_app = flags.clone();
+        with_app.push(SIGN_IN_APP_FLAG.to_owned());
+        let (taken, rest) = take(&with_app).unwrap();
+        let taken = taken.unwrap();
+        assert!(taken.sign_in && taken.sign_in_app && rest.is_empty());
         for value in [None, Some("yes"), Some("ON")] {
             let flags = crate::agent_tasks::tests::arguments_for_sign_in(value);
             let place = take(&flags).unwrap().0.unwrap();

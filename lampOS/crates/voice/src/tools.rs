@@ -2824,6 +2824,7 @@ mod tests {
                 correct: false,
                 questions: false,
                 sign_in: false,
+                sign_in_app: false,
             }),
             make_skill: false,
             schedule_tools: true,
@@ -3148,6 +3149,7 @@ mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         assert_eq!(
             settings,
@@ -4200,6 +4202,7 @@ mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let with = Settings {
             tasks: Some(place.clone()),

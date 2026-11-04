@@ -191,6 +191,7 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     for kind in ["reports.get", "reports.set"] {
         let result = answer(&mut real, kind, &json!({"share": true}));

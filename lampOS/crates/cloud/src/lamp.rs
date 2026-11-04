@@ -106,6 +106,10 @@ pub struct Real {
     /// lamp-skills' call socket, for guard mode from the owner's app, with
     /// `LAMP_GUARD_FROM_APP=on` (#2562, `crate::guard`).
     pub guard: Option<PathBuf>,
+    /// lamp-tasks' app socket, for Harness signed in from the owner's app,
+    /// and the backend the code is handed to over HTTPS, with
+    /// `LAMP_TASKS_SIGN_IN_APP=on` (#5198, `crate::harness_sign_in`).
+    pub harness_sign_in: Option<crate::harness_sign_in::Place>,
     /// lamp-voice's app-make socket, for a skill typed in the owner's app,
     /// with `LAMP_APP_MAKE_SKILL=on` and the skills page (#2813,
     /// `crate::make_skill`).
@@ -734,6 +738,10 @@ impl Lamp for Real {
         self.guard.clone()
     }
 
+    fn harness_sign_in(&self) -> Option<crate::harness_sign_in::Place> {
+        self.harness_sign_in.clone()
+    }
+
     fn make_skill(&self) -> Option<PathBuf> {
         self.make_skill.clone()
     }
@@ -972,6 +980,7 @@ mod tests {
             update_checks: Default::default(),
             restart: None,
             guard: None,
+            harness_sign_in: None,
             make_skill: None,
             write_skill: None,
             share: None,
@@ -1054,6 +1063,7 @@ mod tests {
             update_checks: Default::default(),
             restart: None,
             guard: None,
+            harness_sign_in: None,
             make_skill: None,
             write_skill: None,
             share: None,
@@ -1145,6 +1155,7 @@ mod tests {
             update_checks: Default::default(),
             restart: None,
             guard: None,
+            harness_sign_in: None,
             make_skill: None,
             write_skill: None,
             share: None,
@@ -1249,6 +1260,7 @@ mod tests {
             update_checks: Default::default(),
             restart: None,
             guard: None,
+            harness_sign_in: None,
             make_skill: None,
             write_skill: None,
             share: None,

@@ -2146,6 +2146,70 @@ Tests: `agent_tasks::tests::with_questions_a_question_for_the_staff_is_handed_ov
 `task_news::tests::a_finished_question_task_is_told_as_its_answer`,
 `skill_words::tests::a_task_news_without_the_folder_words_passes_with_the_built_in_ones`.
 
+### Signing the lamp in from the app (#5198, `--app-socket`, off unless `LAMP_TASKS_SIGN_IN_APP=on`)
+
+`lamp-tasks serve --sign-in-by-code --app-socket PATH` binds a third socket,
+the owner's app's route (`/run/lampos-tasks/app.sock`, reached by
+`lamp-cloud` for the app's `harness.sign_in.*`, `docs/cloud.md`, which keeps the code and the email off the broker and hands them to the backend over HTTPS). It takes
+only `app_sign_in_start` (`{"method":"code"}`, the default and, for now, the
+only method), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`);
+any other op there is `not_on_this_route`, and those three on the public or
+voice socket are `untrusted`. Without `--sign-in-by-code` the socket isn't
+bound. The contract the app builds on is in #5198.
+
+- **Who started it.** Each sign-in records `by` (`voice` or `app`) and
+  `method` (`code`). A start from the app while the app's own is open gives
+  it back; while a voice-started one is open it is `voice_sign_in_open`.
+- **The voice never says an app-started one.** On the voice route it is only
+  `{"sign_in":"in_app","id":N}`: `sign_in_start` is `started_in_app`, its code
+  claim `not_available`, `sign_in_asked` and `sign_in_answer` `started_in_app`.
+  The voice tells the person it is finished in the app, without a digit.
+- **The app's view** (`Session::app_view`): `by`, `method`, `revision`,
+  `instance_id` (random per run), the code with `expires_in` and `expires_at`
+  (unix ms, moved on each keepalive), and the question. The email and
+  `answer_here:true` only for an app-started sign-in; a voice-started one
+  shows its code and never its email. `revision` is the sign-in's id times
+  1000 plus its changes: every change moves it, a read never does. A done
+  sign-in has `message`: Harness's own result `message` (bounded, never one
+  holding an `@`) or the lamp's words for its code; Harness's
+  `alreadySignedIn:true` is `done` success with `already_signed_in:true`.
+- **The app's answer** (`Session::answer_from_app`): only for an app-started
+  sign-in (`started_by_voice`), for its `id` (`not_this_sign_in`), once the
+  app was given an `asking` view (`not_read`), within
+  [`sign_in::ANSWER_WINDOW`](../crates/tasks/src/sign_in.rs) of that
+  (`too_late`, which ends it), once.
+- **The id only grows** (Backend2 on #5198: the backend tells an ended
+  sign-in from one not put yet by it). Each new id is the larger of the
+  clock in ms and the newest kept + 1; the newest is kept in the state
+  folder beside the store's (`/var/lib/lampos-tasks/sign-in-id`, written
+  atomically at each new sign-in), so a part restarted with its clock gone
+  back still counts up. Test:
+  `a_sign_in_id_grows_across_a_restart_with_the_clock_gone_back`.
+- **A put that failed** (`app_sign_in_relay {id, delivered}`, app route
+  only, sent by lamp-cloud after each HTTPS put): `delivered:false` gives
+  the open sign-in's view `error:"relay_failed"` and the message "The
+  sign-in code couldn't reach the app. Try again." with a new revision;
+  the sign-in goes on. `delivered:true` (a later put that worked) clears it,
+  with a new revision again. The same word twice is no change.
+- The journal says `sign-in N: started from the app (code)`, `answered yes in
+  the app`, `yes from the app not taken: CODE`: never the digits or the email.
+
+Tests: `sign_in::tests::a_result_keeps_harness_message_and_already_signed_in_for_the_app`,
+`protocol::tests::app_sign_in_operations_are_their_own_and_take_only_a_method_or_an_answer`,
+and the service's `the_apps_sign_in_is_its_own_routes_and_never_the_voices`
+(each route's refusals, the app's start, state and answer, the voice's
+`in_app`, a voice-started one shown without its email and not answerable
+from the app, `revision` moved by changes and not reads, Harness's message
+passed on).
+
+With the same switch in the voice, `sign_in_computer` and the news say the
+code more slowly, one digit at a time with a comma after each and a full stop
+between the two groups ("1, 2, 3, 4. 5, 6, 7, 8."), and tell the model to
+offer to say it again; "say the code again" is a new heard
+`sign_in_computer`, which gives the same code while it is alive. Without the
+switch both are as before. Test:
+`sign_in::tests::with_the_app_switch_the_code_is_said_slowly_and_again_and_an_app_sign_in_never`.
+
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 
 A lamp has no screen for Harness's QR code. Harness 0.4.23 signs a device in

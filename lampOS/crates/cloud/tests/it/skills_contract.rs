@@ -84,6 +84,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     }
 }
 

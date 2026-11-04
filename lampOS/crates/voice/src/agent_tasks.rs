@@ -154,6 +154,12 @@ pub const NAMED_ASK_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ASK";
 /// `on`, and nothing else. Needs `lamp-tasks serve --sign-in-by-code`.
 pub const SIGN_IN_ENVIRONMENT: &str = "LAMP_TASKS_SIGN_IN";
 pub const SIGN_IN_FLAG: &str = "--tasks-sign-in";
+/// Harness signed in from the owner's app too (#5198): `on`, and only with
+/// [`SIGN_IN_ENVIRONMENT`]. lamp-cloud reads the same switch for the app's
+/// kinds. In the voice, the code is said more slowly, digit by digit with a
+/// pause after each, and a sign-in the app started is never said.
+pub const SIGN_IN_APP_ENVIRONMENT: &str = "LAMP_TASKS_SIGN_IN_APP";
+pub const SIGN_IN_APP_FLAG: &str = "--tasks-sign-in-app";
 /// Where it reads whether a question about or for one of the staff is
 /// handed to them as a question task, never answered by the lamp. `on`
 /// only, and only with [`ASKED_ENVIRONMENT`], whose note says it.
@@ -1488,6 +1494,8 @@ pub struct Place {
     /// The person may sign the lamp's Harness in by voice
     /// ([`SIGN_IN_FLAG`], `crate::sign_in`).
     pub sign_in: bool,
+    /// The code is said more slowly ([`SIGN_IN_APP_FLAG`], #5198).
+    pub sign_in_app: bool,
     /// A question about or for one of the staff is handed to them as a
     /// question task ([`QUESTIONS_FLAG`], [`QUESTION`]).
     pub questions: bool,
@@ -1524,7 +1532,19 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         arguments.push(QUESTIONS_FLAG.to_owned());
     }
+    if sign_in_app(
+        &arguments,
+        std::env::var(SIGN_IN_APP_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(SIGN_IN_APP_FLAG.to_owned());
+    }
     arguments
+}
+
+/// Whether [`SIGN_IN_APP_FLAG`] goes after `arguments`: `on`, and only
+/// with [`SIGN_IN_FLAG`].
+pub(crate) fn sign_in_app(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && arguments.iter().any(|flag| flag == SIGN_IN_FLAG)
 }
 
 /// Whether [`QUESTIONS_FLAG`] goes after `arguments`: `on`, and only with
@@ -1602,7 +1622,8 @@ fn alias(text: &str) -> bool {
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
 /// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
 /// [--tasks-needs PATH] [--tasks-sign-in] [--tasks-named-only]
-/// [--tasks-correct] [--tasks-questions]` off the flags.
+/// [--tasks-correct] [--tasks-questions] [--tasks-sign-in-app]` off the
+/// flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
         return Ok((None, flags));
@@ -1675,6 +1696,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == QUESTIONS_FLAG && asked => (true, rest),
         _ => (false, rest),
     };
+    let (sign_in_app, rest) = match rest {
+        [flag, rest @ ..] if flag == SIGN_IN_APP_FLAG && sign_in => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1689,6 +1714,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             named_only,
             correct,
             sign_in,
+            sign_in_app,
             questions,
         }),
         rest,
@@ -1844,7 +1870,14 @@ fn run_for(
             if !place.sign_in {
                 return (crate::tools::unavailable(), false);
             }
-            crate::sign_in::run(&place.directory, call, request, heard, left())
+            crate::sign_in::run(
+                &place.directory,
+                call,
+                request,
+                heard,
+                left(),
+                place.sign_in_app,
+            )
         }
         START => {
             let Some(task) = call
@@ -2433,6 +2466,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let told = |place: &Place, name: &str, args: Value| {
             let call = ToolCall {
@@ -2665,6 +2699,7 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 sign_in: false,
+                sign_in_app: false,
             })
         );
         assert_eq!(rest, &flags[2..]);
@@ -3075,6 +3110,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
                           Say so plainly in a few words: it needs setting up on the computer first.";
@@ -3293,6 +3329,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -3375,6 +3412,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -3465,6 +3503,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
@@ -3520,6 +3559,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let call = |task: &str| ToolCall {
             id: "c".into(),
@@ -3577,6 +3617,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let task = json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
             "observations":[{"id":4,"state":"idle"}]});
@@ -3680,6 +3721,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         }
     }
 
@@ -4082,6 +4124,7 @@ pub(crate) mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         }
     }
 
@@ -5311,6 +5354,7 @@ pub(crate) mod tests {
                 correct: false,
                 questions: false,
                 sign_in: false,
+                sign_in_app: false,
             })
         );
         assert_eq!(rest, ["--other"]);
@@ -5860,6 +5904,7 @@ pub(crate) mod tests {
             correct,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         }
     }
 

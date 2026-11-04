@@ -152,6 +152,13 @@ pub trait Lamp {
         None
     }
 
+    /// lamp-tasks' app socket, for signing the lamp's Harness in from the
+    /// owner's app (`LAMP_TASKS_SIGN_IN_APP=on`, #5198,
+    /// `crate::harness_sign_in`).
+    fn harness_sign_in(&self) -> Option<crate::harness_sign_in::Place> {
+        None
+    }
+
     /// lamp-voice's app-make socket, for a skill typed in the owner's app
     /// (`LAMP_APP_MAKE_SKILL=on` with the skills page, #2813,
     /// `crate::make_skill`).
@@ -252,7 +259,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 50] = [
+pub const KINDS: [(&str, Switch); 53] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -310,7 +317,16 @@ pub const KINDS: [(&str, Switch); 50] = [
     // both rows wait for lamp-services' admin socket as well.
     (crate::services::CAN, SERVICES),
     (crate::services::LIST_KIND, SERVICES),
+    // Harness signed in from the app (#5198): the code shown there. The
+    // feature's word first, as `services`: an app shows the screen only
+    // on a lamp that names it.
+    (crate::harness_sign_in::CAN, HARNESS_SIGN_IN),
+    (crate::harness_sign_in::KINDS[0], HARNESS_SIGN_IN),
+    (crate::harness_sign_in::KINDS[1], HARNESS_SIGN_IN),
+    (crate::harness_sign_in::KINDS[2], HARNESS_SIGN_IN),
 ];
+
+const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
 /// The switch, and a computer to make the skill on (fourteen-P15).
@@ -644,6 +660,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let services = lamp.services().ok_or_else(|| not_here(kind))?;
             services.list().map(Some)
         }
+        // Harness's sign-in from the app (#5198): asked of lamp-tasks' app
+        // route, which decides who may answer; its view comes back at once.
+        kind if crate::harness_sign_in::KINDS.contains(&kind) && on(lamp, kind) => {
+            let place = lamp.harness_sign_in().ok_or_else(|| not_here(kind))?;
+            crate::harness_sign_in::ask(&place, kind, data)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -689,6 +711,7 @@ pub mod tests {
         pub faces: Option<crate::faces::Eyes>,
         pub schedule: Option<lamp_actions::schedule::Adapter>,
         pub guard: Option<std::path::PathBuf>,
+        pub harness_sign_in: Option<crate::harness_sign_in::Place>,
         pub make_skill: Option<std::path::PathBuf>,
         pub make_skill_ready: bool,
         pub write_skill: Option<std::path::PathBuf>,
@@ -794,6 +817,9 @@ pub mod tests {
         }
         fn guard(&self) -> Option<std::path::PathBuf> {
             self.guard.clone()
+        }
+        fn harness_sign_in(&self) -> Option<crate::harness_sign_in::Place> {
+            self.harness_sign_in.clone()
         }
         fn make_skill(&self) -> Option<std::path::PathBuf> {
             self.make_skill.clone()
@@ -1168,6 +1194,10 @@ pub mod tests {
             "skills.made",
             // Without LAMP_SKILL_WRITTEN=on.
             "skills.write",
+            // Without LAMP_TASKS_SIGN_IN_APP=on (#5198).
+            "harness.sign_in.start",
+            "harness.sign_in.state",
+            "harness.sign_in.answer",
         ] {
             assert_eq!(
                 answer(&mut lamp, kind, &Value::Null),
@@ -1382,6 +1412,21 @@ pub mod tests {
                 "update page",
                 |f| f.update_page = true,
                 &["update.status", "update.check"],
+            ),
+            (
+                "harness sign-in",
+                |f| {
+                    f.harness_sign_in = Some(crate::harness_sign_in::tests::place(
+                        std::path::Path::new("/nowhere"),
+                        Default::default(),
+                    ))
+                },
+                &[
+                    "harness.sign_in",
+                    "harness.sign_in.start",
+                    "harness.sign_in.state",
+                    "harness.sign_in.answer",
+                ],
             ),
             ("restart", |f| f.restart = true, &["system.reboot"]),
             ("shutdown", |f| f.shutdown = true, &["system.shutdown"]),

@@ -15,6 +15,13 @@
 //! The part runs Harness's own sign-in and passes the person's spoken answer
 //! on; it keeps no credential. The code's digits and the email are said by
 //! the voice and never journalled here.
+//!
+//! The owner's app may start one too (#5198, `serve --app-socket`), by the
+//! same code, which the app shows and the person types into Harness. Each
+//! sign-in records who started it ([`By`]) and how ([`Method`], only the
+//! code for now; Harness's QR sign-in may be added later): only the app
+//! answers an app-started one, only the voice a voice-started one, and the
+//! voice never sees an app-started one's code or email.
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
@@ -28,6 +35,41 @@ const MOST_EMAIL_BYTES: usize = 254;
 /// heard later is for something else.
 pub const ANSWER_WINDOW: Duration = Duration::from_secs(120);
 const MOST_EXPIRES_IN: u64 = 600;
+
+/// How a sign-in is done: Harness's 8-digit code, the only method for now
+/// (#5198). Named in the app's view, so another (Harness's QR) can be
+/// added later without changing what the app reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Method {
+    #[default]
+    Code,
+}
+
+impl Method {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Code => "code",
+        }
+    }
+}
+
+/// Who started a sign-in (#5198): only they answer its question.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum By {
+    #[default]
+    Voice,
+    App,
+}
+
+impl By {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Voice => "voice",
+            Self::App => "app",
+        }
+    }
+}
 
 /// One line of `harness login --code --json`. Its `Debug` hides the digits
 /// and the email (Jarvis's P3 on #2131), so a later `{:?}` can't print them.
@@ -43,6 +85,28 @@ pub enum Event {
         email: String,
     },
     Result(Done),
+    /// A result with more than [`Event::Result`] holds (#5198): Harness's
+    /// own `message` (only text with no `@`, bounded), or
+    /// `alreadySignedIn:true` (a success with nothing to do).
+    ResultWith {
+        done: Done,
+        message: Option<String>,
+        already_signed_in: bool,
+    },
+}
+
+/// The most of Harness's own message kept for the app.
+const MOST_MESSAGE_BYTES: usize = 200;
+
+/// Harness's `message` as the app may show it: plain, bounded text, with
+/// no address in it.
+fn message(value: Option<&Value>) -> Option<String> {
+    let message = value?.as_str()?.trim();
+    (!message.is_empty()
+        && message.len() <= MOST_MESSAGE_BYTES
+        && !message.contains('@')
+        && !message.chars().any(char::is_control))
+    .then(|| message.to_owned())
 }
 
 /// How a sign-in ended. Its `Debug` hides the email.
@@ -69,6 +133,15 @@ impl std::fmt::Debug for Event {
             }
             Self::Confirm { .. } => write!(f, "Confirm {{ email: <hidden> }}"),
             Self::Result(done) => write!(f, "Result({done:?})"),
+            Self::ResultWith {
+                done,
+                message,
+                already_signed_in,
+            } => write!(
+                f,
+                "ResultWith {{ done: {done:?}, message: {}, already_signed_in: {already_signed_in} }}",
+                if message.is_some() { "<kept>" } else { "None" }
+            ),
         }
     }
 }
@@ -135,31 +208,46 @@ pub fn parse_line(line: &str) -> Result<Option<Event>, &'static str> {
         "confirm" => Event::Confirm {
             email: email(value.get("email")).ok_or(unreadable)?,
         },
-        "result" => Event::Result(match value["status"].as_str() {
-            Some("success") => Done::Success {
-                email: email(value.get("email")),
-            },
-            Some("error") => {
-                let code = value["code"]
-                    .as_str()
-                    .filter(|code| {
-                        !code.is_empty()
-                            && code.len() <= 32
-                            && code.bytes().all(|b| b.is_ascii_uppercase() || b == b'_')
-                    })
-                    .unwrap_or("BACKEND_ERROR");
-                Done::Error {
-                    code: code.to_owned(),
+        "result" => {
+            let done = match value["status"].as_str() {
+                Some("success") => Done::Success {
+                    email: email(value.get("email")),
+                },
+                Some("error") => {
+                    let code = value["code"]
+                        .as_str()
+                        .filter(|code| {
+                            !code.is_empty()
+                                && code.len() <= 32
+                                && code.bytes().all(|b| b.is_ascii_uppercase() || b == b'_')
+                        })
+                        .unwrap_or("BACKEND_ERROR");
+                    Done::Error {
+                        code: code.to_owned(),
+                    }
+                }
+                _ => return Err(unreadable),
+            };
+            let message = message(value.get("message"));
+            let already_signed_in = matches!(done, Done::Success { .. })
+                && value["alreadySignedIn"].as_bool() == Some(true);
+            if message.is_none() && !already_signed_in {
+                Event::Result(done)
+            } else {
+                Event::ResultWith {
+                    done,
+                    message,
+                    already_signed_in,
                 }
             }
-            _ => return Err(unreadable),
-        }),
+        }
         _ => return Ok(None),
     }))
 }
 
-/// What starts a sign-in: Harness's own, on a lane of its own.
-pub type Starter = Box<dyn FnMut() -> Result<Box<dyn Link>, String> + Send>;
+/// What starts a sign-in: Harness's own, on a lane of its own, by the
+/// method asked (only `--code` for now).
+pub type Starter = Box<dyn FnMut(Method) -> Result<Box<dyn Link>, String> + Send>;
 
 /// A running `harness login --code --json`: dropping it stops the program.
 pub trait Link: Send {
@@ -201,8 +289,24 @@ pub struct Session {
     state: State,
     until: Instant,
     /// The voice's request in which the question was heard whole, and
-    /// when ([`Session::asked`]).
+    /// when ([`Session::asked`]); for an app-started one, request 0 and
+    /// when the app was first given the question ([`Session::app_view`]).
     told: Option<(u64, Instant)>,
+    by: By,
+    method: Method,
+    /// How many times its state changed ([`Session::revision`]); never by
+    /// a read.
+    changes: u64,
+    /// When the code stops being good, in unix ms, as the app counts down
+    /// to it: set when Harness gives or extends it, never on a read.
+    expires_at_ms: Option<u64>,
+    /// Harness's own message with its result, and whether it said the lamp
+    /// was already signed in (#5198).
+    message: Option<String>,
+    already_signed_in: bool,
+    /// lamp-cloud's last put of this sign-in's code or question to the
+    /// backend failed (#5198, [`Session::relayed`]).
+    relay_failed: bool,
     /// The code already given by a start or initial claim. A same-code
     /// keepalive does not make another initial telling available.
     code_given: Option<String>,
@@ -219,7 +323,35 @@ impl Session {
             until: now + MOST_LIFE,
             told: None,
             code_given: None,
+            by: By::Voice,
+            method: Method::Code,
+            changes: 0,
+            expires_at_ms: None,
+            message: None,
+            already_signed_in: false,
+            relay_failed: false,
         }
+    }
+
+    /// Who started it and how (#5198): a voice-started code unless said.
+    pub fn started_by(mut self, by: By, method: Method) -> Self {
+        self.by = by;
+        self.method = method;
+        self
+    }
+
+    pub fn by(&self) -> By {
+        self.by
+    }
+
+    /// Bumped by every change of state and never by a read (#5198), and
+    /// higher for each later sign-in: ids go up by one a sign-in, and a
+    /// sign-in changes far fewer than 1000 times (a code is kept alive at
+    /// most five times).
+    pub fn revision(&self) -> u64 {
+        self.id
+            .saturating_mul(1000)
+            .saturating_add(self.changes.min(999))
     }
 
     /// One that could not start: done, with why.
@@ -231,6 +363,13 @@ impl Session {
             until: Instant::now(),
             told: None,
             code_given: None,
+            by: By::Voice,
+            method: Method::Code,
+            changes: 0,
+            expires_at_ms: None,
+            message: None,
+            already_signed_in: false,
+            relay_failed: false,
         }
     }
 
@@ -251,7 +390,8 @@ impl Session {
     /// undo the claim; a new heard start can ask for the code again.
     pub(crate) fn take_code(&mut self, id: u64, now: Instant) -> Value {
         let unavailable = || json!({"claim": "not_available", "id": id});
-        if id != self.id || now >= self.until {
+        // An app-started sign-in's code is never the voice's to say.
+        if id != self.id || now >= self.until || self.by == By::App {
             return unavailable();
         }
         match &self.state {
@@ -298,6 +438,8 @@ impl Session {
                         code,
                         until: now + Duration::from_secs(expires_in),
                     };
+                    self.changes += 1;
+                    self.expires_at_ms = Some(unix_ms().saturating_add(expires_in * 1000));
                 }
                 Ok(Event::Code { .. }) => {}
                 // Asked once: a question after it was answered is passed
@@ -307,8 +449,26 @@ impl Session {
                 {
                     said.push("approved in Harness: asking whether to sign in".into());
                     self.state = State::Asking { email };
+                    self.changes += 1;
                 }
                 Ok(Event::Confirm { .. }) => {}
+                Ok(Event::ResultWith {
+                    done,
+                    message,
+                    already_signed_in,
+                }) => {
+                    self.message = message;
+                    self.already_signed_in = already_signed_in;
+                    said.push(match &done {
+                        Done::Success { .. } if already_signed_in => "already signed in".into(),
+                        Done::Success { .. } => "signed in".into(),
+                        Done::Error { code } => format!("not signed in: {code}"),
+                    });
+                    self.finish(match done {
+                        Done::Success { .. } => Done::Success { email: None },
+                        error => error,
+                    });
+                }
                 Ok(Event::Result(done)) => {
                     said.push(match &done {
                         Done::Success { .. } => "signed in".into(),
@@ -356,6 +516,8 @@ impl Session {
 
     fn finish(&mut self, done: Done) {
         self.state = State::Done(done);
+        self.changes += 1;
+        self.expires_at_ms = None;
         self.code_given = None;
         // Dropped: the program is stopped, if it hasn't ended itself.
         self.link = None;
@@ -369,6 +531,10 @@ impl Session {
     pub fn asked(&mut self, id: u64, request: u64, now: Instant) -> Result<(), &'static str> {
         if id != self.id {
             return Err("not_this_sign_in");
+        }
+        // Only the app answers an app-started sign-in (#5198).
+        if self.by == By::App {
+            return Err("started_in_app");
         }
         if !matches!(self.state, State::Asking { .. }) {
             return Err("not_asking");
@@ -385,6 +551,9 @@ impl Session {
     /// [`ANSWER_WINDOW`] of it. An answer too soon leaves the question open;
     /// one too late ends the sign-in, which can't be answered any more.
     pub fn answer(&mut self, yes: bool, request: u64, now: Instant) -> Result<(), &'static str> {
+        if self.by == By::App {
+            return Err("started_in_app");
+        }
         if !matches!(self.state, State::Asking { .. }) {
             return Err("not_asking");
         }
@@ -392,6 +561,47 @@ impl Session {
         if request <= told_in {
             return Err("not_told");
         }
+        self.pass_on(yes, told_at, now)
+    }
+
+    /// lamp-cloud's word on its last put of sign-in `id`'s code or
+    /// question to the backend (#5198): a change of it is a change, with a
+    /// new revision, and the sign-in itself goes on either way.
+    pub fn relayed(&mut self, id: u64, delivered: bool) -> Result<(), &'static str> {
+        if id != self.id {
+            return Err("not_this_sign_in");
+        }
+        if self.relay_failed == delivered {
+            self.relay_failed = !delivered;
+            self.changes += 1;
+        }
+        Ok(())
+    }
+
+    /// The app's answer for sign-in `id` (#5198): only for one the app
+    /// started, once the app was given its question ([`Session::app_view`]),
+    /// within [`ANSWER_WINDOW`] of that, once.
+    pub fn answer_from_app(
+        &mut self,
+        id: u64,
+        yes: bool,
+        now: Instant,
+    ) -> Result<(), &'static str> {
+        if id != self.id {
+            return Err("not_this_sign_in");
+        }
+        if self.by != By::App {
+            return Err("started_by_voice");
+        }
+        if !matches!(self.state, State::Asking { .. }) {
+            return Err("not_asking");
+        }
+        let (_, told_at) = self.told.ok_or("not_read")?;
+        self.pass_on(yes, told_at, now)
+    }
+
+    /// The answer written to Harness, unless its window has passed.
+    fn pass_on(&mut self, yes: bool, told_at: Instant, now: Instant) -> Result<(), &'static str> {
         if now.saturating_duration_since(told_at) > ANSWER_WINDOW {
             self.finish(Done::Error {
                 code: "too_late".into(),
@@ -406,11 +616,16 @@ impl Session {
             return Err("ended");
         }
         self.state = State::Answered { yes };
+        self.changes += 1;
         Ok(())
     }
 
-    /// What the voice reads (`sign_in_state`).
+    /// What the voice reads (`sign_in_state`). An app-started sign-in is
+    /// only `in_app` here: never its code or email (#5198).
     pub fn view(&self, now: Instant) -> Value {
+        if self.by == By::App {
+            return json!({"sign_in": "in_app", "id": self.id});
+        }
         let mut view = match &self.state {
             State::Starting => json!({"sign_in": "starting"}),
             State::Code { code, until } => json!({
@@ -430,6 +645,94 @@ impl Session {
         };
         view["id"] = self.id.into();
         view
+    }
+
+    /// What the app reads (#5198, `app_sign_in_*`): who started it and how,
+    /// its code with `expires_in`, and its question. The email,
+    /// and `answer_here`, only for one the app started: giving the app its
+    /// question opens [`ANSWER_WINDOW`] for the app's answer, the first
+    /// time. A voice-started one shows its code only, for the app to show.
+    pub fn app_view(&mut self, now: Instant) -> Value {
+        let mine = self.by == By::App;
+        let mut view = match &self.state {
+            State::Starting => json!({"sign_in": "starting"}),
+            State::Code { code, until } => json!({
+                "sign_in": "code",
+                "code": code,
+                "expires_in": until.saturating_duration_since(now).as_secs(),
+                "expires_at": self.expires_at_ms,
+            }),
+            State::Asking { email } if mine => {
+                let told_at = *self.told.get_or_insert((0, now));
+                json!({
+                    "sign_in": "asking",
+                    "email": email,
+                    "answer_within": ANSWER_WINDOW
+                        .saturating_sub(now.saturating_duration_since(told_at.1))
+                        .as_secs(),
+                })
+            }
+            State::Asking { .. } => json!({"sign_in": "asking"}),
+            State::Answered { yes } => {
+                json!({"sign_in": "answered", "answer": if *yes { "yes" } else { "no" }})
+            }
+            State::Done(Done::Success { .. }) if self.already_signed_in => json!({
+                "sign_in": "done",
+                "result": "success",
+                "already_signed_in": true,
+                "message": "This lamp is already signed in to Harness.",
+            }),
+            State::Done(Done::Success { .. }) => json!({"sign_in": "done", "result": "success"}),
+            State::Done(Done::Error { code }) => json!({
+                "sign_in": "done",
+                "result": "error",
+                "error": code,
+                "message": self.message.as_deref().unwrap_or(done_message(code)),
+            }),
+        };
+        if self.relay_failed && self.open() {
+            view["error"] = "relay_failed".into();
+            view["message"] = RELAY_FAILED.into();
+        }
+        view["id"] = self.id.into();
+        view["revision"] = self.revision().into();
+        view["by"] = self.by.name().into();
+        view["method"] = self.method.name().into();
+        view["answer_here"] = (mine && matches!(self.state, State::Asking { .. })).into();
+        view
+    }
+}
+
+/// What the app shows when lamp-cloud's put of the code or the question
+/// to the backend failed (#5198).
+pub const RELAY_FAILED: &str = "The sign-in code couldn't reach the app. Try again.";
+
+/// Now, in unix ms.
+fn unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| {
+            u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+        })
+}
+
+/// What the app shows for a sign-in that ended with `code` and no message
+/// of Harness's own (#5198).
+pub fn done_message(code: &str) -> &'static str {
+    match code {
+        "EXPIRED" => "The code ran out of time. Start again for a new code.",
+        "DENIED" => "The sign-in was not approved.",
+        "CANCELLED" => "The sign-in was cancelled.",
+        "BACKEND_ERROR" => "Harness could not be reached. Try again in a moment.",
+        "DAEMON_BUSY" => "Harness on the lamp is busy. Try again in a moment.",
+        "DAEMON_DID_NOT_STOP" => {
+            "Harness on the lamp could not get ready to sign in. Try again in a moment."
+        }
+        "harness_too_old" => "Harness on the lamp needs updating first.",
+        "no_harness" => "Harness is not installed on this lamp.",
+        "timeout" => "The sign-in took too long. Start again.",
+        "too_late" => "The question went unanswered for two minutes. Start again.",
+        _ => "The sign-in stopped. Try again.",
     }
 }
 
@@ -894,6 +1197,92 @@ mod tests {
         session.asked(1, 4, now).unwrap();
         assert_eq!(session.tend(late), ["not signed in: too_late"]);
         assert!(!session.open());
+    }
+
+    /// #5198: Harness's own message and `alreadySignedIn` are kept for the
+    /// app (a message holding an address is not); the qr kind is passed
+    /// over, as any kind this part doesn't run.
+    #[test]
+    fn a_result_keeps_harness_message_and_already_signed_in_for_the_app() {
+        assert_eq!(
+            parse_line(r#"{"type":"result","status":"success","alreadySignedIn":true}"#),
+            Ok(Some(Event::ResultWith {
+                done: Done::Success { email: None },
+                message: None,
+                already_signed_in: true,
+            }))
+        );
+        assert_eq!(
+            parse_line(
+                r#"{"type":"result","status":"error","code":"DENIED","message":"Too many wrong codes. Try again in an hour."}"#
+            ),
+            Ok(Some(Event::ResultWith {
+                done: Done::Error {
+                    code: "DENIED".into()
+                },
+                message: Some("Too many wrong codes. Try again in an hour.".into()),
+                already_signed_in: false,
+            }))
+        );
+        assert_eq!(
+            parse_line(
+                r#"{"type":"result","status":"error","code":"DENIED","message":"no for someone@example.com"}"#
+            ),
+            Ok(Some(Event::Result(Done::Error {
+                code: "DENIED".into()
+            })))
+        );
+        assert_eq!(
+            parse_line(
+                r#"{"type":"qr","url":"https://harness.autonomous.ai/signin#k=x","expiresIn":120}"#
+            ),
+            Ok(None)
+        );
+        let now = Instant::now();
+        let (session, lines, _) = scripted(now);
+        let mut session = session.started_by(By::App, Method::Code);
+        lines.lock().unwrap().push_back(Some(Ok(Event::ResultWith {
+            done: Done::Success { email: None },
+            message: None,
+            already_signed_in: true,
+        })));
+        let before = session.revision();
+        assert_eq!(session.tend(now), ["already signed in"]);
+        let view = session.app_view(now);
+        assert_eq!(view["already_signed_in"], true);
+        assert_eq!(view["result"], "success");
+        assert!(view["revision"].as_u64().unwrap() > before);
+        assert_eq!(session.app_view(now)["revision"], view["revision"]);
+        assert_eq!(session.view(now), json!({"sign_in": "in_app", "id": 1}));
+
+        // The PM's privacy rule: no journal line of an app-started sign-in,
+        // nor a refusal, holds the code or the email.
+        let (session, lines, _) = scripted(now);
+        let mut session = session.started_by(By::App, Method::Code);
+        lines.lock().unwrap().extend([
+            code("12345678"),
+            Some(Ok(Event::Confirm {
+                email: "someone@example.com".into(),
+            })),
+        ]);
+        let mut said = session.tend(now);
+        said.push(format!("{:?}", session.answer_from_app(1, true, now)));
+        session.app_view(now);
+        said.push(format!("{:?}", session.answer_from_app(2, true, now)));
+        said.push(format!("{:?}", session.answer(true, 9, now)));
+        said.push(format!("{:?}", session.state()));
+        session.answer_from_app(1, false, now).unwrap();
+        lines
+            .lock()
+            .unwrap()
+            .push_back(Some(Ok(Event::Result(Done::Error {
+                code: "DENIED".into(),
+            }))));
+        said.extend(session.tend(now));
+        assert!(said.len() >= 5, "{said:?}");
+        for line in &said {
+            assert!(!line.contains("1234") && !line.contains('@'), "{line}");
+        }
     }
 
     /// The reviewer's P3 on #2174: the code a start gave is kept only while
