@@ -108,6 +108,7 @@ impl Rig {
             new_folder: None,
             journal: None,
             calls: None,
+            health_after_start: false,
         };
         let rig = Self {
             root,

@@ -1199,15 +1199,58 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **Installed, not running:** no Harness at boot, no `harness service
      install`, no daemon. lamp-tasks starts the daemon after the person's
      sign-in by a spoken code, as it does today.
-   - **Pinned, minimally** (#3693's decision (a) is still open): with
+   - **Pinned:** with
      `LAMP_HARNESS_MANIFEST_URL` (https) and `LAMP_HARNESS_MANIFEST_SHA256`
      both set, the manifest is fetched (`curl`, 1 MB at most) and its
      sha256 compared first; another sha256 installs nothing
      (`pin_mismatch`). A match runs the installer with
-     `HARNESS_METADATA_URL` at that URL. The installer fetches it again
-     itself, so a server that changes it between the two reads isn't
-     caught. With neither set the install is `harness-on`'s, said
-     `pinned: false`; one alone is `pin_unreadable`.
+     `HARNESS_METADATA_URL` at the checked bytes, served on 127.0.0.1
+     (next), so a server that changes the manifest after that read isn't
+     read again. With neither set the install is `harness-on`'s, said
+     `pinned: false`, except on a product lamp (next); one alone is
+     `pin_unreadable`.
+   - **The build's own pin** (#5229, `harness_install/product.rs`): a round
+     never rewrites `lamp-update.service`, so a pin or switch written there
+     would reach only a lamp installed after it. Instead the pinned Harness
+     manifest itself is compiled into lamp-update (`product::MANIFEST`, from
+     `deploy/harness/cli-0.5.39.metadata.json`, a byte-for-byte copy of
+     Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
+     when it named 0.5.39). The signed manifest names lamp-update by its
+     SHA-256, so the build's Ed25519 signature covers the pin (#3693's
+     decision (a): a sha256 pin in our signed manifest is enough, as Harness
+     signs nothing). Nothing is fetched or hosted for it: the one-shot checks
+     the bytes against `product::MANIFEST_SHA256` (`pin_mismatch` otherwise)
+     and runs the installer with `HARNESS_METADATA_URL` at a listener of its
+     own on `127.0.0.1` that serves those bytes while the installer runs
+     (`harness_install/serve.rs`). The installer reads its manifest with
+     Node's `fetch`, so it takes http but not `file://`. The installer checks
+     each file the manifest names (`cli.js`, `notify.mjs`, at per-version
+     CDN paths that are never republished) against its sha256. A fetched pin
+     (`LAMP_HARNESS_MANIFEST_*`) is served the same way, so the installer
+     never reads it again from its server. After the install, `harness
+     version` is compared with the manifest's `cli.version` and journaled:
+     `Harness 0.5.39 is the pinned version`, or `Harness says version …, not
+     the pinned …`.
+     - **Which lamp:** a product lamp is one whose `lamp-update.service` is a
+       regular file starting `/opt/lampOS/update/current/lamp-update`, that
+       link naming a build. That is the same test a round makes before
+       writing the product's settings. A builder's lamp on `deploy/units/`
+       (lamp-update from a build's own folder) is not one, and keeps
+       #5197's behaviour.
+     - **What a product lamp does:** with no `LAMP_HARNESS_MANIFEST_*` set it
+       uses the build's pin, so a home lamp never installs an unpinned
+       Harness. The env pair still overrides it, for a builder's test. With
+       `LAMP_HARNESS_AT_ONBOARDING` unset, it takes the build's
+       `PRODUCT_DEFAULT`, journaled as `Harness before the sign-in: off by
+       this build's default on a product lamp`. That default is off until a
+       later build turns it on after its lamp check. The environment, a
+       drop-in included, always wins.
+     - **A new Harness version** is a one-file PR: the new copy under
+       `deploy/harness/`, and `product.rs`'s `include_bytes!` path,
+       `MANIFEST_SHA256` and `VERSION` (a test holds the three to the file).
+     - **Held there:** Harness's own self-update is held by lamp-tasks'
+       `LAMP_HARNESS_HOLD_UPDATES` (tasks.md, "Harness held at its pinned
+       version"). A Team account ignores it.
    - **Said to the app:** `harness-install.json` in the records,
      `{"install", "revision", "at_unix_ms", "version"?, "pinned"?,
      "error"?, "message"}` (`lamp_msgs::HarnessInstall`), on

@@ -84,6 +84,9 @@ const ENVIRONMENT: &[&str] = &[
     "ADAPTER_DATA_DIR",
     "HARNESS_AUTH_DIR",
     "PORT",
+    // The update hold (`LAMP_HARNESS_HOLD_UPDATES`, crate::hold, #5229).
+    crate::hold::DISABLE,
+    crate::hold::ENV_FILE,
 ];
 
 /// The agents a target may name. `opencode` since Harness 0.4.2 names it
@@ -448,6 +451,11 @@ pub struct CliConfig {
     /// Each Harness call's journal line ([`call_line`]) is also kept here,
     /// for a test to read; it always goes to stderr, the unit's journal.
     pub calls: Option<Arc<Mutex<Vec<String>>>>,
+    /// After each `harness start` that succeeded, Harness's `/api/health`
+    /// is asked, with no credential, in a thread of its own, and one line
+    /// journaled ([`crate::hold::watch_health`], #5229). Set with the update
+    /// hold (`LAMP_HARNESS_HOLD_UPDATES=on`); off unless set.
+    pub health_after_start: bool,
 }
 
 impl CliConfig {
@@ -469,6 +477,7 @@ impl CliConfig {
             new_folder: None,
             journal: None,
             calls: None,
+            health_after_start: false,
         }
     }
 }
@@ -1275,6 +1284,9 @@ impl Cli {
             .map_err(|error| error.code.to_string())?;
         if !reply.success {
             return Err("start_failed".into());
+        }
+        if self.config.health_after_start {
+            crate::hold::watch_health(crate::hold::port(&self.config.environment));
         }
         Ok(())
     }

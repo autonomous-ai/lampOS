@@ -417,7 +417,8 @@ fn a_failed_install_is_recorded_without_blocking_and_tried_again() {
 
 /// Pinned: the manifest is fetched and its sha256 checked before anything
 /// is installed; one that differs installs nothing; a match installs
-/// through `HARNESS_METADATA_URL`. A pin set wrongly starts nothing.
+/// through `HARNESS_METADATA_URL`, at the checked bytes served on
+/// 127.0.0.1. A pin set wrongly starts nothing.
 #[test]
 fn a_pinned_manifest_with_another_sha256_is_refused() {
     let url = "https://example.invalid/harness/manifest.json";
@@ -468,10 +469,13 @@ fn a_pinned_manifest_with_another_sha256_is_refused() {
         .rev()
         .find(|line| line.contains(install::HARNESS_INSTALLER))
         .unwrap();
+    // The checked bytes, from lamp-update's own listener (#5229), never the
+    // URL again.
     assert!(
-        installer.contains(&format!("HARNESS_METADATA_URL={url} sh -c")),
+        installer.contains("HARNESS_METADATA_URL=http://127.0.0.1:"),
         "{installer}"
     );
+    assert!(!installer.contains(url), "{installer}");
 
     let lamp = Lamp::new();
     let runs = Runs {
@@ -535,4 +539,104 @@ fn a_second_install_waits_for_none() {
     assert!(refused.is_err());
     assert_eq!(lamp.said().unwrap().install, "installing");
     assert!(runs.log.borrow().is_empty());
+}
+
+/// The build's own pin (#5229): nothing fetched; the installer is given
+/// lamp-update's listener on 127.0.0.1, which serves exactly the compiled-in
+/// manifest while the installer runs, and `harness version` is compared
+/// with the version it pins.
+#[test]
+fn the_builds_own_pin_is_served_to_the_installer_from_loopback() {
+    let lamp = Lamp::new();
+    let said = after_round(
+        lamp.root(),
+        &lamp.records(),
+        &Ok(Some(product::built_in())),
+        &mut Fake::default(),
+        1,
+        &mut quiet(),
+    );
+    assert_eq!(said.unwrap().pinned, Some(true));
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let served: Rc<RefCell<Option<String>>> = Rc::default();
+    let mut run = |argv: &[String]| -> Result<String, String> {
+        let line = argv.join(" ");
+        log.borrow_mut().push(line.clone());
+        if argv[0] == "id" {
+            return Ok("990\n".into());
+        }
+        if line.contains(install::HARNESS_INSTALLER) {
+            let url = argv
+                .iter()
+                .find_map(|arg| arg.strip_prefix("HARNESS_METADATA_URL="))
+                .unwrap();
+            *served.borrow_mut() = Some(fetch(url));
+        }
+        if line.ends_with("harness version") {
+            return Ok(format!("harness {}\n", product::VERSION));
+        }
+        Ok(String::new())
+    };
+    let mut lines = Vec::new();
+    let said = install_now(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 2,
+        &mut |line: &str| lines.push(line.to_owned()),
+    )
+    .unwrap();
+    assert_eq!(
+        (said.install.as_str(), said.pinned, said.version.as_deref()),
+        ("installed", Some(true), Some(product::VERSION))
+    );
+    assert!(!log.borrow().iter().any(|line| line.starts_with("curl ")));
+    let body = served.borrow().clone().unwrap();
+    assert!(body.starts_with("HTTP/1.1 200 OK\r\n"), "{body}");
+    assert!(
+        body.as_bytes().ends_with(product::MANIFEST),
+        "the installer read the compiled-in bytes: {body}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line == &format!("Harness {} is the pinned version", product::VERSION)),
+        "{lines:?}"
+    );
+}
+
+/// The build's own pin with bytes that are not its sha256 installs nothing:
+/// the check runs before each install, not only in the test of the copy.
+#[test]
+fn a_built_in_pin_with_another_sha256_installs_nothing() {
+    let lamp = Lamp::new();
+    let pin = Pin {
+        sha256: "0".repeat(64),
+        ..product::built_in()
+    };
+    after_round(
+        lamp.root(),
+        &lamp.records(),
+        &Ok(Some(pin)),
+        &mut Fake::default(),
+        1,
+        &mut quiet(),
+    );
+    let runs = Runs::new();
+    let said = install(&lamp, &runs, 2);
+    assert_eq!(said.error.as_deref(), Some("pin_mismatch"));
+    assert!(!runs.ran("curl "));
+    assert!(!runs.ran(install::HARNESS_INSTALLER));
+}
+
+/// A `GET` of `url` on loopback, the whole answer.
+fn fetch(url: &str) -> String {
+    use std::io::{Read, Write};
+    let rest = url.strip_prefix("http://").unwrap();
+    let (address, path) = rest.split_once('/').unwrap();
+    let mut stream = std::net::TcpStream::connect(address).unwrap();
+    write!(stream, "GET /{path} HTTP/1.1\r\nHost: {address}\r\n\r\n").unwrap();
+    let mut said = String::new();
+    stream.read_to_string(&mut said).unwrap();
+    said
 }
