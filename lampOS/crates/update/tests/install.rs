@@ -2112,6 +2112,28 @@ fn the_product_summarises_a_long_conversation() {
     );
 }
 
+/// Tiers' ideas in Days are on in the product (the memory owner's call on
+/// 5 Nov): a newer correction first (`LAMP_MEMORY_NEWER_FIRST`), a maybe or
+/// a plan marked (`LAMP_MEMORY_STRENGTH`), and tastes first in the session
+/// note (`LAMP_MEMORY_PROFILE`). Each sends its field only with Days on.
+#[test]
+fn the_product_ranks_corrections_marks_maybes_and_keeps_tastes_first() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_NEWER_FIRST=on",
+        "Environment=LAMP_MEMORY_STRENGTH=on",
+        "Environment=LAMP_MEMORY_PROFILE=on",
+        "Environment=LAMP_MEMORY_DAYS=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.
