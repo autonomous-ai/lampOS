@@ -2284,6 +2284,9 @@ pub fn serve(
     let days = crate::remember::days_from_environment();
     // For what memory holds that fits a turn's words (#2176 row 5c).
     let (hits_socket, hits_who) = (socket.clone(), who.clone());
+    // For a reply's don't-know, the person's own kept things
+    // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
+    let (dont_know_socket, dont_know_who) = (socket.clone(), who.clone());
     // Told after the character with `LAMP_TASKS_ASKED=on`, as the Live route is (#854).
     let tasks = tools.tasks.clone();
     // What a Live session is told of the moment, with `--session-fact` and
@@ -2360,6 +2363,7 @@ pub fn serve(
     // session the turn is opened for (the reviewer's P2 on #2268).
     let sessions = Arc::new(Mutex::new(Sessions::reopening_after_quiet(reopen_quiet)));
     let hits_sessions = sessions.clone();
+    let dont_know_sessions = sessions.clone();
     // Whose a greeting turn is, for a dated follow-up's line (#2805).
     let (event_sessions, event_who) = (sessions.clone(), who.clone());
     // The Days note asked as each spoken line begins, off the loop (lamp-4ace,
@@ -2872,6 +2876,52 @@ pub fn serve(
         (true, _) => eprintln!(
             "lamp-voice second: memory isn't told on each turn: {} needs the Days memory",
             crate::remember::HITS_ENVIRONMENT
+        ),
+        (false, _) => {}
+    }
+    // A reply that opens with a don't-know on a line about the person
+    // (`LAMP_MEMORY_DONT_KNOW_RECALLS`, task C57, Days only): their own kept
+    // things that share the line's words, read as memory's hits read them
+    // and within the same bound, only when the request's own scope names a
+    // person ([`dont_know_whose`]). Never the room's, and never by the face
+    // in view alone.
+    match (crate::dont_know::on(), dont_know_socket) {
+        (true, Some(socket)) if days => {
+            eprintln!(
+                "lamp-voice second: a reply that opens with a don't-know about the person recalls their kept things first ({})",
+                crate::dont_know::ENVIRONMENT
+            );
+            let who = dont_know_who;
+            engine = engine.recalling_before_a_dont_know(Arc::new(move |request, heard, lease| {
+                let started = Instant::now();
+                let person =
+                    dont_know_whose(request, lease, &dont_know_sessions, who.as_deref(), started)?;
+                let now_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_millis() as u64);
+                let note = crate::remember::hits_note_counted(
+                    &socket,
+                    Some(&person),
+                    heard,
+                    now_unix_ms,
+                    crate::local_time::system(),
+                );
+                // Counts only, never the words, and not added to the hits'
+                // per-path turn counts (#2510 take 1 c).
+                let count = note.as_ref().map(|(_, count)| *count).unwrap_or_default();
+                eprintln!(
+                    "lamp-voice second: request {request}: memory searched for a don't-know in {} ms (theirs) told={} bytes_told={} ({})",
+                    started.elapsed().as_millis(),
+                    count.told,
+                    count.bytes,
+                    crate::dont_know::ENVIRONMENT
+                );
+                note.map(|(note, _)| note)
+            }));
+        }
+        (true, _) => eprintln!(
+            "lamp-voice second: a don't-know recalls nothing: {} needs the Days memory",
+            crate::dont_know::ENVIRONMENT
         ),
         (false, _) => {}
     }
@@ -10226,6 +10276,21 @@ pub(super) fn hits_of_lease(
     } else {
         (None, HitsPath::Room)
     })
+}
+
+/// Whose kept things a reply's don't-know is recalled from
+/// (`LAMP_MEMORY_DONT_KNOW_RECALLS`): the person [`hits_whose`] names for the
+/// request, and nobody for the room's or a revoked one. Never the face in
+/// view alone, the hits' accepted fallback: a don't-know is only ever
+/// answered with the asker's own kept things.
+fn dont_know_whose(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    sessions: &Mutex<Sessions>,
+    who: Option<&Path>,
+    now: Instant,
+) -> Option<String> {
+    hits_whose(request, lease, sessions, who, now).flatten()
 }
 
 /// Whether a line was judged where talk not for the lamp may be
@@ -21782,6 +21847,48 @@ mod tests {
         // Revoked: nothing.
         silent.revoke();
         assert_eq!(whose(&lease), None);
+    }
+
+    /// `LAMP_MEMORY_DONT_KNOW_RECALLS`: a don't-know is recalled only from the
+    /// request's own person: never the room's once another face spoke the
+    /// line, never anyone's for a revoked lease, and without a lease only
+    /// when the face and the session's person agree.
+    #[test]
+    fn a_dont_know_recalls_only_the_requests_own_persons_kept_things() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-voice-second-dont-know-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("known");
+        std::fs::write(&file, "Kesh\n").unwrap();
+        let now = Instant::now();
+        let sessions = Mutex::new(Sessions::default());
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+            session: 1,
+            request: 3,
+        };
+        let scope = RequestScope::new(key, ScopeSnapshot::of("Ossa"));
+        let lease = scope.lease();
+        let theirs = dont_know_whose(3, Some(&lease), &sessions, Some(&file), now);
+        lease.narrow_to_room();
+        assert!(lease.fall_back_to_face_for_hits());
+        let narrowed = dont_know_whose(3, Some(&lease), &sessions, Some(&file), now);
+        scope.revoke();
+        let revoked = dont_know_whose(3, Some(&lease), &sessions, Some(&file), now);
+        let room = RequestScope::new(key, ScopeSnapshot::room());
+        let rooms = dont_know_whose(3, Some(&room.lease()), &sessions, Some(&file), now);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(theirs, Some(crate::remember::person_id("Ossa")));
+        assert_eq!(
+            narrowed, None,
+            "the face in view alone, its hits fallback taken: nobody's"
+        );
+        assert_eq!(revoked, None, "a revoked lease: nobody's");
+        assert_eq!(rooms, None, "the room's line: nobody's");
     }
 
     /// #1712: as the lamp's only voice, the rule judges in the room this

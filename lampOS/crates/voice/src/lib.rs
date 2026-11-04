@@ -68,6 +68,7 @@ pub mod cut_in_told;
 pub mod cut_in_wordless;
 pub mod diagnostic_control;
 pub mod diagnostics;
+pub mod dont_know;
 pub mod early_words;
 pub mod expression_out;
 pub mod first_output;
