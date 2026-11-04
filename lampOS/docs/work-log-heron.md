@@ -304,3 +304,15 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   lib 4641/4645 with the 4 `ring_mark` fails Mac-only (long TMPDIR,
   untouched file), switches 2, notes 15. P3: `SAID_EXCHANGES` is 2, the
   usual walk fills it exactly, one exchange more costs a second read-back.
+- 14:2x–14:3x: #4450's after2 on lamp-fc4b at 9980 with `held` by the
+  drop-in `heron-held.conf` (on 14:26:13, off 14:28:08; on 14:29:20, off
+  14:31:48; the lamp as found). PLAYING and released on #4710. Pass a
+  (14:27:06, 53 s after the restart) void: a01 raised no request, lamp-name
+  `heard=0`. Pass b (14:30:51, 90 s after the restart): a01 answered, first
+  audio 2257 ms; d07 let through on one shared word ("time") and kept out
+  by the model's `not_for_me`; d08 held by the untied rule's own reason.
+  Posted on #4450 at 14:3x with the one-shared-word data point for #5110.
+  Evidence PR #5217 (docs only, one read) opened from
+  `heron/4450-9980-held`; READ ASK to Faye/Thirteen at 14:4x. The replay
+  script's own request attribution was off by one for d07/d08 here; the
+  README says the journal's numbers are the ones used.
