@@ -1659,6 +1659,9 @@ for it.
     Only a skill made here before is replaced.
   - Its done line says it is bound to the person's yes by its SHA-256, not
     that it carries no signature.
+  - **One added from a file** (`added: file` in its `SKILL.md`, "Added from
+    a file" below) is held to `capped_added` instead, and never takes the
+    place of any skill, one made here neither.
   Tests: `made::a_made_skill_goes_on_by_its_sha256_and_only_by_it`,
   `…never_takes_the_place_of_one_put_on_another_way`,
   `…whose_package_changed_does_not_go_on`,
@@ -2378,6 +2381,82 @@ nothing on, one not kept told why with nothing said, and an ask said whole
 while a dropped one stays `kept` and is noted to the model). The app's side
 is `skills.make` and `skills.made` in `lamp-cloud` ([cloud.md](cloud.md),
 "A skill typed in the app").
+
+#### Added from a file (`LAMP_SKILL_UPLOAD=on`, off)
+
+A skill the owner adds from a file on their phone (the first builder on the
+Queue, 3 Nov 14:33, with Backend3's rules; `crate::upload_skill`): a package
+as `lamp-skills pack` makes it, or a bare `SKILL.md`. The app uploads it to
+the backend, and `lamp-cloud` takes it from the backend's message for
+`skills.upload.<upload_id>`, checks it and hands it on ([cloud.md](cloud.md),
+"A skill added from a file"): it refuses a package with the Store's
+signature ("add it from the Skill Store"), a `run.py` or any file but
+`skill.toml` and `SKILL.md`, a SHA-256, size or id that isn't the one
+uploaded, and a name on the lamp. Then, on the app-make socket (a line of
+at most 64 KiB, `{"upload": {"skill_md", "skill_toml"?}}`, taken only with
+the switch in `lamp-voice`'s unit and the say service there to ask; and
+`{"added": {"sha256"}}`, its state, `kept`, `asked`, `on`, `left_off` or
+`none`, which `lamp-cloud` asks until it is on or left off, so the backend
+hears `success` only after the spoken yes):
+
+1. **A name the lamp holds is refused, never replaced**: a skill on the lamp
+   by that name (core, from the Store, made, `/var/lib/lampOS/skills`),
+   pushed (`/var/lib/lampOS/skills-dev`), or one kept here, made or added
+   (`upload_skill::taken`).
+2. **A bare `SKILL.md`** becomes a written skill (`upload_skill::written`):
+   ```toml
+   kind = "installable"
+   version = "1.0.0"
+   needs = ["voice"]
+   tool = "NAME_WITH_UNDERSCORES"
+
+   [permissions]
+   speak = true
+
+   [[do]]
+   say = "THE TEXT AFTER THE FRONT MATTER, ON ONE LINE"
+   ```
+   No trigger: the model calls its function when the person asks for it, and
+   its note, the file's text (at most 2,000 bytes), is the model's
+   instruction for its own answer. A name that can't be a function's (not
+   starting with a letter, or longer than 48) is refused.
+3. **The cap** (`made_skill::capped_added`): a made skill's, with two
+   differences. It never starts on its own: a trigger, a `[[while]]` or an
+   `[ask]` is refused, and it must have a function (`tool`), or it could
+   never be asked for. And it may `speak`, its function's note being the
+   model's own answer in its turn, as any tool's. Otherwise only the light,
+   the head, and `voice/state` and `room/presence`.
+4. **Said plainly** (`made_skill::plainly`, now also for a skill asked for
+   only): "Only when you ask for it, it answers in its own words, as its
+   file tells it, and never on its own." A light or a gesture step is said
+   as a made skill's. A step it can't say is refused.
+5. **Checked and kept as a made skill** (`made_skill::keep_added`): its card
+   marked `made: here` and `added: file`, its description what `plainly`
+   says, "Added from a file, not from the Skills Store", and when to use it
+   in the file's own words (so the model knows when to call it), at most
+   900 bytes; on the skills page (`skills.list`) it is made here, listed
+   `"uploaded": true`, never the Store's; checked and packed by `lamp-skills pack`; kept beside the made
+   skills from `upload:<ms>` with `"added": "file"` in `made.json`, at most
+   five made or added (`KEPT_MOST`).
+6. **Asked aloud, put on only at a spoken yes**, as a skill typed in the app
+   and made here: through the say service's own asks, at a good moment, "A
+   skill called NAME was added in the app from a file, not from the Skills
+   Store." with what `plainly` says, then exactly "Shall I put it on the
+   lamp?" (`upload_skill::ask_line`). Said whole, it waits 120 s for a plain
+   spoken yes (`put_on_made_skill`); nothing from the app puts it on.
+7. **The manage helper holds it again** (`install_made`): a card that says
+   `added: file` is held to `capped_added`, and never takes the place of any
+   skill, a made one's neither ("… a skill added from a file never takes its
+   place").
+
+The files' words are never in the journal.
+
+Tests: `upload_skill::tests` (a bare SKILL.md taken as a trigger-less
+written skill; a trigger, no function or more than a made skill may use
+refused; a taken name refused; never on before the spoken yes; the socket's
+line with the switch off, without the say service, and kept) and, with the
+real `lamp-skills`,
+`made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 
 ## V1's moves and emotions: what we take
 

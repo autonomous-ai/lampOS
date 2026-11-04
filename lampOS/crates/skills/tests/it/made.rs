@@ -609,3 +609,71 @@ fn once_the_newest_is_on_an_older_ask_puts_nothing_on() {
         "{again}"
     );
 }
+
+/// A skill added from a file (`lamp_voice::upload_skill`): a bare SKILL.md
+/// becomes a written skill the real `lamp-skills pack` takes, trigger-less
+/// and asked for by its function alone; the helper puts it on only at the
+/// lamp's ask, held to the added cap, and never in another skill's place,
+/// a made one's neither.
+#[test]
+fn a_skill_added_from_a_file_is_checked_and_never_takes_a_place() {
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    let place = lamp_voice::upload_skill::Place {
+        skills: skills.clone(),
+        pushed: dir.path().join("pushed"),
+    };
+    let card = "---\nname: tea-tip\ndescription: Call when someone asks for a tea tip.\n---\n\n# Tea tip\n\nGive one short tip about brewing green tea.\n";
+    let made = lamp_voice::upload_skill::take(&place, &keeping, None, card, now_ms()).unwrap();
+    let bytes = String::from_utf8_lossy(&fs::read(&made.package).unwrap()).into_owned();
+    assert!(bytes.contains("made: here") && bytes.contains("added: file"));
+    let wait = std::time::Duration::from_millis(200);
+    // Not asked about yet: nothing goes on.
+    let refused = install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap_err();
+    assert!(refused.contains("didn't ask about"), "{refused}");
+    offer(&keeping, &made.sha256);
+    install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap();
+    let toml = fs::read_to_string(skills.join("tea-tip").join("skill.toml")).unwrap();
+    assert!(
+        toml.contains("tool = \"tea_tip\"") && !toml.contains("[trigger]"),
+        "{toml}"
+    );
+    // A made skill of the same name, kept and asked about: an added one
+    // in its place is refused, and the other way the made one is not
+    // replaced by an added one either.
+    let made_dim = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    offer(&keeping, &made_dim.sha256);
+    install_made(&skills, None, &keeping.directory, &made_dim.sha256, wait).unwrap();
+    let folder = dir.path().join("src").join("evening-dim");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(
+        folder.join("skill.toml"),
+        "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"evening_dim\"\n[permissions]\nlight = true\n[[do]]\nlight = { dim = 1 }\n",
+    )
+    .unwrap();
+    fs::write(
+        folder.join("SKILL.md"),
+        "---\nname: evening-dim\ndescription: Dims.\nmade: here\nadded: file\n---\n",
+    )
+    .unwrap();
+    let packed = package::pack(&folder, &keeping.directory).unwrap();
+    let sha256 = package::sha256_hex(&fs::read(&packed).unwrap());
+    let index = keeping.directory.join(lamp_voice::made_skill::INDEX);
+    let mut entries: Vec<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&index).unwrap()).unwrap();
+    entries.push(serde_json::json!({
+        "sha256": sha256,
+        "package": packed.file_name().unwrap().to_str().unwrap(),
+    }));
+    fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+    offer(&keeping, &sha256);
+    let refused = install_made(&skills, None, &keeping.directory, &sha256, wait).unwrap_err();
+    assert!(refused.contains("never takes its place"), "{refused}");
+    assert!(
+        !fs::read_to_string(skills.join("evening-dim").join("SKILL.md"))
+            .unwrap()
+            .contains("added: file")
+    );
+}

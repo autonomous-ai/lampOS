@@ -115,7 +115,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.share`/`skills.shared`/`skills.unshare`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `system.reboot`, `system.shutdown`, `services`/`services.list` while `lamp-services`' admin socket is there too), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
@@ -137,6 +137,7 @@ lamp says so.
 | `skills.camera` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` (#3504's piece C, "The owner's yes to a skill's camera" below): the owner's yes to the skill seeing the camera's picture, given (`allow` true) or taken back, past the app's warning, asked of root's manage helper as off and on are and kept in `lamp-skills`' `camera`; the reply is `skills.list`'s, read after it, with `camera: {name, allowed}`, what was kept for that name, on the lamp or not (#4099). A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
 | `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker answers `ready` (asked every 60 s; the lamp's own model makes it, so the voice says yes at once, and the button can show up to 60 s after lamp-voice starts): `skills.make` (`{"words", "request_id"}`, the words at most 180 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
+| `skills.upload.<upload_id>` (`upload_id` the first 16 lowercase hex of the file's SHA-256; no file inline) | with `LAMP_SKILL_UPLOAD=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill added from a file" below); `can` names it `skills.upload`: answered `starting` at once, which keeps the file on the backend; the file is taken from the backend's `get-message` for that kind, checked and handed to `lamp-voice`, and a second reply of the same kind follows once it settles: `success` with `{"state": "on", "upload_id", "added": "file", "uploaded": true, "name", "description", "version", "sha256", "may_use"}` once a spoken yes put it on, or `failure` with why (a check, or left off at the lamp). Either deletes the file on the backend; with no reply it is gone after a day. Nothing from the app puts it on |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
@@ -717,6 +718,11 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   installed, not the folder as it is now: a hand edit that keeps the
   version still lists the package's `sha256`.
 - **`can_remove`**: false for a core skill, true for the others.
+- **`uploaded`**: `true` only on a skill added from a file in the app
+  (`made_here`, its `SKILL.md` front matter `added: file` beside `made:
+  here`; "A skill added from a file" below), which the app labels "Added
+  from a file, not from the Store"; left out on every other row. Such a
+  skill is never listed as the Store's.
 - **`can_turn_off`**: the skill loads and is not part of the lamp itself
   (#2815): true for every one but those granted a core operation (`core =
   [...]` in `[permissions]`: Night sleep, Onboarding, Prepare to unplug,
@@ -1103,6 +1109,73 @@ day, 3 waiting at once and 20 attempts a day, and each owner to 10 a day
 (Backend3, 30 Oct). Each exchange runs on a thread of its own with its own
 runtime and waits at most 30 s (`share::WITHIN`), as `skills.install`
 waits on the manage helper.
+
+## A skill added from a file (`skills.upload.<upload_id>`, `LAMP_SKILL_UPLOAD`)
+
+Off unless `LAMP_SKILL_UPLOAD=on` in `lamp-cloud`'s unit, with the skills
+page (`LAMP_SKILLS_PAGE=on`) and `LAMP_CLOUD`, and the backend's base and
+the lamp's key at start (`crate::upload::Uploads`); `lamp-voice`'s unit
+needs the same switch, with `LAMP_MAKE_SKILL=on`, `LAMP_APP_MAKE_SKILL=on`
+(the upload rides its socket) and the say service. No product unit sets it.
+`system.info`'s `can` names `skills.upload` only then. The first builder
+approved it on the Queue (3 Nov 14:33) with Backend3's rules; the contract
+is Backend3's.
+
+1. The person picks a file on their phone: a package as `lamp-skills pack`
+   makes it, or a bare `SKILL.md`. The app uploads it to the backend, which
+   sends the kind `skills.upload.<upload_id>` (`upload_id`: the first 16
+   lowercase hex of the file's SHA-256) with no file inline, as V1's privacy
+   kinds and `connector.set`. `lamp-cloud` answers `starting` at once, which
+   keeps the file on the backend, and does the rest on a thread of its own;
+   one fetch at a time ("a skill from a file is still being added").
+2. **The message.** `GET <base>/devices/get-message?kind=skills.upload.<upload_id>`,
+   `<base>` the account's `llm_base_url` with a trailing `/v1` cut off (as
+   the ping's), with `authorization: Bearer` and the lamp's key and
+   `x-device-id`; read up to about 1.6 MiB (`upload::MOST_MESSAGE_BYTES`),
+   for this kind only. The backend answers V1's shape, the file inside:
+   `{"status": 1, "data": {"cmd": "data", "kind": "skills.upload.<upload_id>",
+   "data": {"upload_id", "name", "version", "format", "sha256", "size",
+   "content_base64"}}}`. `format` is `package` or `skill_md`; `version` is
+   empty for a `SKILL.md`; `name` is never used or logged. Anything else:
+   "the backend didn't give the file to add".
+3. **The file** (`upload::decoded`): at most 1 MiB decoded (`MOST_BYTES`;
+   base64 longer than that is refused before it is decoded); its size, its
+   SHA-256, and its `upload_id` against both the kind and the bytes must be
+   what was said, else "the file isn't the one uploaded". `format` must be
+   what the bytes are.
+4. **Read.** A file that begins with `---` is a bare `SKILL.md`; anything
+   else must read as a package (`lamp_skills::package::read_package_bytes`).
+   A package carrying the Store's signature is refused, "this skill carries
+   the Skills Store's signature: add it from the Skill Store": never added
+   as the Store's on this route. A package with `run.py` is refused (no
+   code), and so is one with any file but `skill.toml` and `SKILL.md`, or
+   either longer than 8 KiB. A skill by its name on the lamp
+   (`/var/lib/lampOS/skills`, core, from the Store or made) or pushed
+   (`/var/lib/lampOS/skills-dev`) is refused, never replaced.
+5. **Handed to the voice** on `/run/lampos-app-make/make.sock`:
+   `{"upload": {"skill_md", "skill_toml"?}}`, waited for at most 25 s.
+   `lamp-voice` holds it to a made skill's checks and its own, keeps it and
+   asks aloud ([skills.md](skills.md), "Added from a file"), and answers
+   `{"kept": {...}}` or `{"refused": WHY}`.
+6. **Settled** (`Uploads::settle`): `lamp-cloud` asks `{"added": {"sha256"}}`
+   every 5 s, for at most 2 h (the ask may wait an hour for a good moment,
+   then 120 s for the yes): `on` is `success`; `left_off` is `failure`, "it
+   wasn't put on: there was no spoken yes at the lamp"; let go, or never
+   asked within the wait, is `failure` too. The next upload need not wait
+   for it.
+7. **The result** goes to the app as the kind's second reply, on the
+   broker's own loop while online, and is said again if the connection
+   drops before the broker's ack: the backend deletes the file on either.
+
+The journal says the bytes taken, kept or not and why not, and whether a
+yes put it on, never the file's words or its name (`upload::tests`).
+
+Tests: `upload::tests` (the switch and the kind's id; a bare SKILL.md taken
+from the message with the key and `success` only once on; left off or
+never asked a failure; a package's refusal; a SHA-256, size, id or format
+that doesn't match; too big; a Store-signed package; `run.py` and other
+files; a taken name; its result kept for the app), and
+`online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`.
 
 ## Health and crash reports (#1683, step 1)
 
