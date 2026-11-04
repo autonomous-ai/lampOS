@@ -25,6 +25,16 @@ async fn asked_with(
     near: Option<Option<f32>>,
     turned: bool,
 ) -> (Option<String>, Vec<u64>) {
+    asked_in(heard, near, turned, false).await
+}
+
+/// [`asked_with`], with `LAMP_NAME_AS_A_SENTENCE` `as_a_sentence`.
+async fn asked_in(
+    heard: &str,
+    near: Option<Option<f32>>,
+    turned: bool,
+    as_a_sentence: bool,
+) -> (Option<String>, Vec<u64>) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
@@ -41,6 +51,7 @@ async fn asked_with(
             seen.lock().unwrap().push(began_us);
             (near, turned)
         }));
+        engine = engine.taking_the_name_as_a_sentence(as_a_sentence);
     }
     engine.submit(start(1));
     engine.submit(ProviderInput::Audio {
@@ -269,4 +280,124 @@ fn no_word_heard_for_the_name_is_said_to_a_person() {
         assert_eq!(said_to_a_person(&line), None, "{line}");
     }
     assert_eq!(said_to_a_person("Ma'am, the salt?"), Some("ma'am"));
+}
+
+/// The owner's umbrella line on lamp-52e6 (4 Nov, sw5008f, OFF arm,
+/// request 24), as the relay's speech to text writes it: the name a
+/// sentence of its own. Written "Lamp." it is asked as it is, the switch
+/// on or off.
+const UMBRELLA: &str = "Lamp. I'm going out later. Do I need an umbrella?";
+
+/// lamp-name's near score at that line's start (sw5008f's journal).
+const UMBRELLA_NEAR: f32 = 0.67;
+
+/// #5277, `LAMP_NAME_AS_A_SENTENCE=on`: the umbrella line with its first
+/// word, a sentence of its own, written as a word that doesn't sound like
+/// the name ("its first word, set off, doesn't sound like it: not the
+/// name" in the journal) is asked as the name when lamp-name heard it near
+/// by the line's start, with no face turned to the lamp. Off, it is held
+/// as before; with no near hearing, or one under 0.5, it is held too.
+#[tokio::test]
+async fn the_umbrella_line_with_the_name_said_as_a_sentence_is_asked_as_the_name() {
+    let near = Some(Some(UMBRELLA_NEAR));
+    for on in [false, true] {
+        assert_eq!(
+            asked_in(UMBRELLA, near, false, on).await.0.as_deref(),
+            Some(UMBRELLA),
+            "written as the name, on={on}"
+        );
+    }
+    for word in ["Lamps", "Clamp", "Lab", "Ramp"] {
+        for stop in ['.', '?', '!'] {
+            let heard = UMBRELLA.replacen("Lamp.", &format!("{word}{stop}"), 1);
+            let called = format!("Lamp{stop} I'm going out later. Do I need an umbrella?");
+            assert_eq!(
+                asked_in(&heard, near, false, true).await.0,
+                Some(called),
+                "{heard}"
+            );
+            assert_eq!(
+                asked_in(&heard, near, false, false).await.0,
+                None,
+                "{heard}: the switch off"
+            );
+            for missing in [Some(None), Some(Some(0.49)), None] {
+                assert_eq!(
+                    asked_in(&heard, missing, false, true).await.0,
+                    None,
+                    "{heard}: near {missing:?}"
+                );
+            }
+        }
+    }
+}
+
+/// #5277 keeps #3945: with `LAMP_NAME_AS_A_SENTENCE=on` and lamp-name
+/// hearing the name near at the line's start (0.99, as "Ma'am, …" was),
+/// a line opening with a word said to a person stays held, as a sentence
+/// of its own or set off by a comma; so do a person's name of the name's
+/// shape, a word a line opens with that is said ("Thanks.", "Tomorrow."),
+/// a word set off by a comma only ("Daniel, …"), the first word with
+/// nothing after it, a figure, and a word of the name's shape with no face
+/// turned to the lamp, as before the switch.
+#[tokio::test]
+async fn with_the_name_as_a_sentence_a_line_said_to_a_person_is_still_held() {
+    let near = Some(Some(0.99));
+    for heard in [
+        "Ma'am, could you pass me the salt please?",
+        "Ma'am. Could you pass me the salt please?",
+        "Ma\u{2019}am. Could you pass me the salt please?",
+        "Sir. Could you pass me the salt please?",
+        "Honey. Could you pass me the salt please?",
+        "Guys. Could you pass me the salt please?",
+        "Dad? Can you pick me up later?",
+        "Lynn. Pass me that.",
+        "Liam. Pass me that.",
+        "Thanks. I'm going out later.",
+        "Tomorrow. I see the dentist at three.",
+        "Hello. I'm going out later.",
+        "Daniel, could you pass me the salt please?",
+        "Lab.",
+        "Lab. ",
+        "1. How are you today?",
+        "Leon. Pass me that.",
+        "Louvre is a museum in Paris.",
+    ] {
+        assert_eq!(asked_in(heard, near, false, true).await.0, None, "{heard}");
+    }
+}
+
+/// Which first words are said as a sentence of their own
+/// ([`super::super::a_sentence_of_its_own`]).
+#[test]
+fn a_first_word_is_a_sentence_of_its_own_only_before_a_stop_and_more_words() {
+    use super::super::{a_sentence_of_its_own, first_word_set_off};
+    let own = |text: &str| {
+        first_word_set_off(text).is_some_and(|(start, end)| a_sentence_of_its_own(text, start, end))
+    };
+    for yes in [
+        "Lamps. I'm going out later.",
+        "Lab? What time is it?",
+        "Hey Clamp! Turn the light on.",
+        "  Ramp . What time is it?",
+    ] {
+        assert!(own(yes), "{yes}");
+    }
+    for no in [
+        "Lamps, I'm going out later.",
+        "Lamps.",
+        "Lamps. ...",
+        "Lamps I'm going out later.",
+        "Ma'am. Could you pass me the salt?",
+        "Madam. Could you pass me the salt?",
+        "Buddy. Could you pass me the salt?",
+        "Lane. Pass me that.",
+        "Yes. I'm going out later.",
+        "Now. Turn it off.",
+        "Hello. Turn it off.",
+        "2nd. Turn it off.",
+        "",
+    ] {
+        assert!(!own(no), "{no}");
+    }
 }
