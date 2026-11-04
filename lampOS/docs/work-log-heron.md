@@ -329,3 +329,7 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   mutations on `names_someone` and `reported` each caught by the no-keep
   test; READ-OK restated at 15:1x with the miss said. Thirteen lifted the
   HOLD at 15:02, so #5090 has its two reads.
+- 15:2x: Faye placed #5166's second read (names side, El's released) on
+  heron, by 17:30; taken on the PR at `7037b11e47`, gate running.
+  15:33: #5217 landed in train 602 (lamp-voice `3e0b88251`): the 9980
+  `held` run is in `docs/verification/4450-lamp-fc4b-20261103/`.
