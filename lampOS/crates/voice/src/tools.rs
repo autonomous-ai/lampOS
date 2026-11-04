@@ -3066,6 +3066,14 @@ mod tests {
         );
     }
 
+    /// The Schedule's functions, whose calls a later turn's history keeps
+    /// with their arguments (lamp-52e6 at 9928, 4 Nov), are the executive's
+    /// own, in its order (`lamp_actions::schedule::NAMES`).
+    #[test]
+    fn the_schedule_functions_are_the_executives() {
+        assert_eq!(SCHEDULE_NAMES, lamp_actions::schedule::NAMES);
+    }
+
     #[test]
     fn tasks_then_schedule_flags_keep_both_owners_and_their_declarations() {
         let dir = schedule_directory("tasks-schedule");

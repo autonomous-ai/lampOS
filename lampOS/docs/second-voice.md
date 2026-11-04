@@ -1874,10 +1874,18 @@ order is kept. A written turn is the same from the chat on.
   `Engine::keeping_calls`, `second_provider::kept_args`): one made with
   no arguments (the light's and the volume's steps, on, off, mute), and
   a light's or volume's call (`light_*`, `volume_*` but the app's two,
-  as `lamp_actions::is_short`) with its own arguments, `light_colour
-  {"colour":"red"}`, at most 256 bytes of compact JSON (#5045(a): with
-  colour turns told as words alone, "Make the light red." was answered
-  "Done." with no call on lamp-52e6 at 9730). The history tells such an
+  as `lamp_actions::is_short`) or a Schedule's (`set_timer`,
+  `set_reminder`, `repeat_reminder`, `list_reminders`, `cancel_reminder`,
+  `snooze_reminder`: `tools::SCHEDULE_NAMES`, `lamp_actions::schedule::NAMES`)
+  with its own arguments, `light_colour {"colour":"red"}`, `set_timer
+  {"text":"Timer","seconds":60}`, at most 256 bytes of compact JSON
+  (#5045(a): with colour turns told as words alone, "Make the light red."
+  was answered "Done." with no call on lamp-52e6 at 9730; on lamp-52e6 at
+  9928 on 4 Nov, with timers kept not at all, "Lamp, set a timer to one
+  minute." made no call and said "Timer set. It rings at 9:39 am.", the
+  earlier reply copied with a new time, and no timer existed). A kept
+  call's arguments live only in the thread in RAM, as the exchange's words
+  do, and are never journalled. The history tells such an
   exchange as a round with calls goes: the person's words, an assistant
   message with the calls (each with the arguments it was kept with, ids
   `kept-<request>-<n>`), one `tool` message for each saying `(done
@@ -1888,16 +1896,17 @@ order is kept. A written turn is the same from the chat on.
   step." with no `volume_down` call in 4 of 14 action lines, and nothing
   changed. Only a call that ran and answered with no error and no keep
   refused is kept, never `more_functions`, and never one declined, held,
-  refused, or of a reminder or an add-on's quoted line. The calls go with
+  refused, or of a due reminder's or an add-on's quoted line. The calls go with
   the exchange the lamp's words were filed under, so they are told only
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
   build would set the file aside, #1505): after a restart, earlier
   exchanges are words only. Any other call that took arguments (a keep, a
-  reminder) is never kept: its arguments are the person's words, and told
-  bare it would teach calling it bare (Fourteen's P3 on #5018). A light's
-  or volume's call whose arguments pass 256 bytes is kept bare if its
-  function takes none, else not at all. At most 8 calls an exchange, each
+  skill's) is never kept: its arguments are the person's words, and told
+  bare it would teach calling it bare (Fourteen's P3 on #5018). A light's,
+  volume's or Schedule's call whose arguments pass 256 bytes is kept bare
+  if its function takes none, else not at all (every Schedule function
+  takes some, so a reminder with a long text is not kept). At most 8 calls an exchange, each
   name with the same arguments once. With
   `LAMP_CONVERSATION_ROOM_LINES_TOLD` on, a room exchange's calls reach a
   person's history with its words. A chat that refuses round 1 (a status
@@ -3089,6 +3098,24 @@ after a take-over, but now for every turn:
   position by its name, and its name's parts join the key terms speech to
   text listens for (read every 10 s). The journal says `request N: its
   words need a place; the model is told the owner's place`, never where.
+- **The lamp's own light** (`LAMP_LIGHT_TOLD=on`, on in the product;
+  `light_told`): each turn's system message carries, after the other
+  facts (`worker::facts`, the health line), one line with the light as the
+  ring says it shows it on `light/state` now: "Your light now: on, warm,
+  level 1 of 5." (the colour by name, one of `lamp_msgs::Light::COLOURS`,
+  the level of `Light::BRIGHTEST`), or "Your light now: off." with no
+  colour. It is read from the bus's kept latest value as the message is
+  made (a small file in `/run`, never a wait): a state the ring no longer
+  says (it says it each second, each good for 3 s, `ring_light::STATE_LASTS`,
+  so the line is at most about 3 s old), one with no lifetime, one that is
+  no light there is, or none, tells nothing, never a guess. Not a
+  function: past 32 the voice drops tools without a word. Without it, on
+  lamp-52e6 at 9928 (4 Nov 09:30), "what colour is the light?" was
+  answered "White — my light is on in plain white" three times while
+  `light/state` said warm at level 1: the executive's catalog has only the
+  light's setters, so the model guessed. The worker's journal says once at
+  start that each turn is told the light. Off, or with no bus, the system
+  message is as before, byte for byte.
 - **A line let out only as the conversation going on** (with
   `LAMP_SPOKEN_TO` and `not_for_me` offered, `LAMP_TOOLS=on`): no name,
   nobody turned to the lamp, not said close to it, no answer to its own
