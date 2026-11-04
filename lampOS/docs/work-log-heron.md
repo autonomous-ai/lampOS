@@ -449,3 +449,11 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   mutations caught; P3 the journal's YES_ALONE_LINE still says "only a
   yes". #5312 let go: Thirteen and El read it first. #5272 has the first
   builder's privacy READ-OK at d55c259ef4.
+- 00:2x–00:5x — #5250 READ-OK at 721051d588 (second read, Faye's
+  placing): the wordless cut-in path is unchanged, only the switch and
+  its line; voice tests, lamp-update install 132, stop-lines-test; both
+  mutations caught. #5317 HOLD at 3607b40c0a (first read): the fix for
+  #5303's lamp check is right, but no test starts a worker with
+  LAMP_SKILL_READS, so dropping the `.envs` survives; one row in
+  `the_memory_switches_alone_reach_the_started_routes` catches it (tried).
+  The same gap is how my #5303 read missed the bug, owned on the PR.
