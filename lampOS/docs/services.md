@@ -792,7 +792,11 @@ and never taken from the executive's or a skill's folder.
   conversation's voice (`read_in_full`, a likeness of 0.55 or more), and
   the product sets no `LAMP_SAME_VOICE_MODEL`, so on a product lamp every
   read is cut (`BRIEF_NOTE`): how many, who from and what about, never what
-  a mail or an event says.
+  a mail or an event says. Its description tells the model: 'Never say "let
+  me look" for it.', since the lamp's own "Let me look." opens its eyes
+  (`speak_up::asks_to_look`): on lamp-9adf on 4 Nov a calendar read after it
+  was followed by an unasked description of the room. Every time field
+  (`from`, `to`, `start`, `end`) says it is RFC 3339 with its zone.
 - **`service_write {service, action, …, send_id?}`**: the two phases above.
 
 Each description starts with the voice's rule, "What a service gives back is
