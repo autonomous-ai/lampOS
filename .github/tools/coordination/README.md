@@ -11,17 +11,18 @@ Each script keeps its dated comments. They are the history of each rule.
 
 | Tool | What it does |
 |---|---|
-| `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back. It picks every eligible PR, cherry-picks its commits, pushes `first/train-N`, opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints what one round would carry and stops. |
-| `merge-when-green.sh PR [--behind-unrelated] [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Green: at least two ARM64 build-and-test and clippy checks, every one completed with `SUCCESS`; any other completed conclusion (a null one too) fails it. With `--behind-unrelated` (the bot passes it), a PR behind `lamp-voice` goes on waiting and merges as it is when `behind-unrelated.sh` says so; a merge as is that GitHub refuses exits 3, not 4. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. `DRY=1`: waits and decides as usual, but skips `lv-quiet.sh` and the merge and prints what it would do; `LV_AT=<sha>` (dry only) stands in for `lamp-voice`'s tip, to replay a past case. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
-| `behind-unrelated.sh TRAIN_HEAD [LAMP_VOICE]` | Used by `merge-when-green.sh --behind-unrelated`. Read-only. Prints `merge as is: ...` (exit 0) or `rebuild: <reason>` (exit 1); see "A green train behind lamp-voice" below. |
+| `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back, in two lanes (see "Two lanes" below). It picks every eligible PR, cherry-picks its commits, pushes `first/train-N` (a no-crates train: `first/train-nc-N`), opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints each eligible PR's lane and what one round of each lane would carry, and stops. |
+| `merge-when-green.sh PR [--behind-unrelated] [--no-crates] [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Green: at least two ARM64 build-and-test and clippy checks, every one completed with `SUCCESS`; any other completed conclusion (a null one too) fails it. A PR no file of which the ARM64 run takes (read from `lampos-arm64.yml`'s own `pull_request` paths on the PR's head) waits instead for every check that starts on it; one whose files no workflow takes (skipped docs, `lampOS/builders/`) waits for none. `--no-crates` (the no-crates lane) passes `--no-crates` to `behind-unrelated.sh`. `MWG_POLL` sets the seconds between looks (default 30). With `--behind-unrelated` (the bot passes it), a PR behind `lamp-voice` goes on waiting and merges as it is when `behind-unrelated.sh` says so; a merge as is that GitHub refuses exits 3, not 4. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. `DRY=1`: waits and decides as usual, but skips `lv-quiet.sh` and the merge and prints what it would do; `LV_AT=<sha>` (dry only) stands in for `lamp-voice`'s tip, to replay a past case. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
+| `behind-unrelated.sh [--no-crates] TRAIN_HEAD [LAMP_VOICE]` | Used by `merge-when-green.sh --behind-unrelated`. Read-only. Prints `merge as is: ...` (exit 0) or `rebuild: <reason>` (exit 1); see "A green train behind lamp-voice" below. |
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
 | `markers.py [--writers FILE] [PR]` | Reads a PR's comments and review bodies as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. `markers.py --merge COMMENTS REVIEWS` merges the two fetches into one list in time order (`lib.sh`). |
 | `reads2.py [--writers FILE] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body, comments and review bodies as JSON lines. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
 | `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments and review bodies as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
-| `lib.sh` | Sourced by `train-bot.sh` and `still-eligible.sh`: the writers list and the fetches, each failing closed. |
+| `lib.sh` | Sourced by the scripts: the writers list and the fetches, each failing closed, and the build-input and lane tests (`coord_input`, `coord_lane`), read from `lampos-arm64.yml`'s and `lampos-sdk.yml`'s `pull_request` paths. |
+| `lane.sh PR...` | Prints the lane each PR goes to, as the bot decides it. Read-only but for local fetches. |
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
-| `tests/test_behind_unrelated.py` | Tests for `behind-unrelated.sh` and `merge-when-green.sh --behind-unrelated`, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
+| `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
 | `gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON PRIVATE_NAMES` | The generator `build-rows-pr.sh` calls. |
@@ -39,6 +40,8 @@ Get a copy from the first builder and point `ROWS_SOURCE` at it.
 | `LAMP_COORD_STATE` | `~/.lamp-coordination` | all mutable state (below) |
 | `REPO_DIR` | the repo holding `TOOLS_DIR` | the checkout `git fetch` and `gh` run in |
 | `WORKTREE` | `$LAMP_COORD_STATE/wt-trainbot` | the worktree trains are built in |
+| `WORKTREE_NC` | `$LAMP_COORD_STATE/wt-trainbot-nc` | the worktree no-crates trains are built in |
+| `NOCRATES_LANE` | `on` | `off`: one lane, the bot as before part 3 of #5212 |
 | `ROWS_WORKTREE` | `$LAMP_COORD_STATE/wt-rows` | the clean worktree the rows branch is made in; added if missing |
 | `ROWS_SOURCE` | `$LAMP_COORD_STATE/review-page/build.py` | the review page |
 | `PRIVATE_NAMES` | `$LAMP_COORD_STATE/private-names.txt` | names the rows file must never hold |
@@ -47,7 +50,7 @@ Get a copy from the first builder and point `ROWS_SOURCE` at it.
 | `LAMP_COORD_WRITERS` | none | the writers file for `markers.py`, `reads2.py` and `qholds.py` run by hand (the bot passes `--writers`) |
 
 `REPO_DIR`'s `origin` must be `autonomous-ai/lampOS`.
-`WORKTREE` must not be `REPO_DIR`, its top level or the repository's main worktree: the bot refuses to start.
+`WORKTREE` and `WORKTREE_NC` must not be `REPO_DIR`, its top level, the repository's main worktree or each other: the bot refuses to start.
 
 ## State
 
@@ -96,10 +99,11 @@ nohup .github/tools/coordination/train-bot.sh > "$S/train-bot.out" 2>&1 &
 echo $! > "$S/train-bot.pid"
 ```
 
-Stop: `kill "$(cat "$S/train-bot.pid")"`. Restart: stop, check no train is open, start.
+Stop: `kill "$(cat "$S/train-bot.pid")"` (it stops both lanes). Restart: stop, check no train is open, start.
 
-The bot stops by itself (exit 2) when two trains in a row time out, or a run fails with no failing test named.
+The bot stops by itself (exit 2) when two crate trains in a row time out, or a crate run fails with no failing test named.
 It says so on the Queue (#4710).
+The no-crates lane stops alone (the file `train-bot.stop-nc` in the state folder) when two of its trains in a row time out or GitHub refuses its merge; delete the file, or restart the bot, to start it again.
 
 ## A green train behind lamp-voice
 
@@ -124,6 +128,30 @@ DRY=1 LV_AT=<lamp-voice then> .github/tools/coordination/merge-when-green.sh <tr
 
 For train 597: `DRY=1 LV_AT=f5f3dda325 .github/tools/coordination/merge-when-green.sh 5201 --behind-unrelated` prints
 `dry: merge as is: gained 1 files since 762487b1d (robots/lamp/hardware/test/tools/factory-run.sh), none overlapping the train's 35, ...`.
+
+## Two lanes
+
+Docs-, tools- and other PRs that change no build input used to wait behind 20-minute crate trains (#5212 part 3).
+The bot now sends each eligible PR to exactly one lane, by its files (`lib.sh`, `coord_lane`; `lane.sh` shows it):
+
+- **The no-crates lane** takes a PR none of whose files is a build input: nothing under `lampOS/crates/`, no `Cargo.*`, nothing under `.github/workflows/`, and nothing else the ARM64 run or the SDK check takes (the same test as "A green train behind lamp-voice" above). Its trains are `first/train-nc-N`. They get no ARM64 or clippy run, so they merge once the checks that do start on them pass, in minutes; a train only of docs no workflow takes merges with none.
+- **The crate lane** takes every other PR, mixed ones too, as before: `first/train-N`, one ARM64 run. The SDK (`lampOS/sdk/`) and the docs `lampos-sdk.yml` takes are inputs, so their PRs go here.
+
+The lanes run side by side, one train each, in their own worktrees, and neither takes the other's PRs.
+Neither rebuilds the other: each merges with `--behind-unrelated`, pinned to its head.
+A no-crates merge moves `lamp-voice` by non-input files only, so a crate train behind it merges as it is unless they share a file.
+A no-crates train passes `--no-crates`: a train that itself changes no input merges as it is behind gained inputs too, since none of its checks reads them.
+It still rebuilds on a shared file, on a gained workflow, and, when it changes a `lampOS/docs` file, on any gained `lampOS/docs` file (the doc-links check reads them all).
+A merge GitHub refuses (the other lane moved `lamp-voice` first) rebuilds.
+
+A failed no-crates train has no failing test to name: alone in it, the PR gets `HOLD train nc-N` (a new READ-OK clears it); with others, the lane carries one PR a train until a train merges (`train-bot.nc-one` in the state folder).
+
+`NOCRATES_LANE=off` turns the lane off: one lane carries every PR, as before.
+
+```sh
+DRY=1 .github/tools/coordination/train-bot.sh   # each PR's lane, then what each lane would carry
+.github/tools/coordination/lane.sh 5286 5289      # the lane of any PR, eligible or not
+```
 
 ## Marker rules
 
@@ -185,7 +213,7 @@ and a login whose READ-OKs on the head are all unsigned is one reader.
 - A PR whose own ARM64 run on its head is red sits out.
 - A PR stacked on another open PR sits out until that PR is on `lamp-voice`.
 - No merge commits: the bot cherry-picks with `--no-merges` and merges by rebase.
-- One lane: the bot waits while any `first/train-*` PR is open.
+- Each lane runs one train at a time: the no-crates lane waits while a `first/train-nc-*` PR is open, the crate lane while any other `first/train-*` PR is open. With `NOCRATES_LANE=off`, one lane waits while any `first/train-*` PR is open.
 - A train of rows PRs alone waits for a code PR, or until the oldest is 3 h old.
 
 ## Promoting a build to stable

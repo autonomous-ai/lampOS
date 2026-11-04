@@ -14,6 +14,18 @@ WORKFLOW = """on:
       - '!lampOS/builders/**'
       - 'lampOS/docs/memory.md'
 """
+# lampos-sdk.yml's paths as on lamp-voice: the SDK docs it takes are inputs too (Thirteen's P3 on #5289).
+SDK_WORKFLOW = """on:
+  pull_request:
+    branches: [lamp-voice]
+    paths:
+      - 'lampOS/sdk/**'
+      - 'lampOS/docs/control*'
+      - 'lampOS/docs/skill-format*'
+      - '.github/workflows/lampos-sdk.yml'
+  push:
+    branches: [lamp-voice]
+"""
 # The stand-in gh: answers the calls merge-when-green.sh and lv-quiet.sh make, and logs every call.
 FAKE_GH = r"""#!/bin/sh
 echo "$*" >> "$FAKE_DIR/calls.log"
@@ -75,6 +87,7 @@ class Repo(unittest.TestCase):
         self.git("remote", "add", "origin", self.origin)
         for f, body in [("lampOS/crates/x/src/lib.rs", "x\n"), ("Cargo.lock", "x\n"), ("lampOS/docs/memory.md", "x\n"),
                         ("lampOS/docs/other.md", "x\n"), (".github/workflows/lampos-arm64.yml", WORKFLOW),
+                        (".github/workflows/lampos-sdk.yml", SDK_WORKFLOW),
                         (TRAIN_FILE, "x\n"), ("robots/lamp/hardware/test/tools/factory-run.sh", "x\n")]:
             self.write(f, body)
         self.commit("base")
@@ -178,6 +191,13 @@ class Decision(Repo):
         r = self.behind()
         self.assertEqual(r.returncode, 1)
         self.assertIn("a doc the ARM64 run reads", r.stdout)
+
+    def test_a_doc_the_sdk_check_reads_rebuilds(self):
+        # Thirteen's P3 on #5289: lampos-sdk.yml takes lampOS/docs/control* and skill-format*, Markdown included.
+        for f in ("lampOS/docs/controls.md", "lampOS/docs/skill-format.md"):
+            r = self.behind(self.gain(f, push=False))
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertIn(f + " (a doc the SDK check reads)", r.stdout)
 
     def test_another_arm64_input_rebuilds(self):
         self.gain("lampOS/deploy/product/settings/records.json", push=False)

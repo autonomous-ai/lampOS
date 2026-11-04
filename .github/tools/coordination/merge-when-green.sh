@@ -1,5 +1,5 @@
 #!/bin/zsh
-# merge-when-green.sh PR [--behind-unrelated] [--precheck PR...] (22 Oct 23:4x, the owner: "do the reviewer job yourself too ... so we can move faster"): wait for
+# merge-when-green.sh PR [--behind-unrelated] [--no-crates] [--precheck PR...] (22 Oct 23:4x, the owner: "do the reviewer job yourself too ... so we can move faster"): wait for
 # the PR's required checks to finish; merge it by rebase, pinned to its head, only when every check passed and the head
 # already contains lamp-voice's latest commit (the owner's 22 Oct rule). Otherwise say why and stop. Never pushes.
 # Paths from the environment (README.md): TOOLS_DIR (default: this folder), REPO_DIR (default: the repo holding it).
@@ -8,31 +8,44 @@
 # that variable is ignored now.
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"; R="${REPO_DIR:-$(git -C $TOOLS_DIR rev-parse --show-toplevel)}"; P=${1:?PR}; cd $R || exit 1
 unset PRECHECK; typeset -a pre; pre=()
+# MWG_POLL: seconds between looks (default 30; the tests set 0).
+poll=${MWG_POLL:-30}
 # 4 Nov (#5212 part 2): --behind-unrelated (the train bot's trains) lets a PR behind lamp-voice go on waiting and merge
 # as it is when behind-unrelated.sh says lamp-voice gained only files the PR doesn't touch and no build input; the
 # owner's 22 Oct "contains lamp-voice's tip" rule stands for every other case, and for every PR without the flag.
-unrelated=0; [[ $2 == --behind-unrelated ]] && { unrelated=1; argv[2]=(); }
+# 4 Nov (#5212 part 3): --no-crates (the no-crates lane's trains) passes --no-crates to behind-unrelated.sh, so a crate
+# train's merge under this train doesn't make it rebuild when the files are disjoint.
+unrelated=0; nocrates=0
+while [[ $2 == --behind-unrelated || $2 == --no-crates ]]; do
+  [[ $2 == --behind-unrelated ]] && unrelated=1; [[ $2 == --no-crates ]] && nocrates=1; argv[2]=()
+done
 [[ $2 == --precheck ]] && pre=("${@[3,-1]}")
 # DRY=1 (#5212): wait and decide as usual but change nothing: no lv-quiet wait, no merge; print what it would do. LV_AT
 # (dry only) stands in for lamp-voice's tip in the behind decision, to replay a past case.
 lvat=origin/lamp-voice; [[ ${DRY:-0} == 1 && -n $LV_AT ]] && lvat=$LV_AT
 # behind_ok: behind-unrelated.sh's decision on this PR's head, printed; true only with --behind-unrelated and "merge as is".
-behind_ok() { local d; (( unrelated )) || return 1; d=$($TOOLS_DIR/behind-unrelated.sh refs/remotes/pr/$P $lvat); local rc=$?; echo "$(date +%T) #$P behind lamp-voice: $d"; return $rc; }
-# A PR whose every file the lampOS workflows skip (lampOS/docs/**/*.md and lampOS/builders/**, but not the seven docs
-# they take back in) gets no checks at all, so waiting for them timed out trains 41 and 44 (23 Oct): it merges on the
-# same current-base and precheck rules, with nothing to wait for.
-files=$(gh pr diff $P -R autonomous-ai/lampOS --name-only)
-nochecks=1
-# 26 Oct 12:5x: a PR with no file the ARM64 workflow takes (lampos-arm64.yml's pull_request paths: lampOS/** but the
-# docs' Markdown and builders/, plus its own .github files) gets no build-and-test or clippy check, only the others its
+behind_ok() { local d; (( unrelated )) || return 1; d=$($TOOLS_DIR/behind-unrelated.sh ${${nocrates:#0}:+--no-crates} refs/remotes/pr/$P $lvat); local rc=$?; echo "$(date +%T) #$P behind lamp-voice: $d"; return $rc; }
+# A PR whose every file the lampOS workflows skip (the docs' Markdown no workflow takes back in, and lampOS/builders/**)
+# gets no checks at all, so waiting for them timed out trains 41 and 44 (23 Oct): it merges on the same current-base
+# and precheck rules, with nothing to wait for.
+# 26 Oct 12:5x: a PR with no file the ARM64 workflow takes gets no build-and-test or clippy check, only the others its
 # files start (#3536, scripts/imager only: trains 157 and 158 waited 45 min twice for an ARM64 run that never comes).
 # Such a PR merges once every check that did start has passed.
-armless=1
+# 4 Nov (#5212 part 3): both tests read the workflows' own pull_request paths (lib.sh, coord_inputs_init and
+# coord_takes) from the PR's head, not a list kept here: the seven docs written here had fallen behind the workflow's
+# twelve, so a setup.md-only PR merged without waiting for the ARM64 run it starts. Paths that can't be read: the ARM64
+# run is waited for (fail closed).
+source $TOOLS_DIR/lib.sh
+files=$(gh pr diff $P -R autonomous-ai/lampOS --name-only)
+git fetch -q origin "+refs/pull/$P/head:refs/remotes/pr/$P" 2>/dev/null
+wref=refs/remotes/pr/$P; git rev-parse -q --verify "$wref^{commit}" >/dev/null || wref=origin/lamp-voice
+coord_inputs_init $wref
+nochecks=1; armless=1
 for f in ${(f)files}; do
+  if ! (( ${#coord_arm_pats} )) || coord_takes $f coord_arm_pats; then nochecks=0; armless=0; continue; fi
   case $f in
-    lampOS/docs/attention.md|lampOS/docs/brain-build.md|lampOS/docs/endpoint-detection.md|lampOS/docs/endpoint-pilot.md|lampOS/docs/install.md|lampOS/docs/memory.md|lampOS/docs/switches.md) nochecks=0; armless=0 ;;
-    lampOS/docs/*.md|lampOS/docs/*/*.md|lampOS/docs/*/*/*.md|lampOS/builders/*) ;;
-    lampOS/*|.github/workflows/lampos-arm64.yml|.github/scripts/lampos-pr-crates.py|.github/scripts/lampos-source-times.py|.github/scripts/lampos-publish*.py|.github/tools/lampos-promote/*) nochecks=0; armless=0 ;;
+    lampOS/builders/*) ;;
+    lampOS/docs/*.md) [[ -z $(coord_input $f) ]] || nochecks=0 ;;
     *) nochecks=0 ;;
   esac
 done
@@ -80,7 +93,7 @@ for i in {1..90}; do
       echo "$(date +%T) #$P has no ARM64 run (no file it takes): its $passed checks passed"
       green=1
     else
-      last_every=$every; sleep 30; continue
+      last_every=$every; sleep $poll; continue
     fi
   else
     # The ARM64 build and test and clippy: at least two, every one COMPLETED with SUCCESS.
@@ -107,8 +120,12 @@ for i in {1..90}; do
     gh pr merge $P -R autonomous-ai/lampOS --rebase --match-head-commit $head && echo "$(date +%T) #$P merged at ${head:0:9}$( (( asis )) && echo ', as it is, behind lamp-voice')" && exit 0
     # A refused merge as is goes back to the old path (exit 3, rebuild), never the failed-run path.
     (( asis )) && { echo "$(date +%T) #$P merge as is refused; rebuilding as behind lamp-voice"; exit 3; }
+    # 4 Nov (#5212 part 3): with two lanes, the other lane can move lamp-voice between the check above and the merge.
+    # A merge refused because lamp-voice moved is a rebuild (exit 3), not a failure that stops the bot.
+    git fetch -q origin lamp-voice
+    if ! git merge-base --is-ancestor origin/lamp-voice refs/remotes/pr/$P; then echo "$(date +%T) #$P merge refused; lamp-voice moved meanwhile: rebuilding"; exit 3; fi
     echo "$(date +%T) #$P merge refused"; exit 4
   fi
-  sleep 30
+  sleep $poll
 done
 echo "$(date +%T) #$P checks not done in 45 min"; exit 5
