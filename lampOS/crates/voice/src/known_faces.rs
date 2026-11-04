@@ -1873,6 +1873,19 @@ pub fn replaced_of(answer: &Value) -> Option<Vec<String>> {
         .collect()
 }
 
+/// Why a yes to being named is not the named person's own, if it is not:
+/// the line's scope `person` must be the memory id of the name, `named`
+/// ([`memory_person`]: with the stable id, the id the eyes gave that name,
+/// so a person renamed A to B is B's own and a new face saved as A is not;
+/// without it, `person_id` of the name, as before).
+fn whose_yes(person: Option<&str>, named: &str) -> Option<&'static str> {
+    match person {
+        None => Some("the line's scope is the room's"),
+        Some(id) if id != named => Some("the line's scope is someone else's"),
+        Some(_) => None,
+    }
+}
+
 /// What the model is told when a yes to being named may not be the named
 /// person's own: nothing is sent, and it isn't asked again in that turn.
 pub const NOT_SURE_WHOSE_YES: &str = "I can't be sure that yes was theirs, so I haven't taken it. Don't ask again now; they can tell you when it's only them at the lamp.";
@@ -1899,20 +1912,11 @@ fn run_visits(socket: &Path, call: &ToolCall, person: Option<&str>) -> (Value, b
         return (json!({"error": "There was no name in that."}), true);
     };
     let yes = call.name == TELL;
-    if yes {
-        let whose = match person {
-            None => Some("the line's scope is the room's"),
-            Some(id) if id != crate::remember::person_id(name) => {
-                Some("the line's scope is someone else's")
-            }
-            Some(_) => None,
-        };
-        if let Some(why) = whose {
-            eprintln!(
-                "lamp-voice: a yes to being named in Who was here was not taken: {why}; nothing was sent"
-            );
-            return (json!({"error": NOT_SURE_WHOSE_YES}), true);
-        }
+    if yes && let Some(why) = whose_yes(person, &memory_person(name)) {
+        eprintln!(
+            "lamp-voice: a yes to being named in Who was here was not taken: {why}; nothing was sent"
+        );
+        return (json!({"error": NOT_SURE_WHOSE_YES}), true);
     }
     let line = if yes {
         json!({"visits_yes": name})
@@ -4985,6 +4989,39 @@ mod tests {
         // Off (no LAMP_MEMORY_STABLE_ID in tests): the name's, as before.
         assert_eq!(observation.person(), person_id("Sam"));
         std::fs::remove_file(&path).unwrap();
+    }
+
+    /// #5150's P3: with the stable id, a yes to being named is the named
+    /// person's own by the id the eyes gave that name, not by the name's
+    /// hash. Renamed A to B, B's yes is theirs; a new face later saved as A
+    /// (A's hash with `-2`) is not B's to agree for. Off, as before.
+    #[test]
+    fn a_yes_to_being_named_follows_the_eyes_id_of_the_name() {
+        use lamp_msgs::known::person_id;
+        let first_a = person_id("A");
+        let new_a = format!("{first_a}-2");
+        let mut seen = SeenIds::default();
+        seen.note("B", Some(&first_a));
+        seen.note("A", Some(&new_a));
+        // B, renamed from A, keeps A's first id as their scope.
+        assert_eq!(whose_yes(Some(&first_a), &seen.person("B", true)), None);
+        // B can't agree for the new A.
+        assert_eq!(
+            whose_yes(Some(&first_a), &seen.person("A", true)),
+            Some("the line's scope is someone else's")
+        );
+        // The new A's own yes is theirs.
+        assert_eq!(whose_yes(Some(&new_a), &seen.person("A", true)), None);
+        // Off: the name's hash, as before.
+        assert_eq!(whose_yes(Some(&first_a), &seen.person("A", false)), None);
+        assert_eq!(
+            whose_yes(Some(&first_a), &seen.person("B", false)),
+            Some("the line's scope is someone else's")
+        );
+        assert_eq!(
+            whose_yes(None, &seen.person("A", true)),
+            Some("the line's scope is the room's")
+        );
     }
 
     /// The voice follows the eyes (#2176): when its own switch and the eyes'
