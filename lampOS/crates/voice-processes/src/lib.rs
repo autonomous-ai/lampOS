@@ -108,10 +108,14 @@ pub enum WorkerRole {
     Ring,
     Privacy,
     Probe,
+    /// The sleep capture (migrate-P2, `LAMP_SLEEP_HEARS_NAME`): one
+    /// microphone read for the name listener alone while a hand's sleep
+    /// waits, under its own name-only grant.
+    Sleep,
 }
 
 impl WorkerRole {
-    pub const ALL: [WorkerRole; 8] = [
+    pub const ALL: [WorkerRole; 9] = [
         WorkerRole::Capture,
         WorkerRole::Speaker,
         WorkerRole::Provider,
@@ -120,6 +124,7 @@ impl WorkerRole {
         WorkerRole::Ring,
         WorkerRole::Privacy,
         WorkerRole::Probe,
+        WorkerRole::Sleep,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -132,6 +137,7 @@ impl WorkerRole {
             WorkerRole::Ring => "ring",
             WorkerRole::Privacy => "privacy",
             WorkerRole::Probe => "probe",
+            WorkerRole::Sleep => "sleep",
         }
     }
 
@@ -157,7 +163,10 @@ impl WorkerRole {
             | WorkerRole::Second
             | WorkerRole::Camera
             | WorkerRole::Privacy
-            | WorkerRole::Probe => Scheduling::Ordinary,
+            | WorkerRole::Probe
+            // Only a name to hear, nothing said back at once: no deadline the
+            // voice's RR 20 is for.
+            | WorkerRole::Sleep => Scheduling::Ordinary,
         }
     }
 }

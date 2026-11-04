@@ -634,7 +634,8 @@ fn run_with_notice_policy(
                                     | ProviderInput::CountOnly { .. }
                                     | ProviderInput::StepCall { .. }
                                     | ProviderInput::Onboarding { .. }
-                                    | ProviderInput::TurnOpened { .. },
+                                    | ProviderInput::TurnOpened { .. }
+                                    | ProviderInput::WokenByName { .. },
                                 ) => {}
                                 None => break,
                             }

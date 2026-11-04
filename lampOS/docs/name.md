@@ -109,6 +109,79 @@ down (it refuses its recording option), and this does not change that: a
 topic is not a file, and nothing on the lamp records it. But it is a door
 that was not there, and it is why it has a switch of its own.
 
+## While it sleeps (migrate-P2)
+
+A hand held three seconds on the head puts the lamp to sleep: the voice ends
+its conversation, closes its whole audio rig and waits, so nothing is
+published on `mic2/audio` and the listener says "no sound reaches it". With
+the voice's `LAMP_SLEEP_HEARS_NAME=on` (off unless set; the Queue comment
+<https://github.com/autonomous-ai/lampOS/issues/3997#issuecomment-6526292114>)
+a sleep by choice still hears its name while the physical slide is open:
+
+- The voice's privacy wait starts the **sleep capture**
+  (`crates/voice/src/sleep_worker.rs`, worker role `sleep`): the second
+  microphone alone, no speaker, no echo canceller, no speech detector, no
+  speech to text. It reads only under a **name-only grant**
+  (`lamp_turn_owner::NameGrant`), a lease of at most 250 ms the wait renews
+  while it reads the slide open and fresh and revokes at the look that reads
+  it anything else. The wait's own controller keeps microphone and camera
+  `Denied`, so `voice/privacy` still says not permitted, Ears stays closed
+  and the red line on the ring stays the slide's alone.
+- Its 20 ms blocks go on **`mic2/sleep_audio`** (`lamp_msgs::Audio::SLEEP_TOPIC`),
+  never on `mic2/audio`, and only to this listener: before each publish the
+  voice lists the topic's subscribers, and any listening one that is not
+  `name` stops the capture, said once in the journal, and leaves today's
+  full sleep until the lamp wakes (`sleep_capture::Readers`). The guarded
+  publish (`Publisher::publish_bytes_guarded`) never looks for subscribers
+  again after that check.
+- This listener hears that topic with **`--sleep-source mic2/sleep_audio`**,
+  beside `mic2/audio`, with the same models and bars; at most one of the two
+  publishes at a time. Without the flag it is as before. The product unit
+  does not set it yet: turning the voice's switch on needs this flag in
+  `lamp-name.service` too.
+- The voice reads `name/heard`. Its rule (`sleep_capture::judge`, a pure
+  function) is chosen by a constant, `WAKE_RULE`: two hearings at 0.9 or
+  over within 3 s, one at 0.97 or over, or either; the default is either
+  (the turns reviewer's prior, and the design owner's answer: one call is
+  enough). With `LAMP_SLEEP_HEARS_NAME=shadow` everything runs as
+  with `on` but no wake is asked, and each hearing is journaled with its
+  score and the verdict (`would wake: two >=0.9 in 3 s`, `would wake: one
+  >=0.97`, or `no`).
+- A wake closes the capture and its grant first, then asks the same wake a
+  tap asks: the clear saved before the latch opens, and where a tap says its
+  "hm?", a short fixed line from the speech cache (`language::WOKEN_BY_NAME_LINE`,
+  "Yes?", "Dạ?" and the others; `TtsCache::wake_line`). One file read, never
+  rendered there and never a model's: not kept yet, it is the "hm?" this once,
+  and a lamp in another language never says the English. A tap's wake is the
+  "hm?" as ever. The woken conversation opens its own rig, whose speech detector and
+  pre-roll start empty: nothing heard while asleep reaches a request.
+- A wake by name the lamp hasn't answered within 15 s goes back to sleep, as
+  from a hold, and listens again (the owner set 15 s, long enough to watch it
+  stand and then speak). A line or reply open at that time holds the re-sleep
+  until its end. Only an answer's first sound keeps the wake: room talk attention
+  holds doesn't (`HandControls::answer_began`,
+  `a_held_line_after_a_wake_by_name_does_not_keep_it_awake`).
+- Its hearings also reach every `name/heard` reader while it sleeps: scores, not
+  sound. Body and Expression ignore them, but the app's `NameHeard` events and
+  skills' `broken_by = name/heard` see them, false ones too.
+- A line begun in those 15 s is said to the lamp without its name
+  (`attention::NAME_WOKE_LISTENS_US`, that same length; a tap's window stays
+  2 s). The coordinator marks it after its Start (`ProviderInput::WokenByName`)
+  for that wake's conversation only, on both routes. The first line let out
+  spends it; a short sound held does not. So a false wake costs one "Dạ?" or
+  "Yes?" and at most one room line answered, and a room sound doesn't keep the
+  lamp awake.
+- `voice/mute` keeps `muted: true`, `reason: sleep`, `muted_by: sleep` and adds
+  `hears_name: true` while the capture runs; `mic.get` passes it on. The ring's
+  asleep face shows one faint warm ember at the top while it hears its name
+  (`lamp_ring::asleep::hearing_name_pixels`, the one function to change for
+  another look; the design owner picks the final one).
+- Unchanged: a closed slide starts nothing and sends this listener nothing; a
+  person's mute, the restart guard's or an untrusted record never listen; the
+  onboarding walk never sleeps (#3747); a restart while asleep comes back
+  asleep and listens again only with the switch on. Both privacy routes
+  run it, through the same muted wait.
+
 ## How it hears
 
 Three small models, run every 80 ms (`src/hear.rs`). The design is

@@ -5376,6 +5376,11 @@ impl Engine {
                     opened(request);
                 }
             }
+            // Woken by its name, this line inside the wait for one
+            // (migrate-P2): read when the rule judges the line.
+            ProviderInput::WokenByName { request, at_us, .. } => {
+                crate::attention::mark_woken_by_name(request, at_us);
+            }
             // Begun while onboarding waits for a call (#3504): read by the
             // turn's task once its words are in.
             ProviderInput::StepCall { request, .. } => {

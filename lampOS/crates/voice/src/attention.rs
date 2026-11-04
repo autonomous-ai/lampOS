@@ -1415,6 +1415,42 @@ const TAPPED: &str = "someone tapped its head to talk to it";
 /// tap is. The voice decides the window ([`crate::control_turn::OPEN_FOR_US`]);
 /// this worker is told only which request began in it.
 const OPENED: &str = "a computer opened a turn for it to answer";
+/// A wake by its name (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2) counts as a
+/// call for a line that begins as late as this after it: what the lamp waits
+/// before it goes back to sleep, for a person who watches it stand and then
+/// speaks. It is spent by the first line it lets out
+/// ([`Attention::woken_by_name`]), so a false wake answers one room line. A
+/// tap's [`TAPPED_BEFORE_US`] is not this.
+pub const NAME_WOKE_LISTENS_US: u64 = crate::hand_controls::NAME_RESLEEP_AFTER_US;
+const WOKEN_BY_NAME: &str = "its name woke it, and someone spoke before it went back to sleep";
+
+/// The request the coordinator marked as begun in a wake by name's wait, and
+/// the wake's time (`ProviderInput::WokenByName`): one at a time, as requests
+/// are, kept for the second route's rule to read when it judges the line.
+static WOKEN_BY_NAME_MARK: std::sync::Mutex<Option<(u64, u64)>> = std::sync::Mutex::new(None);
+
+/// `request` began in the wait after a wake by name at `at_us`.
+pub fn mark_woken_by_name(request: u64, at_us: u64) {
+    if let Ok(mut marked) = WOKEN_BY_NAME_MARK.lock() {
+        *marked = Some((request, at_us));
+    }
+}
+
+/// When the wake by name that `request` began after happened, if it was
+/// marked so.
+pub fn marked_woken_by_name(request: u64) -> Option<u64> {
+    WOKEN_BY_NAME_MARK.lock().ok().and_then(|marked| {
+        (*marked)
+            .filter(|(marked, _)| *marked == request)
+            .map(|(_, at)| at)
+    })
+}
+
+/// Whether a line begun at `began_us` is in the wait after a wake by name at
+/// `woke_us`.
+pub fn in_name_wakes_wait(woke_us: u64, began_us: u64) -> bool {
+    woke_us <= began_us && woke_us.saturating_add(NAME_WOKE_LISTENS_US) >= began_us
+}
 /// A request that begins this long after one that was only the lamp's name
 /// (the call's wait ran out, #891) is that call's (#829, the first builder
 /// at 16:32: "Lamp," then "Check my work." was held in a busy room by day),
@@ -1625,6 +1661,12 @@ pub struct Attention {
     /// call as a tap is, by its own reason.
     opened_request: Option<u64>,
     opened: bool,
+    /// The wake by name whose wait a line may still begin in
+    /// ([`NAME_WOKE_LISTENS_US`]), the one a line's answer spent, and whether
+    /// that counts for the request in hand (migrate-P2).
+    woken_by_name_us: Option<u64>,
+    name_wake_spent_us: Option<u64>,
+    in_name_wake: bool,
     /// The newest request that was only the lamp's name, when it ended,
     /// and, once the next request began, whether its own hearing showed the
     /// lamp was called; and whether the request in hand began within
@@ -2354,6 +2396,9 @@ impl Attention {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
         });
         self.opened = self.opened_request == Some(request);
+        self.in_name_wake = self
+            .woken_by_name_us
+            .is_some_and(|woke| in_name_wakes_wait(woke, now_us));
         self.after_call = self.bare_call_us.is_some_and(|(call, ended, shown)| {
             call != request
                 && shown == Some(true)
@@ -2397,6 +2442,7 @@ impl Attention {
     pub fn continued_at_led(&mut self, request: u64, session: u64, now_us: u64, lead_us: u64) {
         let tapped = session == self.session && self.began_us.is_some() && self.tapped;
         let opened = session == self.session && self.began_us.is_some() && self.opened;
+        let in_name_wake = session == self.session && self.began_us.is_some() && self.in_name_wake;
         let after_call = session == self.session && self.began_us.is_some() && self.after_call;
         let after_another = self.after_another;
         let another_line = self.another_line.clone();
@@ -2475,6 +2521,7 @@ impl Attention {
         }
         self.tapped |= tapped;
         self.opened |= opened || self.opened_request == Some(request);
+        self.in_name_wake |= in_name_wake;
         self.after_call |= after_call;
     }
 
@@ -2545,6 +2592,24 @@ impl Attention {
             self.opened = true;
         }
     }
+    /// The lamp was woken from its sleep by its name at `at_us` (migrate-P2):
+    /// a call for a line that begins within [`NAME_WOKE_LISTENS_US`], and for
+    /// the one in hand if it began in that wait and its sound has not ended.
+    /// Only the first line let out for it: a wake already spent is not
+    /// opened again by a later line's mark.
+    pub fn woken_by_name(&mut self, at_us: u64) {
+        if self.name_wake_spent_us == Some(at_us) {
+            return;
+        }
+        self.woken_by_name_us = Some(at_us);
+        if self.ended_us.is_none()
+            && self
+                .began_us
+                .is_some_and(|began| in_name_wakes_wait(at_us, began))
+        {
+            self.in_name_wake = true;
+        }
+    }
 
     /// A request began on `session`.
     pub fn began(&mut self, request: u64, session: u64) {
@@ -2565,6 +2630,7 @@ impl Attention {
         self.named_sure = false;
         self.tapped = false;
         self.opened = false;
+        self.in_name_wake = false;
         self.best_score = 0.0;
         self.near = false;
         self.addressed = false;
@@ -2857,6 +2923,17 @@ impl Attention {
             self.verdict = Some(verdict);
             return Some(verdict);
         }
+        // So is a wake by its name, for a line begun in the wait after it
+        // (migrate-P2): spent here, a false wake answers one room line. The
+        // short sound is judged above, and spends nothing.
+        if self.in_name_wake && !own {
+            if let Some(woke) = self.woken_by_name_us.take() {
+                self.name_wake_spent_us = Some(woke);
+            }
+            let verdict = Verdict::Play(WOKEN_BY_NAME);
+            self.verdict = Some(verdict);
+            return Some(verdict);
+        }
         // So is the lamp's name said alone just before: the request after
         // it is what the person called the lamp for.
         if self.after_call && !own {
@@ -3064,6 +3141,8 @@ impl Attention {
             Some(TAPPED)
         } else if self.opened {
             Some(OPENED)
+        } else if self.in_name_wake {
+            Some(WOKEN_BY_NAME)
         } else if called_in_text {
             Some(CALLED_IN_TEXT)
         } else if self.face_shows(self.judged_room.unwrap_or(Room::Unknown), turned) {
@@ -3112,7 +3191,7 @@ impl Attention {
     /// another person's conversation was going on was judged against that
     /// person's voice).
     pub fn called_for_itself(&self) -> bool {
-        self.named || self.tapped || self.opened || self.called_in_text()
+        self.named || self.tapped || self.opened || self.in_name_wake || self.called_in_text()
     }
 
     /// Whether the text shows the lamp was called, as the rule reads it
@@ -3723,6 +3802,144 @@ mod tests {
         attention.head_tapped(10_000_000);
         attention.began_at(2, 1, 10_000_000 + TAPPED_BEFORE_US + 1);
         assert!(matches!(busy(&mut attention, 2), Verdict::Hold(_)));
+    }
+    /// migrate-P2: on lamp-e82d a person watched the lamp stand and then
+    /// spoke. A line begun in the wait after a wake by name is a call in any
+    /// room, in the strict busy form with nobody turned, and one begun past
+    /// it is not. The wait is the re-sleep's, whatever its length.
+    #[test]
+    fn a_line_in_the_wait_after_a_wake_by_name_is_said_to_the_lamp() {
+        assert_eq!(
+            NAME_WOKE_LISTENS_US,
+            crate::hand_controls::NAME_RESLEEP_AFTER_US
+        );
+        assert_eq!(NAME_WOKE_LISTENS_US, 15_000_000);
+        let decide = |woke_at: Option<u64>, began_at: u64| {
+            let mut attention = Attention::default();
+            for request in 1..=2 {
+                attention.began_at(request, 1, request * 1_000_000);
+            }
+            if let Some(at) = woke_at {
+                attention.woken_by_name(at);
+            }
+            attention.began_at(3, 1, began_at);
+            attention
+                .first_output_busy(3, Room::Busy, false, true, None)
+                .unwrap()
+        };
+        let woke = 10_000_000;
+        let played = Verdict::Play(WOKEN_BY_NAME);
+        assert_eq!(decide(Some(woke), woke + 8_000_000), played);
+        assert_eq!(decide(Some(woke), woke + NAME_WOKE_LISTENS_US), played);
+        assert!(matches!(
+            decide(Some(woke), woke + NAME_WOKE_LISTENS_US + 1),
+            Verdict::Hold(_)
+        ));
+        // No wake by name, and a line begun before it, are as ever.
+        assert!(matches!(decide(None, woke + 8_000_000), Verdict::Hold(_)));
+        assert!(matches!(decide(Some(woke), woke - 1), Verdict::Hold(_)));
+    }
+
+    /// migrate-P2: a false wake answers one room line, not every line in the
+    /// wait. The first line let out spends the wake; a cough judged a sound
+    /// and held does not; the next wake is its own.
+    #[test]
+    fn a_wake_by_name_lets_out_one_line_and_a_sound_does_not_spend_it() {
+        let woke = 10_000_000;
+        let s = 1_000_000;
+        let mut attention = Attention::default();
+        attention.check_sounds(true);
+        for request in 1..=2 {
+            attention.began_at(request, 1, request * s);
+        }
+        attention.woken_by_name(woke);
+        attention.began_at(3, 1, woke + s);
+        attention.ended_as_sound(3);
+        assert!(matches!(
+            attention.first_output_busy(3, Room::Busy, false, true, None),
+            Some(Verdict::Hold(_))
+        ));
+        attention.woken_by_name(woke);
+        attention.began_at(4, 1, woke + 8 * s);
+        assert_eq!(
+            attention.first_output_busy(4, Room::Busy, false, true, None),
+            Some(Verdict::Play(WOKEN_BY_NAME))
+        );
+        assert!(attention.called_for_itself());
+        attention.ended(4, woke + 9 * s);
+        // Spent, though the coordinator marks the next line too.
+        attention.woken_by_name(woke);
+        attention.began_at(5, 1, woke + 10 * s);
+        assert!(matches!(
+            attention.first_output_busy(5, Room::Busy, false, true, None),
+            Some(Verdict::Hold(_))
+        ));
+        attention.woken_by_name(woke + 11 * s);
+        attention.began_at(6, 1, woke + 12 * s);
+        assert_eq!(
+            attention.first_output_busy(6, Room::Busy, false, true, None),
+            Some(Verdict::Play(WOKEN_BY_NAME))
+        );
+    }
+
+    /// migrate-P2: the line in hand if it began in the wait and has not
+    /// ended, as Live's mark can come after its start; and a line going on
+    /// keeps what its first part had.
+    #[test]
+    fn a_name_wake_counts_for_the_line_in_hand_and_for_its_continuation() {
+        let woke = 10_000_000;
+        let mut attention = Attention::default();
+        for request in 1..=2 {
+            attention.began_at(request, 1, request * 1_000_000);
+        }
+        attention.began_at(3, 1, woke + 8_000_000);
+        attention.woken_by_name(woke);
+        assert_eq!(
+            attention.first_output_busy(3, Room::Busy, false, true, None),
+            Some(Verdict::Play(WOKEN_BY_NAME))
+        );
+        // Going on past the wait, begun inside it.
+        let mut attention = Attention::default();
+        for request in 1..=2 {
+            attention.began_at(request, 1, request * 1_000_000);
+        }
+        attention.woken_by_name(woke);
+        attention.began_at(3, 1, woke + 14_000_000);
+        attention.ended(3, woke + 15_500_000);
+        attention.continued_at(4, 1, woke + 16_000_000);
+        assert_eq!(
+            attention.first_output_busy(4, Room::Busy, false, true, None),
+            Some(Verdict::Play(WOKEN_BY_NAME))
+        );
+    }
+
+    /// migrate-P2: a tap's window is its own 2 s, with or without a wake by
+    /// name's wait, and a tap opens no such wait.
+    #[test]
+    fn a_taps_window_stays_two_seconds_beside_a_wake_by_name() {
+        assert_eq!(TAPPED_BEFORE_US, 2_000_000);
+        let tap = 10_000_000;
+        let mut attention = Attention::default();
+        for request in 1..=2 {
+            attention.began_at(request, 1, request * 1_000_000);
+        }
+        attention.head_tapped(tap);
+        attention.began_at(3, 1, tap + 8_000_000);
+        assert!(matches!(
+            attention.first_output_busy(3, Room::Busy, false, true, None),
+            Some(Verdict::Hold(_))
+        ));
+        let mut attention = Attention::default();
+        for request in 1..=2 {
+            attention.began_at(request, 1, request * 1_000_000);
+        }
+        attention.head_tapped(tap);
+        attention.woken_by_name(tap - 1_000_000);
+        attention.began_at(3, 1, tap + 1_000_000);
+        assert_eq!(
+            attention.first_output_busy(3, Room::Busy, false, true, None),
+            Some(Verdict::Play(TAPPED))
+        );
     }
 
     #[test]

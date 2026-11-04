@@ -19,7 +19,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--near SCORE] [--moving-least SCORE] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
+const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--near SCORE] [--moving-least SCORE] [--sleep-source mic2/sleep_audio] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] [--step-ms 80|40|20|10 [--wake SCORE]] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...";
 const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs/name.md.
 
   --models      a directory holding melspectrogram.onnx, embedding_model.onnx and name.onnx
@@ -46,6 +46,9 @@ const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs
   --moving-least  a hearing that began while the body played a gesture (body/gesture),
                 or within 0.8 s after, is said only at this higher bar, over --least, to 1.
                 LAMP_NAME_MOVING_LEAST=on is --moving-least 0.99. Off unless set
+  --sleep-source  also listen to mic2/sleep_audio, the second microphone's sound the voice
+                publishes only while a hand's sleep listens for the name alone
+                (LAMP_SLEEP_HEARS_NAME, docs/name.md); the same models and bars. Off unless set
   --bus-root    the bus's directory (LAMP_BUS_ROOT, or /run/lampos-bus)
 
 It listens to MICROPHONE/audio and publishes name/rising as each hearing begins,
@@ -57,6 +60,29 @@ channel, 16 bits, raw or WAV) and prints for each every time it would have said 
 was heard (seconds into the file, and the score), its highest score and when, and then how
 long a step took: for trying the models where they are installed. With --quiet-below it
 rests as the program would, and says how many steps rested. It touches no bus.";
+
+/// The next block from the microphone's topic, or with `--sleep-source`
+/// from the sleep's too (migrate-P2): at most one of them publishes at a
+/// time, the microphone's while the voice listens and the sleep's while a
+/// hand's sleep listens for the name alone. Without it, as always.
+fn next_block(
+    sound: &mut lamp_bus::Subscriber,
+    sleep: Option<&mut lamp_bus::Subscriber>,
+) -> io::Result<Option<lamp_bus::Message>> {
+    let Some(sleep) = sleep else {
+        return sound.recv(Duration::from_millis(100));
+    };
+    // What the sleep's topic says of its source is no news: nobody
+    // publishes it while the lamp is awake.
+    let _ = sleep.notices();
+    if let Some(message) = sleep.recv(Duration::ZERO)? {
+        return Ok(Some(message));
+    }
+    match sound.recv(Duration::from_millis(20))? {
+        Some(message) => Ok(Some(message)),
+        None => sleep.recv(Duration::ZERO),
+    }
+}
 
 /// The name it publishes under, and reports as.
 const NAME: &str = "name";
@@ -101,6 +127,9 @@ struct Arguments {
     near: Option<f32>,
     /// `--moving-least`: the bar while the body moves (#4208), over `--least`.
     moving_least: Option<f32>,
+    /// `--sleep-source`: the sleep's own sound, heard beside the microphone's
+    /// (migrate-P2): `mic2/sleep_audio`, the only one there is.
+    sleep_source: Option<String>,
     bus: Option<PathBuf>,
 }
 
@@ -181,6 +210,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
     let mut not_while_speaking = None;
     let mut near = None;
     let mut moving_least = None;
+    let mut sleep_source = None;
     while let Some(option) = arguments.next() {
         if option == "--help" || option == "-h" {
             return Ok(None);
@@ -228,6 +258,12 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
                         .ok_or("--moving-least is a score from 0.5 to 1, over --least")?,
                 )
                 .is_some(),
+            "--sleep-source" => {
+                if value != Audio::SLEEP_TOPIC {
+                    return Err(format!("--sleep-source is {}", Audio::SLEEP_TOPIC));
+                }
+                sleep_source.replace(value).is_some()
+            }
             "--not-while-speaking" => not_while_speaking
                 .replace(match value.as_str() {
                     "on" => true,
@@ -269,6 +305,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
         not_while_speaking: not_while_speaking.unwrap_or(false),
         near,
         moving_least,
+        sleep_source,
         bus,
     }))
 }
@@ -513,6 +550,13 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     };
     let topic = format!("{}/audio", arguments.microphone);
     let mut sound = bus.subscribe_typed(&topic, NAME, Audio::TYPE)?;
+    // A hand's sleep's own sound, while the voice listens for the name alone
+    // (migrate-P2): heard as the microphone's is, by the same models.
+    let mut sleep_sound = arguments
+        .sleep_source
+        .as_deref()
+        .map(|topic| bus.subscribe_typed(topic, NAME, Audio::TYPE))
+        .transpose()?;
     let mut heard: Publisher =
         bus.publisher_declared(NameHeard::TOPIC, &NameHeard::declaration(), NAME)?;
     // The first sign of each hearing, as soon as the score reaches the bar
@@ -553,9 +597,10 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         ));
     }
     log(&format!(
-        "started models={} loaded_ms={} listening_to={topic} least={} near={} quiet_below={} step_ms={} wake={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
+        "started models={} loaded_ms={} listening_to={topic} sleep_source={} least={} near={} quiet_below={} step_ms={} wake={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
         arguments.models.display(),
         loaded.as_millis(),
+        arguments.sleep_source.as_deref().unwrap_or("off"),
         arguments.least,
         arguments
             .near
@@ -602,7 +647,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     let mut told = Instant::now();
     let at_us = |now: Instant| now.saturating_duration_since(started).as_micros() as u64;
     loop {
-        let message = sound.recv(Duration::from_millis(100))?;
+        let message = next_block(&mut sound, sleep_sound.as_mut())?;
         let now = Instant::now();
         if let Some(voice) = voice.as_mut() {
             while let Ok(Some(state)) = voice.recv(Duration::ZERO) {
@@ -1209,6 +1254,56 @@ mod tests {
         parse(text.split_whitespace().map(str::to_owned))
     }
 
+    /// migrate-P2: `--sleep-source` takes the sleep's topic and nothing
+    /// else, and is off unless given; with it, blocks from either topic are
+    /// heard, and without it only the microphone's, as always.
+    #[test]
+    fn a_sleep_source_is_the_sleeps_topic_alone_and_is_heard_beside_the_microphone() {
+        assert_eq!(of("--models /m").unwrap().unwrap().sleep_source, None);
+        assert_eq!(
+            of("--models /m --sleep-source mic2/sleep_audio")
+                .unwrap()
+                .unwrap()
+                .sleep_source
+                .as_deref(),
+            Some("mic2/sleep_audio")
+        );
+        for refused in [
+            "--models /m --sleep-source mic2/audio",
+            "--models /m --sleep-source mic1/sleep_audio",
+            "--models /m --sleep-source mic2/sleep_audio --sleep-source mic2/sleep_audio",
+        ] {
+            assert!(of(refused).is_err(), "{refused}");
+        }
+        let root = PathBuf::from(format!("/tmp/ln-sleep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = Bus::new(&root).unwrap();
+        let mut sound = bus
+            .subscribe_typed("mic2/audio", NAME, Audio::TYPE)
+            .unwrap();
+        let mut sleep = bus
+            .subscribe_typed(Audio::SLEEP_TOPIC, NAME, Audio::TYPE)
+            .unwrap();
+        let mut asleep = bus
+            .publisher_declared(Audio::SLEEP_TOPIC, &Audio::declaration(), "voice")
+            .unwrap();
+        let block = Audio {
+            sample_rate: 16_000,
+            channels: 1,
+            sample_format: Audio::S16LE.into(),
+            sequence: 0,
+        }
+        .block(&[0u8; 640])
+        .unwrap();
+        asleep.publish_bytes(1, Audio::ENCODING, &block).unwrap();
+        let heard = next_block(&mut sound, Some(&mut sleep)).unwrap().unwrap();
+        assert_eq!(heard.header.topic, Audio::SLEEP_TOPIC);
+        asleep.publish_bytes(2, Audio::ENCODING, &block).unwrap();
+        // Without the flag the sleep's topic is not read at all.
+        assert!(next_block(&mut sound, None).unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// #891: a quiet longer than the lease leaves both topics with their
     /// publisher, as the heartbeat renews both; renewing one alone loses
     /// the other.
@@ -1426,6 +1521,7 @@ mod tests {
                 not_while_speaking: false,
                 near: None,
                 moving_least: None,
+                sleep_source: None,
                 bus: None,
             }
         );
@@ -1445,6 +1541,7 @@ mod tests {
                 not_while_speaking: false,
                 near: None,
                 moving_least: None,
+                sleep_source: None,
                 bus: Some("/run/lampos-bus".into()),
             }
         );

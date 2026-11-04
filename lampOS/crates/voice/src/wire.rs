@@ -6,7 +6,9 @@ use crate::{
 };
 use lamp_audio::ownership::{PlaybackCursor, QueuedRange};
 use lamp_ipc::MAX_DATAGRAM_BYTES;
-use lamp_turn_owner::{BootId, Error as InteractionError, OutputPermit, Snapshot, TurnOwner};
+use lamp_turn_owner::{
+    BootId, Error as InteractionError, NameGrant, OutputPermit, Snapshot, TurnOwner,
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::io;
 
@@ -33,6 +35,12 @@ pub enum Control {
     ProviderOutputCapacity {
         through: u64,
     },
+    /// The sleep capture's name-only grant, or its revocation (migrate-P2):
+    /// sent to that worker alone, beside no [`Control::Authority`]. It never
+    /// grants a microphone to any other worker.
+    NameGrant {
+        grant: NameGrant,
+    },
     Stop,
 }
 
@@ -55,6 +63,7 @@ impl<'de> Deserialize<'de> for Control {
             ConnectReference { peer: BootId },
             StartCapture {},
             ProviderOutputCapacity { through: u64 },
+            NameGrant { grant: NameGrant },
             Stop {},
         }
         Ok(match StrictControl::deserialize(deserializer)? {
@@ -64,9 +73,26 @@ impl<'de> Deserialize<'de> for Control {
             StrictControl::ProviderOutputCapacity { through } => {
                 Self::ProviderOutputCapacity { through }
             }
+            StrictControl::NameGrant { grant } => Self::NameGrant { grant },
             StrictControl::Stop {} => Self::Stop,
         })
     }
+}
+
+/// One 20 ms block from the sleep capture (migrate-P2), on its data
+/// channel to the voice: the samples as read, 16 kHz, one channel, 16 bits.
+/// The voice publishes it on `mic2/sleep_audio` only while its grant stands
+/// and only the name listener subscribes; nothing else in the voice reads
+/// it, so no block of a sleep reaches a conversation's activity, pre-roll
+/// or speech to text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SleepBlock {
+    /// From 0 for this worker's first block; one more each block.
+    pub sequence: u64,
+    /// The host's read completion, on the shared monotonic clock.
+    pub read_completed_at_us: u64,
+    pub samples: Vec<i16>,
 }
 
 /// A device that failed to open at start, and opened while it was waited

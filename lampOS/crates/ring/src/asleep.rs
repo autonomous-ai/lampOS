@@ -61,6 +61,27 @@ pub fn owed_pixels(breath: f32, around: f32) -> [Rgb; PIXEL_COUNT] {
     pixels
 }
 
+/// The pixel of the ember a sleep that hears its name shows (migrate-P2):
+/// the top, across the ring from the face, as one ear left open.
+pub const EMBER: usize = 0;
+/// The ember's least, as a share of its top, so it never goes out.
+pub const EMBER_LOW: f32 = 0.4;
+
+/// The asleep face of a sleep that still listens for its name (migrate-P2,
+/// `LAMP_SLEEP_HEARS_NAME`), `breath` of the way up the face's breath and
+/// `ember` of the way up the ember's own: the face as [`asleep_pixels`], and
+/// one faint warm ember at [`EMBER`], at most half of [`PEAK`], that glows
+/// slowly and never goes dark. Small and gentle, so it reads as a sleeper
+/// with one ear open, not a light that is on. This is the one function to
+/// change for another look: the voice draws whatever it returns.
+pub fn hearing_name_pixels(breath: f32, ember: f32) -> [Rgb; PIXEL_COUNT] {
+    let mut pixels = asleep_pixels(breath);
+    let level = 0.5 * (EMBER_LOW + (1.0 - EMBER_LOW) * ember.clamp(0.0, 1.0));
+    let scale = |channel: u8| (f32::from(channel) * level).round() as u8;
+    pixels[EMBER] = Rgb::new(scale(PEAK.red), scale(PEAK.green), scale(PEAK.blue));
+    pixels
+}
+
 /// A ring writer that shows only the asleep face, the face with an owed
 /// reminder's arc over it ([`owed_pixels`], #1545), the person's own light
 /// at rest while a hand's sleep keeps it on ([`AsleepRing::show_light`],
@@ -94,6 +115,18 @@ impl<S: FrameSink> AsleepRing<S> {
     ) -> io::Result<()> {
         self.sink
             .write_frame(&encode(&owed_pixels(breath, around), ceiling))
+    }
+
+    /// The asleep face of a sleep that hears its name, with its ember
+    /// ([`hearing_name_pixels`], migrate-P2), under `ceiling`.
+    pub fn show_hearing_name(
+        &mut self,
+        breath: f32,
+        ember: f32,
+        ceiling: crate::ChannelCeiling,
+    ) -> io::Result<()> {
+        self.sink
+            .write_frame(&encode(&hearing_name_pixels(breath, ember), ceiling))
     }
 
     /// The person's own light as their ring showed it at rest, `pixels`
@@ -208,6 +241,28 @@ mod tests {
     /// #1545: a reminder's arc goes around in the face's own warmth, never
     /// above its peak, a sixth of the ring wide; at its start and end it is
     /// at the bottom, where the face is.
+    /// migrate-P2: a sleep that hears its name differs from the plain face
+    /// by its ember alone, at the top, faint and never dark, never above
+    /// half the peak; the face itself is unchanged.
+    #[test]
+    fn a_sleep_that_hears_its_name_adds_one_faint_ember_at_the_top() {
+        for breath in [0.0, 0.5, 1.0] {
+            for ember in [0.0, 0.5, 1.0] {
+                let plain = asleep_pixels(breath);
+                let hearing = hearing_name_pixels(breath, ember);
+                for (index, (a, b)) in plain.iter().zip(hearing.iter()).enumerate() {
+                    if index == EMBER {
+                        assert_ne!(*b, Rgb::BLACK);
+                        assert!(b.red <= PEAK.red / 2 + 1 && b.green <= PEAK.green / 2 + 1);
+                        assert!(b.blue <= PEAK.blue);
+                    } else {
+                        assert_eq!(a, b, "pixel {index}");
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn an_owed_arc_goes_around_warm_and_never_above_the_peak() {
         for step in 0..=20 {

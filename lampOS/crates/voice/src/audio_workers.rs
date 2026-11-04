@@ -623,6 +623,10 @@ fn capture_loop<D: CaptureDevice>(
                 Control::ProviderOutputCapacity { .. } => {
                     return Err(io::Error::other("provider capacity sent to capture").into());
                 }
+                // The sleep's grant is its own worker's, never the capture's.
+                Control::NameGrant { .. } => {
+                    return Err(io::Error::other("a name grant sent to capture").into());
+                }
                 Control::Stop => {
                     microphone.revoke()?;
                     channels.control.send(WorkerEvent::CaptureStopped)?;
@@ -1530,7 +1534,9 @@ fn speaker_loop(
                     }
                     return Ok(EndReason::Stopped);
                 }
-                Control::StartCapture | Control::ProviderOutputCapacity { .. } => {
+                Control::StartCapture
+                | Control::ProviderOutputCapacity { .. }
+                | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid speaker command").into());
                 }
             }

@@ -239,6 +239,7 @@ mod tests {
             reason,
             muted_by: None,
             control: false,
+            hears_name: false,
         })
     }
 
@@ -296,6 +297,7 @@ mod tests {
                 reason: None,
                 muted_by: None,
                 control: false,
+                hears_name: false,
             }),
             10 * S,
         );

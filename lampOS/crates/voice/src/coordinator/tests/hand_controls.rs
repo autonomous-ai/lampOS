@@ -2275,6 +2275,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
         None,
         None,
         None,
+        None,
         |on_state, gate| {
             let boot = crate::process::new_boot().unwrap();
             on_state(PrivacyState::Allowed, boot, 1)?;
@@ -2334,6 +2335,7 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
         &reminders,
         None::<TapFace<fn() -> Option<Asleep>>>,
         Some(face),
+        None,
         None,
         None,
         None,
@@ -3470,6 +3472,114 @@ fn woken_from_a_hands_sleep_the_lamp_says_hm_first() {
     let hum = crate::head_cue::hum(crate::head_cue::DBFS);
     let first = ran.chunks.first().expect("the hum reached the speaker");
     assert_eq!(first.samples, hum[..240]);
+}
+
+/// migrate-P2: the wake by name's own line, from a cache set as a lamp's
+/// start would have left it (`kept`), and how often anything was rendered
+/// as the wake was said.
+fn name_wake_run(
+    language: Option<crate::language::Language>,
+    kept: bool,
+    wake: impl FnOnce(u64) -> HandControls,
+) -> (Ran, Vec<i16>, usize) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let directory = std::env::temp_dir().join(format!(
+        "lamp-wake-line-{}-{}",
+        std::process::id(),
+        monotonic_us()
+    ));
+    let line = vec![1_234_i16; 4_800];
+    let rendered = line.clone();
+    let renders = std::sync::Arc::new(AtomicUsize::new(0));
+    let counted = renders.clone();
+    let cache = crate::say::tts_cache::TtsCache::new(
+        &directory,
+        "Rachel",
+        "eleven_v4_turbo",
+        "en",
+        Box::new(move |_: &str| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            Ok(rendered.clone())
+        }),
+    )
+    .speaking(language)
+    .hearing_its_name(true);
+    if kept {
+        let words = language.map_or(
+            crate::language::WOKEN_BY_NAME_LINE,
+            crate::language::Language::woken_by_name,
+        );
+        cache.warm(&[words]).unwrap();
+        renders.store(0, Ordering::SeqCst);
+    }
+    TEST_SPEECH_CACHE.with(|given| *given.borrow_mut() = Some(std::sync::Arc::new(cache)));
+    let ran = run_loop_with(
+        || wake(monotonic_us() - 60_000),
+        || (quiet_owner(), None),
+        false,
+        Clocking::Stepped,
+    );
+    TEST_SPEECH_CACHE.with(|given| given.borrow_mut().take());
+    let _ = fs::remove_dir_all(directory);
+    let times = renders.load(Ordering::SeqCst);
+    (ran, line, times)
+}
+
+fn the_wakes_cue(ran: &Ran) -> serde_json::Value {
+    let cues: Vec<_> = ran
+        .trace
+        .iter()
+        .filter(|row| row["kind"] == "head_wake_cue")
+        .collect();
+    assert_eq!(cues.len(), 1, "once: {cues:?}");
+    assert_eq!(cues[0]["plays"], true, "{}", cues[0]);
+    cues[0].clone()
+}
+
+/// migrate-P2 (the design owner on #4877): a lamp woken by its name says its
+/// short line, "Dạ?" in Vietnamese and "Yes?" in English, as the "hm?" would
+/// be, from the cache, with nothing rendered.
+#[test]
+fn woken_by_its_name_the_lamp_says_its_line_in_the_owners_language() {
+    for language in [None, Some(crate::language::Language::Vietnamese)] {
+        let (ran, line, renders) = name_wake_run(language, true, |at| {
+            HandControls::with_test_name_woken("test-hand-clock", at).unwrap()
+        });
+        assert_eq!(the_wakes_cue(&ran)["line"], true);
+        assert_eq!(renders, 0, "{language:?}");
+        // The conversation took the wake's wait for its lines, once.
+        let mut ran = ran;
+        assert_eq!(ran.controls.as_mut().unwrap().take_name_wake(), None);
+        let first = ran.chunks.first().expect("the line reached the speaker");
+        assert_eq!(first.samples, line[..240], "{language:?}");
+    }
+}
+
+/// A tap's or a hand's wake keeps its "hm?", the line kept or not, and its
+/// trace row as ever; the wake's own line is never read for it.
+#[test]
+fn a_taps_wake_still_says_hm_with_the_line_kept() {
+    let (ran, _, _) = name_wake_run(None, true, |at| {
+        HandControls::with_test_woken("test-hand-clock", at).unwrap()
+    });
+    assert!(the_wakes_cue(&ran).get("line").is_none());
+    let hum = crate::head_cue::hum(crate::head_cue::DBFS);
+    assert_eq!(ran.chunks.first().unwrap().samples, hum[..240]);
+}
+
+/// The line not kept yet: the "hm?" this once, within the same turn and at
+/// the same point, and nothing asked of the speech service on the wake's way.
+#[test]
+fn a_line_not_kept_yet_is_the_hm_and_asks_the_network_for_nothing() {
+    for language in [None, Some(crate::language::Language::Vietnamese)] {
+        let (ran, _, renders) = name_wake_run(language, false, |at| {
+            HandControls::with_test_name_woken("test-hand-clock", at).unwrap()
+        });
+        assert!(the_wakes_cue(&ran).get("line").is_none());
+        assert_eq!(renders, 0, "{language:?}");
+        let hum = crate::head_cue::hum(crate::head_cue::DBFS);
+        assert_eq!(ran.chunks.first().unwrap().samples, hum[..240]);
+    }
 }
 
 /// Wake with the real initial Unknown permission and privacy stabilization.

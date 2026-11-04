@@ -15,11 +15,13 @@
 
 mod controller;
 mod guard;
+mod name_grant;
 mod observation;
 mod types;
 
 pub use controller::Controller;
 pub use guard::{BoundaryGuard, ZeroAuthority};
+pub use name_grant::{NameGrant, NameGrantGuard, NameGrantIssuer};
 pub use observation::{Confidence, Freshness, Observation, ObservationTracker};
 pub use types::{
     AdmissionState, AdmittedInput, BootId, CameraGrant, CaptureState, Error,

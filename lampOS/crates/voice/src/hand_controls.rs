@@ -291,6 +291,20 @@ const LATCH_UNREADABLE: u8 = 5;
 /// Beside any latch above: a paired computer holds a mute
 /// ([`crate::control_mute`]); with [`LATCH_OPEN`], it alone does.
 const LATCH_CONTROL: u8 = 0x80;
+/// Asleep from a hand's hold, and its sleep capture listening for the name
+/// alone (migrate-P2, [`HandControls::set_hears_name`]).
+const LATCH_ASLEEP_HEARS_NAME: u8 = 6;
+
+/// How long after a wake by name the lamp goes back to sleep if no line has
+/// begun (migrate-P2, Sixth's re-sleep guard on the Queue comment
+/// <https://github.com/autonomous-ai/lampOS/issues/3997#issuecomment-6526292114>):
+/// long enough for a person to watch it stand and then speak: on lamp-e82d
+/// a person waited for the stand and 5 s sent it back to sleep before they
+/// spoke, and the owner set this (migrate-P2). A line begun in it needs no name
+/// ([`crate::attention::NAME_WOKE_LISTENS_US`] is this). A false wake then
+/// costs one "Dạ?" or "Yes?" and at most one room line answered; a wake by a tap or a
+/// hand keeps today's behaviour.
+pub const NAME_RESLEEP_AFTER_US: u64 = 15_000_000;
 
 /// What the pump says on `voice/mute` for a latch, with who or what muted
 /// it (`muted_by`, #4332): the mute it always said is the person's hold.
@@ -305,6 +319,7 @@ fn latch_message(latch: u8) -> Option<VoiceMute> {
             reason: None,
             muted_by: Some(muted_by),
             control,
+            hears_name: false,
         })
     };
     match latch & !LATCH_CONTROL {
@@ -313,15 +328,17 @@ fn latch_message(latch: u8) -> Option<VoiceMute> {
             reason: None,
             muted_by: None,
             control,
+            hears_name: false,
         }),
         LATCH_MUTED => muted(MutedBy::Button),
         LATCH_GUARD => muted(MutedBy::RestartGuard),
         LATCH_UNREADABLE => muted(MutedBy::Unreadable),
-        LATCH_ASLEEP => Some(VoiceMute {
+        LATCH_ASLEEP | LATCH_ASLEEP_HEARS_NAME => Some(VoiceMute {
             muted: true,
             reason: Some(MuteReason::Sleep),
             muted_by: Some(MutedBy::Sleep),
             control,
+            hears_name: latch & !LATCH_CONTROL == LATCH_ASLEEP_HEARS_NAME,
         }),
         _ => None,
     }
@@ -524,6 +541,21 @@ pub struct HandControls {
     /// that did, until the next conversation takes it for its "hm?"
     /// ([`Self::take_woken`]).
     woken: Option<u64>,
+    /// The sleep capture runs and listens for the name alone (migrate-P2),
+    /// as the muted wait last said ([`Self::set_hears_name`]): said on
+    /// `voice/mute` as `hears_name` while asleep.
+    hears_name: bool,
+    /// A wake by name asked and not yet saved ([`Self::name_wake`]): its
+    /// time, the wake's for the "hm?" once the clear is committed.
+    name_woke: Option<u64>,
+    /// A wake by name, until the conversation it opens takes it for the
+    /// lines begun in its wait ([`Self::take_name_wake`]).
+    name_wake_open: Option<u64>,
+    /// A line or a reply is open ([`Self::set_line_open`]).
+    line_open: bool,
+    /// When a wake by name goes back to sleep if the lamp hasn't answered by
+    /// then ([`NAME_RESLEEP_AFTER_US`], [`Self::answer_began`]).
+    name_resleep_at: Option<u64>,
     /// The onboarding walk is under way ([`Self::set_onboarding`]): a hold
     /// on the head asks no sleep.
     onboarding: bool,
@@ -791,6 +823,14 @@ impl HandControls {
         Ok(owner)
     }
 
+    /// As [`Self::with_test_woken`], the wake by the lamp's name (migrate-P2).
+    #[cfg(test)]
+    pub(crate) fn with_test_name_woken(clock_id: &str, woken_us: u64) -> io::Result<Self> {
+        let mut owner = Self::with_test_woken(clock_id, woken_us)?;
+        owner.name_wake_open = Some(woken_us);
+        Ok(owner)
+    }
+
     /// Retain a pending wake alongside another fixture's scheduled inputs.
     #[cfg(test)]
     pub(crate) fn set_woken_for_test(&mut self, woken_us: u64) {
@@ -835,6 +875,34 @@ impl HandControls {
             Arc::new(Shared::default()),
             started_us,
         )
+    }
+
+    /// As [`Self::with_test_asleep`], with its input still connected, as
+    /// the pump keeps it: a wake asked of it is saved, not fenced off by a
+    /// gone pump (migrate-P2's wake by name).
+    #[cfg(test)]
+    pub(crate) fn with_test_asleep_connected(
+        clock_id: &str,
+        started_us: u64,
+        record: &Path,
+    ) -> io::Result<Self> {
+        let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+        let mut asleep = MuteRecord::new(clock_id)?;
+        assert!(asleep.request_sleep(started_us / 2));
+        let mut owner = Self::from_parts(
+            ControlsOptions {
+                head_touch: true,
+                mute_record: Some(record.to_path_buf()),
+                ..Default::default()
+            },
+            clock_id,
+            asleep,
+            input,
+            Arc::new(Shared::default()),
+            started_us,
+        )?;
+        owner.scheduler = Some(sender);
+        Ok(owner)
     }
 
     /// A listening lamp with its mute record at `record` (in a private
@@ -1021,6 +1089,11 @@ impl HandControls {
             #[cfg(test)]
             while_held: None,
             woken: None,
+            hears_name: false,
+            name_woke: None,
+            line_open: false,
+            name_wake_open: None,
+            name_resleep_at: None,
             onboarding: false,
             control_mutes: crate::control_mute::ControlMutes::default(),
             control_held: false,
@@ -1064,6 +1137,8 @@ impl HandControls {
         }
         let latch = if !self.muted() {
             LATCH_OPEN
+        } else if self.asleep() && self.hears_name {
+            LATCH_ASLEEP_HEARS_NAME
         } else if self.asleep() {
             LATCH_ASLEEP
         } else if self.restored_after_fault() {
@@ -1181,8 +1256,89 @@ impl HandControls {
             .filter(|at| now_us.saturating_sub(*at) < WOKEN_FRESH_US)
     }
 
+    /// When the lamp's name woke it, once, for the conversation the wake
+    /// opened (migrate-P2): a line begun in its wait needs no name
+    /// ([`crate::attention::NAME_WOKE_LISTENS_US`]). The conversation keeps
+    /// it, so a sleep, a mute or a closed slide, which each end that
+    /// conversation, end the wait too. Nothing for any other wake.
+    pub fn take_name_wake(&mut self) -> Option<u64> {
+        self.name_wake_open.take()
+    }
+
     fn asleep(&self) -> bool {
         self.options.mute_record.is_some() && self.receiver.mute_record().asleep()
+    }
+
+    /// Whether the lamp sleeps from a hand's hold (or a sleep asked aloud),
+    /// and nothing else holds it: not the restart guard's mute, not a record
+    /// it could not trust, not a person's own mute, not while the walk
+    /// is under way (#3747), and not under a paired computer's mute, which
+    /// closed the microphones. Only such a sleep may listen for its name
+    /// (migrate-P2).
+    pub fn asleep_by_choice(&self) -> bool {
+        self.asleep()
+            && !self.restored_after_fault()
+            && !self.unreadable()
+            && !self.onboarding
+            && !self.control_held()
+    }
+
+    /// The muted wait says whether its sleep capture runs (migrate-P2):
+    /// `voice/mute` then says `hears_name`, only while asleep.
+    pub fn set_hears_name(&mut self, on: bool) {
+        self.hears_name = on;
+        self.share_latch();
+    }
+
+    /// The lamp's name was heard by the rule while it slept (migrate-P2):
+    /// the same wake a tap asks ([`Receiver::request_wake`]), a clear the
+    /// quiescent owner saves and commits before the latch opens, with its
+    /// own line or "hm?" ([`crate::say::tts_cache::TtsCache::wake_line`]) and
+    /// a line let in without its name after
+    /// ([`crate::attention::NAME_WOKE_LISTENS_US`]). Only of a sleep by choice
+    /// ([`Self::asleep_by_choice`]); whether it is pending.
+    pub fn name_wake(&mut self, now_us: u64) -> bool {
+        if self.options.mute_record.is_none() || !self.asleep_by_choice() {
+            return false;
+        }
+        let asked = self
+            .receiver
+            .request_wake(now_us, now_us, now_us)
+            .unwrap_or_else(|_| {
+                add(&self.shared.rejected, 1);
+                false
+            });
+        if asked {
+            self.name_woke = Some(now_us);
+        }
+        asked
+    }
+
+    /// The lamp began to answer in the conversation a wake by name opened:
+    /// it is not taken back to sleep (Sixth's re-sleep guard, migrate-P2).
+    /// Only an answer does this: room talk held by attention, or a cough,
+    /// doesn't keep a false wake awake (Seventh on #4877).
+    pub fn answer_began(&mut self) {
+        self.name_resleep_at = None;
+    }
+
+    /// Whether a line or a reply is open right now: the re-sleep waits for
+    /// its end, so it never cuts off someone speaking or an answer on its
+    /// way, and doesn't move its time.
+    pub fn set_line_open(&mut self, open: bool) {
+        self.line_open = open;
+    }
+
+    /// When a wake by name goes back to sleep unless a line begins first.
+    pub fn name_resleep_at(&self) -> Option<u64> {
+        self.name_resleep_at
+    }
+
+    /// What the pump says on `voice/mute` now, for a test outside this
+    /// module.
+    #[cfg(test)]
+    pub(crate) fn said_for_test(&self) -> Option<VoiceMute> {
+        latch_message(self.shared.latch.load(Ordering::Acquire))
     }
 
     /// The live mute was restored by the restart guard after a fault, and the
@@ -1423,6 +1579,18 @@ impl HandControls {
         // A sleep asked aloud (#3748): the same request a hand's hold makes,
         // begun and asked now, and never while the walk is under way. Only
         // with head sleep: a tap on the head is how it is woken.
+        // A wake by name that no line followed goes back to sleep, as a
+        // hold's sleep (migrate-P2, Sixth's re-sleep guard).
+        if !self.line_open && self.name_resleep_at.is_some_and(|due| now_us >= due) {
+            self.name_resleep_at = None;
+            if self.options.head_sleep() && !self.onboarding && !self.muted() {
+                eprintln!(
+                    "lamp-voice: woken by its name, and nothing to answer within {} s: back to sleep",
+                    NAME_RESLEEP_AFTER_US / 1_000_000
+                );
+                self.sleep_asked = true;
+            }
+        }
         if std::mem::take(&mut self.sleep_asked) && self.options.head_sleep() && !self.onboarding {
             match self.receiver.request_sleep(now_us, now_us, now_us) {
                 Ok(true) => {
@@ -1676,10 +1844,19 @@ impl HandControls {
         // Open again after a hand's sleep, by the person's tap or button:
         // the next conversation says its "hm?" (#1362).
         if was_asleep && allowed && !observation.muted {
-            self.woken = observation
-                .head_tap_at_us
+            // A wake by name is the wake's own time, and only it is taken
+            // back to sleep when no line follows (migrate-P2).
+            let by_name = self.name_woke.take();
+            self.woken = by_name
+                .or(observation.head_tap_at_us)
                 .or(observation.acquired_at_us)
                 .or(observation.observed_at_us);
+            self.name_wake_open = by_name;
+            self.name_resleep_at = by_name.map(|at| at.saturating_add(NAME_RESLEEP_AFTER_US));
+        }
+        if !observation.asleep {
+            self.name_woke = None;
+            self.hears_name = false;
         }
         self.share_latch();
         Ok((allowed, observation))

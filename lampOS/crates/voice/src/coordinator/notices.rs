@@ -271,7 +271,8 @@ pub(super) enum SpeechOrigin {
     /// The falling breath in a hand's hold on the head (`head_cue::breath`,
     /// #1362), as the lamp settles to sleep.
     SleepBreath,
-    /// The "hm?" as the person wakes the lamp from a hand's sleep (#1362).
+    /// The "hm?" as the person wakes the lamp from a hand's sleep (#1362),
+    /// or a wake by name's kept line in its place (migrate-P2).
     WakeHum,
     /// A skill's own sound (`crate::say`, #938): local PCM, no answer.
     SkillSound,

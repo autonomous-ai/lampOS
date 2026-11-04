@@ -218,6 +218,7 @@ each line plays exactly as before.
 | Line | English words | Today | In the owner's language |
 |---|---|---|---|
 | The shutdown's | `lamp_msgs::GOING_TO_SLEEP` | speech cache, warmed at start | cached `text` played in the owner's words (`Recordings::cached`) |
+| A wake by name's line, in the "hm?"'s place (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2) | `language::WOKEN_BY_NAME_LINE` ("Yes?") | speech cache, warmed at start only with the switch, else the "hm?" | the owner's when kept, else the "hm?", never the English (`TtsCache::wake_line`) |
 | A hand's hold's sleep line | `lamp_msgs::SLEEP_LINE` | speech cache, warmed at start (`LAMP_SLEEP_LINE`) | the owner's when kept, else the English kept line, else the breath |
 | `go_to_sleep`'s line | `lamp_msgs::SLEEP_LINE` | the model told to say the words; with `LAMP_SLEEP_LINE=on` and the line kept, the hold's cached line in its place | the model told the owner's words (`sleep_asked::told`); the cached line as a hold's, when kept |
 | Offline, service down, back online | `language::PROVIDER_UNAVAILABLE`, `VOICE_SERVICE_UNREACHABLE`, `BACK_ONLINE` | the notices release's English file | the cache's line when kept (`FailureNotices::owners_line`), the English file otherwise |

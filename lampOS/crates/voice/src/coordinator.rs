@@ -1669,6 +1669,32 @@ fn sleep_face_allowed(head_touch: bool, asleep_on: bool, privacy_controls: bool)
     (head_touch && (privacy_controls || !asleep_on)).then_some(privacy_controls)
 }
 
+/// Whether a hand's sleep listens for its name (`LAMP_SLEEP_HEARS_NAME`,
+/// migrate-P2): its mode, kept only with the bus on (`LAMP_BUS=on`, where
+/// its blocks go), the second microphone (its topic is `mic2/sleep_audio`)
+/// and head sleep (only a hand's hold sleeps). Otherwise off, said once.
+fn sleep_name_mode(
+    mode: crate::sleep_capture::Mode,
+    bus: bool,
+    microphone: crate::options::Microphone,
+    head_sleep: bool,
+) -> crate::sleep_capture::Mode {
+    if !mode.listens() {
+        return mode;
+    }
+    let why = if !bus {
+        "the bus is off"
+    } else if microphone != crate::options::Microphone::Mic2 {
+        "the voice listens on mic1"
+    } else if !head_sleep {
+        "a hand's sleep is off (LAMP_HEAD_TOUCH with --controls-mute)"
+    } else {
+        return mode;
+    };
+    eprintln!("lamp-voice: LAMP_SLEEP_HEARS_NAME is set but {why}, so a sleep hears nothing");
+    crate::sleep_capture::Mode::Off
+}
+
 /// What the journal says, once, when `LAMP_REMINDER_PULSE=on` has no
 /// asleep face to draw on (#1545, the first builder, 18 Oct 18:03): the
 /// pulse is drawn over that face, so rather than pulse nothing, it says
@@ -1729,6 +1755,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
         health,
         None,
         None,
+        None,
         wait,
     )
 }
@@ -1745,6 +1772,13 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
 /// draws nothing, and is let go before this returns, so the next session's
 /// ring worker owns it again.
 ///
+/// With `sleep_name` (`LAMP_SLEEP_HEARS_NAME=on` or `shadow`, migrate-P2), a
+/// sleep by choice with the slide open and fresh also listens for its name
+/// ([`crate::sleep_capture`]): its grant is revoked at the look that reads
+/// the slide anything but open, a wake by name is asked of the hand controls
+/// only after the capture and its grant are closed, and `voice/mute` says
+/// `hears_name` while it runs. It is closed before this returns.
+///
 /// [`Asleep::owed`]: crate::ring_asleep::Asleep::owed
 #[allow(clippy::too_many_arguments)]
 fn muted_wait_pulsing<
@@ -1760,6 +1794,7 @@ fn muted_wait_pulsing<
     mut health: Option<crate::bus_out::WaitHealth>,
     pulse: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
     light: Option<crate::ring_light::RingLight>,
+    sleep_name: Option<crate::sleep_capture::SleepName<'_>>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
         &mut dyn FnMut(crate::service_privacy_controls::Keep<'_>) -> Result<bool>,
@@ -1779,11 +1814,17 @@ fn muted_wait_pulsing<
     // With LAMP_STALLS=on, each of the wait's checks of 50 ms or more is a
     // line of its own, by name (#4332).
     let calls = RefCell::new(WaitCalls::from_environment());
+    let sleep_name = RefCell::new(sleep_name);
     let outcome = wait(
         &mut |state, boot, at_us| {
             let mut calls = calls.borrow_mut();
             let pass = calls.state.begin();
             slide.set(Some(state));
+            // The slide read anything but open and fresh: the sleep's name
+            // grant is revoked here, at the look that read it (migrate-P2).
+            if let Some(name) = sleep_name.borrow_mut().as_mut() {
+                name.slide(state == crate::privacy::PrivacyState::Allowed);
+            }
             // The slide closed: a hand's sleep's face gives the ring to the
             // slide's indication before the wait starts it (#1362, #795).
             if let Some(face) = sleep_face.borrow_mut().as_mut() {
@@ -1839,11 +1880,50 @@ fn muted_wait_pulsing<
             }
             #[cfg(test)]
             test_wait_check()?;
+            let slide_open = slide.get() == Some(crate::privacy::PrivacyState::Allowed);
+            // The sleep's capture, its blocks to the name listener and its
+            // hearings (migrate-P2). A wake comes back with it closed.
+            let woke_by_name = match sleep_name.borrow_mut().as_mut() {
+                Some(name) => {
+                    let woke = name.look(slide_open, &mut || {
+                        keep("sleep-capture").map_err(|error| io::Error::other(error.to_string()))
+                    })?;
+                    keep("sleep-capture")?;
+                    woke
+                }
+                None => None,
+            };
             let pass = calls.controls.begin();
             let (allowed, asleep, restored) = match &mut *controls.borrow_mut() {
                 None => (true, false, false),
                 Some(controls) => {
+                    if let Some(at) = woke_by_name
+                        && controls.name_wake(at)
+                    {
+                        record(
+                            &mut trace.borrow_mut(),
+                            json!({"kind":"head_sleep_name_wake","at_us":at}),
+                        )?;
+                    }
                     let (allowed, observation) = controls.quiescent_observation()?;
+                    // Started, kept or closed by this look: only a sleep by
+                    // choice with the slide open listens, and it is closed
+                    // before a wake's cycle can open its rig (migrate-P2).
+                    if let Some(name) = sleep_name.borrow_mut().as_mut() {
+                        name.want(
+                            controls.asleep_by_choice() && !allowed,
+                            slide_open,
+                            &mut || {
+                                keep("sleep-capture")
+                                    .map_err(|error| io::Error::other(error.to_string()))
+                            },
+                        )?;
+                        controls.set_hears_name(name.hearing());
+                        // Its face looks different while it hears its name.
+                        if let Some(face) = sleep_face.borrow_mut().as_mut() {
+                            face.hears_name(name.hearing());
+                        }
+                    }
                     record_hand_pats(&mut trace.borrow_mut(), observation.pets)?;
                     // A hand's sleep shows the asleep face (#1362), and a
                     // tap's face is not drawn over it.
@@ -1924,6 +2004,14 @@ fn muted_wait_pulsing<
             Ok(allowed)
         },
     );
+    // Closed, whatever ended the wait, before the next cycle opens anything.
+    if let Some(mut name) = sleep_name.into_inner() {
+        let closed = name.close(&mut || Ok(()));
+        if let Some(controls) = controls.borrow_mut().as_mut() {
+            controls.set_hears_name(false);
+        }
+        closed?;
+    }
     if let Some(face) = tap_face.into_inner() {
         face.stop();
     }
@@ -3114,6 +3202,17 @@ fn run_source(
                 crate::ring_asleep::enabled_from_environment(),
                 privacy_controls,
             ));
+            // A hand's sleep that still hears its name (migrate-P2): only
+            // with the bus, on the second microphone, and with head sleep.
+            let sleep_name_mode = sleep_name_mode(
+                crate::sleep_capture::Mode::from_environment(),
+                std::env::var(crate::bus_out::ENVIRONMENT).ok().as_deref() == Some("on"),
+                options.microphone,
+                controls
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(HandControls::head_sleep),
+            );
             if let Some(line) = pulse_without_face(
                 crate::ring_asleep::pulse_enabled_from_environment(),
                 options.ring_channel_ceiling.is_some(),
@@ -3158,6 +3257,20 @@ fn run_source(
                         crate::ring_light::while_muted_from_environment(
                             options.ring_channel_ceiling.is_some(),
                         ),
+                        sleep_name_mode.listens().then(|| {
+                            crate::sleep_capture::SleepName::new(
+                                sleep_name_mode,
+                                Box::new(|mode, keep| {
+                                    crate::sleep_capture::SleepCapture::start(
+                                        &executable,
+                                        crate::options::Microphone::Mic2.device(),
+                                        lamp_bus::Bus::from_environment()?,
+                                        mode,
+                                        keep,
+                                    )
+                                }),
+                            )
+                        }),
                         |on_state, gate| {
                             crate::service_privacy_controls::wait_selected(
                                 &executable,
@@ -4002,6 +4115,7 @@ fn flush_provider_input_with(
             | ProviderInput::StepCall { request, .. }
             | ProviderInput::Onboarding { request, .. }
             | ProviderInput::TurnOpened { request, .. }
+            | ProviderInput::WokenByName { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -6159,6 +6273,23 @@ fn conversation_with_gate_inner(
         // whose cancellation the outer conversation would otherwise record.
         .filter(|_| head_cue.is_some())
         .map(|woken_us| (woken_us, monotonic_us()));
+    // Woken by its name: a line begun in the wait after it needs no name
+    // (migrate-P2). Kept here, so it ends with this conversation.
+    let name_wake = controls.as_mut().and_then(HandControls::take_name_wake);
+    // And says its short line in place of the "hm?", if the speech cache keeps
+    // it: one file read, never rendered, so the wake waits for no network; not
+    // kept yet, it is the "hm?" this once. A tap's or a hand's wake reads
+    // nothing here.
+    let wake_line = waking
+        .filter(|(woken_us, _)| name_wake == Some(*woken_us))
+        .and_then(|_| {
+            #[cfg(test)]
+            let cache = TEST_SPEECH_CACHE.with(|cache| cache.borrow_mut().take());
+            #[cfg(not(test))]
+            let cache = crate::say::tts_cache::from_environment();
+            cache
+        })
+        .and_then(|cache| cache.wake_line());
     let mut last_hum_us: Option<u64> = None;
     let mut took_over_turn: Option<u64> = None;
     // The turn whose speech last ended as something said, not a sound, and
@@ -7376,6 +7507,11 @@ fn conversation_with_gate_inner(
         {
             controls.sleep_cue_sounding(monotonic_us());
         }
+        // A line or a reply is open: a wake by name's re-sleep waits for its
+        // end (migrate-P2, the guard in `HandControls::poll`).
+        if let Some(controls) = controls.as_mut() {
+            controls.set_line_open(admission.owns_stream() || reply.is_some());
+        }
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
             None => None,
@@ -8124,6 +8260,10 @@ fn conversation_with_gate_inner(
                                 json!({"kind":"provider_first_audio","turn":request,"at_us":monotonic_us()}),
                             )?;
                             current.had_audio = true;
+                            // It answers: a wake by name it followed is kept.
+                            if let Some(controls) = controls.as_mut() {
+                                controls.answer_began();
+                            }
                         }
                         let now_us = monotonic_us();
                         if let Some(after) =
@@ -10201,6 +10341,8 @@ fn conversation_with_gate_inner(
                         onboarding.as_ref(),
                     );
                     let trigger_us = accepted.candidate.trigger_read_at_us;
+                    let woken_by_name = name_wake
+                        .filter(|woke| crate::attention::in_name_wakes_wait(*woke, trigger_us));
                     snapshot = commit_admitted_input(
                         owner,
                         reply,
@@ -10216,6 +10358,7 @@ fn conversation_with_gate_inner(
                         follows_on,
                         count_only,
                         not_now,
+                        woken_by_name,
                         // Read as the input is admitted, not as the detector
                         // started it: still that start's, since no new start
                         // comes while a candidate is pending (the
@@ -10458,6 +10601,13 @@ fn conversation_with_gate_inner(
                                     rig.cut_keeps_name,
                                     sentence_heard.is_some(),
                                     not_now,
+                                    // Its start is the line given up's, or
+                                    // its opening's first block.
+                                    name_wake.filter(|woke| {
+                                        line_start.is_some_and(|at| {
+                                            crate::attention::in_name_wakes_wait(*woke, at)
+                                        })
+                                    }),
                                     rig.playout_start_now(),
                                     trace,
                                     |state| rig.publish(state),
@@ -12760,12 +12910,14 @@ fn conversation_with_gate_inner(
             );
             if !waits {
                 *waking = None;
-                record(
-                    trace,
-                    json!({"kind":"head_wake_cue","acquired_at_us":woken_us,"at_us":at_us,
+                let mut row = json!({"kind":"head_wake_cue","acquired_at_us":woken_us,"at_us":at_us,
                         "plays":decided.is_ok(),"why":decided.err(),
-                        "boundary":"the waking input's acquisition to this decision; the first sample is head_wake_cue_first_write"}),
-                )?;
+                        "boundary":"the waking input's acquisition to this decision; the first sample is head_wake_cue_first_write"});
+                // Said only of a wake by name's own line (migrate-P2).
+                if wake_line.is_some() {
+                    row["line"] = json!(true);
+                }
+                record(trace, row)?;
             }
             if decided.is_ok() {
                 if let Some(choreography) = choreography.as_mut() {
@@ -12775,7 +12927,10 @@ fn conversation_with_gate_inner(
                 let (now_state, _) = speaker_tone::commit_sound_turn(
                     owner,
                     reply,
-                    NoticeDelivery::sound(SpeechOrigin::WakeHum, sound.clone()),
+                    NoticeDelivery::sound(
+                        SpeechOrigin::WakeHum,
+                        wake_line.clone().unwrap_or_else(|| sound.clone()),
+                    ),
                     "head_wake_cue",
                     "the person woke the lamp: nothing heard, nothing sent to the provider",
                     0,
@@ -14840,6 +14995,9 @@ fn commit_admitted_input(
     // Begun while the walk is under way ([`sleep_not_now`]): its Start is
     // followed at once by `Onboarding`, before any of its sound.
     not_now: bool,
+    // Begun in the wait after a wake by name, its time (migrate-P2): its
+    // Start is followed at once by `WokenByName`, before any of its sound.
+    woken_by_name: Option<u64>,
     // The detector began it ordinarily, not as a yield's reach back or as
     // the lamp's sound ended (`TurnDetector::began_ordinarily`): only then
     // does its soft start's lead count (#4226).
@@ -14922,6 +15080,7 @@ fn commit_admitted_input(
         snapshot.microphone_generation(),
         count_only,
         not_now,
+        woken_by_name,
     );
     let marked = marks.len();
     provider_queue.extend(marks);
@@ -15270,6 +15429,8 @@ fn continue_after_early_end(
     count_only: bool,
     // Going on while the walk is under way ([`sleep_not_now`]).
     not_now: bool,
+    // Its line began in the wait after a wake by name (migrate-P2).
+    woken_by_name: Option<u64>,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -15318,6 +15479,7 @@ fn continue_after_early_end(
         snapshot.microphone_generation(),
         count_only,
         not_now,
+        woken_by_name,
     );
     let marked = marks.len();
     provider_queue.extend(marks);
@@ -15627,12 +15789,14 @@ fn dispatch_speaker_chunk(
 /// sentence's `CountOnly` (#1803), then `Onboarding` while the walk is
 /// under way, so a `go_to_sleep` the request calls is answered not now
 /// however soon the model calls it, never the line, then a sleep refused
-/// (Sixth's P3 on #3835).
+/// (Sixth's P3 on #3835); and `WokenByName` for a line begun in the wait
+/// after a wake by name (migrate-P2).
 fn after_start(
     request: u64,
     privacy_generation: u64,
     count_only: bool,
     not_now: bool,
+    woken_by_name: Option<u64>,
 ) -> Vec<ProviderInput> {
     let mut marks = Vec::new();
     if count_only {
@@ -15645,6 +15809,13 @@ fn after_start(
         marks.push(ProviderInput::Onboarding {
             request,
             privacy_generation,
+        });
+    }
+    if let Some(at_us) = woken_by_name {
+        marks.push(ProviderInput::WokenByName {
+            request,
+            privacy_generation,
+            at_us,
         });
     }
     marks
@@ -16370,6 +16541,7 @@ mod tests {
     mod second_route;
     mod service;
     mod service_mute;
+    mod sleep_name;
     mod speaker_lapse;
     mod speaker_tone;
     mod startup_cues;
