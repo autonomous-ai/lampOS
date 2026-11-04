@@ -1563,7 +1563,10 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     either way, so a bigger disk only leaves more free.
   - **How long 20M lasts:** about three hours at lamp-4ace's rate on 17 Oct.
     A quieter lamp keeps more, but no check should count on a whole day of
-    journal (`--since yesterday`).
+    journal (`--since yesterday`). A first-time setup's is kept apart on
+    the eMMC (#5144, "A first-time setup's journal" below), so the cap stays
+    as it is: the RAM disk is 50M, and `orangepi-truncate-logs` vacuums the
+    journal to 5M past 75% of it.
   - **Read last:** "zz-" puts it after any other drop-in, so its numbers win.
   - **Tests:** `lamp-update`'s `tests/it/image_journal.rs` checks the numbers
     against the disk. Where `systemd-analyze` exists, it checks that systemd
@@ -1676,6 +1679,83 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     (`LAMP_UPDATE_IMAGE=on`), then `systemctl daemon-reload`: the next
     shutdown keeps, and the boot after it links. By hand: copy both, then
     `sudo systemctl daemon-reload`.
+- A first-time setup's journal, kept on the eMMC past the 20M cap:
+  `robots/lamp/rootfs/etc/systemd/system/lamp-journal-setup.timer` and
+  `lamp-journal-setup.service`, running `lamp-journal-keep setup` (#5144).
+  So a setup step that failed can be read back hours or days later.
+  - **Why:** a tester's setup on lamp-0c4e (3 Nov) was gone from the 20M
+    journal within 4 hours, so the face step that failed couldn't be read
+    back. A larger cap isn't the answer: the journal lives in the 50M
+    `/var/log` RAM disk (zram) with the other logs, and past 75% of it
+    `orangepi-truncate-logs` vacuums the journal to 5M anyway. Nor is a
+    journald restart to change it, which broke every part's log stream on
+    15 Oct.
+  - **What it does:** every 3 minutes from a minute after boot, while the
+    setup walk is under way and for 20 runs (an hour) after it ends, each
+    of this boot's closed journal files (4M at most, an archived name with
+    "@") is copied once to `/var/lib/lamp-journal/setup` on the eMMC, oldest
+    first. "Under way" is read as `lamp-update`'s `walk.rs` reads it: setup
+    done (`/var/lib/lampos-setup/done`), and the voice's onboarding file
+    (`/var/lib/lampOS/voice/onboarding/progress.json`) not yet written or
+    without an outcome for one of its 9 steps. Files closed before the walk
+    was first seen hold nothing of it and are left. After the hour, the
+    first file closed after it, which holds the walk's end, is copied, and
+    nothing more. Every part's lines are in them, the voice's and the eyes'
+    among them.
+  - **How it is read:** each copy is linked into `/run/log/journal` as
+    `lamp-kept-setup-….journal` once its original has left the journal
+    (the cap's vacuum), and at every boot by `link`, so `journalctl -u
+    lamp-voice -u lamp-eyes` reads the setup in the same boot and after a
+    reboot, and never reads a line twice.
+  - **How long it is kept (privacy, the PM's call on #5342):** its lines can
+    hold what the person said at setup, so it is deleted, links and all,
+    72 hours after the walk was first seen, at a reset (both reset plans
+    wipe `/var/lib/lamp-journal/setup`), or when a walk begins again (a
+    redo of the walk or of a step), which replaces it, whichever comes
+    first; the keep's run says "deleted after 72 hours". A walk first seen
+    before the lamp's clock was set (before 2026) is dated anew once it is.
+    The owner's own "forget everything about me", once their memory is
+    emptied (the same mark and rule as their place and voice print),
+    deletes it at once: `lamp-voice`'s `setup_journal::forget_with_everything`
+    removes the copies and their links, the answer says
+    `setup_log: "forgotten too"` (or `everything: false` with the reason
+    when one can't be removed), and it leaves `.forgotten`, so nothing more
+    of that walk is copied, even a file being copied then; a redo after
+    that walk ends starts anew. The last two boots' copies (#2602, above)
+    are not part of this.
+  - **Its bound:** 24 MB on the eMMC, each file written once, stopping at
+    the first that doesn't fit, so what is kept is the setup's start
+    without a gap, with a `lamp-journal-setup:` line saying it is full.
+    That is about 3.5 hours at lamp-4ace's busy rate on 17 Oct, and more
+    than 17 hours at lamp-06c1's 1.1 to 1.4 MB an hour (22 Oct). Beside the
+    last 2 boots' 10 MB, 34 MB of the eMMC at most. Nothing is added to the
+    RAM disk; the links are in `/run`, a few bytes each. Idle I/O and
+    `Nice=10`, so a copy never competes with the voice.
+  - **Never journald:** the keep never rotates, restarts or signals journald,
+    and the timer needs no enable: `orangepi-ramlog.service`, enabled on the
+    base image, wants it (`zz-lamp-journal-keep.conf`, `[Unit]
+    Wants=lamp-journal-setup.timer`). A lamp whose walk ended before the
+    timer first ran keeps nothing.
+  - **Tests:** `lamp-update`'s `tests/it/image_journal_setup.rs` runs the
+    script on folders shaped as the lamp's, with a `journalctl`,
+    `systemctl` and `pkill` that fail the test if called: nothing kept
+    without a walk under way, each closed file kept once and linked once its
+    original is gone, 24 MB at most, the hour after and the walk's end, a
+    redo replacing it, the links at boot, deleted after 72 hours (and a
+    start before the clock was set dated anew), nothing more of a forgotten
+    walk; the script's steps are
+    `lamp_msgs::ONBOARDING_STEPS`; and the units pinned, read by
+    `systemd-analyze verify` where it exists. `lamp-voice`'s
+    `setup_journal` tests: only the owner's emptied forget removes the
+    copies and links (never #2602's), and one that can't be removed is
+    said. `lamp-setup`'s reset tests: both plans wipe the folder.
+  - **Existing lamps:** a newly imaged lamp has it. A build carries the
+    three files with the image's files (`LAMP_UPDATE_IMAGE=on`, then
+    `systemctl daemon-reload`), and the timer starts at the next boot; by
+    hand, copy them and `sudo systemctl daemon-reload`, then reboot or
+    `sudo systemctl start lamp-journal-setup.timer`. Not shown on a lamp
+    yet: the lamp check in the pull request (a fresh flash, setup, 24
+    hours) is owed.
 - Which group may read the GPIO chips and the I²C bus on the base image was
   not checked.
 - `lamp-surround` was not read beyond its unit, and `lamp-records` has two

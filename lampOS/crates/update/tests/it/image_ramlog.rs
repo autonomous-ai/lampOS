@@ -241,6 +241,8 @@ fn ramlogs_stop_keeps_the_journal_before_its_own_stop() {
     assert_eq!(
         lines,
         [
+            "[Unit]",
+            "Wants=lamp-journal-setup.timer",
             "[Service]",
             "ExecStartPost=-/bin/bash /usr/local/libexec/lamp-journal-keep link",
             "ExecStop=",
