@@ -1058,6 +1058,7 @@ lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
 lamp-update harness-off
 lamp-update harness-on
+lamp-update harness-install
 lamp-update back
 lamp-update apply
 lamp-update writer-probe
