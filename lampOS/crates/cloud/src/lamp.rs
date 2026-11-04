@@ -127,6 +127,9 @@ pub struct Real {
     /// A skill added from a file in the owner's app, with
     /// `LAMP_SKILL_UPLOAD=on` and the skills page (`crate::upload`).
     pub upload: Option<std::sync::Arc<crate::upload::Uploads>>,
+    /// lamp-control's admin socket, for the developer door from the owner's
+    /// app, with `--control-admin-socket` (#5299, `crate::control`).
+    pub control: Option<crate::control::Door>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -769,6 +772,10 @@ impl Lamp for Real {
         self.upload.clone()
     }
 
+    fn control(&self) -> Option<crate::control::Door> {
+        self.control.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -988,6 +995,7 @@ mod tests {
             write_skill: None,
             share: None,
             services: None,
+            control: None,
             upload: None,
             shutdown: None,
         };
@@ -1071,6 +1079,7 @@ mod tests {
             write_skill: None,
             share: None,
             services: None,
+            control: None,
             upload: None,
             shutdown: None,
         };
@@ -1163,6 +1172,7 @@ mod tests {
             write_skill: None,
             share: None,
             services: None,
+            control: None,
             upload: None,
             shutdown: None,
         };
@@ -1268,6 +1278,7 @@ mod tests {
             write_skill: None,
             share: None,
             services: None,
+            control: None,
             upload: None,
             shutdown: None,
         };

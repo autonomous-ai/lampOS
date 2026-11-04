@@ -1,5 +1,7 @@
-//! `lamp-cloud [--bus-root ABSOLUTE_DIR]`: the lamp on the company broker
-//! (#1396). Off unless `LAMP_CLOUD=on`. Its unit hands it, through
+//! `lamp-cloud [--bus-root ABSOLUTE_DIR] [--control-admin-socket ABSOLUTE_PATH]`: the lamp
+//! on the company broker (#1396). Off unless `LAMP_CLOUD=on`. With
+//! `--control-admin-socket` (lamp-control's admin socket), the app's
+//! developer door is answered (#5299, `lamp_cloud::control`). Its unit hands it, through
 //! `LoadCredential=`, setup's account (`account`), the voice's key (`key`)
 //! and `lamp-update`'s state (`build`), so it runs as `lampos` and no file
 //! is widened. A login a ping rotated is kept in its own state folder.
@@ -17,7 +19,8 @@ use std::process::ExitCode;
 use std::time::Duration;
 use tokio::sync::watch;
 
-const USAGE: &str = "usage: lamp-cloud [--bus-root ABSOLUTE_DIR] | lamp-cloud exit-note UNIT\n\
+const USAGE: &str = "usage: lamp-cloud [--bus-root ABSOLUTE_DIR] [--control-admin-socket ABSOLUTE_PATH]\n\
+  | lamp-cloud exit-note UNIT\n\
   | lamp-cloud make-skill make WORDS REQUEST_ID | made REQUEST_ID (the played check, #2813)\n\
   With LAMP_CLOUD=on, and CREDENTIALS_DIRECTORY holding account, key and build\n\
   (the unit's LoadCredential=); a rotated login is kept in STATE_DIRECTORY.";
@@ -96,6 +99,7 @@ fn exit_note(unit: &str) -> ExitCode {
 
 fn main() -> ExitCode {
     let mut bus_root = None;
+    let mut control_socket = None;
     let mut arguments = std::env::args().skip(1);
     // The played check's own ask of lamp-voice's app-make socket, as the
     // app's `skills.make` and `skills.made` make it (#2813): no switch,
@@ -120,6 +124,9 @@ fn main() -> ExitCode {
         match (argument.as_str(), arguments.next()) {
             ("--bus-root", Some(root)) if root.starts_with('/') => {
                 bus_root = Some(PathBuf::from(root))
+            }
+            ("--control-admin-socket", Some(socket)) if socket.starts_with('/') => {
+                control_socket = Some(PathBuf::from(socket))
             }
             _ => {
                 eprintln!("{USAGE}");
@@ -275,6 +282,12 @@ fn main() -> ExitCode {
         share,
         services,
         upload,
+        // The developer door from the owner's app (#5299): only with
+        // --control-admin-socket, each code sealed to this lamp's device id.
+        control: control_socket.map(|socket| lamp_cloud::control::Door {
+            socket,
+            device_id: account.device_id.clone(),
+        }),
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -326,6 +339,7 @@ fn main() -> ExitCode {
         write_skill: None,
         share: None,
         services: None,
+        control: None,
         upload: None,
         shutdown: None,
     };

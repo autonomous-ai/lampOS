@@ -12,7 +12,8 @@
 //! The admin socket is the owner's side ([`admin`]): a pairing code with its
 //! grants, a revoke, the list of paired computers. It is a Unix socket only
 //! the door's own user may open; the app reaches it through the lamp's cloud
-//! part in a later piece.
+//! part (lamp-cloud's `control.code`, `control.clients` and `control.revoke`,
+//! docs/cloud.md).
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, 
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::cert::Identity;
-use crate::protocol::{EventKind, Grant};
+use crate::protocol::{EventKind, Grant, Op};
 use crate::session::{Door, Parts, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
@@ -1045,10 +1046,23 @@ async fn connection<S>(
 
 /// The owner's side, one JSON object a line on a Unix socket:
 /// - `{"code": {"grants": ["body", "light"]}}` → `{"code": "12345678", "pin": "<sha256>",
-///   "shown": [...]}`, `shown` the pairing screen's words for each grant;
+///   "shown": [...], "until_unix_ms": N}`, `shown` the pairing screen's words
+///   for each grant and `until_unix_ms` when the code runs out by the wall
+///   clock (the code itself lapses by the monotonic clock, [`CODE_FOR_US`]
+///   from now, so this is the wall clock now plus that). With `"say_pin":
+///   true` the lamp also says the first 8 characters of its pin aloud (the
+///   spoken pin check, #5299), and the answer says `"pin_said"`: whether the
+///   voice took the line;
+/// - `{"cancel_code": true}` → `{"dropped": true|false}`: the code out is
+///   dropped, so nobody can pair with it (the app's answer to a spoken check
+///   that doesn't match), and whether there was one;
 /// - `{"revoke": "c_…"}` → `{"revoked": true, "saved": true}`, or `"saved":
 ///   false` with an `error` when the file couldn't take it yet;
-/// - `{"clients": true}` → `{"clients": [{id, name, grants, paired_at}]}`.
+/// - `{"clients": true}` → `{"clients": [{id, name, grants, paired_at,
+///   paired_at_unix_ms}]}`, `paired_at` in Unix seconds as the file keeps it
+///   (for older readers) and `paired_at_unix_ms` the same in milliseconds.
+///
+/// [`CODE_FOR_US`]: crate::pairing::CODE_FOR_US
 pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
     loop {
         let Ok((stream, _)) = listener.accept().await else {
@@ -1078,6 +1092,7 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
     };
     let now = shared.now_us();
     if let Some(code) = asked.get("code") {
+        let say_pin = code.get("say_pin") == Some(&json!(true));
         let grants: Result<BTreeSet<Grant>, _> =
             serde_json::from_value(code.get("grants").cloned().unwrap_or(json!([])));
         return match grants {
@@ -1085,10 +1100,23 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
                 // The pairing screen's words for what is granted.
                 let shown: Vec<&str> = grants.iter().map(|grant| grant.shown()).collect();
                 let code = shared.door.lock().expect("door").issue_code(grants, now);
-                json!({"code": code, "pin": shared.pin, "shown": shown})
+                // A new code always runs the full CODE_FOR_US from now.
+                let until_unix_ms = wall_ms().saturating_add(crate::pairing::CODE_FOR_US / 1_000);
+                let mut answer = json!({"code": code, "pin": shared.pin, "shown": shown, "until_unix_ms": until_unix_ms});
+                if say_pin {
+                    answer["pin_said"] = json!(said_pin(shared, now));
+                }
+                answer
             }
             Err(error) => json!({"error": format!("grants: {error}")}),
         };
+    }
+    if asked.get("cancel_code") == Some(&json!(true)) {
+        let dropped = shared.door.lock().expect("door").cancel_code();
+        eprintln!(
+            "lamp-control: the owner's app dropped the pairing code (one was out: {dropped})"
+        );
+        return json!({"dropped": dropped});
     }
     if let Some(Value::String(client)) = asked.get("revoke") {
         let revoked = shared.door.lock().expect("door").revoke(client, now);
@@ -1120,11 +1148,75 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
             .clients()
             .clients
             .iter()
-            .map(|client| json!({"id": client.id, "name": client.name, "grants": client.grants, "paired_at": client.paired_at}))
+            .map(|client| {
+                json!({
+                    "id": client.id,
+                    "name": client.name,
+                    "grants": client.grants,
+                    "paired_at": client.paired_at,
+                    "paired_at_unix_ms": client.paired_at.saturating_mul(1_000),
+                })
+            })
             .collect();
         return json!({"clients": clients});
     }
-    json!({"error": "ask for code, revoke or clients"})
+    json!({"error": "ask for code, cancel_code, revoke or clients"})
+}
+
+/// Who says the spoken pin check, as the voice's say socket and a `stop`
+/// know it: the lamp itself, never a computer.
+const PIN_SPEAKER: &str = "lamp";
+
+/// The spoken pin check (#5299): the first 8 characters of the lamp's pin,
+/// the fingerprint of the certificate a computer will trust, said aloud in
+/// two groups of four so the owner can match them with the app's. Whether
+/// the voice took the line; the pin is in no journal line.
+fn said_pin(shared: &Shared, now: u64) -> bool {
+    let said = shared.parts.lock().expect("parts").act(
+        PIN_SPEAKER,
+        0,
+        &Op::Say {
+            text: spoken_pin(&shared.pin),
+            rephrase: None,
+        },
+        now,
+    );
+    match said {
+        Ok(_) => {
+            eprintln!("lamp-control: the pairing check was given to the voice");
+            true
+        }
+        Err(error) => {
+            eprintln!(
+                "lamp-control: the pairing check was not said: {}",
+                error.why
+            );
+            false
+        }
+    }
+}
+
+/// The words of the spoken pin check: "My pairing check is 3 F 9 A, 0 B 2 C."
+pub fn spoken_pin(pin: &str) -> String {
+    let characters: Vec<String> = pin
+        .chars()
+        .take(8)
+        .map(|character| character.to_ascii_uppercase().to_string())
+        .collect();
+    let (first, second) = characters.split_at(characters.len().min(4));
+    format!(
+        "My pairing check is {}, {}.",
+        first.join(" "),
+        second.join(" ")
+    )
+}
+
+/// Milliseconds since the epoch, by the lamp's wall clock.
+fn wall_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| u64::try_from(since.as_millis()).unwrap_or(u64::MAX))
+        .unwrap_or_default()
 }
 
 /// The bus topics the door reads, each subscribed on its own thread, every

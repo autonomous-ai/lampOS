@@ -513,6 +513,13 @@ impl Door {
         self.codes.issue(&self.random, now_us)
     }
 
+    /// The owner's app drops the code out, so nobody can pair with it:
+    /// whether there was one.
+    pub fn cancel_code(&mut self) -> bool {
+        self.code_grants.clear();
+        self.codes.cancel()
+    }
+
     /// The owner revokes `client`: its leases end, told. Whether it was
     /// paired. The server closes its connections at once; a frame that
     /// beats it is refused.
