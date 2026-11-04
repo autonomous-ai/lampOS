@@ -1634,7 +1634,8 @@ def test_a_push_without_the_check_extra_leaves_the_shape_to_the_lamp(tmp_path, m
         async with FakeLamp(grants=("light", "skills")) as fake:
             ring = await paired(fake, tmp_path / "keys")
             async with await Lamp.connect(keyring=ring) as lamp:
-                skill = await lamp.push_skill(folder)
+                with pytest.warns(UserWarning, match="the lamp checks it"):
+                    skill = await lamp.push_skill(folder)
                 assert skill["name"] == "desk-wave" and fake.asked("skill.push")
 
     run(go())
