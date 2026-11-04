@@ -353,3 +353,12 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   caught. Worktrees removed. Every item placed on heron today is posted;
   what remains is other builders' (rebases, trains, Faye's release of
   #4450's `status:taken`).
+- 17:35–18:0x: #5258 (the first builder's #5219 hotfix, the next promote's
+  blocker) opened with heron to read first. Read: `Abandon` carries
+  `no_audio` from `had_audio`; with audio, once more then held; never
+  voiced, up to 5 retries 5 s apart then held; the ledger written as
+  schema 2 only while it keeps an abandoned retirement. Gate: fmt, clippy
+  (lamp-voice, lamp-schedule), lamp-schedule 206, lamp-voice lib 4681,
+  switches 2, notes 15; mutations on the once-more, the five-retry cap and
+  `written_schema` each caught. READ-OK posted with a P3 on rollback.
+  17:5x: #5097 restated on Friday's rebase `fe9808bb86` by range-diff.
