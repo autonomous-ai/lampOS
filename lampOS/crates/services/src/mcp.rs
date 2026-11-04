@@ -102,6 +102,54 @@ pub const READ_VERBS: &[(&str, &[&str], &[&str])] = &[
     ("notion", &["notion"], READS),
 ];
 
+/// MCP services whose writes are only the tools named here, any other write
+/// of theirs refused before its read-back. Notion's (ruled on #4710, 4 Nov
+/// 23:2x): create, append to and update the owner's pages and blocks
+/// (`notion-update-page` is how its server appends); never delete, archive,
+/// move, duplicate, a database's shape, a comment, or anything that shares
+/// or changes who may see a page, which no read-back makes safe.
+pub const WRITE_TOOLS: &[(&str, &[&str])] =
+    &[("notion", &["notion-create-pages", "notion-update-page"])];
+
+/// Argument keys that turn an allowed write into one left out: Notion's
+/// trash and archive are a page's property, so an update could carry them.
+pub const WRITE_KEYS_REFUSED: &[&str] = &["archived", "in_trash", "is_archived", "trashed"];
+
+/// Whether `code` may write with `name` and `arguments`. A service with no
+/// entry in `WRITE_TOOLS` writes with any tool `is_read` calls a write, as
+/// Slack's do.
+pub fn write_allowed(code: &str, name: &str, arguments: &Value) -> Result<(), String> {
+    let Some((_, tools)) = WRITE_TOOLS.iter().find(|(service, _)| *service == code) else {
+        return Ok(());
+    };
+    if !tools.contains(&name) {
+        return Err(format!(
+            "{name} is not a write the lamp makes: it only creates, adds to and updates the owner's pages, never deletes, archives, moves or shares one"
+        ));
+    }
+    if carries_key(arguments, WRITE_KEYS_REFUSED, 0) {
+        return Err(format!(
+            "{name} may not archive or trash a page: the lamp only creates, adds to and updates the owner's pages"
+        ));
+    }
+    Ok(())
+}
+
+/// Whether any object in `value`, at any depth, has one of `keys`; past 32
+/// levels, as if it had.
+fn carries_key(value: &Value, keys: &[&str], depth: usize) -> bool {
+    if depth > 32 {
+        return true;
+    }
+    match value {
+        Value::Object(map) => map.iter().any(|(key, value)| {
+            keys.contains(&key.to_ascii_lowercase().as_str()) || carries_key(value, keys, depth + 1)
+        }),
+        Value::Array(items) => items.iter().any(|item| carries_key(item, keys, depth + 1)),
+        _ => false,
+    }
+}
+
 /// The words of a tool's name, in lower case: split at anything not a
 /// letter or digit and where a lower-case letter meets an upper-case one.
 pub fn name_words(name: &str) -> Vec<String> {
@@ -974,6 +1022,7 @@ mod tests {
         assert!(!is_read("notion", &tool("notion-update-page")));
         assert!(!is_read("notion", &tool("notion-create-pages")));
         assert!(!is_read("notion", &tool("notion-duplicate-page")));
+        assert!(!is_read("notion", &tool("notion-move-pages")));
         // A read word inside another isn't one; an unknown service reads nothing.
         assert!(!is_read("slack", &tool("listen")));
         assert!(!is_read("github", &tool("get_issue")));

@@ -85,6 +85,7 @@ pub fn prepare_mcp(
             "{name} only reads: use service_read with what \"call\""
         ));
     }
+    crate::mcp::write_allowed(service.code, name, &arguments)?;
     Ok(Pending {
         service: service.code,
         read_back: crate::mcp::read_back(service, entry, tool, &arguments),
@@ -514,6 +515,47 @@ mod tests {
             0,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn notion_writes_only_create_add_to_and_update_pages() {
+        let notion = catalog::service("notion").unwrap();
+        let entry = Entry::from_set(
+            "notion",
+            &json!({"auth_type":"oauth","access_token":"planted-notion-4710","expires_in":3600}),
+            0,
+        )
+        .unwrap();
+        let tool = |name: &str| json!({"name": name});
+        let update = json!({"data": {"page_id": "p1", "command": "insert_content_after", "new_str": "Milk"}});
+        assert!(prepare_mcp(notion, &entry, &tool("notion-update-page"), update).is_ok());
+        let create =
+            json!({"parent": {"page_id": "p1"}, "pages": [{"properties": {"title": "Groceries"}}]});
+        assert!(prepare_mcp(notion, &entry, &tool("notion-create-pages"), create).is_ok());
+        // Left out: delete, archive, move, duplicate, a database, a comment, a share.
+        for name in [
+            "notion-move-pages",
+            "notion-duplicate-page",
+            "notion-create-database",
+            "notion-update-database",
+            "notion-create-comment",
+            "notion-delete-page",
+            "notion-share-page",
+        ] {
+            let refused = prepare_mcp(notion, &entry, &tool(name), json!({})).unwrap_err();
+            assert!(
+                refused.contains("never deletes, archives, moves or shares"),
+                "{name}: {refused}"
+            );
+        }
+        // An allowed update that would trash or archive the page is refused too.
+        for key in ["archived", "in_trash", "Is_Archived"] {
+            let args = json!({"data": {"page_id": "p1", "properties": {key: true}}});
+            assert!(
+                prepare_mcp(notion, &entry, &tool("notion-update-page"), args).is_err(),
+                "{key}"
+            );
+        }
     }
 
     #[test]

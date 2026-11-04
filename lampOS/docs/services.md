@@ -446,6 +446,16 @@ an answer read as `application/json` or a `text/event-stream`.
   Notion's server (`notion-search`, `notion-fetch`, … read; `notion-create-pages`,
   `notion-update-page`, … write), and reads and writes go through `call`.
   The REST `search`, `page {id}` and `append_text` are gone.
+- **Notion's writes are an allow-list** (`mcp::WRITE_TOOLS`, ruled on Queue
+  #4710 on 4 Nov): only `notion-create-pages` and `notion-update-page`
+  (create, add to and update the owner's pages and blocks). Every other write
+  tool its server lists (delete, archive, move, duplicate, a database, a
+  comment, anything that shares a page or changes who may see it) is refused
+  before its read-back, as is an allowed one whose arguments carry
+  `archived`, `in_trash`, `is_archived` or `trashed` at any depth
+  (`mcp::WRITE_KEYS_REFUSED`). An allowed write is still read back with its
+  tool and target and sent only on the owner's "send", behind
+  `LAMP_SERVICES_WRITE`. The other MCP services have no such list.
 
 ## Reads
 
