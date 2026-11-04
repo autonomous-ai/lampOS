@@ -1184,8 +1184,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      channel was reached (not `unreachable`, nor a switch of lamp-update's
      own), so the first one once the onboarding has the lamp on Wi-Fi,
      and every later one, with or without a lampOS update due. Only while
-     nothing is at `/usr/local/bin/harness`; one already there is recorded
-     `installed` and nothing runs.
+     nothing is at `/usr/local/bin/harness`, its link followed: a link whose
+     target is gone counts as missing and is put there again; one already
+     there is recorded `installed` and nothing runs.
    - **How:** a round's own sandbox can't write `/usr/local/bin` or
      Harness's home, so, as with the settings writer, the round writes the
      fixed one-shot `lamp-update-harness.service` in `/etc/systemd/system`,
