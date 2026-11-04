@@ -312,3 +312,59 @@ giờ có tên, lời hay tệp của một kỹ năng.
   `made_counts::forget`); hỏi lại mỗi 10 giây cho đến khi xong. Số đếm còn
   trong bộ nhớ chưa ghi (tối đa một phút) bắt đầu tệp mới. Kiểm thử:
   `package::tests::forget_counts_deletes_both_counts`.
+
+
+## Thêm kỹ năng từ một tệp (`LAMP_SKILL_UPLOAD=on`, tắt)
+
+Chủ đèn chọn một tệp trên điện thoại (người xây dựng đầu tiên duyệt trên
+Queue, 3/11 14:33, theo quy tắc của Backend3; `crate::upload_skill`): một
+gói như `lamp-skills pack` tạo ra, hoặc một `SKILL.md` trần. Ứng dụng tải
+nó lên backend, backend gửi `skills.upload.<upload_id>` (16 ký tự hex đầu
+của SHA-256 của tệp) không kèm tệp; `lamp-cloud` trả lời `starting` ngay
+(backend giữ tệp), lấy `GET <base>/devices/get-message?kind=skills.upload.<upload_id>`
+bằng khóa của đèn, trong đó có chính tệp (`{upload_id, name, version,
+format, sha256, size, content_base64}`), giải mã tối đa 1 MiB, kiểm tra
+kích thước, SHA-256 và `upload_id`; rồi gửi `success` khi một tiếng "có"
+đã bật nó, hoặc `failure` khi một bước kiểm tra không qua hay nó bị để tắt,
+làm câu trả lời thứ hai để backend xóa tệp ([cloud.md](../cloud.md), "A
+skill added from a file"). `lamp-cloud` từ chối
+gói mang chữ ký của Store ("add it from the Skill Store"), gói có `run.py`
+hay tệp nào khác ngoài `skill.toml` và `SKILL.md`, và tên đã có trên đèn.
+Sau đó, qua socket app-make (`{"upload": {"skill_md", "skill_toml"?}}`, một
+dòng tối đa 64 KiB, chỉ nhận khi `lamp-voice` bật công tắc và có dịch vụ
+say để hỏi; và `{"added": {"sha256"}}`, trạng thái `kept`, `asked`, `on`,
+`left_off` hay `none`, mà `lamp-cloud` hỏi mỗi 5 giây, tối đa 2 giờ):
+
+1. **Tên đèn đang giữ bị từ chối, không bao giờ bị thay**: kỹ năng có tên
+   đó trên đèn (lõi, từ Store, tự tạo), được đẩy từ máy tính, hay đang giữ
+   ở đây, tự tạo hoặc thêm từ tệp (`upload_skill::taken`).
+2. **Một `SKILL.md` trần** thành một kỹ năng viết (`upload_skill::written`):
+   không có trigger, `tool` theo tên kỹ năng (`-` thành `_`), chỉ có quyền
+   `speak`, và một bước `say` là phần chữ sau front matter trên một dòng
+   (tối đa 2.000 byte): lời dặn cho mô hình khi người ta nhờ đến nó.
+3. **Giới hạn** (`made_skill::capped_added`): như kỹ năng tự tạo, khác hai
+   điểm: không bao giờ tự chạy (trigger, `[[while]]`, `[ask]` bị từ chối),
+   phải có hàm (`tool`); và được `speak`, vì lời của hàm là câu trả lời của
+   chính mô hình. Ngoài ra chỉ đèn, đầu, `voice/state` và `room/presence`.
+4. **Nói rõ** bằng `made_skill::plainly`: "Only when you ask for it, it
+   answers in its own words, as its file tells it, and never on its own."
+5. **Kiểm tra và giữ như kỹ năng tự tạo** (`made_skill::keep_added`): thẻ
+   được đánh dấu `made: here` và `added: file`, mô tả là lời của
+   `plainly`, nhãn "Added from a file, not from the Skills Store" và lúc
+   nên dùng theo lời của tệp; `lamp-skills pack` kiểm tra và đóng gói; giữ
+   cạnh các kỹ năng tự tạo với `"added": "file"`, tối đa năm (tự tạo hoặc
+   thêm). Trên trang kỹ năng (`skills.list`) nó thuộc nhóm tạo trên đèn, có
+   `"uploaded": true`, không bao giờ là của Store.
+6. **Hỏi thành tiếng, chỉ bật khi có tiếng "có"**: qua dịch vụ say, "A skill
+   called NAME was added in the app from a file, not from the Skills
+   Store." cùng lời của `plainly`, rồi đúng câu "Shall I put it on the
+   lamp?". Không gì từ ứng dụng bật được nó.
+7. **Helper quản lý kiểm tra lại** (`install_made`): thẻ có `added: file`
+   theo `capped_added`, và không bao giờ thay chỗ kỹ năng nào, kể cả kỹ
+   năng tự tạo.
+
+Không bao giờ ghi nội dung tệp vào journal.
+
+Kiểm thử: `upload_skill::tests`, `upload::tests`,
+`online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`
+và `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.

@@ -51,6 +51,10 @@ const FILE_MOST: u64 = 64 * 1_024;
 /// skill can be one; a core skill that says it is still core.
 pub const MADE_HERE: &str = "here";
 
+/// `SKILL.md` front matter `added: file` beside `made: here`: a skill added
+/// from a file in the app (`crate::upload`), listed `"uploaded": true`.
+pub const ADDED_FILE: &str = "file";
+
 /// The privacy switch's line, beside what a camera or microphone skill may
 /// use (the first builder's 17:21: "since that's what a person will ask").
 pub const PRIVACY: &str = "the privacy switch stops it";
@@ -351,6 +355,12 @@ pub struct Listed {
     /// Why not, in the lamp's words, when it does not; else null.
     pub why: Option<String>,
     pub may_use: Vec<Use>,
+    /// True for a skill added from a file in the app (`SKILL.md` front
+    /// matter `added: file` beside `made: here`, `crate::upload`): the app
+    /// labels it "Added from a file, not from the Store". Left out
+    /// otherwise; such a skill is made here, never the Store's.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub uploaded: bool,
 }
 
 /// `skills.list`'s reply: `{"version", "skills", "left_out"}`, the skills
@@ -681,6 +691,8 @@ fn row(
     };
     let can_turn_off =
         loads && lamp_skills::package::cannot_turn_off(&name, &permissions).is_none();
+    let uploaded =
+        group == Group::MadeHere && front_field(&card, "added").as_deref() == Some(ADDED_FILE);
     Listed {
         title: heading(&card).unwrap_or_else(|| name.clone()),
         description: cut(&description, DESCRIPTION_MOST),
@@ -696,6 +708,7 @@ fn row(
         loads,
         why,
         may_use: may_use(&permissions),
+        uploaded,
         name,
     }
 }
@@ -1001,6 +1014,52 @@ pub mod tests {
         );
         assert_eq!(rows[2]["can_remove"], true);
         assert_eq!(rows[2]["title"], "Water the plant");
+    }
+
+    /// A skill added from a file in the app (`crate::upload`) is listed
+    /// `"uploaded": true` and made here, never the Store's; no other row
+    /// carries the key, and `added: file` on an installed skill is no mark.
+    #[test]
+    fn a_skill_added_from_a_file_is_listed_uploaded() {
+        let places = places("uploaded");
+        skill(
+            &places,
+            "plant-water",
+            "Water the plant",
+            "made: here\nadded: file\n",
+            "[permissions]\nbody = true",
+        );
+        skill(
+            &places,
+            "made-here",
+            "Made here",
+            "made: here\n",
+            "[permissions]\nbody = true",
+        );
+        skill(
+            &places,
+            "z-store",
+            "From the Store",
+            "added: file\n",
+            "[permissions]\nbody = true",
+        );
+        let rows = listed(&places);
+        let uploaded: Vec<(&Value, &Value, Option<&Value>)> = rows
+            .iter()
+            .map(|row| (&row["name"], &row["group"], row.get("uploaded")))
+            .collect();
+        assert_eq!(
+            uploaded,
+            [
+                (&json!("z-store"), &json!("installed"), None),
+                (&json!("made-here"), &json!("made_here"), None),
+                (
+                    &json!("plant-water"),
+                    &json!("made_here"),
+                    Some(&json!(true))
+                ),
+            ]
+        );
     }
 
     /// A skill reading a pet on the head (#3997, Head pat) feels a touch,

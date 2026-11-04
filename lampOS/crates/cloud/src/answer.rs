@@ -168,6 +168,12 @@ pub trait Lamp {
         None
     }
 
+    /// A skill added from a file in the owner's app
+    /// (`LAMP_SKILL_UPLOAD=on` with the skills page, `crate::upload`).
+    fn upload(&self) -> Option<std::sync::Arc<crate::upload::Uploads>> {
+        None
+    }
+
     /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
     /// `crate::schedule`): there only with the switch.
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
@@ -234,7 +240,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 48] = [
+pub const KINDS: [(&str, Switch); 49] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -281,6 +287,7 @@ pub const KINDS: [(&str, Switch); 48] = [
     (crate::share::KINDS[0], SHARE),
     (crate::share::KINDS[1], SHARE),
     (crate::share::KINDS[2], SHARE),
+    (crate::upload::KIND, |lamp| lamp.upload().is_some()),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
     ("system.reboot", |lamp| lamp.restarts()),
@@ -561,6 +568,16 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let store = lamp.share().ok_or_else(|| not_here(kind))?;
             crate::share::unshare(&store, data).map(Some)
         }
+        // A skill added from a file in the owner's app (`LAMP_SKILL_UPLOAD`),
+        // `skills.upload.<upload_id>`: no file inline. Taken `starting`; the
+        // file fetched from the backend's message, checked and handed to
+        // lamp-voice on a thread of its own; its result follows once a
+        // spoken yes put it on, or it was refused or left off.
+        kind if crate::upload::id_of(kind).is_some() && on(lamp, crate::upload::KIND) => {
+            let uploads = lamp.upload().ok_or_else(|| not_here(kind))?;
+            uploads.start(kind)?;
+            Ok(None)
+        }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
         // installs it only signed with the Store's key.
@@ -647,6 +664,7 @@ pub mod tests {
         pub make_skill: Option<std::path::PathBuf>,
         pub make_skill_ready: bool,
         pub share: Option<crate::share::Store>,
+        pub upload: Option<std::sync::Arc<crate::upload::Uploads>>,
         pub update_page: bool,
         /// The bus lamp-update's `update/status` is read from (#2194) and
         /// `update.check` asks on, and the checks asked (#4153).
@@ -755,6 +773,9 @@ pub mod tests {
         }
         fn share(&self) -> Option<crate::share::Store> {
             self.share.clone()
+        }
+        fn upload(&self) -> Option<std::sync::Arc<crate::upload::Uploads>> {
+            self.upload.clone()
         }
         fn update_page(&self) -> bool {
             self.update_page
@@ -1298,6 +1319,22 @@ pub mod tests {
                     f.make_skill_ready = true;
                 },
                 &["skills.make", "skills.made"],
+            ),
+            (
+                // A skill added from a file (`LAMP_SKILL_UPLOAD`).
+                "skill upload",
+                |f| {
+                    f.upload = Some(std::sync::Arc::new(crate::upload::Uploads::new(
+                        "https://api.test",
+                        "k",
+                        "d",
+                        std::path::Path::new("/nowhere/skills"),
+                        std::path::Path::new("/nowhere/pushed"),
+                        std::path::Path::new("/nowhere/key.pub"),
+                        std::path::Path::new("/nowhere/make.sock"),
+                    )))
+                },
+                &["skills.upload"],
             ),
             (
                 "update page",

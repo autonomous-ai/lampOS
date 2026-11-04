@@ -352,6 +352,47 @@ pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
             "it gives the model a function, which a made skill can't",
         ));
     }
+    held(&table, false)
+}
+
+/// What a skill added from a file says of itself in its `SKILL.md`, beside
+/// `made: here` (`crate::upload_skill`): the manage helper holds it to
+/// [`capped_added`] and never lets it take another skill's place.
+pub const ADDED_FROM_FILE: &str = "added: file";
+
+/// What the lamp says of a skill added from a file before what it does:
+/// never said as the Store's.
+pub const ADDED_LABEL: &str = "Added from a file, not from the Skills Store";
+
+/// A skill added from a file (`crate::upload_skill`, `LAMP_SKILL_UPLOAD`)
+/// held to the made skills' cap, with two differences: it never starts on
+/// its own (no trigger, no `[ask]`), so it must have a function for the
+/// model (`tool`), the only way it runs; and the model may say its note
+/// (`speak`), its own answer in its own turn, as any tool's is.
+pub fn capped_added(text: &str) -> Result<(String, Uses), Refused> {
+    let table: toml::Table =
+        toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
+    if table.contains_key("trigger") || table.contains_key("while") {
+        return Err(Refused::new(
+            "it starts on its own, which a skill added from a file can't: it runs only when asked",
+        ));
+    }
+    if table.contains_key("ask") {
+        return Err(Refused::new(
+            "it asks the Policy to start it, which a skill added from a file never does",
+        ));
+    }
+    if !table.get("tool").is_some_and(toml::Value::is_str) {
+        return Err(Refused::new(
+            "it has no function for the model, so it could never be asked for",
+        ));
+    }
+    held(&table, true)
+}
+
+/// [`capped`]'s check of a table, past its tool: `speak` taken only for a
+/// skill added from a file ([`capped_added`]).
+fn held(table: &toml::Table, added: bool) -> Result<(String, Uses), Refused> {
     match table.get("kind").map(|kind| kind.as_str()) {
         None | Some(Some("installable")) => {}
         _ => return Err(Refused::new("a made skill can only be installable")),
@@ -394,6 +435,7 @@ pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
                     }
                 }
                 ("actions", toml::Value::Array(actions)) if actions.is_empty() => {}
+                ("speak", toml::Value::Boolean(_)) if added => {}
                 ("speak" | "look" | "messages" | "known_faces" | "actions", _) => {
                     return Err(Refused::new(
                         "it asks to use more than the light and the head, which a made skill can't",
@@ -464,9 +506,38 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
         "trigger",
         "ask",
         "do",
+        "tool",
     ];
     if table.keys().any(|key| !parts.contains(&key.as_str())) {
         return Err(unsaid());
+    }
+    // A skill added from a file (`crate::upload_skill`): started by its
+    // function alone, when the person asks, never on its own. A made skill
+    // never gets here with a tool: [`capped`] refuses it first.
+    if table.contains_key("tool") {
+        if table.contains_key("trigger") || table.contains_key("ask") {
+            return Err(unsaid());
+        }
+        let steps = table
+            .get("do")
+            .and_then(|steps| steps.as_array())
+            .filter(|steps| !steps.is_empty())
+            .ok_or_else(unsaid)?
+            .iter()
+            .map(|step| {
+                note_plainly(step)
+                    .or_else(|| step_plainly(step))
+                    .ok_or_else(unsaid)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let said = format!(
+            "Only when you ask for it, it {}, and never on its own.",
+            steps.join(", then ")
+        );
+        if said.chars().count() > MOST_PLAIN_CHARS {
+            return Err(unsaid());
+        }
+        return Ok(said);
     }
     let trigger = table
         .get("trigger")
@@ -560,6 +631,16 @@ fn left_out(what: &str) -> String {
         .collect();
     let clause = clause.trim().trim_end_matches(',');
     format!("The maker notes what it couldn't do: {clause}.")
+}
+
+/// A function's note (`say = "…"`, the model's own answer to its call) in
+/// plain words: a skill added from a file's only way to speak.
+fn note_plainly(step: &toml::Value) -> Option<String> {
+    let step = step.as_table().filter(|step| step.len() == 1)?;
+    step.get("say")?
+        .as_str()
+        .filter(|note| !note.trim().is_empty())
+        .map(|_| "answers in its own words, as its file tells it".to_owned())
 }
 
 /// One `[[do]]` step in plain words: a light or a gesture, as the brief
@@ -671,6 +752,17 @@ impl Maker {
 /// `description` ([`plainly`]'s) in place of the one written. A `made` or
 /// `made_by` line the model wrote is dropped: only the lamp says them.
 fn card(text: &str, description: &str, maker: Maker) -> Result<(String, String), Refused> {
+    card_marked(
+        text,
+        description,
+        &format!("made: here\n{MADE_BY}: {}", maker.key()),
+    )
+}
+
+/// [`card`] with `marks`, the front matter's last lines: `made: here` and
+/// its maker, and for a skill added from a file [`ADDED_FROM_FILE`] too.
+/// Any such line the file had is taken out first.
+fn card_marked(text: &str, description: &str, marks: &str) -> Result<(String, String), Refused> {
     let unread = || Refused::new("its SKILL.md has no name and description");
     let rest = text.strip_prefix("---\n").ok_or_else(unread)?;
     let (front, body) = rest.split_once("\n---").ok_or_else(unread)?;
@@ -701,18 +793,14 @@ fn card(text: &str, description: &str, maker: Maker) -> Result<(String, String),
         in_description = continued || line.starts_with("description:");
         let marker = line
             .split_once(':')
-            .is_some_and(|(key, _)| matches!(key.trim(), "made" | MADE_BY));
+            .is_some_and(|(key, _)| matches!(key.trim(), "made" | MADE_BY | "added"));
         if !in_description && !marker {
             kept.push(line);
         }
     }
     let description = format!("description: \"{}\"", description.replace(['"', '\\'], "'"));
     kept.push(&description);
-    let marked = format!(
-        "---\n{}\nmade: here\n{MADE_BY}: {}\n---{body}",
-        kept.join("\n"),
-        maker.key()
-    );
+    let marked = format!("---\n{}\n{marks}\n---{body}", kept.join("\n"));
     Ok((name, marked))
 }
 
@@ -790,6 +878,144 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
         said.as_deref().unwrap_or_default(),
         Maker::of(from),
     )?;
+    packed_and_kept(
+        keeping,
+        from,
+        Card {
+            toml: &files.toml,
+            name,
+            marked,
+            version,
+            uses,
+        },
+        said,
+        false,
+    )
+}
+
+/// A skill's two files as they are packed: its `skill.toml` as written,
+/// its name, its `SKILL.md` marked ([`card_marked`]), its version and
+/// what it may use.
+struct Card<'a> {
+    toml: &'a str,
+    name: String,
+    marked: String,
+    version: String,
+    uses: Uses,
+}
+
+/// A skill added from a file (`crate::upload_skill`, `LAMP_SKILL_UPLOAD`):
+/// its two `files` (a bare `SKILL.md` already shaped as a written skill)
+/// held to [`capped_added`], said by [`plainly`], marked `made: here` and
+/// [`ADDED_FROM_FILE`], checked and packed by `lamp-skills pack` and kept
+/// beside the made skills from `from`, with them at most [`KEPT_MOST`].
+/// Its card's description is what [`plainly`] says, the label, and when to
+/// ask for it in the file's own words, so the model knows when to call it;
+/// what the lamp says aloud is [`plainly`]'s alone.
+pub fn keep_added(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
+    let unkept = |why: io::Error| {
+        eprintln!("lamp-voice: a skill added from a file was not kept: {why}");
+        Refused::new("the lamp couldn't keep it")
+    };
+    ensure_private(&keeping.directory).map_err(unkept)?;
+    drop_unfinished(&keeping.directory);
+    if let Some(made) = kept(&keeping.directory, from) {
+        return Ok(made);
+    }
+    if files.toml.len() > MOST_FILE_BYTES || files.card.len() > MOST_FILE_BYTES {
+        return Err(Refused::new("one of its files is too long"));
+    }
+    let (version, uses) = capped_added(&files.toml)?;
+    let does = plainly(&files.toml)?;
+    let when = written_description(&files.card).unwrap_or_default();
+    let card_description = cut_bytes(
+        &format!("{does} {ADDED_LABEL}. When to use it: {when}"),
+        MOST_ADDED_DESCRIPTION_BYTES,
+    )
+    .to_owned();
+    let (name, marked) = card_marked(
+        &files.card,
+        &card_description,
+        &format!(
+            "made: here\n{MADE_BY}: {}\n{ADDED_FROM_FILE}",
+            Maker::App.key()
+        ),
+    )?;
+    packed_and_kept(
+        keeping,
+        from,
+        Card {
+            toml: &files.toml,
+            name,
+            marked,
+            version,
+            uses,
+        },
+        Ok(does),
+        true,
+    )
+}
+
+/// The most of an added skill's card description: a tool's is at most
+/// 1,024 bytes (`lamp-skills`' check), with room for its quotes.
+const MOST_ADDED_DESCRIPTION_BYTES: usize = 900;
+
+/// A `SKILL.md`'s own `description:`, on one line, with no control
+/// characters.
+pub fn written_description(card: &str) -> Option<String> {
+    let front = card.strip_prefix("---\n")?.split_once("\n---")?.0;
+    let line = front
+        .lines()
+        .find_map(|line| line.strip_prefix("description:"))?;
+    let line: String = line
+        .trim()
+        .trim_matches('"')
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let line = line.trim().to_owned();
+    (!line.is_empty()).then_some(line)
+}
+
+/// A `SKILL.md`'s `name:`, as the card's own check reads it.
+pub fn card_name(card: &str) -> Option<String> {
+    let front = card.strip_prefix("---\n")?.split_once("\n---")?.0;
+    front
+        .lines()
+        .find_map(|line| line.strip_prefix("name:"))
+        .map(|name| name.trim().trim_matches('"').to_owned())
+        .filter(|name| !name.is_empty())
+}
+
+/// The names of the skills kept here, made or added, on or not.
+pub fn kept_names(directory: &Path) -> Vec<String> {
+    index(directory)
+        .iter()
+        .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// `card` written to a folder of this call's own, checked and packed by
+/// `lamp-skills pack`, and kept from `from` once `said` is; `added` is kept
+/// in the index as `"added": "file"`.
+fn packed_and_kept(
+    keeping: &Keeping,
+    from: &str,
+    card: Card,
+    said: Result<String, Refused>,
+    added: bool,
+) -> Result<Made, Refused> {
+    let unkept = |why: io::Error| {
+        eprintln!("lamp-voice: a made skill was not kept: {why}");
+        Refused::new("the lamp couldn't keep it")
+    };
+    let Card {
+        toml,
+        name,
+        marked,
+        version,
+        uses,
+    } = card;
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
     // its check's words.
@@ -805,7 +1031,7 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
     let made = (|| {
         fs::create_dir_all(&folder)?;
         fs::create_dir_all(&out)?;
-        fs::write(folder.join("skill.toml"), &files.toml)?;
+        fs::write(folder.join("skill.toml"), toml)?;
         fs::write(folder.join("SKILL.md"), &marked)?;
         Ok::<_, io::Error>(())
     })()
@@ -833,7 +1059,7 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
             uses,
             package: kept_as,
         };
-        remember(&keeping.directory, from, &made).map_err(unkept)?;
+        remember(&keeping.directory, from, &made, added).map_err(unkept)?;
         fs::rename(&new, &made.package).map_err(unkept)?;
         Ok(made)
     });
@@ -1070,7 +1296,7 @@ fn kept(directory: &Path, from: &str) -> Option<Made> {
 /// Eviction lets go the oldest that is not on, never the one just kept;
 /// with every other one on, all are kept, past the cap. A package another
 /// entry still names stays.
-fn remember(directory: &Path, from: &str, made: &Made) -> io::Result<()> {
+fn remember(directory: &Path, from: &str, made: &Made, added: bool) -> io::Result<()> {
     let mut entries = index(directory);
     let mut entry = json!({
         "from": from,
@@ -1097,6 +1323,9 @@ fn remember(directory: &Path, from: &str, made: &Made) -> io::Result<()> {
         }
         !same
     });
+    if added {
+        entry["added"] = json!("file");
+    }
     entries.push(entry);
     while entries.len() > KEPT_MOST {
         // The newest, just kept, is never let go.

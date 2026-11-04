@@ -210,6 +210,11 @@ fn main() -> ExitCode {
     let share = (skills::on_from_environment() && lamp_cloud::share::on_from_environment())
         .then(|| lamp_cloud::share::Store::of(&account, &key))
         .flatten();
+    // A skill added from a file in the owner's app: only with
+    // LAMP_SKILL_UPLOAD=on and the skills page.
+    let upload = (skills::on_from_environment() && lamp_cloud::upload::on_from_environment())
+        .then(|| lamp_cloud::upload::Uploads::product(&account, &key))
+        .flatten();
     let mut lamp = Real {
         places: Places::default(),
         bus,
@@ -258,6 +263,7 @@ fn main() -> ExitCode {
             .flatten(),
         share,
         services,
+        upload,
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -307,6 +313,7 @@ fn main() -> ExitCode {
         make_skill: None,
         share: None,
         services: None,
+        upload: None,
         shutdown: None,
     };
     runtime.block_on(async move {

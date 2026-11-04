@@ -158,7 +158,8 @@ pub fn reply(
                     || crate::settings::KEYS_KINDS.contains(&kind.as_str())
                     || crate::settings::PLACE_KINDS.contains(&kind.as_str())
                     || kind == crate::settings::WIFI_KIND
-                    || crate::services::connector_kind(&kind).is_some())
+                    || crate::services::connector_kind(&kind).is_some()
+                    || crate::upload::id_of(&kind).is_some())
             {
                 let mut starting = identity.starting(now, &kind);
                 // The keys' kinds say the app's id back at once too (#2094).
@@ -232,6 +233,9 @@ struct Handed {
     /// The services' results the connection took before their ack, oldest
     /// first, to go again (`crate::services`).
     services_lost: Vec<crate::settings::Outcome>,
+    /// The results of skills added from a file the connection took before
+    /// their ack, to go again (`crate::upload`).
+    uploads_lost: Vec<crate::settings::Outcome>,
     /// Journal lines, one per step of a change's result (Mobile on #1959,
     /// 21:0x): handed, sent as a packet, acked or lost. Never its data.
     journal: Vec<String>,
@@ -250,6 +254,9 @@ enum Tagged {
     /// A service's result, said again if it is lost before its ack
     /// (`crate::services`).
     Service(crate::settings::Outcome),
+    /// A skill added from a file's result (`crate::upload`), said again if
+    /// it is lost before its ack: the backend deletes the file on it.
+    Upload(crate::settings::Outcome),
 }
 
 impl Handed {
@@ -366,6 +373,10 @@ impl Handed {
                     self.services_lost.push(outcome);
                     None
                 }
+                Tagged::Upload(outcome) => {
+                    self.uploads_lost.push(outcome);
+                    None
+                }
                 _ => None,
             })
             .collect()
@@ -419,6 +430,10 @@ fn dropped(
     }
     if let Some(changes) = changes {
         changes.owe(again);
+    }
+    let uploads = std::mem::take(&mut handed.uploads_lost);
+    if let Some(upload) = lamp.upload() {
+        upload.owe(uploads);
     }
     if let Some(shared) = reports {
         shared.with(|reports| reports.unhand(None));
@@ -542,6 +557,8 @@ async fn session(
         let changes = lamp.changes();
         // The services' results (Queue #4710), the same way, with their switch.
         let services = lamp.services();
+        // Skills added from a file: their results go on the same tick.
+        let uploads = lamp.upload();
         let polled = {
             let poll = events.poll();
             tokio::pin!(poll);
@@ -556,7 +573,7 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if texting || changes.is_some() || services.is_some() => {
+                    _ = tick.tick(), if texting || changes.is_some() || services.is_some() || uploads.is_some() => {
                         let me = identity.borrow().clone();
                         if texting {
                             for data in lamp.chat_events(crate::chat::now_ms()) {
@@ -616,6 +633,18 @@ async fn session(
                                     say.line(&outcome.journal());
                                 } else {
                                     services.owe(vec![outcome]);
+                                }
+                            }
+                        }
+                        // A skill added from a file: `success` or `failure`,
+                        // kept until the broker's ack, so the backend hears
+                        // it and deletes the file.
+                        if connected && let Some(uploads) = &uploads {
+                            for outcome in uploads.take() {
+                                let reply = outcome.reply(&me, &now()).to_string();
+                                let tag = Tagged::Upload(outcome.clone());
+                                if !handed.publish_tagged(&client, account.fd_channel.as_str(), reply, tag) {
+                                    uploads.owe(vec![outcome]);
                                 }
                             }
                         }
@@ -1306,6 +1335,57 @@ mod tests {
             )
         );
         let _ = std::fs::remove_file(&socket);
+    }
+
+    /// A skill added from a file (`skills.upload.<upload_id>`): acked
+    /// `starting` at once, which keeps the file on the backend, and its
+    /// result, here a failure since the backend gives no file, follows as
+    /// the same kind, so the backend deletes the file.
+    #[tokio::test]
+    async fn a_skill_from_a_file_is_acked_starting_and_its_result_follows() {
+        let (port, seen) = broker(
+            Broker::Takes,
+            vec![r#"{"cmd":"data","kind":"skills.upload.0123456789abcdef","type":"privacy","data":{}}"#],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let mut uploads = crate::upload::Uploads::new(
+            "http://127.0.0.1:9",
+            "k",
+            "d-42",
+            std::path::Path::new("/nowhere/skills"),
+            std::path::Path::new("/nowhere/pushed"),
+            std::path::Path::new("/nowhere/key.pub"),
+            std::path::Path::new("/nowhere/make.sock"),
+        );
+        uploads.https_only = false;
+        let uploads = Arc::new(uploads);
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                upload: Some(uploads),
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+        });
+        let added = |seen: &[Seen]| {
+            publishes(seen)
+                .into_iter()
+                .filter(|(_, reply)| reply["kind"] == "skills.upload.0123456789abcdef")
+                .collect::<Vec<_>>()
+        };
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        while added(&seen.lock().unwrap()).len() < 2 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        lamp.await.unwrap();
+        let replies = added(&seen.lock().unwrap());
+        assert_eq!(replies.len(), 2, "{replies:?}");
+        assert_eq!(replies[0].1["status"], "starting");
+        assert_eq!(replies[1].1["status"], "failure");
+        assert_eq!(replies[1].1["error"], crate::upload::NO_MESSAGE);
     }
 
     /// The reviewer's P3 1 on #2214, which #1968, #2199 and #2214 rest on:

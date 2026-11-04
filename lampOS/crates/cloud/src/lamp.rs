@@ -116,6 +116,9 @@ pub struct Real {
     /// The person's own services linked from the app, with
     /// `LAMP_SERVICES=on` (Queue #4710, `crate::services`).
     pub services: Option<std::sync::Arc<crate::services::Services>>,
+    /// A skill added from a file in the owner's app, with
+    /// `LAMP_SKILL_UPLOAD=on` and the skills page (`crate::upload`).
+    pub upload: Option<std::sync::Arc<crate::upload::Uploads>>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -739,6 +742,10 @@ impl Lamp for Real {
         self.share.clone()
     }
 
+    fn upload(&self) -> Option<std::sync::Arc<crate::upload::Uploads>> {
+        self.upload.clone()
+    }
+
     fn update_status(&self) -> Option<lamp_bus::Message> {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
@@ -956,6 +963,7 @@ mod tests {
             make_skill: None,
             share: None,
             services: None,
+            upload: None,
             shutdown: None,
         };
         assert!(!lamp.recovery());
@@ -1036,6 +1044,7 @@ mod tests {
             make_skill: None,
             share: None,
             services: None,
+            upload: None,
             shutdown: None,
         };
         let level = Volume {
@@ -1124,6 +1133,7 @@ mod tests {
             make_skill: None,
             share: None,
             services: None,
+            upload: None,
             shutdown: None,
         };
         let info = crate::answer::answer(&mut lamp, "system.info", &Value::Null)
@@ -1226,6 +1236,7 @@ mod tests {
             make_skill: None,
             share: None,
             services: None,
+            upload: None,
             shutdown: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
