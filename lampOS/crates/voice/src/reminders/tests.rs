@@ -220,7 +220,9 @@ fn active_lease_is_exact_and_does_not_revoke_an_unrelated_person_turn() {
     );
     drop(receipt);
     test.parent.poll(AT + 200);
-    assert!(matches!(test.command(), Some(ToWorker::Abandon { token }) if token == first.token));
+    assert!(
+        matches!(test.command(), Some(ToWorker::Abandon { token, no_audio: true }) if token == first.token)
+    );
 }
 
 #[test]
@@ -383,6 +385,40 @@ fn interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio() {
     }
 }
 
+/// #5219: a receipt dropped unsettled says whether any of its audio came,
+/// and the packet reads as before when some did: the field is sent only
+/// when true, and a packet without it is taken as possibly heard.
+#[test]
+fn an_abandon_says_whether_any_audio_came() {
+    for had_audio in [false, true] {
+        let (turn, privacy) = owner(1);
+        let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+        if had_audio {
+            receipt.audio();
+        }
+        drop(receipt);
+        let settlement = probe.settlement().unwrap();
+        assert!(
+            matches!(settlement, ToWorker::Abandon { no_audio, .. } if no_audio != had_audio),
+            "{settlement:?}"
+        );
+        let wire = serde_json::to_value(&settlement).unwrap();
+        assert_eq!(wire.get("no_audio").is_some(), !had_audio, "{wire}");
+    }
+    let (turn, privacy) = owner(1);
+    let (receipt, probe) = receipt_for_test(turn, privacy, 7);
+    drop(receipt);
+    let mut older = serde_json::to_value(probe.settlement().unwrap()).unwrap();
+    older.as_object_mut().unwrap().remove("no_audio");
+    assert!(matches!(
+        serde_json::from_value::<ToWorker>(older).unwrap(),
+        ToWorker::Abandon {
+            no_audio: false,
+            ..
+        }
+    ));
+}
+
 #[test]
 fn interrupted_receipt_preserves_completed_and_invalidated_outcomes() {
     let (turn, privacy) = owner(1);
@@ -542,6 +578,7 @@ fn parent_poll_cost() {
             drop(receipt);
             let packet = ToWorker::Abandon {
                 token: offered.token,
+                no_audio: false,
             };
             let mut full = false;
             for _ in 0..1024 {

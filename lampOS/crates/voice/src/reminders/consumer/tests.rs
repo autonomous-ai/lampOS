@@ -679,23 +679,16 @@ fn completed_playout_survives_both_real_store_reopens_then_acks_without_respeech
 /// does not offer it again; a voice started after it does (the first
 /// builder, 2026-10-16), since that voice's claim proves the old one gone.
 #[test]
-fn abandon_keeps_pending_and_only_a_later_voice_offers_it_again() {
+fn abandoned_twice_keeps_pending_and_only_a_later_voice_offers_it_again() {
     let (engine, socket) = served(1);
     let disk = Disk::default();
     let mut first = consumer(disk.clone());
+    let once = begin(&mut first, &engine, &socket);
+    abandon(&mut first, &once.token);
+    first.next_offer_us = 0;
     let offered = begin(&mut first, &engine, &socket);
-    first
-        .command(
-            ToWorker::Abandon {
-                token: offered.token.clone(),
-            },
-            lamp_ipc::monotonic_us(),
-        )
-        .unwrap();
-    assert!(
-        matches!(first.outgoing.pop_front(), Some(FromWorker::Settled { token }) if token == offered.token)
-    );
-    // The same voice holds it.
+    abandon(&mut first, &offered.token);
+    // Given up twice, the same voice holds it.
     first.next_offer_us = 0;
     let now = lamp_ipc::monotonic_us();
     let report = due(&engine.lock().unwrap(), now);
@@ -723,6 +716,356 @@ fn abandon_keeps_pending_and_only_a_later_voice_offers_it_again() {
             .iter()
             .any(|r| matches!(r, Request::Ack { .. }))
     );
+}
+
+/// The voice gives up `token`'s attempt with nothing proven: its reply
+/// ended (cut by talk, say) with no completion and no fenced retirement.
+fn abandon(worker: &mut Consumer<Disk>, token: &PreparedToken) -> u64 {
+    abandon_as(worker, token, false)
+}
+/// As [`abandon`], saying whether any of its audio came.
+fn abandon_as(worker: &mut Consumer<Disk>, token: &PreparedToken, no_audio: bool) -> u64 {
+    let now = lamp_ipc::monotonic_us();
+    worker
+        .command(
+            ToWorker::Abandon {
+                token: token.clone(),
+                no_audio,
+            },
+            now,
+        )
+        .unwrap();
+    assert!(
+        matches!(worker.outgoing.pop_front(), Some(FromWorker::Settled { token: settled }) if &settled == token)
+    );
+    now
+}
+
+/// Ticks past the pacing `times` over, offering nothing.
+fn ticks_offer_nothing(
+    worker: &mut Consumer<Disk>,
+    engine: &Arc<Mutex<Engine<Disk>>>,
+    socket: &Socket,
+    times: usize,
+) {
+    for _ in 0..times {
+        worker.next_offer_us = 0;
+        let now = lamp_ipc::monotonic_us();
+        let report = due(&engine.lock().unwrap(), now);
+        worker.tick(&socket.path(), Some(&report), now).unwrap();
+        no_offer(worker);
+        worker.outgoing.clear();
+    }
+}
+
+/// #5219, stable 9980 on lamp-52e6: a one-minute timer came due while
+/// someone was talking, its attempt was cut, and it was held for good and
+/// never rang. An attempt given up with nothing proven is offered once
+/// more, after the pacing, under a new attempt; given up a second time it
+/// is held, so it is said twice at most.
+#[test]
+fn abandoned_once_is_offered_again_after_the_pace_and_twice_is_held() {
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    let now = abandon(&mut worker, &first.token);
+    assert_eq!(worker.next_offer_us, now + PACE_US);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {ONCE_MORE}")
+    );
+    // Not before the pacing.
+    let report = due(&engine.lock().unwrap(), now);
+    worker.tick(&socket.path(), Some(&report), now).unwrap();
+    no_offer(&worker);
+    // After it, offered again under a new attempt and correlation.
+    worker.next_offer_us = 0;
+    let second = begin(&mut worker, &engine, &socket);
+    assert_eq!(second.token.key, first.token.key);
+    assert!(second.token.attempt > first.token.attempt);
+    assert_ne!(second.token.correlation, first.token.correlation);
+    // The old attempt can settle nothing now.
+    assert!(
+        worker
+            .command(
+                ToWorker::Complete {
+                    token: first.token.clone(),
+                    proof: completion(&first.token),
+                },
+                now
+            )
+            .is_err()
+    );
+    // Given up again: held for good.
+    abandon(&mut worker, &second.token);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {HELD}")
+    );
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+    assert_eq!(engine.lock().unwrap().counts(&sample(1000)).0, 1);
+    assert!(
+        !socket
+            .requests()
+            .iter()
+            .any(|r| matches!(r, Request::Ack { .. }))
+    );
+}
+
+/// lamp-9adf, build 10012 (#5219): a timer's ring is a model turn, and one
+/// whose chat had not begun in 3 s ended `GaveUp` with none of its audio,
+/// then was held for good. An attempt given up before any of its audio came
+/// was certainly not heard: it is offered again after the pacing, and does
+/// not use up the once more an attempt that played some sound has.
+#[test]
+fn a_never_voiced_attempt_is_offered_again_without_using_the_once_more() {
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    let now = abandon_as(&mut worker, &first.token, true);
+    assert_eq!(worker.next_offer_us, now + PACE_US);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {}", no_audio_again(1))
+    );
+    let report = due(&engine.lock().unwrap(), now);
+    worker.tick(&socket.path(), Some(&report), now).unwrap();
+    no_offer(&worker);
+    worker.next_offer_us = 0;
+    let second = begin(&mut worker, &engine, &socket);
+    assert!(second.token.attempt > first.token.attempt);
+    assert_ne!(second.token.correlation, first.token.correlation);
+    // Played, then cut: still its one more.
+    abandon(&mut worker, &second.token);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {ONCE_MORE}")
+    );
+    worker.next_offer_us = 0;
+    let third = begin(&mut worker, &engine, &socket);
+    assert!(third.token.attempt > second.token.attempt);
+    // Played and cut again: held.
+    abandon(&mut worker, &third.token);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {HELD}")
+    );
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+}
+
+/// Given up before any of its audio came, an item is offered again
+/// [`NO_AUDIO_RETRIES`] (5) times, each after the pacing; given up so once
+/// more, it is held with a line saying why. A played attempt after those
+/// still has its one more.
+#[test]
+fn never_voiced_attempts_are_offered_again_five_times_then_held() {
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let mut offered = begin(&mut worker, &engine, &socket);
+    for n in 1..=NO_AUDIO_RETRIES {
+        let now = abandon_as(&mut worker, &offered.token, true);
+        assert_eq!(worker.next_offer_us, now + PACE_US);
+        assert_eq!(
+            worker.journal.lines.last().unwrap(),
+            &format!("reminder id 1 delivery 1: {}", no_audio_again(n))
+        );
+        worker.next_offer_us = 0;
+        let next = begin(&mut worker, &engine, &socket);
+        assert!(next.token.attempt > offered.token.attempt);
+        offered = next;
+    }
+    abandon_as(&mut worker, &offered.token, true);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {NO_AUDIO_HELD}")
+    );
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+    assert_eq!(engine.lock().unwrap().counts(&sample(1000)).0, 1);
+
+    // Played and cut after its five: one more, then held.
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let mut offered = begin(&mut worker, &engine, &socket);
+    for _ in 1..=NO_AUDIO_RETRIES {
+        abandon_as(&mut worker, &offered.token, true);
+        worker.next_offer_us = 0;
+        offered = begin(&mut worker, &engine, &socket);
+    }
+    abandon(&mut worker, &offered.token);
+    worker.next_offer_us = 0;
+    let last = begin(&mut worker, &engine, &socket);
+    abandon(&mut worker, &last.token);
+    assert_eq!(
+        worker.journal.lines.last().unwrap(),
+        &format!("reminder id 1 delivery 1: {HELD}")
+    );
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+}
+
+/// Four reminders 39 hours late, served as one late line, and the sample
+/// time they are served at.
+fn late_four() -> (Arc<Mutex<Engine<Disk>>>, Socket, u64) {
+    const LATE: u64 = 39 * 3_600_000;
+    let mut engine = Engine::open(Disk::default(), "Etc/UTC", &sample(0), STORE_ID).unwrap();
+    for (index, (text, seconds)) in [
+        ("Send the report", 3_600),
+        ("Buy the gift", 6 * 3_600),
+        ("Drink water", 60),
+        ("Water timer", 120),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        engine
+            .answer(
+                Request::Set {
+                    person: None,
+                    guard: guard(&engine, &format!("set-{index}")),
+                    text: text.into(),
+                    when: When::After { seconds },
+                },
+                &sample(0),
+            )
+            .unwrap();
+    }
+    engine.tick(&sample(LATE)).unwrap();
+    let engine = Arc::new(Mutex::new(engine));
+    let shared = engine.clone();
+    let socket = Socket::new(move |request| {
+        Some(
+            shared
+                .lock()
+                .unwrap()
+                .answer(request.clone(), &sample(LATE))
+                .unwrap_or_else(|e| refusal(e.code, e.message)),
+        )
+    });
+    (engine, socket, LATE)
+}
+
+/// Each reminder joined to a late line that was given up is treated as the
+/// line's own: offered once more, each under its own new attempt, and held
+/// when given up again.
+#[test]
+fn joined_ones_in_an_abandoned_line_are_offered_once_more_then_held() {
+    let (engine, socket, late) = late_four();
+    let tick = |worker: &mut Consumer<Disk>| {
+        worker.next_offer_us = 0;
+        let now = monotonic_us();
+        let report = engine
+            .lock()
+            .unwrap()
+            .due(&sample(late), stamp(now, 1), true);
+        worker.tick(&socket.path(), Some(&report), now).unwrap();
+    };
+    let mut worker = consumer(Disk::default());
+    tick(&mut worker);
+    let first = take_offer(&mut worker);
+    assert_eq!(first.also.len(), 3);
+    abandon(&mut worker, &first.token);
+    for joined in &first.also {
+        assert!(
+            worker.journal.lines.contains(&format!(
+                "reminder id {} delivery {}: {ONCE_MORE}",
+                joined.token.key.id, joined.token.key.delivery
+            )),
+            "{:?}",
+            worker.journal.lines
+        );
+    }
+    tick(&mut worker);
+    let second = take_offer(&mut worker);
+    assert_eq!(second.token.key, first.token.key);
+    let keys = |offer: &Offer| {
+        offer
+            .also
+            .iter()
+            .map(|joined| joined.token.key.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(keys(&second), keys(&first));
+    for (again, before) in second.also.iter().zip(&first.also) {
+        assert!(again.token.attempt > before.token.attempt);
+        assert_ne!(again.token.correlation, before.token.correlation);
+    }
+    abandon(&mut worker, &second.token);
+    for joined in &second.also {
+        assert!(
+            worker.journal.lines.contains(&format!(
+                "reminder id {} delivery {}: {HELD}",
+                joined.token.key.id, joined.token.key.delivery
+            )),
+            "{:?}",
+            worker.journal.lines
+        );
+    }
+    for _ in 0..6 {
+        tick(&mut worker);
+        no_offer(&worker);
+        worker.outgoing.clear();
+    }
+    assert_eq!(engine.lock().unwrap().counts(&sample(late)).0, 4);
+}
+
+/// An item said on its attempt after the cut is acknowledged and never
+/// offered again, and one cancelled while it waits to be offered once more
+/// is resolved, not offered.
+#[test]
+fn an_abandoned_one_completed_or_resolved_is_never_offered_again() {
+    // Said on the attempt after the cut.
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    abandon(&mut worker, &first.token);
+    worker.next_offer_us = 0;
+    let second = begin(&mut worker, &engine, &socket);
+    worker
+        .command(
+            ToWorker::Complete {
+                token: second.token.clone(),
+                proof: completion(&second.token),
+            },
+            lamp_ipc::monotonic_us(),
+        )
+        .unwrap();
+    worker.outgoing.clear();
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+    assert_eq!(engine.lock().unwrap().counts(&sample(1000)), (0, 0, 0));
+    assert_eq!(
+        socket
+            .requests()
+            .iter()
+            .filter(|r| matches!(r, Request::Ack { .. }))
+            .count(),
+        1
+    );
+    assert!(worker.retry.is_empty());
+
+    // Cancelled while it waits to be offered once more.
+    let (engine, socket) = served(1);
+    let mut worker = consumer(Disk::default());
+    let first = begin(&mut worker, &engine, &socket);
+    abandon(&mut worker, &first.token);
+    {
+        let mut engine = engine.lock().unwrap();
+        let request = Request::Cancel {
+            asker: None,
+            guard: guard(&engine, "cancel"),
+            id: 1,
+        };
+        engine.answer(request, &sample(1000)).unwrap();
+    }
+    ticks_offer_nothing(&mut worker, &engine, &socket, 4);
+    assert!(
+        worker
+            .journal
+            .lines
+            .iter()
+            .any(|line| line.starts_with("reminder id 1 delivery 1: resolved (Gone")),
+        "{:?}",
+        worker.journal.lines
+    );
+    assert!(worker.retry.is_empty());
 }
 
 /// The first builder's test for lamp-4ace's ids 12 and 26 (2026-10-16):
@@ -799,7 +1142,13 @@ fn only_exact_qualified_completion_can_change_the_durable_prepared_record() {
     wrong.attempt += 1;
     assert!(
         consumer
-            .command(ToWorker::Abandon { token: wrong }, lamp_ipc::monotonic_us())
+            .command(
+                ToWorker::Abandon {
+                    token: wrong,
+                    no_audio: false,
+                },
+                lamp_ipc::monotonic_us()
+            )
             .is_err()
     );
     let mut proof = completion(&offered.token);
@@ -1378,17 +1727,15 @@ fn the_journal_says_what_became_of_each_due_item_once_per_change() {
         "{lines:?}"
     );
 
-    // Given up with nothing proven: held, said once however often it ticks.
+    // Given up with nothing proven twice: held, said once however often
+    // it ticks.
     let (engine, socket) = served(1);
     let mut held = consumer(Disk::default());
+    let once = begin(&mut held, &engine, &socket);
+    abandon(&mut held, &once.token);
+    held.next_offer_us = 0;
     let offered = begin(&mut held, &engine, &socket);
-    held.command(
-        ToWorker::Abandon {
-            token: offered.token,
-        },
-        lamp_ipc::monotonic_us(),
-    )
-    .unwrap();
+    abandon(&mut held, &offered.token);
     for _ in 0..3 {
         // Past the pacing after a settlement, so each tick reaches `held()`
         // (the reviewer on #1081: without this the check could not fail).
@@ -1397,10 +1744,14 @@ fn the_journal_says_what_became_of_each_due_item_once_per_change() {
         let report = due(&engine.lock().unwrap(), now);
         held.tick(&socket.path(), Some(&report), now).unwrap();
     }
-    assert_eq!(held.journal.lines.len(), 2, "{:?}", held.journal.lines);
     assert_eq!(
-        held.journal.lines[1],
-        format!("reminder id 1 delivery 1: {HELD}")
+        held.journal.lines,
+        [
+            "reminder id 1 delivery 1: due, offered to the voice (attempt 1)".to_owned(),
+            format!("reminder id 1 delivery 1: {ONCE_MORE}"),
+            "reminder id 1 delivery 1: due, offered to the voice (attempt 2)".to_owned(),
+            format!("reminder id 1 delivery 1: {HELD}"),
+        ]
     );
 
     // At start the first good read is said, so the journal shows the
