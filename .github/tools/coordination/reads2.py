@@ -24,6 +24,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from markers import parse_marker, signer, writers_from_args, is_writer
 
 
+# 4 Nov 22:1x (the PM, on #5212): a PR body asks for two reads only on a line that asks it, not wherever the words
+# appear. A body quoting the rule held #5240 ("a separate default-on PR (TWO READS)") and #5202 ("privacy pull requests
+# need TWO READS") for a second read neither needed, and #5286's test list ("- TWO READS across a comment and a review")
+# the same. Asked: a line opening with TWO READS (after an optional heading mark, list mark, quote mark or bold),
+# followed by ":", a dash, "(" or the line's end ("TWO READS: Fourth and the first builder", "## TWO READS"); or
+# "TWO READS:" with readers after it anywhere in a line, as #5049's "Privacy. TWO READS: Reviewer-lead, Tests.".
+ASK_LINE = re.compile(r"^[ \t]*(?:#+[ \t]*|[-*+][ \t]+|>[ \t]*)?\**[ \t]*TWO READS\**[ \t]*(?::|-|\u2013|\u2014|\(|$)", re.M)
+ASK_READERS = re.compile(r"\bTWO READS\**[ \t]*:\**[ \t]*\S")
+
+
+def body_asks(body):
+    """Whether a PR body asks this PR for two reads (ASK_LINE or ASK_READERS), not merely names the rule."""
+    return bool(ASK_LINE.search(body) or ASK_READERS.search(body))
+
+
 def two_reads(items, heads, writers):
     """items: dicts {login, body} in posting order, the PR body as {pr_body: true}. heads: the head sha, or a list of it
     and earlier heads with the same patch. Returns "none", "met N" or "short N"."""
@@ -34,7 +49,7 @@ def two_reads(items, heads, writers):
         # 3 Nov 14:1x: the PR body is read too (a line {"pr_body": true}). 14:5x: anywhere in the body: #5049 says
         # "TWO READS: Reviewer-lead, Tests." at character 3518, and train 558 took it on one READ-OK.
         if c.get("pr_body"):
-            asked = asked or bool(re.search(r"\bTWO READS\b", body))
+            asked = asked or body_asks(c["body"])
             continue
         if not is_writer(c, writers):
             continue
