@@ -700,6 +700,8 @@ fn config(
         running,
         updater: manifest::UPDATER,
         models: lamp_update::models::on(std::env::var(lamp_update::models::SWITCH).ok().as_deref()),
+        // Not set at all: the switch file a round carries decides.
+        models_file: std::env::var_os(lamp_update::models::SWITCH).is_none(),
         settings,
         product_settings,
         image: lamp_update::image::on(std::env::var(lamp_update::image::SWITCH).ok().as_deref()),

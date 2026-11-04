@@ -29,8 +29,10 @@ switches remain off unless set to `on`. Explicit `LAMP_UPDATE_APPLY=off`
 also stays off; an absent apply switch can inherit the authenticated
 managed-product default described below. The product unit sets
 `LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` since 25 Oct, and
-`LAMP_UPDATE_MODELS` since 4 Nov (same-voice step 2, below); image files
-remain separate. The lamp trials below do not enable them elsewhere.
+`LAMP_UPDATE_MODELS` since 4 Nov (same-voice step 2, below). With
+`LAMP_UPDATE_MODELS` not set at all, the models switch file a round
+carries, `/etc/lampOS/models.env`, decides it instead ("Models in the
+manifest"); image files remain separate. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
@@ -551,11 +553,12 @@ that build could never be promoted. Now:
   A newer head refuses as stale, as before.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 10 (2 reads models, 3 settings, 4 image, 5 reset plans,
+`manifest::UPDATER` is 11 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
 product unit the lamp lacks added, 9 the switch in the build's own order,
 which every product build asks for: `ORDER_UPDATER`, #4582, 10 the Skills
-Store's switch file among the settings: `STORE_ENV_UPDATER`). With its product deploy tree, this workflow now
+Store's switch file among the settings: `STORE_ENV_UPDATER`, 11 the models
+switch file among the settings: `MODELS_ENV_UPDATER`). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -1697,12 +1700,41 @@ this build on does its part.
 Since 4 November the product's `deploy/product/lamp-update.service` sets
 `LAMP_UPDATE_MODELS=on` (same-voice step 2, [same-voice.md](same-voice.md)),
 so a round fetches the models `deploy/product/models.json` pins that the lamp
-lacks: the same-voice check's CAM++ beside the voice. The switch is in the
-updater's own unit, never in a part's. No round switches that unit
-(`round::OWN_UNIT`, above), so a lamp already in a home gets the line only
-from an image or a `lamp-update install` made from then on; on any other
-lamp it stays off, as below. The development unit
+lacks: the same-voice check's CAM++ beside the voice. No round switches the
+updater's own unit (`round::OWN_UNIT`, above), so that line reaches a lamp
+only from an image or a `lamp-update install` made from then on. A lamp
+already in a home gets the switch from a file a round carries instead, the
+models switch file `/etc/lampOS/models.env` (`manifest::MODELS_ENV`, "The
+models switch file", below), one of the build's signed, hash-pinned
+settings, `LAMP_UPDATE_MODELS=on` (the first builder on #4710, option (b):
+never a drop-in a round writes for the updater). The development unit
 (`deploy/units/lamp-update.service`) doesn't set it.
+
+Which one decides (`round::Round::models_on`, `Config::models_file`):
+
+1. `LAMP_UPDATE_MODELS` set in lamp-update's environment, to anything,
+   wins: `on` is on, and `off` or any other value is off, whatever the file
+   says. So `Environment=LAMP_UPDATE_MODELS=off` in a drop-in holds a
+   development or test lamp's models off.
+2. Not set there at all: the file, as this round leaves it. When the build
+   carries it and the round writes it (the lamp writes the build's settings,
+   and its copy is still the build's before, or there is none), the
+   build's text decides, so the build that first carries it takes its
+   models in the same round. Otherwise the lamp's file decides: a copy
+   changed on the lamp is kept, as every setting is, and read.
+3. A missing file, a link, one over 4 KiB, not UTF-8, with a line that is
+   neither blank, a `#` comment nor `NAME=value`, a quoted value, or whose
+   last `LAMP_UPDATE_MODELS=` isn't exactly `on`, is off
+   (`models::file_on`).
+
+A lamp put back to a lamp-update older than updater 11 doesn't know the
+file: it reads only its environment, as before, and leaves the file where
+it is, which it never reads (#1680's rule: what an older program doesn't
+know, it passes over). With the product unit of an image before 4
+November that is off, so a build with another model waits for the switch,
+as below, until the newer updater is climbed to again. The settings writer
+is not the one to judge it: an older `lamp-update-back` refuses the path,
+so a build carrying it waits for the writer's refresh first (above).
 
 A build can carry the models its parts read (`models.rs`, #1680): a
 `models` list in the signed manifest, each entry in
@@ -1710,13 +1742,13 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 10; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
+before the field climbs first. The current `UPDATER` is 11; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
 plain parts.
 
-With `LAMP_UPDATE_MODELS=on` in `lamp-update.service`'s environment:
+With the switch on (`LAMP_UPDATE_MODELS=on` in `lamp-update.service`'s environment, or the models switch file's, above):
 
 - **Two kinds of path.** A path with a `current` part
   (`/opt/lampOS/voice/current/smart-turn-v3.2-gpu.onnx`) belongs in that
@@ -1761,7 +1793,8 @@ Off, or absent: a build whose models are the lamp's is taken as today, its
 models ignored. A file at a model's path that install didn't place is the
 lamp's own, kept and said, as with the switch on. A build with any other
 model whose file on the lamp has another SHA-256 is refused
-(`... and LAMP_UPDATE_MODELS=on is not set`, `refused` in `log.jsonl`),
+(`... and LAMP_UPDATE_MODELS=on is not set (in lamp-update's environment,
+or in /etc/lampOS/models.env)`, `refused` in `log.jsonl`),
 with nothing fetched or written, since its parts may need that model: the
 rest isn't taken without it, which is what `min_updater` 2 is for. The
 build waits for the switch. A new lamp-update's dry round counts only what
@@ -1996,10 +2029,11 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 10; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 11; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`,
-`/etc/lampOS/skills/store.env` (from updater 10), or a file in
+`/etc/lampOS/skills/store.env` (from updater 10), `/etc/lampOS/models.env`
+(from updater 11), or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
 `/var/lib/lampOS/skills/`; any other refuses the build. So a build never
 writes a secret key, the voice's service, the zone, setup's answers,
@@ -2038,6 +2072,18 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   this lamp's settings writer is older than this lamp-update: waiting for
   it to be refreshed`. A dry round (`check`, a climbed updater's confirm)
   writes nothing and never waits for it. The drop-in `store.conf` stays install's alone.
+- **The models switch file.** `/etc/lampOS/models.env`
+  (`manifest::MODELS_ENV`, `deploy/product/settings/models.env`,
+  `install::MODELS_SETTING`) is carried by every build with settings from
+  updater 11 (`manifest::MODELS_ENV_UPDATER`), `LAMP_UPDATE_MODELS=on`. It
+  is read by lamp-update itself, never by systemd, and decides the models
+  switch when lamp-update's environment doesn't set it ("Models in the
+  manifest", above). Install doesn't write it. An older updater and an
+  older `lamp-update-back` refuse its path as they do `store.env`'s, so a
+  build carrying it asks for updater 11 and waits for the writer's refresh
+  the same way (`build N carries /etc/lampOS/models.env, and this lamp's
+  settings writer is older ...`). It is outside `/etc/lampOS/update/`,
+  which `lamp-update-apply` may not write.
 - **Root, small.** At the switch, after the journal and normally before any
   unit, link or model moves (the paired head-pins exception is below), the round stages `apply/request.json` and the
   build's envelope in its records and starts `lamp-update-apply.service`
@@ -2172,7 +2218,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 10. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 11. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,

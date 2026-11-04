@@ -47,6 +47,9 @@ mod setup_walk;
 #[path = "round/head_touch.rs"]
 mod head_touch;
 
+#[path = "round/models_file.rs"]
+mod models_file;
+
 #[path = "round/asleep_quiet.rs"]
 mod asleep_quiet;
 
@@ -645,6 +648,7 @@ impl Lamp {
             running: None,
             updater: manifest::UPDATER,
             models: false,
+            models_file: false,
             settings: false,
             product_settings: false,
             writer_from: None,
