@@ -321,6 +321,42 @@ pub struct Days {
     /// The zone at the last reading, minutes east of UTC: whether a day is
     /// over is judged by it.
     offset_minutes: i32,
+    /// By local day, the skills on and kept off at its last reading: sent
+    /// only with that day, so two reports never tell a skill put on or
+    /// off between them.
+    shown: BTreeMap<u64, Shown>,
+}
+
+/// The skills on and kept off at a day's last reading, by source key, as
+/// the counts are kept: a key a later build adds never stops a state file
+/// being read.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+struct Shown {
+    on: BTreeMap<String, u32>,
+    kept_off: BTreeMap<String, u32>,
+}
+
+impl Shown {
+    fn of(reading: &Reading) -> Self {
+        let keys = |by: &BTreeMap<Source, u32>| {
+            by.iter()
+                .map(|(source, count)| (source.key().to_owned(), *count))
+                .collect()
+        };
+        Self {
+            on: keys(&reading.on),
+            kept_off: keys(&reading.kept_off),
+        }
+    }
+
+    /// By source, the keys this build doesn't know left out.
+    fn sources(by: &BTreeMap<String, u32>) -> BTreeMap<Source, u32> {
+        Source::ALL
+            .into_iter()
+            .filter_map(|source| Some((source, *by.get(source.key())?)))
+            .collect()
+    }
 }
 
 /// One of the lamp's local days as a report carries it: only ever a day
@@ -329,6 +365,12 @@ pub struct Days {
 pub struct Day {
     /// `YYYY-MM-DD`, the lamp's local date.
     pub date: String,
+    /// Skills on at the day's last reading, by source; a source not there
+    /// is 0.
+    pub on: BTreeMap<Source, u32>,
+    /// Skills kept on the lamp and not on at the day's last reading, by
+    /// source.
+    pub kept_off: BTreeMap<Source, u32>,
     /// Made-skill asks by voice; an outcome not there is 0.
     pub made_by_voice: BTreeMap<Outcome, u64>,
     /// Made-skill asks from the app, made on the lamp; an outcome not
@@ -346,10 +388,6 @@ pub struct Day {
 /// The `skills` field of a health report.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SkillsBody {
-    /// Skills on now, by source; a source not there is 0.
-    pub on: BTreeMap<Source, u32>,
-    /// Skills kept on the lamp and not on now, by source.
-    pub kept_off: BTreeMap<Source, u32>,
     /// The oldest day not yet acknowledged, when there is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub day: Option<Day>,
@@ -429,6 +467,9 @@ impl Days {
     pub fn add(&mut self, now_s: u64, reading: &Reading) {
         self.offset_minutes = reading.offset_minutes;
         let today = local_day(now_s, self.offset_minutes);
+        // Every day read is sent once over, its counts 0 or not.
+        self.days.entry(today).or_default();
+        self.shown.insert(today, Shown::of(reading));
         for (kind, now) in totals(reading) {
             let prefix = format!("{kind}/");
             if self.begun.insert(kind.to_owned()) {
@@ -461,6 +502,7 @@ impl Days {
         }
         let oldest = today.saturating_sub(DAYS_MOST);
         self.days.retain(|day, _| *day >= oldest);
+        self.shown.retain(|day, _| *day >= oldest);
     }
 
     /// The oldest day that is over and not yet acknowledged, as a report
@@ -492,8 +534,11 @@ impl Days {
                 })
                 .collect()
         };
+        let shown = self.shown.get(number).cloned().unwrap_or_default();
         let day = Day {
             date: date.get(..10).unwrap_or_default().to_owned(),
+            on: Shown::sources(&shown.on),
+            kept_off: Shown::sources(&shown.kept_off),
             made_by_voice: outcomes("ask"),
             made_by_app: outcomes("app_ask"),
             runs: Source::ALL
@@ -516,6 +561,7 @@ impl Days {
     /// The report carrying `day` was acknowledged.
     pub fn acked(&mut self, day: u64) {
         self.days.remove(&day);
+        self.shown.remove(&day);
     }
 }
 
@@ -593,6 +639,42 @@ mod tests {
         let (day, _) = days.oldest(evening + 21 * 3_600 + 1_800).unwrap();
         assert_eq!(day.date, "2026-10-19");
         assert_eq!(day.runs, BTreeMap::from([(Source::Core, 4)]));
+    }
+
+    /// El's HOLD on #5096: a skill put on between two reports the same day
+    /// changes neither; the day says it once over, as at its last reading.
+    #[test]
+    fn skills_on_and_off_go_only_with_their_day_as_last_read() {
+        let with = |made_voice, off| Reading {
+            on: BTreeMap::from([(Source::Core, 3), (Source::MadeVoice, made_voice)]),
+            kept_off: BTreeMap::from([(Source::MadeVoice, off)]),
+            ..reading(100, &[], 0)
+        };
+        let mut days = Days::default();
+        days.add(NOW, &with(2, 0));
+        assert_eq!(days.oldest(NOW), None);
+        days.add(NOW + 900, &with(3, 1));
+        assert_eq!(days.oldest(NOW + 900), None);
+        let (day, over) = days.oldest(NOW + DAY_S).unwrap();
+        assert_eq!(day.date, "2026-10-18");
+        assert_eq!(
+            day.on,
+            BTreeMap::from([(Source::Core, 3), (Source::MadeVoice, 3)])
+        );
+        assert_eq!(day.kept_off, BTreeMap::from([(Source::MadeVoice, 1)]));
+        // A day read with nothing run is still sent, its counts 0.
+        days.acked(over);
+        days.add(NOW + DAY_S, &with(3, 1));
+        let (quiet, _) = days.oldest(NOW + 2 * DAY_S).unwrap();
+        assert_eq!(quiet.date, "2026-10-19");
+        assert!(quiet.runs.is_empty());
+        assert_eq!(quiet.on[&Source::MadeVoice], 3);
+        // Kept by key: a source this build doesn't know is left out, not
+        // an unreadable state.
+        let mut kept = serde_json::to_value(&days).unwrap();
+        kept["shown"]["20745"]["on"]["uploaded"] = json!(1);
+        let read: Days = serde_json::from_value(kept).unwrap();
+        assert_eq!(read.oldest(NOW + 2 * DAY_S).unwrap().0.on, quiet.on);
     }
 
     /// The zone is the system's; a lamp whose zone can't be read counts
@@ -736,8 +818,6 @@ mod tests {
         let total: u64 = day.store.values().sum::<u64>() + day.store_rest;
         // Cut one step: the least listed goes to the rest, the total kept.
         let mut body = SkillsBody {
-            on: BTreeMap::new(),
-            kept_off: BTreeMap::new(),
             day: Some(day.clone()),
         };
         assert!(body.cut());

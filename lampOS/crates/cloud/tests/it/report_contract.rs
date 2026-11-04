@@ -301,10 +301,16 @@ fn the_skills_field_is_added_under_schema_one_and_left_out_when_unread() {
         ..Seen::default()
     };
     reports.health(1_792_382_460, None, &seen).unwrap();
-    let health: Value = serde_json::from_str(&reports.due("dev-42")[0].1).unwrap();
+    let sent = reports.due("dev-42");
+    let health: Value = serde_json::from_str(&sent[0].1).unwrap();
     assert_eq!(health["schema"], "lamp-report/1");
-    assert_eq!(
-        health["skills"],
-        json!({"on": {"core": 12, "made_voice": 1}, "kept_off": {"store": 2}})
-    );
+    // Read, with no day over yet: nothing said of the skills on or off.
+    assert_eq!(health["skills"], json!({}));
+    reports.acked(sent[0].0);
+    // The day over: what was on and off at its last reading, with it.
+    reports.health(1_792_382_460 + 86_400, None, &seen).unwrap();
+    let health: Value = serde_json::from_str(&reports.due("dev-42")[0].1).unwrap();
+    let day = &health["skills"]["day"];
+    assert_eq!(day["on"], json!({"core": 12, "made_voice": 1}));
+    assert_eq!(day["kept_off"], json!({"store": 2}));
 }
