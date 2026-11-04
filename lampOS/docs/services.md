@@ -585,8 +585,9 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   send only when the voice saying "send" is the one that asked for it. Say
   it was not sent." A print is made only of a line of 1.5 s of speech or
   more begun with the lamp quiet (`same_voice::LEAST_SAMPLES`), so a bare
-  "send" often has none: then the write is kept (its 2 minutes and 30 s
-  still running) and the model is told `NO_PRINT_YET`, "Not sent yet: I
+  "send" often has none: then the write is kept (its 2 minutes still
+  running, its 30 s counted again from the lamp's asking once more, which
+  with the first "send" took past 30 s of the read-back on lamp-9adf) and the model is told `NO_PRINT_YET`, "Not sent yet: I
   couldn't hear whose voice that was.", with the next step "Ask them, in the
   conversation's language, to say "go ahead and send it" (in Vietnamese "ừ,
   gửi đi giúp tôi"), and nothing else. …". The lamp's words in that request
