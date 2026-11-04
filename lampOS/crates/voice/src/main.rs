@@ -690,6 +690,16 @@ fn run() -> Result<()> {
                 lamp_voice::audio_workers::speaker(channels,parent,worker,Path::new(dir),device,options.diagnostic_directory.as_deref())?;
             }
         }
+        // worker sleep DIR PARENT WORKER DEVICE: the sleep capture
+        // (migrate-P2, `LAMP_SLEEP_HEARS_NAME`), under its name grant alone.
+        #[cfg(target_os = "linux")]
+        [command, role, dir, parent, worker, device] if command == "worker" && role == "sleep" => {
+            let parent = parse_boot(parent)?;
+            let worker = parse_boot(worker)?;
+            let mut channels = WorkerChannels::bind(Path::new(dir), role, parent, worker, true)?;
+            channels.connect(Path::new(dir), role, true)?;
+            lamp_voice::sleep_worker::run_alsa(channels, parent, device)?;
+        }
         [command, role, dir, parent, worker, extra, flags @ ..] if command == "worker" && role == "provider" => {
             let parent = parse_boot(parent)?;
             let worker = parse_boot(worker)?;
@@ -907,7 +917,8 @@ fn probe(mut channels: WorkerChannels) -> Result<()> {
             Some(
                 Control::StartCapture
                 | Control::ConnectReference { .. }
-                | Control::ProviderOutputCapacity { .. },
+                | Control::ProviderOutputCapacity { .. }
+                | Control::NameGrant { .. },
             ) => {
                 return Err(io::Error::other("invalid probe command").into());
             }

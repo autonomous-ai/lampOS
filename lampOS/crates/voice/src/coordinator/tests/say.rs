@@ -1359,11 +1359,11 @@ fn a_request_begun_in_the_walk_is_marked_before_any_of_its_sound() {
             })
             .collect()
     };
-    assert!(after_start(7, 3, false, false).is_empty());
-    assert_eq!(kinds(after_start(7, 3, false, true)), ["onboarding"]);
-    assert_eq!(kinds(after_start(7, 3, true, false)), ["count_only"]);
+    assert!(after_start(7, 3, false, false, None).is_empty());
+    assert_eq!(kinds(after_start(7, 3, false, true, None)), ["onboarding"]);
+    assert_eq!(kinds(after_start(7, 3, true, false, None)), ["count_only"]);
     assert_eq!(
-        kinds(after_start(7, 3, true, true)),
+        kinds(after_start(7, 3, true, true, None)),
         ["count_only", "onboarding"]
     );
     let [
@@ -1371,11 +1371,28 @@ fn a_request_begun_in_the_walk_is_marked_before_any_of_its_sound() {
             request,
             privacy_generation,
         },
-    ] = after_start(7, 3, false, true)[..]
+    ] = after_start(7, 3, false, true, None)[..]
     else {
         panic!("one Onboarding");
     };
     assert_eq!((request, privacy_generation), (7, 3));
+    // migrate-P2: a line in a name wake's wait is marked with the wake's
+    // time, after the others, before any of its sound.
+    assert_eq!(
+        kinds(after_start(7, 3, false, true, Some(99))),
+        ["onboarding", "woken_by_name"]
+    );
+    let [
+        ProviderInput::WokenByName {
+            request,
+            privacy_generation,
+            at_us,
+        },
+    ] = after_start(7, 3, false, false, Some(99))[..]
+    else {
+        panic!("one WokenByName");
+    };
+    assert_eq!((request, privacy_generation, at_us), (7, 3, 99));
     // Off without the switch, and with no walk known.
     assert!(!sleep_not_now(false, None, None));
     assert!(!sleep_not_now(true, None, None));

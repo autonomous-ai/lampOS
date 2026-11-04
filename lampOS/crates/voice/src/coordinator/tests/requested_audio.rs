@@ -385,6 +385,7 @@ impl Test {
                 false,
                 false,
                 false,
+                None,
                 true,
                 PlayoutStart::default(),
                 &mut self.trace,

@@ -806,8 +806,9 @@ run by hand, `short-turns`, `stt-check`, `marked`, `turn-times`, `stalls`,
 `probe-cascade`, `probe-cache`, `probe-tools`, `probe-reminders`), its worker
 roles
 (`capture`, `speaker`, `provider`, `second`, `camera`, `ring`, `privacy`,
-`probe`) and its helpers (`lamp-turn-end`, and `lamp-same-voice`, the
-same-voice child the provider worker starts). Both crates use that list:
+`probe`, and `sleep`, the sleep capture of migrate-P2) and its helpers
+(`lamp-turn-end`, and `lamp-same-voice`, the same-voice child the provider
+worker starts). Both crates use that list:
 
 - **The voice** runs only as a listed command: `lamp-voice WORD` refuses
   any other first word before anything runs, and a test reads `main.rs`'s

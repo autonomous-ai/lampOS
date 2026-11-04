@@ -807,6 +807,15 @@ pub enum ProviderInput {
         privacy_generation: u64,
         kept_ms: u64,
     },
+    /// A line that began within [`crate::attention::NAME_WOKE_LISTENS_US`] of
+    /// a wake by name (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2), sent just
+    /// after its Start, with the wake's time on the machine's monotonic clock:
+    /// said to the lamp, without its name. Never sent without such a wake.
+    WokenByName {
+        request: u64,
+        privacy_generation: u64,
+        at_us: u64,
+    },
     /// The request in hand is onboarding's sentence (#1803), sent just
     /// after its Start: its words are counted by the coordinator and kept
     /// nowhere else, neither in the thread, the memory's journal nor a
@@ -895,6 +904,7 @@ impl ProviderInput {
             | Self::StepCall { request, .. }
             | Self::Onboarding { request, .. }
             | Self::TurnOpened { request, .. }
+            | Self::WokenByName { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
         }
@@ -929,6 +939,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::TurnOpened {
+                privacy_generation, ..
+            }
+            | Self::WokenByName {
                 privacy_generation, ..
             }
             | Self::Written {
@@ -2332,6 +2345,11 @@ async fn serve_with_visual<C: Connect>(
                 // A line begun in a computer's turn is a call, as a tap is.
                 if let Some(request) = intake.handoff.opened.take() {
                     attention.turn_opened(request);
+                }
+                // Woken by its name, and this line began in the wait for one
+                // (migrate-P2): no bus, the coordinator marked the line.
+                if let Some(woke) = intake.handoff.woken_by_name.take() {
+                    attention.woken_by_name(woke);
                 }
                 // Heard plainly as this request began: the model is told,
                 // beside what it is hearing, once.
@@ -5186,7 +5204,9 @@ impl ProviderIntake {
                 Control::ProviderOutputCapacity { through } => {
                     self.output_flow.grant(through)?;
                 }
-                Control::StartCapture | Control::ConnectReference { .. } => {
+                Control::StartCapture
+                | Control::ConnectReference { .. }
+                | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid provider command").into());
                 }
             }
@@ -5357,6 +5377,10 @@ struct InputHandoff {
     /// The newest request that continues the one before it after an early
     /// end, as its Start said (`ProviderInput::Start::continues`).
     continued: Option<u64>,
+    /// When a wake by name happened, as a line's mark just said
+    /// ([`ProviderInput::WokenByName`], migrate-P2), until the worker's loop
+    /// tells the rule.
+    woken_by_name: Option<u64>,
     /// The newest request that goes on from the one before, as its Start
     /// said (`continues` or `continues_cut_off`), and whether the one
     /// before was cut off and given up: its words are the earlier one's
@@ -6403,6 +6427,12 @@ impl InputHandoff {
             ProviderInput::TurnOpened { .. } => {
                 self.require_open(request)?;
                 self.opened = Some(request.get());
+            }
+            // Woken by its name, this line inside the wait for one
+            // (migrate-P2): the worker's loop tells the rule.
+            ProviderInput::WokenByName { at_us, .. } => {
+                self.require_open(request)?;
+                self.woken_by_name = Some(at_us);
             }
             ProviderInput::End { sound, cut_in, .. } => {
                 self.require_open(request)?;
@@ -7690,6 +7720,23 @@ pub(crate) mod tests {
         fn has_room_for(&self, commands: usize) -> bool {
             self.room.get().is_none_or(|room| room >= commands)
         }
+    }
+
+    /// migrate-P2: on Live, a line's `WokenByName` is kept for the worker's
+    /// loop to tell the rule, and only for an open line.
+    #[test]
+    fn a_name_wakes_mark_is_kept_for_the_live_rule() {
+        let input = |request| ProviderInput::WokenByName {
+            request,
+            privacy_generation: 3,
+            at_us: 99,
+        };
+        assert_eq!(input(7).request(), 7);
+        assert_eq!(input(7).privacy_generation(), 3);
+        let said = serde_json::to_value(input(7)).unwrap();
+        assert_eq!(said["kind"], "woken_by_name");
+        assert_eq!(said["at_us"], 99);
+        assert!(InputHandoff::default().woken_by_name.is_none());
     }
 
     /// Jarvis on #2031 (#1803): on Live, `CountOnly` after the sentence's

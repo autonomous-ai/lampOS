@@ -594,6 +594,9 @@ impl Lamp for Real {
             // The voice renews its lease every 10 ms while it runs.
             available: privacy.is_some(),
             muted_by,
+            // A sleep that still listens for its name (migrate-P2): said
+            // only by a voice whose `voice/mute` checks.
+            hears_name: mute.is_some_and(|mute| mute.hears_name && mute.check().is_ok()),
         })
     }
 
@@ -1107,6 +1110,7 @@ mod tests {
                 hw_switch_muted: None,
                 available: false,
                 muted_by: None,
+                hears_name: false,
             })
         );
         assert!(lamp.health().is_err());

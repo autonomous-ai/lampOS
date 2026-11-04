@@ -224,7 +224,8 @@ impl State {
                 }
                 Control::StartCapture
                 | Control::ConnectReference { .. }
-                | Control::ProviderOutputCapacity { .. } => {
+                | Control::ProviderOutputCapacity { .. }
+                | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid privacy ring control command"));
                 }
             }

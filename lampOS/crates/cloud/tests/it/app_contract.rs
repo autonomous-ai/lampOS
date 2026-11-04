@@ -1016,6 +1016,7 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
             reason,
             muted_by: Some(by),
             control: false,
+            hears_name: false,
         };
         let data = mic(&mut real, &serde_json::to_value(said).unwrap());
         assert_eq!(data["muted"], true, "{data}");
@@ -1031,6 +1032,23 @@ fn mic_get_says_who_muted_the_lamp_only_while_muted() {
     assert!(data.get("muted_by").is_none(), "{data}");
     let data = mic(&mut real, &json!({"muted": true, "reason": "sleep"}));
     assert_eq!(data["muted_by"], "sleep", "{data}");
+    assert!(data.get("hears_name").is_none(), "{data}");
+    // migrate-P2: asleep and listening for its name alone says so, still
+    // muted by sleep; a `hears_name` without a sleep is not believed.
+    let data = mic(
+        &mut real,
+        &json!({"muted": true, "reason": "sleep", "muted_by": "sleep", "hears_name": true}),
+    );
+    assert_eq!(
+        (&data["muted"], &data["muted_by"], &data["hears_name"]),
+        (&json!(true), &json!("sleep"), &json!(true)),
+        "{data}"
+    );
+    let data = mic(
+        &mut real,
+        &json!({"muted": true, "muted_by": "button", "hears_name": true}),
+    );
+    assert!(data.get("hears_name").is_none(), "{data}");
     let _ = std::fs::remove_dir_all(root);
 }
 

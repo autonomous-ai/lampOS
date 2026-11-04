@@ -714,6 +714,7 @@ fn voice_mute_says_who_muted_it() {
             reason: None,
             muted_by: None,
             control: false,
+            hears_name: false,
         }
     );
     drop(open);
@@ -737,6 +738,7 @@ fn voice_mute_says_who_muted_it() {
             reason: Some(MuteReason::Sleep),
             muted_by: Some(MutedBy::Sleep),
             control: false,
+            hears_name: false,
         }
     );
     assert!(said(&asleep).check().is_ok());
@@ -1324,6 +1326,10 @@ fn a_hand_held_on_the_head_puts_it_to_sleep_and_a_tap_wakes_it_once_saved() {
     // only while fresh.
     assert_eq!(owner.take_woken(woke_at), seen.head_tap_at_us);
     assert_eq!(owner.take_woken(woke_at), None, "once");
+    // Only a wake by name goes back to sleep unanswered, and opens the wait
+    // for a line with no name (migrate-P2).
+    assert_eq!(owner.name_resleep_at(), None);
+    assert_eq!(owner.take_name_wake(), None);
     owner.woken = seen.head_tap_at_us;
     assert_eq!(
         owner.take_woken(seen.head_tap_at_us.unwrap() + WOKEN_FRESH_US),
@@ -1332,6 +1338,143 @@ fn a_hand_held_on_the_head_puts_it_to_sleep_and_a_tap_wakes_it_once_saved() {
     );
     let saved = MuteRecord::load(&directory.file(), CLOCK, START + 5_600_000).unwrap();
     assert!(!saved.muted && saved.reason.is_none());
+}
+
+/// A fixture put to sleep by a hand's hold, as the test above does, and
+/// saved: the wait's state for migrate-P2's tests.
+fn asleep_by_a_hold(directory: &Directory) -> (HandControls, TestHead, u64) {
+    let (mut owner, sender) = fixture(head_options(Some(directory)));
+    let mut head = TestHead::new(CLOCK, START);
+    feed(&mut owner, &sender, head.run(START + 500_000, false), false);
+    feed(
+        &mut owner,
+        &sender,
+        head.run(START + 3_700_000, true),
+        false,
+    );
+    owner.persist_muted().unwrap();
+    let quiet = feed(
+        &mut owner,
+        &sender,
+        head.run(START + 4_800_000, false),
+        true,
+    );
+    assert!(
+        quiet
+            .iter()
+            .all(|(_, seen, allowed)| seen.asleep && !allowed)
+    );
+    std::mem::forget(sender);
+    (owner, head, START + 4_800_000)
+}
+
+/// migrate-P2: a sleep that hears its name says so on `voice/mute` (still
+/// muted, by sleep), and a wake by name is a tap's wake: saved before the
+/// latch opens, its "hm?" at the wake's time.
+#[test]
+fn a_sleep_by_a_hold_hears_its_name_and_a_wake_by_name_is_saved_as_a_taps() {
+    let directory = Directory::new();
+    let (mut owner, _head, at) = asleep_by_a_hold(&directory);
+    assert!(owner.asleep_by_choice());
+    owner.set_hears_name(true);
+    let latch = owner.shared.latch.load(Ordering::Acquire);
+    assert_eq!(latch, LATCH_ASLEEP_HEARS_NAME);
+    let said = latch_message(latch).unwrap();
+    assert!(said.asleep() && said.hears_name && said.check().is_ok());
+    assert_eq!(said.muted_by, Some(MutedBy::Sleep));
+    let woke = at + 100_000;
+    assert!(owner.name_wake(woke));
+    assert!(owner.quiescent_at(woke + 1_000).unwrap());
+    assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_OPEN);
+    assert_eq!(owner.take_woken(woke + 2_000), Some(woke));
+    assert_eq!(owner.name_resleep_at(), Some(woke + NAME_RESLEEP_AFTER_US));
+    // Its wait is for the conversation it opens, once, however long the
+    // "hm?" took (migrate-P2).
+    assert_eq!(owner.take_name_wake(), Some(woke));
+    assert_eq!(owner.take_name_wake(), None, "once");
+    let saved = MuteRecord::load(&directory.file(), CLOCK, woke + 3_000).unwrap();
+    assert!(!saved.muted);
+}
+
+/// Sixth's re-sleep guard (migrate-P2): the name, then silence, and the lamp
+/// is asleep again at [`NAME_RESLEEP_AFTER_US`], by sleep, as from a hold,
+/// and hears its name again once the wait says so. Nothing began, so
+/// nothing was sent to speech to text or the model: the guard only lands
+/// while the lamp hasn't answered ([`HandControls::answer_began`]).
+#[test]
+fn a_wake_by_name_that_no_line_follows_goes_back_to_sleep() {
+    let directory = Directory::new();
+    let (mut owner, _head, at) = asleep_by_a_hold(&directory);
+    owner.set_hears_name(true);
+    let woke = at + 100_000;
+    assert!(owner.name_wake(woke));
+    assert!(owner.quiescent_at(woke + 1_000).unwrap());
+    let _ = owner.take_woken(woke + 2_000);
+    // A person who watches it stand has this long (the owner, migrate-P2).
+    assert_eq!(NAME_RESLEEP_AFTER_US, 15_000_000);
+    let before = owner.poll_at(woke + NAME_RESLEEP_AFTER_US - 1).unwrap();
+    assert!(!before.muted && !before.mute_changed);
+    let again = owner.poll_at(woke + NAME_RESLEEP_AFTER_US).unwrap();
+    assert!(again.mute_changed && again.muted && again.asleep);
+    assert_eq!(owner.name_resleep_at(), None);
+    owner.persist_muted().unwrap();
+    let saved =
+        MuteRecord::load(&directory.file(), CLOCK, woke + NAME_RESLEEP_AFTER_US + 1).unwrap();
+    assert!(saved.asleep());
+    owner.set_hears_name(true);
+    let said = latch_message(owner.shared.latch.load(Ordering::Acquire)).unwrap();
+    assert!(said.asleep() && said.hears_name);
+}
+
+/// A false wake in a busy room (Seventh on #4877): a line attention holds is
+/// open a while and gets no answer, and the lamp is asleep at the wake's 15 s.
+#[test]
+fn a_held_line_after_a_wake_by_name_does_not_keep_it_awake() {
+    let directory = Directory::new();
+    let (mut owner, _head, at) = asleep_by_a_hold(&directory);
+    let woke = at + 100_000;
+    assert!(owner.name_wake(woke));
+    assert!(owner.quiescent_at(woke + 1_000).unwrap());
+    owner.set_line_open(true);
+    assert!(!owner.poll_at(woke + 5_000_000).unwrap().muted);
+    owner.set_line_open(false);
+    assert!(!owner.poll_at(woke + 6_000_000).unwrap().muted);
+    let again = owner.poll_at(woke + NAME_RESLEEP_AFTER_US).unwrap();
+    assert!(again.muted && again.asleep);
+}
+
+/// The re-sleep never cuts off a line open at its time: it lands at the line's
+/// end, however long the line ran.
+#[test]
+fn a_wake_by_names_re_sleep_waits_for_an_open_line() {
+    let directory = Directory::new();
+    let (mut owner, _head, at) = asleep_by_a_hold(&directory);
+    let woke = at + 100_000;
+    assert!(owner.name_wake(woke));
+    assert!(owner.quiescent_at(woke + 1_000).unwrap());
+    owner.set_line_open(true);
+    let during = owner.poll_at(woke + NAME_RESLEEP_AFTER_US + 1).unwrap();
+    assert!(!during.muted);
+    assert_eq!(owner.name_resleep_at(), Some(woke + NAME_RESLEEP_AFTER_US));
+    owner.set_line_open(false);
+    let after = owner.poll_at(woke + NAME_RESLEEP_AFTER_US + 2).unwrap();
+    assert!(after.muted && after.asleep);
+}
+
+/// An answer keeps a wake by name (a tap's wake has no guard:
+/// `a_hand_held_on_the_head_puts_it_to_sleep_and_a_tap_wakes_it_once_saved`).
+#[test]
+fn an_answer_keeps_a_wake_by_name_and_a_taps_wake_has_no_guard() {
+    let directory = Directory::new();
+    let (mut owner, _head, at) = asleep_by_a_hold(&directory);
+    let woke = at + 100_000;
+    assert!(owner.name_wake(woke));
+    assert!(owner.quiescent_at(woke + 1_000).unwrap());
+    owner.answer_began();
+    let later = owner
+        .poll_at(woke + NAME_RESLEEP_AFTER_US + 1_000_000)
+        .unwrap();
+    assert!(!later.muted && !later.mute_changed);
 }
 
 /// #3747 (the lead on #1711): while the onboarding walk is under way, a
@@ -1371,6 +1514,7 @@ fn a_hold_while_onboarding_is_under_way_asks_no_sleep() {
             reason: None,
             muted_by: None,
             control: false,
+            hears_name: false,
         }),
         "said open"
     );
@@ -1934,6 +2078,7 @@ fn the_pump_says_the_latch_on_voice_mute_when_it_changes_and_every_second() {
             reason: None,
             muted_by: None,
             control: false,
+            hears_name: false,
         }
     );
     shared.latch.store(LATCH_ASLEEP, Ordering::Release);
@@ -3675,6 +3820,7 @@ fn a_computers_mute_closes_the_microphones_without_touching_the_record() {
             reason: None,
             muted_by: None,
             control: true,
+            hears_name: false,
         }
     );
     assert!(said(&owner).check().is_ok());
@@ -3819,4 +3965,19 @@ fn a_computers_lift_never_opens_sleep_or_the_restart_guard() {
 fn without_a_mute_record_a_computers_mute_is_refused() {
     let (owner, _sender) = fixture(options(true, None));
     assert!(owner.control_mutes().hold().is_err());
+}
+
+/// A paired computer's mute closes the microphones: a hand's sleep under it
+/// doesn't listen for its name, and its name can't wake it (migrate-P2).
+#[test]
+fn a_sleep_under_a_computers_mute_does_not_hear_its_name() {
+    let directory = Directory::new();
+    let (mut owner, _head, at) = asleep_by_a_hold(&directory);
+    assert!(owner.asleep_by_choice());
+    let mutes = owner.control_mutes();
+    let _hold = mutes.hold().unwrap();
+    owner.poll_at(at + 1_000).unwrap();
+    assert!(owner.control_held());
+    assert!(!owner.asleep_by_choice());
+    assert!(!owner.name_wake(at + 2_000));
 }

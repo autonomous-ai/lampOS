@@ -462,6 +462,11 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::WokenByName {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -565,7 +570,8 @@ impl FixtureProvider {
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }
-            | ProviderInput::TurnOpened { .. } => {}
+            | ProviderInput::TurnOpened { .. }
+            | ProviderInput::WokenByName { .. } => {}
             ProviderInput::End { .. } => {
                 let input = self
                     .input
@@ -689,7 +695,11 @@ impl FixtureProvider {
                 Some(Control::ProviderOutputCapacity { through }) => {
                     self.output_flow.grant(through)?;
                 }
-                Some(Control::StartCapture | Control::ConnectReference { .. }) => {
+                Some(
+                    Control::StartCapture
+                    | Control::ConnectReference { .. }
+                    | Control::NameGrant { .. },
+                ) => {
                     return Err(invalid("invalid fixture provider control"));
                 }
                 None => return Ok(ControlDrain::Empty),
