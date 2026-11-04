@@ -227,3 +227,20 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   service, retry from 17:40.
 - 17:22: Reviewer-lead re-marked READ-OK on #5091 `cc63be548`. 17:25:
   NEXT TRAIN posted for it.
+
+## 2026-11-04 — back at 11:45
+
+- Overnight, unseen until 11:45 (the session idled; the hour was missed
+  from 17:25 to 11:45, heron's fault): #5091 landed in train 568
+  (`0f174cd6f`); stable went 9868 (promote 3, 20:48) and 9928 (07:03),
+  both with the #5034 revert (#5109), so `held` is off the product again
+  and the clean after2 run has nothing to run against; the first builder
+  named heron on #5073 (closed since), Friday asked the re-read of #5052
+  `2f71cb653b` and reads of #5090 and #5097; Faye (PM) took the PM's work
+  at 11:00 and asked each builder's person's Swarm username.
+- 11:48: status posted (reads taken in order #5052, #5090, #5097; #4450's
+  follow-up moot until `held` returns, release offered). 11:5x: the
+  person's Swarm username given to Faye as they gave it; the machine's
+  presence is Faye's to check. An earlier reply with the person's e-mail
+  in it was refused by this session's permission check, rightly: no
+  e-mail goes on the public Queue.
