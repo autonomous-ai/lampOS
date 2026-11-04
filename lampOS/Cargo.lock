@@ -2268,6 +2268,7 @@ name = "lamp-services"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "lamp-local-time",
  "reqwest",
  "ring",
  "rustix",

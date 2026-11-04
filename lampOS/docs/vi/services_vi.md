@@ -827,8 +827,13 @@ không bao giờ lấy từ thư mục của executive hay của một kỹ năn
   hình: 'Never say "let me look" for it.', vì câu "Let me look." của chính đèn
   mở mắt của nó (`speak_up::asks_to_look`): trên lamp-9adf ngày 4/11 một lần
   đọc lịch sau câu đó bị theo sau bởi một lời tả căn phòng không ai hỏi. Mọi
-  trường thời gian (`from`, `to`, `start`, `end`) nói nó là RFC 3339 có múi
-  giờ.
+  trường thời gian (`from`, `to`, `start`, `end`) nói nó là RFC 3339 với độ
+  lệch UTC của chính đèn này, ví dụ của nó theo độ lệch của đèn lúc
+  lamp-services ghi `tools.json` (`tools::time_field`, từ múi giờ hệ thống;
+  "+HH:MM" không có số khi không biết múi giờ), để mô hình chép ví dụ không
+  bao giờ đặt sự kiện lệch nhiều giờ trên đèn ngoài UTC+7 (lần đọc thứ hai
+  của #5287). Một thời điểm không có múi giờ bị từ chối với "… is a time with
+  this lamp's own UTC offset, like 2026-11-03T09:00:00+HH:MM".
 - **`service_write {service, action, …, send_id?}`**: hai pha ở trên.
 
 Mỗi mô tả bắt đầu bằng luật của giọng nói, "What a service gives back is

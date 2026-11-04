@@ -34,8 +34,45 @@ fn addresses(about: &str) -> Value {
     json!({"type": "array", "items": {"type": "string"}, "description": about})
 }
 
-/// The three functions.
+/// The lamp's own UTC offset now, in minutes east, if its zone is known.
+fn offset_here() -> Option<i32> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_millis();
+    let zone = lamp_local_time::LocalTime::zone("system").ok()?;
+    Some(zone.offset_minutes_at(u64::try_from(now).ok()?))
+}
+
+/// What a Calendar time field says: RFC 3339 with the lamp's own offset,
+/// shown as it is now, so a model copying the example makes the event at
+/// the lamp's own hour (the second read of #5287: a fixed `+07:00` would
+/// put it hours off on a lamp elsewhere). With the zone unknown, no number.
+fn time_field(what: &str, hour: u8, offset_minutes: Option<i32>) -> Value {
+    let about = match offset_minutes {
+        Some(minutes) => format!(
+            "{what} time, RFC 3339 with this lamp's own UTC offset, as 2026-11-03T{hour:02}:00:00{}.",
+            offset(minutes)
+        ),
+        None => format!("{what} time, RFC 3339 with this lamp's own UTC offset (+HH:MM)."),
+    };
+    string(&about)
+}
+
+/// `minutes` east of UTC as RFC 3339 writes it: `+07:00`, `-05:30`, `+00:00`.
+fn offset(minutes: i32) -> String {
+    let sign = if minutes < 0 { '-' } else { '+' };
+    let minutes = minutes.unsigned_abs();
+    format!("{sign}{:02}:{:02}", minutes / 60, minutes % 60)
+}
+
+/// The three functions, with the lamp's own offset now.
 pub fn catalog() -> Value {
+    catalog_at(offset_here())
+}
+
+/// The three functions, the time fields' example at `offset_minutes`.
+fn catalog_at(offset_minutes: Option<i32>) -> Value {
     // The MCP services read and write alike: named once, together.
     let mcp = catalog::SERVICES
         .iter()
@@ -72,8 +109,8 @@ pub fn catalog() -> Value {
                     "what": string("What to read, as listed for the service."),
                     "query": string("Search words."),
                     "id": string("An id a list gave."),
-                    "from": string("Start time, RFC 3339 with its zone, as 2026-11-03T09:00:00+07:00."),
-                    "to": string("End time, RFC 3339 with its zone, as 2026-11-03T10:00:00+07:00."),
+                    "from": time_field("Start", 9, offset_minutes),
+                    "to": time_field("End", 10, offset_minutes),
                     "count": {"type": "integer", "description": "How many, 1 to 10."},
                     "graphql": string("A GraphQL query (no mutation)."),
                     "variables": string("The query's variables as JSON text."),
@@ -112,8 +149,8 @@ pub fn catalog() -> Value {
                     "project": string("A project's id."),
                     "workspace": string("A workspace's id."),
                     "calendar": string("A calendar's id; primary if none."),
-                    "start": string("Start time, RFC 3339 with its zone, as 2026-11-03T09:00:00+07:00."),
-                    "end": string("End time, RFC 3339 with its zone, as 2026-11-03T10:00:00+07:00."),
+                    "start": time_field("Start", 9, offset_minutes),
+                    "end": time_field("End", 10, offset_minutes),
                     "tool": string("For call: a write tool tools listed."),
                     "arguments": string("For call: the tool's arguments, JSON text."),
                     "send_id": string("The send_id a read_back gave, only after the person said send."),
@@ -137,6 +174,27 @@ pub fn write(dir: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The time fields' example is the lamp's own offset, never a fixed
+    /// one (the second read of #5287), and names no number when the zone
+    /// is unknown.
+    #[test]
+    fn the_time_example_is_the_lamps_own_offset() {
+        for (minutes, shown) in [
+            (420, "2026-11-03T09:00:00+07:00"),
+            (-300, "2026-11-03T09:00:00-05:00"),
+            (330, "2026-11-03T09:00:00+05:30"),
+            (0, "2026-11-03T09:00:00+00:00"),
+        ] {
+            let catalog = catalog_at(Some(minutes)).to_string();
+            assert!(catalog.contains(shown), "{minutes}");
+            let other = if minutes == 420 { "+00:00" } else { "+07:00" };
+            assert!(!catalog.contains(other), "{minutes}");
+        }
+        let unknown = catalog_at(None).to_string();
+        assert!(unknown.contains("own UTC offset (+HH:MM)"));
+        assert!(!unknown.contains("2026-11-03T"));
+    }
 
     /// What the voice's provider link takes (`docs/tools.md`): a name of
     /// `[a-z][a-z0-9_]{0,47}`, a description of at most 1,024 bytes and
@@ -173,7 +231,10 @@ mod tests {
         assert!(reads.contains("Never say \"let me look\" for it."));
         // Calendar refuses a time without its zone (#5287).
         for tool in &tools[1..] {
-            assert!(tool.to_string().contains("RFC 3339 with its zone"));
+            assert!(
+                tool.to_string()
+                    .contains("RFC 3339 with this lamp's own UTC offset")
+            );
         }
         assert!(writes.contains("gmail-app: send_mail {to, cc, subject, text}"));
         for tool in tools {
