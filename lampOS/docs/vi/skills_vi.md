@@ -61,7 +61,9 @@ sau:
    bước đọc duy nhất của dịch vụ đó (bước của lịch hay thư được cho trọn; với
    dịch vụ khác, các việc đọc của nó được liệt kê trừ những việc trả về toàn
    văn và dạng tự do), thời điểm trong ngày là của yêu cầu (`during` của
-   trigger chỉ là ví dụ, 08:00 đến 08:30), và câu "có" nói ra của nó nêu dịch vụ, thứ nó đọc và điều kiện, "when
+   trigger chỉ ghi dạng `HH:MM`, và chỉ khi yêu cầu nêu giờ: lần thử trên
+   lamp-9adf ngày 5/11 đã tạo skill với 08:00 đến 08:30 được nêu làm ví dụ,
+   dù yêu cầu không hề nói giờ), và câu "có" nói ra của nó nêu dịch vụ, thứ nó đọc và điều kiện, "when
    you're alone with the lamp, it reads you tomorrow's Google Calendar: how
    many events, then each time and title." Khi tắt, mọi yêu cầu nêu một dịch
    vụ là `NOT_A_SERVICE`, như trước.
