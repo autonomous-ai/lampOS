@@ -737,9 +737,12 @@ kỹ năng có nêu bất kỳ dịch vụ liên kết nào (thư và lịch: "m
 nguyên vẹn: Notion, Figma, GitHub, Asana, Ahrefs, Facebook, Slack, HubSpot,
 Amplitude, "gdrive"; và "google drive", "linear app", "monday com" dưới dạng
 cụm từ, vì "drive", "linear" và "monday" cũng là từ thường) không bao giờ được
-giao cho mô hình: `made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "A skill
-can't use your mail, calendar or other services, but you can just ask me once
-the service is linked in the app: Skills, then Connectors."
+giao cho mô hình: `made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "Not
+possible yet: a skill can't use your mail, calendar or other services, even
+ones already linked. Say so plainly, in a few words, and that they can ask you
+for it themselves any time." Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf
+ngày 4/11 mô hình bảo chủ liên kết một lịch đã được liên kết (#5288, nơi các
+skill đọc dịch vụ được lên kế hoạch).
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
 to this lamp yet. It can be linked in the app: Skills, then Connectors."
