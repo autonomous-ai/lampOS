@@ -41,7 +41,9 @@ until its model is put there and the voice is told where.
   lamp-update when its environment doesn't set `LAMP_UPDATE_MODELS`; one
   set there, `off` included, wins.
   The voice reads the model only when `LAMP_SAME_VOICE_MODEL` names it,
-  which no product unit sets.
+  which the product's `lamp-voice.service` does at that path since
+  4 November, with `LAMP_SAME_VOICE_FOR=services` ("For the services
+  only", below).
 - **The front end:** 80 Kaldi filter banks a frame, computed in Rust as
   `torchaudio.compliance.kaldi.fbank` computes them with no dither, with
   the utterance's mean taken off each band, as 3D-Speaker does.
@@ -257,8 +259,9 @@ pass as the same and go on, so more talk between people is answered, the
 case #829 was made for. That set's count of pairs of two at or over 0.30 is
 not recountable (only its summary is kept): between about 220 (at 0.455,
 its 7.5% equal error) and 1,269 (at 0.25) of 2,966. The 0.29 top for other
-voices on 21 October is two synthetic voices in one room. Without `LAMP_SAME_VOICE_MODEL`, which
-no lamp sets today, nothing changes.
+voices on 21 October is two synthetic voices in one room. Without `LAMP_SAME_VOICE_MODEL`, or
+with it for the services alone (`LAMP_SAME_VOICE_FOR=services`, the
+product's since 4 November), nothing changes.
 
 **The bar was 0.45 before**, the equal-error bar of lamp-4ace's labelled set
 (18 October, scored on lamp-4ace by the first builder with the Sixth's
@@ -339,7 +342,8 @@ speakers, both judged right.)
   was most of them: 31 of 38 on the older recordings (below). Before, one
   false "another voice" held one line; now it holds every unnamed line
   after it until the lamp speaks. **So before `LAMP_SAME_VOICE_MODEL`
-  goes on anywhere,** #829's battery on lamp-4ace gets a TV line and a
+  goes on anywhere for the conversation** (not for the services alone,
+  `LAMP_SAME_VOICE_FOR=services`), #829's battery on lamp-4ace gets a TV line and a
   raised-voice line between a call and its follow-up. If those end the
   conversation, the fallback is to end it only when the other voice was
   near the lamp (`set_near`) or a second face is in view.
@@ -555,13 +559,14 @@ speakers, both judged right.)
   journal line. One that ends 3 times in a row before it is ready
   (`MOST_UNREADY`: a missing program or model, a broken file) is not
   started again, and the journal says once that the check is off.
-- **Shipped in the voice's folder, off.** `lamp-same-voice` is an
+- **Shipped in the voice's folder.** `lamp-same-voice` is an
   `optional` binary in `deploy/package-binaries.json`, so a published build
   carries it, and `lamp-update install` puts it beside `lamp-voice` when the
   build carries it (`install::BESIDE_IF_CARRIED`; a build from before it
-  still installs, and install says once that it was left out). Nothing
-  turns it on: the voice starts it only when `LAMP_SAME_VOICE_MODEL` is set,
-  and no product unit sets it. A round carries a voice folder's files
+  still installs, and install says once that it was left out). The voice
+  starts it only when `LAMP_SAME_VOICE_MODEL` is set, which the product's
+  `lamp-voice.service` does since 4 November, for the linked services
+  alone (`LAMP_SAME_VOICE_FOR=services`). A round carries a voice folder's files
   forward and replaces the build's own, but adds none the old folder lacks
   (`round::wants_of`), so a lamp installed before this gets the binary at
   its next `lamp-update install`, not from a round; until then, a lamp that
@@ -655,8 +660,9 @@ alike to the asker").
 
 Shown in tests only (`like_asker_is_against_the_line_that_began_the_conversation_alone`,
 `like_asker_is_told_only_in_a_conversation_and_high_in_the_askers_voice`):
-no unit in `deploy/` sets `LAMP_SAME_VOICE_MODEL` or `LAMP_ADDRESSED`
-yet, and the voice says `like_asker` only with both.
+no unit in `deploy/` sets `LAMP_ADDRESSED` yet, and the product's
+`LAMP_SAME_VOICE_MODEL` comes with `LAMP_SAME_VOICE_FOR=services`, whose
+prints the Policy's `like_asker` never reads (below), so no lamp says it.
 
 ## For the services only (`LAMP_SAME_VOICE_FOR=services`, 4 November)
 
@@ -705,8 +711,12 @@ prints for the services alone:
 Shown in tests only (`the_services_alone_start_the_same_voice_for_themselves`,
 `prints_for_the_services_alone_feed_their_judge_and_no_conversation_rule`,
 `a_late_other_voice_ends_no_conversation_for_the_services_alone`,
-`the_prints_are_for_the_services_only_with_services_exactly`): no unit in
-`deploy/` sets it.
+`the_prints_are_for_the_services_only_with_services_exactly`). The
+product's `lamp-voice.service` sets it, beside `LAMP_SAME_VOICE_MODEL` at
+CAM++'s pinned path, since 4 November, with `LAMP_SERVICES_WRITE=on` in
+`lamp-services.service` ([services.md](services.md)); a lamp whose voice
+folder lacks the model or `lamp-same-voice` has the check off after its
+three starts (`MOST_UNREADY`), and every send stays refused.
 
 ## The owner's voice print (`LAMP_SAME_VOICE_FOR=services`, 4 November)
 
@@ -798,8 +808,9 @@ Shown in tests only (`owner_voice::tests`,
 `a_send_is_held_to_the_owners_enrolled_print_when_there_is_one`,
 `the_owner_is_asked_to_learn_their_voice_once_after_a_send`,
 `two_lines_and_three_seconds_make_a_print`,
-`a_services_likeness_of_0_6_passes_and_0_4_is_refused`): no unit in
-`deploy/` sets `LAMP_SAME_VOICE_FOR`.
+`a_services_likeness_of_0_6_passes_and_0_4_is_refused`). The product's
+`lamp-voice.service` sets `LAMP_SAME_VOICE_FOR=services` since 4 November
+("For the services only", above); played check: see the PR's Lamp check.
 
 ## Not shown
 

@@ -348,8 +348,15 @@ Environment=LAMP_SCHEDULE_TOOLS=on
 # The person's linked services, read by voice for the owner only (Queue #4710): declared only when
 # lamp-services' tools.json is there, so a lamp whose update has not yet put lamp-services on is told
 # none. Read on lamp-9adf on build 9928 on 4 Nov ("what is on my Google calendar this week?").
-# Writes stay off unless lamp-services.service sets LAMP_SERVICES_WRITE=on.
+# Sends on too: lamp-services.service sets LAMP_SERVICES_WRITE=on.
 Environment=LAMP_SERVICES=on
+# The owner's voice print for the linked services only, so a send and a read in full can be held to the owner's
+# voice; every conversation rule reads no print (LAMP_SAME_VOICE_FOR=services, docs/same-voice.md). The model is
+# pinned in deploy/product/models.json and fetched by install and by rounds (lamp-update.service's models switch,
+# on). Missing, the check's child ends 3 times before ready and the check turns off, journalled once
+# (MOST_UNREADY), and every send stays refused as before.
+Environment=LAMP_SAME_VOICE_MODEL=/opt/lampOS/voice/current/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+Environment=LAMP_SAME_VOICE_FOR=services
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
@@ -457,8 +464,9 @@ Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on
 Environment=LAMP_MEMORY_FORGET_ASKS=on
 # What a caller said before their face was known becomes theirs once it is (#2176, docs/memory.md): the memory
 # owner's call on 4 Nov. It needs LAMP_MEMORY_DAYS and LAMP_VOICE_ROUTE=second, both above, and the eyes' speaking
-# faces (LAMP_EYES_SPEAKING). With no LAMP_SAME_VOICE_MODEL in the product no line has a voice print, so only a line
-# seen spoken by exactly one face, the one the eyes know as that person, moves; off camera or two faces, it stays.
+# faces (LAMP_EYES_SPEAKING). The product's voice print is for the linked services only (LAMP_SAME_VOICE_FOR=services,
+# above), so this rule reads no print, and only a line seen spoken by exactly one face, the one the eyes know as that
+# person, moves; off camera or two faces, it stays.
 Environment=LAMP_MEMORY_FOLLOWS_FACE=on
 # One memory id through a rename (#2176 row 3): the voice keys a known person's memory on the id the eyes give
 # beside their name, with the eyes' LAMP_MEMORY_STABLE_ID (both or neither: apart, no ids are used). Anyone already

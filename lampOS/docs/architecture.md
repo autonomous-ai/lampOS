@@ -65,10 +65,11 @@ says otherwise, this is what runs.
   [expression.md](expression.md)).
 - Memory is `lamp-memory`, as below.
 - **A person's linked services** (Gmail, their calendar, Notion, GitHub and
-  the rest of V1's connectors) are `lamp-services`, installed but off: its
+  the rest of V1's connectors) are `lamp-services`, on in the product: its
   tokens in root's store, read through the voice's three functions, a write
-  only on a spoken "send" after a full read-back (`LAMP_SERVICES`,
-  `LAMP_SERVICES_WRITE`, [services.md](services.md)).
+  only on a spoken "send" after a full read-back, held to the owner's voice
+  print (`LAMP_SERVICES`, `LAMP_SERVICES_WRITE`,
+  `LAMP_SAME_VOICE_FOR=services`, [services.md](services.md)).
 
 ## Product boundary
 
