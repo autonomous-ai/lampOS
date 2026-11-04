@@ -6918,6 +6918,45 @@ impl Heeding {
         crate::untied_going_on::tied(heard, &said)
     }
 
+    /// With `LAMP_UNTIED_GOING_ON=held` (#5110), why a line with no tie by
+    /// [`Self::tied_to_the_lamp`] is still the caller's own, if it is: said
+    /// right after the lamp's own answer, with no held line between, it
+    /// replies to it ("Thanks.", "That's a good idea.",
+    /// [`crate::untied_going_on::replies_to_the_lamp`]) or asks its advice
+    /// ("Any tips to sleep better tonight?",
+    /// [`crate::untied_going_on::asks_for_advice`]). Never in a sure other
+    /// voice than the conversation's (`Seen::other_voice`), or with desk
+    /// talk ([`crate::untied_going_on::desk_talk`]): a colleague's "Thanks"
+    /// to the caller is not the caller's (Twelve's P3 on #5240).
+    fn callers_own_line(&self, request: u64, seen: &Seen) -> Option<&'static str> {
+        let heard = seen.heard.as_str();
+        if seen.other_voice || crate::untied_going_on::desk_talk(heard) {
+            return None;
+        }
+        // The line judged before this one is the one the lamp answered
+        // last: nothing was held between its answer and this line.
+        let answered = crate::thread::current(self.thread.as_deref(), |thread| {
+            thread.answered_request_but(request)
+        })
+        .flatten();
+        let before = self
+            .said_lately
+            .iter()
+            .rev()
+            .map(|(before, ..)| *before)
+            .find(|before| *before != request);
+        if answered.is_none() || before != answered {
+            return None;
+        }
+        if crate::untied_going_on::replies_to_the_lamp(heard) {
+            Some("said right after the lamp's answer, it replies to it")
+        } else if crate::untied_going_on::asks_for_advice(heard) {
+            Some("said right after the lamp's answer, it asks the lamp's advice")
+        } else {
+            None
+        }
+    }
+
     /// In a busy room with nobody turned to the lamp, the text shows a call
     /// only as the name set off as one, or with the name heard
     /// (`LAMP_BUSY_CALLED_STRICT=on`).
@@ -9515,6 +9554,11 @@ impl Heeding {
         // `LAMP_UNTIED_GOING_ON`: whether its words tie it to the lamp, read
         // before the rule's verdict; only with the switch.
         let tied = !self.untied || seen.lamp_asked || self.tied_to_the_lamp(request, &seen.heard);
+        // With `held`, the caller's own line is tied too (#5110).
+        let callers_own = (self.untied_held && !tied)
+            .then(|| self.callers_own_line(request, seen))
+            .flatten();
+        let tied = tied || callers_own.is_some();
         // #3945: whether only one person is at the lamp (no other voice, no
         // face speaking it but the caller's, at most one face in view), read
         // only for a line opening with a set-off name that is also a word
@@ -9553,13 +9597,18 @@ impl Heeding {
         // lamp is held, not told; the model answered most such lines.
         if self.untied_held
             && alone
-            && !tied
             && !stop_over_the_lamp
             && matches!(verdict, Some(crate::attention::Verdict::Play(_)))
         {
-            verdict = Some(crate::attention::Verdict::Hold(
-                crate::untied_going_on::HELD,
-            ));
+            if !tied {
+                verdict = Some(crate::attention::Verdict::Hold(
+                    crate::untied_going_on::HELD,
+                ));
+            } else if let Some(why) = callers_own {
+                eprintln!(
+                    "lamp-voice second: request {request}: let out only as the conversation going on, and not held as untied: {why} (LAMP_UNTIED_GOING_ON=held, #5110)"
+                );
+            }
         }
         // A reply to nothing the lamp asked, said over its answer, is
         // someone else's (#2136): "Yes, give me five minutes." to B, over
@@ -28020,3 +28069,7 @@ mod memory_observer {
 #[cfg(test)]
 #[path = "worker/kept_name_callback_tests.rs"]
 mod kept_name_callback;
+
+#[cfg(test)]
+#[path = "worker/held_keeps_caller_tests.rs"]
+mod held_keeps_caller;

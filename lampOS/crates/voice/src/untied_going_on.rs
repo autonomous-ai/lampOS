@@ -36,6 +36,16 @@
 //! begun over the lamp's answer, the model answered 10: the note alone does
 //! not keep it out, and each answer kept the next line inside the window,
 //! so no busy room ever formed.
+//!
+//! `held` keeps the caller's own lines (#5110): in the first builder's 37
+//! owner and companion lines on lamp-52e6 (stable 9788, 3 Nov 18:43, a
+//! quiet room, #5085), OFF answered 37/37 and `held` 25/28, its three
+//! misses all held as untied. With `held` the worker also ties a line said
+//! right after the lamp's own answer, with nothing held between and in no
+//! sure other voice, that replies to it ([`replies_to_the_lamp`]:
+//! "Thanks.", "That's a good idea.") or an ask of its advice
+//! ([`asks_for_advice`]: "Any tips to sleep better tonight?"). With `on`,
+//! as before.
 
 /// Where the worker reads the switch. `on` or `held`.
 pub const ENVIRONMENT: &str = "LAMP_UNTIED_GOING_ON";
@@ -431,6 +441,128 @@ pub fn shares_a_word(heard: &str, said: &[&str]) -> bool {
         .any(|word| theirs.iter().any(|their| same_word(word, their)))
 }
 
+/// Words a line opens with in reply to what was just said to it: a thanks,
+/// or taking up the idea (#5110: `talk_day-5`'s "That's a good idea." and
+/// `talk_day-6`'s "Thanks. You're a good listener.", held on lamp-52e6).
+const REPLIES: &[&str] = &[
+    "thanks",
+    "thank you",
+    "thank u",
+    "cheers",
+    "much appreciated",
+    "appreciate it",
+    "i appreciate it",
+    "that's a good idea",
+    "that's a great idea",
+    "that is a good idea",
+    "good idea",
+    "great idea",
+    "that sounds good",
+    "that sounds great",
+    "sounds good",
+    "sounds great",
+    "that makes sense",
+    "makes sense",
+    "that's helpful",
+    "that helps",
+    "good to know",
+    "that's good to know",
+    "you're right",
+    "got it",
+    "cảm ơn",
+    "cám ơn",
+    "ý hay",
+    "hay đấy",
+    "đúng rồi",
+];
+
+/// Words before a reply that leave it a reply: "Okay, thanks.", "Oh, that
+/// makes sense.".
+const REPLY_LEADS: &[&str] = &[
+    "oh", "ah", "aw", "okay", "ok", "well", "yeah", "yes", "wow", "hmm", "alright", "lamp",
+];
+
+/// Words that open a question asking for advice of the one who knows: "Any
+/// tips to sleep better tonight?", "How can I stop waking up at night?".
+const ASKS_FOR_ADVICE: &[&str] = &[
+    "any tips",
+    "any tip",
+    "any advice",
+    "any ideas",
+    "any suggestions",
+    "what should i",
+    "what can i",
+    "how should i",
+    "how can i",
+    "how do i",
+    "what do you suggest",
+    "what would you suggest",
+    "what do you recommend",
+    "what would you recommend",
+];
+
+/// Whether `heard` opens in reply to what was just said to it
+/// ([`REPLIES`], after any of [`REPLY_LEADS`]), says no one's name right
+/// after ("Thanks Sam, …") and shows no desk talk ([`desk_talk`]). The
+/// worker asks it only of a line said right after the lamp's own answer:
+/// after a held desk line, a thanks may be a person's to another.
+pub fn replies_to_the_lamp(heard: &str) -> bool {
+    let words = words_of(heard);
+    let mut rest = words.as_str();
+    while let Some(lead) = REPLY_LEADS
+        .iter()
+        .find(|lead| rest.starts_with(&format!(" {lead} ")))
+    {
+        rest = &rest[lead.len() + 1..];
+    }
+    let Some(reply) = REPLIES
+        .iter()
+        .filter(|reply| rest.starts_with(&format!(" {reply} ")))
+        .max_by_key(|reply| reply.len())
+    else {
+        return false;
+    };
+    // The words heard up to the reply's end, and the one after it: a word
+    // in capitals there, in the same sentence, is someone's name ("Thanks
+    // Sam", "Thanks, Linh"), unless it is the speaker or the lamp.
+    let opened = words[..words.len() - rest.len() + reply.len() + 1]
+        .split_whitespace()
+        .count();
+    let tokens: Vec<&str> = heard
+        .split_whitespace()
+        .filter(|token| token.chars().any(char::is_alphanumeric))
+        .collect();
+    let names_someone = tokens.get(opened).is_some_and(|next| {
+        let ends_a_sentence = tokens
+            .get(opened.wrapping_sub(1))
+            .is_some_and(|last| last.ends_with(['.', '!', '?']));
+        let word = words_of(next);
+        !ends_a_sentence
+            && next.chars().next().is_some_and(char::is_uppercase)
+            && !["i", "i'm", "i'll", "i've", "i'd", "lamp"].contains(&word.trim())
+    });
+    !names_someone && !desk_talk(heard)
+}
+
+/// Whether `heard` asks for advice ([`ASKS_FOR_ADVICE`] opening any part
+/// of a question, after any of [`ASK_LEADS`]) with no sign of desk talk
+/// ([`desk_talk`]). The worker asks it only of a line said right after
+/// the lamp's own answer.
+pub fn asks_for_advice(heard: &str) -> bool {
+    let asks = |part: &str| {
+        let words = words_of(part);
+        let rest = ASK_LEADS
+            .iter()
+            .filter(|lead| words.starts_with(&format!(" {lead} ")))
+            .max_by_key(|lead| lead.len())
+            .map_or(words.as_str(), |lead| &words[lead.len() + 1..]);
+        ASKS_FOR_ADVICE
+            .iter()
+            .any(|phrase| rest.starts_with(&format!(" {phrase} ")))
+    };
+    heard.contains('?') && heard.split([',', '.', ';', '!', '?']).any(asks) && !desk_talk(heard)
+}
+
 /// Whether a line let out only as the conversation going on is tied to the
 /// lamp by its words: it refers back, shares a content word with what the
 /// lamp last said or the line that was to (`said`), or asks the lamp a
@@ -663,5 +795,61 @@ mod tests {
             "Did you send the slides to Sam yet?",
             &["It's sunny in Saigon, about thirty-three degrees."]
         ));
+    }
+
+    /// #5110: `talk_day-6`'s thank-you and `talk_day-5`'s "That's a good
+    /// idea." reply to what was just said; a thanks to someone by name, or
+    /// with desk talk, does not.
+    #[test]
+    fn replies_open_with_thanks_or_taking_up_the_idea() {
+        for line in [
+            "Thanks. You're a good listener.",
+            "Thank you, that was nice.",
+            "Okay, thanks a lot.",
+            "Oh, that makes sense.",
+            "That's a good idea. Any tips to sleep better tonight?",
+            "Sounds good, I'll try it.",
+            "Thanks, I'll try that.",
+            "Thanks Lamp.",
+            "Cảm ơn nhé.",
+        ] {
+            assert!(replies_to_the_lamp(line), "{line}");
+        }
+        for line in [
+            "Thanks Sam, I'll send it after lunch.",
+            "Thanks, Linh.",
+            "Sam, thanks for the coffee.",
+            "Thanks, you guys.",
+            "No thanks.",
+            "I'm thankful it's Friday.",
+            "Did you send the slides to Sam yet?",
+            "Not yet, I'll do it after lunch.",
+        ] {
+            assert!(!replies_to_the_lamp(line), "{line}");
+        }
+    }
+
+    /// #5110: `talk_day-5`'s "Any tips …?" asks advice of the one who
+    /// knows; a statement, or one asked of a colleague by name, does not.
+    #[test]
+    fn advice_is_asked_in_a_question() {
+        for line in [
+            "Any tips to sleep better tonight?",
+            "That's a good idea. Any tips to sleep better tonight?",
+            "How can I stop waking up at night?",
+            "So what should I eat before a run?",
+            "What would you recommend?",
+        ] {
+            assert!(asks_for_advice(line), "{line}");
+        }
+        for line in [
+            "Any tips are welcome.",
+            "Sam, how do I get to the meeting room?",
+            "How do I look, you guys?",
+            "Are you coming to the meeting at four?",
+            "Can you pass me the charger? The white one.",
+        ] {
+            assert!(!asks_for_advice(line), "{line}");
+        }
     }
 }
