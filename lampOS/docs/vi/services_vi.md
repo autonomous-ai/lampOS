@@ -739,8 +739,8 @@ Amplitude, "gdrive"; và "google drive", "linear app", "monday com" dưới dạ
 cụm từ, vì "drive", "linear" và "monday" cũng là từ thường) không bao giờ được
 giao cho mô hình: `made_skill::brief` trả lời bằng `NOT_A_SERVICE`, "Not
 possible yet: a skill can't use your mail, calendar or other services, even
-ones already linked. Say so plainly, in a few words, and that they can ask you
-for it themselves any time." Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf
+ones already linked. You can ask me for it yourself any time.", là lời nói với
+người dùng, vì app hiện đúng nguyên văn. Nó không nêu chỗ liên kết dịch vụ: trên lamp-9adf
 ngày 4/11 mô hình bảo chủ liên kết một lịch đã được liên kết (#5288, nơi các
 skill đọc dịch vụ được lên kế hoạch).
 

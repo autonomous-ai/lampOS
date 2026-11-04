@@ -709,8 +709,8 @@ and "google drive", "linear app", "monday com" as phrases, since "drive",
 "linear" and "monday" are plain words too) is never handed to the model:
 `made_skill::brief` answers it with `NOT_A_SERVICE`, "Not possible yet: a
 skill can't use your mail, calendar or other services, even ones already
-linked. Say so plainly, in a few words, and that they can ask you for it
-themselves any time." It names no place to link a service: on lamp-9adf on 4
+linked. You can ask me for it yourself any time.", words to the person, as the
+app shows them as they are. It names no place to link a service: on lamp-9adf on 4
 Nov the model told the owner to link a calendar that was already linked
 (#5288, where skills that read a service are planned).
 

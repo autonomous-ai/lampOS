@@ -95,9 +95,10 @@ const REQUEST_MARK: &str = "Request: ";
 /// service yet, linked or not, but the person can ask the lamp itself. It
 /// names no place to link one: on lamp-9adf, 4 Nov, the model told the
 /// owner to link a calendar already linked (the first builder on #5288).
+/// Words to the person, as the app shows them as they are
+/// (`app_make::begin`'s `refused`); the voice tells the model to say them.
 pub const NOT_A_SERVICE: &str = "Not possible yet: a skill can't use your mail, calendar or \
-     other services, even ones already linked. Say so plainly, in a few words, and that they \
-     can ask you for it themselves any time.";
+     other services, even ones already linked. You can ask me for it yourself any time.";
 /// Words that name a linked service ([`crate::services`]) in a request, as
 /// a whole word: mail and a calendar, and the services' own names.
 const SERVICE_WORDS: [&str; 17] = [

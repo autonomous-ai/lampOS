@@ -919,6 +919,22 @@ mod tests {
         assert!(told.get("name").is_none(), "{told}");
     }
 
+    /// A skill naming a linked service is refused in the person's own
+    /// words, shown in the app as they are (the read of #5290).
+    #[test]
+    fn a_skill_using_a_service_is_refused_in_plain_words() {
+        let dir = folder("service");
+        let refused = begin(
+            dir.as_path(),
+            "a skill that checks my calendar every evening",
+            "r1",
+            NOW,
+        )
+        .unwrap_err();
+        assert_eq!(refused, made_skill::NOT_A_SERVICE);
+        assert!(!refused.contains("Say so"), "{refused}");
+    }
+
     /// One at a time, a request id each, the words within the voice's own
     /// bound; an old ask still "making" lets another start.
     #[test]
