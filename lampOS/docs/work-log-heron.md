@@ -462,3 +462,10 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   17/1; the ask-word guard: the new row); made_skill 36, process 18.
   Nine asked #4526 (90c52a59ba) and #4579 (869bd94832) of the
   Reviewer-lead first, then Heron, for the 5 Nov evening promote.
+- 01:4x — #5321 HOLD at 7b02201d0c (first read; Thirteen's HOLD is the
+  same P2): the voice/heard mark is right, but my run shows both
+  mutations survive (`seen` back to `latest`, the shipped bug; `serve`
+  never listening); a `LampRoom::seen()` assert catches the first
+  (tried). Asked the lamp check for a 2+ item read alone: the lamp's own
+  reading may now mark "a voice heard" and stop it after one line. This
+  is #5303's second gap my read passed.
