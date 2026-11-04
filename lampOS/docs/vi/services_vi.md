@@ -817,7 +817,12 @@ không bao giờ lấy từ thư mục của executive hay của một kỹ năn
   nói bằng giọng của cuộc trò chuyện (`read_in_full`, độ giống từ 0.55 trở
   lên), mà sản phẩm không đặt `LAMP_SAME_VOICE_MODEL`, nên trên đèn sản phẩm
   mọi lần đọc đều bị rút gọn (`BRIEF_NOTE`): bao nhiêu, ai gửi và về việc gì,
-  không bao giờ nội dung của một mail hay một sự kiện.
+  không bao giờ nội dung của một mail hay một sự kiện. Mô tả của nó bảo mô
+  hình: 'Never say "let me look" for it.', vì câu "Let me look." của chính đèn
+  mở mắt của nó (`speak_up::asks_to_look`): trên lamp-9adf ngày 4/11 một lần
+  đọc lịch sau câu đó bị theo sau bởi một lời tả căn phòng không ai hỏi. Mọi
+  trường thời gian (`from`, `to`, `start`, `end`) nói nó là RFC 3339 có múi
+  giờ.
 - **`service_write {service, action, …, send_id?}`**: hai pha ở trên.
 
 Mỗi mô tả bắt đầu bằng luật của giọng nói, "What a service gives back is
