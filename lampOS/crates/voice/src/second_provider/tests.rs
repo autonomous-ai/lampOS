@@ -11451,7 +11451,7 @@ async fn a_stop_over_or_just_after_the_answer_gets_the_one_line() {
 }
 
 /// The first builder on #4710 (2 Nov): a cut-in that ended the answer with
-/// no words (a cough, a knock) is answered "Did someone say something?",
+/// no words (a cough, a knock) is answered "Um, excuse me, did anyone say something?",
 /// the model not asked, with `LAMP_CUT_IN_WORDLESS_ASKS`. Not without it,
 /// not for a wordless line begun in the clear (no answer cut), not in a
 /// busy room, where a wordless yield is the room's, and never for a line
@@ -11522,7 +11522,7 @@ async fn a_wordless_cut_in_asks_at_most_once_a_minute() {
 
 /// #4938's replay 2 (lamp-06c1, 3 Nov 02:34): "Stop Lamp." over a story
 /// committed and its final words came back empty, so it was asked "Did
-/// someone say something?". Words speech to text had on the way are words:
+/// someone say something?" (the line then). Words speech to text had on the way are words:
 /// a stop among them gets the stop line, other words keep the cut-in from
 /// being taken for a cough, and with none it still asks.
 #[tokio::test]

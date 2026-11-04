@@ -111,7 +111,7 @@ These you can run on their own:
 - `stop-lines.sh LABEL [ROUNDS]`, about 8 minutes a round
   (#4710): on the second route, a stop always gets "Okay, I'll stop there."
   (`LAMP_SPOKEN_STOP_ENDS`) and a cut-in that ended the answer with no words
-  gets "Did someone say something?" (`LAMP_CUT_IN_WORDLESS_ASKS`). Each round
+  gets "Um, excuse me, did anyone say something?" (`LAMP_CUT_IN_WORDLESS_ASKS`). Each round
   plays "Stop." and "Stop Lamp." over a story, "Stop." about 1 s after a short
   answer ended (its turn's `turn_finished` by the lamp's clock, not a playback
   interval's retirement, which a wait sound or a gap between sentences also

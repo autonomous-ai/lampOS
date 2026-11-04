@@ -552,21 +552,24 @@ one is chosen) and kept in the thread as the lamp's:
   `crate::cut_in_wordless`): a cough, a beep or a knock over the lamp's
   answer that made it yield and then commit, ending the answer
   (`user_interrupted`), comes back with no words; without the switch the
-  lamp then goes quiet mid-answer. With it, the line is answered "Did
-  someone say something?". Only for a line whose Start came over the lamp's
+  lamp then goes quiet mid-answer. With it, the line is answered "Um,
+  excuse me, did anyone say something?", the polite opener telling the
+  person a noise cut the lamp off (the memory owner, 4 Nov). Only for a line whose Start came over the lamp's
   audible answer (the yield committed): a yield that resumed sends no
   Start, so it stays silent; a wordless line begun in the clear (no answer
   cut), or one in a busy room (where a wordless yield is the
   room's, `LAMP_CUT_IN_OVER_BED`) gets nothing. Asked at most once a minute
   (`cut_in_wordless::AGAIN_AFTER`): a second knock that cuts the question
-  itself leaves the lamp quiet, never asking again and again. The product
-  leaves it off (#4938): the lamp's own echo commits as a cut-in with 0
-  words (on lamp-06c1 on 3 Nov, 7 of 15 stories had one over the lamp's
-  answer), so the question would answer the lamp's own voice. It goes on
-  once a replay shows those echo asks near 0.
+  itself leaves the lamp quiet, never asking again and again. On in the
+  product by the memory owner's call (4 Nov), with a known gap accepted
+  (#4938): the lamp's own echo commits as a cut-in with 0 words (on
+  lamp-06c1 on 3 Nov, 7 of 15 stories had one over the lamp's answer), so
+  the question can answer the lamp's own voice; a later echo fix from
+  duplex makes those asks fewer.
 - **Words on the way** (#4938, lamp-06c1, 3 Nov 02:34): a "Stop Lamp." over
   a story committed on 760 ms of speech, and speech to text's final came
-  back with no words, so it was asked "Did someone say something?". For a
+  back with no words, so it was asked the wordless question (then "Did
+  someone say something?"). For a
   line begun over the lamp's answer, with `LAMP_CUT_IN_WORDLESS_ASKS` or
   `LAMP_SPOKEN_STOP_ENDS` on, the provider now keeps the last words speech
   to text had on the way (`listener.said()`, fillers stripped,
@@ -579,7 +582,8 @@ one is chosen) and kept in the thread as the lamp's:
 - **Known gaps** (#4938): the lamp's own echo can still cut its answer with
   no words. A playback gap admitted the story's tail in the clear, or a loud
   word of its own made a yield commit (06c1, 3 Nov 02:13 and 02:24); with
-  nothing on the way that is asked "Did someone say something?", where the
+  nothing on the way that is asked "Um, excuse me, did anyone say
+  something?", where the
   lamp used to go quiet. Telling that sound from a person's needs evidence
   from the coordinator that the provider doesn't have. A bare "Stop." is also
   not answered when it is a yield over the lamp that resumes (no Start is
