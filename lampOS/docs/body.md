@@ -2512,7 +2512,10 @@ also lets go once Expression has not said asleep for 120 s
 (`body::NIGHT_LAPSE`): awake for the morning, or gone quiet, so a stale
 sleep never keeps the lamp folded for good. A night line and Expression's
 settling again 30 s after it fit well inside that, and the bound counts
-from the last time it said asleep. The journal says when it latches
+from the last time it said asleep or, while latched, the voice last
+listened or thought: Expression is kept awake through a night talk, so a
+TV or two people up for minutes don't let the latch go mid-talk (the
+Reviewer-lead's P2 on #5158). The journal says when it latches
 (`asleep for the night and folded`), each line slept through
 (`the voice listens and it stays folded`), and why it let go. A call at
 night stands the lamp as a call by day does; a softer stir for it is not

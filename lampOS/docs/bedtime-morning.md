@@ -309,7 +309,8 @@ Bedtime's rest step says so:
   or thinks, though Expression has already ended its rest: the body
   latched the sleep before the line. Its name, a tap, a face or the lamp
   answering stand it as ever, and the latch lets go once Expression has
-  not said asleep for 120 s ([body.md](body.md), "Asleep for the night").
+  not said asleep for 120 s with the voice at rest, so a long night talk
+  doesn't end it ([body.md](body.md), "Asleep for the night").
   Without it, the body stands at the sound and stays up for its awake
   time (90 s on the product).
 - **The daily chance.** A re-settle makes no run and no daily claim: the

@@ -868,11 +868,24 @@ impl ExpressionState {
     pub const TYPE: &str = "lamp_msgs/ExpressionState";
     pub const VERSION: u32 = 1;
     pub const TOPIC: &str = "expression/state";
+    /// The one part that says it on the bus.
+    pub const SOURCE: &str = "expression";
+    /// How long a state lasts once said, in microseconds (its declaration's
+    /// `lasting`).
+    pub const LASTS_US: u64 = 500_000;
 
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
             .every(Duration::from_millis(200))
-            .lasting(Duration::from_millis(500))
+            .lasting(Duration::from_micros(Self::LASTS_US))
+    }
+
+    /// Whether this state, valid and enabled, says the lamp is asleep for
+    /// the night (or falling asleep): read so by the voice's night face
+    /// (`ring_night`) and the body's night latch (`night_in`, #5158), one
+    /// rule for both.
+    pub fn says_asleep(&self) -> bool {
+        self.check().is_ok() && self.enabled && self.asleep == Some(true)
     }
 
     pub fn check(&self) -> Result<(), Invalid> {
