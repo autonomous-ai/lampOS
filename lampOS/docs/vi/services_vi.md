@@ -895,7 +895,11 @@ Một tiêu đề, người gửi hay chủ đề bị cắt còn 100 ký tự. 
 trước mỗi dòng. Nếu có người đến (khuôn mặt thứ hai, một khuôn mặt khác, một
 giọng nói), đèn dừng sau dòng đang nói và chỉ nói "I'll tell you the rest
 later."; nếu cổng đóng vì lý do khác (riêng tư, tạm dừng, giờ yên lặng, chủ
-đèn rời đi), nó dừng mà không nói gì.
+đèn rời đi), nó dừng mà không nói gì. Khi không nhận ra chủ đèn, hoặc không
+thấy ai, cổng được xem lại trong tối đa 5 s (`BLINK`) mà không nói gì, vì mắt
+làm mới dấu khuôn mặt quen mỗi 2 s và dấu chỉ được coi là mới trong 2 s: trên
+lamp-9adf một lần làm mới cách 2,1 s đã dừng một lần đọc trước khi nói chữ
+nào. Mọi lý do khác đóng cổng ngay.
 
 **Journal** chỉ giữ kết quả: "read 4", "skipped: not alone", "stopped:
 someone came in, 2 of 5 read", "not read: <lỗi rõ ràng của dịch vụ>", không
