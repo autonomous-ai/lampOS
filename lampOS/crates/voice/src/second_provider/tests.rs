@@ -9300,6 +9300,100 @@ async fn a_rename_said_done_after_a_yes_with_no_call_is_the_face_miss() {
     }
 }
 
+/// Friday's P1 on #5166: a `remember_my_face` the eyes refused (not
+/// theirs, not heard, not agreed, the eyes down) saves no face, so a later
+/// round's "I've saved your face" is the same miss as one with no call at
+/// all: held and asked again once, then the plain line, never said.
+#[tokio::test]
+async fn a_face_said_saved_after_a_refused_call_is_the_face_miss() {
+    let face = || {
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            crate::known_faces::REMEMBER,
+            json!({"name":"Lauren"}),
+        )]))
+    };
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let claim = "Got it, I've saved your face, Lauren.";
+    let cases: Vec<(Chats, usize, &str)> = vec![
+        // Refused, then said saved twice: the plain line.
+        (
+            vec![
+                vec![face(), Ok(ChatEvent::Done)],
+                vec![text(claim), Ok(ChatEvent::Done)],
+                vec![text("Okay, I've saved your face."), Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:I haven't saved your face yet.",
+        ),
+        // Refused, said saved, then the truth when asked again.
+        (
+            vec![
+                vec![face(), Ok(ChatEvent::Done)],
+                vec![text(claim), Ok(ChatEvent::Done)],
+                vec![
+                    text("Sorry, I couldn't keep your face just now."),
+                    Ok(ChatEvent::Done),
+                ],
+            ],
+            1,
+            "said:Sorry, I couldn't keep your face just now.",
+        ),
+    ];
+    for (chats, faces, first_said) in cases {
+        let rounds = chats.len();
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Remember my face, I'm Lauren.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let called = Arc::new(AtomicUsize::new(0));
+        let counted = called.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, name, _| {
+            counted.fetch_add(
+                usize::from(name == crate::known_faces::REMEMBER),
+                Ordering::SeqCst,
+            );
+            Box::pin(async { json!({"error": "not_theirs"}) })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false)
+        .claiming_faces(true);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(first_said)),
+            "{first_said}: {labels:?}"
+        );
+        assert!(
+            !said
+                .iter()
+                .any(|said| said.contains("I've saved your face")),
+            "{labels:?}"
+        );
+        assert_eq!(called.load(Ordering::SeqCst), faces, "{labels:?}");
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::FACE_CLAIMED_UNSAVED))
+        });
+        assert!(told, "{labels:?}");
+    }
+}
+
 /// K3 on #3504 (lamp-06c1, 28 Oct night: "Noted — you work at a library
 /// now, not the bakery." and "All right, I'll keep it in mind." with no
 /// call): a soft keep claim in a round with no calls is held and asked

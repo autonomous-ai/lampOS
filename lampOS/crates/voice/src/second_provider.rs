@@ -10538,9 +10538,6 @@ async fn answer(
         // other calls, once those calls are answered: what the model is
         // told of a keep claim, or of a face claim (#5141 row 8).
         let mut keep_claim_note: Option<&'static str> = None;
-        // Whether a round of this request called `remember_my_face`, so a
-        // later round may say the face is saved (#5141 row 8).
-        let mut face_called = false;
         // A reply's offer to keep something, held to its round's end and
         // not said beside a `remember` call that keeps it (finding K2 on
         // #3504), and whether a `remember` of this request ran.
@@ -11060,9 +11057,14 @@ async fn answer(
                 let claim = crate::remember::keep_claim_or_face(&held, shared.face_claims);
                 // A face said saved (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8:
                 // lamp-0c4e, 3 Nov, "hold still while I take your face in"
-                // with no call) is kept by `remember_my_face`, in this round
-                // or an earlier one, and is otherwise the same miss, judged
-                // here with the same once-asked-again and journal line.
+                // with no call) is kept by `remember_my_face`: one in this
+                // round, or one the eyes answered ok earlier in the same
+                // request, which sets `kept_now`, so no later claim is held.
+                // A refused one (not theirs, not heard, not agreed, the eyes
+                // down) keeps nothing: a later claim is judged on its own
+                // round's calls (Friday's P1 on #5166). Otherwise it is the
+                // same miss, judged here with the same once-asked-again and
+                // journal line.
                 let face = claim == Some(crate::remember::KeepClaim::Face);
                 let (keeper, told, not_kept) = if face {
                     (
@@ -11077,8 +11079,7 @@ async fn answer(
                         crate::remember::NOT_KEPT_LINE,
                     )
                 };
-                let remembers =
-                    calls.iter().any(|call| call.name == keeper) || (face && face_called);
+                let remembers = calls.iter().any(|call| call.name == keeper);
                 // A soft claim ("Noted — timer set for ten minutes.") beside
                 // any call confirms that call (Reviewer-three's and
                 // Reviewer-two's P2 on #4137): a claim only with none.
@@ -11173,9 +11174,6 @@ async fn answer(
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
-            face_called |= calls
-                .iter()
-                .any(|call| call.name == crate::known_faces::REMEMBER);
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 let named = heard
                     && shared
