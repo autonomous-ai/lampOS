@@ -63,6 +63,9 @@ EnvironmentFile=-/etc/lampOS/skills/store.env
 # packed unsigned from its own files and sent with the lamp's key; a reviewer reads it before it is listed.
 Environment=LAMP_SKILLS_SHARE=on
 Environment=LAMP_APP_UPDATE=on
+# The app's connectors (Queue #4710): a link set or removed through lamp-services' admin socket. Writes as
+# lamp-services.service sets LAMP_SERVICES_WRITE (on in the product); the same line there and in lamp-voice.service.
+Environment=LAMP_SERVICES=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
 Environment=LAMP_SHUTDOWN=on
 Environment=LAMP_APP_RESTART=on

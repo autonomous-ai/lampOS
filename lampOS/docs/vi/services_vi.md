@@ -111,11 +111,15 @@ bật trên mọi đèn, như `lamp-addons.service`, nhưng `lamp-services` khô
 socket nào trừ khi `LAMP_SERVICES=on` có trong môi trường của nó (hoặc nó được
 khởi động với `--enable`, mà unit của nó không truyền vào): khi tắt, nó ghi
 một dòng và thoát 0 ngay, nên unit ở trạng thái inactive và không bị khởi động
-lại. Công tắc được đặt bằng một drop-in trên mỗi unit trong ba unit,
-`lamp-services.service`, `lamp-cloud.service` và `lamp-voice.service`, và
-`LAMP_SERVICES_WRITE` cũng vậy, trên `lamp-services.service`. Không unit sản
-phẩm nào đặt công tắc nào trong hai công tắc này
-([switches.md](../switches.md)).
+lại. Ba unit sản phẩm, `lamp-services.service`, `lamp-cloud.service` và
+`lamp-voice.service`, mỗi unit đặt `LAMP_SERVICES=on` (đã đọc thử trên
+lamp-9adf bằng chính các binary của bản 9928 ngày 4/11), và
+`lamp-services.service` còn đặt `LAMP_SERVICES_WRITE=on`. Một drop-in đặt
+`LAMP_SERVICES=off` sẽ tắt chúng, và một drop-in đặt `LAMP_SERVICES_WRITE=off`
+trên `lamp-services.service` chỉ để lại việc đọc
+([switches.md](../switches.md)). Một đèn được cập nhật bởi một `lamp-update`
+cũ hơn bản cài `lamp-services` sẽ chưa có thư mục tools cho tới lần chuyển bản
+kế tiếp, và khi đó giọng nói không khai báo hàm nào của dịch vụ.
 
 ## Ba phần và các socket của chúng
 
@@ -859,6 +863,7 @@ lịch đều bị từ chối, cả đọc lẫn ghi), không gì khác chạy 
 trong cùng yêu cầu, một lần đọc rút gọn còn ai gửi và về việc gì khi có thể có
 người khác, lời của một lần đọc không được giữ ở đâu trong luồng hay bản tóm
 tắt, một kỹ năng tự tạo không bao giờ chạm đến dịch vụ. `-p lamp-update` (unit được
-cài mà không có dòng `LAMP_SERVICES` và không có `--enable`, hash của kế
-hoạch reset) và `-p lamp-setup`
+cài với `LAMP_SERVICES=on` trong đó, như trong `lamp-cloud.service` và
+`lamp-voice.service`, có `LAMP_SERVICES_WRITE=on` và không có `--enable`,
+hash của kế hoạch reset) và `-p lamp-setup`
 (`tests/it/reset.rs`).
