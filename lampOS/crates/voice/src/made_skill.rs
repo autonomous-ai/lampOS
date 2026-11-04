@@ -2292,15 +2292,12 @@ light = { dim = 1 }
                 .contains("day = \"today\"")
         );
         // Every other linked service: its reads listed, never a whole text.
-        let notion = brief_with("each morning read me my Notion plans", true).unwrap();
-        assert!(
-            notion.contains("services = { notion = \"read\" }"),
-            "{notion}"
+        // Notion is read only through its MCP server's tools (#5308), which
+        // a made skill can't read yet.
+        assert_eq!(
+            brief_with("each morning read me my Notion plans", true),
+            Err(NOT_A_SERVICE)
         );
-        assert!(notion.contains(
-            "read = { service = \"notion\", what = one of search {query, count}, its keys }"
-        ));
-        assert!(!notion.contains("page {id}"));
         let drive = brief_with("read me my Google Drive files at nine", true).unwrap();
         assert!(drive.contains("services = { google_drive = \"read\" }"));
         assert!(
@@ -2312,7 +2309,7 @@ light = { dim = 1 }
         assert!(github.contains("notifications; issues {repo}; pulls {repo}; repos, its keys"));
         assert!(!github.contains("query") && !github.contains("graphql"));
         // P3.3: the time of day is the request's, its window only shown.
-        for brief in [&github, &drive, &notion] {
+        for brief in [&github, &drive] {
             assert!(brief.contains("a time of day as its during = {"), "{brief}");
             assert!(!brief.contains("21:00"), "{brief}");
         }

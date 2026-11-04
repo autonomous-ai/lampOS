@@ -35,13 +35,13 @@ pub const ADMIN_SOCKET: &str = "/run/lampos-services/admin.sock";
 /// The services this lamp knows, by V1's codes. Figma is `figma-api` as
 /// the backend lists it for lamps, and `figma` as V1's helper named it.
 /// `gmail-app` is a Lamp 2's Google sign-in for Gmail, send only; `gmail`
-/// its app password. The last four are V1's MCP services.
+/// its app password. The last five are MCP services: V1's four, then
+/// Notion, whose app sign-in gives a token only its MCP server takes.
 pub const CODES: [&str; 16] = [
     "gmail",
     "gmail-app",
     "google_calendar",
     "google_drive",
-    "notion",
     "figma-api",
     "figma",
     "github",
@@ -53,6 +53,7 @@ pub const CODES: [&str; 16] = [
     "mondaydotcom",
     "hubspot",
     "amplitude",
+    "notion",
 ];
 
 /// A service linked: `connector.set.<code>`, its connector fetched.

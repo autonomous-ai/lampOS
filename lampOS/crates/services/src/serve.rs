@@ -3,7 +3,7 @@
 //! call. Each takes one JSON line and answers one, and each refuses any
 //! other peer before reading its line (by `SO_PEERCRED` and its cgroup, as
 //! setup's keys helper does).
-use crate::catalog::{self, Method, NOTION_VERSION};
+use crate::catalog::{self, Method};
 use crate::mail::{self, Failure, Mail, MailAsk, MailItem};
 use crate::mcp::{self, Client, Endpoint};
 use crate::net::{self, Call, Http};
@@ -304,17 +304,11 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// or `{"ok":false,"error"}`, at most [`ANSWER_MOST`] bytes with its
     /// line break.
     pub async fn tool(&self, line: &str) -> Value {
-        self.tool_for(line, false).await
-    }
-
-    /// [`Self::tool`], for the voice or, with `skill`, a made skill, whose
-    /// Notion items are their titles alone (`spoken::items`).
-    async fn tool_for(&self, line: &str, skill: bool) -> Value {
         let answer = match parse_tool(line.trim_end_matches(['\r', '\n'])) {
             Err(why) => Err(why),
             Ok((name, args)) => match name.as_str() {
                 tools::CONNECTED => Ok(self.connected()),
-                tools::READ => self.read(&args, skill).await,
+                tools::READ => self.read(&args).await,
                 _ => self.write(&args).await,
             },
         };
@@ -342,7 +336,7 @@ impl<H: Http, M: Mail> Services<H, M> {
                 let text = |key: &str| args.get(key).and_then(Value::as_str).unwrap_or_default();
                 match spoken::skill_read_refused(text("service"), text("what")) {
                     Some(why) => json!({"ok": false, "error": why}),
-                    None => self.tool_for(line, true).await,
+                    None => self.tool(line).await,
                 }
             }
             Ok(_) => json!({"ok": false, "error": SKILL_READS_ONLY}),
@@ -507,12 +501,8 @@ impl<H: Http, M: Mail> Services<H, M> {
             call.headers
                 .push(("content-type".into(), "application/json".into()));
         }
-        match service.code {
-            "notion" => call
-                .headers
-                .push(("notion-version".into(), NOTION_VERSION.into())),
-            "github" => call.headers[0].1 = "application/vnd.github+json".into(),
-            _ => {}
+        if service.code == "github" {
+            call.headers[0].1 = "application/vnd.github+json".into();
         }
         let token = entry.token();
         if service.code.starts_with("figma") && entry.auth_type == "pat" {
@@ -659,7 +649,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         .await
     }
 
-    async fn read(&self, args: &Value, skill: bool) -> Result<Value, String> {
+    async fn read(&self, args: &Value) -> Result<Value, String> {
         // A send-only link is answered so whether or not it is linked, and
         // so is `gmail` when the lamp's one Gmail link is send-only.
         let asked = args.get("service").and_then(Value::as_str);
@@ -691,12 +681,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Plan::Http { method, url, body } => {
                 let text = self.call(service, &entry, method, url, body, false).await?;
-                let items = if skill {
-                    spoken::items(service.code, &text)
-                } else {
-                    reads::items(service.code, &text)
-                };
-                Ok(reads::quoted(service.name, items))
+                Ok(reads::quoted(service.name, reads::items(&text)))
             }
         }
     }
@@ -1277,7 +1262,7 @@ mod tests {
         assert_eq!(services.http.calls.lock().unwrap().len(), 1);
         // A service not linked says so.
         let answer = run(services.tool(
-            r#"{"op":"call","name":"service_read","args":{"service":"notion","what":"search"}}"#,
+            r#"{"op":"call","name":"service_read","args":{"service":"notion","what":"tools"}}"#,
         ));
         assert_eq!(
             answer["error"],

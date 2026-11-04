@@ -20,7 +20,7 @@
 //!   other service the item's title or name ([`TITLE_KEYS`]), never a body,
 //!   a message's text, a file's content or a comment.
 use crate::{catalog, reads};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 /// How a read's items are said.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,11 +54,10 @@ pub const SPOKEN: &[(&str, Option<&str>, Spoken)] = &[
 pub const FREE_FORM: &[&str] = &["query", "get", "call"];
 
 /// Reads that give an item's whole text, never a made skill's: a mail, a
-/// Drive file's text, a Notion page's blocks, Figma's comments.
+/// Drive file's text, Figma's comments.
 pub const WHOLE_TEXTS: &[(&str, &str)] = &[
     ("gmail", "message"),
     ("google_drive", "text"),
-    ("notion", "page"),
     ("figma", "comments"),
     ("figma-api", "comments"),
 ];
@@ -129,59 +128,6 @@ pub fn skill_read_refused(code: &str, what: &str) -> Option<String> {
         .collect();
     (!fixed.iter().any(|listed| listed == what))
         .then(|| format!("{code} reads {}, not {what:?}", fixed.join(", ")))
-}
-
-/// The items of a service's answer body as a made skill gets them: as
-/// [`reads::items`] gives them, but a Notion page or database as its id,
-/// kind and title property alone, never its other properties' text.
-pub fn items(code: &str, body: &str) -> Vec<Value> {
-    if code != "notion" {
-        return reads::items(code, body);
-    }
-    let Ok(value) = serde_json::from_str::<Value>(body) else {
-        return Vec::new();
-    };
-    let list = match &value {
-        Value::Array(items) => items.clone(),
-        Value::Object(object) => object
-            .get("results")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_else(|| vec![value.clone()]),
-        _ => Vec::new(),
-    };
-    list.iter()
-        .map(|item| {
-            json!({
-                "id": item.get("id"),
-                "type": item.get("object"),
-                "title": notion_title(item),
-            })
-        })
-        .collect()
-}
-
-/// A Notion page's title property (the one property of type `title`), or
-/// a database's own title, as plain text.
-fn notion_title(item: &Value) -> String {
-    let rich = item
-        .get("properties")
-        .and_then(Value::as_object)
-        .and_then(|properties| {
-            properties
-                .values()
-                .find(|property| property.get("type").and_then(Value::as_str) == Some("title"))
-        })
-        .and_then(|property| property.get("title"))
-        .or_else(|| item.get("title"));
-    rich.and_then(Value::as_array)
-        .map(|parts| {
-            parts
-                .iter()
-                .filter_map(|part| part.get("plain_text").and_then(Value::as_str))
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 /// Every service a made skill may read, in the catalogue's order.
@@ -395,7 +341,6 @@ mod tests {
                 "gmail",
                 "google_calendar",
                 "google_drive",
-                "notion",
                 "figma",
                 "figma-api",
                 "github",
@@ -406,7 +351,7 @@ mod tests {
         );
         assert!(not_readable("gmail-app").unwrap().contains("only sends"));
         assert!(not_readable("dropbox").is_some());
-        for mcp in ["slack", "mondaydotcom", "hubspot", "amplitude"] {
+        for mcp in ["slack", "mondaydotcom", "hubspot", "amplitude", "notion"] {
             assert!(
                 not_readable(mcp).unwrap().contains("can't read yet"),
                 "{mcp}"
@@ -426,7 +371,7 @@ mod tests {
             );
         }
         assert_eq!(whats("google_drive"), ["files {query, count}", "file {id}"]);
-        assert_eq!(whats("notion"), ["search {query, count}"]);
+        assert!(whats("notion").is_empty());
         assert!(whats("slack").is_empty());
         assert_eq!(
             whats("github"),
@@ -462,11 +407,6 @@ mod tests {
         ]});
         let lines = lines("google_drive", "files", None, &drive);
         assert_eq!(lines, ["2 items from Google Drive.", "Tax 2026."]);
-        let notion = json!({"quoted": [{"id": "p", "type": "page", "title": "Launch\nplan"}]});
-        assert_eq!(
-            super::lines("notion", "search", None, &notion),
-            ["One item from Notion.", "Launch plan."]
-        );
         let github = json!({"quoted": [
             {"subject": {"title": "Fix the build", "type": "PullRequest"}, "body": "x"},
             {"title": "Crash on start", "body": "Steps: run it"},
@@ -522,38 +462,12 @@ mod tests {
             ("slack", "call", "can't read yet"),
             ("hubspot", "tools", "can't read yet"),
             ("gmail", "message", "whole text"),
-            ("notion", "page", "whole text"),
+            ("notion", "search", "can't read yet"),
             ("google_drive", "nothing", "reads files, file"),
             ("gmail-app", "recent", "only sends"),
         ] {
             let refused = skill_read_refused(code, what).unwrap_or_default();
             assert!(refused.contains(why), "{code} {what}: {refused}");
         }
-    }
-
-    /// Thirteen's P3.2: a Notion page is said by its title property alone,
-    /// never its other properties' text; a database by its own title.
-    #[test]
-    fn notion_is_said_by_its_title_alone() {
-        let body = json!({"results": [
-            {"object": "page", "id": "p1", "properties": {
-                "Notes": {"type": "rich_text", "rich_text": [{"plain_text": "call the bank at 5"}]},
-                "Name": {"type": "title", "title": [{"plain_text": "Launch "}, {"plain_text": "plan"}]},
-            }},
-            {"object": "database", "id": "d1", "title": [{"plain_text": "Tasks"}],
-             "description": [{"plain_text": "private"}]},
-        ]})
-        .to_string();
-        let items = items("notion", &body);
-        assert_eq!(items[0]["title"], "Launch plan");
-        assert!(!items[0].to_string().contains("bank"));
-        let said = lines("notion", "search", None, &reads::quoted("Notion", items));
-        assert_eq!(said, ["2 items from Notion.", "Launch plan.", "Tasks."]);
-        // Every other service's items are the voice's own.
-        let drive = json!({"files": [{"name": "Tax"}]}).to_string();
-        assert_eq!(
-            super::items("google_drive", &drive),
-            reads::items("google_drive", &drive)
-        );
     }
 }

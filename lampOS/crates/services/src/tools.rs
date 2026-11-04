@@ -206,19 +206,17 @@ mod tests {
         let tools = catalog["tools"].as_array().unwrap();
         let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
         assert_eq!(names, [CONNECTED, READ, WRITE]);
-        // V1's MCP services are in both enums, with their call.
+        // V1's MCP services and Notion's are in both enums, with their call;
+        // Notion's REST reads and writes are gone.
         for tool in &tools[1..] {
             let codes = tool["parameters"]["properties"]["service"]["enum"].to_string();
-            for code in ["slack", "mondaydotcom", "hubspot", "amplitude"] {
+            for code in ["slack", "mondaydotcom", "hubspot", "amplitude", "notion"] {
                 assert!(codes.contains(&format!("\"{code}\"")), "{code}");
             }
             assert!(tool["parameters"]["properties"]["tool"].is_object());
-            assert!(
-                tool["description"]
-                    .as_str()
-                    .unwrap()
-                    .contains("amplitude: ")
-            );
+            let description = tool["description"].as_str().unwrap();
+            assert!(description.contains("amplitude, notion: "), "{description}");
+            assert!(!description.contains("append_text") && !description.contains("page {id}"));
         }
         // The send-only Google sign-in: a send like gmail's, and no read.
         let (reads, writes) = (

@@ -1,9 +1,9 @@
 //! `lamp-services`: the person's linked services on the lamp (Queue #4710).
-//! V1's token connectors (Gmail, Google Calendar and Drive, Notion, Figma,
-//! GitHub, Linear, Asana, Ahrefs, a Facebook Page) and its MCP ones (Slack,
-//! monday.com, HubSpot, Amplitude, through `mcp.rs`), their tokens kept by
-//! this one root process in `/var/lib/lampos-services`, never in a log, the
-//! journal, the bus, the conversation or the model.
+//! V1's token connectors (Gmail, Google Calendar and Drive, Figma, GitHub,
+//! Linear, Asana, Ahrefs, a Facebook Page) and its MCP ones (Slack,
+//! monday.com, HubSpot, Amplitude) and Notion's, through `mcp.rs`, their
+//! tokens kept by this one root process in `/var/lib/lampos-services`, never
+//! in a log, the journal, the bus, the conversation or the model.
 //!
 //! Two sockets: the admin one, which only `lamp-cloud.service` may ask
 //! (`set`, `remove`, `wipe`, `list`), and a tools folder for the voice
