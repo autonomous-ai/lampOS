@@ -96,13 +96,16 @@ fn directory(path: &Path) -> io::Result<(PathBuf, File)> {
     // resolve the final component: a linked store directory is refused.
     let parent_path = path
         .parent()
-        .ok_or_else(|| invalid("tasks directory needs a parent"))?
-        .canonicalize()?;
+        .ok_or_else(|| invalid("tasks directory needs a parent"))?;
+    let parent_path = parent_path
+        .canonicalize()
+        .map_err(crate::runtime::at(parent_path))?;
     let parent: File = unix::open(
         &parent_path,
         OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
         Mode::empty(),
-    )?
+    )
+    .map_err(|error| crate::runtime::at(&parent_path)(error.into()))?
     .into();
     match unix::mkdirat(&parent, name, Mode::from_bits_retain(0o700)) {
         Ok(()) => parent.sync_all()?,

@@ -989,8 +989,10 @@ again and again, saying nothing useful. `lamp-tasks serve --set-up-later`
 with `--targets-from-machines claude`, since 3 Nov) lets it run, and says why
 hand-overs are off. On lamp-c0a4 on 3 Nov, without it, `lamp-update
 harness-on` left the part failing at every start (`tasks: No such file or
-directory (os error 2)`) until systemd stopped restarting it. The product
-unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
+directory (os error 2)`) until systemd stopped restarting it. Since 4 Nov
+every file error at start names its path, e.g. `tasks:
+/var/lib/lampos-tasks/targets.json: No such file or directory (os error 2)`.
+The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
 (`crates/update/tests/install.rs`):
 
 - **No targets file:** the part starts with no target. Every `prepare` is
