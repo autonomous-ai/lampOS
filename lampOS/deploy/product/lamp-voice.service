@@ -433,6 +433,11 @@ Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on
 # the plant?" in 2 of 2 rounds with it; without it, a misheard forget stopped at "nothing to forget" (3 rounds) or forgot
 # the plant on a guess, unconfirmed (1).
 Environment=LAMP_MEMORY_FORGET_ASKS=on
+# What a caller said before their face was known becomes theirs once it is (#2176, docs/memory.md): the memory
+# owner's call on 4 Nov. It needs LAMP_MEMORY_DAYS and LAMP_VOICE_ROUTE=second, both above, and the eyes' speaking
+# faces (LAMP_EYES_SPEAKING). With no LAMP_SAME_VOICE_MODEL in the product no line has a voice print, so only a line
+# seen spoken by exactly one face, the one the eyes know as that person, moves; off camera or two faces, it stays.
+Environment=LAMP_MEMORY_FOLLOWS_FACE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
