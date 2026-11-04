@@ -126,7 +126,8 @@ near rule's bar measured at setup `/var/lib/lampOS/voice/near-call.json`
 skills made by voice and kept unconfirmed `/var/lib/lampOS/voice/made-skills`
 (`LAMP_MAKE_SKILL`, #2011), the
 person's light kept across a restart `/var/lib/lampOS/light` (emptied)
-(`LAMP_LIGHT_KEEP`), the
+(`LAMP_LIGHT_KEEP`), a first-time setup's journal the image keeps on the eMMC
+`/var/lib/lamp-journal/setup` (#5144, install.md), the
 voice's software mute and sleep from the head (`/var/lib/lampOS/voice/mute`,
 `--controls-mute`, #711), the
 policy's log `/var/lib/lampos-policy`, the person's parts of Harness under

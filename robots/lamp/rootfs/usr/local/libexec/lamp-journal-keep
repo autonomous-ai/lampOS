@@ -1,5 +1,7 @@
 # The last two boots' journal, kept on the eMMC (#2602; the drop-in
-# orangepi-ramlog.service.d/zz-lamp-journal-keep.conf runs it). Run with bash.
+# orangepi-ramlog.service.d/zz-lamp-journal-keep.conf runs it), and a
+# first-time setup's (#5144; lamp-journal-setup.timer runs it). Run with
+# bash.
 #
 # The journal lives on the /var/log RAM disk, one boot at a time, and
 # ramlog's copies to the eMMC leave it out (/etc/default/orangepi-ramlog):
@@ -23,12 +25,68 @@
 #   (orangepi-truncate-logs' `journalctl --vacuum-size`) never removes a
 #   file whose name isn't an archived one's, which a link's ("lamp-kept-…",
 #   no "@") isn't. Nothing is written to the RAM disk.
+# `setup`, from lamp-journal-setup.timer every 3 minutes (#5144): a tester's
+#   setup on lamp-0c4e (3 Nov) was gone from the 20M journal within 4
+#   hours, so its failed face step couldn't be read back. While the setup
+#   walk is under way (setup done, and the voice's onboarding file missing
+#   or without an outcome for one of its steps), and for 20 runs (an hour)
+#   after it ends, each of this boot's closed journal files is copied, oldest
+#   first, to $keep/setup, up to 24 MB, stopping at the first that doesn't
+#   fit, so what is kept is the setup's start without a gap. Every part's
+#   lines are in them, the voice's and the eyes' among them. The walk's end
+#   is kept by one more copy: the first file closed after the hour, which
+#   holds it. Each copy is linked into /run/log/journal once its original
+#   is gone from the journal (vacuumed), and at boot by `link`, so
+#   journalctl never reads a line twice. Its lines can hold what the person
+#   said at setup, so it is deleted 72 hours after the walk was first seen,
+#   at a reset (the reset plan wipes the folder) or when a walk begins again
+#   (a redo), which replaces it, whichever comes first; and the owner's
+#   "forget everything" deletes it at once (lamp-voice's setup_journal.rs,
+#   which leaves .forgotten: nothing more of that walk is copied). 24 MB at
+#   most, each file written once. A lamp whose walk ended before this ran
+#   keeps nothing. Journald is never rotated, restarted nor signalled here.
 #
 # The paths, and the state, may be given for tests only; with them given,
 # journald isn't asked to rotate.
 keep=${LAMP_JOURNAL_KEEP:-/var/lib/lamp-journal}
 run=${LAMP_JOURNAL_RUN:-/run/log/journal}
 budget=5000000
+# `setup`'s bound, its runs after the walk, and the onboarding's steps
+# (lamp_msgs::ONBOARDING_STEPS; lamp-update's tests check they match).
+setup_budget=24000000
+setup_after=20
+# 72 hours, and a time before which the clock isn't set yet (2026-01-01).
+setup_life=259200
+clock_set=1767225600
+steps="where_you_sit who_you_are how_you_sound touch privacy giving_way room_sounds face_expressions preferences"
+
+# Whether the setup walk is under way, as lamp-update's walk.rs reads it:
+# setup done, and the onboarding file not written yet or without an
+# outcome for one of the steps (its "steps" object, written compact by the
+# voice). A file that can't be read is no walk.
+walking() {
+    [ -f "$1" ] || return 1
+    [ -e "$2" ] || return 0
+    local text
+    text=$(head -c 65536 "$2" 2>/dev/null) || return 1
+    case "$text" in *'"steps":{'*) ;; *) return 1 ;; esac
+    for step in $steps; do
+        case "$text" in *"\"$step\":{"*) ;; *) return 0 ;; esac
+    done
+    return 1
+}
+
+# Links each setup copy whose original is gone from `$1` (all of them with
+# no `$1`) into $run, as lamp-kept-setup-….journal.
+setup_links() {
+    mkdir -p "$run" || return
+    for file in "$keep/setup"/*.journal; do
+        [ -f "$file" ] || continue
+        name=${file##*/}
+        [ -n "$1" ] && [ -e "$1/$name" ] && continue
+        ln -sfn "$file" "$run/lamp-kept-setup-${name//@/.}"
+    done
+}
 
 case "$1" in
 keep)
@@ -90,6 +148,94 @@ link)
             ln -s "$file" "$run/lamp-kept-$slot-${name//@/.}"
         done
     done
+    setup_links ""
+    ;;
+setup)
+    done_marker=${LAMP_JOURNAL_SETUP_DONE:-/var/lib/lampos-setup/done}
+    progress=${LAMP_JOURNAL_PROGRESS:-/var/lib/lampOS/voice/onboarding/progress.json}
+    from=${LAMP_JOURNAL_FROM:-/var/log/journal/$(cat /etc/machine-id 2>/dev/null)}
+    slot=$keep/setup
+    now=$(date +%s)
+    # 72 hours after the walk was first seen, all of it goes. A start
+    # dated before the clock was set is dated now instead.
+    if [ -e "$slot/.started" ]; then
+        started=$(stat -c %Y "$slot/.started")
+        if [ "$started" -lt "$clock_set" ] && [ "$now" -ge "$clock_set" ]; then
+            touch "$slot/.started"
+        elif [ $((now - started)) -ge "$setup_life" ]; then
+            rm -f "$run"/lamp-kept-setup-*.journal
+            rm -rf "$slot"
+            echo "lamp-journal-setup: the setup's journal kept is deleted after 72 hours" >&2
+            exit 0
+        fi
+    fi
+    if walking "$done_marker" "$progress"; then
+        # A walk begun again (a redo, a reset) replaces the setup kept.
+        if [ -e "$slot/.ended" ] || [ -e "$slot/.after" ]; then
+            rm -f "$run"/lamp-kept-setup-*.journal
+            rm -rf "$slot"
+        fi
+        # Forgotten during this walk: nothing more of it is kept.
+        [ -e "$slot/.forgotten" ] && exit 0
+        if [ ! -e "$slot/.started" ]; then
+            mkdir -p "$slot" && touch "$slot/.started" || exit 0
+        fi
+    else
+        # Nothing for a walk this never saw. One forgotten keeps only its
+        # end marked, so a redo after it starts anew. One kept to its end
+        # is only linked as its originals go.
+        [ -e "$slot/.started" ] || exit 0
+        if [ -e "$slot/.forgotten" ]; then
+            [ -e "$slot/.after" ] || echo 1 >"$slot/.after"
+            exit 0
+        fi
+        if [ -e "$slot/.ended" ]; then
+            [ -d "$from" ] && setup_links "$from"
+            exit 0
+        fi
+        after=$(cat "$slot/.after" 2>/dev/null)
+        after=$(( ${after:-0} + 1 ))
+        echo "$after" >"$slot/.after"
+        # The hour after: the time it ends at, once. The first file closed
+        # after it holds the walk's end; once it is kept, nothing more.
+        if [ "$after" -ge "$setup_after" ] && [ ! -e "$slot/.end_at" ]; then
+            date +%s >"$slot/.end_at"
+        fi
+    fi
+    [ -d "$from" ] || exit 0
+    total=0
+    for file in "$slot"/*.journal; do
+        [ -f "$file" ] && total=$((total + $(stat -c %s "$file")))
+    done
+    end_at=$(cat "$slot/.end_at" 2>/dev/null)
+    # The walk is first seen up to a run (3 minutes) after it begins: a file
+    # closed in that gap holds its first lines (Twelve's P3 on #5342).
+    started=$(( $(stat -c %Y "$slot/.started") - 180 ))
+    # Closed files only (an archived name has "@"), oldest first, and none
+    # closed before the walk began: those hold nothing of it.
+    for file in $(ls -1tr "$from"/*@*.journal 2>/dev/null); do
+        name=${file##*/}
+        [ -e "$slot/$name" ] && continue
+        [ "$(stat -c %Y "$file")" -ge "$started" ] || continue
+        size=$(wc -c <"$file")
+        if [ $((total + size)) -gt $setup_budget ]; then
+            touch "$slot/.ended"
+            echo "lamp-journal-setup: the setup's journal kept is full at $total bytes" >&2
+            break
+        fi
+        cp -p "$file" "$slot/.$name" && mv "$slot/.$name" "$slot/$name" || break
+        # Forgotten while it copied: the copy goes too.
+        if [ -e "$slot/.forgotten" ]; then
+            rm -f "$slot/$name"
+            exit 0
+        fi
+        total=$((total + size))
+        if [ -n "$end_at" ] && [ "$(stat -c %Y "$file")" -ge "$end_at" ]; then
+            touch "$slot/.ended"
+            break
+        fi
+    done
+    setup_links "$from"
     ;;
 esac
 exit 0

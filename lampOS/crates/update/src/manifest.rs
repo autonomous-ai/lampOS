@@ -99,6 +99,8 @@ pub const IMAGE_FILES: &[&str] = &[
     "/etc/asound.conf",
     "/etc/default/orangepi-ramlog",
     "/etc/systemd/system/lamp-cmedia-speaker.service",
+    "/etc/systemd/system/lamp-journal-setup.service",
+    "/etc/systemd/system/lamp-journal-setup.timer",
     "/etc/systemd/system/respeaker-lite-softvol.service",
     "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf",
     "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf",

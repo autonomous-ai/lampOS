@@ -929,6 +929,8 @@ ExecStart=
             image_unit_names(),
             [
                 "lamp-cmedia-speaker.service",
+                "lamp-journal-setup.service",
+                "lamp-journal-setup.timer",
                 "respeaker-lite-softvol.service"
             ]
         );
