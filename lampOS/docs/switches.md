@@ -644,7 +644,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SECOND_MEMORY_HITS` | The lamp checks what it remembers against each thing you say, so its answers can use those memories. |
 | `LAMP_SECOND_QUIET_HELD` | Nothing you'd notice: the lamp holds back silence after you pause instead of sending it off. |
 | `LAMP_SECOND_PREPARED` | The lamp starts working on its answer as you finish speaking, so it can reply sooner; nothing is said early. |
-| `LAMP_NAME_AS_A_SENTENCE` | "Lamp." said on its own before a question calls the lamp when it heard its name, even if the transcript got the word wrong. |
+| `LAMP_NAME_AS_A_SENTENCE` | Saying "Lamp." alone before a question calls the lamp, even if the transcript got the word wrong. |
 | `LAMP_NAME_SAID_TO_A_PERSON` | The lamp no longer takes "Ma'am," or "Dad," at a line's start as its name, unless you face or talk with it. |
 | `LAMP_NAME_START_USUAL` | Nothing you'd notice: makes sure the lamp's name said first in a line is still caught as a call. |
 | `LAMP_NAME_REPEAT_NOT_A_CALL` | A desk remark about the lamp that the transcript repeats is no longer taken as calling it. |
