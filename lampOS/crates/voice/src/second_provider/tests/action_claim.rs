@@ -192,7 +192,7 @@ fn a_step_word_claimed_twice_with_no_call_says_it_was_not_done() {
     let went = claimed(
         true,
         "Make it blue.",
-        saying("My light is blue now."),
+        saying("It already is."),
         vec![saying("Done.")],
     );
     assert_eq!(went.said, said(&[crate::action_claim::NOT_DONE_LINE]));

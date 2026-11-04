@@ -3312,13 +3312,15 @@ after a take-over, but now for every turn:
   lamp-actions' lines after a light or volume call (`action_claim::SAID_LINES`,
   held equal to `lamp_actions::SAID_LINES`, every `short_say` and
   `already_say`: "Brighter.", "Louder.", "Done.", "I'm already as warm as I
-  go.", "It already is." …), its line for a colour made ("My light is blue
-  now.", `lamp_actions::light::colour_line`, for each of the ten colours),
-  and the timer's own lines (`timer_line`): "Timer set." and "I'll remind
-  you at H:MM am/pm." A light or volume line stands beside a light or
-  volume call, "Done." and "It already is." beside any call, and a timer
-  line beside `set_timer`, `set_reminder`, `repeat_reminder` or
-  `snooze_reminder`, made in any round of the turn (a cut answer's carried
+  go.", "It already is." …), and the timer's own lines (`timer_line`):
+  "Timer set." and "I'll remind you at H:MM am/pm." Not the line for a
+  colour made ("My light is blue now."): with `LAMP_LIGHT_TOLD` it is also
+  how a turn answers "what colour is the light?", and kept colour calls
+  carry their colour (#5101). A light or volume line stands beside a light
+  or volume call, "Done." and "It already is." beside any call, "Timer
+  set." beside `set_timer`, `set_reminder`, `repeat_reminder` or
+  `snooze_reminder`, and "I'll remind you at …" beside those or
+  `list_reminders`, which it also answers, each made in any round of the turn (a cut answer's carried
   rounds too). Each round's opening is held only while its words could
   still begin a claim; at the first that fits none, or a claim whose call
   an earlier round made, it goes on as before. A claim with no call yet is
