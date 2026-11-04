@@ -30,3 +30,6 @@ place or a need is `a_comfort_break_never_names_the_bathroom` in
 
 Without its `faces_at_most` condition, `held-while-someone-else-is-in-view`
 fails: the line is said at 120 minutes, with the second face in view.
+| `present-a-break-after-90-minutes` | `present = true` (`LAMP_NUDGES_PRESENT=on`, #5207): 10:00, 130 minutes alone, faces every 1.5 s from minute 85 to 100 | Pass: At 90 minutes, once |
+| `present-quiet-at-night` | `present = true`: 21:00, 130 minutes | Pass: Nothing: due at 22:30, in its quiet hours |
+| `present-quiet-when-they-stood-up` | `present = true`: 10:00, an hour, three minutes away, 70 minutes more | Pass: Nothing: neither sitting is 90 minutes |

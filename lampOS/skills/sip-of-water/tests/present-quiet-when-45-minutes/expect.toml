@@ -1,0 +1,5 @@
+# LAMP_NUDGES_PRESENT=on (#5207): 10:00, 45 minutes at the desk, then away:
+# nothing, short of its 50 minutes.
+clock = "10:00"
+present = true
+none = true

@@ -182,6 +182,14 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 6
+        },
+        "gap": {
+          "description": "The least time between two runs of the group, 1m to 1h, by the largest any member names (#5207).",
+          "$ref": "#/$defs/duration"
+        },
+        "give_back_unsaid": {
+          "description": "A run of the group that said nothing (its say never begun) gives its place in the hour, and its gap, back, when any member names it (#5207).",
+          "type": "boolean"
         }
       }
     },
@@ -199,6 +207,110 @@
         },
         "within": {
           "$ref": "#/$defs/duration"
+        }
+      }
+    },
+    "present": {
+      "description": "The values that stand in for the file's own, each key whole, with LAMP_NUDGES_PRESENT=on in lamp-skills (#5207); read, checked and ignored without it. When and how often the skill starts itself and what it does, never what it may read or use.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/trigger"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/trigger"
+              }
+            }
+          ]
+        },
+        "while": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/while"
+          }
+        },
+        "most_a_day": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
+        },
+        "active": {
+          "$ref": "#/$defs/window"
+        },
+        "quiet": {
+          "$ref": "#/$defs/window"
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "per_hour"
+          ],
+          "properties": {
+            "group": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            },
+            "per_hour": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "gap": {
+              "description": "The least time between two runs of the group, 1m to 1h, by the largest any member names (#5207).",
+              "$ref": "#/$defs/duration"
+            },
+            "give_back_unsaid": {
+              "description": "A run of the group that said nothing (its say never begun) gives its place in the hour, and its gap, back, when any member names it (#5207).",
+              "type": "boolean"
+            }
+          }
+        },
+        "rest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "after_ignored"
+          ],
+          "properties": {
+            "after_ignored": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "within": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        },
+        "ask": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy"
+          ],
+          "properties": {
+            "policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "do": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
         }
       }
     },
@@ -817,6 +929,11 @@
               "$ref": "#/$defs/duration"
             }
           }
+        },
+        "instead_of": {
+          "description": "A later trigger of the same skill on the same topic, by name, whose chance this one's run takes: its cooldown begins then (#5207). Only with `once_per_day`.",
+          "type": "string",
+          "pattern": "^[a-z0-9_]{1,64}$"
         }
       }
     },
@@ -1063,6 +1180,10 @@
             },
             "expires": {
               "$ref": "#/$defs/duration"
+            },
+            "question": {
+              "description": "With a note, in a skill given who: the hello may ask the one question its note asks (#5207).",
+              "type": "boolean"
             }
           }
         }

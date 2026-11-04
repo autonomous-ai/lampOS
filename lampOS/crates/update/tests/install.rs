@@ -2345,8 +2345,9 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // Not feeling well came with the product after its lamp check (#1681);
     // the seven of PRODUCT_SKILLS_OFF come installed disabled; the startle
     // came with its move (#2822); the four wellbeing nudges since 25 Oct;
-    // Head pat and its wiggle since #4133's design owner's yes (29 Oct).
-    assert_eq!(installed.len(), 28);
+    // Head pat and its wiggle since #4133's design owner's yes (29 Oct);
+    // Comfort break, off but for LAMP_NUDGES_PRESENT=on (#5207).
+    assert_eq!(installed.len(), 29);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -2377,7 +2378,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, and the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct), and Pose's set_pose (#4135).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 28);
+    assert_eq!(inventory.len(), 29);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed

@@ -87,3 +87,12 @@ policy = "nudge"
 body = { gesture = "sleepy" }          # one slow droop
 light = { dim = 1, until = "ends" }    # a shade dimmer, given back when they leave the desk
 say = "It is late in the evening and they are still at the desk. In one short, gentle line, suggest starting to wind down for the night."
+
+# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
+# group's two an hour, never within 30 minutes of each other, which
+# Sip of water and Comfort break name too (a group keeps its quietest).
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
