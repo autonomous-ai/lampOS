@@ -1652,39 +1652,24 @@ thêm nhiều thứ (chặn theo setup, schedule, skills, ears, air, records, c�
 `LAMP_*` khác của voice, link `current`), nên lamp migrate chưa phải bản cài sản phẩm
 V2 đầy đủ.
 
-### Migrate một Lamp V1
+### Chuyển một Lamp V1
 
-`scripts/provision/lamp-v2-migrate` chạy trên lamp bằng root sau khi gói đã có trên
-feed. Với `--dry-run` nó không đổi gì; còn lại:
+Một Lamp V1 chuyển sang gói `lamp-os` (V2) chung chỉ bằng một lần promote, không chạy
+script nào trên lamp:
 
-1. Kiểm lamp: `device_type` là `lamp`, updater có preflight protocol, `lamp-os` chưa
-   chạy, có user `orangepi`.
-2. Đọc phần cứng: đúng một adapter servo `1a86` trong `/dev/serial/by-id`, đúng một
-   camera USB (`/dev/video0`, `vendor:product@cổng-usb`), mic `device_micro2`
-   (`--microphone mic2`), `allwinnerhdmi`/`Speaker`, các CPU nhanh nhất và vùng nhiệt
-   `cpu`/`skin`. Thiếu hoặc không phân biệt được thì từ chối.
-3. Tải ZIP `lamp-os` của feed (`OTA_METADATA_URL` hoặc `/root/config/bootstrap.json`,
-   kiểm sha256; `--package ZIP` đọc file cục bộ) và từ chối gói không có `tools/` và
-   `provision/`.
-4. Đo pose nếu chưa có `/etc/lampOS/body/lamp.env` (`--remeasure` đo lại): HAL dừng
-   vài giây, `lamp-body-measure` đọc lamp đứng yên bằng user `orangepi` (nó từ chối
-   root), không ghi thanh ghi nào, và HAL luôn được bật lại. Lamp phải gập và nằm yên.
-   Tool không đo gaze; thiếu gaze thì body từ chối `--gaze-socket`, nên script thêm
-   `--gaze 755,555`, giá trị giữa của hai Lamp V1 đã đo trong `docs/body.md` của
-   lampOS, để đo lại trên chính lamp sau.
-5. Ghi `/etc/lampOS/body/lamp.env`, `package-profile.json`, `voice/provider.json`
-   (0600), `controls/controls.json` và `controls/controls-pins.json` (bỏ `reset`/
-   `legacy_head` chỉ dùng cho touch, vì unit controls chung chạy không có `--touch`),
-   và tạo thư mục voice sessions, memory, actions và lock. File khác nội dung được để
-   nguyên trừ khi có `--force`.
-6. Chạy `software-update lamp-os --activate` và chờ. Prepare ghi credential; nếu V2
-   không ready, updater tự khôi phục V1.
+```bash
+make promote-service COMPONENT=lamp-os FOR=lamp V=<version> ACTIVATE=1
+```
 
-`--no-activate` dừng sau bước 5, `--rollback` chạy
-`software-update rollback-to-legacy lamp-os`. Script không promote gì và không đổi lamp
-khác.
+Updater của lamp cài gói. Bước prepare, `lamp-keeper prepare` (`docs/keeper.md` của
+lampOS), đọc phần cứng mà không làm gì di chuyển, và chỉ ghi profile, settings và các
+thư mục khi chúng chưa có. Nếu V2 không ready, updater tự khôi phục V1.
 
-Đã kiểm trên lamp-a63e (V1, 2026-10-19) với các gói build từ lamp-voice `ec9b26a`:
-V1 lên V2, rồi cập nhật V2 lên V2, mọi part active và health `ok`. Voice của nó không
-kết nối được Gemini (quota campaign-api của device đó, `quota_exceeded`), nên phần nói
-chưa được kiểm và voice khởi động lại cho tới khi có quota.
+**Rollback:** chạy `software-update rollback-to-legacy lamp-os` trên lamp bằng root. Lệnh
+này khôi phục checkpoint V1 giữ từ lần activate đầu tiên, kể cả sau các lần cập nhật V2
+về sau; thiếu hoặc sai checkpoint thì dừng an toàn. Nó thay cho
+`lamp-v2-migrate --rollback`, vốn chỉ chạy đúng lệnh này. Bản thân script đã được bỏ
+trong #5189.
+
+Đã thể hiện trên lamp-a63e với người ở bên cánh tay đèn (#2396), và trong các lần chuyển
+fleet của lamp-e82d, lamp-dbda và lamp-a63e.

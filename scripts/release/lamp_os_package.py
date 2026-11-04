@@ -256,8 +256,8 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
         add(f'{voice_dir}/{name}', read_file(binaries, name), True)
     add(f'runtime/body/{binary_hashes["lamp-body"]}/lamp-body-worker', read_file(binaries, 'lamp-body-worker'), True)
     if generic:
-        # What scripts/provision/lamp-v2-migrate reads from this package on a V1
-        # lamp: the bench tool for its poses and V2's own setting templates.
+        # For a V1 lamp's move: the bench tool for its poses and V2's own setting
+        # templates.
         for name in sorted(provisioning_binaries):
             data = read_file(binaries, name)
             check_elf(data, name)

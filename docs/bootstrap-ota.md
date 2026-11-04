@@ -1716,43 +1716,25 @@ installs more (setup gating, schedule, skills, ears, air, records, the voice's
 other `LAMP_*` features, `current` links), so a migrated lamp is not yet a full V2
 product install.
 
-### Migrating a V1 Lamp
+### Moving a V1 Lamp
 
-`scripts/provision/lamp-v2-migrate` runs on the lamp as root after the package is
-on the feed. It changes nothing with `--dry-run`, and otherwise:
+A V1 Lamp moves to the generic `lamp-os` (V2) package with one promotion, and no
+script runs on the lamp:
 
-1. Checks the lamp: `device_type` `lamp`, an updater with the preflight protocol,
-   `lamp-os` not yet active, the `orangepi` account.
-2. Reads the hardware: the one `1a86` servo adapter under `/dev/serial/by-id`,
-   the one USB camera (`/dev/video0`, `vendor:product@usb-port`), the
-   `device_micro2` microphone (`--microphone mic2`), `allwinnerhdmi`/`Speaker`,
-   the fastest CPUs and the `cpu`/`skin` thermal zones. Anything ambiguous or
-   missing refuses.
-3. Downloads the feed's `lamp-os` ZIP (`OTA_METADATA_URL` or
-   `/root/config/bootstrap.json`, checked against its sha256; `--package ZIP`
-   reads a local one) and refuses a package without `tools/` and `provision/`.
-4. Measures the poses unless `/etc/lampOS/body/lamp.env` exists (`--remeasure`
-   measures again): HAL stops for a few seconds, `lamp-body-measure` reads the
-   lamp at rest as `orangepi` (it refuses root) with no register writes, and HAL
-   starts again whatever happens. The lamp must be folded and still. The gaze is
-   not measured by the tool; without one the body would refuse `--gaze-socket`,
-   so the script adds `--gaze 755,555`, the middle of the two V1 Lamps measured
-   in lampOS `docs/body.md`, to be measured on the lamp later.
-5. Writes `/etc/lampOS/body/lamp.env`, `package-profile.json`,
-   `voice/provider.json` (0600), `controls/controls.json` and
-   `controls/controls-pins.json` (without the touch-only `reset`/`legacy_head`,
-   since the generic controls unit runs without `--touch`), and creates the voice
-   sessions, memory, actions and lock directories. A file that differs is left
-   alone unless `--force`.
-6. Runs `software-update lamp-os --activate` and waits. Prepare writes the
-   credentials; if V2 does not become ready, the updater restores V1.
+```bash
+make promote-service COMPONENT=lamp-os FOR=lamp V=<version> ACTIVATE=1
+```
 
-`--no-activate` stops after step 5 and `--rollback` runs
-`software-update rollback-to-legacy lamp-os`. The script does not promote
-anything and does not change other lamps.
+The lamp's updater installs the package. Its prepare step, `lamp-keeper prepare`
+(lampOS `docs/keeper.md`), reads the hardware without moving anything, and writes
+the profile, the settings and the directories only where they are absent. If V2
+does not become ready, the updater restores V1.
 
-Verified on lamp-a63e (V1, 2026-10-19) with packages built from lamp-voice
-`ec9b26a`: V1 to V2, then V2 to V2 updates, every part active and health `ok`.
-Its voice could not reach Gemini (the campaign-api quota of that device,
-`quota_exceeded`), so speech was not verified and the voice restarts until the
-quota returns.
+**Rollback:** run `software-update rollback-to-legacy lamp-os` on the lamp as root.
+It restores the V1 checkpoint kept at the first activation, even after later V2
+updates, and a missing or mismatched checkpoint fails closed. This replaces
+`lamp-v2-migrate --rollback`, which only ran the same command. The script itself
+was retired in #5189.
+
+Shown on lamp-a63e with its person at the arm (#2396), and on the fleet moves of
+lamp-e82d, lamp-dbda and lamp-a63e.
