@@ -109,7 +109,9 @@ From the units (lamp-4ace's and the product's) and the reset plans: memory `/var
 faces from photos not yet confirmed (`people.json.from-photos`, only with
 `--photo-dir`), what the eyes set aside beside it
 (`/var/lib/lampos-eyes/set-aside`, #1505), a labelled session's face reads
-(`seems.log`) and the glance log (`glance.log`) in the same folder, tasks
+(`seems.log`), the glance log (`glance.log`) and the owner's voice print for
+the linked services' sends (`owner-voice.json`, and `owner-voice.json.new`
+half written) in the same folder, tasks
 `/var/lib/lampos-tasks/store` and their targets (`targets.json` beside it), the
 skills' state `/var/lib/lampos-skills-state` (daily routine claims included),
 the pushed skills and the owner's yes to them `/var/lib/lampOS/skills-dev`, the

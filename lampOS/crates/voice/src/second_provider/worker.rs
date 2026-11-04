@@ -3396,6 +3396,13 @@ pub fn serve(
                     crate::services::VoiceAsk::Conversation(request) => {
                         voices.likeness_so_far(request)
                     }
+                    crate::services::VoiceAsk::Owner(request) => {
+                        let print = voices.print_of(request)?;
+                        let owner = crate::person::owner_ids();
+                        owner
+                            .iter()
+                            .find_map(|owner| crate::owner_voice::likeness(owner, &print))
+                    }
                 }
             }));
         }
@@ -5840,6 +5847,9 @@ fn checking_the_voice_for(
                 if let Ok(mut heeding) = heeding.lock() {
                     heeding.checking_the_voice_for_services(printer);
                 }
+                // The owner's enrolled print, for the send gate alone
+                // (`crate::owner_voice`): asked for, learnt and used.
+                crate::owner_voice::enable();
                 Printing::ForServices
             }
             Err(error) => {
@@ -9719,6 +9729,12 @@ impl Heeding {
                 attention.called_for_itself()
             };
             voices.decided(request, played, seen.going_on && !new_call);
+        }
+        // With the prints for the services only, after the owner's yes their
+        // next lines make their print (`crate::owner_voice::offer`); a
+        // conversation decision reads none of it.
+        if let Some(voices) = self.for_services.as_mut() {
+            crate::owner_voice::offer(request, voices);
         }
         // The verdict for the room this route keeps (`super::room`), and a
         // call let out, which ends the count of talk past the lamp; a line
