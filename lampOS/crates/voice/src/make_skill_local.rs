@@ -1277,6 +1277,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             sign_in_app: false,
             questions: false,
             now: false,
+            one_yes: false,
         };
         for tasks in [None, Some(tasks)] {
             let off = Settings {

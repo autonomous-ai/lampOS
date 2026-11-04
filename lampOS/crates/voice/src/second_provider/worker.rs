@@ -29318,6 +29318,7 @@ mod memory_observer {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -29585,6 +29586,7 @@ mod memory_observer {
             correct: false,
             questions: false,
             now: false,
+            one_yes: false,
             sign_in: false,
             sign_in_app: false,
         };
