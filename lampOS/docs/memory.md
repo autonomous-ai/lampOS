@@ -2511,6 +2511,21 @@ On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `sea
   A line carried as a person's conversation going on (`LAMP_CONVERSATION_CARRIES`, a held scope) is told no hits, as before. Tested in `worker::tests::a_turns_hits_go_to_the_face_seen_speaking_then_the_face_in_view_then_the_room`, and on the engine in `person_scope_seen`'s `a_line_seen_spoken_by_a_gets_as_hits_with_b_silent_in_view`, `a_line_with_one_silent_known_face_and_no_speaking_evidence_gets_the_faces_hits`, `a_line_seen_spoken_by_another_face_never_gets_the_silent_known_faces_hits`, `a_line_with_no_known_face_in_view_gets_the_rooms_hits` and `a_second_silent_face_in_view_keeps_the_hits_the_rooms`; the journal line in `remember::tests::the_hits_line_says_its_path_and_counts_each_path`; also `a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs`.
 - **Without a lease:** the face-and-session rule above (`hits_path=face` for a person's, `room` for the room's).
 
+### A don't-know recalls first (`LAMP_MEMORY_DONT_KNOW_RECALLS=on`, task C57)
+
+On lamp-06c1 on 30 Oct the lamp answered only 1 to 2 of 15 questions about things the person had asked it to keep, after #4522 told the model to call `recall` before saying it doesn't know. The rest were "I don't know" or "I'm not sure" with the answer kept. With this switch and the Days memory, the second route checks such a reply in code (`crate::dont_know`):
+
+- **Which lines:** a spoken line that names the person asking (`dont_know::about_themself`: "my", "me", "I", "tôi", "mình" …), not one held only by a face's gap, in a turn that has not called `recall` itself. Once a turn, never in its last round.
+- **Which replies:** one that opens with a don't-know (`dont_know::opens_dont_know`: "I don't know", "I'm not sure", "I don't remember", "you haven't told me", "tôi không nhớ" …, after fillers such as "Hmm," or "Sorry,"). The reply's opening is held only until it is known: a reply that begins "Your" or "I think" goes on at its first word.
+- **The search:** the moment a don't-know is known, the person's own kept things that share the line's words, read as memory's hits read them (`remember::hits_note_counted`, the newest 16 KB of the kept list, within `HITS_WITHIN`, 60 ms), off the worker's runtime.
+- **Whose:** only the request's own person (`worker::dont_know_whose`): its lease's person, or without a lease the face and the session's person agreeing. Never the room's, never a line another face spoke (narrowed to the room), never a revoked lease, and never the face in view alone, the hits' accepted fallback (#5272).
+- **Found:** the don't-know is not said, and the model is asked once more with `dont_know::NOTE` and the kept things found (at most three, each cut to 160 characters, told as the person's own). A second don't-know is said as it comes.
+- **Nothing found:** the held words go on as they came.
+- **Latency:** a reply that isn't a don't-know waits only for its first word or two. A don't-know with nothing found waits for the search (60 ms at most; 3 to 4 ms on a 200-thing kept list, `hits_note_latency_on_a_200_entry_kept_list`). A don't-know with a find adds the search and one chat round, as a `recall` the model called would.
+- **Journal:** `its reply opens with a don't-know; the person's kept things were found: not said, asked again with them in N ms (LAMP_MEMORY_DONT_KNOW_RECALLS)`, or `… had nothing for its words: said …`, and a `memory searched for a don't-know` line with the counts (kept out of the hits' per-path counts). Counts only, never words.
+
+Off, every reply is byte for byte as before. Tested in `second_provider::tests::dont_know` and `worker::tests::a_dont_know_recalls_only_the_requests_own_persons_kept_things`.
+
 ### The nightly pass (`LAMP_MEMORY_NIGHTLY=on`, extraction plan C, step B)
 
 The memory owner's extraction plan C, step B (3 Nov): a nightly model pass

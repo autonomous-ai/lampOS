@@ -1447,6 +1447,10 @@ struct Shared {
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
     remembered: Option<Remembered>,
+    /// With `LAMP_MEMORY_DONT_KNOW_RECALLS=on`: the person's own kept
+    /// things that fit a spoken request's words, searched when its reply
+    /// opens with a don't-know ([`Engine::recalling_before_a_dont_know`]).
+    dont_know: Option<Remembered>,
     /// With `LAMP_MEMORY_EVENTS`: the line a session's first turn, a
     /// greeting alone, is given for a dated follow-up
     /// ([`Engine::asking_after_events`], #2805, #2602 22 Oct 22:17).
@@ -3294,6 +3298,7 @@ impl Engine {
                 staff: None,
                 place: None,
                 remembered: None,
+                dont_know: None,
                 event_turn: None,
                 event_withheld: None,
                 note_ahead: None,
@@ -4437,6 +4442,19 @@ impl Engine {
     pub fn remembering(mut self, note: Remembered) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.remembered = Some(note);
+        }
+        self
+    }
+
+    /// With `LAMP_MEMORY_DONT_KNOW_RECALLS=on` (`crate::dont_know`, task
+    /// C57): a spoken request about the person whose reply opens with a
+    /// don't-know is searched with `found`, given the request's lease; with
+    /// kept things found, the don't-know is not said and the model is asked
+    /// once more with them. `found` gives only the request's own person's
+    /// kept things, never the room's or anyone else's. Before any turn only.
+    pub fn recalling_before_a_dont_know(mut self, found: Remembered) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.dont_know = Some(found);
         }
         self
     }
@@ -10255,6 +10273,69 @@ fn calls_a_service(calls: &[net::ToolCall]) -> bool {
         .any(|call| crate::services::is_tool(&call.name))
 }
 
+/// What became of a piece of a reply held for a don't-know
+/// (`LAMP_MEMORY_DONT_KNOW_RECALLS`, [`dont_know_first`]).
+enum DontKnow {
+    /// Held: its opening is not known yet.
+    Held,
+    /// Said as it came: what was held with it, or the piece alone.
+    Pass(String),
+    /// A don't-know, and the person's own kept things found for the line's
+    /// words: the note of them, for the round asked again.
+    Recalled(String),
+}
+
+/// `piece` of a reply on the line `words` of `request` (`None`: no line
+/// about the person) added to `hold` while a don't-know's opening is held
+/// (`crate::dont_know`). Once one is known, the person's own kept things are
+/// searched for the line's words at once, within the memory hits' bound
+/// (`crate::remember::HITS_WITHIN`), off the runtime's thread: with some
+/// found, [`DontKnow::Recalled`]; with none, what was held goes on. `whole`
+/// at the round's end; `may_recall` false beside a call, which is answered
+/// as it is.
+async fn dont_know_first(
+    shared: &Shared,
+    (request, words, scope): (u64, Option<&str>, Option<&crate::memory_scope::ScopeLease>),
+    hold: &mut Option<String>,
+    piece: String,
+    (whole, may_recall): (bool, bool),
+) -> DontKnow {
+    let Some(held) = hold.as_mut() else {
+        return DontKnow::Pass(piece);
+    };
+    held.push_str(&piece);
+    match crate::dont_know::opens_dont_know(held, whole) {
+        None => return DontKnow::Held,
+        Some(false) => return DontKnow::Pass(hold.take().unwrap_or_default()),
+        Some(true) => {}
+    }
+    let held = hold.take().unwrap_or_default();
+    let (Some(found), Some(words), true) = (shared.dont_know.clone(), words, may_recall) else {
+        return DontKnow::Pass(held);
+    };
+    let started = Instant::now();
+    let (words, lease) = (words.to_owned(), scope.cloned());
+    let note = tokio::task::spawn_blocking(move || found(request, &words, lease.as_ref()))
+        .await
+        .ok()
+        .flatten();
+    // Counts only, never the words (#2510 take 1 c).
+    eprintln!(
+        "lamp-voice second: request {request}: its reply opens with a don't-know; the person's kept things {} in {} ms ({})",
+        if note.is_some() {
+            "were found: not said, asked again with them"
+        } else {
+            "had nothing for its words: said"
+        },
+        started.elapsed().as_millis(),
+        crate::dont_know::ENVIRONMENT
+    );
+    match note {
+        Some(note) => DontKnow::Recalled(note),
+        None => DontKnow::Pass(held),
+    }
+}
+
 /// `piece` added to a round's held claim (`LAMP_ACTION_CLAIM_CHECKED`,
 /// #5215) while one is held, so nothing of it is said before the claim is
 /// judged at the round's end; else `piece` as it is.
@@ -10455,6 +10536,14 @@ async fn answer(
     // covers, and whether it asked for a reminder
     // (`LAMP_SECOND_SAY_WITH_CALL`, #2135).
     let heard_words = said.clone();
+    // A line about the person, whose reply may recall before a don't-know
+    // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
+    let dont_know_words = (heard
+        && !quoted
+        && shared.dont_know.is_some()
+        && !held_by_gap(scope.as_ref())
+        && crate::dont_know::about_themself(&said))
+    .then(|| said.clone());
     let reminded = said.to_lowercase().contains("remind");
     let words = Message::user(said.clone());
     let event_words = said.clone();
@@ -10729,6 +10818,9 @@ async fn answer(
         // #3504), and whether a `remember` of this request ran.
         let mut offer_hold = crate::remember::OfferHold::default();
         let mut remember_ran = false;
+        // Whether a don't-know was recalled once already in this turn
+        // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
+        let mut dont_know_recalled = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if let Some(note) = keep_claim_note.take() {
@@ -10793,6 +10885,20 @@ async fn answer(
             // a turn offered no function.
             let mut action_held =
                 (shared.action_claims && !quoted && asked != Asker::Reminder).then(String::new);
+            // A reply's opening on a line about the person, held until it is
+            // known whether it says it doesn't know; one that does is
+            // searched for at once, and with the person's kept things found
+            // is not said: the model is asked again with them
+            // (`LAMP_MEMORY_DONT_KNOW_RECALLS`). Once a turn, never after
+            // the turn called recall itself, and never in its last round.
+            let mut dont_know_held = (dont_know_words.is_some()
+                && !dont_know_recalled
+                && round < MAX_ROUNDS
+                && !turn_called
+                    .iter()
+                    .any(|name| name == crate::remember::RECALL))
+            .then(String::new);
+            let mut recalled: Option<String> = None;
             loop {
                 let next = if first && round == 1 {
                     let at = |after: Duration| from + after;
@@ -11033,6 +11139,22 @@ async fn answer(
                                 continue;
                             }
                         };
+                        let piece = match dont_know_first(
+                            shared,
+                            (request, dont_know_words.as_deref(), scope.as_ref()),
+                            &mut dont_know_held,
+                            piece,
+                            (false, calls.is_empty()),
+                        )
+                        .await
+                        {
+                            DontKnow::Held => continue,
+                            DontKnow::Pass(piece) => piece,
+                            DontKnow::Recalled(found) => {
+                                recalled = Some(found);
+                                break;
+                            }
+                        };
                         let piece = match claim_held.as_mut() {
                             None => piece,
                             Some(held) => {
@@ -11111,6 +11233,16 @@ async fn answer(
                 round -= 1;
                 continue;
             }
+            // A don't-know with the person's kept things found: not said,
+            // asked again with them (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
+            if let Some(found) = recalled.take() {
+                dont_know_recalled = true;
+                messages.push(Message::system(format!(
+                    "{}\n{found}",
+                    crate::dont_know::NOTE
+                )));
+                continue;
+            }
             // A partial marker has not reached the other opening filters
             // yet. Give it to their normal end-of-round path too.
             // So does what the stage filter still waited on.
@@ -11140,10 +11272,15 @@ async fn answer(
                         aloud = Some(name);
                     }
                     // No narration: on to the holds after it, else said.
-                    _ => match (opening.as_mut(), claim_held.as_mut()) {
-                        (Some(opening), _) => opening.push_str(&held),
-                        (None, Some(claim)) => claim.push_str(&held),
-                        (None, None) => {
+                    _ => match (
+                        opening.as_mut(),
+                        dont_know_held.as_mut(),
+                        claim_held.as_mut(),
+                    ) {
+                        (Some(opening), ..) => opening.push_str(&held),
+                        (None, Some(dont_know), _) => dont_know.push_str(&held),
+                        (None, None, Some(claim)) => claim.push_str(&held),
+                        (None, None, None) => {
                             for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                                 if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
                                     queue.push(sentence).await?;
@@ -11222,9 +11359,10 @@ async fn answer(
                     );
                     return Err(Stop::Declined);
                 }
-                match decline_held.as_mut() {
-                    Some(declined) => declined.push_str(&held),
-                    None => {
+                match (decline_held.as_mut(), dont_know_held.as_mut()) {
+                    (Some(declined), _) => declined.push_str(&held),
+                    (None, Some(dont_know)) => dont_know.push_str(&held),
+                    (None, None) => {
                         for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                             if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
                                 queue.push(sentence).await?;
@@ -11253,6 +11391,8 @@ async fn answer(
                         "lamp-voice second: request {request}: its reply is \"not for me\" on a line that may not be for the lamp: taken as not_for_me, nothing said (LAMP_DECLINE_SILENT)"
                     );
                     return Err(Stop::Declined);
+                } else if let Some(dont_know) = dont_know_held.as_mut() {
+                    dont_know.push_str(&held);
                 } else {
                     let piece = match claim_held.as_mut() {
                         None => held,
@@ -11278,6 +11418,59 @@ async fn answer(
                     for sentence in split.push(&piece) {
                         if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
                             queue.push(sentence).await?;
+                        }
+                    }
+                }
+            }
+            // The round ended with a don't-know's opening still held, whole
+            // now (`LAMP_MEMORY_DONT_KNOW_RECALLS`): recalled as one streamed
+            // would be, beside no call; else it goes on to the holds after
+            // it and is said.
+            if dont_know_held.as_ref().is_some_and(|held| !held.is_empty()) {
+                match dont_know_first(
+                    shared,
+                    (request, dont_know_words.as_deref(), scope.as_ref()),
+                    &mut dont_know_held,
+                    String::new(),
+                    (true, calls.is_empty()),
+                )
+                .await
+                {
+                    DontKnow::Recalled(found) => {
+                        dont_know_recalled = true;
+                        messages.push(Message::system(format!(
+                            "{}\n{found}",
+                            crate::dont_know::NOTE
+                        )));
+                        continue;
+                    }
+                    DontKnow::Held => {}
+                    DontKnow::Pass(held) => {
+                        let piece = match claim_held.as_mut() {
+                            None => held,
+                            Some(claim) => {
+                                claim.push_str(&held);
+                                match crate::remember::claims_a_keep_or_face(
+                                    claim,
+                                    false,
+                                    shared.face_claims,
+                                ) {
+                                    Some(false) => claim_held.take().unwrap_or_default(),
+                                    // Undecided, or a claim: judged below.
+                                    _ => String::new(),
+                                }
+                            }
+                        };
+                        let piece = held_for_a_claim(&mut action_held, piece);
+                        if piece.chars().any(char::is_alphanumeric)
+                            && !crate::not_speech::names_a_function(&text)
+                        {
+                            queue.announce().await?;
+                        }
+                        for sentence in split.push(&piece) {
+                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                                queue.push(sentence).await?;
+                            }
                         }
                     }
                 }
