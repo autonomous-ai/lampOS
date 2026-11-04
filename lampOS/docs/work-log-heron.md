@@ -477,3 +477,6 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
 - 02:0x — #5317 READ-OK restated at 970f07cacc after the rebase over
   #5308 (`&notion` out of two loops); its first commit landed as
   85efa8bbb ahead of this test; the `.envs` mutation still fails.
+- 02:2x — Faye placed #5064's second read on me: it's already in
+  (READ-OK e2657988dc, 4 Nov 16:27), head unchanged; it conflicts with
+  lamp-voice in three docs, so a rebase is what it waits on.
