@@ -411,7 +411,11 @@ pub fn said_in(pending: &mut Option<Pending>, request: u64, words: &str, now: In
         kept.spoken_from.get_or_insert(now);
         kept.spoken_at = Some(now);
     } else if kept.asked_again == Some(request) {
-        // The lamp asking once more for the words: no other request.
+        // The lamp asking once more for the words: no other request, and
+        // the "send" it asks for is timed from these words, not from the
+        // read-back (on lamp-9adf on 4 Nov the read-back, the first "send",
+        // its answer and the second "send" took 35 s, past SEND_WITHIN).
+        kept.spoken_at = Some(now);
     } else if *kept.other.get_or_insert(request) != request {
         *pending = None;
     }
@@ -1379,6 +1383,40 @@ mod tests {
         .expect("the longer line sends");
         assert_eq!(passed.args["said"], "send");
         assert_eq!(pending, None);
+
+        // As timed on a lamp: the read-back said, then the first "send" and
+        // the lamp's asking once more take past SEND_WITHIN of it; the
+        // second "send", soon after the asking, still sends.
+        let mut pending = waiting(now);
+        let first = now + SEND_WITHIN - Duration::from_secs(5);
+        let _ = gate(&mut pending, &send("s1"), 11, &short, first);
+        let asked_at = first + Duration::from_secs(8);
+        said_in(&mut pending, 11, "Say go ahead and send it.", asked_at);
+        began_in(&mut pending, asked_at + Duration::from_secs(3));
+        let passed = gate(
+            &mut pending,
+            &send("s1"),
+            12,
+            &longer,
+            asked_at + Duration::from_secs(5),
+        )
+        .expect("timed from the asking");
+        assert_eq!(passed.args["said"], "send");
+
+        // Its own window: a second "send" long after the asking cancels.
+        let mut pending = waiting(now);
+        let _ = gate(&mut pending, &send("s1"), 11, &short, at(now));
+        said_in(&mut pending, 11, "Say go ahead and send it.", at(now));
+        began_in(&mut pending, at(now) + Duration::from_secs(2));
+        let refused = gate(
+            &mut pending,
+            &send("s1"),
+            12,
+            &longer,
+            at(now) + SEND_WITHIN + Duration::from_secs(1),
+        )
+        .expect_err("late after the asking");
+        assert_eq!(refused["error"], CANCELLED);
 
         // A second line with no print cancels it.
         let mut pending = waiting(now);
