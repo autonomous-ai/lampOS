@@ -1317,7 +1317,7 @@ pub fn run_for(
     person: Option<&str>,
     line: Option<&crate::speaking_faces::LineSeen>,
 ) -> (Value, bool) {
-    run_for_with(socket, call, switches, person, line, None)
+    run_for_with(socket, call, switches, person, line, None, &mut None)
 }
 
 /// [`run_for`], sending to the eyes only while `fence` holds: a forget made
@@ -1336,10 +1336,12 @@ pub fn run_for_fenced(
     line: Option<&crate::speaking_faces::LineSeen>,
     fence: &dyn Fn() -> bool,
 ) -> (Value, bool) {
-    run_for_with(socket, call, switches, person, line, Some(fence))
+    run_for_with(socket, call, switches, person, line, Some(fence), &mut None)
 }
 
-/// [`run_for`], fenced on `fence` when one is given ([`run_for_fenced`]).
+/// [`run_for`], fenced on `fence` when one is given ([`run_for_fenced`]),
+/// with the people a remembering replaced put in `replaced`
+/// ([`replaced_of`]).
 fn run_for_with(
     socket: &Path,
     call: &ToolCall,
@@ -1347,6 +1349,7 @@ fn run_for_with(
     person: Option<&str>,
     line: Option<&crate::speaking_faces::LineSeen>,
     fence: Option<&dyn Fn() -> bool>,
+    replaced: &mut Option<Vec<String>>,
 ) -> (Value, bool) {
     let told = run_face(socket, call, switches, person, line, fence);
     record_told(socket, call, told, switches, person, line)
@@ -1401,7 +1404,7 @@ fn run_face(
     } else {
         Said::default()
     };
-    run_switched(socket, call, switches, &said, fence)
+    run_switched(socket, call, switches, &said, fence, replaced)
 }
 
 /// Enrollment under the caller's revocable authority. The switch-off
@@ -1415,8 +1418,48 @@ pub fn run_scoped(
     request: u64,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> (Value, bool) {
+    run_scoped_replacing(socket, call, switches, person, line, request, lease).0
+}
+
+/// [`run_scoped`], with the people the eyes answered a remembering replaced
+/// ([`replaced_of`]) beside what the model is told, never in it: only
+/// [`OwnerRename::answered`] reads them (Reviewer-three's P1 on #5149).
+pub fn run_scoped_replacing(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> ((Value, bool), Option<Vec<String>>) {
+    let mut replaced = None;
+    let told = run_scoped_into(
+        socket,
+        call,
+        switches,
+        person,
+        line,
+        request,
+        lease,
+        &mut replaced,
+    );
+    (told, replaced)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_scoped_into(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    replaced: &mut Option<Vec<String>>,
+) -> (Value, bool) {
     if call.name != REMEMBER || !switches.remember_speaker {
-        return run_for(socket, call, switches, person, line);
+        return run_for_with(socket, call, switches, person, line, None, replaced);
     }
     let told = run_speaker(socket, call, switches, line, request, lease);
     record_told(socket, call, told, switches, person, line)
@@ -1490,7 +1533,10 @@ fn run_speaker(
         Some(answer) if answer.get("error").and_then(Value::as_str) == Some("known_as") => {
             (json!({"error": NAME_UNCHANGED}), true)
         }
-        Some(answer) => (told_asking(&answer, switches.visits), true),
+        Some(answer) => {
+            *replaced = replaced_of(&answer);
+            (told_asking(&answer, switches.visits), true)
+        }
         None => (
             json!({"error": "I could not finish remembering that face. I have not confirmed that it was saved."}),
             false,
@@ -1680,6 +1726,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
         },
         said,
         None,
+        &mut None,
     )
 }
 
@@ -1696,6 +1743,7 @@ fn run_at_setup(socket: &Path, call: &ToolCall, said: &Said) -> (Value, bool) {
         },
         said,
         None,
+        &mut None,
     )
 }
 
@@ -1705,6 +1753,7 @@ fn run_switched(
     switches: FaceSwitches,
     said: &Said,
     fence: Option<&dyn Fn() -> bool>,
+    replaced: &mut Option<Vec<String>>,
 ) -> (Value, bool) {
     let checked = switches.checked;
     let Some(name) = call
@@ -1797,12 +1846,29 @@ fn run_switched(
         None => crate::tools::exchange(socket, &line, DEADLINE),
     };
     match answer {
-        Some(answer) => (told_asking(&answer, switches.visits), true),
+        Some(answer) => {
+            *replaced = replaced_of(&answer);
+            (told_asking(&answer, switches.visits), true)
+        }
         None => (
             json!({"error": "My eye is not answering right now, so I could not do that."}),
             false,
         ),
     }
+}
+
+/// The people the eyes say a remembering replaced (`"replaced"`, the names
+/// they were kept under, `[]` for none): `None` when the answer has no such
+/// list of names, as from eyes older than #5149's P1 fix, which then moves
+/// no owner ([`OwnerRename::answered`]). Never told to the model
+/// ([`told_asking`] leaves it out) nor journaled.
+pub fn replaced_of(answer: &Value) -> Option<Vec<String>> {
+    answer
+        .get("replaced")?
+        .as_array()?
+        .iter()
+        .map(|name| name.as_str().map(str::to_owned))
+        .collect()
 }
 
 /// What the model is told when a yes to being named may not be the named
@@ -2335,19 +2401,18 @@ fn renames_of(file: &Path) -> (u32, u64) {
 /// misheard, renamed from name A to name B by the person, a tester's lamp
 /// on 3 Nov), and [`refresh_owner`], matching the owner by name, would then
 /// find A gone and drop the owner for good, so the lamp no longer knew
-/// them. Counted in flight from before the eyes are asked until the owner
-/// is moved ([`OwnerRename::answered`]) or the call came to nothing
+/// them. Counted in flight from before the eyes are asked until they
+/// answered ([`OwnerRename::answered`]) or the call came to nothing
 /// (dropped).
 pub struct OwnerRename {
     file: PathBuf,
-    socket: PathBuf,
     owner: String,
 }
 
 impl OwnerRename {
     /// Begun only for a `remember_my_face` with `replace` and an owner kept
     /// in the onboarding file `onboarding`; else there is nothing to move.
-    pub fn begin(socket: &Path, call: &ToolCall, onboarding: Option<&Path>) -> Option<Self> {
+    pub fn begin(call: &ToolCall, onboarding: Option<&Path>) -> Option<Self> {
         if call.name != REMEMBER || call.args.get("replace").and_then(Value::as_bool) != Some(true)
         {
             return None;
@@ -2362,53 +2427,72 @@ impl OwnerRename {
             .0 += 1;
         Some(Self {
             file: file.to_owned(),
-            socket: socket.to_owned(),
             owner,
         })
     }
 
-    /// The eyes' answer as the model is told it (`told`): a face kept under
-    /// a name moves the owner to it ([`Self::moved`]) off the reply's path,
-    /// as the eyes' list can take seconds on a busy lamp ([`LIST_WITHIN`]);
-    /// anything else ends the rename here.
-    pub fn answered(self, told: &Value) {
-        let Some(to) = told["remembered"]
-            .as_str()
-            .filter(|_| told["ok"] == true)
-            .map(str::to_owned)
-        else {
-            return;
-        };
-        std::thread::spawn(move || self.moved(&to));
-    }
-
-    /// The owner moved to `to` when the eyes now know `to` and no longer the
-    /// owner's name: theirs was the face renamed. Asked up to three times,
-    /// since eyes slow to answer would leave the owner to the next
-    /// refresh's drop. The owner the voice names follows at once.
-    // ponytail: the owner's face removed in the app within one OWNER_EVERY
-    // before someone else's is renamed to `to` reads the same; the eyes
-    // would need to say which name they replaced.
-    fn moved(&self, to: &str) {
-        for _ in 0..3 {
-            let Some(Some(names)) = names_reached(&self.socket) else {
-                continue;
-            };
-            if among(&names, to) && !among(&names, &self.owner) {
-                crate::onboarding::owner_renamed(&self.file, &self.owner, to);
-                let mut now = OWNER_NOW
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
-                if now
-                    .0
-                    .as_ref()
-                    .is_some_and(|owner| owner.to_lowercase() == self.owner.to_lowercase())
-                {
-                    now.0 = Some(to.to_owned());
+    /// The eyes' answer as the model is told it (`told`), and the people
+    /// they say it replaced (`replaced`, [`replaced_of`]): the owner moves
+    /// to the name kept only when the eyes kept it and replaced exactly one
+    /// person, the owner ([`moved_to`]). A list read after the save can't
+    /// say whose face was renamed: the owner's removed in the app, then a
+    /// visitor's own rename to that name, read the same and gave the
+    /// visitor the owner's authority (Reviewer-three's P1 on #5149). Any
+    /// other answer, or eyes that don't say (`None`), move nothing. The
+    /// rename ends here either way, so a refresh drops an owner the eyes no
+    /// longer know as before. The owner the voice names follows at once.
+    ///
+    /// The journal says whether the owner moved, and how many the eyes
+    /// said they replaced, never a name.
+    pub fn answered(self, told: &Value, replaced: Option<&[String]>) {
+        let Some(to) = moved_to(&self.owner, told, replaced) else {
+            if told["ok"] == true {
+                match replaced {
+                    Some(replaced) => eprintln!(
+                        "lamp-voice: a face renamed while setup keeps an owner moved no owner: the eyes replaced {} people, not the owner alone",
+                        replaced.len()
+                    ),
+                    None => eprintln!(
+                        "lamp-voice: a face renamed while setup keeps an owner moved no owner: the eyes did not say whom they replaced"
+                    ),
                 }
             }
             return;
-        }
+        };
+        eprintln!(
+            "lamp-voice: a rename of the setup owner's face moved the owner: the eyes replaced the owner alone"
+        );
+        crate::onboarding::owner_renamed(&self.file, &self.owner, to);
+        renamed_in(
+            &mut OWNER_NOW
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .0,
+            &self.owner,
+            to,
+        );
+    }
+}
+
+/// The owner named (`now`, [`OWNER_NOW`]'s) follows a rename from `from`
+/// to `to`, when it is still `from` (any case).
+fn renamed_in(now: &mut Option<String>, from: &str, to: &str) {
+    if now
+        .as_ref()
+        .is_some_and(|owner| owner.to_lowercase() == from.to_lowercase())
+    {
+        *now = Some(to.to_owned());
+    }
+}
+
+/// The name `owner` moves to on the eyes' answer `told`: the one they kept,
+/// when it was kept and the people it `replaced` are exactly `owner` (any
+/// case, as the eyes match a name); else none.
+fn moved_to<'a>(owner: &str, told: &'a Value, replaced: Option<&[String]>) -> Option<&'a str> {
+    let to = told["remembered"].as_str().filter(|_| told["ok"] == true)?;
+    match replaced? {
+        [one] if among(std::slice::from_ref(one), owner) => Some(to),
+        _ => None,
     }
 }
 
@@ -3751,54 +3835,223 @@ mod tests {
         assert_eq!(told(), "");
     }
 
+    /// An onboarding file whose setup owner is `owner`, beside a fresh
+    /// folder, and its mailbox read.
+    fn owner_file(owner: &str) -> (PathBuf, impl Fn() -> String) {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let directory = std::env::temp_dir().join(format!(
+            "lamp-voice-owner-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let file = directory.join("progress.json");
+        std::fs::write(
+            &file,
+            serde_json::json!({"steps": {}, "owner": owner}).to_string(),
+        )
+        .unwrap();
+        let mailbox = crate::onboarding::mailbox_of(&file);
+        (file, move || {
+            std::fs::read_to_string(&mailbox).unwrap_or_default()
+        })
+    }
+
+    fn rename_to(name: &str, replace: bool) -> ToolCall {
+        ToolCall {
+            id: "c".into(),
+            name: REMEMBER.into(),
+            args: serde_json::json!({"name": name, "replace": replace}),
+        }
+    }
+
+    /// The eyes' raw answer `raw` to a rename of `owner`'s file, through
+    /// the voice as `tools` hands it on: told as the model is, `replaced`
+    /// beside it. What the mailbox then says.
+    fn owner_after(owner: &str, raw: &Value) -> String {
+        let (file, told) = owner_file(owner);
+        let renaming = OwnerRename::begin(&rename_to("Rosa", true), Some(&file)).unwrap();
+        assert_eq!(renames_of(&file).0, 1);
+        renaming.answered(&told_asking(raw, false), replaced_of(raw).as_deref());
+        assert_eq!(renames_of(&file), (0, 1), "the rename ended");
+        told()
+    }
+
     /// A tester's lamp, 3 Nov: the setup owner's face saved under a misheard
-    /// name A, renamed to name B, moves the owner to B, and a refresh while
-    /// the rename is in flight drops nothing; a rename of someone else's
-    /// face, or a remembering without `replace`, leaves the owner alone.
+    /// name A, renamed to name B, moves the owner to B when the eyes say the
+    /// face they replaced was A's, and a refresh while the rename is in
+    /// flight drops nothing; a remembering without `replace` begins none.
     #[test]
     fn a_rename_of_the_owners_face_moves_the_owner_and_no_refresh_drops_them() {
         let (socket, asked) = eyes(vec![
             // The refresh in flight: the eyes know B already.
             serde_json::json!({"people": ["Name B"]}),
-            // The move: A gone, B there.
-            serde_json::json!({"people": ["Name B"]}),
-            // Someone else's face renamed: A still there.
-            serde_json::json!({"people": ["Name A", "Name D"]}),
         ]);
         let file = socket.with_file_name("progress.json");
         std::fs::write(&file, r#"{"steps":{},"owner":"Name A"}"#).unwrap();
         let mailbox = crate::onboarding::mailbox_of(&file);
         let told = || std::fs::read_to_string(&mailbox).unwrap_or_default();
-        let call = |replace: bool| ToolCall {
-            id: "c".into(),
-            name: REMEMBER.into(),
-            args: serde_json::json!({"name": "Name B", "replace": replace}),
-        };
-        assert!(OwnerRename::begin(&socket, &call(false), Some(&file)).is_none());
-        assert!(OwnerRename::begin(&socket, &call(true), None).is_none());
-        let renaming = OwnerRename::begin(&socket, &call(true), Some(&file)).unwrap();
+        assert!(OwnerRename::begin(&rename_to("Name B", false), Some(&file)).is_none());
+        assert!(OwnerRename::begin(&rename_to("Name B", true), None).is_none());
+        let renaming = OwnerRename::begin(&rename_to("Name B", true), Some(&file)).unwrap();
         refresh_owner(Some(&file), Some(&socket));
         assert_eq!(told(), "", "no drop while the rename is in flight");
-        renaming.moved("Name B");
-        drop(renaming);
+        let raw = serde_json::json!({"remembered": "Name B", "replaced": ["Name A"]});
+        renaming.answered(&told_asking(&raw, false), replaced_of(&raw).as_deref());
         assert_eq!(renames_of(&file).0, 0);
         assert_eq!(
             told(),
             "{\"owner_renamed\":{\"from\":\"Name A\",\"to\":\"Name B\"}}\n"
         );
-        std::fs::remove_file(&mailbox).unwrap();
-        let other = OwnerRename::begin(&socket, &call(true), Some(&file)).unwrap();
-        other.moved("Name D");
-        drop(other);
-        assert_eq!(told(), "", "someone else's rename moves nothing");
+        // Moved on the answer itself: the eyes' list is asked only by the
+        // refresh.
         assert_eq!(
             asked.join().unwrap(),
-            vec![serde_json::json!({"list": true}); 3]
+            vec![serde_json::json!({"list": true})]
         );
         // A failed remembering ends the rename at once, moving nothing.
-        let failed = OwnerRename::begin(&socket, &call(true), Some(&file)).unwrap();
-        failed.answered(&serde_json::json!({"error": "busy"}));
+        std::fs::remove_file(&mailbox).unwrap();
+        let failed = OwnerRename::begin(&rename_to("Name B", true), Some(&file)).unwrap();
+        failed.answered(&serde_json::json!({"error": "busy"}), None);
         assert_eq!(renames_of(&file).0, 0);
+        assert_eq!(told(), "");
+    }
+
+    /// The owner the voice names follows the owner's own rename at once,
+    /// and only while it is still them. Tried on a value of its own:
+    /// [`OWNER_NOW`] is shared with the other owner tests.
+    #[test]
+    fn the_owner_named_follows_their_own_rename() {
+        let mut now = Some("original owner".to_owned());
+        renamed_in(&mut now, "Original Owner", "Rosa");
+        assert_eq!(now.as_deref(), Some("Rosa"));
+        renamed_in(&mut now, "Original Owner", "Ines");
+        assert_eq!(now.as_deref(), Some("Rosa"), "someone else's name stays");
+        let mut none = None;
+        renamed_in(&mut none, "Original Owner", "Rosa");
+        assert_eq!(none, None, "a forgotten owner is not brought back");
+    }
+
+    /// Reviewer-three's P1 on #5149: the app removed the owner's face, and
+    /// before the next refresh a visitor renamed their own face to the
+    /// name the eyes now know. Before, a list read after the save that knew
+    /// the new name and not the owner's moved the owner, and their
+    /// authority, to the visitor. Now the eyes say whom they replaced: the
+    /// visitor's old name, so nothing moves and the owner stays.
+    #[test]
+    fn a_visitors_rename_after_the_owners_removal_moves_no_owner() {
+        let (file, told) = owner_file("Original Owner");
+        let renaming =
+            OwnerRename::begin(&rename_to("Visitor Renamed", true), Some(&file)).unwrap();
+        let raw = serde_json::json!({"remembered": "Visitor Renamed", "replaced": ["Visitor"]});
+        renaming.answered(&told_asking(&raw, false), replaced_of(&raw).as_deref());
+        assert_eq!(told(), "", "no owner_renamed");
+        assert_eq!(
+            crate::onboarding::owner_of(&file).as_deref(),
+            Some("Original Owner")
+        );
+        assert_eq!(renames_of(&file), (0, 1));
+    }
+
+    /// Reviewer-three's condition (a) on #5149: only `replaced` naming
+    /// exactly the owner, any case, moves them; missing (older eyes), not a
+    /// list, a list with anything but names, empty, two people, or someone
+    /// else moves nothing.
+    #[test]
+    fn only_the_owner_replaced_alone_moves_the_owner() {
+        let moved = "{\"owner_renamed\":{\"from\":\"Original Owner\",\"to\":\"Rosa\"}}\n";
+        for replaced in [
+            serde_json::json!(["Original Owner"]),
+            serde_json::json!(["original owner"]),
+        ] {
+            let raw = serde_json::json!({"remembered": "Rosa", "replaced": replaced});
+            assert_eq!(owner_after("Original Owner", &raw), moved, "{raw}");
+        }
+        for raw in [
+            serde_json::json!({"remembered": "Rosa"}),
+            serde_json::json!({"remembered": "Rosa", "replaced": null}),
+            serde_json::json!({"remembered": "Rosa", "replaced": "Original Owner"}),
+            serde_json::json!({"remembered": "Rosa", "replaced": {"name": "Original Owner"}}),
+            serde_json::json!({"remembered": "Rosa", "replaced": [1]}),
+            serde_json::json!({"remembered": "Rosa", "replaced": ["Original Owner", 2]}),
+            serde_json::json!({"remembered": "Rosa", "replaced": [["Original Owner"]]}),
+            serde_json::json!({"remembered": "Rosa", "replaced": []}),
+            serde_json::json!({"remembered": "Rosa", "replaced": ["Original Owner", "Ines"]}),
+            serde_json::json!({"remembered": "Rosa", "replaced": ["Original Owner", "original owner"]}),
+            serde_json::json!({"remembered": "Rosa", "replaced": ["Ines"]}),
+            serde_json::json!({"remembered": "Rosa", "replaced": ["Original"]}),
+            serde_json::json!({"error": "known_as", "known_as": "Ines", "replaced": ["Original Owner"]}),
+        ] {
+            assert_eq!(owner_after("Original Owner", &raw), "", "{raw}");
+        }
+    }
+
+    /// Reviewer-three's condition (b) on #5149: the owner's face removed in
+    /// the app, then a visitor's rename the eyes refuse: the rename ends on
+    /// the refusal, so the next refresh drops the owner the eyes no longer
+    /// know, as it would with no rename at all.
+    #[test]
+    fn a_refused_rename_after_the_owners_removal_leaves_the_refresh_to_drop_them() {
+        let (socket, asked) = eyes(vec![serde_json::json!({"people": ["Visitor"]})]);
+        let file = socket.with_file_name("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Original Owner"}"#).unwrap();
+        let mailbox = crate::onboarding::mailbox_of(&file);
+        let renaming = OwnerRename::begin(&rename_to("Rosa", true), Some(&file)).unwrap();
+        let raw = serde_json::json!({"error": "not_like_them"});
+        renaming.answered(&told_asking(&raw, false), replaced_of(&raw).as_deref());
+        assert_eq!(renames_of(&file).0, 0, "nothing left in flight");
+        refresh_owner(Some(&file), Some(&socket));
+        assert_eq!(
+            std::fs::read_to_string(&mailbox).unwrap_or_default(),
+            "{\"face_forgotten\":true,\"owner\":\"Original Owner\"}\n"
+        );
+        assert_eq!(
+            asked.join().unwrap(),
+            vec![serde_json::json!({"list": true})]
+        );
+    }
+
+    /// Reviewer-three's condition (c) on #5149: whom the eyes replaced
+    /// reaches the rename beside the answer, never what the model is told.
+    #[test]
+    fn whom_the_eyes_replaced_is_never_told_to_the_model() {
+        let raw = serde_json::json!({"remembered": "Rosa", "replaced": ["Original Owner"]});
+        let (socket, asked) = eyes(vec![raw.clone(), raw.clone()]);
+        let mut replaced = None;
+        let said = Said::default();
+        let switches = FaceSwitches {
+            checked: false,
+            visits: true,
+            remember_speaker: false,
+            at_setup: false,
+        };
+        let (told, _) = run_switched(
+            &socket,
+            &rename_to("Rosa", true),
+            switches,
+            &said,
+            None,
+            &mut replaced,
+        );
+        assert_eq!(replaced, Some(vec!["Original Owner".to_owned()]));
+        assert!(told.get("replaced").is_none(), "{told}");
+        assert!(!told.to_string().contains("Original Owner"), "{told}");
+        // The public path the tools take gives the same answer, without it.
+        let (told, _) = run_scoped(
+            &socket,
+            &rename_to("Rosa", true),
+            switches,
+            None,
+            None,
+            1,
+            None,
+        );
+        assert!(!told.to_string().contains("Original Owner"), "{told}");
+        assert_eq!(asked.join().unwrap().len(), 2);
+        for visits in [false, true] {
+            assert!(told_asking(&raw, visits).get("replaced").is_none());
+        }
     }
 
     /// A face `width` of the frame wide at `confidence`, square in a 4:3
