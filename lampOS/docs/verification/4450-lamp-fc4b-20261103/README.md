@@ -178,8 +178,9 @@ clean after2 run #4450 was owed (the 9788 passes ran under the chat
 service's 503s) was played on lamp-fc4b at stable 9980 with `held` set by
 a systemd drop-in for the run only, `lamp-voice.service.d/heron-held.conf`
 (`[Service] Environment=LAMP_UNTIED_GOING_ON=held`), a `daemon-reload` and
-a restart of lamp-voice each way; the drop-in came out at 14:31:48 and the
-lamp is as found. Journal-only, the same three clips and spacing as the
+a restart of lamp-voice each way, and once more between the passes (the
+drop-in was put back after pass a and set again for pass b); the drop-in
+came out at 14:31:48 and the lamp is as found. Journal-only, the same three clips and spacing as the
 9788 passes, the person's yes, the slot posted and released on #4710.
 
 | pass | played | a01 "Lamp, what time is it?" | d07 "What time does the shop close today?" (a+4.0) | d08 "I think around nine, but I'm not sure." (g+0.6) |
@@ -189,9 +190,9 @@ lamp is as found. Journal-only, the same three clips and spacing as the
 
 Pass b is the run: the ask answered, d08 held by the untied rule with no
 model turn, d07 kept from the room by the model. On 9724 (`held` off) d08
-was answered. One data point for #5110: d07 passed the untied check on a
-single shared word ("time"), which is the same tie a real follow-up that
-shares no word lacks. Pass a is one sample of a line played within a minute
+was answered. One data point for #5110: a one-word overlap ("time") was
+enough for d07 to pass the untied check, while a real follow-up that shares
+no word with the answer fails it. Pass a is one sample of a line played within a minute
 of a restart raising no request; it is kept only so nobody plays that soon.
 
 `journal-9980-held-pass-b.txt` has pass b's request lines from the lamp's
