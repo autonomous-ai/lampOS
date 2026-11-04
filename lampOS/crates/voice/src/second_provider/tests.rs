@@ -488,6 +488,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             }
             ProviderOutput::StepCallHeard { request } => (format!("step_call:{request}"), false),
             ProviderOutput::OwnWordsSaid { request } => (format!("own_words:{request}"), false),
+            ProviderOutput::ServiceCalled { request } => (format!("service:{request}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -1195,6 +1196,72 @@ async fn news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models() {
             Message::tool("c1", r#"{"answer":"done"}"#),
             Message::tool("c2", r#"{"news_key":"not-news","ok":true}"#),
         ]
+    );
+}
+
+/// lamp-9adf, 4 Nov 21:45: "what's on my calendar tomorrow?" opened "Let me
+/// look." and called `service_read`, and the coordinator took the words for
+/// a look at the room. A round that calls a linked service's function tells
+/// the coordinator so (`ServiceCalled`), once a request however many rounds
+/// call one, before the call runs; any other function tells nothing.
+#[tokio::test]
+async fn a_linked_service_called_is_told_once_a_request_and_no_other_call_is() {
+    let labels_for = async |rounds: Vec<Vec<ToolCall>>| {
+        let mut chats: Vec<Vec<net::Result<ChatEvent>>> = rounds
+            .into_iter()
+            .map(|calls| {
+                vec![
+                    text("Let me look."),
+                    Ok(ChatEvent::ToolCalls(calls)),
+                    Ok(ChatEvent::Done),
+                ]
+            })
+            .collect();
+        chats.push(vec![
+            text("Tomorrow you have one thing."),
+            Ok(ChatEvent::Done),
+        ]);
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What's on my calendar tomorrow?".to_owned())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let tools: ToolRunner =
+            Arc::new(|_, _, _, _| Box::pin(async move { json!({"answer": "Lamp Test"}) }));
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await
+    };
+    let read = call(
+        "c1",
+        crate::services::READ,
+        json!({"service": "google_calendar"}),
+    );
+    let labels = labels_for(vec![vec![read.clone()], vec![read.clone()]]).await;
+    let told: Vec<_> = labels
+        .iter()
+        .filter(|label| label.starts_with("service:"))
+        .collect();
+    assert_eq!(told, ["service:1"], "{labels:?}");
+    // Told before the call's answer is asked about: ahead of the turn's
+    // last words.
+    let at = |words: &str| labels.iter().position(|label| label.contains(words));
+    let last_words = at("Tomorrow you have one thing.");
+    assert!(last_words.is_some(), "{labels:?}");
+    assert!(at("service:1") < last_words, "{labels:?}");
+    let timer = call("c2", "set_timer", json!({"minutes": 5}));
+    let labels = labels_for(vec![vec![timer]]).await;
+    assert!(
+        !labels.iter().any(|label| label.starts_with("service:")),
+        "{labels:?}"
     );
 }
 

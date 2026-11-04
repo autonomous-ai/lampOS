@@ -805,7 +805,15 @@ parameters' 4,096 bytes), so the model still knows, say, a calendar's
 to 16 KB of the answer is read; one that can't go to the model whole is
 "That part of me is not running right now". On the second route, a call
 heard at the lamp that hasn't answered by the wait sound's time makes that
-sound, as a slow chat does.
+sound, as a slow chat does. And since the words the model is told to say
+are the eyes' own ("Let me look."), a round that calls any of the three
+functions tells the coordinator before the call runs
+(`ProviderOutput::ServiceCalled`, once a request): a look those words
+asked for that turn is dropped (`look_dropped`, "its turn called a linked
+service"), and its later words ask none, so the lamp never takes a picture
+of the room for a calendar read (lamp-9adf, 4 Nov 21:45: "Let me look.",
+`service_read`, then "I see a laptop screen…" unasked). A skill's look in
+the same turn stands.
 
 ## What is not done yet
 

@@ -832,7 +832,15 @@ hình vẫn biết, chẳng hạn, `create_event` của lịch. Một lệnh g�
 (`DEADLINE`), và đọc đến 16 KB câu trả lời; câu trả lời nào không thể đưa
 trọn cho mô hình thì là "That part of me is not running right now". Ở tuyến
 thứ hai, một lệnh gọi được nghe tại đèn mà chưa trả lời khi đến lúc âm thanh
-chờ thì phát âm thanh đó, như một cuộc trò chuyện chậm.
+chờ thì phát âm thanh đó, như một cuộc trò chuyện chậm. Và vì lời mô hình được
+dặn nói cũng là lời của đôi mắt ("Let me look."), một vòng gọi bất kỳ hàm nào
+trong ba hàm sẽ báo cho coordinator trước khi lệnh gọi chạy
+(`ProviderOutput::ServiceCalled`, một lần mỗi yêu cầu): cái nhìn mà lời đó
+xin cho lượt ấy bị bỏ (`look_dropped`, "its turn called a linked service"), và
+lời sau đó của lượt không xin cái nhìn nào nữa, nên đèn không bao giờ chụp
+căn phòng cho một lần đọc lịch (lamp-9adf, 4/11 21:45: "Let me look.",
+`service_read`, rồi "I see a laptop screen…" không ai hỏi). Cái nhìn của một
+kỹ năng trong cùng lượt vẫn giữ.
 
 ## Những gì chưa làm
 

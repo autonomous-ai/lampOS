@@ -58,6 +58,7 @@ fn an_answer_that_looks_something_up_takes_no_picture() {
                 Some(7),
                 text,
                 None,
+                None,
                 &mut opening,
                 &mut wanted,
                 &mut trace,
@@ -72,6 +73,125 @@ fn an_answer_that_looks_something_up_takes_no_picture() {
     assert_eq!(look(&["Let me look."]), Some(7));
 }
 
+/// lamp-9adf, 4 Nov 21:45: "what's on my calendar tomorrow?" opened "Let me
+/// look.", called `service_read`, and once the turn ended the lamp took a
+/// picture of the room unasked. A turn the second route says called a
+/// linked service (`ServiceCalled`) takes no look from its words, whether
+/// they came before the call was told or after; the same words with no
+/// service called still look, as before.
+#[test]
+fn a_turn_that_calls_a_linked_service_takes_no_look_from_its_words() {
+    let words = |turn: u64,
+                 pieces: &[&str],
+                 service_turn: Option<u64>,
+                 opening: &mut Option<(u64, String)>,
+                 wanted: &mut Option<(u64, u64)>,
+                 trace: &mut SessionState| {
+        for text in pieces {
+            record_look_intent(
+                true,
+                Some(turn),
+                text,
+                None,
+                service_turn,
+                opening,
+                wanted,
+                trace,
+            )
+            .unwrap();
+        }
+    };
+    let kinds = |trace: &SessionState| -> Vec<String> {
+        trace
+            .iter()
+            .map(|row| row["kind"].as_str().unwrap_or_default().to_owned())
+            .collect()
+    };
+    // The words first, then the call told: the look is dropped and says
+    // why, and the turn's later words ask nothing again.
+    let (mut opening, mut wanted, mut trace) = (None, None, SessionState::default());
+    let mut service_turn = None;
+    words(
+        7,
+        &["Let me look."],
+        service_turn,
+        &mut opening,
+        &mut wanted,
+        &mut trace,
+    );
+    assert_eq!(wanted.map(|(turn, _)| turn), Some(7));
+    service_called(&mut service_turn, &mut wanted, None, 7, &mut trace).unwrap();
+    assert!(wanted.is_none());
+    let dropped = trace
+        .iter()
+        .find(|row| row["kind"] == "look_dropped")
+        .unwrap();
+    assert_eq!(
+        (dropped["turn"].as_u64(), dropped["by"].as_str()),
+        (Some(7), Some("words"))
+    );
+    assert_eq!(dropped["why"], "its turn called a linked service");
+    opening = None;
+    words(
+        7,
+        &["Let me ", "take a look."],
+        service_turn,
+        &mut opening,
+        &mut wanted,
+        &mut trace,
+    );
+    assert!(wanted.is_none());
+    assert_eq!(kinds(&trace), ["look_asked", "look_dropped"]);
+    // The call told first: its words ask for nothing at all.
+    let (mut opening, mut wanted, mut trace) = (None, None, SessionState::default());
+    let mut service_turn = None;
+    service_called(&mut service_turn, &mut wanted, None, 8, &mut trace).unwrap();
+    words(
+        8,
+        &["Let me look", "."],
+        service_turn,
+        &mut opening,
+        &mut wanted,
+        &mut trace,
+    );
+    assert!(wanted.is_none());
+    assert_eq!(trace.len(), 0);
+    // The next turn, no service called: "Let me look." looks, as today.
+    words(
+        9,
+        &["Let me look."],
+        service_turn,
+        &mut opening,
+        &mut wanted,
+        &mut trace,
+    );
+    assert_eq!(wanted.map(|(turn, _)| turn), Some(9));
+    assert_eq!(kinds(&trace), ["look_asked"]);
+}
+
+/// A skill's look (#941, `look_held`) in a turn that also called a linked
+/// service is the skill's, not the words': it stands.
+#[test]
+fn a_tool_s_look_stands_in_a_turn_that_called_a_linked_service() {
+    let mut trace = SessionState::default();
+    let mut wanted = None;
+    let mut service_turn = None;
+    record_tool_look(true, 5, Some(5), None, &mut wanted, &mut trace).unwrap();
+    let asked = wanted;
+    assert_eq!(asked.map(|(turn, _)| turn), Some(5));
+    service_called(
+        &mut service_turn,
+        &mut wanted,
+        Some((5, 1, true)),
+        5,
+        &mut trace,
+    )
+    .unwrap();
+    assert_eq!(wanted, asked);
+    assert_eq!(service_turn, Some(5));
+    assert!(!trace.iter().any(|row| row["kind"] == "look_dropped"));
+}
+
 #[test]
 fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_late() {
     let mut opening = None;
@@ -82,6 +202,7 @@ fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_
             true,
             Some(1),
             text,
+            None,
             None,
             &mut opening,
             &mut wanted,
@@ -98,6 +219,7 @@ fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_
             Some(2),
             text,
             Some(2),
+            None,
             &mut opening,
             &mut wanted,
             &mut trace,
@@ -112,6 +234,7 @@ fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_
         Some(3),
         "Let me look.",
         Some(2),
+        None,
         &mut opening,
         &mut wanted,
         &mut trace,
@@ -126,6 +249,7 @@ fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_
             Some(turn),
             "Let me look.",
             Some(2),
+            None,
             &mut opening,
             &mut wanted,
             &mut trace,
@@ -358,6 +482,7 @@ fn reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_termina
         true,
         Some(previous.turn()),
         "Let me take a look.",
+        None,
         None,
         &mut opening,
         &mut wanted,
@@ -1259,6 +1384,7 @@ fn a_lamp_written_turn_s_phrase_asks_for_no_still() {
             Some(written),
             "Let me take a look.",
             None,
+            None,
             &mut opening,
             &mut wanted,
             &mut test.trace,
@@ -1269,6 +1395,7 @@ fn a_lamp_written_turn_s_phrase_asks_for_no_still() {
             true,
             Some(written + 1),
             "Let me take a look.",
+            None,
             None,
             &mut opening,
             &mut wanted,
@@ -1326,6 +1453,7 @@ fn after_a_new_cycle_the_last_cycle_s_written_turn_number_spoken_asks_for_the_st
         true,
         Some(written),
         "Let me take a look.",
+        None,
         None,
         &mut opening,
         &mut wanted,

@@ -232,6 +232,10 @@ giving the model one with everything said was switched off).
   `heard` rule; cleared with each service cycle, whose turns number from 1
   again). A skill's search on the second route goes on in its own turns
   by the skill's call, never by these words ([second-voice.md](second-voice.md)).
+  Nor in a turn whose model called a linked service on the second route
+  (`ServiceCalled`): its "Let me look." was a calendar or a mail box being
+  read, so a look it asked is dropped and its later words ask none
+  ([services.md](services.md); lamp-9adf, 4 Nov 21:45).
 - When the lamp has finished saying so, the next turn is its own: a written
   request with `look` set. The provider worker puts the eyes' newest frame
   with the note (`--eyes-look PATH`, from `LAMP_EYES_LOOK_FILE`; a frame
