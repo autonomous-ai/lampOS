@@ -2044,6 +2044,10 @@ mod tests {
                 crate::same_voice::CALLER_ONLY_ENVIRONMENT,
                 ["second"].as_slice(),
             ),
+            (
+                crate::made_skill::READS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
         ] {
             let only = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             for role in ["second", "provider", "capture", "speaker"] {
