@@ -409,11 +409,38 @@ made defaults by the first builder as it confirms each on lamp-4ace.
 **Who turns a switch on in the product** (the lead, 4 November 2026). It is
 the PM's call, and a person is not asked. The PM turns a switch on once its
 pull requests are on stable and the builder has posted its `PASS` from its
-own lamp, and writes the conditions on the pull request. A person is asked
-only for a kit run on a lamp, a step that needs hands, or a change to a
-ship date, the roadmap or the product's direction, and then with a
-recommendation and a default that applies at a stated time if there is no
-answer.
+own lamp, and writes the conditions on the pull request. A switch that
+changes what a home hears or sees unprompted (nudges, proactive lines,
+sounds) also needs its played count, and goes to the lead under "The lead's
+calls" below. A person is asked only for a kit's yes, a step that needs
+hands (a sign-in, adding a machine, a lamp-4ace session), or one of the
+lead's calls, and then with a recommendation and a default that applies at
+a stated time if there is no answer.
+
+**Proposals** (the first builder's rule, #5161, now the PM's to apply). The
+answer is **yes** when the proposal fixes a failure measured on a lamp,
+ships off unless set (or is a bug fix with a failing test first), and names
+its played before-and-after count. It is **no** to anything that changes
+what the lamp says or does unprompted without that count (the repository's
+`CLAUDE.md`, rule 8). Privacy also gets TWO READS.
+
+**The lead's calls.** These always go to the lead (or the owner), never
+decided by the PM: a new paid or external service, a person's data leaving
+the lamp, a default that changes what a home hears or sees unprompted,
+hardware and safety bounds, and anything that moves a ship date.
+
+**App, backend and lamp work go in this order:** the backend's contract,
+then its endpoint; then the lamp, behind its switch; then the app, which the
+mobile builder checks end to end on a real phone and a lamp. The lamp
+builder reads the backend pull request, and the mobile builder reads the
+lamp's contract.
+
+**Who holds what.** The backend and its database are the backend builder's;
+TestFlight is the mobile builder's person's; the update signing key is the
+owner's; the connector test accounts are the skills builder's person's.
+Nobody posts a secret, only where it lives. Only one person may touch
+lamp-4ace (the first builder), the update key (the owner), the relay's
+limits (the backend builder) and a lamp's slot while it is PLAYING.
 
 ### One pull request per task (`fifth-P6`, decided 2026-10-14)
 
@@ -703,9 +730,11 @@ Slots are comments on **#3336**:
 
 - Post `PLAYING <lamp> HH:MM–HH:MM` before any played round, and
   `QUIET <lamp> HH:MM–HH:MM` before a step that needs silence (a mic check,
-  an empty camera view). A kit's other-lamp gate reads #3336, so a slot
-  posted anywhere else does not count. End the round with the put-back and
-  say so.
+  an empty camera view). A post reads `PLAYING lamp-X · who · from–to ·
+  what · build N`, then `QUIET`, then `FREE`. A kit's other-lamp gate reads
+  #3336, so a slot posted anywhere else does not count. End the round with
+  the put-back and say so. One lamp has one holder, and a builder's own lamp
+  is scheduled by nobody else.
 - The PM sets the priority of waiting lamp checks, in this order: a hotfix's
   check on stable, a builder's check of its change in a train's build
   (the `PASS N` check, below), a default-on pull request's owed
@@ -751,6 +780,14 @@ office tester lamps go through the lead's agent. lamp-4ace is the first
 builder's, and after any test there it is put back on the product unit and
 checked. A hardware fault (a lamp throttled at 91 to 95 °C) is repaired or
 swapped, not coded around.
+
+**Lamps and their holders** (#5161, as of 4 November). 52e6: Fifth (the
+lead's office; the lead's agent moves it between builds). 4ace: the first
+builder only. 9adf: Fourteen. 06c1: Friday, El and Jarvis, by slot. c0a4:
+Thirteen, Twelve and SubDarren. 75c9: the SDK's local leader. fc4b: Heron's
+person's. a63e: Migrate. 0c4e: El's person's. 0c89: Mobile. 29e7, 3e83,
+0529, e82d and 220c are testers' and customers' lamps, read only through
+Migrate's field watch unless the lead says otherwise.
 
 **The verifiers** are Claude Code sessions on the lead's Mac, not builders.
 Each needs the lead's agent's yes per kit and Fifth's GO on 52e6.
@@ -802,7 +839,9 @@ promotes. A hotfix is promoted the same day, not batched; a clearly better
 hotfix ships and the rest becomes a follow-up issue. The steps:
 
 1. **Each builder checks its own change on its own lamp** (the lead, 4
-   November). When the build N of a builder's train publishes, the builder
+   November). When the build N of a builder's train publishes (N is the
+   build's feed sequence, the number in its release tag
+   `lampos-lamp-voice-N`), the builder
    takes N on its lamp with its kit and slot, runs its rows plus the basics
    (every unit active, `listening_ready`, a spoken turn answered, not
    muted), and posts `PASS N #<pull request>` or `FAIL N #<pull request>`
@@ -821,9 +860,14 @@ hotfix ships and the rest becomes a follow-up issue. The steps:
 3. **Verify:** decode the base64 `manifest` in the `lampos-stable` release's
    `lampos-manifest.json` and check its sequence and commit.
 4. **Notes:** add "What's new for you in build N" to the `lampos-stable`
-   release notes (`gh release edit lampos-stable --notes-file`), before
-   "Built but not on yet": one plain bullet for each change a person would
-   notice, checked against its switch's row; switches still off get none.
+   release notes (`gh release edit lampos-stable --notes-file`), right
+   before "Built but not on yet": one plain bullet for each change a person
+   would notice, checked against its switch's row; switches still off get
+   none.
+5. **Close the issues** the build carries to stable: search the open issues
+   for its pull requests' numbers and read each one's last comment first.
+6. **Post on #1711:** the build, its commit, what is in it and what is not,
+   the checks and the figures.
 
 **The figures.** The PM posts build % (the 76 build rows) and quality %
 (17 rows, scored only from lamp runs on the product unit) on #1711 each
