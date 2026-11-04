@@ -3989,6 +3989,7 @@ fn observe_provider_output(
         ProviderOutput::Unclear { .. }
         | ProviderOutput::LookAsked { .. }
         | ProviderOutput::SleepAsked { .. }
+        | ProviderOutput::ServiceCalled { .. }
         | ProviderOutput::StepCallHeard { .. }
         | ProviderOutput::OwnWordsSaid { .. }
         | ProviderOutput::RequestedAudio { .. } => {}
@@ -6527,6 +6528,10 @@ fn conversation_with_gate_inner(
     // was answering when it was made: the look's turn goes to that session
     // on that route, or the look is dropped.
     let mut look_held: Option<(u64, u64, bool)> = None;
+    // The last turn whose model called a linked service (the second route's
+    // `ServiceCalled`; lamp-9adf, 4 Nov 21:45): its "Let me look." was a
+    // look-up, so its words ask the eyes for nothing.
+    let mut service_turn: Option<u64> = None;
     // A sleep the person asked aloud (#3748), asked once its line is heard.
     let mut sleep_owed = SleepOwed::default();
     // The last turn told the provider it began while onboarding was under
@@ -8466,6 +8471,19 @@ fn conversation_with_gate_inner(
                     }
                     record(trace, row)?;
                 }
+                // The model called a linked service for this turn
+                // (lamp-9adf, 4 Nov 21:45): its "Let me look." was it
+                // looking something up, so a look its words asked is
+                // dropped, and its later words ask none.
+                ProviderOutput::ServiceCalled { request } => {
+                    service_called(
+                        &mut service_turn,
+                        &mut look_wanted,
+                        look_held,
+                        request,
+                        trace,
+                    )?;
+                }
                 ProviderOutput::SleepAsked { request } => {
                     // With `LAMP_SLEEP_LINE=on` and the line kept (#3748
                     // part 3): the same recording a hand's hold says, in
@@ -8809,6 +8827,7 @@ fn conversation_with_gate_inner(
                         request,
                         &text,
                         last_reminder_turn,
+                        service_turn,
                         &mut answer_opening,
                         &mut look_wanted,
                         trace,
@@ -14420,11 +14439,13 @@ fn idle_reminder_offer(
     reminders.offer(now_us)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn record_look_intent(
     enabled: bool,
     request: Option<u64>,
     text: &str,
     last_reminder_turn: Option<u64>,
+    service_turn: Option<u64>,
     answer_opening: &mut Option<(u64, String)>,
     look_wanted: &mut Option<(u64, u64)>,
     trace: &mut SessionState,
@@ -14432,9 +14453,13 @@ fn record_look_intent(
     // A turn the lamp wrote itself (its own look, a hello, a "Sorry?", a
     // reminder) takes no still from its words: nobody spoke, so pictures
     // cannot chain with nobody speaking. The worker's `heard` rule.
+    // Nor does a turn whose model called a linked service
+    // (`service_turn`, lamp-9adf, 4 Nov 21:45): its "Let me look." was a
+    // calendar or a mail box being read, never the room.
     let Some(turn) = request.filter(|turn| {
         enabled
             && last_reminder_turn.is_none_or(|reminder| *turn > reminder)
+            && service_turn != Some(*turn)
             && own_turn().load(std::sync::atomic::Ordering::Acquire) != *turn
     }) else {
         return Ok(());
@@ -14580,6 +14605,36 @@ fn drop_unsaid_look(
         )?;
     }
     Ok(())
+}
+
+/// The model called a linked service for `turn` (the second route's
+/// `ServiceCalled`). Seen on lamp-9adf on 4 Nov 21:45: asked "what's on my
+/// calendar tomorrow?", the model opened "Let me look.", called
+/// `service_read`, and once its answer was over the lamp took a picture and
+/// described the room unasked ("I see a laptop screen…"). A line in the
+/// function's description did not stop the model saying it, so the voice
+/// reads it as the look-up it was: a look asked by the turn's words is
+/// dropped and says so, and `record_look_intent` takes none from its later
+/// words. A tool's look for the turn (`look_held`, #941) is the skill's,
+/// never the words', and stands.
+fn service_called(
+    service_turn: &mut Option<u64>,
+    look_wanted: &mut Option<(u64, u64)>,
+    look_held: Option<(u64, u64, bool)>,
+    turn: u64,
+    trace: &mut SessionState,
+) -> Result<()> {
+    *service_turn = Some(turn);
+    if look_held.is_some_and(|(of, ..)| of == turn) {
+        return Ok(());
+    }
+    drop_unsaid_look(
+        look_wanted,
+        look_held,
+        turn,
+        "its turn called a linked service",
+        trace,
+    )
 }
 
 /// A skill's tool asked for a look in its answer (#941): the full look is

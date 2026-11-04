@@ -6099,6 +6099,7 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
+        | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request } => Some(*request),
@@ -10244,6 +10245,16 @@ fn offered(
     said
 }
 
+/// Whether a round called one of the linked services' functions
+/// ([`crate::services::is_tool`]: `service_read`, `service_write`,
+/// `services_connected`), whose "Let me look." is a look-up, never the
+/// eyes' (`ProviderOutput::ServiceCalled`).
+fn calls_a_service(calls: &[net::ToolCall]) -> bool {
+    calls
+        .iter()
+        .any(|call| crate::services::is_tool(&call.name))
+}
+
 /// `piece` added to a round's held claim (`LAMP_ACTION_CLAIM_CHECKED`,
 /// #5215) while one is held, so nothing of it is said before the claim is
 /// judged at the round's end; else `piece` as it is.
@@ -10694,6 +10705,9 @@ async fn answer(
         // answered with its calls' own line is one whose first calls are
         // all short (`LAMP_SHORT_DONE`, #2877).
         let mut called_earlier = false;
+        // Whether the coordinator was told this request called a linked
+        // service (`ProviderOutput::ServiceCalled`): once a request.
+        let mut service_told = false;
         // The calls' own line, kept while the round after them is asked
         // whether the request held more (the Reviewer-lead's P2 on #2930):
         // said only if that round adds no words and no calls.
@@ -11456,6 +11470,17 @@ async fn answer(
             // holding answer (#1712; the peer read on #1986).
             if !calls.is_empty() {
                 called.store(true, Ordering::Relaxed);
+            }
+            // A linked service called (lamp-9adf, 4 Nov 21:45: "Let me
+            // look." then `service_read` for a calendar, and a picture of
+            // the room after it): the coordinator is told before the call
+            // runs, while its words are still being said, so the turn's
+            // "Let me look." takes no picture. Once a request.
+            if !service_told && calls_a_service(&calls) {
+                service_told = true;
+                if !shared.emit(ProviderOutput::ServiceCalled { request }).await {
+                    return Err(Stop::Gone);
+                }
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
