@@ -343,3 +343,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   (4684, short TMPDIR); Thirteen's rebase `0b9fef6b8a` is the same patch
   (range-diff: `record` beside `at_setup`, the duplicate `asks_to_spell`
   dropped); its own checks and mutations running. 16:3x: the hour posted.
+- 16:5x: READ-OK `0b9fef6b8a` on #5166 (names side, the second of two
+  with Friday's on the same patch): row 7's carry once, theirs, inside the
+  held turn's minute; rows 9 and 10 name only the asker's record and the
+  journal only a reason name; El's five lines in the negative test;
+  switch hygiene. Gate: full lib 4684 on `7037b11e47` (short TMPDIR), and
+  on the rebase fmt/clippy clean, names filter 541, process 45, switches
+  2, notes 15; mutations on `record_now` and the `carried` guard each
+  caught. Worktrees removed. Every item placed on heron today is posted;
+  what remains is other builders' (rebases, trains, Faye's release of
+  #4450's `status:taken`).
