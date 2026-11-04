@@ -182,6 +182,10 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 6
+        },
+        "apart": {
+          "description": "The least time between two of the group's runs (#5207), at most 1h: the group keeps the longest any member names.",
+          "$ref": "#/$defs/duration"
         }
       }
     },
@@ -518,6 +522,17 @@
       "items": {
         "$ref": "#/$defs/step"
       }
+    },
+    "switched": {
+      "description": "Values the skill runs with in place of its own while a lamp-skills switch is on (#5207): `[switched.NAME]`, NAME one of the switches lamp-skills reads for it. Each top-level key in it replaces the file's own whole; it is checked whether the switch is on or not.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "LAMP_WELLBEING_SPACING": {
+          "$ref": "#/$defs/switched_values"
+        }
+      }
     }
   },
   "$defs": {
@@ -817,6 +832,10 @@
               "$ref": "#/$defs/duration"
             }
           }
+        },
+        "cooldown_with": {
+          "description": "Another of the skill's triggers, by name, whose run starts this trigger's cooldown as its own does (#5207): one hello an arrival, Welcome back's morning one or the plain one. Needs a `cooldown`.",
+          "type": "string"
         }
       }
     },
@@ -1287,6 +1306,103 @@
         "dance_jazz"
       ],
       "description": "The body's clips a skill may name: control.schema.json's gestures."
+    },
+    "switched_values": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "format": {
+          "$ref": "#/properties/format"
+        },
+        "enabled": {
+          "$ref": "#/properties/enabled"
+        },
+        "needs": {
+          "$ref": "#/properties/needs"
+        },
+        "kind": {
+          "$ref": "#/properties/kind"
+        },
+        "version": {
+          "$ref": "#/properties/version"
+        },
+        "permissions": {
+          "$ref": "#/properties/permissions"
+        },
+        "trigger": {
+          "$ref": "#/properties/trigger"
+        },
+        "while": {
+          "$ref": "#/properties/while"
+        },
+        "ask": {
+          "$ref": "#/properties/ask"
+        },
+        "tool": {
+          "$ref": "#/properties/tool"
+        },
+        "choice": {
+          "$ref": "#/properties/choice"
+        },
+        "flag": {
+          "$ref": "#/properties/flag"
+        },
+        "again": {
+          "$ref": "#/properties/again"
+        },
+        "still": {
+          "$ref": "#/properties/still"
+        },
+        "most_a_day": {
+          "$ref": "#/properties/most_a_day"
+        },
+        "quiet": {
+          "$ref": "#/properties/quiet"
+        },
+        "active": {
+          "$ref": "#/properties/active"
+        },
+        "budget": {
+          "$ref": "#/properties/budget"
+        },
+        "rest": {
+          "$ref": "#/properties/rest"
+        },
+        "stop": {
+          "$ref": "#/properties/stop"
+        },
+        "search": {
+          "$ref": "#/properties/search"
+        },
+        "history": {
+          "$ref": "#/properties/history"
+        },
+        "watch": {
+          "$ref": "#/properties/watch"
+        },
+        "limits": {
+          "$ref": "#/properties/limits"
+        },
+        "unplug": {
+          "$ref": "#/properties/unplug"
+        },
+        "news": {
+          "$ref": "#/properties/news"
+        },
+        "reminder": {
+          "$ref": "#/properties/reminder"
+        },
+        "onboarding": {
+          "$ref": "#/properties/onboarding"
+        },
+        "startle": {
+          "$ref": "#/properties/startle"
+        },
+        "do": {
+          "$ref": "#/properties/do"
+        }
+      }
     }
   }
 }

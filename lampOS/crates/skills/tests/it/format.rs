@@ -78,8 +78,14 @@ fn errors(root: &Value, schema: &Value, value: &Value, at: &str) -> Vec<String> 
         );
     }
     if let Some(reference) = rules.get("$ref").and_then(Value::as_str) {
-        let name = reference.strip_prefix("#/$defs/").expect("a local $ref");
-        out.extend(errors(root, &root["$defs"][name], value, at));
+        // A local one: a definition, or a top-level key's own rules
+        // (`[switched]`'s values, #5207).
+        let pointed = reference
+            .strip_prefix('#')
+            .filter(|pointer| pointer.starts_with("/$defs/") || pointer.starts_with("/properties/"))
+            .and_then(|pointer| root.pointer(pointer))
+            .expect("a local $ref");
+        out.extend(errors(root, pointed, value, at));
     }
     if let Some(kind) = rules.get("type").and_then(Value::as_str) {
         let fits = match kind {
@@ -354,6 +360,24 @@ fn the_schema_refuses_what_lamp_skills_refuses_in_shape() {
             format!("format = 3\n{GOOD}"),
             "a format this lamp doesn't read",
         ),
+        (
+            format!("{GOOD}[switched.LAMP_SOMETHING_ELSE]\nmost_a_day = 2\n"),
+            "a switched table for a switch lamp-skills doesn't read (#5207)",
+        ),
+        (
+            format!("{GOOD}[switched.LAMP_WELLBEING_SPACING]\nguess = 1\n"),
+            "a switched key the format doesn't have",
+        ),
+        (
+            format!("{GOOD}[switched.LAMP_WELLBEING_SPACING]\n"),
+            "a switched table that changes nothing",
+        ),
+        (
+            format!(
+                "{GOOD}[switched.LAMP_WELLBEING_SPACING.trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"never\"\n"
+            ),
+            "a switched trigger the format doesn't have",
+        ),
     ] {
         assert!(
             !check(&as_json(&bad)).is_empty(),
@@ -361,6 +385,38 @@ fn the_schema_refuses_what_lamp_skills_refuses_in_shape() {
         );
         assert!(loads(&bad).is_err(), "lamp-skills loaded {why}: {bad}");
     }
+}
+
+/// `[switched.NAME]` (#5207): its values are the file's own keys, every
+/// one, by the root's own rules; a good one loads and fits the schema.
+#[test]
+fn a_switched_table_takes_the_files_own_keys_and_only_its_switches() {
+    let schema = schema();
+    let mut own: Vec<&String> = schema["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .filter(|key| *key != "switched")
+        .collect();
+    let mut values: Vec<&String> = schema["$defs"]["switched_values"]["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .collect();
+    own.sort();
+    values.sort();
+    assert_eq!(own, values);
+    let switches: Vec<&String> = schema["properties"]["switched"]["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .collect();
+    assert_eq!(switches, lamp_skills::SWITCHED);
+    let good = format!(
+        "{GOOD}[switched.LAMP_WELLBEING_SPACING]\nmost_a_day = 2\n[switched.LAMP_WELLBEING_SPACING.trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\ncooldown = \"5m\"\n"
+    );
+    assert_eq!(loads(&good), Ok(()));
+    assert_eq!(check(&as_json(&good)), Vec::<String>::new());
 }
 
 fn listed(path: &[&str]) -> Vec<String> {

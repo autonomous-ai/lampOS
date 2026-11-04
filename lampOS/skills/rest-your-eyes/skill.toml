@@ -82,3 +82,9 @@ policy = "nudge"
 body = { gesture = "curious" }      # a small tilt (3 s), as if something across the room caught its eye
 light = { dim = 1 }                 # a shade softer while it tilts, then as it was
 say = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away."
+
+# With LAMP_WELLBEING_SPACING=on in lamp-skills (#5207): the wellbeing group
+# has room for two nudges an hour, never two within 20 minutes. The group
+# keeps the smallest per_hour of its members, so each says it.
+[switched.LAMP_WELLBEING_SPACING]
+budget = { group = "wellbeing", per_hour = 2, apart = "20m" }

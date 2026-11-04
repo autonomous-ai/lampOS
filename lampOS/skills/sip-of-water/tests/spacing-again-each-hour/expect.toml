@@ -1,0 +1,77 @@
+# With LAMP_WELLBEING_SPACING=on (#5207): 10:00, four hours without getting
+# up, as once-a-sitting: a sip at 45 minutes and again each hour while they
+# stay (its cooldown, no rearm), at 105, 165 and 225.
+clock = "10:00"
+switches = ["LAMP_WELLBEING_SPACING"]
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a good while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health, and no count of the time." }
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a good while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health, and no count of the time." }
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a good while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health, and no count of the time." }
+
+[[expect]]
+at = "225m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "225m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "225m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a good while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health, and no count of the time." }

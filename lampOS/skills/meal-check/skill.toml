@@ -103,3 +103,9 @@ say = "They have been at the desk through most of lunchtime. Ask them once, warm
 on = "dinner"
 body = { look_at = "face" }
 say = "They have been at the desk through most of dinnertime. Ask them once, warmly and in a few words, the way a friend would, whether they've had dinner yet. One open question: suggest no food, no menu and no place, and say nothing about health."
+
+# With LAMP_WELLBEING_SPACING=on in lamp-skills (#5207): the wellbeing group
+# has room for two nudges an hour, never two within 20 minutes. The group
+# keeps the smallest per_hour of its members, so each says it.
+[switched.LAMP_WELLBEING_SPACING]
+budget = { group = "wellbeing", per_hour = 2, apart = "20m" }

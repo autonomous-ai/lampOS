@@ -38,5 +38,12 @@ people walking past or speak into a conversation.
 - **The only hello:** the voice has none of its own (#2825), so one arrival
   gets one hello.
 
+- **The morning's first:** with the lamp's wellbeing spacing on
+  (`LAMP_WELLBEING_SPACING=on` in `lamp-skills`, #5207, V1's morning
+  opener), the first arrival of the day, from 05:00 to 11:00, gets the hello
+  and one open clause, "what's first today?", once a day (kept in the
+  daily journal, so a restart does not ask again). Every other arrival
+  gets the hello alone, and one arrival never gets two.
+
 Asked about it, the lamp says it greets people when they come back to
 their desk, and that it can be switched off.

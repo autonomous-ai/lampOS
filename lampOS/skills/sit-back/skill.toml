@@ -109,3 +109,9 @@ say = "They have been leaning in toward the desk for a while. In one short, kind
 [[do]]
 on = "sat_well"
 say = "They sat back after your word. Say a short, warm thanks or 'that's better' in two or three words. Nothing about their body or looks."
+
+# With LAMP_WELLBEING_SPACING=on in lamp-skills (#5207): the wellbeing group
+# has room for two nudges an hour, never two within 20 minutes. The group
+# keeps the smallest per_hour of its members, so each says it.
+[switched.LAMP_WELLBEING_SPACING]
+budget = { group = "wellbeing", per_hour = 2, apart = "20m" }

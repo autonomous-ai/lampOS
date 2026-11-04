@@ -247,7 +247,10 @@ light of someone reading face down), Light scenes, Point the light and Light
 show (#1679),
 Smoky air and Dusty air
 (#1684), until they are measured for false alarms on real traces, and
-Feelings (#3691), which needs Mood on (`LAMP_MOOD=on`, trial-only). Install
+Feelings (#3691), which needs Mood on (`LAMP_MOOD=on`, trial-only), and
+Comfort break (#3504), which `LAMP_WELLBEING_SPACING=on` in `lamp-skills`
+turns on itself, at 90 minutes (#5207; skills.md, "The wellbeing nudges at
+a present spacing"). Install
 and a round's bundle write `enabled = false` (`install::OFF_LINE`) above
 each one's own `skill.toml`, so the folder in `lampOS/skills/`, and a lamp
 run from it, keeps its own default and its cases; each adds no trigger and

@@ -1,0 +1,23 @@
+# With LAMP_WELLBEING_SPACING=on (#5207): 17:00, 100 minutes at the desk, as
+# quiet-after-its-hours: its hours are the waking day (08:00 to 22:00), so a
+# sip at 45 minutes, 17:45.
+clock = "17:00"
+switches = ["LAMP_WELLBEING_SPACING"]
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "light"
+args = { colour = "blue", level = 2 }
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk a good while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health, and no count of the time." }

@@ -99,7 +99,8 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[choice]`, `[flag]` | | the tool's one argument: a named value, or yes or no |
 | `[again]` | `{ within, if_heard, told }` | when the tool is called again soon after it ran |
 | `[quiet]`, `[active]` | windows | local hours when it never starts itself, or the only ones it may |
-| `[budget]` | `{ group, per_hour 1–6 }` | runs an hour shared by every skill of the group |
+| `[budget]` | `{ group, per_hour 1–6, apart }` | runs an hour shared by every skill of the group, and with `apart` (at most 1 h) the least time between two of them (#5207) |
+| `[switched.NAME]` | table of the file's own keys | values it runs with in place of its own while `lamp-skills`' switch NAME is on, each key replacing the file's own whole; NAME only `LAMP_WELLBEING_SPACING` (#5207). Checked either way |
 | `[rest]` | `{ after_ignored 1–5, within }` | rests until the next morning after runs nobody noticed |
 | `[stop]` | `{ tool, about }` | a function the model calls to snooze it or turn it off |
 | `[search]` | `{ looks 1–8, give_up, found, note, walk, looked }` | a search a person asked for, its looks and what the model is told past the last (look-for-things) |
@@ -158,6 +159,9 @@ Keys of a trigger:
   topic's field is above the line, on a trigger with a `for`. It is kept
   only with `LAMP_YAWN_SOONER=on`; off, it is read, checked and ignored
   (#3709).
+- `cooldown_with = "NAME"`: another of the skill's triggers whose run
+  starts this one's `cooldown` too, so two triggers on one moment make one
+  run (#5207: Welcome back's morning hello and its plain one).
 
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on

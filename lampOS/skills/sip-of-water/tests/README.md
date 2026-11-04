@@ -27,3 +27,7 @@ wellbeing skills, which a case of one skill cannot show, is
 | `a-sip-when-the-eyes-say-the-same-sitting` | As `a-sip-after-90-minutes`, with the eyes' `room/activity` 100 ms before each face, its `sitting_s` the sitting's | Pass: At 90 minutes, as there |
 | `not-when-someone-else-sat-down` | 10:00, a face at the desk 100 minutes, but `room/activity`'s `sitting_s` begins again at 60 minutes: someone else sat down | Pass: Nothing: that sitter has sat 30 minutes at 90 |
 | `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, 100 minutes | Pass: Nothing (`[stop]`) |
+| `spacing-a-sip-after-45-minutes` | With `switches = ["LAMP_WELLBEING_SPACING"]` (#5207): `a-sip-after-90-minutes`'s recordings | Pass: At 45 minutes, with the note that names no time; not again at 100 (its cooldown, 60 minutes) |
+| `spacing-again-each-hour` | With the switch: `once-a-sitting`'s four hours | Pass: At 45, 105, 165 and 225 minutes (no `rearm`, `cooldown = "60m"`) |
+| `spacing-after-17` | With the switch: `quiet-after-its-hours`' 17:00, 100 minutes | Pass: At 45 minutes, 17:45 (`[active]` 08:00 to 22:00) |
+| `spacing-quiet-at-night` | With the switch: the same recordings at 22:00 | Pass: Nothing (`[quiet]` 22:00 to 08:00) |

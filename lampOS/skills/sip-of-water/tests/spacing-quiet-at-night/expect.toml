@@ -1,0 +1,5 @@
+# With LAMP_WELLBEING_SPACING=on (#5207): 22:00, 100 minutes at the desk: the
+# quiet hours (22:00 to 08:00) still hold, so nothing.
+clock = "22:00"
+switches = ["LAMP_WELLBEING_SPACING"]
+none = true

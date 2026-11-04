@@ -885,6 +885,7 @@ fn serve(
     let (woken, waker) = wake_pipe()?;
     let waker = Arc::new(waker);
     let (finished, done) = waking::<SkillEvent>(&waker);
+    let (unsaid, unsaid_runs) = mpsc::channel::<String>();
     let limits =
         if options.routines && std::env::var("LAMP_OUTPUT_CAPS").is_ok_and(|value| value == "on") {
             let local = options
@@ -945,6 +946,19 @@ fn serve(
             lamp_skills::SOONER_ENVIRONMENT
         );
         engine = engine.sooner();
+    }
+    // A run whose word was never said gives its group's hour back, only
+    // with LAMP_WELLBEING_SPACING=on (#5207).
+    if watch::switched_on(
+        std::env::var(lamp_skills::SPACING_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        eprintln!(
+            "lamp-skills: the wellbeing nudges at a present spacing, and an unsaid word gives its group's hour back ({})",
+            lamp_skills::SPACING_ENVIRONMENT
+        );
+        engine = engine.spacing();
     }
     // Who was here's mark of someone the lamp knows, never a name, only
     // with LAMP_WHO_WAS_HERE_KNOWN=on and the eyes' known file (#1685).
@@ -1027,6 +1041,7 @@ fn serve(
     let runner = Runner {
         sockets: sockets.clone(),
         finished,
+        unsaid,
         bus: bus.clone(),
         glows,
         body_requests: options.body_requests,
@@ -1124,6 +1139,15 @@ fn serve(
         // Pending Policy answers and queued runs must see loss of clock
         // trust before they can start scheduled output.
         sample_clock(&mut engine, &runner, clock::now_us());
+        // Told before its run's end, on the run's own thread.
+        while let Ok(skill) = unsaid_runs.try_recv() {
+            if engine.unsaid(&skill) {
+                eprintln!(
+                    "lamp-skills: {skill}: its word was never said, so its group's hour is given back ({})",
+                    lamp_skills::SPACING_ENVIRONMENT
+                );
+            }
+        }
         while let Ok(event) = done.try_recv() {
             let skill = event.skill.clone();
             publish(&mut out, event);
@@ -1657,6 +1681,10 @@ fn start_or_queue(
 struct Runner {
     sockets: Sockets,
     finished: Waking<SkillEvent>,
+    /// A run of a skill whose word was never said, by skill, told before
+    /// its end: with `LAMP_WELLBEING_SPACING=on` its group's hour is given
+    /// back (`Engine::unsaid`, #5207).
+    unsaid: mpsc::Sender<String>,
     bus: Bus,
     /// With `LAMP_LIGHT_REQUESTS=on`, how a skill's light is asked of the ring.
     glows: Option<Glows>,
@@ -2381,6 +2409,11 @@ fn start(
     // SAY_TIMEOUT a line) or a light's for (at most 10 min): its own
     // thread, one a skill, so the skills go on listening.
     // ponytail: a skill removed meanwhile still finishes its run.
+    // A run with a word to say: whether it was said is told (#5207).
+    let speaks = calls
+        .iter()
+        .any(|call| matches!(call, Call::Say(_) | Call::Words(_) | Call::SayFrom(..)));
+    let unsaid = runner.unsaid.clone();
     let (sockets, finished, bus, glows, asks_body, rest_client) = (
         runner.sockets_for(&skill),
         runner.finished.clone(),
@@ -2492,6 +2525,7 @@ fn start(
             .then(|| Call::Gesture(MORNING_STRETCH.into()))
             .into_iter()
             .collect();
+        let mut begun = false;
         let why = perform(
             &skill,
             (&calls, &rest_permits, &opening),
@@ -2499,8 +2533,11 @@ fn start(
             &bus,
             before,
             (glows.as_ref(), asks_body),
-            (made, end),
+            (made, end, &mut begun),
         );
+        if speaks && !begun {
+            let _ = unsaid.send(skill.clone());
+        }
         let _ = finished.send(SkillEvent {
             skill,
             stage: SkillStage::Done,
@@ -3548,7 +3585,9 @@ fn perform(
     (glows, asks_body): (Option<&Glows>, bool),
     // Told once the body and the light are made, and, for a dim held until
     // its trigger ends, told that end.
-    (made, end): (mpsc::Sender<()>, Option<mpsc::Receiver<()>>),
+    // And set once the voice begins the run's say (#5207): left false, a
+    // run with a word to say never said it.
+    (made, end, said_begun): (mpsc::Sender<()>, Option<mpsc::Receiver<()>>, &mut bool),
 ) -> String {
     if calls == [Call::PrepareUnplug] {
         let _ = made.send(());
@@ -3665,6 +3704,7 @@ fn perform(
             let mut was_begun = false;
             let outcome = say(&sockets.say, what, skill, asking, rest_permits, || {
                 was_begun = true;
+                *said_begun = true;
                 act(
                     &first,
                     sockets,
@@ -4833,7 +4873,7 @@ mod tests {
                 &bus,
                 None,
                 (None, false),
-                (made, None),
+                (made, None, &mut false),
             );
             assert!(outcome.contains("refused"), "{outcome}");
             assert!(
@@ -5082,6 +5122,7 @@ mod tests {
         let runner = Runner {
             sockets: nowhere(dir.path(), Permissions::default()),
             finished,
+            unsaid: mpsc::channel().0,
             bus: Bus::new(dir.path().join("bus")).unwrap(),
             glows: None,
             body_requests: false,
@@ -5282,6 +5323,7 @@ mod tests {
             Call::Cue,
         ] {
             let (made, told) = mpsc::channel();
+            let mut begun = false;
             let said = perform(
                 "test",
                 (&[speech, Call::Gesture("nod".into())], &[], &[]),
@@ -5289,9 +5331,11 @@ mod tests {
                 &bus,
                 None,
                 (None, false),
-                (made, None),
+                (made, None, &mut begun),
             );
             assert!(said.contains("refused") && said.contains("speak"), "{said}");
+            // A word refused is a word never said (#5207).
+            assert!(!begun);
             assert!(!said.contains("gesture"), "{said}");
             // Never told that its body was made: the sender is gone.
             assert!(told.recv().is_err());
@@ -5383,7 +5427,7 @@ mod tests {
                 &bus,
                 None,
                 (None, false),
-                (made, None),
+                (made, None, &mut false),
             );
             let (told, over_at) = played.join().unwrap();
             assert_eq!(told["gesture"], "stretching");
@@ -5434,6 +5478,7 @@ mod tests {
                 let runner = Runner {
                     sockets: nowhere(root.path(), Permissions::default()),
                     finished,
+                    unsaid: mpsc::channel().0,
                     bus,
                     glows: None,
                     body_requests: false,
@@ -5513,6 +5558,7 @@ mod tests {
         let runner = Runner {
             sockets: nowhere(dir.path(), Permissions::default()),
             finished,
+            unsaid: mpsc::channel().0,
             bus: Bus::new(dir.path().join("bus")).unwrap(),
             glows: None,
             body_requests: false,

@@ -30,8 +30,10 @@ What it says and when:
 It keeps nothing about you: only, in memory, how many times it went today
 and whether it is resting; off is one line with its name.
 
-An installable skill: its owner puts it on the lamp (`lamp-skills install`)
-and takes it off. Not in the product yet.
+A core skill since #5207: the product installs it off. With the lamp's
+wellbeing spacing on (`LAMP_WELLBEING_SPACING=on` in `lamp-skills`) it is on,
+and comes after about an hour and a half, not two hours; the wellbeing
+nudges then share two an hour, never two within 20 minutes.
 
 If asked about it, the lamp says something like: "When you've sat a long
 while, and it's just us, I'll mention it's a good moment for a short break.

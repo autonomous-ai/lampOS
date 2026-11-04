@@ -27,6 +27,7 @@ place or a need is `a_comfort_break_never_names_the_bathroom` in
 | `held-while-someone-else-is-in-view` | 10:00, a second face in view from minute 115 to 125 | Pass: Held at 120, said at 126, once they have been gone a minute |
 | `let-go-while-someone-else-stays` | 10:00, a second face in view from minute 115 to 160 | Pass: Nothing: held past its 30-minute `wait`, then let go |
 | `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, 130 minutes | Pass: Nothing (`[stop]`) |
+| `spacing-a-break-after-90-minutes` | With `switches = ["LAMP_WELLBEING_SPACING"]` (#5207): 10:00, 100 minutes alone, faces every 1.5 s from 80 minutes | Pass: At 90 minutes, not 120: turns to the face and says its line, "about an hour and a half" |
 
 Without its `faces_at_most` condition, `held-while-someone-else-is-in-view`
 fails: the line is said at 120 minutes, with the second face in view.

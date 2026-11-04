@@ -87,3 +87,9 @@ policy = "nudge"
 body = { gesture = "sleepy" }          # one slow droop
 light = { dim = 1, until = "ends" }    # a shade dimmer, given back when they leave the desk
 say = "It is late in the evening and they are still at the desk. In one short, gentle line, suggest starting to wind down for the night."
+
+# With LAMP_WELLBEING_SPACING=on in lamp-skills (#5207): the wellbeing group
+# has room for two nudges an hour, never two within 20 minutes. The group
+# keeps the smallest per_hour of its members, so each says it.
+[switched.LAMP_WELLBEING_SPACING]
+budget = { group = "wellbeing", per_hour = 2, apart = "20m" }

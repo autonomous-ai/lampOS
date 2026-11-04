@@ -356,6 +356,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "smoky-air",
     "dusty-air",
     "feelings",
+    "comfort-break",
 ];
 
 /// The product skills installed disabled, each with why: install and a
@@ -403,6 +404,14 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
         "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
          traces and an office's own days, replayed",
     ),
+    // #3504's comfort break, core since #5207: on with the wellbeing
+    // spacing's switch, which its own file turns on.
+    (
+        "comfort-break",
+        "on only with `LAMP_WELLBEING_SPACING=on` in `lamp-skills` (#5207), whose \
+         `[switched]` values turn it on at 90 minutes: V1's bathroom-break reminder, said with \
+         nobody else in view, waits for that switch's played check on a lamp",
+    ),
     // #3691's core skill, built and not yet seen on a lamp.
     (
         "feelings",
@@ -426,13 +435,6 @@ pub const OFF_LINE: &str = off_line!();
 /// (`tests/functions.rs`): the two tools of Desk tutor and its marks would
 /// put the last of them past it, left out without a word.
 pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
-    // An installable skill (#3504): its owner chooses it; not in the
-    // product's install until it has been tried on a lamp.
-    (
-        "comfort-break",
-        "an installable skill, not yet tried on a lamp (#3504): V1's bathroom-break reminder, \
-         which its owner chooses; a played check on a lamp comes first",
-    ),
     (
         "desk-tutor",
         "with its marks its two functions would be 33 of a Live session's 32; the full look it \
@@ -595,6 +597,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("smoky-air", "SKILL.md"),
     skill_file_off!("dusty-air"),
     skill_file!("dusty-air", "SKILL.md"),
+    skill_file_off!("comfort-break"),
+    skill_file!("comfort-break", "SKILL.md"),
     skill_file_off!("feelings"),
     skill_file!("feelings", "SKILL.md"),
     skill_file!("feelings", "moves/glad-lift.json"),

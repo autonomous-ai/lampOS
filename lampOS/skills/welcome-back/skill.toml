@@ -54,3 +54,53 @@ light = "warm_glow"
 # Policy's hello gate, asked even with LAMP_SKILLS_ASK=skip, to one an hour
 # to each person (the first builder, 30 Oct, on the launch testers' findings).
 say = { note = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.", expires = "60s" }
+
+# With LAMP_WELLBEING_SPACING=on in lamp-skills (#5207, V1's morning opener):
+# these values in place of the file's own. The first arrival of the day, from
+# 05:00 to 11:00, gets the hello and one open clause, "what's first today?";
+# once a day, kept in lamp-skills' daily journal (LAMP_SKILLS_DAILY_FILE),
+# so a restart does not ask again. Every other arrival gets the hello as
+# before. The two triggers share one cooldown (`cooldown_with`): one hello an
+# arrival. Each key here replaces the file's own whole (docs/skills.md,
+# "[switched]").
+[switched.LAMP_WELLBEING_SPACING]
+
+[[switched.LAMP_WELLBEING_SPACING.trigger]]
+name = "first_today"
+topic = "humans/faces/tracked"
+when = "appears"
+near = 0.14
+absent_for = "5m"
+for = "3s"
+gap = "3s"
+wait = "60s"
+cooldown = "20m"
+cooldown_with = "arrival"
+during = { from = "05:00", to = "11:00" }
+once_per_day = true
+yields_to = { skill = "bedtime-morning", trigger = "morning" }
+
+[[switched.LAMP_WELLBEING_SPACING.trigger]]
+name = "arrival"
+topic = "humans/faces/tracked"
+when = "appears"
+near = 0.14
+absent_for = "5m"
+for = "3s"
+gap = "3s"
+wait = "60s"
+cooldown = "20m"
+cooldown_with = "first_today"   # after the morning's hello, not a second
+yields_to = { skill = "bedtime-morning", trigger = "morning" }
+
+[[switched.LAMP_WELLBEING_SPACING.do]]
+body = { look_at = "face" }
+light = "warm_glow"
+
+[[switched.LAMP_WELLBEING_SPACING.do]]
+on = "first_today"
+say = { note = "They are at their desk for the first time today. Say a hello and their name if you know it, then ask only \"what's first today?\", in one short line: nothing else.", expires = "60s" }
+
+[[switched.LAMP_WELLBEING_SPACING.do]]
+on = "arrival"
+say = { note = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.", expires = "60s" }

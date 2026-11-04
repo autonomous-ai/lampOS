@@ -30,6 +30,11 @@ What it says and when:
   wellbeing nudges share that one function: it stops the one that came
   last, unless you ask for all of them, and the lamp says which.
 
+With the lamp's wellbeing spacing on (`LAMP_WELLBEING_SPACING=on` in
+`lamp-skills`, #5207), it comes after 45 minutes at your desk and again
+each hour you stay, from 08:00 to 22:00, six times a day at most; the
+wellbeing nudges then share two an hour, never two within 20 minutes.
+
 It keeps nothing about you: only, in memory, how many times it went today
 and whether it is resting; off is one line with its name.
 

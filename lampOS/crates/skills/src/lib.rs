@@ -77,6 +77,26 @@ pub const PRESENCE_TOPICS: [&str; 2] = ["humans/faces/tracked", "room/stood_up"]
 /// break forward). Off unless set: `sooner` is read, checked and ignored.
 pub const SOONER_ENVIRONMENT: &str = "LAMP_YAWN_SOONER";
 
+/// `LAMP_WELLBEING_SPACING=on` (#5207): a skill's `[switched.LAMP_WELLBEING_SPACING]`
+/// values are the ones it runs with (the wellbeing nudges at a present
+/// spacing, and Welcome back's morning clause), and a wellbeing run whose
+/// word was never said gives its group's hour back ([`Engine::unsaid`]).
+/// Off unless set: the table is read and checked, and the skill's own
+/// values run as before.
+pub const SPACING_ENVIRONMENT: &str = "LAMP_WELLBEING_SPACING";
+
+/// The switches a `skill.toml`'s `[switched.NAME]` may name: each a
+/// `lamp-skills` environment line, read as on only when it is `on`.
+pub const SWITCHED: [&str; 1] = [SPACING_ENVIRONMENT];
+
+/// The [`SWITCHED`] switches that are on in this program's environment.
+pub fn switches_on() -> Vec<&'static str> {
+    SWITCHED
+        .into_iter()
+        .filter(|name| std::env::var(name).is_ok_and(|value| value == "on"))
+        .collect()
+}
+
 /// The topics a `[[while]]`'s `broken_by` may name, each with its rule
 /// ([`breaks`]): words heard, the lamp's name heard, a new push on the
 /// lamp, and a touch.
@@ -281,6 +301,9 @@ struct SkillFile {
 struct BudgetFile {
     group: String,
     per_hour: u32,
+    /// The least time between two of the group's runs (#5207), at most an
+    /// hour: the group keeps the longest any member names.
+    apart: Option<String>,
 }
 
 /// `[rest]`: after `after_ignored` runs in a row that nobody noticed within
@@ -628,6 +651,10 @@ struct TriggerFile {
     /// Holds only within a while after another of the skill's triggers
     /// ran, once for each of its runs: a word after a nudge (#3504).
     follows: Option<FollowsFile>,
+    /// Another of the skill's triggers, by name, whose run starts this
+    /// one's cooldown too (#5207): one hello an arrival, the morning's or
+    /// the plain one.
+    cooldown_with: Option<String>,
 }
 
 /// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
@@ -1766,6 +1793,9 @@ pub struct Skill {
     active: Option<(u16, u16)>,
     /// Its group and that group's runs an hour, as this skill names them.
     pub budget: Option<(String, u32)>,
+    /// The least time between two of its group's runs, as this skill names
+    /// it (`[budget] apart`, #5207); 0 without it.
+    pub budget_apart_us: u64,
     /// When it rests after runs nobody noticed.
     pub rest: Option<Rest>,
     /// The function that snoozes it or turns it off (#1685).
@@ -2232,6 +2262,9 @@ pub struct Trigger {
     /// Another trigger of the skill, by name, and how long after its run
     /// this one may hold (#3504, `follows`): once for each of its runs.
     pub follows: Option<(String, u64)>,
+    /// Another trigger of the skill, by name, whose run starts this one's
+    /// cooldown as its own does (#5207, `cooldown_with`).
+    pub cooldown_with: Option<String>,
 }
 
 /// A trigger's `sooner` (#3709): while `test` holds on `topic`'s newest
@@ -2917,6 +2950,15 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             Some((follows.trigger, within_us))
         }
     };
+    // Another trigger's run counts toward this one's cooldown (#5207).
+    if let Some(other) = &file.cooldown_with {
+        if !plain_name(other) || other.contains('-') {
+            return Err(format!("cooldown_with {other:?} is not a trigger's name"));
+        }
+        if file.cooldown.is_none() {
+            return Err("cooldown_with shares a cooldown: give the trigger a cooldown".into());
+        }
+    }
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -3065,6 +3107,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         yields_to,
         sooner,
         follows,
+        cooldown_with: file.cooldown_with,
     })
 }
 
@@ -3073,8 +3116,17 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
 const FOLLOWS_LEAST_US: u64 = 10_000_000;
 const FOLLOWS_MOST_US: u64 = HOUR_US;
 
-/// One skill folder, or why it cannot be loaded.
+/// One skill folder, or why it cannot be loaded, with the [`SWITCHED`]
+/// switches on in this program's environment ([`switches_on`]).
 pub fn load(dir: &Path) -> Result<Skill, String> {
+    load_switched(dir, &switches_on())
+}
+
+/// One skill folder, or why it cannot be loaded, with the switches `on`:
+/// a `[switched.NAME]` table's values in place of the file's own for each
+/// switch on (#5207). Each table is checked whether its switch is on or
+/// not: the skill as it would run with it must load too.
+pub fn load_switched(dir: &Path, on: &[&str]) -> Result<Skill, String> {
     let read =
         |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
     let description_text = read("SKILL.md")?;
@@ -3093,8 +3145,114 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         return Err("run.py is not run yet: a skill with one is not loaded".into());
     }
     let manifest_text = read("skill.toml")?;
-    let mut file: SkillFile =
-        toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+    let Some(switched) = switched_files(&manifest_text)? else {
+        let file: SkillFile =
+            toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+        return load_file(
+            dir,
+            name,
+            description,
+            &description_text,
+            &manifest_text,
+            file,
+        );
+    };
+    let mut chosen = None;
+    for (switch, file) in switched.files {
+        let skill = load_file(
+            dir,
+            name.clone(),
+            description.clone(),
+            &description_text,
+            &manifest_text,
+            file,
+        )
+        .map_err(|error| format!("[switched.{switch}]: {error}"))?;
+        if on.contains(&switch) {
+            chosen = Some(skill);
+        }
+    }
+    let own = load_file(
+        dir,
+        name,
+        description,
+        &description_text,
+        &manifest_text,
+        switched.own,
+    )?;
+    Ok(chosen.unwrap_or(own))
+}
+
+/// A `skill.toml`'s `[switched]` tables (#5207), each a switch of
+/// [`SWITCHED`] and its values, as the file reads with them in place of
+/// its own; and the file without them.
+struct Switched {
+    own: SkillFile,
+    files: Vec<(&'static str, SkillFile)>,
+}
+
+/// Reads `[switched.NAME]` (#5207): each top-level key in it replaces the
+/// file's own whole (a table or a list of tables is given again in full,
+/// never merged), and `NAME` is one of [`SWITCHED`]. A switch in it, or a
+/// key the file could not have, refuses the skill. None without
+/// `[switched]`.
+fn switched_files(text: &str) -> Result<Option<Switched>, String> {
+    let mut table: toml::Table =
+        toml::from_str(text).map_err(|error| format!("skill.toml: {error}"))?;
+    let Some(switched) = table.remove("switched") else {
+        return Ok(None);
+    };
+    let toml::Value::Table(switched) = switched else {
+        return Err("skill.toml: switched is a table of [switched.NAME] tables".into());
+    };
+    if switched.is_empty() {
+        return Err("skill.toml: [switched] names no switch".into());
+    }
+    let read = |table: toml::Table, what: &str| -> Result<SkillFile, String> {
+        toml::Value::Table(table)
+            .try_into()
+            .map_err(|error| format!("skill.toml{what}: {error}"))
+    };
+    let mut files = Vec::new();
+    for (name, values) in switched {
+        let Some(switch) = SWITCHED.into_iter().find(|known| *known == name) else {
+            return Err(format!(
+                "skill.toml: [switched.{name}] is not a switch lamp-skills reads ({})",
+                SWITCHED.join(", ")
+            ));
+        };
+        let toml::Value::Table(values) = values else {
+            return Err(format!("skill.toml: [switched.{name}] is a table"));
+        };
+        if values.is_empty() {
+            return Err(format!("skill.toml: [switched.{name}] changes nothing"));
+        }
+        if values.contains_key("switched") {
+            return Err(format!(
+                "skill.toml: [switched.{name}] cannot hold switched tables"
+            ));
+        }
+        let mut with = table.clone();
+        with.extend(values);
+        files.push((switch, read(with, &format!(" with {name}"))?));
+    }
+    Ok(Some(Switched {
+        own: read(table, "")?,
+        files,
+    }))
+}
+
+/// The rest of [`load_switched`], on a `skill.toml` read.
+fn load_file(
+    dir: &Path,
+    name: String,
+    description: String,
+    description_text: &str,
+    manifest_text: &str,
+    mut file: SkillFile,
+) -> Result<Skill, String> {
+    let read =
+        |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
     match file.format {
         None | Some(1) => {}
         Some(2) => file.permissions.format_2 = true,
@@ -3614,8 +3772,16 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             if !(1..=PER_HOUR_AT_MOST).contains(&budget.per_hour) {
                 return Err(format!("[budget] per_hour is 1 to {PER_HOUR_AT_MOST}"));
             }
-            Some((budget.group, budget.per_hour))
+            let apart_us = budget.apart.as_deref().map_or(Ok(0), duration_us)?;
+            if apart_us > HOUR_US {
+                return Err("[budget] apart is at most 1h".into());
+            }
+            Some((budget.group, budget.per_hour, apart_us))
         }
+    };
+    let (budget, budget_apart_us) = match budget {
+        Some((group, per_hour, apart_us)) => (Some((group, per_hour)), apart_us),
+        None => (None, 0),
     };
     let rest = match file.rest {
         None => None,
@@ -3684,6 +3850,13 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         {
             return Err(format!(
                 "follows.trigger {other:?} names none of the skill's other triggers"
+            ));
+        }
+        if let Some(other) = &trigger.cooldown_with
+            && (!names.contains(&other) || trigger.name.as_ref() == Some(other))
+        {
+            return Err(format!(
+                "cooldown_with {other:?} names none of the skill's other triggers"
             ));
         }
     }
@@ -4028,7 +4201,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         }
         if let Some(relative) = step.requested_audio {
             let asset = requested_audio::Asset::load(dir, &relative)?;
-            if !asset.matches_definition(&description_text, &manifest_text) {
+            if !asset.matches_definition(description_text, manifest_text) {
                 return Err("requested audio definition changed while loading".into());
             }
             steps.push(Step::Call(Call::RequestedAudio(asset)));
@@ -4356,6 +4529,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         most_a_day: file.most_a_day,
         active,
         budget,
+        budget_apart_us,
         rest,
         stop,
         steps,
@@ -5292,6 +5466,11 @@ pub struct Engine {
     /// skills sharing a `[stop]`, the latest is what a call without `all`
     /// stops.
     group_ran: HashMap<String, u64>,
+    /// By skill, when its last run that spent its group's hour began, while
+    /// that is still its last run: what [`Engine::unsaid`] gives back, once
+    /// (#5207). A run since that spends nothing (a word after a nudge, a
+    /// tool's) takes it away.
+    unsaid_from: HashMap<String, u64>,
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
     /// Until when each snoozed skill starts nothing itself, by skill: in
@@ -5332,6 +5511,9 @@ pub struct Engine {
     rest_through_sounds: bool,
     /// With [`SOONER_ENVIRONMENT`] on: a trigger's `sooner` is kept (#3709).
     sooner: bool,
+    /// With [`SPACING_ENVIRONMENT`] on: a run whose word was never said
+    /// gives its group's hour back ([`Engine::unsaid`], #5207).
+    spacing: bool,
     /// The line each skill last picked from a list of lines, by skill: its
     /// next pick is one of the others, so a pet twice in a row never gets
     /// the same words twice (#3997). Behind a lock as [`Engine::still`]
@@ -5515,6 +5697,7 @@ impl Engine {
             group_runs: HashMap::new(),
             budget_waits: HashMap::new(),
             group_ran: HashMap::new(),
+            unsaid_from: HashMap::new(),
             nudges: HashMap::new(),
             snoozed: HashMap::new(),
             off: BTreeSet::new(),
@@ -5530,6 +5713,7 @@ impl Engine {
             dropped: Vec::new(),
             rest_through_sounds: false,
             sooner: false,
+            spacing: false,
             picked: std::sync::Mutex::default(),
         }
     }
@@ -5548,6 +5732,48 @@ impl Engine {
     pub fn sooner(mut self) -> Self {
         self.sooner = true;
         self
+    }
+
+    /// A run whose word was never said gives its `[budget]` group's hour
+    /// back (`LAMP_WELLBEING_SPACING=on`, #5207). Without it, a run spends
+    /// its group's hour as it starts, said or not, as before.
+    pub fn spacing(mut self) -> Self {
+        self.spacing = true;
+        self
+    }
+
+    /// `skill`'s last run ended with its word never said (the voice's say
+    /// expired, refused or not reached, #5207: on lamp-9adf Stretch break's
+    /// `say: expired` still spent the wellbeing hour, and Sit back and Rest
+    /// your eyes were turned away for it). With [`Engine::spacing`], that
+    /// run's place in its group's hour is given back, so the next member
+    /// due may go; the day's most, the cooldown and the rest still count
+    /// it. Whether a place was given back.
+    pub fn unsaid(&mut self, skill: &str) -> bool {
+        if !self.spacing {
+            return false;
+        }
+        let Some((group, _)) = self
+            .skills
+            .iter()
+            .find(|known| known.name == skill)
+            .and_then(|known| known.budget.as_ref())
+        else {
+            return false;
+        };
+        let Some(at) = self.unsaid_from.remove(skill) else {
+            return false;
+        };
+        let Some(began) = self.group_runs.get_mut(group) else {
+            return false;
+        };
+        match began.iter().position(|run| *run == at) {
+            Some(index) => {
+                began.remove(index);
+                true
+            }
+            None => false,
+        }
     }
 
     /// The lines of due chances dropped since the last take, each
@@ -6724,6 +6950,17 @@ impl Engine {
                             && ran(index).is_none_or(|mine| mine < at)
                     })
                 });
+                // The run of the trigger it shares its cooldown with
+                // (#5207), counted as its own.
+                let shared_ran = trigger.cooldown_with.as_ref().and_then(|other| {
+                    let at = skill
+                        .triggers
+                        .iter()
+                        .position(|named| named.name.as_ref() == Some(other))?;
+                    self.watches
+                        .get(&(skill.name.clone(), at))
+                        .and_then(|watch| watch.ran_us)
+                });
                 let watch = self.watches.entry((skill.name.clone(), index)).or_default();
                 if let Some(why) = out_of_window(trigger, moment.as_ref()) {
                     if trigger.once_per_day
@@ -6964,6 +7201,7 @@ impl Engine {
                 }
                 if let Some(ran) = watch
                     .ran_us
+                    .max(shared_ran)
                     .filter(|ran| now_us - ran < trigger.cooldown_us)
                 {
                     let rest = trigger.cooldown_us - (now_us - ran);
@@ -7141,12 +7379,27 @@ impl Engine {
                                 .map(|(_, per_hour)| *per_hour)
                                 .min()
                                 .unwrap_or(u32::MAX);
+                            // The group's least time between two runs: the
+                            // longest any member names (#5207).
+                            let apart_us = self
+                                .skills
+                                .iter()
+                                .filter(|other| {
+                                    other
+                                        .budget
+                                        .as_ref()
+                                        .is_some_and(|(named, _)| named == group)
+                                })
+                                .map(|other| other.budget_apart_us)
+                                .max()
+                                .unwrap_or(0);
                             self.group_runs.get(group).is_some_and(|began| {
                                 began
                                     .iter()
                                     .filter(|at| now_us.saturating_sub(**at) < HOUR_US)
                                     .count() as u64
                                     >= u64::from(limit)
+                                    || began.iter().any(|at| now_us.saturating_sub(*at) < apart_us)
                             })
                         });
                 // First come, first served: with the hour free, a member
@@ -7469,11 +7722,16 @@ impl Engine {
                         }
                         count.1 += 1;
                     }
+                    if !nudge {
+                        // A word after a nudge: its say is not the nudge's.
+                        self.unsaid_from.remove(&skill.name);
+                    }
                     if let Some((group, _)) = skill.budget.as_ref().filter(|_| nudge) {
                         let began = self.group_runs.entry(group.clone()).or_default();
                         began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
                         began.push_back(now_us);
                         self.group_ran.insert(skill.name.clone(), now_us);
+                        self.unsaid_from.insert(skill.name.clone(), now_us);
                         if let Some(waits) = self.budget_waits.get_mut(group) {
                             waits.remove(&skill.name);
                             waits.retain(|_, (_, last)| {
@@ -7576,6 +7834,8 @@ impl Engine {
             .iter()
             .find(|skill| skill.tool.as_deref() == Some(name))
             .ok_or("No skill of mine does that just now.")?;
+        // A tool's run is not the nudge an unsaid word gives back (#5207).
+        self.unsaid_from.remove(&skill.name);
         if skill.requested_audio().is_some() && !permitted {
             return Err("Requested audio is disabled or has no spoken context.".into());
         }
@@ -8259,7 +8519,19 @@ pub fn replay_with(
     tools: &[ToolCall],
     clock: Option<&str>,
 ) -> Result<Vec<Made>, String> {
-    let skill = load(dir)?;
+    replay_switched(dir, recording, tools, clock, &switches_on())
+}
+
+/// [`replay_with`], with the skill loaded with the switches `on`
+/// ([`load_switched`]): a case's `switches` (#5207).
+pub fn replay_switched(
+    dir: &Path,
+    recording: &Path,
+    tools: &[ToolCall],
+    clock: Option<&str>,
+    on: &[&str],
+) -> Result<Vec<Made>, String> {
+    let skill = load_switched(dir, on)?;
     // A name the skill's tool is not, nor its `[stop]` function's, would
     // make nothing and pass as a quiet case: it is refused.
     let stop = skill.stop.as_ref().map(|stop| stop.tool.clone());
@@ -8505,6 +8777,11 @@ struct ExpectFile {
     /// A watch's: the face the eyes know at the lamp, as time goes.
     #[serde(default)]
     known: Vec<KnownAt>,
+    /// The [`SWITCHED`] switches on in the case (#5207): the skill runs
+    /// with its `[switched.NAME]` values. None without it, whatever the
+    /// environment of the test says.
+    #[serde(default)]
+    switches: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -8594,7 +8871,19 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
                 "[[known]] is a watch's: this skill has no [watch]".into(),
             ));
         } else {
-            replay_with(dir, case, &expect.call_tool, expect.clock.as_deref())?
+            let mut on = Vec::new();
+            for name in &expect.switches {
+                match SWITCHED.into_iter().find(|known| known == name) {
+                    Some(switch) => on.push(switch),
+                    None => {
+                        return Err(wrong(format!(
+                            "expect.toml: switches names {name:?}, not a switch a skill.toml may name ({})",
+                            SWITCHED.join(", ")
+                        )));
+                    }
+                }
+            }
+            replay_switched(dir, case, &expect.call_tool, expect.clock.as_deref(), &on)?
         };
         let names: Vec<_> = made
             .iter()

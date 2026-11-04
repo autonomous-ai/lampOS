@@ -83,3 +83,52 @@ policy = "nudge"
 body = { look_at = "face" }
 light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
 say = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
+
+# With LAMP_WELLBEING_SPACING=on in lamp-skills (#5207: the testers found the
+# lamp too passive, and V1 offered water 45 minutes after the last): these
+# values in place of the file's own. A sip after 45 minutes at the desk, and
+# again each hour the sitting goes on (no rearm: its cooldown spaces them),
+# through the waking day the quiet hours allow, six a day at most. The
+# wellbeing group has room for two an hour, never two within 20 minutes.
+# Each key here replaces the file's own whole (docs/skills.md, "[switched]").
+[switched.LAMP_WELLBEING_SPACING]
+most_a_day = 6
+active = { from = "08:00", to = "22:00" }
+budget = { group = "wellbeing", per_hour = 2, apart = "20m" }
+
+[switched.LAMP_WELLBEING_SPACING.trigger]
+topic = "humans/faces/tracked"
+when = "present"
+near = 0.14
+for = "45m"
+gap = "2m"
+cooldown = "60m"          # again an hour after the last, while they stay
+
+[[switched.LAMP_WELLBEING_SPACING.while]]
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[switched.LAMP_WELLBEING_SPACING.while]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[[switched.LAMP_WELLBEING_SPACING.while]]
+topic = "room/activity"
+field = "state"
+not_equals = "head_down"
+unknown = "holds"
+
+[[switched.LAMP_WELLBEING_SPACING.while]]   # the sitter's own 45 minutes
+topic = "room/activity"
+field = "sitting_s"
+above = 2699
+unknown = "holds"
+
+[[switched.LAMP_WELLBEING_SPACING.do]]
+body = { look_at = "face" }
+light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
+say = "They have been at the desk a good while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health, and no count of the time."

@@ -72,3 +72,11 @@ body = { gesture = "stretching" }
 # (the third's arbitration and leases, #940): until then a light step would
 # change the person's own light for good.
 say = "They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too."
+
+# With LAMP_WELLBEING_SPACING=on in lamp-skills (#5207): the wellbeing group
+# has room for two nudges an hour, never two within 20 minutes. The group
+# keeps the smallest per_hour of its members, so each says it.
+[switched.LAMP_WELLBEING_SPACING]
+budget = { group = "wellbeing", per_hour = 2, apart = "20m" }
+# Never at night, as the other wellbeing nudges (#5207: none in the quiet hours).
+quiet = { from = "22:00", to = "08:00" }

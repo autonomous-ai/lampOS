@@ -500,6 +500,7 @@ fn every_skill_folder_says_its_kind_and_version() {
         named(SkillKind::Core),
         [
             "bedtime-morning",
+            "comfort-break",
             "dance",
             "dusty-air",
             "feelings",
@@ -533,7 +534,6 @@ fn every_skill_folder_says_its_kind_and_version() {
     assert_eq!(
         named(SkillKind::Installable),
         [
-            "comfort-break",
             "desk-tutor",
             "desk-tutor-marks",
             "guard-mode",
@@ -2855,7 +2855,14 @@ fn a_comfort_break_never_names_the_bathroom() {
     let toml: toml::Value =
         toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
     let mut told = vec![skill.name.clone(), markdown];
-    for step in toml["do"].as_array().unwrap() {
+    // Its own steps, and those it runs with LAMP_WELLBEING_SPACING=on (#5207).
+    let switched = &toml["switched"]["LAMP_WELLBEING_SPACING"]["do"];
+    for step in toml["do"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(switched.as_array().unwrap())
+    {
         if let Some(say) = step.get("say").and_then(toml::Value::as_str) {
             told.push(say.to_owned());
         }
@@ -2874,7 +2881,8 @@ fn a_comfort_break_never_names_the_bathroom() {
             );
         }
     }
-    assert_eq!(skill.kind, SkillKind::Installable);
+    // Core since #5207: installed off in the product, on with the spacing.
+    assert_eq!(skill.kind, SkillKind::Core);
 }
 
 /// A meal check (#3504) asks one open question: it names no food or dish
