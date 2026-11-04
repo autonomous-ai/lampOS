@@ -1224,8 +1224,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   zone's midnight, past six days, another year, the week daylight saving
   ends) and `remember::tests::recall_names_the_day_only_when_asked_when`.
 - **A forget that names a thing removes only what matches** (#3113, the
-  Days client, on every switch: the product's unit has
-  `LAMP_MEMORY_FORGET_ABOUT` off).
+  Days client, on every switch: it holds with `LAMP_MEMORY_FORGET_ABOUT`
+  off, as the product's unit had it until 4 Nov).
   - **Why:** on lamp-c0a4 (23 Oct, second route, observe, threads, events
     and forget-all on), the lamp noticed a person's favourite colour (an
     observation), then kept their sister's wedding. "Lamp, please forget my
@@ -1599,7 +1599,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     gave goes and something else stays; everything goes, journal included).
 
 - **Recall's second version** (#2176, `LAMP_MEMORY_RECALL_V2=on`, with
-  the Days client only; off unless set; both voice routes).
+  the Days client only; off unless set; both voice routes; on in the
+  product since 4 Nov, after lamp-06c1's check: "my" alone found nothing,
+  "last week" a span answer).
   - **Words that match everything:** the memory leaves common English and
     Vietnamese words ("what", "is", "my", "của", "tôi", "là" …) out of a
     recall's query. "What is my drink order" searches "drink" and "order"
@@ -1743,13 +1745,18 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `remember::tests::a_known_persons_keep_is_told_as_theirs_never_for_everyone`.
 
 - **A correction replaces a kept thing** (#2510, `LAMP_MEMORY_REPLACES=on`,
-  with the Days client only; off unless set; both voice routes).
+  with the Days client only; off unless set; both voice routes; on in the
+  product since 4 Nov, after lamp-06c1's check: "Green now, not violet.",
+  one green kept, violet gone).
   - **Why:** on lamp-06c1 on 21 Oct "it's green now" after a kept violet
     was answered but never kept; on 20 Oct three versions of the same
     bicycle fact were kept side by side.
   - **What:** `remember` takes an optional `replaces` (an integer id): its
     description tells the model to give it only when the person corrects
-    something it was shown as kept, by that id. The ids the model sees: a
+    something it was shown as kept, by that id (`REPLACES_DESCRIBED`, short
+    so `remember` stays within the link's 1,024 bytes with the events
+    switch's day: at 1,216 bytes the Live link left `remember` out, #5274).
+    The ids the model sees: a
     session note's facts carry `id`, recall's `found` items `source_id`,
     and with the switch each hit line of the second route ends
     `(said when; source_id N)`. The voice sends `replaces` with `shown`, what
@@ -1930,7 +1937,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     never the room's: `the_rooms_scope_gives_its_own_history_only_to_its_own_recall`).
 
 - **Forgetting what a thing was about** (#2176, `LAMP_MEMORY_FORGET_ABOUT=on`,
-  with the Days client only; off unless set; both voice routes).
+  with the Days client only; off unless set; both voice routes; on in the
+  product since 4 Nov, after lamp-06c1's check: both bicycle things
+  forgotten, the coffee still found).
   - **Why:** on lamp-06c1 (second route, 20 Oct 14:28), "never mind, forget
     what I said about my bicycle" called `forget {}`, which sent
     `forget_last`: it removed the newest kept thing, a coffee preference,

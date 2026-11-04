@@ -1573,6 +1573,9 @@ pub const REMEMBER_ONCE_ENVIRONMENT: &str = "LAMP_MEMORY_REMEMBER_ONCE";
 pub const REPLACES_ENVIRONMENT: &str = "LAMP_MEMORY_REPLACES";
 static REPLACES: OnceLock<bool> = OnceLock::new();
 
+/// What [`REPLACES_ENVIRONMENT`] adds to `remember`'s description.
+pub const REPLACES_DESCRIBED: &str = " When they correct a kept thing shown by id or source_id (\"it's green now\"), keep the corrected sentence and give that id as replaces; never guess one. If told replaced, say both: 'green now, not violet'.";
+
 /// Whether `remember` takes `replaces` ([`REPLACES_ENVIRONMENT`]).
 pub fn replaces_on() -> bool {
     REPLACES.get() == Some(&true)
@@ -2310,13 +2313,10 @@ fn dated(mut tools: Vec<Tool>, events: bool) -> Vec<Tool> {
 /// `recall` with `history`: the other functions as they are.
 fn replaces_described(mut tools: Vec<Tool>) -> Vec<Tool> {
     for tool in tools.iter_mut().filter(|tool| tool.name == REMEMBER) {
-        tool.description.push_str(
-            " When they correct something you were shown as kept, with its id or source_id \
-             (\"it's green now\" after \"my favourite colour is violet\"), keep the corrected sentence and give \
-             that id as replaces, so the old one is replaced and not kept beside it. Never guess an id; \
-             without one, keep it without replaces. When the answer says replaced, say what it is now \
-             and what it was, such as 'green now, not violet'.",
-        );
+        // Short, so remember stays within the link's 1,024 bytes with the
+        // events switch's day too (#5274: 1,216 bytes, and the link left
+        // `remember` out).
+        tool.description.push_str(REPLACES_DESCRIBED);
         if let Some(parameters) = tool.parameters.as_mut() {
             parameters["properties"]["replaces"] = json!({"type": "integer", "description": "Only for a correction: the id or source_id of the kept thing it corrects, as you were shown it."});
         }
@@ -23453,6 +23453,14 @@ mod tests {
             assert!(on[0].parameters.as_ref().unwrap()["properties"]["replaces"].is_object());
             assert!(on[0].description.starts_with(&off[0].description));
             assert!(on[0].description.contains("give that id as replaces"));
+            // With the events switch's day too, within the link's bound (#5274).
+            let both = dated(on.clone(), true);
+            assert!(
+                both[0].description.len() <= 1_024,
+                "{}",
+                both[0].description.len()
+            );
+            assert!(both[0].validate().is_ok());
         }
         let answer = json!({"ok":true,"entries":[
             {"id":4,"at_unix_ms":NOW,"text":"Her favourite colour is violet."}
