@@ -2484,7 +2484,12 @@ pub fn serve(
         socket,
         who.clone(),
         days,
-        move |now, person, line: Option<Option<String>>, memory, carried: Option<String>| {
+        move |now,
+              person,
+              line: Option<Option<String>>,
+              memory,
+              carried: Option<String>,
+              named: Option<String>| {
             let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
                 .unwrap_or_default();
             let room = room_bus.as_ref().map(crate::bus_out::room_now);
@@ -2588,16 +2593,13 @@ pub fn serve(
                 + &named_by_default
                 + &health_fact(health.as_deref())
                 + &crate::light_told::fact(light_bus.as_ref())
-                // A line narrowed to the room whose person's face was alone
-                // in view is told their name only (`ScopeLease::named_for_reply`,
-                // lamp-3e83): its `line`, never its `person`, the thread's.
-                + &known_name_told(
-                    known_name,
-                    who.as_deref(),
-                    person
-                        .as_deref()
-                        .or(line.as_ref().and_then(Option::as_deref)),
-                );
+                // Only the line's own person, the face seen speaking it under
+                // LAMP_PERSON_SCOPE_SEEN ([`known_person_for`]): never
+                // `line`'s alone-in-view name (`ScopeLease::named_for_reply`),
+                // which #4090 and #4132 give the owner alone, through the
+                // typed name (the readers' HOLDs on #4158: a silent known
+                // guest's nod would name an off-camera caller's answer).
+                + &known_name_told(known_name, who.as_deref(), named.as_deref());
             // Beside the character, where the instruction had it: told after
             // the exchanges, the model used it for the owner a third as
             // often (EN, the #2602 probe).
@@ -4994,10 +4996,33 @@ pub(crate) fn lamp_just_asked(thread: &crate::thread::Thread, request: u64, now:
     thread.going_on(now) && thread.lamp_asked(request)
 }
 
+/// Whose name a second-route turn may be told (#2539,
+/// `LAMP_SECOND_FACE_NAME`): only a turn told by its own lease
+/// (`Chosen::ByLease`, `LAMP_SECOND_SCOPED_CONTEXT`), and only that lease's
+/// own person, which with `LAMP_PERSON_SCOPE_SEEN` is the face seen speaking
+/// it. Nobody for a turn with no lease or told by presence (an add-on's say,
+/// Thirteen's P3 on #5325), a line narrowed to the room (its alone-in-view
+/// `ScopeLease::named_for_reply` included: the owner alone is named there,
+/// through the typed name, #4090, #4132), a line `carried` in a person's
+/// conversation (`LAMP_CONVERSATION_CARRIES`, #4339: no face was seen
+/// speaking it, the readers' HOLDs on #4158), one held by a face's gap, or
+/// a revoked one.
+pub(crate) fn known_person_for(
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    chosen: Chosen,
+) -> Option<String> {
+    let lease = lease.filter(|_| chosen == Chosen::ByLease)?;
+    if lease.carried_for().is_some() {
+        return None;
+    }
+    let scope = lease.scope().filter(|scope| !scope.held())?;
+    scope.person().map(str::to_owned)
+}
+
 /// The known person's name for a turn (#2539, `LAMP_SECOND_FACE_NAME=on`),
 /// as the Live route tells it (`known_faces::note`): when the face the eyes
-/// know now, in `who`, is this turn's own person. A room's turn, a line
-/// narrowed to the room, or another person's has none; nor does a face gone.
+/// know now, in `who`, is `person`, the turn's own ([`known_person_for`]).
+/// A face gone has none.
 pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>) -> String {
     if !on {
         return String::new();
@@ -10384,7 +10409,7 @@ fn memory_context(
         socket,
         who,
         days,
-        move |now, person, line, memory, _| tell(now, person, line, memory),
+        move |now, person, line, memory, _, _| tell(now, person, line, memory),
     )
 }
 
@@ -10417,14 +10442,22 @@ fn memory_context_carried(
     socket: Option<PathBuf>,
     who: Option<PathBuf>,
     days: bool,
-    tell: impl Fn(Instant, Option<String>, Option<Option<String>>, String, Option<String>) -> Told
+    tell: impl Fn(
+        Instant,
+        Option<String>,
+        Option<Option<String>>,
+        String,
+        Option<String>,
+        Option<String>,
+    ) -> Told
     + Send
     + Sync,
 ) -> impl Fn(Option<&crate::memory_scope::ScopeLease>, Chosen) -> Told + Send + Sync {
     let compose = move |sessions: &mut Sessions,
                         scope: Option<&crate::memory_scope::ScopeSnapshot>,
                         line: Option<Option<String>>,
-                        carried: Option<String>| {
+                        carried: Option<String>,
+                        named: Option<String>| {
         let now = Instant::now();
         // Counted at every ask, before anything can return early: a turn's
         // second ask (its prepared chat, then its rounds) is never quiet.
@@ -10461,7 +10494,7 @@ fn memory_context_carried(
             Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
             None => crate::remember::told(),
         };
-        tell(now, person, line, memory, carried)
+        tell(now, person, line, memory, carried, named)
     };
     move |lease, chosen| match chosen {
         Chosen::ByLease => told_while_scope_holds(&sessions, lease, |sessions, scope| {
@@ -10474,7 +10507,8 @@ fn memory_context_carried(
             let carried = lease
                 .and_then(crate::memory_scope::ScopeLease::carried_for)
                 .map(str::to_owned);
-            compose(sessions, scope, line, carried)
+            let named = known_person_for(lease, Chosen::ByLease);
+            compose(sessions, scope, line, carried, named)
         }),
         // Whose the turn is as before; the line's own person, read once
         // here, only for the typed name.
@@ -10486,7 +10520,7 @@ fn memory_context_carried(
                 .and_then(crate::memory_scope::ScopeLease::carried_for)
                 .map(str::to_owned);
             told_while_scope_holds(&sessions, None, |sessions, _| {
-                compose(sessions, None, line, carried)
+                compose(sessions, None, line, carried, None)
             })
         }
     }
@@ -21052,6 +21086,56 @@ mod tests {
         ] {
             assert!(parse_flags(dir, &refused).is_err(), "{refused:?}");
         }
+    }
+
+    /// Thirteen's P2 on #5325: whose name a turn may be told is chosen from
+    /// its lease and mode in one place ([`super::known_person_for`]), the
+    /// one `serve` calls. A lease kept as the person's (their own face seen
+    /// speaking it) names them; one narrowed to the room, its reply told
+    /// their name (alone in view, none seen speaking it), names nobody; nor
+    /// does one carried in their conversation, a turn by presence, or no
+    /// lease (an add-on's say). Made-up names.
+    #[test]
+    fn only_a_lease_seen_speaking_its_own_line_is_named() {
+        use super::{Chosen, known_person_for};
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let scope = |request: u64| {
+            RequestScope::new(
+                RequestKey {
+                    worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                ScopeSnapshot::of("Pippa"),
+            )
+        };
+        let pippa = crate::known_faces::memory_person("Pippa");
+        // Seen speaking it: kept as theirs, named.
+        let seen = scope(1);
+        assert_eq!(
+            known_person_for(Some(&seen.lease()), Chosen::ByLease),
+            Some(pippa.clone())
+        );
+        // Narrowed to the room, its reply told their name: nobody here.
+        let narrowed = scope(2);
+        let lease = narrowed.lease();
+        lease.narrow_to_room();
+        lease.name_for_reply();
+        assert_eq!(lease.named_for_reply(), Some(pippa.as_str()));
+        assert_eq!(known_person_for(Some(&lease), Chosen::ByLease), None);
+        // Carried in their conversation, no face seen speaking it.
+        let carried = scope(3);
+        let lease = carried.lease();
+        assert!(lease.carry_conversation(&pippa));
+        assert_eq!(lease.carried_for(), Some(pippa.as_str()));
+        assert_eq!(known_person_for(Some(&lease), Chosen::ByLease), None);
+        // By presence, with or without a lease: nobody.
+        assert_eq!(
+            known_person_for(Some(&seen.lease()), Chosen::ByPresence),
+            None
+        );
+        assert_eq!(known_person_for(None, Chosen::ByPresence), None);
+        assert_eq!(known_person_for(None, Chosen::ByLease), None);
     }
 
     /// #2539 (`LAMP_SECOND_FACE_NAME`): a turn that is the known face's own
