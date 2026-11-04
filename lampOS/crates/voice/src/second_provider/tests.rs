@@ -11718,6 +11718,8 @@ async fn a_stop_said_over_the_lamp_is_answered_in_the_owners_language() {
 /// words (its first answer audio journalled), never a wait sound.
 #[tokio::test]
 async fn the_stop_line_rendered_ahead_plays_at_once_though_the_voice_is_stuck() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
     let line = crate::spoken_stop::LINE;
     let script = Arc::new(Script {
         heard: Mutex::new([Ok("Stop.".to_owned())].into()),
@@ -11757,6 +11759,8 @@ async fn the_stop_line_rendered_ahead_plays_at_once_though_the_voice_is_stuck() 
 /// a voice that gives it no sound is asked once more, never a silent turn.
 #[tokio::test]
 async fn a_fixed_line_with_no_sound_is_asked_once_more() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
     let line = crate::spoken_stop::LINE;
     let script = Arc::new(Script {
         heard: Mutex::new([Ok("Stop Lamp.".to_owned())].into()),
@@ -11791,6 +11795,8 @@ async fn a_fixed_line_with_no_sound_is_asked_once_more() {
 /// line with "stop" in it, or a stop long after the answer go to the model.
 #[tokio::test]
 async fn a_stop_over_or_just_after_the_answer_gets_the_one_line() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
     // `until_ago`: how long before the stop's line began the answer's last
     // sound played; none for no answer played.
     async fn asked(words: &str, over: bool, until_ago: Option<Duration>) -> bool {
@@ -11918,6 +11924,8 @@ async fn a_wordless_cut_in_asks_at_most_once_a_minute() {
 /// being taken for a cough, and with none it still asks.
 #[tokio::test]
 async fn a_cut_in_with_words_on_the_way_but_none_final_is_not_taken_for_a_cough() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
     let asks = format!("said:{}", crate::cut_in_wordless::LINE);
     let stops = format!("said:{}", crate::spoken_stop::LINE);
     async fn run(on_the_way: &[&str], over: bool) -> (Vec<String>, usize) {
