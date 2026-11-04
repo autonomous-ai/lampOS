@@ -63,7 +63,9 @@ It replaces the three-agent `harness send` route of 12 October.
   played round, and `QUIET <lamp> HH:MM–HH:MM` before a step that needs
   silence; the other-lamp gate in a kit reads #3336. After the round, put the
   lamp back. Read-only reads of a lamp need no ask; a change to a lamp needs
-  the project lead's yes (or the lead's agent's, on the lead's word). A kit
+  the project lead's yes (or the lead's agent's, on the lead's word), except
+  a builder's own in-house lamp, changed by its holder under the lock with
+  the slot posted and the put-back done. A kit
   for lamp-52e6, lamp-4ace or a tester's, customer's or loaned lamp needs the
   lead's agent's yes on its sha256, posted on #3336 with the verdict; a
   builder's own in-house lamp needs none, but its holder still posts the

@@ -177,7 +177,9 @@ Only for a builder whose role file names a lamp.
 - **Reads need no ask; a change does.** A read-only read of a lamp (a
   journal, a status, a file) needs no ask. Any change to a lamp, and
   anything a person in the room would see or hear, needs the project lead's
-  yes, or the lead's agent's on the lead's word. This replaces "ask before
+  yes, or the lead's agent's on the lead's word, except a builder's own
+  in-house lamp, changed by its holder under the lock with the slot posted
+  and the put-back done. This replaces "ask before
   every `ssh`" for lampOS lamps. lamp-4ace stays the first builder's alone,
   and each session on it needs the owner's yes in chat. Never use a customer
   lamp in transit for a test. See "Slots, kits and lamp access".
@@ -197,8 +199,7 @@ Only for a builder whose role file names a lamp.
   ```
 
   An agent that finds no `LAMP.md`, or another owner in it, does not change
-  the lamp (a read-only read is still allowed). A change of owner is a line in work-split.md by the first
-  builder. A lamp lent for one test says so in `runs:` and goes back.
+  the lamp (a read-only read is still allowed). A change of owner is a line in work-split.md by the PM. A lamp lent for one test says so in `runs:` and goes back.
   [lamp-52e6's](../deploy/lamp-52e6/LAMP.md) is an example.
 - **Before installing anything**, write down what the lamp runs:
 
@@ -787,7 +788,9 @@ journal's "a face in N"; `sight.jpg` viewed locally, never posted), never from
 the Mac's camera, which sees behind the lamp.
 
 **Lamp access.** Read-only reads of a lamp need no ask; any change to a lamp
-needs the lead's yes, or the lead's agent's on the lead's word. SSH is by key
+needs the lead's yes, or the lead's agent's on the lead's word, except a
+builder's own in-house lamp, changed by its holder under the lock with the
+slot posted and the put-back done. SSH is by key
 only; the host-key check is skipped for reflashed office lamps (see "Setting
 up a lamp"). A Swarm machine has no ssh to a lamp for now, so lamp kits keep
 running from the lead's sessions with the yes above. Read-only reads of the
@@ -934,7 +937,8 @@ request body has a **"Lamp check" section**, and a tester runs it.
   free and which lamp fits, and `needs:lamp-check`. `status:taken` stays
   with the coder.
 - **The tester** builds the head, assembles the kit from `~/lamp-rows/KITS.md`,
-  gets the lead's agent's yes on its sha (and Fifth's GO on 52e6), posts
+  gets the lead's agent's yes on its sha (not needed on a builder's own
+  in-house lamp; Fifth's GO on 52e6), posts
   PLAYING and QUIET on #3336, and then posts the verdict on the pull request
   with the journal excerpt for the scene's window, and removes
   `needs:lamp-check`. The excerpt has played clips only: no real person's
