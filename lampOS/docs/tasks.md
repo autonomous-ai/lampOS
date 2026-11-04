@@ -2238,8 +2238,8 @@ tasks flags; it needs only the tasks part):
     (120 s);
   - the person's words in it (`thread::heard_for`) are a plain yes: at most
     six words, only yes, yeah, yep, yup, sure, ok, okay, "go ahead", "do
-    it" and "please do", with "please" and "lamp" beside them, and no
-    question mark. "Yes and also make it longer" is not a yes;
+    it" and "please do", with "please", "lamp" and "hey" beside them, and
+    no question mark. "Yes and also make it longer" is not a yes;
   - the lamp's line just before it (`thread::answered_last_but`) was said
     within `CONFIRM_WITHIN`, ends with a question, names who the task was
     prepared for (the name, or a form the voice hears for it), and holds at
