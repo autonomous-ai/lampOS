@@ -505,7 +505,33 @@ impl Days {
         rules: &[u64],
         speaker: Option<&str>,
     ) -> Result<u64> {
+        self.append_keeper(person, at, (heard, said), sources, rules, speaker, None)
+    }
+
+    /// [`Self::append_ruled_by`], citing `keeper`'s kept things (the
+    /// voice's `LAMP_PERSON_SCOPE_ONE_FACE`): a room line whose keep was
+    /// that one known person's, told and read as the room's, is linked to
+    /// the kept things of theirs it used, across the two scopes. Their
+    /// forget of one then takes this line too when it carries the kept
+    /// thing's words (the Core-verifier's GATE 23 FAIL on lamp-52e6, 4 Nov:
+    /// "Jasmine cheese — that's the favorite I have for you, Henry" stayed
+    /// in the room's log after Henry's forget), and their forget everything
+    /// takes it whole ([`empty`]). No other room line is reached: only one
+    /// that cites what goes. Nothing of theirs is told in the room's reads:
+    /// a record's `source_ids` are its own scope's only.
+    #[allow(clippy::too_many_arguments)]
+    pub fn append_keeper(
+        &mut self,
+        person: &Person,
+        at: u64,
+        (heard, said): (&str, &str),
+        sources: &[u64],
+        rules: &[u64],
+        speaker: Option<&str>,
+        keeper: Option<(&str, &[u64])>,
+    ) -> Result<u64> {
         let speaker = speaker_of(person, speaker)?;
+        let keeper = keeper_of(person, keeper)?;
         let heard = store::tidy(heard, store::HEARD_BYTES);
         let said = store::tidy(said, store::SAID_BYTES);
         if heard.is_empty() && said.is_empty() {
@@ -518,7 +544,11 @@ impl Days {
             sources,
             rules,
             None,
-            on_said(None, speaker),
+            Said {
+                on: None,
+                speaker,
+                keeper: keeper.as_ref().map(|(keeper, ids)| (keeper, *ids)),
+            },
         )
     }
     pub fn remember(&mut self, person: &Person, at: u64, text: &str) -> Result<u64> {
@@ -818,7 +848,11 @@ impl Days {
         sources: &[u64],
         rules: &[u64],
         supersedes: Option<u64>,
-        Said { on, speaker }: Said<'_>,
+        Said {
+            on,
+            speaker,
+            keeper,
+        }: Said<'_>,
     ) -> Result<u64> {
         if Day::at(at, &self.local).is_none() {
             return Err(Error::new(
@@ -907,6 +941,17 @@ impl Days {
                 "INSERT INTO speakers(rid,speaker) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
                 params![person.as_str(), id, speaker],
             )?;
+        }
+        // The kept things of the one known person whose keep this room
+        // line was that it cites (checked by `keeper_of`): linked as its
+        // sources across the two scopes, so their forget reaches it.
+        if let Some((keeper, ids)) = keeper {
+            for kept in ids {
+                tx.execute(
+                    "INSERT OR IGNORE INTO sources(child,parent) SELECT c.rid,k.rid FROM entries c JOIN entries k ON k.person=?3 AND k.id=?4 AND k.kind='kept' WHERE c.person=?1 AND c.id=?2",
+                    params![person.as_str(), id, keeper.as_str(), kept],
+                )?;
+            }
         }
         if let Some(scope) = ruled {
             let rid: i64 = tx.query_row(
@@ -2597,13 +2642,45 @@ impl Days {
 }
 
 /// What an entry keeps beside it in side tables ([`Days::add`]): the day
-/// it is about (`event_days`) and who said it (`speakers`, #2849).
+/// it is about (`event_days`), who said it (`speakers`, #2849), and, for a
+/// room line, the kept things of the one known person whose keep it was
+/// that it cites (`keeper`, [`Days::append_keeper`]).
 struct Said<'a> {
     on: Option<Day>,
     speaker: Option<&'a str>,
+    keeper: Option<(&'a Person, &'a [u64])>,
 }
 fn on_said(on: Option<Day>, speaker: Option<&str>) -> Said<'_> {
-    Said { on, speaker }
+    Said {
+        on,
+        speaker,
+        keeper: None,
+    }
+}
+
+/// A room line's `keeper` ([`Days::append_keeper`]), checked before
+/// anything is written: only on the room's lines, only a known person's
+/// own scope (a `p-` id, never the room's nor a rules scope), and at most
+/// 64 ids, each once; else `bad_request`. Ids that are not that person's
+/// kept things (forgotten since, or never kept) are not linked.
+fn keeper_of<'a>(
+    person: &Person,
+    keeper: Option<(&'a str, &'a [u64])>,
+) -> Result<Option<(Person, &'a [u64])>> {
+    let Some((keeper, ids)) = keeper else {
+        return Ok(None);
+    };
+    if person.as_str() != Person::EVERYONE {
+        return Err(bad("a keeper is linked only on the room's lines"));
+    }
+    if !lamp_msgs::known::is_person_id(keeper) {
+        return Err(bad("a keeper is the id of one person the eyes know"));
+    }
+    let keeper = Person::new(keeper).ok_or_else(|| bad("a keeper is a person's own scope"))?;
+    if ids.len() > 64 || ids.iter().collect::<BTreeSet<_>>().len() != ids.len() {
+        return Err(bad("keeper IDs must be unique, with at most 64"));
+    }
+    Ok(Some((keeper, ids)))
 }
 
 /// A write's `speaker` (#2849), checked before anything is written: only
@@ -3216,6 +3293,19 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         "INSERT INTO doomed SELECT rid FROM entries WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],
     )?;
+    // A person's forget everything also takes the room's lines that cite
+    // what was kept as theirs ([`Days::append_keeper`]): lines whose keep
+    // was theirs by the one-face rule. No other room line.
+    // A rules scope's (`r-…`) is never one: a room line cites only the
+    // room's rules.
+    if let Some(person) = person.filter(|person| lamp_msgs::known::is_person_id(person.as_str())) {
+        tx.execute(
+            "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN entries c ON c.rid=s.child JOIN entries k ON k.rid=s.parent WHERE k.person=?1 AND k.kind='kept' AND c.person=?2 AND c.kind='exchange'",
+            params![person.as_str(), Person::EVERYONE],
+        )?;
+        room_from_citing(tx, person)?;
+        talk_with_doomed(tx)?;
+    }
     let count = erase(tx)?;
     // Empty people also have job and snapshot metadata, but keep the high
     // water mark so a stale external reference can never name a new entry.
@@ -3233,6 +3323,51 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
     )?;
     Ok(count)
 }
+/// With [`empty`]'s forget everything of `person`, after the room's lines
+/// citing their kept things are doomed (Thirteen's P2 on #5291): what was
+/// made from those lines, reached parent to child through `sources` (a
+/// kept thing never), that carries a word of one of `person`'s kept
+/// things. Read as [`selective_rows`]' walk reads a row: only those the
+/// search index finds with one of the words, or whose words it may hold
+/// otherwise ([`search::splits_unlike_index`]), each checked word by word
+/// ([`search::content_words`]). What was made from them without any of
+/// the words, others' room memory, stays; talk notes go by
+/// [`talk_with_doomed`] after.
+fn room_from_citing(tx: &Transaction<'_>, person: &Person) -> Result<()> {
+    let texts: Vec<String> = tx
+        .prepare("SELECT text FROM entries WHERE person=?1 AND kind='kept'")?
+        .query_map([person.as_str()], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let any: BTreeSet<String> = texts
+        .iter()
+        .flat_map(|text| search::content_words(text))
+        .collect();
+    if any.is_empty() {
+        return Ok(());
+    }
+    let every = texts.iter().any(|text| search::splits_unlike_index(text));
+    let candidates: Vec<(bool, String, i64)> = tx
+        .prepare(
+            "WITH RECURSIVE reach(rid) AS (SELECT s.child FROM sources s JOIN entries c ON c.rid=s.child JOIN entries k ON k.rid=s.parent WHERE k.person=?1 AND k.kind='kept' AND c.person=?2 AND c.kind='exchange' UNION SELECT s.child FROM sources s JOIN reach r ON s.parent=r.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept') SELECT e.rid IN (SELECT rowid FROM search WHERE search MATCH ?3) AS hit,e.heard||' '||e.said||' '||e.text,e.rid FROM entries e WHERE e.rid IN (SELECT rid FROM reach) AND e.rid NOT IN (SELECT rid FROM doomed) AND (?4 OR hit OR e.heard||e.said||e.text GLOB ?5)",
+        )?
+        .query_map(
+            params![person.as_str(), Person::EVERYONE, any_word(&any), every, NOT_ASCII],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )?
+        .collect::<rusqlite::Result<_>>()?;
+    for (hit, body, rid) in candidates {
+        let read = every || hit || search::splits_unlike_index(&body);
+        if read
+            && search::content_words(&body)
+                .iter()
+                .any(|word| any.contains(word))
+        {
+            tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
+        }
+    }
+    versions(tx)
+}
+
 /// A talk note goes with any one of its sources that goes (#2176's sweep
 /// for talk notes): it is one note of the whole conversation, in the
 /// lamp's words, so it may carry what was forgotten in any of them. Never

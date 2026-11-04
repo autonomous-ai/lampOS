@@ -1487,6 +1487,54 @@ fn send_with_selective(mut line: Value, send: impl Fn(&Value) -> Option<Value>) 
     send(&line)
 }
 
+/// The kept things of `keeper`, the one known person whose keep a room
+/// line was by the one-face rule ([`crate::memory_scope::one_face_line`]),
+/// that the line (`heard`, `said`) carries a key word of
+/// ([`content_words`]), of `sources`, what the session holds; `None` when
+/// it carries none. Only that line's keeper, never another line's: a
+/// guest's line, with another voice heard, is no one's keep, and cites
+/// nothing of theirs. "Jasmine cheese, that's the favorite I have for you,
+/// Henry." cites Henry's "favorite drink is jasmine cheese", and his
+/// forget of it takes the line (the Core-verifier's GATE 23 FAIL on
+/// lamp-52e6, 4 Nov).
+fn keeper_cited(
+    context: &DaysContext,
+    sources: &[(Option<String>, u64)],
+    keeper: &str,
+    heard: &str,
+    said: &str,
+) -> Option<(String, Vec<u64>)> {
+    let words = content_words(&format!("{heard} {said}"));
+    let mut ids: Vec<u64> = Vec::new();
+    for (whose, id) in sources {
+        if whose.as_deref() == Some(keeper)
+            && !ids.contains(id)
+            && context.shares(Some(keeper), *id, &words)
+        {
+            ids.push(*id);
+        }
+    }
+    ids.truncate(SOURCE_IDS);
+    (!ids.is_empty()).then(|| (keeper.to_owned(), ids))
+}
+
+/// Sends a room line by `send`. One with a `keeper` that the memory refuses
+/// as `bad_request` (an older memory, whose requests are strict, or a
+/// current one refusing that keeper) is sent again once without it, kept
+/// as before. Any other line is sent as it is.
+fn send_with_keeper(mut line: Value, send: impl Fn(&Value) -> Option<Value>) -> Option<Value> {
+    let answer = send(&line);
+    let refused = answer
+        .as_ref()
+        .is_some_and(|answer| answer["ok"] == false && answer["error"] == "bad_request");
+    if !refused || line.as_object_mut()?.remove("keeper").is_none() {
+        return answer;
+    }
+    line.as_object_mut()?.remove("keeper_ids");
+    eprintln!("lamp-voice provider: the memory refused a room line's keeper; kept without it");
+    send(&line)
+}
+
 /// The journal's line for `forget_said`'s answer after a person's forget
 /// everything (#2849): counts only, never a line.
 fn forget_said_told(answer: Option<&Value>) -> String {
@@ -7245,6 +7293,10 @@ enum DaysJob {
         /// [`OBSERVE_FORGETS`] as it was made: its conversation takes the
         /// first exchange's, so a forget said in it closes its job unsent.
         observe_forgets: u64,
+        /// A room line's one known person whose kept things it carries the
+        /// words of, and those ids ([`keeper_cited`]): sent as `keeper` and
+        /// `keeper_ids`, so their forget reaches this line.
+        keeper: Option<(String, Vec<u64>)>,
     },
     Close(String, Option<String>),
     End,
@@ -8535,6 +8587,12 @@ impl DaysClient {
         }
         for (at, (whose, id)) in ids.into_iter().enumerate() {
             said = said.or(context.include(whose.as_deref(), &[id]));
+            // A kept thing's words, switch or not: a room line that carries
+            // them cites it ([`keeper_cited`]).
+            if !linking && call.name == REMEMBER {
+                let says = request_text.as_deref().map(content_words);
+                context.says(whose.as_deref(), id, says.unwrap_or_default());
+            }
             if linking {
                 let says = match call.name.as_str() {
                     REMEMBER => request_text.as_deref().map(content_words),
@@ -9392,6 +9450,18 @@ impl DaysClient {
                 context.rules_of(person),
             ),
         };
+        // A room line whose keep was one known person's by the one-face
+        // rule (`LAMP_PERSON_SCOPE_ONE_FACE`) cites their kept things whose
+        // words it carries, so their forget reaches this line (the
+        // Core-verifier's GATE 23 FAIL on lamp-52e6, 4 Nov).
+        let keeper = person
+            .is_none()
+            .then(|| request.and_then(crate::memory_scope::one_face_line))
+            .flatten()
+            .and_then(|keeper| {
+                let all = held.as_ref().map_or(&context.sources, |held| &held.sources);
+                keeper_cited(&context, all, &keeper, heard, said)
+            });
         // #2176 finding 14: only what the turn used, of what it knew: what
         // its own memory calls gave, what shares a key word with what was
         // heard or said in it, and what an earlier exchange of the session
@@ -9429,6 +9499,7 @@ impl DaysClient {
                 person: person.map(str::to_owned),
                 forgotten,
                 observe_forgets: OBSERVE_FORGETS.load(Ordering::Acquire),
+                keeper,
             })
             .is_ok();
         if sent {
@@ -11139,6 +11210,7 @@ fn days_writer(
                 person,
                 forgotten,
                 observe_forgets,
+                keeper,
             }) => {
                 // Made before a forget: not written after it.
                 if forgotten < hand_ons.forgotten.load(Ordering::Acquire) {
@@ -11205,8 +11277,15 @@ fn days_writer(
                 if let Some(speaker) = hand_ons.room_speaker.of(person.as_deref(), Some(request)) {
                     line["speaker"] = json!(speaker);
                 }
+                // The known person whose kept things a room line cites.
+                if let (None, Some((keeper, ids))) = (&person, keeper) {
+                    line["keeper"] = json!(keeper);
+                    line["keeper_ids"] = json!(ids);
+                }
                 let answer = send_with_speaker(&hand_ons.room_speaker, line, |line| {
-                    bounded_exchange(socket, line, WRITER_DEADLINE)
+                    send_with_keeper(line.clone(), |line| {
+                        bounded_exchange(socket, line, WRITER_DEADLINE)
+                    })
                 });
                 conversation.person = person;
                 let id = answer
@@ -17590,6 +17669,7 @@ mod tests {
                 person: Some("p-a".into()),
                 forgotten: 0,
                 observe_forgets: 0,
+                keeper: None,
             })
             .unwrap();
         }
@@ -17689,6 +17769,7 @@ mod tests {
                 person: None,
                 forgotten: 0,
                 observe_forgets: 0,
+                keeper: None,
             })
             .unwrap();
         }
@@ -17763,6 +17844,7 @@ mod tests {
             person: person.map(str::to_owned),
             forgotten: 0,
             observe_forgets: 0,
+            keeper: None,
         };
         send.send(exchange(
             unix_ms() - 2_000,
@@ -17877,6 +17959,7 @@ mod tests {
             person: person.map(str::to_owned),
             forgotten: 0,
             observe_forgets: 0,
+            keeper: None,
         }
     }
 
@@ -18666,6 +18749,7 @@ mod tests {
             person: Some("p-a".into()),
             forgotten: 0,
             observe_forgets: 0,
+            keeper: None,
         };
         send.send(exchange("before", now - Duration::from_secs(2)))
             .unwrap();
@@ -21695,6 +21779,7 @@ mod tests {
                 person: None,
                 forgotten,
                 observe_forgets: 0,
+                keeper: None,
             })
             .unwrap();
         }
@@ -24329,6 +24414,71 @@ mod tests {
         });
         assert_eq!(answer.unwrap()["error"], "bad_request");
         assert_eq!(sent.get(), 1);
+    }
+
+    /// GATE 23 on lamp-52e6 (4 Nov): a room line cites its one-face
+    /// keeper's kept things whose words it carries, never another
+    /// person's nor the room's, nor one it shares no word with.
+    #[test]
+    fn a_room_line_cites_only_its_keepers_kept_things_it_says() {
+        const HENRY: &str = "p-927a0000000000aa";
+        const ANA: &str = "p-0000000000000a0a";
+        let mut context = DaysContext::default();
+        let sources = vec![
+            (Some(HENRY.to_owned()), 4),
+            (Some(HENRY.to_owned()), 5),
+            (Some(ANA.to_owned()), 4),
+            (None, 6),
+        ];
+        let _ = context.include(Some(HENRY), &[4, 5]);
+        let _ = context.include(Some(ANA), &[4]);
+        let _ = context.include(None, &[6]);
+        context.says(
+            Some(HENRY),
+            4,
+            content_words("favorite drink is jasmine cheese"),
+        );
+        context.says(Some(HENRY), 5, content_words("works at the library"));
+        context.says(Some(ANA), 4, content_words("jasmine tea every morning"));
+        context.says(None, 6, content_words("jasmine plant by the window"));
+        let said = "Jasmine cheese, that's the favorite I have for you, Henry.";
+        assert_eq!(
+            keeper_cited(&context, &sources, HENRY, "What's my favorite stuff?", said),
+            Some((HENRY.to_owned(), vec![4]))
+        );
+        assert_eq!(
+            keeper_cited(&context, &sources, HENRY, "How's the weather?", "Sunny."),
+            None
+        );
+    }
+
+    /// A newer memory takes a room line's `keeper`; an older one refuses
+    /// it (`bad_request`) and the line goes once more without it.
+    #[test]
+    fn a_room_lines_keeper_falls_back_for_an_older_memory() {
+        let line = json!({"op":"append_linked","heard":"hi","source_ids":[],
+            "keeper":"p-927a0000000000aa","keeper_ids":[4]});
+        for older in [false, true] {
+            let sent = std::cell::RefCell::new(Vec::new());
+            let answer = send_with_keeper(line.clone(), |line| {
+                sent.borrow_mut().push(line.clone());
+                Some(if older && line.get("keeper").is_some() {
+                    json!({"ok":false,"error":"bad_request"})
+                } else {
+                    json!({"ok":true,"id":7})
+                })
+            });
+            assert_eq!(answer, Some(json!({"ok":true,"id":7})));
+            let want = if older {
+                vec![
+                    line.clone(),
+                    json!({"op":"append_linked","heard":"hi","source_ids":[]}),
+                ]
+            } else {
+                vec![line.clone()]
+            };
+            assert_eq!(sent.into_inner(), want, "older {older}");
+        }
     }
 
     /// An older Days lamp-memory (the first builder's hold on #3127: a part

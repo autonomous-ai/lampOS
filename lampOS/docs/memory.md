@@ -630,6 +630,30 @@ kept things: a forget by id goes only to the scope whose listing showed
 that id this session, and an id shown of both forgets nothing and the
 model asks which one (`remember::by_where_shown`; Thirteen's second P2 on
 #5022).
+**A forget reaches the room's lines that say their keep** (the
+Core-verifier's GATE 23 FAIL on lamp-52e6, stable 9980, 4 Nov): Henry's
+"remember my favourite drink is jasmine cheese" was kept as his, the next
+line's answer "Jasmine cheese, that's the favorite I have for you, Henry."
+went to the room's log, and his "forget my favourite drink" took the kept
+thing while the room's line still held "jasmine": nothing linked that line
+to his keep, since a line's sources are its own scope's only. Now a room
+line whose keep was one known person's by this rule
+(`memory_scope::one_face_line`, marked by `take_by_one_face` and
+`keep_for_one_face`, unmarked by a narrow) cites that person's kept things
+this session holds whose key words it carries (`remember::keeper_cited`),
+sent as `keeper` and `keeper_ids` on `append_linked`. Their forget of one
+then takes the line when it carries the kept thing's words (the selective
+rule, as for their own lines), and their forget everything takes every room
+line citing what they kept, and what the room noticed from those lines (a
+preference "Henry's favourite is jasmine cheese") when it carries a word of
+one of their kept things, as the selective rule reads it (Thirteen's P2 on
+#5291). No other room line is reached: a guest's line,
+with another voice heard, is no one's keep and cites nothing of theirs, and
+the room's reads never show the link. The remember line itself is kept out
+of the journal as every keep's is, so the line that holds the words is the
+answer after it. A memory that refuses the fields (an older one, or a
+current one refusing that keeper) gets the line once more without them, kept
+as before.
 `forget_everything` on such a line still runs in the room's scope, and **a yes said on such a line never runs a held forget**
 (`ScopeLease::by_one_face`, `take_held_forget`; the model is told the yes
 did not count): the yes still needs their face seen saying it. Risk left: a

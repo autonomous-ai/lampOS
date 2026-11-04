@@ -525,6 +525,42 @@ pub const REFRESH_EVERY: Duration = Duration::from_millis(200);
 /// How often that wait looks at the cache.
 const KEEPER_POLL: Duration = Duration::from_millis(50);
 
+/// Lines whose keep is someone's by the one-face rule, by request, with
+/// that person's memory id ([`ScopeLease::take_by_one_face`],
+/// [`ScopeLease::keep_for_one_face`]; a narrow takes a line off): read
+/// after the line is over, when its lease is gone, to tell whose kept
+/// things its room exchange may cite (`remember::keeper_cited`). Far more
+/// lines than run at once, each a number and an id.
+static ONE_FACE_LINES: Mutex<std::collections::VecDeque<(u64, String)>> =
+    Mutex::new(std::collections::VecDeque::new());
+const ONE_FACE_LINES_MOST: usize = 64;
+
+/// `request`'s line is `person`'s keep by the one-face rule, or (`None`)
+/// no longer anyone's. What the lease does; public for the memory's
+/// contract tests, which have no lease.
+pub fn mark_one_face_line(request: u64, person: Option<&str>) {
+    let mut lines = ONE_FACE_LINES.lock().unwrap_or_else(|e| e.into_inner());
+    lines.retain(|(line, _)| *line != request);
+    if let Some(person) = person {
+        if lines.len() == ONE_FACE_LINES_MOST {
+            lines.pop_front();
+        }
+        lines.push_back((request, person.to_owned()));
+    }
+}
+
+/// Whose keep `request`'s line was by the one-face rule, as last marked
+/// ([`mark_one_face_line`]); `None` for any other line, or one forgotten
+/// past [`ONE_FACE_LINES_MOST`].
+pub fn one_face_line(request: u64) -> Option<String> {
+    ONE_FACE_LINES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find(|(line, _)| *line == request)
+        .map(|(_, person)| person.clone())
+}
+
 /// Only this non-cloneable owner keeps the request authorized. Task leases
 /// hold immutable data but cannot keep authorization alive after owner drop.
 pub struct RequestScope {
@@ -647,7 +683,9 @@ impl ScopeLease {
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         self.context.narrowed.store(true, Ordering::Release);
-        *one_face = None;
+        if one_face.take().is_some() {
+            mark_one_face_line(self.context.key.request, None);
+        }
     }
 
     /// A line no face was seen speaking, with nothing to say it was anyone
@@ -743,6 +781,7 @@ impl ScopeLease {
             .unwrap_or_else(|e| e.into_inner());
         self.context.narrowed.store(true, Ordering::Release);
         *one_face = Some(Arc::from(person));
+        mark_one_face_line(self.context.key.request, Some(person));
         true
     }
 
@@ -765,6 +804,7 @@ impl ScopeLease {
             return false;
         }
         *one_face = Some(Arc::from(person));
+        mark_one_face_line(self.context.key.request, Some(person));
         true
     }
 
