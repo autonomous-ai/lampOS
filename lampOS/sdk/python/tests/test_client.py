@@ -1617,6 +1617,58 @@ def test_a_push_beyond_the_pairing_is_refused_before_a_byte_is_sent(tmp_path):
     run(go())
 
 
+def test_a_push_without_the_check_extra_leaves_the_shape_to_the_lamp(tmp_path, monkeypatch):
+    import sys
+
+    from lampos.skillcheck import check
+
+    # As `pip install lampos` without `[check]`: no jsonschema to import.
+    monkeypatch.setitem(sys.modules, "jsonschema", None)
+    folder = _skill(tmp_path, "desk-wave")
+    report = check(folder)
+    assert not report.ok and "needs jsonschema" in report.errors[0]
+    pushed = check(folder, shape_required=False)
+    assert pushed.ok and any("the lamp checks it" in warning for warning in pushed.warnings)
+
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.warns(UserWarning, match="the lamp checks it"):
+                    skill = await lamp.push_skill(folder)
+                assert skill["name"] == "desk-wave" and fake.asked("skill.push")
+
+    run(go())
+
+
+def test_the_readmes_push_example_is_checked_and_pushed_with_skills_and_speak(tmp_path):
+    from lampos.push import pack
+    from lampos.skillcheck import check
+
+    example = Path(__file__).resolve().parents[2] / "examples" / "hello-skill"
+    assert check(example).ok
+    package = pack(example)
+    assert len(package.data) <= 1024 * 1024 and len(package.parts()) == 1
+    for readme in ("python", "js"):
+        text = (Path(__file__).resolve().parents[2] / readme / "README.md").read_text()
+        assert "examples/hello-skill" in text and "relaxing-music" not in text, readme
+
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.push_skill(example)
+                assert fake.asked("skill.push") == []
+        async with FakeLamp(grants=("speak", "skills")) as fake:
+            ring = await paired(fake, tmp_path / "keys2")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                skill = await lamp.push_skill(example)
+                assert (skill["name"], skill["version"]) == ("hello-skill", "1.0.0")
+
+    run(go())
+
+
 def test_the_computers_mute_is_held_lifted_and_ended_by_a_hand_or_its_going(tmp_path):
     async def go():
         async with FakeLamp(grants=("hear",)) as fake:

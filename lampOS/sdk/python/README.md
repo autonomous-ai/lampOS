@@ -43,7 +43,7 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
 example runs this way: `tour.py` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.py`, `follow.py`, `follow_hand.py` (with `lamp fake --hands`),
-`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, and `push_skill.py ../../examples/relaxing-music` (a pairing with `skills`).
+`phrase.py`, `pomodoro.py`, `ci_light.py`, `ask_the_person.py`, and `push_skill.py ../examples/hello-skill` (a pairing with `skills` and `speak`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`
@@ -223,10 +223,28 @@ a skill of its own on its own lamp, with no Store
 ([control.md](../../docs/control.md), "Skills pushed from a computer"):
 
 ```sh
-lamp skill push path/to/my-skill     # checks it, packs it, sends it in parts
+# from lampOS/sdk/python
+lamp skill push ../examples/hello-skill   # checks it, packs it, sends it in parts
 lamp skill list
-lamp skill remove my-skill
+lamp skill remove hello-skill
 ```
+
+`../examples/hello-skill` is a small skill to try it with: one short hello,
+asking only `speak`.
+
+What a push needs:
+- **The grants:** `skills`, and every grant the skill's `[permissions]` asks
+  (`hello-skill` asks `speak`).
+- **The size:** a pushed skill is 1 MiB at most, packed, sent in parts of
+  36 KiB. A skill with a recording or other large files is too big; so is a
+  source template whose files must be rendered first.
+- **The lamp:** lamp-control started with `--manage-socket`, its link to the
+  root helper that installs skills ([control.md](../../docs/control.md),
+  piece 7). Without it the lamp answers that skill push isn't on this lamp. A
+  product lamp has no lamp-control unit until #4526.
+- **jsonschema** for `push`'s first check of `skill.toml`'s shape, with
+  `pip install 'lampos[check]'`. Without it the push goes on, says the shape
+  wasn't checked here, and leaves it to the lamp.
 
 `push` first runs `lamp skill check`, and refuses on this computer what the
 lamp would refuse:
