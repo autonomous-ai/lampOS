@@ -2280,7 +2280,10 @@ path it doesn't know, and ignores a field it doesn't know.
   logrotate's `zz-lamp-ramlog.conf` and its `lamp-ramlog-postrotate`,
   ramlog's `zz-lamp-journal-keep.conf` and its `lamp-journal-keep` (#2602:
   the last 2 boots' journal on the eMMC; a daemon-reload, so the next
-  shutdown keeps, and the boot after links), journald's `zz-lamp-journal.conf`, and the udev rules `90-respeaker-lite`,
+  shutdown keeps, and the boot after links; since #5144 it also wants
+  `lamp-journal-setup.timer`), `lamp-journal-setup.service` and
+  `lamp-journal-setup.timer` (#5144: a first-time setup's journal on the
+  eMMC; started at the next boot, install.md), journald's `zz-lamp-journal.conf`, and the udev rules `90-respeaker-lite`,
   `91-pulseaudio-hal-ignore` and `99-lamp-device`. Never V1's HAL
   (`/opt/hal/.env`, `led-boot`/`led-shutdown`, `hal.service`'s drop-in),
   never the radio scripts (`device-ap-mode`/`device-sta-mode` are written

@@ -1,0 +1,13 @@
+# Runs lamp-journal-setup.service every 3 minutes from a minute after boot
+# (#5144). The journal's 4M files close every 30 minutes or more on a busy
+# lamp, and are dropped hours later, so each is copied well before it goes.
+# No [Install]: orangepi-ramlog.service, enabled on the base image, wants
+# it (its drop-in zz-lamp-journal-keep.conf), so the image needs no enable,
+# and an update that writes it starts it at the next boot.
+[Unit]
+Description=Keep a first-time setup's journal on the eMMC, every 3 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=3min
+AccuracySec=30s

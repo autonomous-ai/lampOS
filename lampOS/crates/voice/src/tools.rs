@@ -1861,6 +1861,15 @@ fn run_call_with_scope(
                 }
                 _ => (told, answered),
             };
+            // And the setup's journal the image keeps on the eMMC (#5144),
+            // which can hold what they said at setup, on the same mark and
+            // rule (`crate::setup_journal`).
+            let (told, answered) = match lease {
+                Some(lease) if heard && model.name == crate::remember::FORGET_EVERYTHING => {
+                    crate::setup_journal::forget_with_everything((told, answered), lease)
+                }
+                _ => (told, answered),
+            };
             // And the name typed at setup, on the same mark and rule (#4461),
             // after the place, which finds the owner by that name.
             let (told, answered) = match lease {

@@ -748,7 +748,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 42] = [
+const PERSON_STORES: [&str; 43] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -818,6 +818,9 @@ const PERSON_STORES: [&str; 42] = [
     // The person's light the ring keeps with `LAMP_LIGHT_KEEP=on` (#1468):
     // the folder, so a `person.json.new` a power cut left goes too.
     "/var/lib/lampOS/light",
+    // A first-time setup's journal the image keeps on the eMMC (#5144,
+    // `lamp-journal-keep setup`): its lines can hold what the person said.
+    "/var/lib/lamp-journal/setup",
     // What setup saves, and its marker: the user's key, to the voice and to
     // the Policy (the owner, #806, 16:13), and the name.
     "/etc/lampOS/voice/credential",

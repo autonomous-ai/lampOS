@@ -1,0 +1,14 @@
+# A first-time setup's journal, kept on the eMMC past the 20M cap (#5144):
+# /usr/local/libexec/lamp-journal-keep says how. Started by
+# lamp-journal-setup.timer only. "-": a keep that fails is said in the
+# journal and fails nothing. Idle I/O and a low priority: it copies a few
+# closed 4M files an hour at most, while the lamp talks.
+[Unit]
+Description=Keep a first-time setup's journal on the eMMC
+After=orangepi-ramlog.service
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+ExecStart=-/bin/bash /usr/local/libexec/lamp-journal-keep setup
