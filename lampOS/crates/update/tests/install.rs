@@ -1463,11 +1463,11 @@ fn the_product_lets_what_a_caller_said_follow_their_face() {
 }
 
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
-/// left the lamp quiet mid-story). The wordless cut-in's question stays
-/// off: the lamp's own echo commits as a cut-in with 0 words (7 of 15
-/// stories on lamp-06c1, 3 Nov, #4938), so it would answer its own voice.
+/// left the lamp quiet mid-story), and a cut-in with no words gets its
+/// question (the memory owner's call, 4 Nov; the lamp's own echo can still
+/// be asked, 7 of 15 stories on lamp-06c1, 3 Nov, #4938).
 #[test]
-fn the_product_answers_a_stop_and_leaves_the_wordless_question_off() {
+fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
     let voice = install::PRODUCT
         .iter()
         .find(|(unit, _)| *unit == "lamp-voice.service")
@@ -1479,10 +1479,8 @@ fn the_product_answers_a_stop_and_leaves_the_wordless_question_off() {
         "the voice lacks LAMP_SPOKEN_STOP_ENDS"
     );
     assert!(
-        !service
-            .iter()
-            .any(|line| line.starts_with("Environment=LAMP_CUT_IN_WORDLESS_ASKS=")),
-        "the voice sets LAMP_CUT_IN_WORDLESS_ASKS"
+        service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_ASKS=on"),
+        "the voice lacks LAMP_CUT_IN_WORDLESS_ASKS"
     );
 }
 
