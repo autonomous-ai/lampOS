@@ -2398,6 +2398,30 @@ fn start(
     if let Some(runs) = runner.runs.borrow().get(&skill) {
         runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
+    // A read of a linked service (#5288) is its skill's whole run: on a
+    // thread of its own, as long as its gate's wait, and nothing is made
+    // with it.
+    if let [Call::ServiceRead(read)] = calls.as_slice() {
+        let read = (**read).clone();
+        let (sockets, finished, bus, local_time) = (
+            runner.sockets_for(&skill),
+            runner.finished.clone(),
+            runner.bus.clone(),
+            runner.local_time.clone(),
+        );
+        let known_file = runner.watching.borrow().known_file.clone();
+        let _ = made.send(());
+        std::thread::spawn(move || {
+            let why = read_service(&skill, &read, &sockets, bus, known_file, local_time);
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why,
+                allowed: None,
+            });
+        });
+        return made_rx;
+    }
     // An add-on's run proposes, and nothing else: written for the judge at
     // once, on this thread, as it holds no output to wait on.
     if !calls.is_empty() && calls.iter().all(|call| matches!(call, Call::Propose(_))) {
@@ -4370,6 +4394,203 @@ fn say(
     }
 }
 
+/// `lamp-services`' tools socket, which takes `lamp-skills.service` for a
+/// skill's `service_read` alone, with `LAMP_SKILL_READS=on` there (#5288).
+const SERVICES_SOCKET: &str = "/run/lampos-services/tools/call.sock";
+/// Where a test or a lamp may name another services socket.
+const SERVICES_SOCKET_ENVIRONMENT: &str = "LAMP_SKILLS_SERVICES_SOCKET";
+/// The file with the owner's name as typed at setup, readable by this
+/// program: the product's `LoadCredential=owner:/etc/lampOS/person/name`
+/// gives it as `%d/owner` (#5288). Unset, no owner is known and no skill
+/// reads a service.
+const OWNER_FILE_ENVIRONMENT: &str = "LAMP_SKILLS_OWNER_FILE";
+/// The longest a service's read is waited for: `lamp-services`' own 20 s,
+/// and room for the line.
+const SERVICES_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// By skill, the local day its read last came due: once a day, read,
+/// skipped or stopped (#5288). Kept while the program runs.
+static READ_DAYS: Mutex<std::collections::BTreeMap<String, i64>> =
+    Mutex::new(std::collections::BTreeMap::new());
+
+/// A skill's read of a linked service that came due (#5288,
+/// [`lamp_skills::service_read`]): held to its permissions and once a
+/// local day, then run behind its gate. The journal's words: counts and
+/// the gate's outcome only.
+fn read_service(
+    skill: &str,
+    read: &lamp_skills::service_read::ReadStep,
+    sockets: &Sockets,
+    bus: Bus,
+    known_file: Option<PathBuf>,
+    local_time: Option<Arc<lamp_local_time::LocalTime>>,
+) -> String {
+    use lamp_skills::service_read;
+    if !service_read::on() {
+        return format!("not made: {} is not on", service_read::ENVIRONMENT);
+    }
+    if let Some(why) = sockets
+        .may
+        .refuses(&Call::ServiceRead(Box::new(read.clone())))
+    {
+        return why;
+    }
+    let day = local_time.as_ref().map(|local| local.day(unix_ms()));
+    {
+        let mut days = READ_DAYS
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if day.is_some() && days.get(skill) == day.as_ref() {
+            return "not made: its read came due once today already".into();
+        }
+        if let Some(day) = day {
+            days.insert(skill.to_owned(), day);
+        }
+    }
+    let owner = std::env::var_os(OWNER_FILE_ENVIRONMENT)
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .and_then(|path| lamp_voice::person::read(&path).ok().flatten());
+    let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
+        .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
+    let mut room = LampRoom {
+        skill: skill.to_owned(),
+        say: sockets.say.clone(),
+        services,
+        bus,
+        known_file,
+        owner,
+        local_time,
+        quiet: read.quiet,
+    };
+    service_read::run(read, &mut room)
+}
+
+/// The lamp as a skill's read sees it ([`lamp_skills::service_read::Room`]).
+struct LampRoom {
+    skill: String,
+    say: PathBuf,
+    services: PathBuf,
+    bus: Bus,
+    known_file: Option<PathBuf>,
+    /// The owner's name as typed at setup, if known.
+    owner: Option<String>,
+    local_time: Option<Arc<lamp_local_time::LocalTime>>,
+    /// The skill's own `[quiet]`.
+    quiet: Option<(u16, u16)>,
+}
+
+impl lamp_skills::service_read::Room for LampRoom {
+    fn seen(&mut self) -> lamp_skills::service_read::Seen {
+        let now_ms = unix_ms();
+        // The eyes' list said whole within 3 s: the faces in view.
+        let faces = said_lately::<lamp_msgs::Faces>(&self.bus, lamp_msgs::Faces::TOPIC)
+            .filter(|faces| faces.check().is_ok())
+            .map(|faces| faces.faces.len());
+        // The eyes' known face at the lamp, fresh: the owner's own.
+        let owner_in_view = match (&self.owner, &self.known_file) {
+            (Some(owner), Some(file)) => {
+                lamp_skills::known::name_in(file, lamp_skills::known::MARK_FRESH)
+                    .is_some_and(|name| name.trim().to_lowercase() == owner.trim().to_lowercase())
+            }
+            _ => false,
+        };
+        // Any voice heard, the owner's too: on the bus a voice is not told
+        // from another, so every one counts.
+        let heard_ago = self
+            .bus
+            .latest(Speech::TOPICS[0])
+            .ok()
+            .flatten()
+            .map(|heard| Duration::from_millis(now_ms.saturating_sub(heard.header.at_unix_ms)));
+        // The privacy switch, the microphones or the lamp put to sleep; and
+        // the microphones known open lately, or it counts as private.
+        let private = lamp_skills::routine::kept_asleep(&self.bus)
+            .map(str::to_owned)
+            .or_else(|| {
+                let open = said_lately::<serde_json::Value>(&self.bus, watch::PRIVACY)
+                    .is_some_and(|privacy| privacy["permitted"] == json!(true));
+                (!open).then(|| "the microphones are not known open".to_owned())
+            });
+        let paused = self
+            .bus
+            .latest(Pause::TOPIC)
+            .ok()
+            .flatten()
+            .and_then(|message| message.parse::<Pause>().ok())
+            .is_some_and(|pause| pause.paused);
+        // The lamp's quiet hours and the skill's own; not known, quiet.
+        let quiet = self.local_time.as_ref().is_none_or(|local| {
+            let minute = local.minute_of_day(now_ms);
+            lamp_local_time::quiet_hours(minute)
+                || self.quiet.is_some_and(|(from, to)| {
+                    lamp_local_time::QuietWindow { from, to }.contains(minute)
+                })
+        });
+        lamp_skills::service_read::Seen {
+            owner_known: self.owner.is_some() && self.known_file.is_some(),
+            faces,
+            owner_in_view,
+            heard_ago,
+            private,
+            paused,
+            quiet,
+        }
+    }
+
+    fn now_ms(&mut self) -> u64 {
+        clock::now_us() / 1_000
+    }
+
+    fn wait(&mut self, wait: Duration) {
+        clock::sleep(wait);
+    }
+
+    fn local(&mut self) -> Option<(u64, i32)> {
+        let now_ms = unix_ms();
+        self.local_time
+            .as_ref()
+            .map(|local| (now_ms, local.offset_minutes_at(now_ms)))
+    }
+
+    fn read(&mut self, args: &serde_json::Value) -> Result<serde_json::Value, String> {
+        let asked = || -> io::Result<serde_json::Value> {
+            let mut stream = UnixStream::connect(&self.services)?;
+            stream.set_read_timeout(Some(SERVICES_TIMEOUT))?;
+            stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
+            writeln!(
+                stream,
+                "{}",
+                json!({"op": "call", "name": "service_read", "args": args})
+            )?;
+            let mut line = String::new();
+            BufReader::new(stream.take(16 * 1_024)).read_line(&mut line)?;
+            serde_json::from_str(&line)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        };
+        let answer = asked()
+            .map_err(|error| format!("the lamp's services were not reached ({})", error.kind()))?;
+        if answer["ok"] == true {
+            Ok(answer["result"].clone())
+        } else {
+            Err(answer["error"].as_str().unwrap_or("refused").to_owned())
+        }
+    }
+
+    fn say(&mut self, text: &str) -> Result<(), String> {
+        // Exact words: never a turn for the model, so nothing read can be
+        // an instruction to it.
+        let asking = json!({"text": text, "exact": true, "priority": lamp_skills::SAY_PRIORITY,
+                            "expires_in_ms": 60_000});
+        let outcome = say(&self.say, "say", &self.skill, asking, &[], || {});
+        match outcome.strip_prefix("say: ") {
+            Some("spoken") => Ok(()),
+            Some(other) => Err(other.to_owned()),
+            None => Err(outcome),
+        }
+    }
+}
+
 /// Makes one call and says how it went. A gesture or a move says it is
 /// `asker`'s, a skill's name, with `LAMP_BODY_REQUESTS=on` (#940).
 fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> String {
@@ -4511,6 +4732,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Text(_) => "text: a watch's, sent by the watch".into(),
         Call::Propose(_) => "propose: written by the run on addon/proposal".into(),
         Call::Ends => "its trigger ended".into(),
+        Call::ServiceRead(_) => "read: made by its own run, behind its gate".into(),
     }
 }
 

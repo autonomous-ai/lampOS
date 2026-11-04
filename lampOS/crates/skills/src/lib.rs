@@ -28,6 +28,7 @@ pub mod limits;
 pub mod package;
 pub mod requested_audio;
 pub mod routine;
+pub mod service_read;
 pub mod unplug;
 pub mod usage;
 pub mod visits;
@@ -748,6 +749,9 @@ struct StepFile {
     /// An add-on's proposal (`kind = "addon"` only, `docs/addons.md`): what
     /// it suggests, which a judge keeps or drops.
     propose: Option<ProposeFile>,
+    /// A read of one of the owner's linked services, said to them alone
+    /// ([`service_read`], #5288).
+    read: Option<service_read::ReadFile>,
 }
 
 /// `propose = { ... }`: what an add-on suggests, as its folder writes it.
@@ -1299,6 +1303,11 @@ pub struct Permissions {
     /// copy of the skill without the declaration gets nothing of it.
     #[serde(default)]
     pub core: Vec<String>,
+    /// The owner's linked services it may use, each with how: `"read"`,
+    /// the only value (#5288; writes are not ruled yet). A `read` step
+    /// reads only a service listed here ([`service_read`]).
+    #[serde(default)]
+    pub services: BTreeMap<String, String>,
 }
 
 /// The core-only grants a `kind = "core"` skill may list in `[permissions]
@@ -1363,6 +1372,17 @@ impl Permissions {
             | Call::RequestedAudio(_) => ("speak", self.speak),
             Call::Look => ("camera", self.sees_picture()),
             Call::Text(_) => ("messages", self.messages),
+            // A read is said aloud: it needs its service listed as a read,
+            // and the voice.
+            Call::ServiceRead(read) => {
+                if self.services.get(&read.service).map(String::as_str) != Some("read") {
+                    return Some(format!(
+                        "read of {0} needs services = {{ {0} = \"read\" }} in [permissions], which it does not give",
+                        read.service
+                    ));
+                }
+                ("speak", self.speak)
+            }
             Call::Propose(proposal) => {
                 return (!self.propose.contains(&proposal.act)).then(|| {
                     format!(
@@ -1511,6 +1531,19 @@ impl Permissions {
 
     /// Each list's entries well formed, once each.
     fn check(&self) -> Result<(), String> {
+        // A service a skill may read, and only read (#5288).
+        for (service, how) in &self.services {
+            if let Some(why) = lamp_services::spoken::not_readable(service) {
+                return Err(format!(
+                    "[permissions] services: {why}, so a skill can't read it"
+                ));
+            }
+            if how != "read" {
+                return Err(format!(
+                    "[permissions] services: {service} = {how:?}: only \"read\"; a skill never writes to a service"
+                ));
+            }
+        }
         for (what, list, ok) in [
             ("topics", &self.topics, topic_name as fn(&str) -> bool),
             ("actions", &self.actions, function_name),
@@ -1667,6 +1700,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
             || step.look.is_some()
             || step.show.is_some()
             || step.stand.is_some()
+            || step.read.is_some()
             || step.after.is_some()
             || step.if_choice.is_some()
         {
@@ -2458,6 +2492,9 @@ pub enum Call {
     /// The trigger of a run that holds something until it ends stopped
     /// holding: what it held is given back. Alone in its run.
     Ends,
+    /// A read of one of the owner's linked services, said to them alone
+    /// behind its gate ([`service_read`], #5288). Its skill's only step.
+    ServiceRead(Box<service_read::ReadStep>),
 }
 
 /// A say written as a table: `{ text = "..." }` or `{ note = "..." }`, with
@@ -2694,6 +2731,7 @@ impl Call {
                 ("propose", args)
             }
             Self::Ends => ("ends", json!({})),
+            Self::ServiceRead(read) => ("read", read.named()),
         }
     }
 }
@@ -3853,7 +3891,43 @@ fn manifest(
     let mut ons: Vec<Option<Only>> = Vec::new();
     let mut said = false;
     let mut after_say = false;
+    // A read of a linked service (#5288) is its skill's whole run: its one
+    // step, alone in it, started by a trigger and never by the model, and
+    // said by this program behind its gate ([`service_read`]).
+    if file.steps.iter().any(|step| step.read.is_some()) {
+        let alone = |step: &StepFile| {
+            step.body.is_none()
+                && step.light.is_none()
+                && step.say.is_none()
+                && step.sound.is_none()
+                && step.cue.is_none()
+                && step.rest.is_none()
+                && step.requested_audio.is_none()
+                && step.look.is_none()
+                && step.show.is_none()
+                && step.stand.is_none()
+                && step.propose.is_none()
+                && step.on.is_none()
+                && step.after.is_none()
+                && step.if_choice.is_none()
+        };
+        if !matches!(file.steps.as_slice(), [step] if alone(step))
+            || file.tool.is_some()
+            || triggers.is_empty()
+            || triggers.iter().any(|trigger| trigger.each.is_some())
+        {
+            return Err(
+                "read is its skill's only step, alone in it, in a skill a trigger starts (no each) and with no tool"
+                    .into(),
+            );
+        }
+    }
     for step in file.steps {
+        if let Some(read) = step.read {
+            steps.push(Step::Call(Call::ServiceRead(Box::new(read.step(quiet)?))));
+            ons.resize(steps.len(), None);
+            continue;
+        }
         if step.body.is_none()
             && step.light.is_none()
             && step.say.is_none()
@@ -3867,7 +3941,7 @@ fn manifest(
             && step.propose.is_none()
         {
             return Err(
-                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand or propose"
+                "a [[do]] step names body, light, say, sound, cue, rest, requested_audio, look, show, stand, propose or read"
                     .into(),
             );
         }

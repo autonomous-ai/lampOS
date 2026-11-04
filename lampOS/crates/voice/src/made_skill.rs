@@ -124,6 +124,100 @@ const SERVICE_WORDS: [&str; 17] = [
 /// "monday"): named only as these.
 const SERVICE_PHRASES: [&str; 3] = ["google drive", "linear app", "monday com"];
 
+/// The switch for a made skill that reads a linked service to its owner
+/// alone (#5288, the first builder's ruling there, 4 Nov 20:5x): here, in
+/// `lamp-skills`, its manage helper and `lamp-services`. `on` only; off,
+/// every request that names a service is [`NOT_A_SERVICE`], as before.
+pub const READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
+
+/// Whether a made skill may read a linked service in this process.
+pub fn reads_on() -> bool {
+    std::env::var(READS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The service each of [`SERVICE_WORDS`] and [`SERVICE_PHRASES`] names, by
+/// its code in `lamp-services`' catalogue. A made skill may read any of
+/// them that has reads (`lamp_services::spoken::not_readable`).
+const SERVICE_CODES: [(&str, &str); 20] = [
+    ("mail", "gmail"),
+    ("mails", "gmail"),
+    ("email", "gmail"),
+    ("emails", "gmail"),
+    ("gmail", "gmail"),
+    ("inbox", "gmail"),
+    ("calendar", "google_calendar"),
+    ("gdrive", "google_drive"),
+    ("notion", "notion"),
+    ("figma", "figma"),
+    ("github", "github"),
+    ("asana", "asana"),
+    ("ahrefs", "ahrefs"),
+    ("facebook", "facebook"),
+    ("slack", "slack"),
+    ("hubspot", "hubspot"),
+    ("amplitude", "amplitude"),
+    ("google drive", "google_drive"),
+    ("linear app", "linear"),
+    ("monday com", "mondaydotcom"),
+];
+
+/// Words of a request that would write, send or change something: a made
+/// skill only reads (writes are not ruled yet).
+/// ("posts" is left out: a Page's posts are read.)
+const WRITE_WORDS: [&str; 21] = [
+    "send", "sends", "draft", "drafts", "reply", "replies", "write", "writes", "add", "adds",
+    "post", "create", "creates", "forward", "delete", "mark", "archive", "invite", "book",
+    "schedule", "put",
+];
+
+/// What a request to be read a linked service asks for: the service's
+/// code, and for a calendar or mail the one step `lamp-skills` takes (a
+/// calendar's events of a day, tomorrow when it says so, else today; the
+/// latest mail). Any other service's step the model writes from the
+/// service's reads. None when it names no service or two, one with nothing
+/// to read, or anything that would write.
+fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
+    let request = request.to_lowercase().replace("e-mail", "email");
+    let words: Vec<&str> = request
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    if words.iter().any(|word| WRITE_WORDS.contains(word)) {
+        return None;
+    }
+    let joined = format!(" {} ", words.join(" "));
+    let mut codes: Vec<&'static str> = SERVICE_CODES
+        .iter()
+        .filter(|(said, _)| {
+            if said.contains(' ') {
+                joined.contains(&format!(" {said} "))
+            } else {
+                words.contains(said)
+            }
+        })
+        .map(|(_, code)| *code)
+        .collect();
+    codes.sort_unstable();
+    codes.dedup();
+    let [code] = codes.as_slice() else {
+        return None;
+    };
+    if lamp_services::spoken::not_readable(code).is_some() {
+        return None;
+    }
+    let step = match *code {
+        "google_calendar" if words.contains(&"tomorrow") => {
+            Some("read = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }")
+        }
+        "google_calendar" => {
+            Some("read = { service = \"google_calendar\", what = \"events\", day = \"today\" }")
+        }
+        "gmail" => Some("read = { service = \"gmail\", what = \"recent\" }"),
+        _ => None,
+    };
+    Some((code, step))
+}
+
 /// Whether a request names a linked service (any case; "e-mail" too), so
 /// a skill to make is never asked of the model for one.
 fn names_a_linked_service(request: &str) -> bool {
@@ -144,6 +238,16 @@ fn names_a_linked_service(request: &str) -> bool {
 /// the conversation but the request: the model passes it, in the person's
 /// words.
 pub fn brief(request: &str) -> Result<String, &'static str> {
+    brief_with(request, reads_on())
+}
+
+/// [`brief`], with a made skill's reads on or off ([`READS_ENVIRONMENT`]).
+/// On, a request to be read one linked service with reads is briefed as a
+/// skill whose one step reads it ([`read_of`]): a calendar's or mail's step
+/// given whole, any other service's reads listed for the model to choose
+/// from (`lamp_services::spoken::whats`, never a whole text). A request
+/// that would write, or names two services, is still [`NOT_A_SERVICE`].
+pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     let request = request.split_whitespace().collect::<Vec<_>>().join(" ");
     if request.is_empty() {
         return Err("Say what the skill should do.");
@@ -152,7 +256,26 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
         return Err("That is too long to ask for as one skill: say it more shortly.");
     }
     if names_a_linked_service(&request) {
-        return Err(NOT_A_SERVICE);
+        let (service, step) = read_of(&request).filter(|_| reads).ok_or(NOT_A_SERVICE)?;
+        let step = match step {
+            Some(step) => step.to_owned(),
+            None => format!(
+                "read = {{ service = \"{service}\", what = one of {}, with its keys }}",
+                lamp_services::spoken::whats(service).join("; ")
+            ),
+        };
+        return Ok(format!(
+            "{BRIEF_HEAD} for the request at the end. Reply with exactly two fenced blocks, \
+             ```skill.toml and ```SKILL.md, and nothing else; write no files. skill.toml: \
+             kind = \"installable\", version = \"1.0.0\", no name key; [permissions] with only \
+             speak = true, services = {{ {service} = \"read\" }} and topics only voice/state and \
+             room/presence; one [trigger] on voice/state (field \"state\", equals \"resting\") or \
+             room/presence (field \"someone\", equals true), with for; \
+             during = {{ from = \"21:00\", to = \"21:30\" }}; [ask] policy = \"nudge\"; \
+             exactly one [[do]] step: {step}. \
+             SKILL.md: front matter name (lowercase, hyphens) and description (one sentence: \
+             what it does, when). {REQUEST_MARK}{request}"
+        ));
     }
     Ok(format!(
         "{BRIEF_HEAD} for the request at the end. Reply with exactly two fenced blocks, \
@@ -308,8 +431,12 @@ pub struct Uses {
     pub body: bool,
     pub topics: Vec<String>,
     /// Its voice: only a skill written in the app ([`Written`]), whose
-    /// call's answer is the person's instructions for the model.
+    /// call's answer is the person's instructions for the model; or one
+    /// that reads a linked service to its owner ([`Uses::reads`]).
     pub speak: bool,
+    /// The linked service it reads to the owner alone, by its code, with
+    /// [`READS_ENVIRONMENT`] on (#5288): never one it writes to.
+    pub reads: Option<String>,
 }
 
 impl Uses {
@@ -319,6 +446,9 @@ impl Uses {
         let mut parts = Vec::new();
         if self.speak {
             parts.push("its voice".to_owned());
+        }
+        if let Some(service) = &self.reads {
+            parts.push(format!("reading your {}", service_name(service)));
         }
         if self.light {
             parts.push("its light".to_owned());
@@ -344,24 +474,41 @@ impl Uses {
     }
 
     fn json(&self) -> Value {
-        json!({"light": self.light, "body": self.body, "topics": self.topics, "speak": self.speak})
+        let mut uses = json!({"light": self.light, "body": self.body, "topics": self.topics, "speak": self.speak});
+        if let Some(service) = &self.reads {
+            uses["reads"] = json!(service);
+        }
+        uses
     }
+}
+
+/// A linked service a made skill may read, as the person hears it.
+fn service_name(code: &str) -> &str {
+    lamp_services::spoken::name(code)
 }
 
 /// A made skill's `skill.toml` held to what one may use (the coordinator's
 /// cap, 19 Oct): installable, with a version; `[permissions]` with only
 /// `light`, `body` and `topics` among [`TOPICS`]; no function for the
 /// model (`tool`). Speaking, messages, the look and every other topic are
-/// refused; widening this is a decision still to be taken. What the skill
+/// refused; widening this is a decision still to be taken. The one widening
+/// so far (#5288): with [`READS_ENVIRONMENT`] on, `services` naming one
+/// linked service with reads (`lamp_services::spoken::not_readable`) as
+/// `"read"`, with `speak` for saying it. What the skill
 /// does within it is checked by `lamp-skills pack` after.
 pub fn capped(text: &str) -> Result<(String, Uses), Refused> {
+    capped_with(text, reads_on())
+}
+
+/// [`capped`], with a made skill's reads on or off ([`READS_ENVIRONMENT`]).
+pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
     let table: toml::Table = toml::from_str(text).map_err(unreadable)?;
     if table.contains_key("tool") {
         return Err(Refused::new(
             "it gives the model a function, which a made skill can't",
         ));
     }
-    held(&table, false)
+    held(&table, false, reads)
 }
 
 /// What a skill added from a file says of itself in its `SKILL.md`, beside
@@ -396,12 +543,13 @@ pub fn capped_added(text: &str) -> Result<(String, Uses), Refused> {
             "it has no function for the model, so it could never be asked for",
         ));
     }
-    held(&table, true)
+    held(&table, true, false)
 }
 
 /// [`capped`]'s check of a table, past its tool: `speak` taken only for a
-/// skill added from a file ([`capped_added`]).
-fn held(table: &toml::Table, added: bool) -> Result<(String, Uses), Refused> {
+/// skill added from a file ([`capped_added`]), or with `reads` on for one
+/// that reads a linked service.
+fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses), Refused> {
     match table.get("kind").map(|kind| kind.as_str()) {
         None | Some(Some("installable")) => {}
         _ => return Err(Refused::new("a made skill can only be installable")),
@@ -445,7 +593,27 @@ fn held(table: &toml::Table, added: bool) -> Result<(String, Uses), Refused> {
                 }
                 ("actions", toml::Value::Array(actions)) if actions.is_empty() => {}
                 ("speak", toml::Value::Boolean(_)) if added => {}
-                ("speak" | "look" | "messages" | "known_faces" | "actions", _) => {
+                // A read of a linked service is said aloud (#5288): its
+                // voice, held below to a skill that reads.
+                ("speak", toml::Value::Boolean(on)) if reads => uses.speak = *on,
+                // One linked service, read and never written (#5288).
+                ("services", toml::Value::Table(services)) if !added && reads => {
+                    let read = match services.iter().collect::<Vec<_>>().as_slice() {
+                        [(service, how)]
+                            if lamp_services::spoken::not_readable(service).is_none()
+                                && how.as_str() == Some("read") =>
+                        {
+                            service.to_string()
+                        }
+                        _ => {
+                            return Err(Refused::new(
+                                "it asks to use linked services other than by reading one that has something to read, which a made skill can't",
+                            ));
+                        }
+                    };
+                    uses.reads = Some(read);
+                }
+                ("speak" | "look" | "messages" | "known_faces" | "actions" | "services", _) => {
                     return Err(Refused::new(
                         "it asks to use more than the light and the head, which a made skill can't",
                     ));
@@ -453,6 +621,12 @@ fn held(table: &toml::Table, added: bool) -> Result<(String, Uses), Refused> {
                 _ => return Err(Refused::new("its permissions can't be read")),
             }
         }
+    }
+    // Its voice only for what it reads to the owner.
+    if !added && uses.speak && uses.reads.is_none() {
+        return Err(Refused::new(
+            "it asks to use more than the light and the head, which a made skill can't",
+        ));
     }
     Ok((version.to_owned(), uses))
 }
@@ -495,6 +669,15 @@ fn unreadable(error: toml::de::Error) -> Refused {
 /// trigger or a step not put in plain words here is refused, so nothing is
 /// kept that the person can't be told.
 pub fn plainly(text: &str) -> Result<String, Refused> {
+    plainly_with(text, reads_on())
+}
+
+/// [`plainly`], with a made skill's reads on or off ([`READS_ENVIRONMENT`]):
+/// on, a skill whose one step reads a linked service is said with the
+/// service, what it reads and the condition it is read under, "…, when
+/// you're alone with the lamp, it reads you tomorrow's Google Calendar: …"
+/// (the first builder's ruling on #5288). Off, such a step is unsaid.
+pub fn plainly_with(text: &str, reads: bool) -> Result<String, Refused> {
     // Its lines go back to the model once, as the check's do.
     let unsaid = || {
         Refused(
@@ -606,11 +789,19 @@ pub fn plainly(text: &str) -> Result<String, Refused> {
         .and_then(|steps| steps.as_array())
         .filter(|steps| !steps.is_empty())
         .ok_or_else(unsaid)?;
-    let steps = steps
-        .iter()
-        .map(|step| step_plainly(step).ok_or_else(unsaid))
-        .collect::<Result<Vec<_>, _>>()?;
-    said.push_str(&format!(", it {}", steps.join(", then ")));
+    // A read of a linked service (#5288): its skill's one step, said with
+    // the gate it waits for.
+    if let [step] = steps.as_slice()
+        && let Some(read) = read_plainly(step).filter(|_| reads)
+    {
+        said.push_str(&format!(", when you're alone with the lamp, it {read}"));
+    } else {
+        let steps = steps
+            .iter()
+            .map(|step| step_plainly(step).ok_or_else(unsaid))
+            .collect::<Result<Vec<_>, _>>()?;
+        said.push_str(&format!(", it {}", steps.join(", then ")));
+    }
     if let Some(cooldown) = text_of("cooldown") {
         let (count, unit) = duration(cooldown).ok_or_else(unsaid)?;
         said.push_str(&match count {
@@ -657,6 +848,34 @@ fn note_plainly(step: &toml::Value) -> Option<String> {
         .as_str()
         .filter(|note| !note.trim().is_empty())
         .map(|_| "answers in its own words, as its file tells it".to_owned())
+}
+
+/// A read step (#5288) in plain words: the service, what it reads and what
+/// is said of it, as `lamp-skills` takes the step
+/// (`lamp_skills::service_read`). Any other shape is none, so unsaid.
+fn read_plainly(step: &toml::Value) -> Option<String> {
+    let step = step.as_table().filter(|step| step.len() == 1)?;
+    let read = step.get("read")?.as_table()?;
+    let text = |key: &str| read.get(key).and_then(|value| value.as_str());
+    let (service, what) = (text("service")?, text("what")?);
+    if lamp_services::spoken::not_readable(service).is_some()
+        || lamp_services::spoken::whole_text(service, what)
+        || !lamp_services::spoken::whats(service)
+            .iter()
+            .any(|listed| listed.split_whitespace().next() == Some(what))
+    {
+        return None;
+    }
+    let events = service == "google_calendar" && what == "events";
+    match (events, text("day")) {
+        (true, Some(day @ ("today" | "tomorrow"))) if read.len() == 3 => {
+            Some(lamp_services::spoken::plainly(service, what, Some(day)))
+        }
+        (false, None) if !read.contains_key("day") => {
+            Some(lamp_services::spoken::plainly(service, what, None))
+        }
+        _ => None,
+    }
 }
 
 /// One `[[do]]` step in plain words: a light or a gesture, as the brief
@@ -1620,6 +1839,7 @@ fn kept(directory: &Path, from: &str) -> Option<Made> {
                         .filter_map(|topic| topic.as_str().map(str::to_owned))
                         .collect(),
                     speak: entry["uses"]["speak"] == true,
+                    reads: entry["uses"]["reads"].as_str().map(str::to_owned),
                 },
                 package,
             })
@@ -2053,6 +2273,157 @@ light = { dim = 1 }
         }
     }
 
+    /// #5288: with a made skill's reads on, a request to be read a calendar
+    /// or mail is briefed with its one read step, within the brief's 1,000
+    /// bytes; a write, another service or both are still [`NOT_A_SERVICE`],
+    /// and with the switch off every one is, as before.
+    #[test]
+    fn with_reads_on_a_calendar_or_mail_read_is_briefed() {
+        let calendar = "every evening at nine, read me tomorrow's calendar";
+        let brief = brief_with(calendar, true).unwrap();
+        assert!(is_brief(&brief) && request_of(&brief) == calendar);
+        assert!(brief.contains(
+            "read = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }"
+        ));
+        assert!(brief.contains("services = { google_calendar = \"read\" }"));
+        let mail = brief_with("every morning read me my mail", true).unwrap();
+        assert!(mail.contains("read = { service = \"gmail\", what = \"recent\" }"));
+        assert!(mail.contains("services = { gmail = \"read\" }"));
+        assert!(
+            brief_with("what is on my calendar, each morning", true)
+                .unwrap()
+                .contains("day = \"today\"")
+        );
+        // Every other linked service: its reads listed, never a whole text.
+        let notion = brief_with("each morning read me my Notion plans", true).unwrap();
+        assert!(
+            notion.contains("services = { notion = \"read\" }"),
+            "{notion}"
+        );
+        assert!(notion.contains(
+            "read = { service = \"notion\", what = one of search {query, count}, with its keys }"
+        ));
+        assert!(!notion.contains("page {id}"));
+        let drive = brief_with("read me my Google Drive files at nine", true).unwrap();
+        assert!(drive.contains("services = { google_drive = \"read\" }"));
+        assert!(
+            drive.contains("files {query, count}; file {id}, with") && !drive.contains("text {id}")
+        );
+        assert!(brief_with("glow red when Slack has a message", true).is_ok());
+        for request in [
+            "every friday draft my weekly mail to the team",
+            "when I say wrap up add tomorrow's first meeting to my calendar",
+            "send my calendar to the team",
+            "read my calendar and my mail",
+            "read my Notion page and my GitHub issues",
+            "post my Notion page to Slack",
+        ] {
+            assert_eq!(brief_with(request, true), Err(NOT_A_SERVICE), "{request}");
+        }
+        for request in [
+            calendar,
+            "every morning read me my mail",
+            "read me my Notion plans",
+        ] {
+            assert_eq!(brief_with(request, false), Err(NOT_A_SERVICE), "{request}");
+        }
+        for service in [
+            "calendar tomorrow",
+            "GitHub",
+            "Google Drive",
+            "Asana",
+            "Ahrefs",
+        ] {
+            let words = format!("read my {service} ");
+            let longest = format!("{words}{}", "x".repeat(MOST_REQUEST_BYTES - words.len()));
+            let brief = brief_with(&longest, true).unwrap();
+            assert!(brief.len() <= 1_000, "{service}: {}", brief.len());
+        }
+    }
+
+    /// A made skill that reads (#5288).
+    const READ_TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\n\
+        speak = true\nservices = { google_calendar = \"read\" }\ntopics = [\"voice/state\"]\n\
+        [trigger]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+        during = { from = \"21:00\", to = \"21:30\" }\n[ask]\npolicy = \"nudge\"\n\
+        [[do]]\nread = { service = \"google_calendar\", what = \"events\", day = \"tomorrow\" }\n";
+
+    /// #5288: its cap takes one linked service, as a read, and its voice
+    /// for saying it, only with the switch on; its spoken yes names the
+    /// service, what it reads and the condition it reads under.
+    #[test]
+    fn a_read_skill_is_held_to_one_service_read_and_said_with_its_condition() {
+        let (_, uses) = capped_with(READ_TOML, true).unwrap();
+        assert_eq!(uses.reads.as_deref(), Some("google_calendar"));
+        assert!(uses.speak);
+        assert_eq!(
+            uses.spoken(),
+            "its voice, reading your Google Calendar and whether it is talking"
+        );
+        assert_eq!(uses.json()["reads"], "google_calendar");
+        assert!(capped_with(READ_TOML, false).is_err());
+        for (from, to) in [
+            ("google_calendar = \"read\"", "google_calendar = \"write\""),
+            (
+                "google_calendar = \"read\"",
+                "google_calendar = \"read\", gmail = \"read\"",
+            ),
+            ("google_calendar = \"read\"", "\"gmail-app\" = \"read\""),
+            ("google_calendar = \"read\"", "dropbox = \"read\""),
+            ("services = { google_calendar = \"read\" }\n", ""),
+        ] {
+            let wider = READ_TOML.replace(from, to);
+            assert!(capped_with(&wider, true).is_err(), "{to}");
+        }
+        // Any other service with reads: a Drive list, said by name.
+        let drive = READ_TOML
+            .replace("google_calendar = \"read\"", "google_drive = \"read\"")
+            .replace(
+                "service = \"google_calendar\", what = \"events\", day = \"tomorrow\"",
+                "service = \"google_drive\", what = \"files\", query = \"taxes\"",
+            );
+        let (_, uses) = capped_with(&drive, true).unwrap();
+        assert_eq!(uses.reads.as_deref(), Some("google_drive"));
+        assert!(uses.spoken().contains("reading your Google Drive"));
+        let said = plainly_with(&drive, true).unwrap();
+        assert!(
+            said.ends_with(
+                "it reads you Google Drive's files: how many, then each name, never the text."
+            ),
+            "{said}"
+        );
+        // A whole text, or a what the service doesn't list, is never said.
+        for what in ["what = \"text\", id = \"f\"", "what = \"nothing\""] {
+            let wrong = drive.replace("what = \"files\", query = \"taxes\"", what);
+            assert!(plainly_with(&wrong, true).is_err(), "{what}");
+        }
+        assert_eq!(
+            plainly_with(READ_TOML, true).unwrap(),
+            "When the lamp goes quiet, between 21:00 and 21:30, when you're alone with the lamp, \
+             it reads you tomorrow's Google Calendar: how many events, then each time and title."
+        );
+        assert!(plainly_with(READ_TOML, false).is_err());
+        let mail = READ_TOML
+            .replace("google_calendar = \"read\"", "gmail = \"read\"")
+            .replace(
+                "service = \"google_calendar\", what = \"events\", day = \"tomorrow\"",
+                "service = \"gmail\", what = \"recent\"",
+            );
+        let said = plainly_with(&mail, true).unwrap();
+        assert!(
+            said.ends_with("each sender and subject, never the text."),
+            "{said}"
+        );
+        // The longest trigger's words still fit, said whole.
+        let longest = mail
+            .replace(
+                "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
+                "topic = \"room/presence\"\nfield = \"someone\"\nequals = true\nfor = \"10m\"\n",
+            )
+            .replace("\"voice/state\"]", "\"room/presence\"]");
+        assert!(plainly_with(&longest, true).unwrap().chars().count() <= MOST_PLAIN_CHARS);
+    }
+
     /// The answer's two files, each its own fenced block; another file, one
     /// twice, one missing, one left open or one too long refuses it.
     #[test]
@@ -2109,6 +2480,7 @@ light = { dim = 1 }
                 body: false,
                 topics: vec!["voice/state".into()],
                 speak: false,
+                reads: None,
             }
         );
         assert_eq!(uses.spoken(), "its light and whether it is talking");
@@ -2575,6 +2947,7 @@ body = { gesture = "nod" }
                 body: false,
                 topics: vec!["room/presence".into()],
                 speak: false,
+                reads: None,
             },
             package,
         }

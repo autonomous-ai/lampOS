@@ -30,6 +30,9 @@ lamp-body = { path = "../body" }
 # The voice's own check of a skill's sound (`lamp_voice::say::read_sound`),
 # so that what loads is what the voice plays.
 lamp-voice = { path = "../voice" }
+# A read step (#5288): the services a skill may read and what of each is
+# said, from lamp-services' own catalogue (`lamp_services::spoken`).
+lamp-services = { path = "../services" }
 # The startle's `[startle]` (#2822), held to Expression's own check, so that
 # what loads is what Expression plays. Night sleep's replay
 # (`tests/it/night_sleep.rs`, #940) tests against its planner too.
