@@ -6521,6 +6521,11 @@ pub(crate) struct Signs {
     pub soft_lead_us: u64,
 }
 
+/// Why a line with `LAMP_UNTIED_GOING_ON=held` is not held as untied when
+/// its tie needed the word set off at its start read as no one's name
+/// (#5110).
+const SET_OFF_IS_THE_LAMPS: &str = "the word set off at its start is no one's name as the rule reads names, so the lamp's name written as another, and its words tie it";
+
 /// The lines judged lately whose sound a later-come hearing of the name is
 /// laid against (`LAMP_NAME_STAYS_IN_ITS_LINE`): a hearing counts for a
 /// line at most [`crate::attention::NAME_BEFORE_US`] before it begins, which
@@ -6918,8 +6923,9 @@ impl Heeding {
     /// the newest exchange whose answer is not in `chain`. The lamp's
     /// question, its name, a face and a near voice are read by the rule:
     /// a line showing any is never let out only as the conversation going
-    /// on.
-    fn tied_to_the_lamp(&self, request: u64, heard: &str) -> bool {
+    /// on. With `no_name_set_off`, its words read as
+    /// [`crate::untied_going_on::tied_read`] reads them.
+    fn tied_to_the_lamp(&self, request: u64, heard: &str, no_name_set_off: bool) -> bool {
         if self.asks_its_work(request) {
             return true;
         }
@@ -6931,7 +6937,7 @@ impl Heeding {
             .as_ref()
             .map(|(person, lamp)| vec![person.as_str(), lamp.as_str()])
             .unwrap_or_default();
-        crate::untied_going_on::tied(heard, &said)
+        crate::untied_going_on::tied_read(heard, &said, no_name_set_off)
     }
 
     /// With `LAMP_UNTIED_GOING_ON=held` (#5110), why a line with no tie by
@@ -6942,11 +6948,17 @@ impl Heeding {
     /// ("Any tips to sleep better tonight?",
     /// [`crate::untied_going_on::asks_for_advice`]). Never in a sure other
     /// voice than the conversation's (`Seen::other_voice`), or with desk
-    /// talk ([`crate::untied_going_on::desk_talk`]): a colleague's "Thanks"
-    /// to the caller is not the caller's (Twelve's P3 on #5240).
-    fn callers_own_line(&self, request: u64, seen: &Seen) -> Option<&'static str> {
+    /// talk ([`crate::untied_going_on::desk_talk_read`], with
+    /// `no_name_set_off`): a colleague's "Thanks" to the caller is not the
+    /// caller's (Twelve's P3 on #5240).
+    fn callers_own_line(
+        &self,
+        request: u64,
+        seen: &Seen,
+        no_name_set_off: bool,
+    ) -> Option<&'static str> {
         let heard = seen.heard.as_str();
-        if seen.other_voice || crate::untied_going_on::desk_talk(heard) {
+        if seen.other_voice || crate::untied_going_on::desk_talk_read(heard, no_name_set_off) {
             return None;
         }
         // The line judged before this one is the one the lamp answered
@@ -6964,9 +6976,9 @@ impl Heeding {
         if answered.is_none() || before != answered {
             return None;
         }
-        if crate::untied_going_on::replies_to_the_lamp(heard) {
+        if crate::untied_going_on::replies_to_the_lamp(heard, no_name_set_off) {
             Some("said right after the lamp's answer, it replies to it")
-        } else if crate::untied_going_on::asks_for_advice(heard) {
+        } else if crate::untied_going_on::asks_for_advice(heard, no_name_set_off) {
             Some("said right after the lamp's answer, it asks the lamp's advice")
         } else {
             None
@@ -9569,11 +9581,23 @@ impl Heeding {
         let after_remark = std::mem::take(&mut self.after_remark);
         // `LAMP_UNTIED_GOING_ON`: whether its words tie it to the lamp, read
         // before the rule's verdict; only with the switch.
-        let tied = !self.untied || seen.lamp_asked || self.tied_to_the_lamp(request, &seen.heard);
-        // With `held`, the caller's own line is tied too (#5110).
-        let callers_own = (self.untied_held && !tied)
-            .then(|| self.callers_own_line(request, seen))
-            .flatten();
+        let tied =
+            !self.untied || seen.lamp_asked || self.tied_to_the_lamp(request, &seen.heard, false);
+        // With `held`, the caller's own line is tied too (#5110). A word set
+        // off at its start is someone else's name only as the rule reads
+        // names (`attention::addresses_someone_else_on`): one it let out as
+        // the conversation going on is the lamp's name written as another
+        // ("Ma'am, tell me a joke."; lamp-52e6, 5 Nov 00:07: owner_b-2 and
+        // owner_b-3 held as untied, let out with the switch off).
+        let callers_own = if self.untied_held && !tied {
+            let no_name_set_off = crate::untied_going_on::opens_with_a_set_off_name(&seen.heard)
+                && !crate::attention::addresses_someone_else_on(&seen.heard, true);
+            (no_name_set_off && self.tied_to_the_lamp(request, &seen.heard, true))
+                .then_some(SET_OFF_IS_THE_LAMPS)
+                .or_else(|| self.callers_own_line(request, seen, no_name_set_off))
+        } else {
+            None
+        };
         let tied = tied || callers_own.is_some();
         // #3945: whether only one person is at the lamp (no other voice, no
         // face speaking it but the caller's, at most one face in view), read
