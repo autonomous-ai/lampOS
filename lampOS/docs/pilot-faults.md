@@ -450,12 +450,66 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   on its own line. On this route the worker only reads Controls' bus and
   holds the wait's Denied authority, with no microphone and no GPIO line,
   so its end grants nothing. Any other path there, a worker not reaped, a
-  killed or failed ring indicator and any other cleanup failure still end
-  the service as before. Unit tests: a stalled stand-in killed in the wait
+  ring indicator that failed without its verified black write (see the next
+  entry) and any other cleanup failure still end the service as before. Unit tests: a stalled stand-in killed in the wait
   leaves no socket and no directory and is read again (before: a cleanup
   failure); a regular file or a symlink to a socket at either path is left
   and still fails; a worker that stops keeps its sockets for itself to
   unlink. Not yet tried on a lamp.
+- **An update's stop taking the muted indication down with the voice.** On
+  lamp-3e83, after every update, the voice was in its muted wait (switch
+  closed, microphones closed) with the slide's indicator writer (`worker ring
+  --privacy`) showing the mute. The update stopped `lamp-voice.service` at
+  07:15:25.170 and systemd took the writer down at the same moment; at .209
+  the wait's cleanup said `verified cleanup failed: ring.c.p: Transport
+  endpoint is not connected (os error 107); unexpected privacy indicator
+  event: Fault { code: "privacy ring…`, at .218 the voice ended
+  `status=1/FAILURE`, and at 26.199 the next start said `muted by the restart
+  guard after a fault, not by choice`, which only a head tap cleared (#4332).
+  The wait (`run` in `service_privacy_controls.rs`) now takes the indicator's
+  trouble as the stop's when the stop was asked for (SIGTERM or SIGINT seen
+  by the end of the wait's cleanup) and the indicator either failed after it
+  or at most 1 s before it (`STOP_WINDOW_US`; on 3e83 about 40 ms, as
+  systemd signals the whole unit at once). The cleanup still runs as before
+  (the writer's Stop and verified black write tried, the writer reaped), and
+  then, if the privacy worker's own part of it was verified, the indicator's
+  errors are said on one line (`lamp-voice: the muted indication ended with
+  the stop, not a fault: …`) and the wait ends stopped, so the service ends
+  with 0 and the restart guard is not armed. A privacy worker whose cleanup
+  failed, or an indicator failure more than 1 s before the stop, still ends
+  the service as before.
+
+  An indicator failure in the muted wait with no stop near no longer ends
+  the voice either. The wait stays muted, its microphones closed (its
+  authority is Denied throughout), says `muted indication failed: …`, and
+  reaps the failed writer there: its Stop sent, its events read for its
+  black write (the shutdown receipt for a write after that Stop, or the
+  control-lost one a writer makes as it ends on a fault), killed after
+  300 ms if it has not ended. Once it has exited, its black write verified
+  and its ring paths removed, it is gone and the wait starts it once more
+  at the next muted look. If that one fails as well, or cannot start, the
+  wait goes on muted with no light, as with a writer that never started
+  (`RingStartup::Unavailable { worker: None }`). Leaving the wait still needs
+  what it always has: the software latch clear, a fresh reading of the
+  switch open and nothing else queued. A head tap's clear alone never
+  leaves it, so a voice that lost its light comes back unmuted only once
+  the slide is opened, and then its conversation's ring shows it listening.
+  The one case that stays fatal is a writer whose black write is not
+  verified (an SPI fault with no receipt, a writer killed with no receipt,
+  or one that failed at its start and did not write black on its Stop):
+  the person may still see a mute light, or none, that the voice cannot
+  vouch for, and no second writer may follow it. That failure ends the wait
+  with the same error as before. Unit tests: an update-style stop with the
+  writer dying with it, and one 100 ms after the writer died, end the wait
+  stopped with no second writer; a failure 1.3 s before the stop is still
+  the error; a failure with no stop, its black write verified, keeps the
+  wait muted through 200 ms of a clear software latch, starts one writer
+  more (one that comes back, and one that cannot start), and leaves only
+  when the slide opens; a failure with no receipt starts no other writer and
+  still ends with the error; a writer that failed at its start without its
+  black write still ends with the error, and with it the wait goes on. Not
+  yet tried on a lamp.
+
 - **A worker's first control message older than 100 ms.** A worker sends its
   first control message as soon as its peer is there; at start the
   coordinator may read it only after starting its other workers. lamp-4ace

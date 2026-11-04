@@ -234,6 +234,15 @@ pub(crate) fn started(worker: io::Result<Worker>) -> Result<Worker> {
     })
 }
 
+/// How long before the voice sees its own stop an indicator failure is still
+/// the stop's (#4332). systemd's stop of `lamp-voice.service` signals the
+/// whole unit at once, so the ring writer can die a moment before the voice
+/// reads its own SIGTERM: on lamp-3e83 the stop was at 07:15:25.170 and the
+/// failure was read and cleaned up by .209, about 40 ms. A second is 25
+/// times that, room for a loaded board, and still far too short for a real
+/// fault to pass as an update's stop by chance.
+const STOP_WINDOW_US: u64 = 1_000_000;
+
 /// The muted wait itself, with the optional ring's start injected.
 #[allow(clippy::too_many_arguments)]
 fn run(
@@ -248,8 +257,17 @@ fn run(
 ) -> Result<WaitOutcome> {
     let mut indicator: Option<Box<Worker>> = None;
     let mut attempted = false;
+    // A writer that failed and was reaped with its black write verified is
+    // started once more, at most, in a wait (#4332).
+    let mut retried = false;
     let mut indicator_failure = None;
     let mut indicator_failed_at = None;
+    // When the failed writer was sent its Stop: a shutdown receipt must be
+    // for a write after it.
+    let mut indicator_stopped_at = 0;
+    // The failed writer's own black write was read: its shutdown receipt,
+    // or the control-lost one it writes as it ends on a fault.
+    let mut indicator_blanked = false;
     let mut indicator_kill_requested = false;
     // With LAMP_STALLS=on, a look of the wait or a gap between looks of
     // 50 ms or more is a line in `stalls-wait.log`, and each of the gate's
@@ -274,7 +292,11 @@ fn run(
             if state.allowed {
                 return Ok(WaitOutcome::Allowed);
             }
-            if indicator_allowed && state.physical == PrivacyState::Muted && !attempted {
+            if indicator_allowed
+                && state.physical == PrivacyState::Muted
+                && !attempted
+                && indicator.is_none()
+            {
                 attempted = true;
                 let started = start_ring(&mut || {
                     termination.check()?;
@@ -288,7 +310,16 @@ fn run(
                                 io::Error::other(error.to_string())
                             }
                         })
-                })?;
+                });
+                let started = match started {
+                    // A stop that came while the writer started is no fault
+                    // (#4332): the start's own teardown has run.
+                    Err(_) if termination.signal_name().is_some() => {
+                        return Ok(WaitOutcome::Stopped);
+                    }
+                    other => other?,
+                };
+                indicator_blanked = false;
                 match started {
                     RingStartup::Ready(child) => indicator = Some(child),
                     // No writer process exists, so no SPI was opened and no
@@ -309,65 +340,185 @@ fn run(
                         eprintln!("lamp-voice: muted indication unavailable: {error}");
                         indicator_failure = Some(error);
                         indicator_failed_at = Some(monotonic_us());
-                        let _ = child.channels.control.send(Control::Stop);
+                        indicator_stopped_at = stop_failed(&mut child);
                         indicator = Some(child);
                     }
                 }
             }
+            let mut reaped = false;
             if let Some(child) = &mut indicator {
                 if indicator_failure.is_none() {
-                    if let Err(error) = child.check_running() {
-                        indicator_failure = Some(error);
-                    } else {
-                        for _ in 0..16 {
-                            match child.channels.control.receive::<WorkerEvent>() {
-                                Ok(Some(WorkerEvent::Ring {
-                                    report: RingFeedback::Blanked { .. },
-                                })) => {}
-                                Ok(None) => break,
-                                Ok(Some(event)) => {
-                                    indicator_failure = Some(io::Error::other(format!(
-                                        "unexpected privacy indicator event: {event:?}"
-                                    )));
-                                    break;
-                                }
-                                Err(error) => {
-                                    indicator_failure = Some(error);
-                                    break;
+                    // What the writer said is read before whether it still
+                    // runs: a writer that sent its Fault and exited is
+                    // failed by that Fault, not by its exit, which a loaded
+                    // board can see first (ARM64 CI on #5244).
+                    for _ in 0..16 {
+                        match child.channels.control.receive::<WorkerEvent>() {
+                            Ok(Some(WorkerEvent::Ring {
+                                report: report @ RingFeedback::Blanked { .. },
+                            })) => {
+                                // A writer ending on a fault writes black
+                                // first and says so before its Fault.
+                                if control_lost_black(report) {
+                                    indicator_blanked = true;
                                 }
                             }
+                            Ok(None) => break,
+                            Ok(Some(event)) => {
+                                indicator_failure = Some(io::Error::other(format!(
+                                    "unexpected privacy indicator event: {event:?}"
+                                )));
+                                break;
+                            }
+                            Err(error) => {
+                                indicator_failure = Some(error);
+                                break;
+                            }
                         }
+                    }
+                    if indicator_failure.is_none()
+                        && let Err(error) = child.check_running()
+                    {
+                        indicator_failure = Some(error);
                     }
                     if let Some(error) = &indicator_failure {
                         indicator_failed_at = Some(monotonic_us());
                         eprintln!("lamp-voice: muted indication failed: {error}");
-                        let _ = child.channels.control.send(Control::Stop);
+                        indicator_stopped_at = stop_failed(child);
                     }
                 }
-                if indicator_failure.is_some()
-                    && !indicator_kill_requested
-                    && indicator_failed_at
-                        .is_some_and(|at| monotonic_us().saturating_sub(at) >= 300_000)
-                    && !matches!(child.try_exit(), Ok(Some(_)))
-                {
-                    indicator_kill_requested = true;
-                    if let Err(error) = child.request_termination() {
-                        eprintln!("lamp-voice: privacy indicator termination failed: {error}");
+                if indicator_failure.is_some() {
+                    // The failed writer is reaped here, in the wait, which
+                    // stays muted with the microphones closed. Only once its
+                    // black write is verified and its process gone may another
+                    // writer start; without that black write the failure
+                    // stays, and ends the wait as it always has.
+                    drain_failed(child, indicator_stopped_at, &mut indicator_blanked);
+                    match child.try_exit() {
+                        Ok(Some(_)) => {
+                            // A receipt can arrive between the drain and the
+                            // exit: read once more, with the sender gone.
+                            drain_failed(child, indicator_stopped_at, &mut indicator_blanked);
+                            reaped = indicator_blanked && child.cleanup_ring_paths().is_ok();
+                        }
+                        Ok(None) => {
+                            if !indicator_kill_requested
+                                && indicator_failed_at
+                                    .is_some_and(|at| monotonic_us().saturating_sub(at) >= 300_000)
+                            {
+                                indicator_kill_requested = true;
+                                if let Err(error) = child.request_termination() {
+                                    eprintln!(
+                                        "lamp-voice: privacy indicator termination failed: {error}"
+                                    );
+                                }
+                            }
+                        }
+                        Err(_) => {}
                     }
+                }
+            }
+            if reaped {
+                // A light that failed with no stop near never ends the voice
+                // (#4332): the wait stays muted, and the writer is started
+                // once more. If that one fails too, the wait goes on muted
+                // without its light, and only the switch opening leaves it.
+                indicator = None;
+                indicator_failure = None;
+                indicator_failed_at = None;
+                indicator_kill_requested = false;
+                indicator_blanked = false;
+                if retried {
+                    eprintln!(
+                        "lamp-voice: the muted indication's writer ended, its black write verified; the wait stays muted without its light"
+                    );
+                } else {
+                    eprintln!(
+                        "lamp-voice: the muted indication's writer ended, its black write verified; the wait stays muted and starts it once more"
+                    );
+                    retried = true;
+                    attempted = false;
                 }
             }
             pass.done();
             std::thread::sleep(Duration::from_millis(2));
         }
     })();
-    let cleanup = cleanup(&mut worker, indicator.as_deref_mut(), &directory.path);
+    let stopped_at = termination.signal_name().map(|_| monotonic_us());
+    let cleanup = cleanup_checked(&mut worker, indicator.as_deref_mut(), &directory.path);
     drop(indicator);
     drop(worker);
-    let result = settled(result, cleanup);
-    // Keep a failed writer's evidence distinct from permission to start a new
-    // one, even when its process was subsequently reaped.
-    let result = finish(result, indicator_failure.map_or(Ok(()), Err));
+    // A stop asked for, seen by the end of the cleanup.
+    let stopped_at = stopped_at.or_else(|| termination.signal_name().map(|_| monotonic_us()));
+    // The indicator's trouble is the stop's when the stop came first, or
+    // within the window after it failed (#4332, lamp-3e83): the update's
+    // stop takes the writer down with the voice. The privacy worker's own
+    // cleanup is never forgiven.
+    let stop_explains = stopped_at.is_some_and(|stop| {
+        indicator_failed_at.is_none_or(|at| stop.saturating_sub(at) <= STOP_WINDOW_US)
+    });
+    let result = if stop_explains && cleanup.privacy_verified {
+        let said: Vec<String> = cleanup
+            .result
+            .err()
+            .into_iter()
+            .chain(indicator_failure)
+            .map(|error| error.to_string())
+            .collect();
+        if !said.is_empty() {
+            eprintln!(
+                "lamp-voice: the muted indication ended with the stop, not a fault: {}",
+                said.join("; ")
+            );
+        }
+        result
+    } else {
+        let result = settled(result, cleanup.result);
+        // Keep a failed writer's evidence distinct from permission to start a
+        // new one, even when its process was subsequently reaped.
+        finish(result, indicator_failure.map_or(Ok(()), Err))
+    };
     finish(result, fs::remove_dir(&directory.path))
+}
+
+/// Sends a failed writer its Stop, and says when: its shutdown receipt must
+/// be for a write after it.
+fn stop_failed(child: &mut Worker) -> u64 {
+    let stopped_at = monotonic_us();
+    let _ = child.channels.control.send(Control::Stop);
+    stopped_at
+}
+
+/// Whether `report` is a black write a writer made as it ended on a fault
+/// (`privacy_indicator::failed`): its last frame, written before its Fault.
+fn control_lost_black(report: RingFeedback) -> bool {
+    matches!(report, RingFeedback::Blanked {
+        reason: RingBlankReason::ControlLost,
+        write_started_at_us,
+        write_finished_at_us,
+    } if write_finished_at_us >= write_started_at_us
+        && write_finished_at_us <= monotonic_us())
+}
+
+/// Reads a failed writer's events, without blocking, for its black write:
+/// the shutdown receipt for a write after its Stop, or its own control-lost
+/// one. Nothing else it says changes the failure.
+fn drain_failed(child: &mut Worker, stopped_at: u64, blanked: &mut bool) {
+    for _ in 0..16 {
+        match child.channels.control.receive::<WorkerEvent>() {
+            Ok(Some(WorkerEvent::Ring {
+                report: report @ RingFeedback::Blanked { .. },
+            })) => {
+                if report.confirms_shutdown(stopped_at, monotonic_us())
+                    || control_lost_black(report)
+                {
+                    *blanked = true;
+                }
+            }
+            Ok(Some(_)) => {}
+            Ok(None) | Err(_) => break,
+        }
+    }
 }
 
 struct Step {
@@ -647,9 +798,26 @@ fn settled<T>(result: Result<T>, cleanup: io::Result<()>) -> Result<T> {
 /// where the privacy worker's sockets are.
 fn cleanup(
     privacy: &mut Worker,
-    mut indicator: Option<&mut Worker>,
+    indicator: Option<&mut Worker>,
     directory: &Path,
 ) -> io::Result<()> {
+    cleanup_checked(privacy, indicator, directory).result
+}
+
+/// A [`cleanup`]'s result, and whether the privacy worker's own part of it
+/// was verified: stopped in the grace, its exit clean. Only then can the
+/// indicator's part be a stop's and not a fault (#4332).
+struct Cleanup {
+    result: io::Result<()>,
+    privacy_verified: bool,
+}
+
+/// [`cleanup`], saying apart whether the privacy worker's part was verified.
+fn cleanup_checked(
+    privacy: &mut Worker,
+    mut indicator: Option<&mut Worker>,
+    directory: &Path,
+) -> Cleanup {
     let stopped_at = monotonic_us();
     let deadline = Instant::now() + Duration::from_millis(300);
     // A worker that ended on its own (an unreadable switch, #795) cannot
@@ -681,6 +849,7 @@ fn cleanup(
         }
     }
     let mut privacy_exited = false;
+    let mut privacy_failed = false;
     let mut indicator_exited = indicator.is_none();
     let mut blanked = false;
     loop {
@@ -710,11 +879,13 @@ fn cleanup(
                 Ok(Some(status)) => {
                     privacy_exited = true;
                     if let Err(failure) = privacy.exit_result(status) {
+                        privacy_failed = true;
                         error.get_or_insert(failure);
                     }
                 }
                 Ok(None) => {}
                 Err(failure) => {
+                    privacy_failed = true;
                     error.get_or_insert(failure);
                 }
             }
@@ -745,13 +916,18 @@ fn cleanup(
         error
             .get_or_insert_with(|| io::Error::other("privacy indicator black write not confirmed"));
     }
-    match (killed, error) {
+    let privacy_verified = killed.is_none() && !privacy_failed;
+    let result = match (killed, error) {
         (None, error) => error.map_or(Ok(()), Err),
         (Some(killed), None) => Err(killed_privacy_worker(privacy, directory, killed)),
         // Any other failure stays one, the kill said first as before.
         (Some(killed), Some(other)) => {
             Err(io::Error::new(killed.kind(), format!("{killed}; {other}")))
         }
+    };
+    Cleanup {
+        result,
+        privacy_verified,
     }
 }
 
@@ -1334,17 +1510,45 @@ pub(crate) mod tests {
         assert!(peer.join().unwrap().received_stop);
     }
 
+    /// A writer that started and failed before its Ready never showed the
+    /// mute. Without its verified black write the failure ends the wait as
+    /// it always has: the one indicator failure that stays fatal (#4332).
+    /// With it, and its exit, the wait goes on muted and ends when the
+    /// switch opens.
     #[test]
     fn a_started_ring_that_failed_still_needs_its_black_write_and_exit() {
         for receipts in [0, 1] {
             let fixtures = SessionDirectory::create().unwrap();
             let directory = SessionDirectory::create().unwrap();
-            let (worker, peer) = mock(
+            // The slide held muted until the failed writer has been dealt
+            // with, then opened.
+            let slide = Arc::new(AtomicBool::new(true));
+            let (worker, peer) = crate::service_privacy::tests::mock_with_slide(
                 &fixtures.path,
-                Script::Unmute,
+                Script::Muted,
                 Arc::new(AtomicBool::new(false)),
+                Some(Arc::clone(&slide)),
             );
-            let (ring, ring_peer) = stopping_child(&fixtures.path, "ring", receipts);
+            // Opened 200 ms after the writer was started, never before: on
+            // a loaded host the wait can take longer than that to reach the
+            // mute, and a slide opened first ends it before any writer.
+            let started = Arc::new(AtomicBool::new(false));
+            let opener = {
+                let slide = Arc::clone(&slide);
+                let started = Arc::clone(&started);
+                std::thread::spawn(move || {
+                    let deadline = Instant::now() + Duration::from_secs(10);
+                    while !started.load(std::sync::atomic::Ordering::SeqCst)
+                        && Instant::now() < deadline
+                    {
+                        std::thread::sleep(Duration::from_millis(2));
+                    }
+                    std::thread::sleep(Duration::from_millis(200));
+                    slide.store(false, std::sync::atomic::Ordering::SeqCst);
+                })
+            };
+            let rings = SessionDirectory::create().unwrap();
+            let (ring, ring_peer) = serving_child(&rings.path, receipts);
             let mut ring = Some(Box::new(ring));
             let outcome = run(
                 worker,
@@ -1355,16 +1559,315 @@ pub(crate) mod tests {
                 |_| Ok(true),
                 true,
                 |_| {
+                    started.store(true, std::sync::atomic::Ordering::SeqCst);
                     Ok(RingStartup::Unavailable {
                         worker: ring.take(),
                         error: io::Error::other("synthetic readiness failure after spawn"),
                     })
                 },
             );
-            assert!(outcome.is_err(), "receipts={receipts}: {outcome:?}");
+            if receipts == 0 {
+                let error = outcome.unwrap_err().to_string();
+                assert!(
+                    error.contains("verified cleanup failed")
+                        && error.contains("synthetic readiness failure after spawn"),
+                    "{error}"
+                );
+            } else {
+                assert!(matches!(outcome, Ok(WaitOutcome::Allowed)), "{outcome:?}");
+            }
+            opener.join().unwrap();
             assert!(peer.join().unwrap().received_stop);
             drop(ring_peer.join().unwrap());
         }
+    }
+
+    /// A ring writer stand-in that takes its controls as they come, on its
+    /// own thread, for as long as the wait runs, and on Stop sends
+    /// `receipts` shutdown receipts and ends. Its peer comes back once it
+    /// has ended.
+    fn serving_child(
+        directory: &Path,
+        receipts: usize,
+    ) -> (
+        Worker,
+        std::thread::JoinHandle<crate::transport::WorkerChannels>,
+    ) {
+        let (worker, mut peer, input) = Worker::cooperative_fixture(directory, "ring");
+        let task = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while Instant::now() < deadline {
+                match peer.control.receive::<Control>() {
+                    Ok(Some(Control::Stop)) => {
+                        for _ in 0..receipts {
+                            let now = monotonic_us();
+                            let _ = peer.control.send(WorkerEvent::Ring {
+                                report: RingFeedback::Blanked {
+                                    reason: RingBlankReason::Shutdown,
+                                    write_started_at_us: now,
+                                    write_finished_at_us: now,
+                                },
+                            });
+                        }
+                        break;
+                    }
+                    Ok(Some(_)) => continue,
+                    Ok(None) | Err(_) => std::thread::sleep(Duration::from_millis(1)),
+                }
+            }
+            drop(input);
+            peer
+        });
+        (worker, task)
+    }
+
+    /// The black write a writer makes as it ends on a fault, as
+    /// `privacy_indicator::failed` reports it before its Fault.
+    fn control_lost() -> WorkerEvent {
+        let now = monotonic_us();
+        WorkerEvent::Ring {
+            report: RingFeedback::Blanked {
+                reason: RingBlankReason::ControlLost,
+                write_started_at_us: now,
+                write_finished_at_us: now,
+            },
+        }
+    }
+
+    /// The muted wait on a slide held muted, its writer started from
+    /// `rings` in turn (none left: a writer that cannot start), and what
+    /// `meanwhile` does to it once the first is up, given that writer's
+    /// peer and input, the slide and a later SIGTERM. The outcome, and how
+    /// many writers it started.
+    fn a_muted_wait(
+        rings: Vec<Worker>,
+        meanwhile: impl FnOnce(
+            crate::transport::WorkerChannels,
+            std::process::ChildStdin,
+            Arc<AtomicBool>,
+            &dyn Fn(),
+            &std::sync::mpsc::Receiver<usize>,
+        ) + Send,
+        first: (crate::transport::WorkerChannels, std::process::ChildStdin),
+    ) -> (Result<WaitOutcome>, usize, Vec<PrivacyState>) {
+        let fixtures = SessionDirectory::create().unwrap();
+        let directory = SessionDirectory::create().unwrap();
+        let slide = Arc::new(AtomicBool::new(true));
+        let (worker, peer) = crate::service_privacy::tests::mock_with_slide(
+            &fixtures.path,
+            Script::Muted,
+            Arc::new(AtomicBool::new(false)),
+            Some(Arc::clone(&slide)),
+        );
+        let termination = Termination::inactive();
+        let stop = termination.later();
+        let (started, starts) = std::sync::mpsc::channel();
+        let mut rings = std::collections::VecDeque::from(rings);
+        let mut count = 0;
+        let mut states = Vec::new();
+        let outcome = std::thread::scope(|scope| {
+            let (channels, input) = first;
+            let slide = Arc::clone(&slide);
+            let task = scope.spawn(move || {
+                // The first writer is up.
+                assert_eq!(starts.recv_timeout(Duration::from_secs(5)), Ok(1));
+                meanwhile(channels, input, slide, &stop, &starts);
+            });
+            let outcome = run(
+                worker,
+                directory,
+                Waiting::new(new_boot().unwrap()).unwrap(),
+                &termination,
+                |state, _, _| {
+                    states.push(state);
+                    Ok(())
+                },
+                // The software latch clear throughout: only the switch keeps
+                // the wait muted.
+                |_| Ok(true),
+                true,
+                |tick| {
+                    tick()?;
+                    count += 1;
+                    let started_now = match rings.pop_front() {
+                        Some(ring) => RingStartup::Ready(Box::new(ring)),
+                        None => RingStartup::Unavailable {
+                            worker: None,
+                            error: io::Error::other("synthetic bind failure before spawn"),
+                        },
+                    };
+                    let _ = started.send(count);
+                    Ok(started_now)
+                },
+            );
+            task.join().unwrap();
+            outcome
+        });
+        assert!(peer.join().unwrap().received_stop);
+        (outcome, count, states)
+    }
+
+    /// lamp-3e83, after every update (#4332): the update's stop took the
+    /// muted indication's writer down with the voice, and its failure, read
+    /// about 40 ms after systemd's stop, ended the voice with status 1, so
+    /// the restart guard muted the next start. Now a writer that dies with
+    /// the stop, or within the window before the voice sees it, is the
+    /// stop's: the cleanup still runs, and the wait ends stopped, which the
+    /// service ends with 0, its guard not armed.
+    #[test]
+    fn an_updates_stop_that_takes_the_light_down_is_no_fault() {
+        for (stop_first, before) in [(true, Duration::ZERO), (false, Duration::from_millis(100))] {
+            let rings = SessionDirectory::create().unwrap();
+            let (ring, ring_peer, input) = Worker::cooperative_fixture(&rings.path, "ring");
+            let (outcome, starts, _) = a_muted_wait(
+                vec![ring],
+                move |mut ring_peer, input, _, stop, _| {
+                    std::thread::sleep(Duration::from_millis(50));
+                    if stop_first {
+                        stop();
+                    }
+                    // Taken down by the stop: its Fault, its end, and no
+                    // black write read.
+                    let _ = ring_peer.control.send(WorkerEvent::Fault {
+                        code: "privacy ring: Transport endpoint is not connected".into(),
+                    });
+                    drop(ring_peer);
+                    drop(input);
+                    std::thread::sleep(before);
+                    stop();
+                },
+                (ring_peer, input),
+            );
+            assert!(
+                matches!(outcome, Ok(WaitOutcome::Stopped)),
+                "stop_first={stop_first}: {outcome:?}"
+            );
+            assert_eq!(starts, 1, "no writer started after the stop");
+        }
+    }
+
+    /// A light that failed long before the stop is no stop's: past the
+    /// window, its unverified black write ends the wait as it always has.
+    #[test]
+    fn a_light_that_failed_well_before_the_stop_is_still_a_fault() {
+        let rings = SessionDirectory::create().unwrap();
+        let (ring, ring_peer, input) = Worker::cooperative_fixture(&rings.path, "ring");
+        let (outcome, starts, _) = a_muted_wait(
+            vec![ring],
+            |mut ring_peer, input, _, stop, _| {
+                std::thread::sleep(Duration::from_millis(50));
+                let _ = ring_peer.control.send(WorkerEvent::Fault {
+                    code: "privacy ring: synthetic SPI fault".into(),
+                });
+                drop(ring_peer);
+                drop(input);
+                std::thread::sleep(
+                    Duration::from_micros(STOP_WINDOW_US) + Duration::from_millis(300),
+                );
+                stop();
+            },
+            (ring_peer, input),
+        );
+        let error = outcome.unwrap_err().to_string();
+        assert!(error.contains("synthetic SPI fault"), "{error}");
+        assert_eq!(starts, 1, "no writer replaces one without its black write");
+    }
+
+    /// #4332, part 2: a writer that fails in the muted wait with no stop
+    /// near, its black write verified, never ends the voice. The wait stays
+    /// muted, its microphones closed (the privacy stand-in asserts every
+    /// authority is Denied), and starts the writer once more. Whether that
+    /// one comes back or not, the software latch's clear alone never leaves
+    /// the wait: only the switch opening does.
+    #[test]
+    fn a_light_lost_with_no_stop_keeps_the_wait_muted_and_starts_it_once_more() {
+        for comes_back in [false, true] {
+            let rings = SessionDirectory::create().unwrap();
+            let again = SessionDirectory::create().unwrap();
+            let (ring, ring_peer, input) = Worker::cooperative_fixture(&rings.path, "ring");
+            let mut writers = vec![ring];
+            let mut second = None;
+            if comes_back {
+                let (ring, peer) = serving_child(&again.path, 1);
+                writers.push(ring);
+                second = Some(peer);
+            }
+            let opened = std::sync::Mutex::new(None);
+            let (outcome, starts, states) = a_muted_wait(
+                writers,
+                |mut ring_peer, input, slide, _, starts| {
+                    std::thread::sleep(Duration::from_millis(50));
+                    ring_peer.control.send(control_lost()).unwrap();
+                    ring_peer
+                        .control
+                        .send(WorkerEvent::Fault {
+                            code: "privacy ring: synthetic heartbeat expired".into(),
+                        })
+                        .unwrap();
+                    drop(input);
+                    // Started once more, after the first was reaped.
+                    assert_eq!(starts.recv_timeout(Duration::from_secs(5)), Ok(2));
+                    // Still muted, and still waiting, long after.
+                    std::thread::sleep(Duration::from_millis(200));
+                    *opened.lock().unwrap() = Some(Instant::now());
+                    slide.store(false, std::sync::atomic::Ordering::SeqCst);
+                    drop(ring_peer);
+                },
+                (ring_peer, input),
+            );
+            let left = Instant::now();
+            assert!(
+                matches!(outcome, Ok(WaitOutcome::Allowed)),
+                "comes_back={comes_back}: {outcome:?}"
+            );
+            assert!(
+                opened.lock().unwrap().is_some_and(|at| at <= left),
+                "the wait ended before the switch opened"
+            );
+            assert_eq!(starts, 2, "comes_back={comes_back}: one retry");
+            assert!(states.contains(&PrivacyState::Muted));
+            assert_eq!(states.last(), Some(&PrivacyState::Allowed));
+            assert_eq!(
+                states
+                    .iter()
+                    .filter(|state| **state == PrivacyState::Allowed)
+                    .count(),
+                1
+            );
+            if let Some(peer) = second {
+                drop(peer.join().unwrap());
+            }
+        }
+    }
+
+    /// A writer that fails in the muted wait with no verified black write
+    /// (no receipt, its process gone) is not replaced, and still ends the
+    /// wait as an error when the switch opens, as before (#4332).
+    #[test]
+    fn a_light_lost_without_its_black_write_is_still_a_fault() {
+        let rings = SessionDirectory::create().unwrap();
+        let (ring, ring_peer, input) = Worker::cooperative_fixture(&rings.path, "ring");
+        let (outcome, starts, _) = a_muted_wait(
+            vec![ring],
+            |mut ring_peer, input, slide, _, _| {
+                std::thread::sleep(Duration::from_millis(50));
+                ring_peer
+                    .control
+                    .send(WorkerEvent::Fault {
+                        code: "privacy ring: synthetic SPI fault".into(),
+                    })
+                    .unwrap();
+                drop(input);
+                std::thread::sleep(Duration::from_millis(200));
+                slide.store(false, std::sync::atomic::Ordering::SeqCst);
+                drop(ring_peer);
+            },
+            (ring_peer, input),
+        );
+        // The failure named is the first seen: its Fault, or its exit.
+        let error = outcome.unwrap_err().to_string();
+        assert!(error.contains("verified cleanup failed"), "{error}");
+        assert_eq!(starts, 1);
     }
 
     #[test]

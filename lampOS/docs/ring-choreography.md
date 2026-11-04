@@ -308,7 +308,15 @@ SPI and bus work stay outside the physical sampler and Voice owner loop.
 Indicator failure cannot reopen a microphone, start audio or bypass privacy
 cleanup. Its optionality does not permit two writers: failed or unverified
 cleanup prevents a successor. A start that fails before any writer process
-exists leaves nothing to clean up; the muted wait goes on without the light. Fake-sink tests establish protocol and write
+exists leaves nothing to clean up; the muted wait goes on without the light.
+A writer that fails during the wait is reaped there: once it has exited with
+its black write verified (its shutdown receipt after its Stop, or the
+control-lost receipt it writes as it ends on a fault) and its ring paths
+removed, the wait, still muted, starts it once more, and after a second
+failure goes on without the light until the slide opens (#4332). Without that
+verified black write no successor starts and the failure ends the wait as
+before, unless the service's stop came with it, at most 1 s later: then the
+light ended with the stop, and the voice ends with 0. Fake-sink tests establish protocol and write
 behavior only. Lamp checks must measure switch acquisition, permission/handle
 closure, speaker silence and visible indication separately, including rapid
 flips, stale input, worker failure and repeated writer handoffs.
