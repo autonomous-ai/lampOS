@@ -469,6 +469,16 @@ câu trả lời được đọc dưới dạng `application/json` hoặc `text/
   `notion-create-pages`, `notion-update-page`, … là ghi), và việc đọc lẫn ghi
   đi qua `call`. Các lệnh REST `search`, `page {id}` và `append_text` không
   còn nữa.
+- **Việc ghi của Notion là một danh sách cho phép** (`mcp::WRITE_TOOLS`,
+  quyết trên Queue #4710 ngày 4/11): chỉ `notion-create-pages` và
+  `notion-update-page` (tạo, thêm vào và cập nhật các trang và khối của chủ).
+  Mọi tool ghi khác mà máy chủ của nó liệt kê (xoá, lưu trữ, di chuyển, nhân
+  bản, một cơ sở dữ liệu, một bình luận, bất cứ thứ gì chia sẻ một trang hay
+  đổi ai được xem nó) bị từ chối trước khi đọc lại, và cả một tool được phép
+  mà đối số mang `archived`, `in_trash`, `is_archived` hay `trashed` ở bất kỳ
+  độ sâu nào (`mcp::WRITE_KEYS_REFUSED`). Một lần ghi được phép vẫn được đọc
+  lại với tool và đích của nó, và chỉ gửi khi chủ nói "send", sau
+  `LAMP_SERVICES_WRITE`. Các dịch vụ MCP khác không có danh sách như vậy.
 
 ## Đọc
 
