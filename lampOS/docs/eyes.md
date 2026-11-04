@@ -835,7 +835,11 @@ this room" until someone asks to be recognised.
 - **Asked.** One line of JSON on `--who-socket` (on lamp-4ace
   `/run/lampos-eyes/who.sock`) and one line back:
   - `{"remember":"Minh"}` takes five prints over the next looks while that
-    one face is at the lamp and answers `{"remembered":"Minh"}`. With no face
+    one face is at the lamp and answers `{"remembered":"Minh","replaced":[]}`:
+    `replaced` names the people that remembering forgot to keep it, as
+    they were kept (only with `replace`, below; `[]` when none, and only
+    names whose removal was written). The journal line counts them, never
+    names them. With no face
     in view at all it answers `no_face` after 1.5 s. With a face too far
     away, or two at the lamp, it gives them four seconds and then answers
     `too_far` or `two_faces`.
@@ -1441,7 +1445,10 @@ With the switch:
   the model is told to say the new name back and ask whether they want to
   be known by it instead. Only once they say yes does it call again with
   `replace` true (`"replace":true`), and the eyes then forget "A" and keep
-  "Jim" in its place (`People::remember_one`). `replace` is refused before
+  "Jim" in its place (`People::remember_one`), answering
+  `{"remembered":"Jim","replaced":["A"]}` (`People::remember_one_replacing`,
+  `who::Remembered`): the voice moves the setup owner on a rename only on this,
+  when it is exactly the owner (Reviewer-three's P1 on #5149, [second-voice.md](second-voice.md)). `replace` is refused before
   the eyes are asked unless the lamp said the new name in its last answer
   and the turn in hand is a plain yes to it: yeses, the name itself and
   words that stand beside a yes ("please", "that's fine", "call me …",

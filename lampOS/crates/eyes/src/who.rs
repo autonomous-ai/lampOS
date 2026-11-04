@@ -1076,6 +1076,38 @@ impl People {
         replace: bool,
         apart: bool,
     ) -> std::result::Result<String, Refused> {
+        self.remember_one_replacing(name, prints, now_unix_s, replace, apart)
+            .map(|kept| kept.name)
+    }
+
+    /// [`Self::remember_one`], saying which people the remembering replaced
+    /// ([`Remembered::replaced`]): the voice moves the setup owner on a rename
+    /// only when this is exactly the owner (Reviewer-three's P1 on #5149).
+    pub fn remember_one_replacing(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        replace: bool,
+        apart: bool,
+    ) -> std::result::Result<Remembered, Refused> {
+        let mut replaced = Vec::new();
+        let name =
+            self.remember_one_into(name, prints, now_unix_s, replace, apart, &mut replaced)?;
+        Ok(Remembered { name, replaced })
+    }
+
+    /// [`Self::remember_one`]'s work: the people a `replace` forgets are
+    /// put in `replaced` once their removal is written.
+    fn remember_one_into(
+        &mut self,
+        name: &str,
+        prints: Vec<Vec<f32>>,
+        now_unix_s: u64,
+        replace: bool,
+        apart: bool,
+        replaced: &mut Vec<String>,
+    ) -> std::result::Result<String, Refused> {
         let kept = plain_name(name).ok_or(Refused::NotAName)?;
         // Whoever else these prints are, by the same likeness that
         // recognises a face.
@@ -1238,9 +1270,16 @@ impl People {
                 .flatten();
             let mut next = self.people.clone();
             next.retain(|person| !known.iter().any(|other| same_name(other, &person.name)));
+            let gone: Vec<String> = self
+                .people
+                .iter()
+                .filter(|person| !next.iter().any(|left| same_name(&left.name, &person.name)))
+                .map(|person| person.name.clone())
+                .collect();
             self.save(&next)
                 .map_err(|error| Refused::Store(error.to_string()))?;
             self.people = next;
+            *replaced = gone;
         }
         self.remember_as(&kept, prints, now_unix_s, carried)
             .map_err(|error| Refused::Store(error.to_string()))
@@ -1989,6 +2028,35 @@ fn theirs_name(people: &[Person], name: &str) -> String {
         .iter()
         .find(|person| same_name(&person.name, name))
         .map_or_else(|| name.to_owned(), |person| person.name.clone())
+}
+
+/// A face remembered by [`People::remember_one_replacing`]: the name kept
+/// under, and the people a `replace` forgot for it, by the names they were
+/// kept under (none for a plain remembering).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Remembered {
+    pub name: String,
+    pub replaced: Vec<String>,
+}
+
+impl Remembered {
+    /// A remembering kept with nothing replaced.
+    pub fn plain(name: String) -> Self {
+        Self {
+            name,
+            replaced: Vec::new(),
+        }
+    }
+
+    /// What the voice is answered: the name kept, the people replaced
+    /// (`[]` when none), and, with visits counted, that they are.
+    pub fn answer(&self, visits: bool) -> serde_json::Value {
+        let mut answer = serde_json::json!({"remembered": self.name, "replaced": self.replaced});
+        if visits {
+            answer["visits"] = serde_json::Value::Bool(true);
+        }
+        answer
+    }
 }
 
 /// Why a face was not kept under a name, with one name for one face.
@@ -4389,6 +4457,66 @@ mod tests {
         // Without the check, a second name sits beside the first, as today.
         people.remember("Jay", vec![print(0.31)], 7).unwrap();
         assert_eq!(people.names().len(), 3);
+    }
+
+    /// Reviewer-three's P1 on #5149: a remembering says exactly whom a
+    /// `replace` forgot, so the voice moves the setup owner only on a
+    /// rename of the owner's own face. Nobody for a plain remembering, the
+    /// same name again, someone new, or a refusal.
+    #[test]
+    fn a_remembering_says_exactly_whom_it_replaced() {
+        let mut people = People::open(file("replaced")).unwrap();
+        people.remember("Rosa", vec![print(0.3)], 1).unwrap();
+        people
+            .remember("Original Owner", vec![print(1.7)], 2)
+            .unwrap();
+        // Someone new, and the same name again: nobody replaced.
+        let new = people
+            .remember_one_replacing("Ines", vec![print(2.9)], 3, false, false)
+            .unwrap();
+        assert_eq!(new, Remembered::plain("Ines".into()));
+        let again = people
+            .remember_one_replacing("rosa", vec![print(0.31)], 4, true, false)
+            .unwrap();
+        assert!(again.replaced.is_empty(), "{again:?}");
+        // A refusal says nothing kept, nothing replaced, and forgets nobody.
+        assert_eq!(
+            people.remember_one_replacing("Bea", vec![print(1.7)], 5, false, false),
+            Err(Refused::KnownAs("Original Owner".into()))
+        );
+        assert_eq!(people.names().len(), 3);
+        // Renamed with a yes: exactly the one forgotten, as kept.
+        let renamed = people
+            .remember_one_replacing("Bea", vec![print(1.7)], 6, true, false)
+            .unwrap();
+        assert_eq!(
+            renamed,
+            Remembered {
+                name: "Bea".into(),
+                replaced: vec!["Original Owner".into()],
+            }
+        );
+        assert!(!people.names().contains(&"Original Owner".to_owned()));
+        // A face known by two names, replaced for both: both said.
+        let mut two = People::open(file("replaced-two")).unwrap();
+        two.remember("Rosa", vec![print(0.3)], 1).unwrap();
+        two.remember("Cal", vec![print(1.7)], 2).unwrap();
+        let both = two
+            .remember_one_replacing("Dee", vec![print(0.3), print(1.7)], 3, true, false)
+            .unwrap();
+        let mut replaced = both.replaced.clone();
+        replaced.sort();
+        assert_eq!(replaced, vec!["Cal".to_owned(), "Rosa".to_owned()]);
+        assert_eq!(two.names(), vec!["Dee".to_owned()]);
+        // The answer carries them, `[]` when none.
+        assert_eq!(
+            renamed.answer(false),
+            serde_json::json!({"remembered": "Bea", "replaced": ["Original Owner"]})
+        );
+        assert_eq!(
+            new.answer(true),
+            serde_json::json!({"remembered": "Ines", "replaced": [], "visits": true})
+        );
     }
 
     /// The reviewer on #1057: prints known by two names are refused with
