@@ -257,6 +257,17 @@ fn listen_for(value: Option<&str>) -> Listen {
     }
 }
 
+/// The source's blocks kept for a yield's held audio (#5111): the most a
+/// candidate holds when its yield begins, its reach back
+/// ([`crate::activity::REACH_BACK_BLOCKS`]), and its decision's blocks
+/// beside. The admission holds the processed blocks; with `raw` or `linear`
+/// the held part was heard as processed while the live part was the source.
+/// On lamp-52e6 on 4 November a played "Stop, Lamp." over the lamp, held,
+/// scored 0.1 to 0.4 on the processed blocks and their speech-to-text heard
+/// no "stop". Only the blocks held for the yield are heard, as before.
+const RECENT_BLOCKS: usize =
+    crate::activity::REACH_BACK_BLOCKS + crate::admission::MAX_DECISION_BLOCKS;
+
 /// The lamp's own words this long before what is heard are its own, not a
 /// person's: it may say "wait" in a story, and the canceller lets its voice
 /// through. Its words are written a moment before they are played.
@@ -654,6 +665,10 @@ pub struct StopWords {
     /// What the coordinator hands on ([`Self::with_source`]), for the
     /// counts file.
     source: Source,
+    /// With a source but the canceller's output: its recent blocks by
+    /// capture time, so a yield's held audio is heard as that source too
+    /// ([`RECENT_BLOCKS`], #5111).
+    recent: VecDeque<(u64, Vec<i16>)>,
     /// A makeup gain for the canceller's output ([`Self::with_gain`]).
     gain: Option<f32>,
     /// With `always`: a stop heard is held for the lamp's own words
@@ -725,6 +740,7 @@ impl StopWords {
             cadence: false,
             since_asked: 0,
             source: Source::Processed,
+            recent: VecDeque::new(),
             gain: None,
             hold: false,
             held: None,
@@ -795,8 +811,9 @@ impl StopWords {
     }
 
     /// Hearing `source`'s blocks: anything but the canceller's output is
-    /// asked for on the cadence too ([`Self::with_cadence`]), and the
-    /// counts file says which it was.
+    /// asked for on the cadence too ([`Self::with_cadence`]), a yield's
+    /// held audio is heard as that source ([`RECENT_BLOCKS`], #5111), and
+    /// the counts file says which it was.
     pub fn with_source(mut self, source: Source) -> Self {
         self.source = source;
         self.with_cadence(source != Source::Processed)
@@ -817,6 +834,15 @@ impl StopWords {
             language == "vi" || language.starts_with("vi-")
         });
         self
+    }
+
+    /// A held block's samples as the source has them, by its capture time
+    /// ([`RECENT_BLOCKS`]); the held, processed block when there are none:
+    /// with `processed`, or for a block this source did not see.
+    fn recent_or<'a>(&'a self, held: &'a crate::activity::ObservedAudio) -> &'a [i16] {
+        self.recent
+            .binary_search_by_key(&held.captured_at_us, |(at, _)| *at)
+            .map_or(&held.samples[..], |found| &self.recent[found].1)
     }
 
     /// `samples` as the ears hear them: raised with a gain, on the
@@ -1226,6 +1252,12 @@ impl StopWords {
         if self.always {
             return self.listen_always(replying, sounding, yielded, still, captured_at_us, samples);
         }
+        if self.source != Source::Processed {
+            if self.recent.len() == RECENT_BLOCKS {
+                self.recent.pop_front();
+            }
+            self.recent.push_back((captured_at_us, samples.to_vec()));
+        }
         let since = captured_at_us.saturating_sub(LAMP_WORDS_US);
         while self.lamp.front().is_some_and(|(at, _)| *at < since) {
             self.lamp.pop_front();
@@ -1251,7 +1283,7 @@ impl StopWords {
             match held {
                 Some(held) => {
                     for block in held {
-                        let heard = self.heard(&block.samples);
+                        let heard = self.heard(self.recent_or(block)).into_owned();
                         self.ears.hear(block.captured_at_us, &heard);
                     }
                 }
@@ -2604,6 +2636,49 @@ mod tests {
         expected.extend(["hear 6"; 10]);
         expected.extend(["finalize", "forget", "rest"]);
         assert_eq!(told, expected);
+    }
+
+    /// #5111: with the linear or raw source, a yield's held audio is heard
+    /// as that source too, not as the processed blocks the admission held.
+    /// Each block's processed samples are `n` and its source's `n + 100`.
+    /// With the canceller's output nothing is swapped: the held blocks are
+    /// heard as held, as before the switch.
+    #[test]
+    fn a_yields_held_audio_is_heard_as_the_chosen_source() {
+        for (source, expected) in [
+            (
+                Source::Linear,
+                ["hear 102", "hear 103", "hear 104", "hear 105"],
+            ),
+            (
+                Source::Raw,
+                ["hear 102", "hear 103", "hear 104", "hear 105"],
+            ),
+            (
+                Source::Processed,
+                ["hear 2", "hear 3", "hear 4", "hear 105"],
+            ),
+        ] {
+            let script = Arc::new(Mutex::new(Script::default()));
+            let mut words =
+                StopWords::new(Box::new(Scripted(Arc::clone(&script)))).with_source(source);
+            for n in 1..=3 {
+                words.block(
+                    true,
+                    true,
+                    false,
+                    None,
+                    None,
+                    n * 10_000,
+                    &block(n as i16 + 100),
+                );
+            }
+            let held = [observed(2), observed(3), observed(4)];
+            words.block(true, true, true, Some(0), Some(&held), 40_000, &block(104));
+            words.block(true, true, true, Some(0), None, 50_000, &block(105));
+            let told = script.lock().unwrap().told.clone();
+            assert_eq!(told[1..], expected, "{source:?}");
+        }
     }
 
     /// #1047, the first builder's `stt-check` at 16:59: through the relay a

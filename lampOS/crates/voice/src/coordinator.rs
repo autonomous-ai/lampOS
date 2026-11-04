@@ -6752,10 +6752,12 @@ fn conversation_with_gate_inner(
                             .with_backchannel_debug(crate::stop_words::debugs_backchannels())
                             .with_asides(crate::stop_words::holds_asides())
                     } else {
-                        // Heard in a yield the source stays the default
-                        // (`Processed`), so the gain is passed only when the
-                        // blocks handed on are that source (El's P2 on #2690).
+                        // The gain is passed only when the blocks handed
+                        // on are the canceller's output (El's P2 on #2690).
+                        // The source lets a yield's held audio be heard as
+                        // that source too, not as processed (#5111).
                         crate::stop_words::StopWords::new(Box::new(ears))
+                            .with_source(crate::stop_words::source())
                             .with_gain(crate::stop_words::yield_gain(
                                 crate::stop_words::gain_from_environment(),
                                 crate::stop_words::source(),
