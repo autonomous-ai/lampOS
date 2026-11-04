@@ -165,8 +165,13 @@ vì nhóm của socket không phân biệt được `lamp-cloud` với một ti�
   `call.sock` (0660), được phục vụ như cách `lamp-skills --tools-dir` phục vụ
   thư mục của nó ([tools.md](../tools.md)): `{"op":"call","name":...,"args":{...}}`
   vào, tối đa 8 KB, và `{"ok":true,"result":...}` hoặc
-  `{"ok":false,"error":"..."}` trả về trong một dòng dưới 8 KB (dài hơn thì là
-  "the answer was too long to give"). Chỉ một tiến trình tại
+  `{"ok":false,"error":"..."}` trả về trong một dòng dưới 4 KB
+  (`reads::ANSWER_MOST`; dài hơn thì là "the answer was too long to give").
+  4 KB là mức giọng nói chuyển được tới model của nó
+  (`lamp_gemini::MAX_TOOL_JSON_BYTES`): với mức 8 KB cũ, một lần đọc Notion
+  4 đến 8 KB trên lamp-9adf (4/11, 23:23) đến được giọng nói nhưng bị báo với
+  người dùng là "not running right now". Một danh sách được cắt cho vừa, kèm
+  số mục bị bỏ ra. Chỉ một tiến trình tại
   `/lampos.slice/lampos-voice.slice/lamp-voice.service` được gọi; mọi tiến
   trình khác nhận "only the voice may use the lamp's services". Với
   `LAMP_SKILL_READS=on`, một tiến trình tại
