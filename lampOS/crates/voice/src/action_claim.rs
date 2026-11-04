@@ -14,11 +14,15 @@
 //! lines, followed by its end or a sentence mark ('.', '!', ',', ';', ':',
 //! a dash), and never a '?':
 //! - the executive's lines after a light or volume call ([`SAID_LINES`],
-//!   `lamp_actions::SAID_LINES`) and its line for a colour made
-//!   ([`colour_line`], `lamp_actions::light::colour_line`);
+//!   `lamp_actions::SAID_LINES`). Not its line for a colour made ("My light
+//!   is blue now."): with `LAMP_LIGHT_TOLD` it is also how a turn answers
+//!   "what colour is the light?", and kept colour calls carry their colour
+//!   since #5101 (the first builder's review of #5215);
 //! - the Schedule's set lines as the second route says them
 //!   (`second_provider::timer_line`): "Timer set." and "I'll remind you at
-//!   H:MM am." (or pm).
+//!   H:MM am." (or pm). The second is also an answer to "when will you
+//!   remind me?", so a `list_reminders` call in the turn makes it stand
+//!   ([`Claim::ReminderTime`]); "Timer set." needs a set.
 //!
 //! Such a claim stands when its turn made a call of its kind
 //! ([`Claim::made_by`]); otherwise it is held, the model is asked once more
@@ -82,12 +86,14 @@ pub const NOT_DONE_LINE: &str = "Sorry, I didn't do that. Could you ask me again
 /// The kind of action a reply claims.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Claim {
-    /// A light or volume line ("Louder.", "My light is blue now.").
+    /// A light or volume line ("Louder.").
     LightOrVolume,
     /// "Done." or "It already is.": any call's line.
     AnyCall,
     /// A Schedule's set line ("Timer set.").
     Schedule,
+    /// "I'll remind you at H:MM am.": a set line, or what a list answers.
+    ReminderTime,
 }
 
 impl Claim {
@@ -100,6 +106,7 @@ impl Claim {
                 name,
                 "set_timer" | "set_reminder" | "repeat_reminder" | "snooze_reminder"
             ),
+            Self::ReminderTime => Self::Schedule.made_by(name) || name == "list_reminders",
         }
     }
 
@@ -109,19 +116,9 @@ impl Claim {
             Self::LightOrVolume => "light or volume",
             Self::AnyCall => "done",
             Self::Schedule => "timer or reminder",
+            Self::ReminderTime => "reminder time",
         }
     }
-}
-
-/// What a light made `colour` is answered with, as
-/// `lamp_actions::light::colour_line` says it (a test holds the two equal).
-pub fn colour_line(colour: &str) -> String {
-    let spoken = if colour == "warm" {
-        "warm white"
-    } else {
-        colour
-    };
-    format!("My light is {spoken} now.")
 }
 
 /// `text` as the claim test reads it: lower case, straight apostrophes,
@@ -253,11 +250,6 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
             };
             (stem(line), kind)
         })
-        .chain(
-            lamp_msgs::Light::COLOURS
-                .iter()
-                .map(|colour| (stem(&colour_line(colour)), Claim::LightOrVolume)),
-        )
         .chain(std::iter::once((stem(TIMER_SET), Claim::Schedule)));
     for (stem, kind) in lines {
         if let Some(kind) = judge(opens_with(&text, &stem, ended), kind) {
@@ -270,7 +262,7 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
         None if !ended && remind.starts_with(text.as_str()) => None,
         None => Some(false),
     };
-    if let Some(kind) = judge(found, Claim::Schedule) {
+    if let Some(kind) = judge(found, Claim::ReminderTime) {
         return Some(Some(kind));
     }
     if undecided { None } else { Some(None) }
@@ -285,13 +277,6 @@ mod tests {
     #[test]
     fn the_said_lines_are_the_executives_own() {
         assert_eq!(SAID_LINES, lamp_actions::SAID_LINES);
-        for colour in lamp_msgs::Light::COLOURS {
-            assert_eq!(
-                colour_line(colour),
-                lamp_actions::light::colour_line(colour),
-                "{colour}"
-            );
-        }
         for line in ANY_CALL_LINES {
             assert!(SAID_LINES.contains(&line), "{line}");
         }
@@ -315,7 +300,12 @@ mod tests {
         let told = [serde_json::json!({"status": "committed", "clock": "09:39"})];
         for reminded in [false, true] {
             let line = crate::second_provider::timer_line(&calls, &told, reminded).unwrap();
-            assert_eq!(claim(&line, true), Some(Some(Claim::Schedule)), "{line}");
+            let kind = if reminded {
+                Claim::ReminderTime
+            } else {
+                Claim::Schedule
+            };
+            assert_eq!(claim(&line, true), Some(Some(kind)), "{line}");
             assert!(
                 line.starts_with(TIMER_SET) || line.starts_with(REMIND_AT),
                 "{line}"
@@ -332,16 +322,14 @@ mod tests {
             ("Brighter. Better?", Claim::LightOrVolume),
             ("Cooler, as you like.", Claim::LightOrVolume),
             ("I\u{2019}m already as loud as I go.", Claim::LightOrVolume),
-            ("My light is blue now.", Claim::LightOrVolume),
-            ("My light is warm white now.", Claim::LightOrVolume),
             ("Done.", Claim::AnyCall),
             ("Done \u{2014} it's red.", Claim::AnyCall),
             ("Louder - there.", Claim::LightOrVolume),
             ("It already is.", Claim::AnyCall),
             ("Timer set. It rings at 9:39 am.", Claim::Schedule),
             ("Timer set.", Claim::Schedule),
-            ("I'll remind you at 12:03 pm.", Claim::Schedule),
-            ("I'll remind you at 9:39 am", Claim::Schedule),
+            ("I'll remind you at 12:03 pm.", Claim::ReminderTime),
+            ("I'll remind you at 9:39 am", Claim::ReminderTime),
         ] {
             assert_eq!(claim(reply, true), Some(Some(kind)), "{reply:?}");
         }
@@ -359,6 +347,8 @@ mod tests {
             "Doneness matters for steak.",
             "Timer settings are in the app.",
             "My light is blue.",
+            "My light is blue now.",
+            "My light is warm white now.",
             "My light is blue now?",
             "I'll remind you at nine.",
             "I'll remind you at 9:39 tomorrow.",
@@ -388,7 +378,7 @@ mod tests {
         assert_eq!(claim("Timer set.", false), Some(Some(Claim::Schedule)));
         assert_eq!(
             claim("I'll remind you at 9:39 am.", false),
-            Some(Some(Claim::Schedule))
+            Some(Some(Claim::ReminderTime))
         );
         for reply in ["Lu", "Louder m", "The", "It's", "I'll remind you at n"] {
             assert_eq!(claim(reply, false), Some(None), "{reply:?}");
@@ -404,6 +394,9 @@ mod tests {
         assert!(Claim::Schedule.made_by("set_timer"));
         assert!(Claim::Schedule.made_by("repeat_reminder"));
         assert!(!Claim::Schedule.made_by("list_reminders"));
+        assert!(Claim::ReminderTime.made_by("list_reminders"));
+        assert!(Claim::ReminderTime.made_by("set_reminder"));
+        assert!(!Claim::ReminderTime.made_by("light_brighter"));
         assert!(!Claim::Schedule.made_by("light_brighter"));
         assert!(Claim::AnyCall.made_by("set_timer"));
     }
