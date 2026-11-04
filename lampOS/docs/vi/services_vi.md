@@ -247,6 +247,12 @@ backend của đèn, không bao giờ đến Google).
 | `hubspot` | HubSpot | `mcp.hubspot.com` | như Slack | như Slack |
 | `amplitude` | Amplitude | `mcp.amplitude.com`, `mcp.eu.amplitude.com` | như Slack | như Slack |
 
+Một lệnh gọi có thể gọi tên mã Gmail nào cũng được: `gmail` hay `gmail-app`
+đều đến liên kết Gmail mà đèn đang có, vì mô hình của giọng nói dùng lẫn hai
+tên (trên lamp-9adf ngày 4/11 nó gọi `gmail` ở hai trong bốn lần gửi và đèn
+nói Gmail chưa được liên kết). Xem phần đăng nhập chỉ-gửi trong mục Gmail bên
+dưới.
+
 Mọi dịch vụ HTTP cũng nhận `get {path, params}`: một đường dẫn thuần mà mô
 hình nêu, được kiểm tra theo danh sách đọc của dịch vụ đó như mọi lần đọc
 khác. Figma là `figma-api` như backend liệt kê cho đèn và `figma` như helper
@@ -378,6 +384,19 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
 - **Khi cả hai được liên kết**, một lần gửi có thể đi qua một trong hai; một
   lần đọc chỉ qua `gmail`. Mô tả của hàm đọc ghi `gmail-app: none, it only
   sends: reads use gmail`.
+- **Tên nào cũng đến được nó** (`serve.rs`, `linked_code`): một lệnh gọi tên
+  `gmail` khi chỉ `gmail-app` được liên kết thì dùng liên kết `gmail-app`, và
+  một lệnh gọi tên `gmail-app` khi chỉ `gmail` được liên kết thì dùng
+  `gmail`, liên kết cũng gửi được. Mô hình của giọng nói dùng lẫn hai tên
+  (lamp-9adf, 4/11), và mỗi lần gửi tên `gmail` đều bị báo "Gmail isn't
+  linked" dù đã liên kết. Bước thứ hai của một lần gửi so sánh hai tên theo
+  liên kết mà chúng đến, nên một lần gửi chuẩn bị bằng tên này và xác nhận
+  bằng tên kia vẫn đi; `send_id` của một dịch vụ khác vẫn bị từ chối. Một lần
+  đọc tên `gmail` khi chỉ `gmail-app` được liên kết trả lời rằng liên kết này
+  chỉ gửi (câu ở trên), không phải "isn't linked". Khi không cái nào được
+  liên kết, mỗi tên vẫn là "isn't linked" như trước. Không gì khác thay đổi:
+  liên kết chỉ-gửi vẫn không đọc gì và không bao giờ qua SMTP, và mọi cổng
+  ghi vẫn giữ nguyên.
 - **Làm mới:** qua backend dưới mã riêng của nó (`connector: "gmail-app"`),
   như của Google Calendar.
 
