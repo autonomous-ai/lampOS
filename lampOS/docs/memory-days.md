@@ -1003,6 +1003,19 @@ guards it (the reviewer-lead's P3s on #3852). Tests:
 `tidy::tests::a_question_is_only_asked_and_a_statement_is_not`,
 `it::days::a_question_is_never_kept_as_a_fact`.
 
+A name is kept only as its person gave it, seen speaking (lamp-06c1, 4 Nov:
+a coworker's "... Connie Long ..." kept as "Their name is Connie Long." for
+the owner, whose face was at the lamp, silent). Before `tidy_apply`, the
+voice leaves out a proposal giving the person's own name
+(`remember::named::name_in`) unless one exchange it cites was seen spoken
+by the conversation's person (one face, theirs: `remember::seen_by`, the
+ids carried with the job, never sent to the model) and in it they
+introduced themselves with that name, spelled it, or agreed with a plain
+yes, seen spoken too, to the lamp's read-back (#1057); not when that
+exchange's answer doubts what was heard (#3504 N5) or the name is the
+lamp's (#3504 N4). Names of others are judged as before. Always on; the
+store is unchanged. Tests: `remember::named::tests`.
+
 With a remote adapter, at most 32 KiB of serialized input per submitted
 job would leave the lamp: selected exchange text, timestamps, IDs,
 caller-supplied person scope and prior observations. Repeated attempts would

@@ -235,7 +235,13 @@ fn observe_barrier() -> Option<Result<u64, ()>> {
     let jobs = OBSERVING.get()?;
     let id = OBSERVE_SENT.fetch_add(1, Ordering::AcqRel) + 1;
     Some(
-        match jobs.try_send((None, json!({ OBSERVE_BARRIER: id }), 0, Vec::new())) {
+        match jobs.try_send((
+            None,
+            json!({ OBSERVE_BARRIER: id }),
+            0,
+            Vec::new(),
+            Vec::new(),
+        )) {
             Ok(()) => Ok(id),
             Err(_) => Err(()),
         },
