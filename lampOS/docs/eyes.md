@@ -997,7 +997,11 @@ this room" until someone asks to be recognised.
     - **A yes only from the named person's own scope** (Third on #1997).
       It's taken only when the request's admitted scope
       (`memory_scope::ScopeLease`) is that person's, and not narrowed to the
-      room by the speaking face. With the room's scope, someone else's, or
+      room by the speaking face. "That person's" is the memory id of the
+      name (`known_faces::memory_person`): with `LAMP_MEMORY_STABLE_ID`, the
+      id the eyes gave that name, so someone renamed A to B can say yes as
+      B, and a new face later saved as A (a `-2` id) is not theirs to agree
+      for (#5150's P3; `whose_yes`). With the room's scope, someone else's, or
       none, it's refused with nothing sent, and the model is told not to ask
       again then (`known_faces::NOT_SURE_WHOSE_YES`). The eyes' own check,
       the face at the lamp now, stays under it.
