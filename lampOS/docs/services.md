@@ -65,8 +65,8 @@ not by its own environment), whatever
 only on the second route, while the eyes count one face in view
 (`known_faces::most_faces_lately`, counted whenever `LAMP_SERVICES=on` there)
 and the line is in the conversation's voice
-(`same_voice::Voices::likeness_so_far` at `same_voice::SAME_FROM`, 0.70, or
-over; `services::read_in_full`). The services ask the second route's
+(`same_voice::Voices::likeness_so_far` at `same_voice::SERVICES_SAME_FROM`,
+0.55, or over; `services::read_in_full`). The services ask the second route's
 same-voice check through `services::judging_voices`, waiting up to 800 ms
 for a print. With `LAMP_SAME_VOICE_MODEL` and
 `LAMP_SAME_VOICE_FOR=services`, the second route makes its prints for these
@@ -608,7 +608,12 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
 - **The voice that said "send" is the one that asked.** The send line's
   print and the prepare line's are compared (`same_voice::Voices::alike`).
   A known other voice (both prints there, alike under
-  `same_voice::SAME_FROM`, 0.70) or another face seen saying the send line
+  `same_voice::SERVICES_SAME_FROM`, 0.55) or another face seen saying the send line
+  (looser than the conversation's `SAME_FROM`, 0.70, which the
+  conversation's rules keep: most owners are alone with the lamp, so a
+  lower bar keeps the owner from being refused while still turning away a
+  clearly different voice; CAM++ scores one speaker usually above 0.6, two
+  at 0.2-0.4)
   cancels it: the model is told `OTHER_VOICE`, "Not sent, and cancelled: I
   send only when the voice saying "send" is the one that asked for it. Say
   it was not sent." A print is made only of a line of 1.5 s of speech or
@@ -627,7 +632,7 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
   owner's voice print"): the send line's print is compared with the owner's
   print, averaged from several of their lines, instead of the prepare
   line's (`VoiceAsk::Owner`, `services::send_likeness`), at the same
-  `SAME_FROM`; the journal says only its cosine ("owner print: the send's
+  `SERVICES_SAME_FROM`; the journal says only its cosine ("owner print: the send's
   cosine 0.82"). Every other check above is unchanged. With no print, it is
   as above. After a send by an owner with no print, sent or refused as
   `OTHER_VOICE`, and their face seen saying it, the model is told once, as
@@ -761,7 +766,7 @@ and never taken from the executive's or a skill's folder.
 - **`service_read {service, what, …}`**: `what` and its arguments as in the
   table above; the answer quoted, cut to who and what about when the owner
   may not be alone. A read in full also needs the line in the
-  conversation's voice (`read_in_full`, a likeness of 0.70 or more), and
+  conversation's voice (`read_in_full`, a likeness of 0.55 or more), and
   the product sets no `LAMP_SAME_VOICE_MODEL`, so on a product lamp every
   read is cut (`BRIEF_NOTE`): how many, who from and what about, never what
   a mail or an event says.

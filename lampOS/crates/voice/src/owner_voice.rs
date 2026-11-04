@@ -3,7 +3,8 @@
 //! voice print"). On lamp-9adf a "send" line's 1.8 s print against the
 //! preparing line's 1.8 s print scored the owner's own voice 0.37-0.70
 //! against [`same_voice::SAME_FROM`], 0.70, so their sends were refused. A
-//! print averaged from several of the owner's lines is steadier.
+//! print averaged from a few of the owner's lines is steadier, and a send
+//! or a read in full is held to [`same_voice::SERVICES_SAME_FROM`], 0.55.
 //!
 //! The first builder's terms, each held here and tested below:
 //!
@@ -60,13 +61,14 @@ pub const ANSWER_WITHIN: Duration = Duration::from_secs(60);
 /// The owner's lines after the yes are learnt from within this; what was
 /// gathered by then and is not enough is dropped, never kept.
 pub const LEARN_WITHIN: Duration = Duration::from_secs(15 * 60);
-/// The least lines a print is made from.
-pub const LEAST_LINES: usize = 4;
-/// The least speech a print is made from, all lines together: 6 s. Each
+/// The least lines a print is made from: 2 (the owner, 4 Nov: most owners
+/// are alone with the lamp, so the print need not be strict).
+pub const LEAST_LINES: usize = 2;
+/// The least speech a print is made from, all lines together: 3 s. Each
 /// line's print is of its first 1.5 s of speech at most
 /// (`same_voice::ASKED_AT`), 1.2 s at least (`same_voice::LEAST_SAMPLES`),
-/// so it is 4 to 5 lines.
-pub const LEAST_SPEECH: usize = same_voice::RATE * 6;
+/// so it is 2 to 3 lines.
+pub const LEAST_SPEECH: usize = same_voice::RATE * 3;
 /// Lines whose print is still to come, waited for.
 const WAITING_LINES: usize = 8;
 /// The most of the lamp's words kept to find the ask in.
@@ -512,6 +514,10 @@ impl State {
                 ));
                 continue;
             }
+            // A line unlike the lines so far is not used: being seen saying
+            // it proves the face moved, not whose voice it was, and at 2
+            // lines one other voice would be half the print (Thirteen's P2
+            // on #5246). The owner's own lines stay above DIFFERENT_BELOW.
             if !lines.is_empty() {
                 let likeness = mean(lines).and_then(|mean| same_voice::cosine(&mean, &print));
                 match likeness {
@@ -971,7 +977,7 @@ mod tests {
         offer_lines(&mut state, 12..19, now, &theirs);
         let kept = state.store.read().unwrap();
         assert_eq!(kept.owner, OWNER);
-        assert_eq!(kept.lines, 4, "12, 14, 16, 18 alone");
+        assert_eq!(kept.lines, 2, "12 and 14 alone");
         assert!(
             said.lock()
                 .unwrap()
@@ -983,40 +989,62 @@ mod tests {
         assert!(state.enrolled("bo").is_none());
     }
 
-    /// From at least LEAST_LINES lines and 6 s of speech; a line unlike
-    /// the others is left out; too long after the yes, what was gathered
-    /// is dropped.
+    /// From 2 lines and 3 s of speech: two whole lines of 1.5 s each make
+    /// a print.
     #[test]
-    fn a_print_needs_four_lines_and_six_seconds_of_steady_speech() {
+    fn two_lines_and_three_seconds_make_a_print() {
+        assert_eq!((LEAST_LINES, LEAST_SPEECH), (2, same_voice::RATE * 3));
+        let now = Instant::now();
+        let dir = folder("two");
+        let (mut state, said) = journaled(store(&dir));
+        asked_and_answered(&mut state, "Yes.", now);
+        offer_lines(&mut state, 12..13, now, &|_, _| true);
+        assert!(state.store.read().is_none(), "one line is not enough");
+        offer_lines(&mut state, 13..14, now, &|_, _| true);
+        let kept = state.store.read().unwrap();
+        assert_eq!((kept.lines, kept.speech_ms), (2, 3_000));
+        assert!(
+            said.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line.ends_with("2 lines, 3.0 s: kept"))
+        );
+    }
+
+    /// Under 3 s of speech is not enough, however many lines; a line
+    /// unlike the others is left out and the next line waited for; too long
+    /// after the yes, what was gathered is dropped.
+    #[test]
+    fn a_print_needs_three_seconds_and_an_unlike_line_is_left_out() {
         let now = Instant::now();
         let dir = folder("enough");
         let owner_seen = |_: u64, _: &str| true;
         let (mut state, said) = journaled(store(&dir));
         asked_and_answered(&mut state, "Yes.", now);
-        // Four short lines, 1.2 s each: 4.8 s is not enough.
+        // Two short lines, 1.2 s each: 2.4 s is not enough.
         let short = same_voice::RATE * 6 / 5;
-        for line in 12..16 {
+        for line in 12..14 {
             state.offer(line, now, 2_000, |r| Some((print(0, r), short)), owner_seen);
         }
         assert!(state.store.read().is_none());
         // Another voice is left out.
-        state.offer(16, now, 2_000, |r| Some((print(5, r), FULL)), owner_seen);
+        state.offer(14, now, 2_000, |r| Some((print(5, r), FULL)), owner_seen);
         assert!(state.store.read().is_none());
-        state.offer(17, now, 2_000, |r| Some((print(0, r), FULL)), owner_seen);
+        state.offer(15, now, 2_000, |r| Some((print(0, r), FULL)), owner_seen);
         let kept = state.store.read().unwrap();
-        assert_eq!((kept.lines, kept.speech_ms), (5, 6_300));
+        assert_eq!((kept.lines, kept.speech_ms), (3, 3_900));
         let said = said.lock().unwrap();
-        assert!(said.iter().any(|line| line.contains("request 16: unlike")));
+        assert!(said.iter().any(|line| line.contains("request 14: unlike")));
         assert!(
             said.iter()
-                .any(|line| line.ends_with("5 lines, 6.3 s: kept"))
+                .any(|line| line.ends_with("3 lines, 3.9 s: kept"))
         );
         // Too slow: dropped, never kept.
         state.store.wipe().unwrap();
         let (mut state, _) = journaled(store(&dir));
         asked_and_answered(&mut state, "Yes.", now);
-        offer_lines(&mut state, 12..14, now, &owner_seen);
-        offer_lines(&mut state, 14..20, now + LEARN_WITHIN * 2, &owner_seen);
+        offer_lines(&mut state, 12..13, now, &owner_seen);
+        offer_lines(&mut state, 13..20, now + LEARN_WITHIN * 2, &owner_seen);
         assert!(state.store.read().is_none());
     }
 
@@ -1030,7 +1058,7 @@ mod tests {
         let owner_seen = |_: u64, _: &str| true;
         state.offer(12, now, 2_000, |_| None, owner_seen);
         offer_lines(&mut state, 13..16, now, &owner_seen);
-        assert_eq!(state.store.read().map(|kept| kept.lines), Some(4));
+        assert_eq!(state.store.read().map(|kept| kept.lines), Some(2));
     }
 
     /// The journal holds counts and cosines only: no print's value.

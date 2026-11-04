@@ -674,7 +674,7 @@ pub fn gate(
     // speaking it, cancels it; no print yet keeps it for one more try.
     match turn.alike {
         _ if turn.other_seen => return Err(json!({ "error": OTHER_VOICE })),
-        Some(alike) if alike >= crate::same_voice::SAME_FROM => {}
+        Some(alike) if alike >= crate::same_voice::SERVICES_SAME_FROM => {}
         Some(_) => return Err(json!({ "error": OTHER_VOICE })),
         None if kept.asked_again.is_none() => {
             *pending = Some(Pending {
@@ -802,9 +802,11 @@ fn owner_alone() -> bool {
 /// Whether a read is said in full: the owner's face seen saying the line
 /// (`seen_saying_owner`), the owner the one face in view, and the line in
 /// the conversation's voice ([`VoiceAsk::Conversation`] at
-/// `same_voice::SAME_FROM` or over). Anything unknown is no.
+/// `same_voice::SERVICES_SAME_FROM`, 0.55, or over). Anything unknown is no.
 pub fn read_in_full(alone: bool, likeness: Option<f32>, seen_owner: bool) -> bool {
-    seen_owner && alone && likeness.is_some_and(|likeness| likeness >= crate::same_voice::SAME_FROM)
+    seen_owner
+        && alone
+        && likeness.is_some_and(|likeness| likeness >= crate::same_voice::SERVICES_SAME_FROM)
 }
 
 /// Whether the owner's face (memory id `owner`) was seen saying the line
@@ -1479,7 +1481,7 @@ mod tests {
             ("another voice", Some(0.3), false),
             (
                 "just under",
-                Some(crate::same_voice::SAME_FROM - 0.01),
+                Some(crate::same_voice::SERVICES_SAME_FROM - 0.01),
                 false,
             ),
             ("another face seen saying it", Some(0.9), true),
@@ -1494,6 +1496,29 @@ mod tests {
             assert_eq!(refused["error"], OTHER_VOICE, "{why}");
             assert_eq!(pending, None, "{why}");
         }
+    }
+
+    /// The services' bar is looser than the conversation's (the owner,
+    /// 4 Nov: most owners are alone with the lamp): a send, and a read in
+    /// full, at 0.6 pass; at 0.4, a clearly different voice, they don't.
+    #[test]
+    fn a_services_likeness_of_0_6_passes_and_0_4_is_refused() {
+        let now = Instant::now();
+        let mut pending = waiting(now);
+        let turn = Turn {
+            alike: Some(0.6),
+            ..heard("send it", 10)
+        };
+        assert!(gate(&mut pending, &send("s1"), 11, &turn, at(now)).is_ok());
+        let mut pending = waiting(now);
+        let turn = Turn {
+            alike: Some(0.4),
+            ..heard("send it", 10)
+        };
+        let refused = gate(&mut pending, &send("s1"), 11, &turn, at(now)).expect_err("0.4");
+        assert_eq!(refused["error"], OTHER_VOICE);
+        assert!(read_in_full(true, Some(0.6), true));
+        assert!(!read_in_full(true, Some(0.4), true));
     }
 
     #[test]
