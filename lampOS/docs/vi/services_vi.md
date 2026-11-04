@@ -118,7 +118,12 @@ bật trên mọi đèn, như `lamp-addons.service`, nhưng `lamp-services` khô
 socket nào trừ khi `LAMP_SERVICES=on` có trong môi trường của nó (hoặc nó được
 khởi động với `--enable`, mà unit của nó không truyền vào): khi tắt, nó ghi
 một dòng và thoát 0 ngay, nên unit ở trạng thái inactive và không bị khởi động
-lại. Ba unit sản phẩm, `lamp-services.service`, `lamp-cloud.service` và
+lại. Nó chỉ khởi động khi setup đã xong và đã có tài khoản của setup
+(`/etc/lampOS/setup/backend.json`) cùng khoá của giọng nói
+(`/etc/lampOS/voice/credential`), như `lamp-cloud`: systemd làm hỏng một unit
+có file `LoadCredential=` bị thiếu, và trên lamp-75c9, một đèn dev chưa từng
+được setup từ ứng dụng, nó đã hỏng lặp lại ngày 4/11. Thiếu chúng, unit bị bỏ
+qua và ở trạng thái inactive. Ba unit sản phẩm, `lamp-services.service`, `lamp-cloud.service` và
 `lamp-voice.service`, mỗi unit đặt `LAMP_SERVICES=on`, chỉ để đọc: đã đọc thử
 trên lamp-9adf bằng chính các binary của bản 9928 ngày 4/11. Một drop-in đặt
 `LAMP_SERVICES=off` sẽ tắt chúng. Không unit sản phẩm nào đặt
