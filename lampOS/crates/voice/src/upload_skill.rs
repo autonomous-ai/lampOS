@@ -44,8 +44,9 @@ pub const SKILLS_FOLDER: &str = "/var/lib/lampOS/skills";
 /// Skills pushed from a computer (`lamp_skills::PUSHED_DIR`).
 pub const PUSHED_FOLDER: &str = "/var/lib/lampOS/skills-dev";
 /// The most of a written skill's note: the file's text, the model's
-/// instruction.
-pub const MOST_NOTE_BYTES: usize = 2_000;
+/// instruction. The say service refuses longer words at every call, so a
+/// longer note would be put on and never work (Thirteen's P2 on #5080).
+pub const MOST_NOTE_BYTES: usize = crate::say::MOST_WORDS_BYTES;
 /// What a refusal says with the switch off.
 pub const OFF: &str = "not on this lamp: a skill added from a file";
 /// What a refusal says without the say service, so nothing could be asked
@@ -168,6 +169,10 @@ pub fn take(
     skill_md: &str,
     at_unix_ms: u64,
 ) -> Result<Made, Refused> {
+    // A file saved with Windows line endings reads as any other.
+    let skill_md = &skill_md.replace("\r\n", "\n");
+    let skill_toml = skill_toml.map(|toml| toml.replace("\r\n", "\n"));
+    let skill_toml = skill_toml.as_deref();
     let name =
         made_skill::card_name(skill_md).ok_or_else(|| Refused(made_skill_md_unread(), None))?;
     if !(1..=64).contains(&name.len())
@@ -342,6 +347,27 @@ mod tests {
         assert!(line.ends_with(made_skill::ASK_TO_PUT_ON), "{line}");
         // Its words are the lamp's plain ones, never the file's.
         assert!(!line.contains("SECRET-WORDS"), "{line}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A note the say service would refuse at every call is refused here,
+    /// and a file with Windows line endings reads as any other (Thirteen's
+    /// P2 and P3 on #5080).
+    #[test]
+    fn a_note_past_the_say_bound_is_refused_and_crlf_is_read() {
+        let body = "a".repeat(crate::say::MOST_WORDS_BYTES + 1);
+        let long = format!("---\nname: tea-tip\ndescription: A tip.\n---\n{body}\n");
+        let why = written(&long).unwrap_err().0;
+        assert!(why.contains("longer than 900 bytes"), "{why}");
+        let fits = format!(
+            "---\nname: tea-tip\ndescription: A tip.\n---\n{}\n",
+            "a".repeat(crate::say::MOST_WORDS_BYTES)
+        );
+        assert!(written(&fits).is_ok());
+        let (root, keeping) = keeping("upload-crlf");
+        let crlf = CARD.replace('\n', "\r\n");
+        let made = take(&place(&root), &keeping, None, &crlf, NOW).unwrap();
+        assert_eq!(made.name, "tea-tip");
         let _ = std::fs::remove_dir_all(&root);
     }
 

@@ -2417,7 +2417,7 @@ hears `success` only after the spoken yes):
    say = "THE TEXT AFTER THE FRONT MATTER, ON ONE LINE"
    ```
    No trigger: the model calls its function when the person asks for it, and
-   its note, the file's text (at most 2,000 bytes), is the model's
+   its note, the file's text (at most 900 bytes, the say service's bound on words, so a longer one is refused rather than put on and failing at every call; a file with Windows line endings reads as any other), is the model's
    instruction for its own answer. A name that can't be a function's (not
    starting with a letter, or longer than 48) is refused.
 3. **The cap** (`made_skill::capped_added`): a made skill's, with two
