@@ -851,6 +851,9 @@ the shoulder (servo 2) and the elbow (servo 3):
   for less than that, somebody walking past, wakes nothing. Not yet seen on
   a lamp: whether a folded lamp-4ace's camera sees a person at the desk at
   all.
+- Asleep for the night with `LAMP_NIGHT_STAYS_FOLDED=on` (#5156, "On the
+  bus" below), a folded lamp is not raised by the voice listening or
+  thinking alone; its name, a tap, a face or an answer still raise it.
 - The way is one number from 0, folded, to 1, stood up. It moves at most the
   whole way in `--stand-seconds` (5 without it; 2 to 20), reaching that speed
   in half a second, and the two joints follow it eased at both ends, so
@@ -2488,6 +2491,32 @@ same from another part, a mute for another reason, a value older than its
 three seconds, nothing kept or a bus it cannot reach is not asleep, and is no wake
 either: a folded lamp stays down until a mood or somebody in front of it
 stands it up. Without the switch nothing is read.
+
+**Asleep for the night** (#5156). With `LAMP_NIGHT_STAYS_FOLDED=on` (off
+by default and in the product, until a lamp check), a body that can reach
+the bus also reads `expression/state` at most every quarter of a second
+(`src/night_in.rs`): only Expression (the topic's publisher `expression`),
+enabled, saying `asleep` true within the half second a state lasts, as the
+voice's night face reads it ([bedtime-morning.md](bedtime-morning.md)).
+While Expression says so and the lamp is folded (its awake time over), the
+body latches the night's sleep. Latched, the voice listening or thinking
+alone is rest to the body: the lamp stays folded through a line in the
+room not meant for it, as a sleeping creature stays curled up at a sound
+(on lamp-06c1 it stood for each of three night lines and stayed up about
+80 s). The latch is held through Expression's own end of its rest the
+moment the voice listens, which is why it is set before the line. It lets
+go, and the lamp rises as ever, at its name heard (`name/heard`, with
+`--look-at-name`), a tap that wakes a hand's sleep, a face in front of it
+(company), or the lamp answering (`speaking`, or a skill's `reading`). It
+also lets go once Expression has not said asleep for 120 s
+(`body::NIGHT_LAPSE`): awake for the morning, or gone quiet, so a stale
+sleep never keeps the lamp folded for good. A night line and Expression's
+settling again 30 s after it fit well inside that, and the bound counts
+from the last time it said asleep. The journal says when it latches
+(`asleep for the night and folded`), each line slept through
+(`the voice listens and it stays folded`), and why it let go. A call at
+night stands the lamp as a call by day does; a softer stir for it is not
+built. Without the switch nothing is read and the body is as before.
 
 The loop that talks to the servos never waits for the bus. It hands
 every fourth step to a thread of its own, which has room for sixteen; a

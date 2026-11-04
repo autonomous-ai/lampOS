@@ -3084,6 +3084,7 @@ fn gesture_run(
                 held: false,
                 aim: None,
                 unseat: false,
+                night: false,
                 asleep: false,
                 woken: false,
             }
@@ -3160,6 +3161,7 @@ fn expression_run_with(
             held: false,
             aim: None,
             unseat: false,
+            night: false,
             asleep: false,
             woken: false,
         },
@@ -3326,6 +3328,7 @@ fn speaking_run_with(
             held: false,
             aim: None,
             unseat: false,
+            night: false,
             asleep: false,
             woken: false,
         },
@@ -4035,6 +4038,7 @@ fn rest_glances_watched(
             held: false,
             aim: None,
             unseat: false,
+            night: false,
             asleep: false,
             woken: false,
         },
@@ -4455,6 +4459,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             held: false,
             aim: None,
             unseat: false,
+            night: false,
             asleep: false,
             woken: false,
         },
@@ -4522,6 +4527,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             held: false,
             aim: None,
             unseat: false,
+            night: false,
             asleep: false,
             woken: false,
         },
@@ -4607,6 +4613,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 held: false,
                 aim: None,
                 unseat: false,
+                night: false,
                 asleep: false,
                 woken: false,
             }
@@ -5031,6 +5038,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     held: false,
                     aim: None,
                     unseat: false,
+                    night: false,
                     asleep: false,
                     woken: false,
                 }
@@ -5111,6 +5119,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 held: false,
                 aim: None,
                 unseat: false,
+                night: false,
                 asleep: false,
                 woken: false,
             }
@@ -5198,6 +5207,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 held: false,
                 aim: None,
                 unseat: false,
+                night: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -8035,6 +8045,7 @@ fn called_run(
                 held: false,
                 aim: None,
                 unseat: false,
+                night: false,
                 asleep: false,
                 woken: false,
             }
@@ -8773,6 +8784,263 @@ fn woken_after_a_hands_sleep_it_stands_at_once() {
     assert!(at(secs(14) + Duration::from_millis(200)) > 0.0);
     assert_eq!(at(secs(20)), 1.0);
     assert_eq!(at(secs(23)), 1.0);
+}
+
+/// A folded lamp at night (#5156), under `look_at_name` as the product
+/// runs: each step's mood is `mood(now)` and what reaches it `ask(now)`,
+/// on top of Expression saying asleep while `asleep(now)`. The eyes look
+/// six times a second and see a face while `face(now)`. Each step's time
+/// and how far up it stood.
+fn night_run(
+    seconds: u64,
+    mood: impl Fn(Duration) -> Mood + 'static,
+    asleep: impl Fn(Duration) -> bool + 'static,
+    face: impl Fn(Duration) -> bool + 'static,
+    ask: impl Fn(Duration) -> Asked + 'static,
+) -> Vec<(Duration, f32)> {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        look_at_name: true,
+        ..gesture_limits()
+    };
+    let (heard, time, seen_at) = (clock.time.clone(), clock.time.clone(), clock.time.clone());
+    let mut last = Duration::ZERO;
+    let mut steps = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 90)),
+        Some(Looking::new([342, 200], [250, 120]).unwrap()),
+        move || Some((mood(heard.get()), 0)),
+        move || {
+            let now = time.get();
+            let look = now.saturating_sub(last) >= Duration::from_millis(150);
+            if look {
+                last = now;
+            }
+            Asked {
+                seen: look.then(|| Seen {
+                    face: face(now).then_some(crate::gaze::Sight {
+                        x: 0.0,
+                        y: 0.0,
+                        size: 0.2,
+                        turned: 0.0,
+                    }),
+                }),
+                night: asleep(now),
+                ..ask(now)
+            }
+        },
+        |glimpse| steps.push((seen_at.get(), glimpse.stand)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    steps
+}
+
+/// The highest it stood between `from` and `to`.
+fn highest(steps: &[(Duration, f32)], from: Duration, to: Duration) -> f32 {
+    steps
+        .iter()
+        .filter(|(at, _)| (from..to).contains(at))
+        .map(|(_, stand)| *stand)
+        .fold(0.0, f32::max)
+}
+
+/// The night's sleep up to 5 s, ended by the voice listening at 5 s as
+/// Expression ends it (`docs/bedtime-morning.md`): a room line from 5 s,
+/// listening three seconds and thinking one, then rest.
+fn room_line(now: Duration) -> Mood {
+    let secs = Duration::from_secs;
+    if (secs(5)..secs(8)).contains(&now) {
+        Mood::Listening
+    } else if (secs(8)..secs(9)).contains(&now) {
+        Mood::Thinking
+    } else {
+        Mood::Resting
+    }
+}
+
+fn asleep_until_five(now: Duration) -> bool {
+    now < Duration::from_secs(5)
+}
+
+fn nobody(_: Duration) -> bool {
+    false
+}
+
+fn nothing(_: Duration) -> Asked {
+    Asked::default()
+}
+
+/// Asleep at night and folded, a room line not meant for the lamp (the
+/// voice listening, then thinking, and no answer) leaves it folded
+/// (lamp-06c1, #5156: it stood for each of three and stayed up 80 s).
+#[test]
+fn asleep_at_night_a_room_line_leaves_it_folded() {
+    let steps = night_run(20, room_line, asleep_until_five, nobody, nothing);
+    assert_eq!(
+        highest(&steps, Duration::ZERO, Duration::from_secs(20)),
+        0.0
+    );
+}
+
+/// Without the switch Expression's sleep never reaches the body: the same
+/// line stands it up, as before.
+#[test]
+fn without_the_night_switch_a_room_line_stands_it_up_as_before() {
+    let steps = night_run(20, room_line, |_| false, nobody, nothing);
+    assert_eq!(highest(&steps, Duration::ZERO, Duration::from_secs(5)), 0.0);
+    assert_eq!(
+        highest(&steps, Duration::from_secs(5), Duration::from_secs(20)),
+        1.0
+    );
+}
+
+/// Its name heard at the line's start stirs it: it rises at once.
+#[test]
+fn asleep_at_night_its_name_rises_it() {
+    let steps = night_run(20, room_line, asleep_until_five, nobody, |now| Asked {
+        called: (Duration::from_secs(5)..Duration::from_millis(5_020)).contains(&now),
+        ..Asked::default()
+    });
+    assert_eq!(highest(&steps, Duration::ZERO, Duration::from_secs(5)), 0.0);
+    assert!(highest(&steps, Duration::from_secs(5), Duration::from_millis(5_300)) > 0.0);
+    assert_eq!(
+        highest(&steps, Duration::from_secs(5), Duration::from_secs(20)),
+        1.0
+    );
+}
+
+/// A tap on the head (the voice open again after a hand's sleep) rises it.
+#[test]
+fn asleep_at_night_a_tap_rises_it() {
+    let steps = night_run(20, room_line, asleep_until_five, nobody, |now| Asked {
+        woken: (Duration::from_secs(6)..Duration::from_millis(6_020)).contains(&now),
+        ..Asked::default()
+    });
+    assert_eq!(highest(&steps, Duration::ZERO, Duration::from_secs(6)), 0.0);
+    assert!(highest(&steps, Duration::from_secs(6), Duration::from_millis(6_300)) > 0.0);
+    assert_eq!(
+        highest(&steps, Duration::from_secs(6), Duration::from_secs(20)),
+        1.0
+    );
+}
+
+/// The lamp answering (speaking) is a line for it: it rises.
+#[test]
+fn asleep_at_night_an_answer_rises_it() {
+    let answered = |now: Duration| {
+        if (Duration::from_secs(9)..Duration::from_secs(11)).contains(&now) {
+            Mood::Speaking
+        } else {
+            room_line(now)
+        }
+    };
+    let steps = night_run(20, answered, asleep_until_five, nobody, nothing);
+    assert_eq!(highest(&steps, Duration::ZERO, Duration::from_secs(9)), 0.0);
+    assert!(highest(&steps, Duration::from_secs(9), Duration::from_millis(9_300)) > 0.0);
+    assert_eq!(
+        highest(&steps, Duration::from_secs(9), Duration::from_secs(20)),
+        1.0
+    );
+}
+
+/// Somebody sitting down in front of it rises it, line or not.
+#[test]
+fn asleep_at_night_a_face_rises_it() {
+    let steps = night_run(
+        20,
+        room_line,
+        asleep_until_five,
+        |now| now >= Duration::from_secs(10),
+        nothing,
+    );
+    assert_eq!(
+        highest(&steps, Duration::ZERO, Duration::from_secs(10)),
+        0.0
+    );
+    assert_eq!(
+        highest(&steps, Duration::from_secs(10), Duration::from_secs(20)),
+        1.0
+    );
+}
+
+/// Expression gone quiet after saying asleep holds it folded no longer
+/// than `NIGHT_LAPSE`: a line within it leaves it folded, one after it
+/// stands it up.
+#[test]
+fn the_night_latch_lets_go_when_expression_goes_quiet() {
+    let lapse = NIGHT_LAPSE.as_secs();
+    let line = move |now: Duration| {
+        let at =
+            |from: u64| (Duration::from_secs(from)..Duration::from_secs(from + 3)).contains(&now);
+        if at(30) || at(lapse + 5) {
+            Mood::Listening
+        } else {
+            Mood::Resting
+        }
+    };
+    let steps = night_run(
+        lapse + 15,
+        line,
+        |now| now < Duration::from_secs(2),
+        nobody,
+        nothing,
+    );
+    assert_eq!(
+        highest(&steps, Duration::ZERO, Duration::from_secs(lapse)),
+        0.0
+    );
+    assert_eq!(
+        highest(
+            &steps,
+            Duration::from_secs(lapse + 5),
+            Duration::from_secs(lapse + 15)
+        ),
+        1.0
+    );
+}
+
+/// Settling again after a night line keeps it latched, and the bound
+/// counts from the last time Expression said asleep: awake in the morning
+/// for longer than `NIGHT_LAPSE`, a line stands it up.
+#[test]
+fn the_night_latch_counts_from_the_last_sleep_said() {
+    let lapse = NIGHT_LAPSE.as_secs();
+    let line = move |now: Duration| {
+        let at =
+            |from: u64| (Duration::from_secs(from)..Duration::from_secs(from + 3)).contains(&now);
+        if at(5) || at(lapse + 30) || at(2 * lapse + 70) {
+            Mood::Listening
+        } else {
+            Mood::Resting
+        }
+    };
+    // Asleep to the first line, settled again from 40 s to 60 s, then
+    // awake for the morning.
+    let asleep = |now: Duration| {
+        now < Duration::from_secs(5)
+            || (Duration::from_secs(40)..Duration::from_secs(60)).contains(&now)
+    };
+    let steps = night_run(2 * lapse + 80, line, asleep, nobody, nothing);
+    // The second line is more than `NIGHT_LAPSE` after the first ended the
+    // sleep, but within it of the settling: still folded.
+    assert_eq!(
+        highest(&steps, Duration::ZERO, Duration::from_secs(2 * lapse + 70)),
+        0.0
+    );
+    assert_eq!(
+        highest(
+            &steps,
+            Duration::from_secs(2 * lapse + 70),
+            Duration::from_secs(2 * lapse + 80)
+        ),
+        1.0
+    );
 }
 
 /// A gesture a folded lamp was rising for when a hand put it to sleep is

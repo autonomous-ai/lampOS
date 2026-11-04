@@ -565,6 +565,14 @@ const COMPANY_SIGHTS: u8 = 6;
 /// goes on; and a call this soon after the last one is let go.
 const CALLED_FOR: Duration = Duration::from_secs(2);
 const CALLED_EVERY: Duration = Duration::from_secs(10);
+/// Under `LAMP_NIGHT_STAYS_FOLDED` (#5156): the night's sleep, latched
+/// while the lamp is folded ([`Asked::night`]), is let go once Expression
+/// has not said asleep for this long. Expression ends its rest the moment
+/// the voice listens and settles again 30 s after the voice rests
+/// (`docs/bedtime-morning.md`, "Settling again after a night sound"), so a
+/// night line and its settling fit well inside it; Expression awake in the
+/// morning, or gone quiet, holds the lamp folded no longer than this.
+pub const NIGHT_LAPSE: Duration = Duration::from_secs(120);
 
 /// A gesture asked on the mood socket, not one the body makes of itself:
 /// a shift at rest (`crate::idle`, `IDLE` among them) or the turn to a call.
@@ -632,6 +640,11 @@ pub struct Asked {
     /// button a second, or a health check started, since the lamp was
     /// seated. It may stand again.
     pub unseat: bool,
+    /// Expression says now that the lamp is asleep for the night
+    /// (`expression/state` `asleep`, `crate::night_in`, #5156). Only with
+    /// `LAMP_NIGHT_STAYS_FOLDED=on`; the body latches it while folded, so a
+    /// line not meant for it leaves it folded (see [`NIGHT_LAPSE`]).
+    pub night: bool,
 }
 
 impl Asked {
@@ -655,6 +668,7 @@ impl Asked {
         held: false,
         aim: None,
         unseat: false,
+        night: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -678,6 +692,7 @@ impl Asked {
         held: false,
         aim: None,
         unseat: false,
+        night: false,
     };
 }
 
@@ -3890,6 +3905,7 @@ pub(crate) fn run_looking(
         held: false,
         aim: None,
         unseat: false,
+        night: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5112,6 +5128,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut heard: Option<(Mood, u8, Duration)> = None;
     // Under `Limits::look_at_name`: when the last call was taken.
     let mut called_at: Option<Duration> = None;
+    // Under `LAMP_NIGHT_STAYS_FOLDED` (#5156, `Asked::night`): asleep for
+    // the night while folded, held through Expression's own end of its
+    // rest as a line begins; when Expression last said asleep; and whether
+    // a line is being slept through now, for the journal.
+    let mut night_latched = false;
+    let mut night_said: Option<Duration> = None;
+    let mut slept_through = false;
     // The last step's mood was a conversation's (listening, thinking or
     // speaking): one beginning ends an unprompted gesture.
     let mut talked = false;
@@ -5364,6 +5387,69 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let (mood, level) = match (leaving, heard) {
             (None, Some((mood, level, at))) if now.saturating_sub(at) < MOOD_STALE => (mood, level),
             _ => (Mood::Resting, 0),
+        };
+        // Asleep for the night (#5156): latched while folded, so a line not
+        // meant for the lamp (the voice listening, or thinking, alone)
+        // leaves it folded, as a sleeping creature stays curled up at a
+        // sound in the room (CLAUDE.md rule 8). Expression ends its rest the
+        // moment the voice listens, so what it says now cannot be waited
+        // for: the latch was set before the line. Its name, a tap, a face
+        // or the lamp answering let go of it and stand it as ever, and so
+        // does Expression not saying asleep for `NIGHT_LAPSE`, gone quiet
+        // or awake for the morning. `Asked::night` is never true without
+        // the switch, and then nothing here changes.
+        if asked_now.night {
+            night_said = Some(now);
+        }
+        let stirred = if company {
+            Some("a face is in front of it")
+        } else if asked_now.woken {
+            Some("a tap woke it")
+        } else if asked_now.called {
+            Some("its name was heard")
+        } else if matches!(mood, Mood::Speaking | Mood::Reading) {
+            Some("it is answering")
+        } else if night_said.is_none_or(|at| now.saturating_sub(at) >= NIGHT_LAPSE) {
+            Some("Expression has not said asleep for the bound")
+        } else {
+            None
+        };
+        if night_latched && let Some(why) = stirred {
+            night_latched = false;
+            slept_through = false;
+            eprintln!(
+                "lamp-body: step {}: the night's sleep let go: {why}",
+                report.steps
+            );
+        } else if !night_latched
+            && stirred.is_none()
+            && asked_now.night
+            && standing.is_some()
+            && awake_until.is_none_or(|until| now >= until)
+        {
+            night_latched = true;
+            eprintln!(
+                "lamp-body: step {}: asleep for the night and folded: a line alone leaves it so",
+                report.steps
+            );
+        }
+        let sleeps_through = night_latched && matches!(mood, Mood::Listening | Mood::Thinking);
+        if sleeps_through && !slept_through {
+            eprintln!(
+                "lamp-body: step {}: asleep for the night: the voice {} and it stays folded",
+                report.steps,
+                if mood == Mood::Listening {
+                    "listens"
+                } else {
+                    "thinks"
+                }
+            );
+        }
+        slept_through = sleeps_through;
+        let (mood, level) = if sleeps_through {
+            (Mood::Resting, 0)
+        } else {
+            (mood, level)
         };
         // Called by its name, and not speaking: spoken to, for a moment.
         // With nobody in view it also glances, once it stands: as long as
