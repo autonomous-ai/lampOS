@@ -274,3 +274,18 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   nightly ops. Like #5052 it conflicts with lamp-voice since #5043
   (`days_protocol.rs`, memory-days_vi.md); the three memory PRs all owe
   rebases in turn. Worktrees removed; all three reads Friday asked done.
+- 12:5x: stable 9980 (promote 12:35) still lists `held` under "built but
+  not on". Friday asked restates after the #5043 rebase: #5052
+  `0a932712c2` and #5097 `de822e4c0d`; range-diffs show only the merged
+  field lines (`session_open_with(…, profile)`; the known-fields list).
+- 13:1x: READ-OK `0a932712c2` restated on #5052 (lib 127, `it` 191/191);
+  Friday put it on NEXT TRAIN at 13:16 with Thirteen's.
+- 13:25: the Reviewer-lead HOLDs #5097 `de822e4c0d`: P2 `explicit()` is
+  `.any`, so one explicit keep exempts a whole episode from `private()`
+  (and `privacy()` reads only topic/gist/feeling, not the exchanges);
+  P2 the 512-item cap counts superseded rows and never frees; P2
+  duplicate switches.md rows after d8425a1a30; P3 quotes with no expiry.
+  My Tests READ-OK had said "every cited source": wrong, the test is
+  one-source so the mutation could not see it. 13:3x: said so on the PR,
+  withdrew that line, asked a two-source `private_kind` test on the FIXED
+  head; my gate on `de822e4c0d` stopped. 13:4x: the hour posted to Faye.
