@@ -111,7 +111,8 @@ an untrusted-data marker and the unknown-speaker scope. Empty results mean
 there is no matching memory, not permission to invent one.
 
 With `LAMP_MEMORY_RECALL_V2=on` (#2176; off unless set, with the Days
-client only, both voice routes), each recall's `search` or `recall` also
+client only, both voice routes; on in the product since 4 Nov, after
+lamp-06c1's check), each recall's `search` or `recall` also
 carries `"recall_v2":true`, and the model may give a span of days:
 `recall {about?, days_ago?, days_ago_from?, days_ago_to?}`, "last week"
 being 7 to 1. The voice sends the span as `day_from` and `day_to`
