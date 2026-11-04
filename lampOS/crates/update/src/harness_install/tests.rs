@@ -349,13 +349,14 @@ fn a_failed_install_is_recorded_without_blocking_and_tried_again() {
     let status = crate::status::status(&lamp.records(), "idle", None);
     assert_eq!(status.harness.unwrap().error.as_deref(), Some("installer"));
 
-    // The retry: the next round starts the one-shot again.
+    // The retry: the first round past the backoff starts the one-shot
+    // again (a_deterministic_failure_waits_out_its_backoff).
     let retried = after_round(
         lamp.root(),
         &lamp.records(),
         &Ok(None),
         &mut systemd,
-        3,
+        2 + RETRY_AFTER.as_millis() as u64,
         &mut quiet(),
     );
     assert_eq!(retried.unwrap().install, "installing");
@@ -446,6 +447,72 @@ fn a_failed_install_is_recorded_without_blocking_and_tried_again() {
             &mut quiet(),
         );
         assert_eq!(install(&lamp, &runs, 2).error.as_deref(), Some(reason));
+    }
+}
+
+/// A failure that the same steps would only repeat, `installer` or
+/// `no_user` (#5241's reader), is not tried after every round: the rounds
+/// within [`RETRY_AFTER`] of it start nothing, and the first past it tries
+/// again. One that may pass at once, `timeout` here, is tried at the next.
+#[test]
+fn a_deterministic_failure_waits_out_its_backoff() {
+    for (runs, reason, held) in [
+        (
+            Runs {
+                installer: Err("sh -c curl …: exit status: 1".into()),
+                ..Runs::new()
+            },
+            "installer",
+            true,
+        ),
+        (
+            Runs {
+                id: Err("id -u lampos: no such user".into()),
+                ..Runs::new()
+            },
+            "no_user",
+            true,
+        ),
+        (
+            Runs {
+                installer: Err("sh: did not end within 900 s: it ran on".into()),
+                ..Runs::new()
+            },
+            "timeout",
+            false,
+        ),
+    ] {
+        let lamp = Lamp::new();
+        let mut systemd = Fake::default();
+        let round = |systemd: &mut Fake, at: u64| {
+            after_round(
+                lamp.root(),
+                &lamp.records(),
+                &Ok(None),
+                systemd,
+                at,
+                &mut quiet(),
+            )
+        };
+        round(&mut systemd, 1);
+        let failed_at = 10 * MINUTE_MS;
+        assert_eq!(
+            install(&lamp, &runs, failed_at).error.as_deref(),
+            Some(reason)
+        );
+        let starts = |systemd: &Fake| systemd.asked.iter().filter(|a| **a == "start").count();
+        let soon = round(&mut systemd, failed_at + MINUTE_MS);
+        if held {
+            assert_eq!(soon, None, "{reason}: held");
+            let edge = failed_at + RETRY_AFTER.as_millis() as u64 - 1;
+            assert_eq!(round(&mut systemd, edge), None, "{reason}: held to its end");
+            assert_eq!(starts(&systemd), 1, "{reason}");
+            let past = round(&mut systemd, edge + 1);
+            assert_eq!(past.unwrap().install, "installing", "{reason}: past it");
+        } else {
+            assert_eq!(soon.unwrap().install, "installing", "{reason}: at once");
+        }
+        assert_eq!(starts(&systemd), 2, "{reason}");
     }
 }
 
