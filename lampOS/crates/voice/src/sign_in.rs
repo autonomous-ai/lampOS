@@ -117,6 +117,12 @@ impl AskAgain {
         due
     }
 
+    /// The question `key` was talked over or cut short (#5198). STUB.
+    pub fn cut(&mut self, key: &str) -> bool {
+        let _ = key;
+        false
+    }
+
     /// How many questions are followed: for a test.
     #[cfg(test)]
     fn followed(&self) -> usize {
@@ -2780,6 +2786,39 @@ mod tests {
         assert_eq!(again.heard(&heard), ["sign-in-2-asking"]);
         assert!(again.heard(&heard).is_empty());
         assert!(again.due(after, at(100)).is_empty());
+        assert_eq!(again.followed(), 0);
+    }
+
+    /// #5198: a question talked over is due at once, not
+    /// [`ASK_AGAIN_AFTER`] later, once; told again, its wait begins anew.
+    /// One not followed, other news, and the last of [`ASKED_MOST`]
+    /// tellings are never due by a cut.
+    #[test]
+    fn a_question_talked_over_is_due_at_once() {
+        let after = ASK_AGAIN_AFTER;
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let mut again = AskAgain::default();
+        // Not followed: nothing to make due.
+        assert!(!again.cut("sign-in-1-asking"));
+        assert!(!again.cut("s1:2:3"));
+        assert!(again.due(after, at(1)).is_empty());
+        assert!(again.told("sign-in-1-asking", at(0)));
+        assert!(again.cut("sign-in-1-asking"));
+        assert_eq!(again.due(after, at(1)), ["sign-in-1-asking"]);
+        // Once: offered already, a second cut makes nothing due.
+        assert!(!again.cut("sign-in-1-asking"));
+        assert!(again.due(after, at(2)).is_empty());
+        // Told again: its own wait, unless it is cut too.
+        assert!(again.told("sign-in-1-asking", at(3)));
+        assert!(again.due(after, at(4)).is_empty());
+        assert!(again.cut("sign-in-1-asking"));
+        assert_eq!(again.due(after, at(4)), ["sign-in-1-asking"]);
+        // The third telling is the last: cut, it is let go, not asked a
+        // fourth time.
+        assert!(again.told("sign-in-1-asking", at(5)));
+        assert!(again.cut("sign-in-1-asking"));
+        assert!(again.due(after, at(6)).is_empty());
         assert_eq!(again.followed(), 0);
     }
 

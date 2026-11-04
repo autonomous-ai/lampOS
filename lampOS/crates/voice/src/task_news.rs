@@ -214,7 +214,7 @@ const WOKEN_GAP: Duration = Duration::from_secs(1);
 
 /// What wakes the reading thread before its next read.
 #[derive(Debug, PartialEq, Eq)]
-enum Wake {
+pub(crate) enum Wake {
     /// News just told: kept in the file at once.
     Told(String),
     /// A task newly settled on `tasks/status` (#560): read now, not at the
@@ -223,6 +223,10 @@ enum Wake {
     /// News not heard whole, to tell once more ([`RETELL_ENVIRONMENT`]):
     /// offered again at the next read though it is kept as told.
     Retell(String),
+    /// A sign-in's question told (`Told` before) but talked over or cut
+    /// short, its key (#5198): offered again at once, to be asked at the
+    /// next pause, not once [`crate::sign_in::ASK_AGAIN_AFTER`] is past.
+    Cut(String),
 }
 
 /// A sign-in by voice followed by the news (#1676), with its switch: the
@@ -869,13 +873,24 @@ impl TaskNews {
         }
     }
 
-    /// News taken to tell, unasked or in an answer, whose turn was cut
-    /// short, never played or played with gaps (`coordinator`): with [`RETELL_ENVIRONMENT`]
-    /// on, each settled piece is told once more at the next quiet pause
+    /// News taken to tell, unasked or in an answer, whose turn was not
+    /// heard whole (talked over, cut short, never played or played with
+    /// gaps), as the turn ends (`coordinator`). A sign-in's question among
+    /// it is offered again now, to be asked at the next pause (#5198), not
+    /// [`crate::sign_in::ASK_AGAIN_AFTER`] later, whatever
+    /// [`RETELL_ENVIRONMENT`] says. With [`RETELL_ENVIRONMENT`]
+    /// on, each other settled piece is told once more at the next quiet pause
     /// ([`Self::retelling_first`]), offered again by the reader though it
     /// is kept as told. One not heard a second time is never told again
-    /// unasked: two tries at most. Off, nothing changes. Never waits.
+    /// unasked: two tries at most. Off, other news is left as it was.
+    /// Never waits.
     pub fn not_heard(&mut self, keys: Vec<String>) {
+        let (asked, keys): (Vec<String>, Vec<String>) = keys
+            .into_iter()
+            .partition(|key| crate::sign_in::asked_of(key).is_some());
+        for key in asked {
+            let _ = self.told.send(Wake::Cut(key));
+        }
         if !self.retell {
             return;
         }
@@ -1196,7 +1211,7 @@ fn read_forever(
                     offered.remove(&key);
                     retelling.insert(key);
                 }
-                Wake::Settled => {}
+                Wake::Settled | Wake::Cut(_) => {}
             }
         }
         // Read again each time: the provider worker keeps there what the
@@ -1286,6 +1301,7 @@ fn read_forever(
                     retelling.insert(key);
                     next = next.min(read_at + woken_gap);
                 }
+                Ok(Wake::Cut(_)) => {}
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
             }
@@ -4073,6 +4089,88 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// #5198: a sign-in's question talked over ([`Wake::Cut`], from
+    /// [`TaskNews::not_heard`]) is offered again at once, to be asked at
+    /// the next pause, not [`crate::sign_in::ASK_AGAIN_AFTER`] later: the
+    /// person's "Yes." to the question asked again is taken. Here the wait
+    /// is the lamp's own 30 s, and the question comes back within a second.
+    #[test]
+    fn a_sign_ins_question_talked_over_is_offered_again_at_once() {
+        let root = std::env::temp_dir().join(format!("task-news-ask-cut-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        for (name, answer) in [
+            (
+                "request.sock",
+                json!({"ok":true,"store_id":"s1","items":[]}),
+            ),
+            (
+                "voice.sock",
+                json!({"ok":true,"sign_in":"asking","email":"someone@example.com","id":7}),
+            ),
+        ] {
+            let listener = UnixListener::bind(root.join(name)).unwrap();
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let mut stream = stream.unwrap();
+                    let mut line = String::new();
+                    BufReader::new(&stream).read_line(&mut line).unwrap();
+                    writeln!(stream, "{answer}").unwrap();
+                }
+            });
+        }
+        let (offer, offered) = mpsc::channel();
+        let (wake, woken) = mpsc::channel();
+        let told_file = root.join("told");
+        let follow = SignInFollow {
+            on: true,
+            slow: false,
+            heard: Arc::new(Mutex::new(BTreeSet::new())),
+            again_after: crate::sign_in::ASK_AGAIN_AFTER,
+        };
+        let reader = {
+            let (directory, told_file, follow) = (root.clone(), told_file.clone(), follow.clone());
+            std::thread::spawn(move || {
+                let shared = Mutex::new(BTreeSet::new());
+                read_forever(
+                    &directory,
+                    &told_file,
+                    &offer,
+                    &woken,
+                    &shared,
+                    &|| Some(now()),
+                    Duration::from_millis(20),
+                    &follow,
+                );
+            })
+        };
+        let first = offered.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(first.key, "sign-in-7-asking");
+        // Taken to be told, then talked over as the turn ends.
+        wake.send(Wake::Told("sign-in-7-asking".into())).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        let cut_at = Instant::now();
+        wake.send(Wake::Cut("sign-in-7-asking".into())).unwrap();
+        let again = offered
+            .recv_timeout(Duration::from_secs(1))
+            .expect("the question talked over is offered again within a second");
+        assert_eq!(again.key, "sign-in-7-asking");
+        assert!(cut_at.elapsed() < crate::sign_in::ASK_AGAIN_AFTER / 10);
+        assert!(!read_told(&told_file).contains("sign-in-7-asking"));
+        // Told again and heard whole: never offered again, and kept.
+        wake.send(Wake::Told("sign-in-7-asking".into())).unwrap();
+        follow.heard.lock().unwrap().insert(7);
+        for _ in 0..3 {
+            std::thread::sleep(Duration::from_millis(60));
+            wake.send(Wake::Settled).unwrap();
+        }
+        assert!(offered.recv_timeout(Duration::from_millis(200)).is_err());
+        assert!(read_told(&told_file).contains("sign-in-7-asking"));
+        drop(wake);
+        reader.join().unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     /// #560: the tasks part is read at once when a task settles, not at the
     /// next of the ten-second reads; news told is kept at once and has
     /// nothing read. The least gap between two woken reads is 200 ms here,
@@ -4364,7 +4462,8 @@ mod tests {
     /// #4342 (b): without `LAMP_TASK_NEWS_RETELL=on` news not heard whole is
     /// as before: kept as told, never offered again. Heard after all (the
     /// person asked and heard the answer whole), news due once more is not
-    /// told again. Progress and a sign-in's question never are.
+    /// told again. Progress and a sign-in's question never are (the
+    /// question is offered again at once instead, #5198).
     #[test]
     fn news_is_told_once_more_only_with_the_switch_and_not_once_heard() {
         let (mut news, offer, wakes) = waiting_news();
@@ -4388,6 +4487,12 @@ mod tests {
             "sign-in-1-asking".into(),
             "nonsense".into(),
         ]);
+        // A sign-in's question is offered again at once instead (#5198),
+        // never told once more.
+        assert_eq!(
+            wakes.try_recv().unwrap(),
+            Wake::Cut("sign-in-1-asking".into())
+        );
         assert!(wakes.try_recv().is_err());
         assert_eq!(
             news.retelling.keys().collect::<Vec<_>>(),
