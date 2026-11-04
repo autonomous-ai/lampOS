@@ -242,6 +242,12 @@ pub fn never_read(code: &str) -> Option<&'static str> {
     (code == "gmail-app").then_some(GMAIL_APP_NO_READS)
 }
 
+/// The lamp's own zone's IANA name, as the system has it now; nothing when
+/// it names none.
+fn zone_here() -> Option<String> {
+    lamp_local_time::LocalTime::zone("system").ok()?.name()
+}
+
 /// How `what` is read from `code`, for `entry`'s account, at `now`.
 pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, String> {
     let service = catalog::service(code).ok_or("the lamp doesn't know that service")?;
@@ -298,6 +304,13 @@ pub fn plan(code: &str, args: &Value, entry: &Entry, now: i64) -> Result<Plan, S
             ];
             if let Some(to) = time(args, "to")? {
                 query.push(("timeMax", to.to_owned()));
+            }
+            // Its times in the lamp's own zone: without it Calendar answers
+            // in the calendar's zone, and on lamp-9adf on 5 Nov at 00:27 a
+            // 15:00 +07:00 event came back as 08:00Z and was said as "8 to 9
+            // AM your time".
+            if let Some(zone) = zone_here() {
+                query.push(("timeZone", zone));
             }
             get(&["calendar", "v3", "calendars", calendar, "events"], &query)
         }
@@ -917,6 +930,8 @@ mod tests {
             ),
             "{url}"
         );
+        // Its times come in the lamp's own zone, whenever the system names one.
+        assert_eq!(url.contains("&timeZone="), zone_here().is_some(), "{url}");
         let (method, url, _) = http(
             plan(
                 "github",
