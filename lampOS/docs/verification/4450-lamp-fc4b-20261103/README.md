@@ -168,3 +168,33 @@ What it says:
 - The 503s are the chat service's, seen on four lamps at once; not 9788's
   and not this lamp's. Before the switch (16:00–16:47) the lamp had no 503
   and no answer either, since nobody spoke to it.
+
+## after2 on stable 9980 with `held` by a drop-in, 04 November 2026
+
+Stable 9868 and 9928 reverted #5034's unit line (#5109, Seventh's owner
+count on lamp-52e6), so `LAMP_UNTIED_GOING_ON=held` is off in the product
+again and waits on #5110. The switch's code is still in the build, so the
+clean after2 run #4450 was owed (the 9788 passes ran under the chat
+service's 503s) was played on lamp-fc4b at stable 9980 with `held` set by
+a systemd drop-in for the run only, `lamp-voice.service.d/heron-held.conf`
+(`[Service] Environment=LAMP_UNTIED_GOING_ON=held`), a `daemon-reload` and
+a restart of lamp-voice each way; the drop-in came out at 14:31:48 and the
+lamp is as found. Journal-only, the same three clips and spacing as the
+9788 passes, the person's yes, the slot posted and released on #4710.
+
+| pass | played | a01 "Lamp, what time is it?" | d07 "What time does the shop close today?" (a+4.0) | d08 "I think around nine, but I'm not sure." (g+0.6) |
+|---|---|---|---|---|
+| a | 14:27:06, 53 s after the restart | no request raised at all (lamp-name's minute line: `heard=0`); void | request 2, held: "nobody spoke to the lamp … no conversation with it going on" (the plain reason) | request 3, the same plain reason |
+| b | 14:30:51, 90 s after the restart | request 2, **answered**: "its name was heard in the room's sound"; first answer audio 2257 ms | request 3, let through as the conversation going on ("of its 7 words, 1 in the lamp's answer to request 2 so far": "time"), then **the model called `not_for_me`** | request 4, **held by the rule**: "a conversation with the lamp is going on, but the line has no tie to the lamp: no reply to its question, no word of its last answer, no ask of the lamp" |
+
+Pass b is the run: the ask answered, d08 held by the untied rule with no
+model turn, d07 kept from the room by the model. On 9724 (`held` off) d08
+was answered. One data point for #5110: d07 passed the untied check on a
+single shared word ("time"), which is the same tie a real follow-up that
+shares no word lacks. Pass a is one sample of a line played within a minute
+of a restart raising no request; it is kept only so nobody plays that soon.
+
+`journal-9980-held-pass-b.txt` has pass b's request lines from the lamp's
+journal, lamp clock (GMT+7), as the 9788 files do. The request numbers in
+it are the journal's; the replay script's own attribution of requests to
+clips by time was off by one for d07 and d08 in this pass and is not used.
