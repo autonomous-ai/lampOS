@@ -295,4 +295,9 @@ fn a_claim_beside_another_kind_of_call_is_not_said() {
         went.said
     );
     assert_eq!(went.ran, ["light_brighter"]);
+    // Thirteen's P2 on #5253: the next round is told the light change ran
+    // and only the timer wasn't, never that no function was called.
+    let beside = crate::action_claim::beside_calls_note(crate::action_claim::Claim::Schedule);
+    assert!(went.notes.contains(&beside), "{:?}", went.notes);
+    assert!(!told_claim(&went), "{:?}", went.notes);
 }

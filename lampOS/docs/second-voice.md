@@ -3320,7 +3320,7 @@ after a take-over, but now for every turn:
   or volume call, "Done." and "It already is." beside any call, "Timer
   set." beside `set_timer`, `set_reminder`, `repeat_reminder` or
   `snooze_reminder`, and "I'll remind you at …" beside those or
-  `list_reminders`, which it also answers, each made in any round of the turn (a cut answer's carried
+  `list_reminders`, which it also answers, each made in any round of the turn (beside calls of another kind, which run, the next round is told only the claimed kind wasn't done and the others mustn't be called again, `action_claim::beside_calls_note`) (a cut answer's carried
   rounds too). Each round's opening is held only while its words could
   still begin a claim; at the first that fits none, or a claim whose call
   an earlier round made, it goes on as before. A claim with no call yet is
