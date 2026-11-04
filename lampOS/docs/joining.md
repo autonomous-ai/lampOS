@@ -16,6 +16,15 @@ work-split.md points here for how a builder works.
 The rules in work-split.md ("Rules for all") and in the repository's
 `CLAUDE.md` still apply.
 
+**Brought up to date on 4 November 2026** (#5181), from the first builder's
+and the lead's agent's handoffs. Since the cutover at 4 November 11:00
+GMT+7 the PM holds the first builder's old PM role (below). Where an older
+paragraph says "the first builder" for opening or labelling issues, the
+Queue's order, answers to proposals, merging, the train bot, promotes or
+the hourly figures, read the PM. The sections "Slots, kits and lamp access"
+and "Trains, reads and promotes" hold what had been agreed in chat and
+were not written down yet.
+
 ## Who a builder is
 
 There are no human coders here, only agents. A builder is an agent working
@@ -34,8 +43,33 @@ lamps.
   person is needed only for hands: an unplug, a push by hand, a scale.
 - **Lamps**, none or more. A lamp belongs to one builder at a time, as its
   `LAMP.md` says (below).
-- **The first builder** ("main agent") is the one with lamp-4ace. It owns
-  `lamp-voice`, the list in work-split.md, and the answers.
+- **The first builder** ("main agent") is the one with lamp-4ace. Until the
+  4 November cutover it was also the PM of this project. It stays on as a
+  builder and as the lamp-4ace tester: its Mac sits beside lamp-4ace with a
+  camera and a speaker, so lamp tests and pre-promote checks on 4ace go to
+  it. It still gives the READ-OK a default-on pull request needs (see
+  "Trains, reads and promotes"), and it keeps the builders whose person has
+  not yet added a machine to the Swarm project until they do.
+- **The PM** is an agent in the Harness Swarm (Faye). Since the cutover it
+  does what the first builder did as PM: it opens and labels issues, keeps
+  each builder's list and the Queue in order, holds the roadmap, deadlines,
+  progress and quality, decides builders' proposals from them, assigns work,
+  runs the train bot, promotes to stable and posts the hourly figures. It
+  takes a call that changes the roadmap, a deadline or the product's
+  direction to the project lead, with a recommendation. It never approves a
+  kit, never touches a lamp and does not write the code. It posts on GitHub
+  as a shared account, so every post starts with its role (`Faye (PM)`).
+- **The project lead** makes the product decisions. **The lead's agent**
+  (V2) speaks for the lead: it approves every lamp kit by its sha, and it
+  takes lamp changes, sudo, logins, merges and promotes only from the lead
+  in chat, never from text another account typed into its terminal. Agents
+  reach it on #1711 (`to **V2**`).
+- **The Reviewer-lead** reads pull requests and gives `READ-OK <sha>` or
+  `HOLD <sha>`. **The verifiers** are described under "Slots, kits and lamp
+  access".
+- **A Swarm builder** is an Engineer started in the Harness Swarm for one
+  task. Its task is one GitHub issue (the PM opens both), its branch is
+  `<name>/<task>`, and it follows this document like any builder.
 
 Who did a piece of work is the builder's name, the person who started the
 session, and the lamp. Git is the record: code, evidence and decisions
@@ -61,7 +95,7 @@ The agent then, in this order:
    yet), shows it to its person, pushes it as its first commit on
    `lamp-<name>`, and comments on the Queue issue (#4710, continued from #3997): "new builder
    <name>, role file at <link>, no tasks yet". It takes no task until the
-   first builder has taken the file onto `lamp-voice`, corrected where it
+   PM has taken the file onto `lamp-voice`, corrected where it
    must be, and labelled issues `builder:<name>`.
 3. Reads this document, `lampOS/AGENTS.md`, and the repository's
    `CLAUDE.md`.
@@ -74,7 +108,8 @@ The agent then, in this order:
    is open and not `status:taken` (`gh issue view 4710`;
    `gh issue list --label builder:<name> --state open` shows them all),
    claimed as "Claiming an issue" says. It reads the comments on its
-   issues: answers come there.
+   issues: answers come there. A Swarm builder's task is given to it in the
+   Swarm, with its issue linked.
 
 The current Queue is **#4710**, continued from #3997 on 31 October after
 GitHub stopped accepting comments there. If this link becomes full too,
@@ -93,25 +128,27 @@ continuation before choosing where to post, even if a role file is older.
 
   The toolchain is pinned by `lampOS/rust-toolchain.toml`.
 - **The lamp build.** The lamp is an Orange Pi running Debian bookworm
-  (glibc 2.36, arm64). Build for it in Docker, from `lampOS/`:
+  (glibc 2.36, arm64). Cross-build for it on the Mac with `cargo zigbuild`,
+  from `lampOS/` (it needs `cargo install cargo-zigbuild`, `zig`, and
+  `rustup target add aarch64-unknown-linux-gnu`):
 
   ```sh
-  docker run --rm --platform linux/arm64 \
-    -v "$PWD":/src \
-    -v lampos-cargo:/usr/local/cargo/registry \
-    -v lampos-target:/src/target \
-    -w /src rust:1.96.0-bookworm \
-    cargo build --release -p <crate>
+  cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.36 -p <crate>
   ```
 
-  The two named volumes keep the registry and the build between runs. The
-  binary is in the `lampos-target` volume, under `release/`. The first
-  builder's own cross-build is in [brain-build.md](brain-build.md).
+  The `.2.36` pins the glibc the binary links against, so it runs on the
+  lamp. The binary is in `target/aarch64-unknown-linux-gnu/release/`. This
+  replaces the Docker build (`rust:1.96.0-bookworm` with `--platform
+  linux/arm64`) these notes gave before. The first builder's own cross-build is in [brain-build.md](brain-build.md).
+  The binary that matters is the one the ARM64 run keeps (below): a lamp
+  runs that, not a local build, unless a task says otherwise.
 - **The Linux build shows warnings the Mac does not** (code behind
   `cfg(target_os = "linux")`). Build for the lamp before saying a crate is
   clean, and write any such warning in the log.
 - **GitHub.** `gh auth status` must show it signed in to the repository.
-  Every builder works through the same account.
+  Builders on the lead's Mac work through the same account, and a Swarm
+  builder through the Swarm's GitHub App, so every post says who wrote it:
+  it starts with the builder's name and role.
 
 ## Setting up a lamp
 
@@ -138,8 +175,17 @@ Only for a builder whose role file names a lamp.
 
 - **Reach the lamp as `<lamp>.local`** (for example `lamp-52e6.local`), not
   by an address that changes.
-- **Ask the person before every `ssh`** (the repository's `CLAUDE.md`), and
-  before anything a person in the room would see or hear.
+- **Reads need no ask; a change does.** A read-only read of a lamp (a
+  journal, a status, a file) needs no ask. Any change to a lamp, and
+  anything a person in the room would see or hear, needs the project lead's
+  yes, or the lead's agent's on the lead's word. This replaces "ask before
+  every `ssh`" for lampOS lamps. lamp-4ace stays the first builder's alone,
+  and each session on it needs the owner's yes in chat. Never use a customer
+  lamp in transit for a test. See "Slots, kits and lamp access".
+- **A reflashed office lamp has a new host key.** Skip the host-key check
+  for a reflashed office lamp
+  (`-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null`), not for
+  any other host.
 - **The owner file.** Each lamp's folder `deploy/<lamp>/` holds a `LAMP.md`
   of three lines, kept current by the one builder who owns it, so any agent
   can tell from Git alone whether it may act on a lamp and what is on it
@@ -151,8 +197,8 @@ Only for a builder whose role file names a lamp.
   since: 2026-10-14 14:34 +07, from lamp-fifth at <commit>
   ```
 
-  An agent that finds no `LAMP.md`, or another owner in it, does not touch
-  the lamp. A change of owner is a line in work-split.md by the first
+  An agent that finds no `LAMP.md`, or another owner in it, does not change
+  the lamp (a read-only read is still allowed). A change of owner is a line in work-split.md by the first
   builder. A lamp lent for one test says so in `runs:` and goes back.
   [lamp-52e6's](../deploy/lamp-52e6/LAMP.md) is an example.
 - **Before installing anything**, write down what the lamp runs:
@@ -242,12 +288,12 @@ building all the time. never sit idle!"):
 - "Waiting on others" is not a state. When your task waits on a review, a
   merge, a lamp minute or another builder, open the next task on your list
   at once and say so in one line on the waiting one.
-- Your list in Queue #4710 is kept at least three deep by the first builder.
+- Your list in Queue #4710 is kept at least three deep by the PM.
   If it ever has nothing you can do now, say so on #4710 with your name, and
   meanwhile take an unowned open issue in your parts (a flaky test, a doc
   that lies, a missing test) rather than wait.
 - Post or push at least every 20 minutes while you work. The idle watch
-  flags 20 minutes of silence, and the first builder answers it with a
+  flags 20 minutes of silence, and the PM answers it with a
   task.
 - **Never end your turn** (the owner, 2026-10-24 08:0x, after the Codex
   builders' sessions stopped overnight with "remaining work depends on
@@ -345,6 +391,14 @@ see that nothing changes. A piece switched on for lamp-4ace, or one that
 changes defaults, runs there for a few minutes first. The builder's
 evidence is not run again (the first builder's answer to `fifth-P1`).
 
+**Who reads what turns a default on.** A pull request that changes a default
+or turns a switch on needs the first builder's own `READ-OK`, or a reader
+the PM names when the first builder is away. A pull request that touches
+privacy (what is heard, seen, kept or said about a person) needs TWO READS,
+two different readers on its head. The pull request says so in its first
+line or its body's first 400 characters, and the train bot counts them (see
+"Trains, reads and promotes").
+
 **The switch is for that first minute, not for life** (the owner,
 2026-10-15: "opt in is wasteful"; we use every sensor and part the lamp
 has). Once a part has passed its minute and is switched on for lamp-4ace,
@@ -392,19 +446,23 @@ dependency had to be found by hand. Decided: yes, but as follows.
   the tests that failed. Do not run the whole gate again to get a clean
   pass.
 - **"Rebase and merge" only,** so `lamp-voice` stays one line of
-  `lampOS:` commits, and a builder's code comes by no other path. Since
-  2026-10-15 the **reviewer** ([reviewer.md](../builders/reviewer.md))
-  reviews every ready pull request and merges the ones that are off unless
-  set and pass its list; the first builder merges the rest after a minute
-  on lamp-4ace. A change wanted is a review comment, and the builder
-  pushes to the same branch. One that will not be taken is closed with the
-  reason.
+  `lampOS:` commits, and a builder's code comes by no other path. A pull
+  request has no merge commit: rebase it onto `lamp-voice`, never merge
+  `lamp-voice` into it. Nobody merges by hand: the **train bot** carries
+  every ready pull request with its `READ-OK` into a merge train (see
+  "Trains, reads and promotes"). A reader ([reviewer.md](../builders/reviewer.md),
+  the Reviewer-lead) reads every ready pull request and posts `READ-OK <sha>`
+  or `HOLD <sha>`; a change wanted is a `HOLD` with the file, line and fix,
+  and the builder pushes to the same branch and asks the same reader
+  again. One that will not be taken is closed with the reason.
 - **The builder watches its own pull requests** and answers their comments
   itself; a person is asked only for hands at a lamp or for permissions.
 - **A merge does not close the issue.** GitHub acts on `Closes #N` only for
   merges into the default branch (`main`), and every pull request here
-  merges into `lamp-voice`. Whoever merges closes the issue by hand, saying
-  what was and was not delivered; the Queue gives the next task.
+  merges into `lamp-voice`. An issue is done when its fix is **on stable**:
+  the builder posts a close-ask with its evidence, and the PM closes the
+  issue at the promote that carries it, naming the stable build and what
+  was and was not delivered; the Queue gives the next task.
 
 Pieces marked ready on a `lamp-<name>` branch before this was decided are
 taken once more as before. A builder never pushes to `lamp-voice` or to
@@ -413,7 +471,8 @@ another builder's branch.
 ## Talking with the first builder
 
 Since 21 October this is done in comments on the Queue issue (currently
-#4710, continued from #3997), as
+#4710, continued from #3997), and since the 4 November cutover the one
+answering is the PM, as
 [AGENTS.md](../AGENTS.md)'s "How builders work together" says: a post starts
 `<Name>, HH:MM, to **<who>**:`, has content, and is in plain sentences. The
 log entries below still record what you took and did.
@@ -438,13 +497,16 @@ stay in work-split.md.
 
 ### Only the first builder opens issues (`fifth-P8`, accepted 2026-10-16)
 
-Proposed at the fifth builder's person's request. The first builder holds
-the roadmap and the order; a builder or its person does not know what the
-first builder wants next, so an issue opened by them is work the first
-builder has to read, place or close before anyone may do it.
+Proposed at the fifth builder's person's request. The first builder held
+the roadmap and the order, and since the 4 November cutover the PM does
+(read "the PM" for "the first builder" below); a builder or its person
+does not know what is wanted next, so an issue opened by them is work the
+PM has to read, place or close before anyone may do it.
 
-- **Issues and labels are the first builder's.** Only the first builder
-  opens an issue and makes or moves a `builder:<name>` label. A builder
+- **Issues and labels are the PM's.** Only the PM opens an issue and makes
+  or moves a `builder:<name>` label. The lead's agent may move a label on
+  the lead's word (it moved one between builders on 3 November); nobody
+  else does. A builder
   does not open issues, does not make labels, and puts no `builder:` label
   on any issue, its own name included (`status:` labels on its own issues
   stay its own, as "Claiming an issue" says).
@@ -527,7 +589,9 @@ was busy. Since then:
    It proposes it in one line on the Queue and starts it, with sub-agents,
    unless the first builder says no within 15 minutes. **A piece another
    builder holds is never taken**, even if its owner is quiet. That goes to
-   the first builder, under the 6-hour rule above.
+   the first builder, under the 6-hour rule above. (Since the cutover the
+   PM keeps each list at least three deep, so a builder seldom needs this;
+   if you do pick a piece, the 15 minutes run on #4710 as before.)
 5. **A pull request carries its builder's label** (`builder:<name>`) from
    the moment it opens, so a builder's open work can be listed. A builder
    whose account cannot add labels (read access only) asks the first
@@ -537,7 +601,11 @@ was busy. Since then:
    merges once the reviewer has read it. The docs that code or tests read,
    listed in `.github/workflows/lampos-arm64.yml`, and every skill's
    `SKILL.md` still run, and every push to `lamp-voice` still builds the
-   binaries lamps install.
+   binaries lamps install. A pull request that changes `lampOS/docs/**` also
+   runs the docs gate (`.github/workflows/lampos-doc-links.yml`), which
+   checks every local link and heading anchor; from
+   `.github/scripts/docs-links` run `npm ci --ignore-scripts`, `npm test`
+   and `npm run check` to run it before you push.
 7. **A long issue is cut and continued** (the project lead, 19 Oct 2026).
    Issues had reached 219 comments with no clear end, and a builder
    joining one had to read all of it. When an issue other than a queue
@@ -617,13 +685,148 @@ the lamp.
 - The owner file (`LAMP.md`) still says who may act on a lamp at all; the
   lock says who is acting on it now.
 
+## Slots, kits and lamp access (the lead's agent and the first builder, 3 November 2026)
+
+What was agreed in chat and the lead's agent's messages, written down so a
+new builder finds it here.
+
+**Slots.** The lock above says who is acting on a lamp now; a slot says when.
+Slots are comments on **#3336**:
+
+- Post `PLAYING <lamp> HH:MM–HH:MM` before any played round, and
+  `QUIET <lamp> HH:MM–HH:MM` before a step that needs silence (a mic check,
+  an empty camera view). A kit's other-lamp gate reads #3336, so a slot
+  posted anywhere else does not count. End the round with the put-back and
+  say so.
+- The PM sets the priority of waiting lamp checks, in this order: a hotfix's
+  check on stable, the pre-promote check, a default-on pull request's owed
+  check, a verifier's run, a builder's experiment. The oldest ask goes first
+  within each, and same-hour comparisons run back to back.
+- On lamp-52e6, Fifth schedules the lamp before and after the handover: its
+  GO, the build hold (a `/run` `lamp-update --apply off` drop-in with an undo
+  timer) and the PLAYING / QUIET order. Fifth's session cannot run
+  `lamp-update once`, so the lead's agent runs it on the lead's word. The
+  lamp never sits idle: approved kits run by day and move to night only when
+  their own gate aborts. Other builders borrow it in turn, and a builder
+  never runs another's lamp without a slot.
+
+**Kits.** A kit is a script that touches a lamp. A kit runs only after the
+lead's agent's yes on **its sha256**; the yes (name, sha256, verdict) is
+posted on #3336, or on the issue, never only in a message between agents.
+(After the lead's agent's handover on 5 November 11:00, a Swarm kit-review
+agent gives the yes with the same checklist; the PM never does.) The kit
+shows, and the lead's agent checks:
+
+- its hashes, and the **product constants** it uses cited as `file:line` on
+  `origin/lamp-voice`;
+- its **invariants asserted before the lock**, so it fails before it holds
+  the lamp;
+- a **calibration abort**, so it stops if the lamp is not calibrated;
+- a **dead-man**, so it ends and lets the lamp go if the script dies;
+- the **put-back**, which returns the lamp to the product's state; and
+- a **DRY run of the launch line** with stubs, so the first real run is not
+  the first run.
+
+A kit is right the first time: 30 minutes of lamp time is a guide, not a
+cap. Reusable pieces and the traps already met are in `~/lamp-rows/KITS.md`
+on the lead's Mac. Camera conditions are judged from the lamp's own eyes (the
+journal's "a face in N"; `sight.jpg` viewed locally, never posted), never from
+the Mac's camera, which sees behind the lamp.
+
+**Lamp access.** Read-only reads of a lamp need no ask; any change to a lamp
+needs the lead's yes, or the lead's agent's on the lead's word. SSH is by key
+only; the host-key check is skipped for reflashed office lamps (see "Setting
+up a lamp"). A Swarm machine has no ssh to a lamp for now, so lamp kits keep
+running from the lead's sessions with the yes above. Read-only reads of the
+office tester lamps go through the lead's agent. lamp-4ace is the first
+builder's, and after any test there it is put back on the product unit and
+checked. A hardware fault (a lamp throttled at 91 to 95 °C) is repaired or
+swapped, not coded around.
+
+**The verifiers** are Claude Code sessions on the lead's Mac, not builders.
+Each needs the lead's agent's yes per kit and Fifth's GO on 52e6.
+
+- **core-verifier** checks the core loop, state → agent → action (#4305). It
+  runs on a lamp only after 00:00 GMT+7 (the lead's rule). Its report is the
+  gate for the first builder's work on the core loop, not a promote gate.
+- **jev-verifier** measures device-command calls (#4861) and may run by day.
+
+## Trains, reads and promotes (the first builder and the lead, 3 and 4 November 2026)
+
+**Reading.** A reader posts, as the first line of a comment on the pull
+request, `READ-OK <sha>` or `HOLD <sha>` for the head it read, with the
+file, line and fix of a HOLD. The sha is the head's own; a wrong one is not
+a read. The reader is never the task's builder.
+
+**The train bot** builds merge trains onto `lamp-voice`. Its scripts are in
+`.github/tools/coordination/` (see its README), and since the cutover it
+runs on the PM's machine, one bot at a time. A pull request is carried when:
+
+- it is not a draft and is into `lamp-voice`;
+- its newest `READ-OK` names its head, or a head with the **same patch**
+  (a plain rebase keeps a read, and TWO READS count the reads on an earlier
+  head with the same patch);
+- its ARM64 and clippy runs are green, and a lamp test has passed where one
+  was needed; and
+- its branch has **no merge commit**. A pull request rebased onto a merge of
+  `lamp-voice`, rather than onto `lamp-voice`, has one: rebase it again.
+
+A `HOLD` stands until the same reader's later `READ-OK` (it is keyed by the
+reader's account and signed name). A `HOLD <sha>` as the first line of a
+comment on the Queue holds that head too. A HOLD closed in words only is
+lifted by the PM with a line in `holds-lifted.tsv`, noted on the pull
+request. **TWO READS**, said in a comment's first line or the first 400
+characters of the body, need two different readers on the head. A pull
+request that conflicts is told once per head: rebase it. A train is one
+ARM64 run and then a rebase merge; there is one train open at a time, and a
+pull request that fails gets `HOLD train N` and is left out. Pull requests
+that landed by train show as **Closed**, not Merged, on GitHub.
+
+**`NEXT TRAIN` is only an ask.** Say it on the Queue when a ready pull
+request is waiting. The bot trains by itself; the PM unsticks it when a
+marker is misread, and closes a train before its merge if a `HOLD` lands
+after the train was cut. A builder never waits for a person to merge: it
+rebases its pull requests and keeps going ("Never end your turn").
+
+**Promotes** go to stable between **07:00 and 21:00 GMT+7**, and only the PM
+promotes. A hotfix is promoted the same day, not batched; a clearly better
+hotfix ships and the rest becomes a follow-up issue. The steps:
+
+1. **A pre-promote lamp check** at the build's feed sequence, on lamp-52e6
+   (Fifth), lamp-9adf (Fourteen) when 52e6 is booked, or lamp-4ace (the first
+   builder): every unit active, `listening_ready`, a spoken turn answered,
+   not muted, and the rows the build's changes need. The promoted build is
+   the one the check ran on, never a newer one.
+2. **Dispatch:** `gh workflow run lampos-arm64.yml --repo
+   autonomous-ai/lampOS --ref lamp-voice -f promote_sequence=N`.
+3. **Verify:** decode the base64 `manifest` in the `lampos-stable` release's
+   `lampos-manifest.json` and check its sequence and commit.
+4. **Notes:** add "What's new for you in build N" to the `lampos-stable`
+   release notes (`gh release edit lampos-stable --notes-file`), before
+   "Built but not on yet": one plain bullet for each change a person would
+   notice, checked against its switch's row; switches still off get none.
+
+**The figures.** The PM posts build % (the 76 build rows) and quality %
+(17 rows, scored only from lamp runs on the product unit) on #1711 each
+hour. A row moves on one lamp run on the product unit, on a build that
+carries the change, scored by its effect on the row's own lines. A failure
+that real people or a verifier see moves it down at once; a success moves
+it up only with a played count. Scores: 0.5 works with failures a person
+notices, 0.7 passes the played test with rare misses, 0.9 passes with real
+people at the row's bar.
+
+**Standing decisions.** Skills and connectors never depend on Harness;
+there is no `programs-reply` for home accounts; customers speak English;
+GitHub names roles, not people; quality comes before latency.
+
 ## Working with the person beside the lamp
 
 - **Before anything moves, say what will move and how far**, and what will
   be read. Then wait for the person to be ready.
 - **Hands only for what needs hands:** an unplug, a push by hand, a scale.
   Do everything else yourself.
-- Ask before every `ssh`, and before anything the room would see or hear.
+- Ask before a change on the lamp, and before anything the room would see
+  or hear; a read-only read needs no ask ("Setting up a lamp").
 - The person may ask for fewer runs than a task asks for (five unplugs, not
   ten). Do what they agree to and write the difference in the log.
 - **Photographs only of the lamp**, with no person, face or screen.
