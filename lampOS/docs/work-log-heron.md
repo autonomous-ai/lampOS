@@ -501,3 +501,6 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   per-person forget mark, El restates, and I restate my HOLD after it. #5335
   trained on my READ-OK; the Wi-Fi pair stays in Kore as approved on 2 Nov,
   so the two-voices call is settled.
+- 04:3x: #5293 READ-OK restated at a312c4e939 by range-diff from 27f0cfd1f
+  (Fourteen asked): two rebases, context moves only, non-doc patch lines
+  identical, CI green.
