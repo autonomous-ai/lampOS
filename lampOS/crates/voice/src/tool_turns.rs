@@ -627,6 +627,7 @@ mod tests {
             correct: false,
             questions: false,
             sign_in: false,
+            sign_in_app: false,
         };
         let declared: Vec<String> = crate::agent_tasks::tools(&place)
             .into_iter()

@@ -108,6 +108,30 @@ pub enum Request {
         answer: Answer,
         request: u64,
     },
+    /// The owner's app starts Harness's sign-in (#5198, `serve
+    /// --app-socket`), by its code (the only method for now), or is given
+    /// back the one it started that is open. Only on the app's route.
+    AppSignInStart {
+        #[serde(default)]
+        method: crate::sign_in::Method,
+    },
+    /// Where the sign-in is, as the app shows it: a voice-started one too,
+    /// without its email.
+    AppSignInState {},
+    /// The app's yes or no for its own sign-in `id`, once it was given the
+    /// question ([`crate::sign_in::Session::answer_from_app`]).
+    AppSignInAnswer {
+        id: u64,
+        answer: Answer,
+    },
+    /// lamp-cloud's word on sign-in `id`'s code or question handed to the
+    /// backend over HTTPS for the app (#5198): `delivered` false after a
+    /// put that failed, so the app's view says `relay_failed`; true again
+    /// after one that worked.
+    AppSignInRelay {
+        id: u64,
+        delivered: bool,
+    },
 }
 
 /// A spoken yes or no.
@@ -158,6 +182,18 @@ impl Request {
         )
     }
 
+    /// The app's sign-in operations (#5198): taken only on the app's route,
+    /// which takes nothing else.
+    pub fn app(&self) -> bool {
+        matches!(
+            self,
+            Self::AppSignInStart { .. }
+                | Self::AppSignInState {}
+                | Self::AppSignInAnswer { .. }
+                | Self::AppSignInRelay { .. }
+        )
+    }
+
     pub fn session_id(&self) -> Option<&str> {
         match self {
             Self::Confirm { session_id, .. }
@@ -188,6 +224,10 @@ impl Request {
             Self::SignInTakeCode { .. } => "sign_in_take_code",
             Self::SignInAsked { .. } => "sign_in_asked",
             Self::SignInAnswer { .. } => "sign_in_answer",
+            Self::AppSignInStart { .. } => "app_sign_in_start",
+            Self::AppSignInState {} => "app_sign_in_state",
+            Self::AppSignInAnswer { .. } => "app_sign_in_answer",
+            Self::AppSignInRelay { .. } => "app_sign_in_relay",
         }
     }
 }
@@ -280,6 +320,51 @@ mod tests {
             br#"{"op":"sign_in_take_code"}"#,
             br#"{"op":"sign_in_take_code","id":-1}"#,
             br#"{"op":"sign_in_take_code","id":1,"code":"12345678"}"#,
+        ] {
+            assert_eq!(Request::parse(bytes), Err("bad_request"));
+        }
+    }
+
+    /// #5198: the app's sign-in operations are the app's route's alone,
+    /// never the voice's; they carry a method (only `code` for now), an id
+    /// and a yes or a no, never a code or an email.
+    #[test]
+    fn app_sign_in_operations_are_their_own_and_take_only_a_method_or_an_answer() {
+        use crate::sign_in::Method;
+        for (bytes, request) in [
+            (
+                br#"{"op":"app_sign_in_start"}"#.as_slice(),
+                Request::AppSignInStart {
+                    method: Method::Code,
+                },
+            ),
+            (
+                br#"{"op":"app_sign_in_start","method":"code"}"#,
+                Request::AppSignInStart {
+                    method: Method::Code,
+                },
+            ),
+            (br#"{"op":"app_sign_in_state"}"#, Request::AppSignInState {}),
+            (
+                br#"{"op":"app_sign_in_answer","id":7,"answer":"no"}"#,
+                Request::AppSignInAnswer {
+                    id: 7,
+                    answer: Answer::No,
+                },
+            ),
+        ] {
+            let parsed = Request::parse(bytes).unwrap();
+            assert_eq!(parsed, request);
+            assert!(parsed.app() && !parsed.trusted() && parsed.guard().is_none());
+        }
+        assert!(!Request::parse(br#"{"op":"sign_in_start"}"#).unwrap().app());
+        for bytes in [
+            br#"{"op":"app_sign_in_start","method":"qr"}"#.as_slice(),
+            br#"{"op":"app_sign_in_start","code":"12345678"}"#,
+            br#"{"op":"app_sign_in_state","email":"someone@example.com"}"#,
+            br#"{"op":"app_sign_in_answer","answer":"yes"}"#,
+            br#"{"op":"app_sign_in_answer","id":7,"answer":"maybe"}"#,
+            br#"{"op":"app_sign_in_answer","id":7,"answer":"yes","request":3}"#,
         ] {
             assert_eq!(Request::parse(bytes), Err("bad_request"));
         }

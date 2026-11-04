@@ -115,6 +115,8 @@ struct Counts {
     sign_in_lines: Arc<Mutex<std::collections::VecDeque<SignInRead>>>,
     sign_in_answers: Arc<Mutex<Vec<bool>>>,
     sign_in_starts: AtomicUsize,
+    /// How each sign-in was started (#5198): `--code` or `--qr`.
+    sign_in_methods: Mutex<Vec<lamp_tasks::sign_in::Method>>,
     /// How many times Harness's daemon was started (openharness#1463).
     daemon_starts: AtomicUsize,
     /// How many daemon starts still fail, `start_failed` (lamp-75c9, 21 Oct).
@@ -267,8 +269,9 @@ impl Adapter for Script {
     }
     fn sign_in_starter(&self) -> Option<lamp_tasks::sign_in::Starter> {
         let counts = self.counts.clone();
-        Some(Box::new(move || {
+        Some(Box::new(move |method| {
             counts.sign_in_starts.fetch_add(1, Ordering::SeqCst);
+            counts.sign_in_methods.lock().unwrap().push(method);
             Ok(Box::new(ScriptSignIn(
                 counts.sign_in_lines.clone(),
                 counts.sign_in_answers.clone(),
@@ -367,6 +370,7 @@ impl Running {
             // Its report every 50 ms, not each second: a test reading it
             // waits a fraction of a second (#1128).
             sign_in_by_code: false,
+            app_socket: None,
             report_every: Duration::from_millis(50),
             // A failed daemon start tried again in 50, 100 and 200 ms.
             daemon_retry_after: Duration::from_millis(50),
@@ -431,6 +435,11 @@ impl Running {
     }
     fn trusted(&self, value: Value) -> Value {
         request(&self.config.voice_socket, &value, Duration::from_secs(2)).unwrap()
+    }
+    /// The owner's app's route (`--app-socket`, #5198).
+    fn app(&self, value: Value) -> Value {
+        let socket = self.config.app_socket.as_ref().expect("an app socket");
+        request(socket, &value, Duration::from_secs(2)).unwrap()
     }
     fn status(&self) -> Value {
         self.ask(json!({"op":"status"}))
@@ -2239,4 +2248,268 @@ fn a_stored_task_this_build_cannot_read_is_kept_and_the_part_serves() {
     let state: Value = serde_json::from_slice(&snapshot).unwrap();
     assert_eq!(state["tasks"][0], later, "kept as it is");
     assert_eq!(state["tasks"][1]["id"], next["id"]);
+}
+
+/// #5198: the owner's app signs Harness in on its own route. Off without
+/// `--app-socket`; the route takes only the app's operations, and they no
+/// other route. An app-started sign-in is the app's to answer, once it was
+/// given the question, and the voice sees only `in_app`: no code, no email,
+/// no start, no claim, no answer. A voice-started one shows in the app with
+/// its code and no email, and the app can neither start another nor answer
+/// it. Every change moves `revision`; a read never does.
+#[test]
+fn the_apps_sign_in_is_its_own_routes_and_never_the_voices() {
+    use lamp_tasks::sign_in::{Done, Event, Method};
+    let push =
+        |s: &Running, event: SignInRead| s.counts.sign_in_lines.lock().unwrap().push_back(event);
+    let code = || {
+        Ok(Event::Code {
+            code: "12345678".into(),
+            expires_in: 120,
+        })
+    };
+    let confirm = || {
+        Ok(Event::Confirm {
+            email: "someone@example.com".into(),
+        })
+    };
+    // Off: no app socket bound, and the app's operations refused elsewhere.
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.sign_in_by_code = true;
+    s.start();
+    assert_eq!(
+        s.trusted(json!({"op":"app_sign_in_state"}))["error"],
+        "untrusted"
+    );
+    assert_eq!(
+        s.ask(json!({"op":"app_sign_in_start"}))["error"],
+        "untrusted"
+    );
+    s.stop();
+    drop(s);
+
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.sign_in_by_code = true;
+    s.config.app_socket = Some(s.root.path().join("run/app"));
+    s.start();
+    // The app's route takes nothing else, and its ops no other route.
+    for op in [
+        json!({"op":"status"}),
+        json!({"op":"sign_in_start"}),
+        json!({"op":"sign_in_state"}),
+        json!({"op":"sign_in_answer","answer":"yes","request":9}),
+    ] {
+        assert_eq!(s.app(op.clone())["error"], "not_on_this_route", "{op}");
+    }
+    for op in [
+        json!({"op":"app_sign_in_start"}),
+        json!({"op":"app_sign_in_state"}),
+        json!({"op":"app_sign_in_answer","id":1,"answer":"yes"}),
+    ] {
+        assert_eq!(s.trusted(op.clone())["error"], "untrusted", "{op}");
+        assert_eq!(s.ask(op.clone())["error"], "untrusted", "{op}");
+    }
+    // Only the code for now.
+    assert_eq!(
+        s.app(json!({"op":"app_sign_in_start","method":"qr"}))["error"],
+        "bad_request"
+    );
+    let none = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(none["sign_in"], "none");
+    assert_eq!(none["revision"], 0);
+    let instance = none["instance_id"].as_str().unwrap().to_owned();
+    assert_eq!(instance.len(), 32);
+    assert!(none.get("store_id").is_none());
+
+    // Started from the app, by its code.
+    push(&s, code());
+    let started = s.app(json!({"op":"app_sign_in_start","method":"code"}));
+    assert_eq!(started["ok"], true, "{started}");
+    assert_eq!(started["by"], "app");
+    assert_eq!(started["method"], "code");
+    assert_eq!(started["sign_in"], "code");
+    assert_eq!(started["code"], "12345678");
+    assert_eq!(started["expires_in"], 120);
+    let expires_at = started["expires_at"].as_u64().unwrap();
+    assert!(expires_at > 1_700_000_000_000, "{started}");
+    assert_eq!(started["instance_id"], instance.as_str());
+    assert_eq!(*s.counts.sign_in_methods.lock().unwrap(), [Method::Code]);
+    let id = started["id"].as_u64().unwrap();
+    let revision = started["revision"].as_u64().unwrap();
+    // A read moves nothing; a start again gives the same one back.
+    let read = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(read["revision"], revision);
+    assert_eq!(read["expires_at"], expires_at);
+    assert_eq!(s.app(json!({"op":"app_sign_in_start"}))["id"], id);
+    assert_eq!(s.counts.sign_in_starts.load(Ordering::SeqCst), 1);
+    // lamp-cloud's put to the backend failed: the app is told, with a new
+    // revision, and the sign-in goes on; a put that worked clears it.
+    assert_eq!(
+        s.app(json!({"op":"app_sign_in_relay","id":id + 1,"delivered":false}))["error"],
+        "not_this_sign_in"
+    );
+    assert_eq!(
+        s.trusted(json!({"op":"app_sign_in_relay","id":id,"delivered":false}))["error"],
+        "untrusted"
+    );
+    let failed = s.app(json!({"op":"app_sign_in_relay","id":id,"delivered":false}));
+    assert_eq!(failed["sign_in"], "code", "{failed}");
+    assert_eq!(failed["error"], "relay_failed");
+    assert_eq!(
+        failed["message"],
+        "The sign-in code couldn't reach the app. Try again."
+    );
+    assert!(failed["revision"].as_u64().unwrap() > revision);
+    let again = s.app(json!({"op":"app_sign_in_relay","id":id,"delivered":false}));
+    assert_eq!(
+        again["revision"], failed["revision"],
+        "the same word is no change"
+    );
+    let cleared = s.app(json!({"op":"app_sign_in_relay","id":id,"delivered":true}));
+    assert!(cleared.get("error").is_none() && cleared.get("message").is_none());
+    assert!(cleared["revision"].as_u64().unwrap() > failed["revision"].as_u64().unwrap());
+    assert_eq!(cleared["code"], "12345678");
+    let revision = cleared["revision"].as_u64().unwrap();
+
+    // The voice: only `in_app`, nothing to say, start or answer.
+    let voice = s.trusted(json!({"op":"sign_in_state"}));
+    assert_eq!(voice["sign_in"], "in_app", "{voice}");
+    assert!(voice.get("code").is_none() && voice.get("email").is_none());
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_start"}))["error"],
+        "started_in_app"
+    );
+    let claim = s.trusted(json!({"op":"sign_in_take_code","id":id}));
+    assert_eq!(claim["claim"], "not_available");
+    assert!(claim.get("code").is_none());
+
+    // The question: asked in Harness, given to the app, answered there.
+    push(&s, confirm());
+    assert_eq!(
+        s.app(json!({"op":"app_sign_in_answer","id":id,"answer":"yes"}))["error"],
+        "not_read"
+    );
+    let asking = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(asking["sign_in"], "asking", "{asking}");
+    assert_eq!(asking["email"], "someone@example.com");
+    assert_eq!(asking["answer_here"], true);
+    assert_eq!(asking["answer_within"], 120);
+    assert!(asking["revision"].as_u64().unwrap() > revision);
+    let voice = s.trusted(json!({"op":"sign_in_state"}));
+    assert!(!voice.to_string().contains('@'), "{voice}");
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_asked","id":id,"request":3}))["error"],
+        "started_in_app"
+    );
+    assert_eq!(
+        s.trusted(json!({"op":"sign_in_answer","answer":"yes","request":4}))["error"],
+        "started_in_app"
+    );
+    assert_eq!(
+        s.app(json!({"op":"app_sign_in_answer","id":id + 1,"answer":"yes"}))["error"],
+        "not_this_sign_in"
+    );
+    assert!(s.counts.sign_in_answers.lock().unwrap().is_empty());
+    let answered = s.app(json!({"op":"app_sign_in_answer","id":id,"answer":"yes"}));
+    assert_eq!(answered["sign_in"], "answered", "{answered}");
+    assert_eq!(*s.counts.sign_in_answers.lock().unwrap(), [true]);
+    assert_eq!(
+        s.app(json!({"op":"app_sign_in_answer","id":id,"answer":"no"}))["error"],
+        "not_asking"
+    );
+    push(
+        &s,
+        Ok(Event::Result(Done::Success {
+            email: Some("someone@example.com".into()),
+        })),
+    );
+    let done = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(done["sign_in"], "done");
+    assert_eq!(done["result"], "success");
+    assert!(done.get("email").is_none());
+
+    // Started by voice: shown in the app with its code, never its email,
+    // and never the app's to start over or answer.
+    push(&s, code());
+    let spoken = s.trusted(json!({"op":"sign_in_start"}));
+    assert_eq!(spoken["code"], "12345678");
+    let voice_id = spoken["id"].as_u64().unwrap();
+    assert_eq!(voice_id, id + 1);
+    let shown = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(shown["by"], "voice");
+    assert_eq!(shown["code"], "12345678");
+    assert_eq!(shown["answer_here"], false);
+    assert!(shown["revision"].as_u64().unwrap() > done["revision"].as_u64().unwrap());
+    assert_eq!(
+        s.app(json!({"op":"app_sign_in_start"}))["error"],
+        "voice_sign_in_open"
+    );
+    push(&s, confirm());
+    let asking = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(asking["sign_in"], "asking");
+    assert!(asking.get("email").is_none(), "{asking}");
+    assert_eq!(asking["answer_here"], false);
+    assert_eq!(
+        s.app(json!({"op":"app_sign_in_answer","id":voice_id,"answer":"yes"}))["error"],
+        "started_by_voice"
+    );
+    assert_eq!(s.counts.sign_in_answers.lock().unwrap().len(), 1);
+    // The voice's own rules hold: told, then answered in a later request.
+    s.trusted(json!({"op":"sign_in_asked","id":voice_id,"request":5}));
+    let answered = s.trusted(json!({"op":"sign_in_answer","answer":"no","request":6}));
+    assert_eq!(answered["sign_in"], "answered", "{answered}");
+    assert_eq!(*s.counts.sign_in_answers.lock().unwrap(), [true, false]);
+    push(
+        &s,
+        Ok(Event::ResultWith {
+            done: Done::Error {
+                code: "DENIED".into(),
+            },
+            message: Some("Too many wrong codes. Try again in an hour.".into()),
+            already_signed_in: false,
+        }),
+    );
+    let ended = s.app(json!({"op":"app_sign_in_state"}));
+    assert_eq!(ended["error"], "DENIED");
+    assert_eq!(
+        ended["message"],
+        "Too many wrong codes. Try again in an hour."
+    );
+}
+
+/// Backend2 on #5198: a sign-in's id only grows, across a restart of the
+/// part too, even if the lamp's clock went back: the newest is kept in the
+/// state folder beside the store's and the next one counts up from it.
+#[test]
+fn a_sign_in_id_grows_across_a_restart_with_the_clock_gone_back() {
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.sign_in_by_code = true;
+    s.config.app_socket = Some(s.root.path().join("run/app"));
+    s.start();
+    let first = s.app(json!({"op":"app_sign_in_start"}))["id"]
+        .as_u64()
+        .unwrap();
+    s.stop();
+    let kept = s
+        .config
+        .dir
+        .parent()
+        .unwrap()
+        .join(lamp_tasks::runtime::SIGN_IN_ID_FILE);
+    assert_eq!(fs::read_to_string(&kept).unwrap().trim(), first.to_string());
+    s.start();
+    let second = s.app(json!({"op":"app_sign_in_start"}))["id"]
+        .as_u64()
+        .unwrap();
+    assert!(second > first, "{second} after {first}");
+    s.stop();
+    // The clock gone back behind the newest id kept (as a lamp's does
+    // before its time is set): the next id is still greater.
+    let ahead = second + 10_000_000_000;
+    fs::write(&kept, format!("{ahead}\n")).unwrap();
+    s.start();
+    let third = s.trusted(json!({"op":"sign_in_start"}))["id"]
+        .as_u64()
+        .unwrap();
+    assert_eq!(third, ahead + 1);
 }

@@ -1501,7 +1501,11 @@ impl<P: Persistence> Engine<P> {
             | Request::SignInState {}
             | Request::SignInTakeCode { .. }
             | Request::SignInAsked { .. }
-            | Request::SignInAnswer { .. } => {
+            | Request::SignInAnswer { .. }
+            | Request::AppSignInStart { .. }
+            | Request::AppSignInState {}
+            | Request::AppSignInAnswer { .. }
+            | Request::AppSignInRelay { .. } => {
                 return Err(err(
                     "sign_in_off",
                     "Signing in by a spoken code is off; the service runs without --sign-in-by-code.",

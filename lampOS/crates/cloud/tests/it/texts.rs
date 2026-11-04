@@ -47,6 +47,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         services: None,
         upload: None,
         shutdown: None,
+        harness_sign_in: None,
     };
     (lamp, bus_root)
 }
