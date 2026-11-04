@@ -872,9 +872,13 @@ const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 /// once, when it does not: the factory's steps run the body's from the
 /// body's folder (`deploy/factory/steps.sh`, #2189), and a build from before
 /// they were made (19 Oct) must still install, as a lamp put back on one
-/// does (the reviewer on #2249).
-const BESIDE_IF_CARRIED: &[(&str, &[&str])] =
-    &[("lamp-body", &["lamp-body-measure", "lamp-body-mood"])];
+/// does (the reviewer on #2249). The voice starts its same-voice check
+/// from its own folder, and only when `LAMP_SAME_VOICE_MODEL` is set
+/// (docs/same-voice.md); a build from before it shipped must still install.
+const BESIDE_IF_CARRIED: &[(&str, &[&str])] = &[
+    ("lamp-body", &["lamp-body-measure", "lamp-body-mood"]),
+    ("lamp-voice", &["lamp-same-voice"]),
+];
 
 /// Whether a list of units holds the Wi-Fi helper only with its boot half
 /// listed and enabled (the first builder's P3 4 on #2617).
