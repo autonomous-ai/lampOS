@@ -1092,6 +1092,19 @@ pub enum ProviderOutput {
     SleepAsked {
         request: u64,
     },
+    /// The model called a linked service's function
+    /// ([`crate::services::NAMES`]: `service_read` and the rest) for
+    /// `request` on the second route, so its own "Let me look." in that
+    /// turn was it looking something up, never asking for the eyes
+    /// (lamp-9adf, 4 Nov 21:45: "what's on my calendar tomorrow?" opened
+    /// "Let me look.", called `service_read`, and once the calendar was
+    /// read the lamp took a picture and described the room unasked). The
+    /// coordinator drops that turn's look asked by words, and takes none
+    /// from its later words; a tool's look stands. Sent once a request,
+    /// before its calls run; no input or speech is granted by it.
+    ServiceCalled {
+        request: u64,
+    },
     /// A line begun while onboarding's `how_you_sound` waits for a call
     /// (`ProviderInput::StepCall`) whose words were the lamp's name alone
     /// (#3923): the coordinator gives the step its start, as a call heard by
@@ -1498,6 +1511,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
+        | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request }

@@ -79,6 +79,7 @@ fn a_tool_s_look_asks_the_eyes_once_with_no_phrase_and_its_still_goes_with_the_l
         Some(turn),
         "Let me take a look.",
         None,
+        None,
         &mut opening,
         &mut wanted,
         &mut trace,

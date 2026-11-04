@@ -811,6 +811,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
+        | ProviderOutput::ServiceCalled { request }
         | ProviderOutput::StepCallHeard { request }
         | ProviderOutput::OwnWordsSaid { request }
         | ProviderOutput::DownLineSaid { request }
