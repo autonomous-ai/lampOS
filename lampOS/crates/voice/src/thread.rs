@@ -1124,27 +1124,42 @@ impl Thread {
     /// from someone else must not keep another's words in their scope
     /// (Reviewer-three's P2 on #3683). `None` else, and for a note the lamp
     /// was given in writing.
+    ///
+    /// When that line itself only answers an earlier offer (`answers`: a
+    /// bare "yes" the lamp met with a second offer, "Want me to keep that
+    /// shoe size for you?", as with a carried yes on lamp-06c1 on
+    /// 2026-11-04), the line that earlier offer was about, each offer held
+    /// to the same tests; `None` when there is none. Never the bare answer.
     pub fn offered_line(
         &self,
         request: u64,
         whose: Option<&str>,
         now: Instant,
         offers: impl Fn(&str) -> bool,
+        answers: impl Fn(&str) -> bool,
     ) -> Option<String> {
-        let offer = self
+        let mut answered = self
             .exchanges
             .iter()
             .rev()
             .filter(|exchange| exchange.request != request)
-            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))?;
-        let person = offer.person.trim();
-        (offer.whose.as_deref() == whose
-            && offer.written.is_none()
-            && now.saturating_duration_since(offer.at) <= GOING_ON_FOR
-            && person.chars().any(char::is_alphanumeric)
-            && crate::remarks::lamp_asked(&offer.tail)
-            && offers(&offer.tail))
-        .then(|| person.to_owned())
+            .filter(|exchange| exchange.lamp.chars().any(char::is_alphanumeric));
+        loop {
+            let offer = answered.next()?;
+            let person = offer.person.trim();
+            let offered = offer.whose.as_deref() == whose
+                && offer.written.is_none()
+                && now.saturating_duration_since(offer.at) <= GOING_ON_FOR
+                && person.chars().any(char::is_alphanumeric)
+                && crate::remarks::lamp_asked(&offer.tail)
+                && offers(&offer.tail);
+            if !offered {
+                return None;
+            }
+            if !answers(person) {
+                return Some(person.to_owned());
+            }
+        }
     }
 
     /// A paired computer ended its turn (`turn: "end"`): the conversation

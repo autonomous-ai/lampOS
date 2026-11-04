@@ -2087,8 +2087,23 @@ fn observe_input(input: &Value, events: bool, now: u64, zone: Option<&LocalTime>
 /// not know it never sees it. A `"replaces"` the model gave is always
 /// dropped: only the voice's own matcher sets one
 /// ([`observations_replacing`]; the reviewer-lead's P2 on #3853, a model or
-/// a steered line naming any kept id would retire it).
-fn observations_for_memory(mut observations: Vec<Value>, events: bool) -> Vec<Value> {
+/// a steered line naming any kept id would retire it). With `keep_heard`
+/// (`LAMP_MEMORY_KEEP_HEARD`), one that is only a yes, no or okay is
+/// dropped.
+fn observations_for_memory(
+    mut observations: Vec<Value>,
+    events: bool,
+    keep_heard: bool,
+) -> Vec<Value> {
+    // One that is only a yes, no or okay is never kept: it says nothing
+    // without the line it answered.
+    if keep_heard {
+        observations.retain(|observation| {
+            !observation["text"]
+                .as_str()
+                .is_some_and(|text| heard::only_an_answer(text.trim_start_matches(heard::SAID)))
+        });
+    }
     for observation in &mut observations {
         if let Some(observation) = observation.as_object_mut() {
             observation.remove("replaces");
@@ -10499,7 +10514,7 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<ObserveJob>) {
                     .and_then(Value::as_array)
                     .cloned()
             })
-            .map(|observations| observations_for_memory(observations, events));
+            .map(|observations| observations_for_memory(observations, events, heard::on()));
         let asked_ms = started.elapsed().as_millis();
         if forgotten(forgets) {
             let closed = close_job(socket, person.as_deref(), &job);
@@ -15673,26 +15688,39 @@ mod tests {
             json!({"text":"Moving house","category":"thread","source_ids":[5],"supersedes":null,"on":null}),
             json!({"text":"Learning piano","category":"thread","source_ids":[5],"supersedes":null}),
         ];
-        let off = observations_for_memory(proposed.clone(), false);
+        let off = observations_for_memory(proposed.clone(), false, false);
         assert!(
             off.iter()
                 .all(|observation| observation.get("on").is_none())
         );
         assert_eq!(off[0]["text"], proposed[0]["text"]);
         assert_eq!(off.len(), proposed.len());
-        let on = observations_for_memory(proposed.clone(), true);
+        let on = observations_for_memory(proposed.clone(), true, false);
         assert_eq!(on[0], proposed[0]);
         assert_eq!(on[1], proposed[1]);
         assert!(on[2].get("on").is_none(), "a preference has no day");
         assert!(on[3].get("on").is_none(), "a null day is left out");
         assert_eq!(on[4], proposed[4]);
+        // lamp-06c1, 2026-11-04: with LAMP_MEMORY_KEEP_HEARD, a proposal
+        // that is only a yes, no or okay is never kept, as the model wrote
+        // it or as heard; off, every proposal goes as before.
+        let bare = vec![
+            json!({"text":"Yes.","category":"preference","source_ids":[5],"supersedes":null}),
+            json!({"text":"They said: Okay.","category":"preference","source_ids":[5],"supersedes":null}),
+            json!({"text":"No, thanks","category":"preference","source_ids":[5],"supersedes":null}),
+            json!({"text":"My shoe size is nine.","category":"preference","source_ids":[5],"supersedes":null}),
+        ];
+        assert_eq!(observations_for_memory(bare.clone(), false, false).len(), 4);
+        let kept = observations_for_memory(bare, false, true);
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert_eq!(kept[0]["text"], "My shoe size is nine.");
         // The reviewer-lead's P2 on #3853: the model's own `replaces` never
         // reaches the memory, with the events switch or without.
         let steered = vec![
             json!({"text":"Works at a library","category":"preference","source_ids":[5],"supersedes":null,"replaces":3}),
         ];
         for events in [false, true] {
-            let sent = observations_for_memory(steered.clone(), events);
+            let sent = observations_for_memory(steered.clone(), events, false);
             assert!(sent[0].get("replaces").is_none(), "{sent:?}");
             assert_eq!(sent[0]["text"], "Works at a library");
             // Off (`LAMP_MEMORY_REPLACES`), nothing adds one back; on, only
