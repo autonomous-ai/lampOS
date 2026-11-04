@@ -574,6 +574,31 @@ nhiều nhất tám điều, và không quên gì khi có nhiều hơn), không 
 (không gì được đọc lại cho giọng ấy). Một câu được lưu là của bạn khi bạn là khuôn mặt duy nhất trong khung
 hình có thể chứa lời người khác nói ngoài khung hình.
 
+**Lệnh quên tới cả dòng của căn phòng nói lại điều họ giữ** (GATE 23 FAIL
+của Core-verifier trên lamp-52e6, bản ổn định 9980, ngày 4/11): câu «remember
+my favourite drink is jasmine cheese» của Henry được giữ là của Henry, câu trả
+lời ở lượt sau «Jasmine cheese, that's the favorite I have for you, Henry.» vào
+nhật ký của căn phòng, và «forget my favourite drink» xoá điều đã giữ nhưng dòng
+của căn phòng vẫn còn «jasmine»: không gì nối dòng đó với điều Henry giữ, vì
+nguồn của một dòng chỉ thuộc phạm vi của chính nó. Nay một dòng của căn phòng
+mà việc ghi nhớ thuộc về một người quen theo quy tắc này
+(`memory_scope::one_face_line`, đánh dấu bởi `take_by_one_face` và
+`keep_for_one_face`, bỏ dấu khi bị thu hẹp) trích dẫn những điều người ấy giữ
+trong phiên này mà dòng đó mang từ khoá của chúng (`remember::keeper_cited`),
+gửi bằng `keeper` và `keeper_ids` trong `append_linked`
+(`Days::append_keeper`). Lệnh quên một điều của họ khi đó xoá luôn dòng ấy nếu
+dòng mang từ của điều đó (quy tắc chọn lọc, như với dòng của chính họ), và
+«quên hết» của họ xoá mọi dòng của căn phòng trích dẫn điều họ giữ, cùng những
+gì căn phòng ghi nhận từ các dòng ấy (một sở thích «Henry's favourite is jasmine
+cheese») khi nó mang một từ của một điều họ giữ, đọc như quy tắc chọn lọc đọc
+(P2 của Thirteen trên #5291). Không dòng
+nào khác của căn phòng bị chạm tới: câu của một người khách, có giọng khác, không
+thuộc về ai và không trích dẫn gì của họ; các lần đọc của căn phòng không bao giờ
+cho thấy liên kết này. Chính câu ghi nhớ không vào nhật ký, như mọi câu ghi nhớ,
+nên dòng mang từ ấy là câu trả lời sau nó. Ký ức từ chối các trường này (một
+bản cũ, hoặc bản hiện tại từ chối người giữ ấy) nhận lại dòng một lần nữa không
+có chúng, được ghi lại như trước.
+
 **Lời nhắc của họ trên câu như vậy** (`LAMP_ONE_FACE_REMINDERS=on`, bật trong
 bản sản phẩm, quyết định của người phụ trách ký ức ngày 4/11): việc ghi nhớ
 của câu cũng quyết định việc đọc lời nhắc. `list_reminders`, `cancel_reminder`

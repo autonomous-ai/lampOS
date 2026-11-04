@@ -30,6 +30,14 @@ enum Extra {
         /// (`Days::append_ruled_by`).
         #[serde(default)]
         speaker: Option<String>,
+        /// On a room line only, the one known person whose keep the line
+        /// was (the voice's `LAMP_PERSON_SCOPE_ONE_FACE`), and the kept
+        /// things of theirs it cites, `keeper_ids` (`Days::append_keeper`):
+        /// their forget of one reaches this line.
+        #[serde(default)]
+        keeper: Option<String>,
+        #[serde(default)]
+        keeper_ids: Vec<u64>,
     },
     /// #2849 (the first builder's yes, 23 Oct 09:37): the room's lines
     /// `speaker` said, and what was made only from them, removed
@@ -534,8 +542,17 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             source_ids,
             rule_ids,
             speaker,
+            keeper,
+            keeper_ids,
         } => {
-            json!({"ok":true,"id":store.append_ruled_by(&one(person)?,at_unix_ms,&heard,&said,&source_ids,&rule_ids,speaker.as_deref())?})
+            if keeper.is_none() && !keeper_ids.is_empty() {
+                return Err(Error::new(
+                    "bad_request",
+                    "keeper_ids are a keeper's, and no keeper was given",
+                ));
+            }
+            let keeper = keeper.as_deref().map(|keeper| (keeper, &keeper_ids[..]));
+            json!({"ok":true,"id":store.append_keeper(&one(person)?,at_unix_ms,(&heard,&said),&source_ids,&rule_ids,speaker.as_deref(),keeper)?})
         }
         Extra::ForgetSaid { person, speaker } => {
             if one(person)?.as_str() != Person::EVERYONE {
