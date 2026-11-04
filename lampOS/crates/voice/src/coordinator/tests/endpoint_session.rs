@@ -694,6 +694,7 @@ fn provider_peer(
                 ProviderInput::Called { .. } => seen.provider.push("called"),
                 ProviderInput::Paused { .. } => seen.provider.push("paused"),
                 ProviderInput::PauseJoin { .. } => seen.provider.push("pause_join"),
+                ProviderInput::StopWords { .. } => seen.provider.push("stop_words"),
                 ProviderInput::CountOnly { .. } => seen.provider.push("count_only"),
                 ProviderInput::StepCall { .. } => seen.provider.push("step_call"),
                 ProviderInput::Onboarding { .. } => seen.provider.push("onboarding"),

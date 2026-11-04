@@ -340,6 +340,37 @@ pub fn holds_backchannels() -> bool {
     std::env::var(BACKCHANNEL_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Where the voice reads whether a yield committed before its words came
+/// waits for them to decide what the cut-in is (#5076, #5111): `on`. Off
+/// unless set, and inert without `LAMP_STOP_WORDS=heard`. On lamp-52e6 on 4
+/// November, at 14:16 and 18:31, "Stop, Lamp." over a story yielded, and
+/// its speech committed the yield 0.41 s later, before the stop stream,
+/// which takes 0.8 to 1.2 s to connect, had any words: the story was cut,
+/// the cut-in's own words came back empty or misheard ("Start land."), no
+/// stop line played, and the lamp went quiet. With the switch the commit
+/// still cuts the answer at once, and the yield's words are waited for, at
+/// most [`COMMIT_WAIT_US`]: a stop phrase among them ([`stop_phrase`])
+/// goes to the second route as the cut-in's words
+/// (`ProviderInput::StopWords`), which then ends it with the stop line
+/// (`LAMP_SPOKEN_STOP_ENDS`). Any other words, or none by the bound, and
+/// the cut-in goes on as before.
+pub const COMMIT_WAITS_ENVIRONMENT: &str = "LAMP_STOP_WORDS_COMMIT_WAITS";
+
+/// Whether the environment asks a commit to wait for its yield's words.
+pub fn commit_waits_from_environment() -> bool {
+    std::env::var(COMMIT_WAITS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With [`COMMIT_WAITS_ENVIRONMENT`], the longest a commit waits for its
+/// yield's words, from the commit, on the blocks' capture clock: 1 s. The
+/// stop stream took 0.8 to 1.2 s to connect on lamp-52e6 on 4 November,
+/// and the yield's audio, kept while it connects, is heard once it has;
+/// the commit came 0.4 s after the yield began, so words said in it come
+/// some 0.5 s after the commit. Longer, and a cut-in that was no stop is
+/// held back from its answer for nothing: the second route waits no
+/// longer than this for them either.
+pub const COMMIT_WAIT_US: u64 = 1_000_000;
+
 /// Where the voice reads whether an aside said while the lamp speaks is
 /// held as a backchannel is (#2939, 25 Oct): `on`. Off unless set, and inert
 /// without [`BACKCHANNEL_ENVIRONMENT`]: with it, [`ASIDES`] count as
@@ -616,6 +647,26 @@ pub enum Tell {
     },
     /// It ended before any words came.
     Unheard,
+    /// A commit waited for its yield's words ([`COMMIT_WAITS_ENVIRONMENT`]):
+    /// whether they were a stop phrase and how many, or `None` when they
+    /// had not come by [`COMMIT_WAIT_US`]; how long it waited, in ms; and
+    /// the cut-in's request, once one was in hand
+    /// ([`StopWords::commit_waits_for`]).
+    Waited {
+        heard: Option<(bool, usize)>,
+        waited_ms: u64,
+        request: Option<u64>,
+    },
+}
+
+/// A commit waiting for its yield's words ([`StopWords::with_commit_waits`]).
+struct CommitWait {
+    /// The capture time of the block it committed at.
+    since_us: u64,
+    /// The reply in hand when it committed, the one it cut; then the
+    /// cut-in's request, once a newer one is.
+    cut: Option<Option<u64>>,
+    request: Option<u64>,
 }
 
 /// The yield's words, followed block by block.
@@ -702,6 +753,14 @@ pub struct StopWords {
     /// A yield's words are journaled with its decision
     /// ([`Self::with_backchannel_debug`]).
     debug: bool,
+    /// A commit waits for its yield's words ([`Self::with_commit_waits`]);
+    /// whether the yield in force was last settled by a commit
+    /// ([`Self::yield_committed`]); the commit waiting; and its stop
+    /// phrase, once heard, for the cut-in ([`Self::take_waited_words`]).
+    commit_waits: bool,
+    committed: bool,
+    waiting: Option<CommitWait>,
+    waited_words: Option<String>,
 }
 
 /// A stop heard over the lamp and held ([`HOLD_US`]): what was heard,
@@ -754,7 +813,50 @@ impl StopWords {
             yield_backchannel: false,
             yield_held: None,
             debug: false,
+            commit_waits: false,
+            committed: false,
+            waiting: None,
+            waited_words: None,
         }
+    }
+
+    /// With `on`, heard in yields, a yield committed before its words came
+    /// keeps its stream and asks for them, and they are told when they come
+    /// or at [`COMMIT_WAIT_US`] after the commit ([`Tell::Waited`]), instead
+    /// of [`Tell::Unheard`] at the commit: `LAMP_STOP_WORDS_COMMIT_WAITS=on`
+    /// (#5076). Off, a commit forgets them as before.
+    pub fn with_commit_waits(mut self, on: bool) -> Self {
+        self.commit_waits = on && !self.always;
+        self
+    }
+
+    /// Whether the last yield was settled by a commit, as the duplex rule
+    /// has it, told before each block ([`Self::block`]).
+    pub fn yield_committed(&mut self, committed: bool) {
+        self.committed = committed;
+    }
+
+    /// While a commit waits for its yield's words, the reply in hand
+    /// (`turn`), told after each block: the first is the one it cut, and
+    /// the first newer one is the cut-in's request, which it then returns
+    /// while it waits, so that the cut-in's End is held for them
+    /// (`coordinator::hold_cut_in_end`). `None` while it is not waiting, or
+    /// no cut-in is in hand yet.
+    pub fn commit_waits_for(&mut self, turn: Option<u64>) -> Option<u64> {
+        let waiting = self.waiting.as_mut()?;
+        match waiting.cut {
+            None => waiting.cut = Some(turn),
+            Some(cut) if waiting.request.is_none() && turn.is_some() && turn != cut => {
+                waiting.request = turn;
+            }
+            Some(_) => {}
+        }
+        waiting.request
+    }
+
+    /// The stop phrase a commit waited for ([`Tell::Waited`]), once.
+    pub fn take_waited_words(&mut self) -> Option<String> {
+        self.waited_words.take()
     }
 
     /// With `on`, listening to everything, a yield is told its words as with
@@ -1274,7 +1376,35 @@ impl StopWords {
         }
         self.replying = replying;
         let mut tell = Tell::Nothing;
+        // A commit waiting for its yield's words (#5076): told when they
+        // come, at the bound, or when another yield begins, which wants
+        // the stream for its own.
+        if let Some(waiting) = self.waiting.as_ref() {
+            let words = self.ears.words();
+            let waited_us = captured_at_us.saturating_sub(waiting.since_us);
+            if words.is_some() || waited_us >= COMMIT_WAIT_US || yielded {
+                let request = waiting.request;
+                self.waiting = None;
+                self.ears.forget();
+                let heard = words.map(|words| {
+                    let stop = stop_phrase(&words);
+                    let count = word_count(&words);
+                    self.waited_words = stop.then_some(words);
+                    (stop, count)
+                });
+                tell = Tell::Waited {
+                    heard,
+                    waited_ms: waited_us / 1_000,
+                    request,
+                };
+            }
+        }
         if yielded && !self.yielded {
+            if matches!(tell, Tell::Waited { heard: None, .. }) {
+                eprintln!(
+                    "lamp-voice: a committed yield's words had not come when another yield began: the cut-in goes on"
+                );
+            }
             self.yielded = true;
             self.asked = false;
             self.told = false;
@@ -1305,12 +1435,27 @@ impl StopWords {
             }
         } else if self.yielded {
             self.yielded = false;
-            self.ears.forget();
-            if !self.told {
-                tell = Tell::Unheard;
+            if self.commit_waits && self.committed && !self.told {
+                // Committed before its words came (#5076): the stream is
+                // kept, asked for them if it was not yet, and they are
+                // waited for ([`COMMIT_WAIT_US`]).
+                if !self.asked {
+                    self.ears.finalize();
+                    self.asked = true;
+                }
+                self.waiting = Some(CommitWait {
+                    since_us: captured_at_us,
+                    cut: None,
+                    request: None,
+                });
+            } else {
+                self.ears.forget();
+                if !self.told {
+                    tell = Tell::Unheard;
+                }
             }
         }
-        if !replying && !yielded && !self.rested {
+        if !replying && !yielded && !self.rested && self.waiting.is_none() {
             self.ears.rest();
             self.rested = true;
         }
@@ -1335,6 +1480,11 @@ impl StopWords {
     /// yield heard is dropped, and no stream is kept until the next reply
     /// (#828). Idempotent.
     pub fn close(&mut self) {
+        // A commit waiting for its words goes with the reply it cut in on.
+        if self.waiting.take().is_some() {
+            self.ears.forget();
+        }
+        self.waited_words = None;
         if self.yielded {
             self.yielded = false;
             // Listening to everything, the stream is the reply's, not the

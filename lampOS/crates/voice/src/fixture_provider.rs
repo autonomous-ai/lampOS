@@ -446,6 +446,11 @@ impl FixtureProvider {
                 privacy_generation,
                 ..
             }
+            | ProviderInput::StopWords {
+                request,
+                privacy_generation,
+                ..
+            }
             | ProviderInput::CountOnly {
                 request,
                 privacy_generation,
@@ -567,6 +572,7 @@ impl FixtureProvider {
             ProviderInput::Called { .. }
             | ProviderInput::Paused { .. }
             | ProviderInput::PauseJoin { .. }
+            | ProviderInput::StopWords { .. }
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. }

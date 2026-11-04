@@ -902,6 +902,39 @@ With the switch:
   made the lamp yield at all: that half is the canceller's, not this one's
   (the first builder, 09:49: a lone "Stop." yielded 0 of 3 that morning).
 
+### A commit that waits for its words (#5076, 4 November)
+
+Off unless `LAMP_STOP_WORDS_COMMIT_WAITS=on`, and only with
+`LAMP_STOP_WORDS=heard`; the stop line it leads to is the second route's,
+with `LAMP_SPOKEN_STOP_ENDS=on`. On lamp-52e6 on 4 November, at 14:16 and
+18:31, "Stop, Lamp." said over a story yielded (0.71 s into the play) and
+its speech committed the yield 0.41 s later, before the stop stream, still
+connecting (0.8 to 1.2 s), had any words: `stop_words` with `words: null`.
+The story was cut, the cut-in's own words came back empty or as "Start
+land.", no stop line played, and the lamp just went quiet.
+
+- **The cut stays at once.** The commit ends the answer as before; only
+  what the cut-in is waits.
+- **The words are waited for.** At a commit with no words yet, the stream
+  is kept, asked for them if it wasn't (`finalize`), and the words are
+  waited for at most 1 s after the commit (`COMMIT_WAIT_US`, on the
+  blocks' capture clock). Meanwhile the cut-in's End is kept back from the
+  route (`hold_cut_in_end`), since its words are judged only once its End
+  is in.
+- **A stop phrase is the cut-in's words.** Judged as in a yield
+  (`stop_phrase`), it goes to the cut-in's request before its End
+  (`ProviderInput::StopWords`). The second route takes it as the line's
+  words when its own are no stop (`spoken_stop::is_stop_request`), and so
+  answers with the stop line, the model not asked, as it does when its own
+  words are the stop.
+- **Anything else goes on as before:** other words, none by the bound, or
+  another yield begun; words that come later are dropped with the yield.
+- One journal line a wait ("a committed yield's words were waited for 480
+  ms: a stop phrase: request 2 is told it"), and a `stop_words_waited`
+  trace line with `turn`, `waited_ms`, `outcome` (`stop`, `no_stop`,
+  `bound`), `words` and `told`, so a lamp row measures commit to stop line
+  from `duplex_commit`. With the switch off nothing of this runs.
+
 ### A backchannel held as a yield (#2939, 22 October)
 
 Off unless `LAMP_BACKCHANNEL_HOLDS=on`, and only with

@@ -816,6 +816,17 @@ pub enum ProviderInput {
         privacy_generation: u64,
         at_us: u64,
     },
+    /// The request in hand is a cut-in whose yield committed before its
+    /// words came, and they came a stop phrase while the commit waited
+    /// (`LAMP_STOP_WORDS_COMMIT_WAITS=on`, #5076), sent before its End,
+    /// only then: the second route takes `words` as the line's when its own
+    /// are no stop, and ends it with the stop line
+    /// (`LAMP_SPOKEN_STOP_ENDS`). The Live worker takes nothing from it.
+    StopWords {
+        request: u64,
+        privacy_generation: u64,
+        words: String,
+    },
     /// The request in hand is onboarding's sentence (#1803), sent just
     /// after its Start: its words are counted by the coordinator and kept
     /// nowhere else, neither in the thread, the memory's journal nor a
@@ -900,6 +911,7 @@ impl ProviderInput {
             | Self::Called { request, .. }
             | Self::Paused { request, .. }
             | Self::PauseJoin { request, .. }
+            | Self::StopWords { request, .. }
             | Self::CountOnly { request, .. }
             | Self::StepCall { request, .. }
             | Self::Onboarding { request, .. }
@@ -927,6 +939,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::PauseJoin {
+                privacy_generation, ..
+            }
+            | Self::StopWords {
                 privacy_generation, ..
             }
             | Self::CountOnly {
@@ -6156,6 +6171,7 @@ impl InputHandoff {
             ProviderInput::Audio { .. }
                 | ProviderInput::Paused { .. }
                 | ProviderInput::PauseJoin { .. }
+                | ProviderInput::StopWords { .. }
         ) {
             SUBMITTED_AT_US.store(now_us, std::sync::atomic::Ordering::Relaxed);
         }
@@ -6409,6 +6425,8 @@ impl InputHandoff {
             ProviderInput::Paused { .. } => {}
             // The second route's (`LAMP_ENDPOINT_PAUSE_JOIN`).
             ProviderInput::PauseJoin { .. } => {}
+            // The second route's (`LAMP_STOP_WORDS_COMMIT_WAITS`).
+            ProviderInput::StopWords { .. } => {}
             // Onboarding's sentence (#1803): from now its words and the
             // answer to it are kept out of the thread.
             ProviderInput::CountOnly { .. } => {

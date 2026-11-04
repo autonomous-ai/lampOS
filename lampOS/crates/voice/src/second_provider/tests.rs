@@ -11959,6 +11959,54 @@ async fn a_cut_in_with_words_on_the_way_but_none_final_is_not_taken_for_a_cough(
     assert!(!out.contains(&asks) && !out.contains(&stops), "{out:?}");
 }
 
+/// #5076 (lamp-52e6, 4 Nov 14:16 and 18:31): "Stop, Lamp." over a story
+/// committed before the stop words had any, and the cut-in's own words came
+/// back empty or as "Start land.", so the lamp went quiet. The stop words'
+/// "Stop, Lamp.", told before its End (`LAMP_STOP_WORDS_COMMIT_WAITS`), are
+/// its words: the stop line, the model not asked. Without them, or with
+/// the cut-in's own words a stop already, as before.
+#[tokio::test]
+async fn a_cut_ins_stop_words_heard_after_its_commit_end_it_with_the_stop_line() {
+    // The stop line closes the conversation: the shared thread is held, as
+    // by the other tests that close it.
+    let _thread = crate::provider_worker::tests::one_thread();
+    let _closes = crate::thread::closes_for_test();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let stops = format!("said:{}", crate::spoken_stop::LINE);
+    async fn run(own: &str, told: Option<&str>) -> (Vec<String>, usize) {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(own.to_owned())].into()),
+            chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built.ending_spoken_stops(true);
+        engine.submit(start_marked(1, true, false, false));
+        engine.submit(audio(1, 1));
+        if let Some(words) = told {
+            engine.submit(ProviderInput::StopWords {
+                request: 1,
+                privacy_generation: 1,
+                words: words.to_owned(),
+            });
+        }
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        (out, asked)
+    }
+    for own in ["", "Start land."] {
+        let (out, asked) = run(own, Some("Stop, Lamp.")).await;
+        assert!(out.contains(&stops), "{own:?}: {out:?}");
+        assert_eq!(asked, 0, "{own:?}");
+        let (out, _) = run(own, None).await;
+        assert!(!out.contains(&stops), "{own:?}: {out:?}");
+    }
+    let (out, asked) = run("Tell me more.", None).await;
+    assert!(!out.contains(&stops), "{out:?}");
+    assert_eq!(asked, 1);
+}
+
 #[test]
 fn words_on_the_way_count_only_for_an_empty_cut_in() {
     let some = || Some("Stop".to_owned());
