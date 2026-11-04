@@ -99,8 +99,9 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[choice]`, `[flag]` | | the tool's one argument: a named value, or yes or no |
 | `[again]` | `{ within, if_heard, told }` | when the tool is called again soon after it ran |
 | `[quiet]`, `[active]` | windows | local hours when it never starts itself, or the only ones it may |
-| `[budget]` | `{ group, per_hour 1–6 }` | runs an hour shared by every skill of the group |
+| `[budget]` | `{ group, per_hour 1–6, gap, give_back_unsaid }` | runs an hour shared by every skill of the group; `gap` (1 m to 1 h), the least time between two of them; `give_back_unsaid`, a run that said nothing gives its place back (#5207) |
 | `[rest]` | `{ after_ignored 1–5, within }` | rests until the next morning after runs nobody noticed |
+| `[present]` | `enabled`, `trigger`, `while`, `most_a_day`, `active`, `quiet`, `budget`, `rest`, `ask`, `do` | with `LAMP_NUDGES_PRESENT=on`, each key stands in for the file's own, whole; read, checked and ignored without it (#5207) |
 | `[stop]` | `{ tool, about }` | a function the model calls to snooze it or turn it off |
 | `[search]` | `{ looks 1–8, give_up, found, note, walk, looked }` | a search a person asked for, its looks and what the model is told past the last (look-for-things) |
 | `[history]` | `{ topic = "room/presence", within, words }` | the room's presence over the last hours, for the model (who-was-here) |
@@ -158,6 +159,9 @@ Keys of a trigger:
   topic's field is above the line, on a trigger with a `for`. It is kept
   only with `LAMP_YAWN_SOONER=on`; off, it is read, checked and ignored
   (#3709).
+- `instead_of = "NAME"`: with `once_per_day`, this trigger's run takes the
+  chance of a later trigger of the skill on the same topic, whose cooldown
+  begins then: one run, not two (#5207, Welcome back's day's first hello).
 
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on

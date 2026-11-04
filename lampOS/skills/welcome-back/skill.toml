@@ -54,3 +54,50 @@ light = "warm_glow"
 # Policy's hello gate, asked even with LAMP_SKILLS_ASK=skip, to one an hour
 # to each person (the first builder, 30 Oct, on the launch testers' findings).
 say = { note = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.", expires = "60s" }
+
+# With LAMP_NUDGES_PRESENT=on (#5207, off unless set), these stand in for
+# the values above, each key whole: the day's first arrival before noon is
+# greeted with one open clause after the hello, "what's first today?" (V1's
+# morning opener), once a day in the daily journal; every other arrival as
+# above. `instead_of`: the morning hello is that arrival's hello, never a
+# second one.
+[present]
+
+[[present.trigger]]
+name = "first"
+topic = "humans/faces/tracked"
+when = "appears"
+near = 0.14
+absent_for = "5m"
+for = "3s"
+gap = "3s"
+wait = "60s"
+cooldown = "20m"
+during = { from = "05:00", to = "12:00" }
+once_per_day = true
+instead_of = "hello"
+yields_to = { skill = "bedtime-morning", trigger = "morning" }
+
+[[present.trigger]]
+name = "hello"
+topic = "humans/faces/tracked"
+when = "appears"
+near = 0.14
+absent_for = "5m"
+for = "3s"
+gap = "3s"
+wait = "60s"
+cooldown = "20m"
+yields_to = { skill = "bedtime-morning", trigger = "morning" }
+
+[[present.do]]
+body = { look_at = "face" }
+light = "warm_glow"
+
+[[present.do]]
+on = "hello"
+say = { note = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.", expires = "60s" }
+
+[[present.do]]
+on = "first"
+say = { note = "They are at their desk for the first time today. Say a hello and their name if you know it, then ask what's first today, in one short line: nothing else.", expires = "60s" }

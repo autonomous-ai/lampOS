@@ -83,3 +83,59 @@ policy = "nudge"
 body = { look_at = "face" }
 light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
 say = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."
+
+# With LAMP_NUDGES_PRESENT=on (#5207, off unless set), these stand in for
+# the values above, each key whole: a sip after 50 minutes at the desk, and
+# again each 50 minutes while they stay, over the waking day the quiet hours
+# leave, six a day at most. The wellbeing group's two an hour, never within
+# 30 minutes of each other, keeps it from crowding the other nudges.
+[present]
+most_a_day = 6
+
+[present.trigger]
+topic = "humans/faces/tracked"
+when = "present"
+near = 0.14
+for = "50m"
+gap = "2m"
+cooldown = "50m"          # no rearm: again after 50 minutes while they stay;
+                          # talking then, every message after is a chance
+
+[[present.while]]
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[present.while]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[[present.while]]
+topic = "room/activity"
+field = "state"
+not_equals = "head_down"
+unknown = "holds"
+
+[[present.while]]         # the sitter's own sitting has lasted 50 minutes too
+topic = "room/activity"
+field = "sitting_s"
+above = 2999
+unknown = "holds"
+
+[present.active]          # the waking day: the quiet hours hold the rest
+from = "08:00"
+to = "22:00"
+
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
+
+[[present.do]]
+body = { look_at = "face" }
+light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
+say = "They have been at the desk a while. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."

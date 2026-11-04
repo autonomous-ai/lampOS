@@ -299,8 +299,9 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
 /// `tests/install.rs` holds the two lists equal). Twenty keep their folders'
-/// own default: nineteen enabled, and Bedtime and Morning disabled by its own
-/// `enabled = false` until its lamp comparison (#1672); those of
+/// own default: nineteen enabled, Bedtime and Morning disabled by its own
+/// `enabled = false` until its lamp comparison (#1672), and Comfort break
+/// by its own until `LAMP_NUDGES_PRESENT=on` (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
 /// Every behaviour that has a skill runs as the skill (the owner, 19 Oct):
@@ -341,6 +342,11 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "rest-your-eyes",
     "stand-up",
     "wind-down",
+    // A short break after a long sitting (#3504, #5207): V1's bathroom-break
+    // reminder, shipped off by its own `enabled = false` and on only with
+    // `LAMP_NUDGES_PRESENT=on` (its `[present]`), until its played check.
+    // Its function is the nudges' one `wellbeing_nudges`, no new one.
+    "comfort-break",
     // A pet on the head (#3997, Part of #4133): Head pat's line, now and
     // then, and its wiggle at every pet, on `controls/pet`, which the
     // product's lamp-controls says (`LAMP_HEAD_PET=on`); the design owner's
@@ -428,11 +434,6 @@ pub const OFF_LINE: &str = off_line!();
 pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     // An installable skill (#3504): its owner chooses it; not in the
     // product's install until it has been tried on a lamp.
-    (
-        "comfort-break",
-        "an installable skill, not yet tried on a lamp (#3504): V1's bathroom-break reminder, \
-         which its owner chooses; a played check on a lamp comes first",
-    ),
     (
         "desk-tutor",
         "with its marks its two functions would be 33 of a Live session's 32; the full look it \
@@ -570,6 +571,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("stand-up", "SKILL.md"),
     skill_file!("wind-down", "skill.toml"),
     skill_file!("wind-down", "SKILL.md"),
+    skill_file!("comfort-break", "skill.toml"),
+    skill_file!("comfort-break", "SKILL.md"),
     skill_file!("head-pat", "skill.toml"),
     skill_file!("head-pat", "SKILL.md"),
     skill_file!("head-pat", "README.md"),
