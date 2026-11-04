@@ -1747,7 +1747,11 @@ without models doesn't write the field and is byte for byte what it was.
 The publish (`.github/scripts/lampos-publish.py`) passes `--models` with
 the product's `deploy/product/models.json`, so every published build
 carries its pinned models; a lamp fetches them only where
-`LAMP_UPDATE_MODELS=on`.
+`LAMP_UPDATE_MODELS=on`. With the switch off, a lamp refuses a build
+whose pinned file it has, as install placed it, with another SHA-256
+(`WaitsForModels`, "Off, or absent" below), so the switch must be on in
+the product's updater, and on the lamps, before the publish carries
+models (#5193 and #5203 first, then #5221).
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
 plain parts.
@@ -2961,7 +2965,9 @@ test does (#1512):
   Nov): tested on the Mac only (`tests/round.rs`). A download cut short
   starts again from nothing; it isn't resumed. Published builds now carry
   the product's pinned models (`deploy/product/models.json`); a lamp
-  fetches them only where `LAMP_UPDATE_MODELS=on`.
+  fetches them only where `LAMP_UPDATE_MODELS=on`, and with it off refuses
+  a build whose pinned file it has, as install placed it, with another
+  SHA-256 (`WaitsForModels`).
 - The image's own files (`LAMP_UPDATE_IMAGE`): tested on the Mac only
   (`image.rs`, `apply.rs`, `tests/round.rs`), with lamp-update-apply called
   in the round's place of systemd and every command recorded, not run.
