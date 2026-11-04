@@ -49,11 +49,11 @@ breaks, a part that says whether the lamp is online, show it) come after it.
   unavailable, with why) is declared and registered, and nothing publishes
   it. The place for the voice's own link state.
 - **Recorded failure lines** ([failure-notices.md](failure-notices.md),
-  `--failure-notice-dir`): played only for a turn whose request failed. Four
+  `--failure-notice-dir`): played only for a turn whose request failed. Three
   are recorded in the second route's voice (#1844, 20 Oct):
-  `provider_unavailable`, `back_online`, `voice_service_unreachable` and the
-  Wi-Fi helper's `wifi_lost`. `lamp-update install` places them, with their
-  manifest, in `/opt/lampOS/voice/notices` from the `notices-2026-10-20`
+  `provider_unavailable`, `back_online` and `voice_service_unreachable`; the
+  Wi-Fi helper's `wifi_lost` and `wifi_recovering` in Kore (#3743). `lamp-update install` places them, with their
+  manifest, in `/opt/lampOS/voice/notices` from the `notices-2026-11-03`
   release (`deploy/product/models.json`), and the product unit passes that
   folder. Before, it passed `/etc/lampOS/voice/notices`, which nothing
   filled, so every line was silent (lamp-06c1, 20 Oct). The way to say "I can't reach

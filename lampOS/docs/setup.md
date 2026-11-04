@@ -845,10 +845,10 @@ by the voice:
   and then checks the folder with `lamp-audio notices`. It needs the voice's key in its credential file; it
   never prints it. `test` unless `production` is given, after a person has
   listened to it.
-  **The product's copy** is rendered in the second route's voice instead
-  (ElevenLabs, with #2300's `render_line_second`), since every lamp now
-  speaks with it, and comes with the other three lines from the
-  `notices-2026-10-20` release ([failure-notices.md](failure-notices.md),
+  **The product's copy** of `wifi_lost` and `wifi_recovering` is this tool's
+  `production` render in Kore, retimed to 1.25x after a person's listen
+  (#3743), and comes with the other three lines from the
+  `notices-2026-11-03` release ([failure-notices.md](failure-notices.md),
   "The product's recordings", #1844).
 - **Missing:** with no folder, no manifest, or a file that fails a check, the
   voice refuses the ask at once with the loader's reason (`the recording is not
