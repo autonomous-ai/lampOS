@@ -867,19 +867,28 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // Harness before the sign-in (#5197): only a `serve` that acts, with
     // its switch on.
     let harness = {
-        use lamp_update::harness_install as harness;
-        let on = config.apply
-            && command == "serve"
-            && harness::on(std::env::var(harness::SWITCH).ok().as_deref());
-        if config.apply && command == "serve" {
+        use lamp_update::harness_install::{self as harness, product};
+        let acts = config.apply && command == "serve";
+        // A lamp installed as the product takes this build's own default
+        // and pin when its environment sets none (#5229).
+        let wanted = product::wanted(
+            std::env::var(harness::SWITCH).ok().as_deref(),
+            std::env::var(harness::MANIFEST_URL).ok().as_deref(),
+            std::env::var(harness::MANIFEST_SHA256).ok().as_deref(),
+            acts && product::product_lamp(&config.root, &config.on(&config.units)),
+            product::PRODUCT_DEFAULT,
+        );
+        let on = acts && wanted.on;
+        if acts {
             harness::at_start(&config.root, &records, on, lamp_update::records::unix_ms());
+            if wanted.source == product::Source::Build {
+                say(&format!(
+                    "Harness before the sign-in: {} by this build's default on a product lamp",
+                    if on { "on" } else { "off" }
+                ));
+            }
         }
-        on.then(|| {
-            harness::pin_from(
-                std::env::var(harness::MANIFEST_URL).ok().as_deref(),
-                std::env::var(harness::MANIFEST_SHA256).ok().as_deref(),
-            )
-        })
+        on.then_some(wanted.pin)
     };
     loop {
         let outcome = {

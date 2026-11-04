@@ -4,6 +4,7 @@
 //! ([`sign_in`]).
 pub mod engine;
 pub mod harness;
+pub mod hold;
 pub mod progress;
 pub mod protocol;
 pub mod runtime;
