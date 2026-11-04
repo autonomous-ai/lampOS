@@ -17,6 +17,11 @@ What is one lamp's own is outside them:
 - A switch a lamp must have off: a drop-in,
   `/etc/systemd/system/lamp-<part>.service.d/<why>.conf`.
 
+The voice's folder holds two more binaries the voice starts from its own
+folder: `lamp-turn-end`, always, and `lamp-same-voice` when the build
+carries it ([same-voice.md](../../docs/same-voice.md)). The latter runs
+only when `LAMP_SAME_VOICE_MODEL` is set, which no unit here sets.
+
 | File | What |
 |---|---|
 | `lampos.target` | The lamp. Starts only once setup's marker `/var/lib/lampos-setup/done` is there (#806) |
