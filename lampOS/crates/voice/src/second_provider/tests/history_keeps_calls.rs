@@ -153,21 +153,18 @@ fn a_light_call_is_handed_on_with_its_arguments() {
     );
 }
 
-/// Any other function's call made with arguments is never handed on: a
-/// keep's or a reminder's are the person's own words, never told again as
-/// a call, and told bare they would teach calling it bare (Fourteen's P3
-/// on #5018). The step beside it is.
+/// Any other function's call made with arguments, neither the light's,
+/// the volume's nor the Schedule's, is never handed on: a keep's are the
+/// person's own words, never told again as a call, and told bare they
+/// would teach calling it bare (Fourteen's P3 on #5018). The step beside
+/// it is.
 #[test]
 fn another_call_with_arguments_is_not_handed_on() {
     let rounds = vec![
         vec![
             Ok(ChatEvent::ToolCalls(vec![
                 call("c0", "remember", json!({"fact": "They like it warm."})),
-                call(
-                    "c1",
-                    "set_reminder",
-                    json!({"what": "tea", "in_minutes": 5}),
-                ),
+                call("c1", "use_skill", json!({"name": "tea", "ask": "five"})),
                 call("c2", "light_warmer", json!({})),
                 call("c3", "light_dimmer", json!({})),
             ])),
@@ -178,10 +175,48 @@ fn another_call_with_arguments_is_not_handed_on() {
     assert_eq!(
         handed_on_with(
             true,
-            "Remember I like it warm, tea in five, dimmer.",
+            "Remember I like it warm, the tea skill for five, dimmer.",
             rounds
         ),
         [(1, "light_dimmer".to_owned(), json!({}))]
+    );
+}
+
+/// lamp-52e6 at 9928 (4 Nov 09:30): "set a timer for one minute" called
+/// `set_timer`; five minutes later "Lamp, set a timer to one minute." made
+/// no call and said "Timer set. It rings at 9:39 am.", the earlier reply
+/// copied with a new time, and no timer existed: the earlier call, made
+/// with arguments, was never kept, so the history showed a timer set in
+/// words alone. A Schedule call is handed on with its own arguments, as a
+/// light's is (#5045(a)); one past `thread::KEPT_ARGS_BYTES` is not kept,
+/// since every Schedule function but `list_reminders` takes some, and
+/// `list_reminders` with none is kept bare as before.
+#[test]
+fn a_schedule_call_is_handed_on_with_its_arguments() {
+    let long = "x".repeat(crate::thread::KEPT_ARGS_BYTES);
+    let rounds = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("c0", "set_timer", json!({"text": "Timer", "seconds": 60})),
+                call("c1", "set_reminder", json!({"text": long, "time": "09:00"})),
+                call("c2", "list_reminders", json!({})),
+                call("c3", "cancel_reminder", json!({"text": "tea"})),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        saying("Timer set. It rings at 9:34 am."),
+    ];
+    assert_eq!(
+        handed_on_with(true, "set a timer for one minute", rounds),
+        [
+            (
+                1,
+                "set_timer".to_owned(),
+                json!({"text": "Timer", "seconds": 60})
+            ),
+            (1, "list_reminders".to_owned(), json!({})),
+            (1, "cancel_reminder".to_owned(), json!({"text": "tea"})),
+        ]
     );
 }
 

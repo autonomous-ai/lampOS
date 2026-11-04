@@ -1772,6 +1772,9 @@ fn second_route_worker_environment(
         // with the owner's forget everything (#4333).
         crate::owner_place::ENVIRONMENT,
         crate::second_provider::net::key_terms::ENVIRONMENT,
+        // Each turn told the light as `light/state` says it now (lamp-52e6,
+        // 4 Nov: "what colour is the light?" guessed "White").
+        crate::light_told::ENVIRONMENT,
     ]
     .into_iter()
     .filter(|_| role == "second")
@@ -1931,6 +1934,7 @@ mod tests {
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
+            crate::light_told::ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -2514,6 +2518,7 @@ mod tests {
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
+                    crate::light_told::ENVIRONMENT,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::memory_scope::GAP_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
@@ -2720,6 +2725,7 @@ mod tests {
                     "LAMP_JOIN_CUT_WORDS=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
+                    "LAMP_LIGHT_TOLD=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_EVENTS=on",
