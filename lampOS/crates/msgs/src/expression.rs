@@ -888,6 +888,14 @@ impl ExpressionState {
         self.check().is_ok() && self.enabled && self.asleep == Some(true)
     }
 
+    /// Whether it says it is waking (`behaviours` names `waking`): out of
+    /// sleep from its name, taken only beside a person's speech where
+    /// `name_requires_speech` is set, or a touch; never from a line alone,
+    /// which only ends its rest.
+    pub fn says_waking(&self) -> bool {
+        self.check().is_ok() && self.enabled && self.behaviours.iter().any(|b| b == "waking")
+    }
+
     pub fn check(&self) -> Result<(), Invalid> {
         self.stamp.check()?;
         if (!self.enabled && (self.body || self.light))
