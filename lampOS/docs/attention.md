@@ -849,8 +849,9 @@ What it does:
    A turn the lamp wrote itself (a hello, a look) is not told, nor a
    request cancelled before either.
 
-   With the same-voice check (`LAMP_SAME_VOICE_MODEL`), it also says
-   `like_asker` (#4306): how alike the request's voice is to the voice of
+   With the same-voice check (`LAMP_SAME_VOICE_MODEL`), unless its prints
+   are for the linked services alone (`LAMP_SAME_VOICE_FOR=services`, as in
+   the product), it also says `like_asker` (#4306): how alike the request's voice is to the voice of
    the person the lamp is in conversation with, the one who said the line
    that began the conversation. It is the cosine of the two lines' voice
    prints, from -1 to 1: the same person reads high (0.70 and over is the
@@ -1902,7 +1903,8 @@ played.
 The first line of that talk, Samantha's "Anyway, …", came before any line
 was left alone, and rode on Daniel's conversation. With a voice model
 (`LAMP_SAME_VOICE_MODEL`, [same-voice.md](same-voice.md), "In the voice"),
-a line of 1.5 s or more, said with the lamp quiet, in a voice plainly not
+not for the linked services alone as in the product
+(`LAMP_SAME_VOICE_FOR=services`), a line of 1.5 s or more, said with the lamp quiet, in a voice plainly not
 the conversation's, is no part of it. A line held as another voice ends
 the conversation: whoever speaks next needs the name or a face, until the
 lamp speaks again (the battery's scene 3, 17 October; same-voice.md). The

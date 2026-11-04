@@ -108,7 +108,7 @@ dịch vụ.
 | Công tắc | Được đọc bởi | Tắt (mặc định) |
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (với `LAMP_CLOUD=on`), `lamp-voice` và `lamp-services` | `lamp-cloud` trả lời `connector.*` và `services.list` của ứng dụng bằng câu của V1 "not on this lamp: <kind>" và không ghi gì vào `can`; giọng nói không khai báo hàm nào trong ba hàm và không định tuyến hàm nào; `lamp-services` không mở socket nào và thoát |
-| `LAMP_SERVICES_WRITE=on` | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
+| `LAMP_SERVICES_WRITE=on` (bật trong `lamp-services.service` của sản phẩm) | `lamp-services` | `service_write` trả lời "writing to services is off on this lamp", và không gì được chuẩn bị hay gửi; việc đọc vẫn như trước |
 | `LAMP_SKILL_READS=on` | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và một yêu cầu tạo kỹ năng nêu một dịch vụ được trả lời `NOT_A_SERVICE` ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
@@ -127,12 +127,18 @@ lại. Nó chỉ khởi động khi setup đã xong và đã có tài khoản c�
 có file `LoadCredential=` bị thiếu, và trên lamp-75c9, một đèn dev chưa từng
 được setup từ ứng dụng, nó đã hỏng lặp lại ngày 4/11. Thiếu chúng, unit bị bỏ
 qua và ở trạng thái inactive. Ba unit sản phẩm, `lamp-services.service`, `lamp-cloud.service` và
-`lamp-voice.service`, mỗi unit đặt `LAMP_SERVICES=on`, chỉ để đọc: đã đọc thử
-trên lamp-9adf bằng chính các binary của bản 9928 ngày 4/11. Một drop-in đặt
-`LAMP_SERVICES=off` sẽ tắt chúng. Không unit sản phẩm nào đặt
-`LAMP_SERVICES_WRITE`: một lệnh "send" cần mẫu giọng, mà sản phẩm không đặt
-`LAMP_SAME_VOICE_MODEL`, nên trên lamp-9adf mọi lần gửi đều bị từ chối vì
-giọng ([switches.md](../switches.md)). Một đèn được cập nhật bởi một `lamp-update`
+`lamp-voice.service`, mỗi unit đặt `LAMP_SERVICES=on`: đã đọc thử trên
+lamp-9adf bằng chính các binary của bản 9928 ngày 4/11. Một drop-in đặt
+`LAMP_SERVICES=off` sẽ tắt chúng. Từ ngày 4/11 `lamp-services.service` còn đặt
+`LAMP_SERVICES_WRITE=on`, và `lamp-voice.service` đặt `LAMP_SAME_VOICE_MODEL`
+(CAM++, được ghim trong `deploy/product/models.json`) cùng
+`LAMP_SAME_VOICE_FOR=services`, nên một lệnh "send" và một lần đọc đầy đủ có
+mẫu giọng, chỉ được tạo cho các dịch vụ; mọi luật của cuộc trò chuyện không
+đọc mẫu giọng nào. Trước đó, khi không có mẫu giọng, mọi lần gửi trên lamp-9adf
+đều bị từ chối vì giọng ([switches.md](../switches.md)). Khi thư mục của giọng
+nói thiếu mô hình hoặc `lamp-same-voice`, phần kiểm tra tắt sau ba lần khởi
+động (`MOST_UNREADY`), và mọi lần gửi bị từ chối, mọi lần đọc đều ngắn gọn,
+như trước. Một drop-in đặt `LAMP_SERVICES_WRITE=off` chỉ để lại việc đọc. Một đèn được cập nhật bởi một `lamp-update`
 cũ hơn bản cài `lamp-services` sẽ chưa có thư mục tools cho tới lần chuyển bản
 kế tiếp, và khi đó giọng nói không khai báo hàm nào của dịch vụ.
 
@@ -998,9 +1004,10 @@ không bao giờ lấy từ thư mục của executive hay của một kỹ năn
   trong bảng ở trên; câu trả lời được trích dẫn, rút gọn còn ai gửi và về
   việc gì khi chủ đèn có thể không ở một mình. Một lần đọc đầy đủ còn cần câu
   nói bằng giọng của cuộc trò chuyện (`read_in_full`, độ giống từ 0.55 trở
-  lên), mà sản phẩm không đặt `LAMP_SAME_VOICE_MODEL`, nên trên đèn sản phẩm
-  mọi lần đọc đều bị rút gọn (`BRIEF_NOTE`): bao nhiêu, ai gửi và về việc gì,
-  không bao giờ nội dung của một mail hay một sự kiện. Mô tả của nó bảo mô
+  lên), từ các mẫu giọng mà sản phẩm chỉ tạo cho các dịch vụ
+  (`LAMP_SAME_VOICE_MODEL` cùng `LAMP_SAME_VOICE_FOR=services`); khi không có
+  mẫu giọng, lần đọc bị rút gọn (`BRIEF_NOTE`): bao nhiêu, ai gửi và về việc
+  gì, không bao giờ nội dung của một mail hay một sự kiện. Mô tả của nó bảo mô
   hình: 'Never say "let me look" for it.', vì câu "Let me look." của chính đèn
   mở mắt của nó (`speak_up::asks_to_look`): trên lamp-9adf ngày 4/11 một lần
   đọc lịch sau câu đó bị theo sau bởi một lời tả căn phòng không ai hỏi. Mọi
@@ -1155,6 +1162,7 @@ bộ nạp khớp nhau; một lần đọc Drive được nói theo tên; cổng
 bỏ qua sau 60 phút, dừng trước một lời, dừng với "I'll tell you the rest
 later." khi có người đến, và các dòng được nói. `-p lamp-update` (unit được
 cài với `LAMP_SERVICES=on` trong đó, như trong `lamp-cloud.service` và
-`lamp-voice.service`, không có `LAMP_SERVICES_WRITE` và không có `--enable`,
-hash của kế hoạch reset) và `-p lamp-setup`
+`lamp-voice.service`, `LAMP_SERVICES_WRITE=on` chỉ trong
+`lamp-services.service`, `LAMP_SAME_VOICE_FOR=services` cạnh mô hình được ghim
+trong `lamp-voice.service`, không có `--enable`, hash của kế hoạch reset) và `-p lamp-setup`
 (`tests/it/reset.rs`).
