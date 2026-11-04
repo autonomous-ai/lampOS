@@ -457,7 +457,9 @@ sách của nó; Ahrefs chỉ đọc bằng `GET`.
 
 Giới hạn: `count` từ 1 đến 10 (5 khi không cho), từ tìm kiếm là một dòng tối
 đa 300 ký tự, một truy vấn GraphQL tối đa 4,000 byte, một id là một đoạn đường
-dẫn tối đa 256 byte, một thời điểm chỉ gồm các ký tự của RFC 3339. Một yêu cầu
+dẫn tối đa 256 byte, một thời điểm chỉ gồm các ký tự của RFC 3339 và có múi
+giờ (`Z` hoặc độ lệch như `+07:00`: Calendar từ chối thời điểm không có, nên nó
+bị từ chối trước khi đọc lại, `reads::calendar_time`). Một yêu cầu
 chỉ qua HTTPS, đến các host của chính dịch vụ, không theo chuyển hướng, 5 s để
 kết nối, tổng cộng 15 s, và đọc tối đa 1 MiB câu trả lời. Một mã lỗi được nói
 rõ ràng: 401 hoặc 403 "<Service> refused the lamp's link: it may need linking

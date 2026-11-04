@@ -160,11 +160,7 @@ fn addresses(args: &Value, key: &str) -> Result<Vec<String>, String> {
 
 fn time<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
     let time = text(args, key).ok_or_else(|| format!("the event needs its {key}"))?;
-    if time.len() > 40
-        || !time
-            .chars()
-            .all(|c| c.is_ascii_digit() || "TZ:+-.".contains(c))
-    {
+    if !reads::calendar_time(time) {
         return Err(format!("{key} is a time like 2026-11-03T09:00:00+07:00"));
     }
     Ok(time)
@@ -624,6 +620,10 @@ mod tests {
             );
         }
         for (code, args) in [
+            (
+                "google_calendar",
+                json!({"action":"create_event","title":"T","start":"2026-11-05T09:00:00","end":"2026-11-05T09:15:00"}),
+            ),
             (
                 "gmail",
                 json!({"action":"send_mail","to":"not an address","subject":"s","text":"t"}),
