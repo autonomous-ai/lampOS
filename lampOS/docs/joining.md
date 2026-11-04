@@ -406,6 +406,15 @@ turn it off (`off`). A part left off says why, in its doc, and the first
 builder tries it within the week. Switches in place before this rule are
 made defaults by the first builder as it confirms each on lamp-4ace.
 
+**Who turns a switch on in the product** (the lead, 4 November 2026). It is
+the PM's call, and a person is not asked. The PM turns a switch on once its
+pull requests are on stable and the builder has posted its `PASS` from its
+own lamp, and writes the conditions on the pull request. A person is asked
+only for a kit run on a lamp, a step that needs hands, or a change to a
+ship date, the roadmap or the product's direction, and then with a
+recommendation and a default that applies at a stated time if there is no
+answer.
+
 ### One pull request per task (`fifth-P6`, decided 2026-10-14)
 
 Proposed by the fifth builder (#716) after #708 was closed unmerged: its
