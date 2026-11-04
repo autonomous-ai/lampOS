@@ -2401,8 +2401,8 @@ fn now_entry(task: &Value, asked: Option<&str>) -> Value {
         "state": plain_state(state),
     });
     if let Some(asked) = asked {
-        let (asked, _) =
-            crate::task_news::quoted(question_of(asked).unwrap_or(asked), MOST_NOW_ASKED_CHARS);
+        let asked = without_paths(question_of(asked).unwrap_or(asked));
+        let (asked, _) = crate::task_news::quoted(&asked, MOST_NOW_ASKED_CHARS);
         if !asked.is_empty() {
             entry["asked"] = json!(asked);
         }
@@ -2416,7 +2416,7 @@ fn now_entry(task: &Value, asked: Option<&str>) -> Value {
         entry["quiet_for"] = json!(ago(quiet).trim_end_matches(" ago").to_owned());
     }
     if let Some(step) = task["last_step"]["untrusted"].as_str() {
-        let (step, _) = crate::task_news::quoted(step, MOST_STEP_CHARS);
+        let (step, _) = crate::task_news::quoted(&without_paths(step), MOST_STEP_CHARS);
         if !step.is_empty() {
             entry["last_step"] = json!({ "untrusted": step });
         }
@@ -2425,6 +2425,24 @@ fn now_entry(task: &Value, asked: Option<&str>) -> Value {
         entry["told"] = json!(task["told"] == json!(true));
     }
     entry
+}
+
+/// `words` with every path-like word (one holding `/` or `\\`, or starting
+/// with `~`) put as "a file": a last step or an ask such as "Editing
+/// /Users/name/payroll.xlsx" never brings a folder or a username to the
+/// model, which could say it aloud (the reviewer-lead's P2 on #5118).
+fn without_paths(words: &str) -> String {
+    words
+        .split_whitespace()
+        .map(|word| {
+            if word.contains('/') || word.contains('\\') || word.starts_with('~') {
+                "a file"
+            } else {
+                word
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// A state on `tasks/status` in the words the model says it in.
@@ -2614,6 +2632,26 @@ fn nonce() -> u128 {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    /// A last step or an ask never brings a folder or a username to the
+    /// model (the reviewer-lead's P2 on #5118).
+    #[test]
+    fn tasks_now_gives_no_file_paths_or_home_folders() {
+        let task = serde_json::json!({
+            "task": 3, "agent": "claude", "target": "office", "state": "working",
+            "last_step": {"untrusted": "Editing /Users/lee/payroll.xlsx and ~/notes/plan.md, C:\\Users\\lee\\a.txt"},
+        });
+        let entry = super::now_entry(
+            &task,
+            Some("fix the parser in ~/code/lee-parser/src/main.rs"),
+        );
+        let said = entry.to_string();
+        for leaked in ["/Users", "lee", "payroll", "~/", "C:", "main.rs"] {
+            assert!(!said.contains(leaked), "{leaked}: {said}");
+        }
+        assert!(said.contains("Editing a file"), "{said}");
+        assert!(said.contains("fix the parser in a file"), "{said}");
+    }
+
     use super::*;
     use std::{
         io::{BufRead, BufReader, Write},
