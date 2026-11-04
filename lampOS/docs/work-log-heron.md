@@ -262,3 +262,15 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   → false fails one unit and one `it` test; gate on a clean rebase onto
   `2e6f1a8f0`: lib 130, `main` 23, `it` 193/193, switches 2, notes 15.
   P3: `taste_kind`'s doc names `allergy`/`diet` kinds that do not exist.
+- 12:4x: the hour posted to Faye. Faye told every builder Reviewer-two and
+  -three have posted nothing since 1 Nov; second reads go to the
+  Reviewer-lead, Thirteen, El, Friday or Heron.
+- 13:0x: READ-OK `cdc5c3e7ca` on #5097 (nightly B, Tests read): per-item
+  drops with reasons, `private()` backstop unless every source is an
+  explicit keep, profile items reach #5043's band through `category_from`
+  → plain fact, forget cascades through `with_doomed`; mutation (backstop
+  off) fails two `nightly::tests`; gate on its own base lib 130, `main`
+  23, `it` 177/177, switches 2, notes 15. P3: no `it` round-trip of the
+  nightly ops. Like #5052 it conflicts with lamp-voice since #5043
+  (`days_protocol.rs`, memory-days_vi.md); the three memory PRs all owe
+  rebases in turn. Worktrees removed; all three reads Friday asked done.
