@@ -127,7 +127,10 @@ coord_takes() {
 # anything under .github/workflows/, and anything else the ARM64 run or the SDK check takes: lampOS/** but the docs'
 # Markdown and lampOS/builders/, with the docs either workflow takes back in (lampos-arm64.yml's list; lampos-sdk.yml's
 # lampOS/docs/control* and skill-format*, Thirteen's P3 on #5289), plus the ARM64 run's .github scripts and the promote
-# tools. Needs coord_inputs_init; with either workflow's paths unread, every lampOS doc is an input (fail closed).
+# tools. Any other file either workflow's pull_request paths take is an input too (Thirteen's P3 on #5297): a path one
+# of them gains outside the cases below would make merge-when-green.sh wait for that run (coord_takes) while the lane
+# test sent the PR to the no-crates lane. Needs coord_inputs_init; with either workflow's paths unread, every lampOS doc
+# is an input (fail closed).
 coord_input() {
   case $1 in
     lampOS/crates/*) print "crates" ;;
@@ -139,6 +142,9 @@ coord_input() {
       elif (( ! ${#coord_sdk_pats} )) || coord_takes $1 coord_sdk_pats; then print "a doc the SDK check reads"; fi ;;
     lampOS/*) print "an ARM64 input" ;;
     .github/scripts/lampos-*|.github/tools/lampos-promote/*) print "an ARM64 input" ;;
+    *)
+      if coord_takes $1 coord_arm_pats; then print "an ARM64 input"
+      elif coord_takes $1 coord_sdk_pats; then print "an input the SDK check takes"; fi ;;
   esac
 }
 # coord_lane COMMIT [LAMP_VOICE]: the train lane of a PR whose head is COMMIT (part 3). Prints "nocrates" when no file

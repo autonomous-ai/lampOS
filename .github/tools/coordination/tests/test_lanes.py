@@ -2,7 +2,7 @@
 # merge-when-green.sh on a train with no ARM64 run, and train-bot.sh's DRY=1 round with the lane on and off. A temporary
 # git repository and a stand-in `gh` on PATH. Needs git, zsh and jq.
 # Run from the repo root: python3 -I -m pytest -q .github/tools/coordination/tests
-import json, os, shutil, subprocess, tempfile, unittest
+import json, os, shutil, subprocess, tempfile, time, unittest
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIB = os.path.join(HERE, "lib.sh")
@@ -53,7 +53,7 @@ case "$*" in
   *"number,headRefOid,headRefName"*) cat "$FAKE_DIR/heads.txt" ;;
   *isCrossRepository,headRepositoryOwner*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); echo "false autonomous-ai/lampOS $(cat "$FAKE_DIR/head-$n.txt")" ;;
   *"--json body"*) echo '{"login":"","body":"","pr_body":true}' ;;
-  *title,createdAt*) printf 'lampOS: a change\t2026-11-04T01:00:00Z\n' ;;
+  *title,createdAt*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/title-$n.txt" ]; then cat "$FAKE_DIR/title-$n.txt"; else printf 'lampOS: a change\t2026-11-04T01:00:00Z\n'; fi ;;
   *headRefOid*) cat "$FAKE_DIR/head.txt" ;;
   *statusCheckRollup*) cat "$FAKE_DIR/checks.json" ;;
   "run list"*) echo 0 ;;
@@ -216,6 +216,29 @@ class Lanes(Repo):
         r = run(["zsh", "-c", 'source "$1"; coord_inputs_init HEAD; coord_lane "$2" HEAD', "x", LIB, h], self.work, env=self.env)
         self.assertTrue(r.stdout.startswith("crates: lampOS/docs/other.md"), r.stdout)
 
+    def test_a_path_a_workflow_adds_is_an_input(self):
+        # Thirteen's P3 on #5297: a path either workflow's pull_request paths gain outside coord_input's fixed cases is an
+        # input, so its PR rides the crate lane, as merge-when-green.sh waits for that run.
+        self.git("checkout", "-q", "--detach", self.base)
+        self.write(".github/workflows/lampos-arm64.yml", ARM64.replace("      - '.github/tools/lampos-promote/**'\n",
+                                                                       "      - '.github/tools/lampos-promote/**'\n      - 'tools/foo/**'\n"))
+        self.write(".github/workflows/lampos-sdk.yml", SDK.replace("      - 'lampOS/sdk/**'\n", "      - 'lampOS/sdk/**'\n      - 'sdkbits/**'\n"))
+        self.commit("workflows gain paths")
+        self.git("push", "-q", "origin", "HEAD:lamp-voice")
+        self.git("fetch", "-q", "origin")
+        base = self.rev("HEAD")
+
+        def lane(files):
+            h = self.pr(9, files, base=base)
+            r = run(["zsh", "-c", 'source "$1"; coord_inputs_init origin/lamp-voice; coord_lane "$2"', "x", LIB, h],
+                    self.work, env=self.env)
+            return r.stdout.strip()
+
+        self.assertEqual(lane(["tools/foo/x.sh"]), "crates: tools/foo/x.sh (an ARM64 input)")
+        self.assertEqual(lane(["sdkbits/a.js"]), "crates: sdkbits/a.js (an input the SDK check takes)")
+        for files in (["tools/bar/x.sh"], [TOOL], ["system/main.go"], ["lampOS/builders/twelve/log.md"], ["lampOS/docs/other.md"]):
+            self.assertEqual(lane(files), "nocrates", files)
+
     def test_lane_sh(self):
         self.pr(7, [TOOL])
         self.pr(8, ["lampOS/crates/x/src/lib.rs"])
@@ -371,6 +394,30 @@ class BotDryRound(Repo):
         r, lines = self.bot()
         self.assertIn("dry: crate lane: a train is open or running; a real run would wait for it", lines)
         self.assertIn("dry: no-crates lane: would carry 7 onto " + self.base[:9], lines)
+
+    def rows(self, *ns):
+        # PRs ns titled as rows PRs, opened a minute ago (well under the 3 h wait).
+        at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
+        for n in ns:
+            self.fakefile("title-%d.txt" % n, "lampOS: docs/build-rows.md as at 05 Nov 02:00\t%s\n" % at)
+
+    def test_a_rows_pr_alone_in_the_no_crates_lane_goes_at_once(self):
+        # Thirteen's P3 on #5297: no code PR rides the no-crates lane, so a rows PR there doesn't wait the 3 h.
+        self.rows(7)
+        r, lines = self.bot()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("dry: no-crates lane: would carry 7 onto " + self.base[:9], lines)
+        self.assertNotIn("dry: no-crates lane: rows PRs alone, waiting", lines)
+        self.assertNothingChanged()
+
+    def test_rows_prs_alone_still_wait_in_the_crate_lane_and_one_lane(self):
+        self.rows(7, 8, 9)
+        r, lines = self.bot()
+        self.assertIn("dry: crate lane: rows PRs alone, waiting", lines)
+        self.assertIn("dry: no-crates lane: would carry 7 onto " + self.base[:9], lines)
+        r, lines = self.bot(NOCRATES_LANE="off")
+        self.assertEqual(lines, ["dry: rows PRs alone, waiting"])
+        self.assertNothingChanged()
 
     def test_lane_off_is_the_old_single_lane(self):
         r, lines = self.bot(NOCRATES_LANE="off")

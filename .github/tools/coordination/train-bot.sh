@@ -356,7 +356,10 @@ lane_round() {
   if (( busy )); then [[ ${DRY:-0} == 1 ]] && say "dry: ${name}a train is open or running; a real run would wait for it"; return 1; fi
   # 25 Oct 16:2x: a train of rows PRs alone (docs/build-rows.md) waits for a code PR to ride with, or until the oldest
   # is 3 h old: one alone moved lamp-voice under every ready PR (train 123), so each had to be carried again.
-  if (( ${#l} )) && rows_only $l; then [[ ${DRY:-0} == 1 ]] && say "dry: ${name}rows PRs alone, waiting"; return 1; fi
+  # 5 Nov 02:0x (Thirteen's P3 on #5297): not in the no-crates lane. No code PR rides there, so a rows PR always waited
+  # the full 3 h. And train 123's cost is gone there: crate trains merge with --behind-unrelated, so a rows merge that
+  # touches none of their files leaves them as they are. The crate lane and the one-lane bot still wait.
+  if [[ $lane != nc ]] && (( ${#l} )) && rows_only $l; then [[ ${DRY:-0} == 1 ]] && say "dry: ${name}rows PRs alone, waiting"; return 1; fi
   if (( ! ${#l} )); then [[ ${DRY:-0} == 1 ]] && say "dry: ${name}nothing eligible"; return 1; fi
   # After a failed no-crates train of several PRs, one PR a train (run_train).
   [[ $lane == nc && -f $SP/train-bot.nc-one ]] && l=(${l[1]})
