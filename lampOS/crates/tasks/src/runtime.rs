@@ -5,12 +5,13 @@ use crate::{
         ObservationJob, Watched,
     },
     harness::{
-        AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, Launch,
+        AccountMachine, CLOSE_BUDGET, Cli, CliConfig, Closed, Ended, EngineKind, EngineRow, Launch,
         LaunchOutcome, Listed, MOST_WAITED, Observation, SignIn, Target,
     },
     now::Now as TasksNow,
     progress::{Reads, Tracker},
     protocol::{Answer, MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
+    readiness::{EARLY_REFUSALS, Known, engines_path, probe_line, read_engines, write_engines},
     sign_in::{By as SignInBy, Method as SignInMethod, Session as SignInSession, Starter},
     store::Store,
 };
@@ -194,6 +195,14 @@ pub struct SetUpLater {
     /// [`MACHINES_EVERY_LOOKS`] looks, with this engine. Never over a file
     /// someone else wrote ([`write_targets_from_machines`]).
     pub from_machines: Option<EngineKind>,
+    /// `serve --engines-from-machines` (#5199), only with
+    /// `from_machines`: after each look at the machines, each computer a
+    /// target names is asked which engines it has (`harness machines
+    /// engines`), on a lane of its own; a target written from the machines
+    /// gets one it has, and a `prepare` is refused at once when its
+    /// computer is known offline, or its engine not found there or known not
+    /// signed in ([`crate::readiness`]). Off unless set.
+    pub engines: bool,
 }
 
 /// `serve --targets-from-machines` asks Harness for the machines once in
@@ -333,6 +342,19 @@ pub fn read_targets_or_newer(path: &Path) -> io::Result<Result<BTreeMap<String, 
     Ok(Ok(document.targets))
 }
 
+/// Harness's `machines engines`, asked beside the adapter's one lane
+/// (`serve --engines-from-machines`, #5199): one computer at a time, never
+/// on a hand-over's way.
+pub trait EnginesLane: Send + Sync + 'static {
+    /// Every engine `machine_id` says it has, as it says now.
+    fn engines(&self, machine_id: &str) -> Result<Vec<EngineRow>, String>;
+}
+impl EnginesLane for Cli {
+    fn engines(&self, machine_id: &str) -> Result<Vec<EngineRow>, String> {
+        Cli::engines(self, machine_id)
+    }
+}
+
 /// Harness's own `wait`, held beside the adapter's one lane (`serve
 /// --push-wait`): several may run at once, one a machine.
 pub trait WaitLane: Send + Sync + 'static {
@@ -368,6 +390,11 @@ pub trait Adapter: Send + 'static {
     /// A lane for `wait`, apart from this adapter's own (`serve
     /// --push-wait`); none when the adapter has no such thing.
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
+        None
+    }
+    /// A lane for `machines engines`, apart from this adapter's own
+    /// (`serve --engines-from-machines`); none when it has no such thing.
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
         None
     }
     /// Close a harness this lamp started, its result told (#1390). An
@@ -432,6 +459,15 @@ impl Adapter for Cli {
             }
         }
     }
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
+        match self.lane() {
+            Ok(lane) => Some(Arc::new(lane)),
+            Err(error) => {
+                eprintln!("tasks: no lane for the computers' engines: {error}");
+                None
+            }
+        }
+    }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
         Cli::launch(self, launch)
     }
@@ -486,6 +522,12 @@ impl Adapter for Production {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         match self {
             Self::Cli(cli) => Adapter::wait_lane(&**cli),
+            Self::Absent => None,
+        }
+    }
+    fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
+        match self {
+            Self::Cli(cli) => Adapter::engines_lane(&**cli),
             Self::Absent => None,
         }
     }
@@ -862,6 +904,8 @@ type Switches = (
     Option<Starter>,
     // [`Config::daemon_retry_after`].
     Duration,
+    // The lane for the computers' engines (`--engines-from-machines`).
+    Option<Arc<dyn EnginesLane>>,
 );
 
 fn owner<C: Clock>(
@@ -872,7 +916,16 @@ fn owner<C: Clock>(
     current: Arc<Mutex<Report>>,
     // When to stop, and the file keeping the newest sign-in id (#5198).
     (stop, sign_in_ids): (Arc<AtomicBool>, PathBuf),
-    (watch, progress, lane, close_told, set_up_later, mut sign_in_starter, daemon_retry_after): Switches,
+    (
+        watch,
+        progress,
+        lane,
+        close_told,
+        set_up_later,
+        mut sign_in_starter,
+        daemon_retry_after,
+        engines_lane,
+    ): Switches,
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
@@ -900,6 +953,18 @@ fn owner<C: Clock>(
     // What the last write from the machines said, so the journal has one
     // line a change, not one a look.
     let mut machines_said = String::new();
+    // `serve --engines-from-machines` (#5199): what is known of each
+    // computer, the machines as last listed, the looks at their engines,
+    // and when a refusal last made the part look again.
+    let engines_on = set_up_later
+        .as_ref()
+        .is_some_and(|later| later.engines && later.from_machines.is_some());
+    let mut known = Known::default();
+    let mut probes = Probes::new(engines_lane.filter(|_| engines_on));
+    let mut last_listed: Option<Vec<AccountMachine>> = None;
+    let mut engines_said = String::new();
+    let mut engines_read_said = String::new();
+    let mut relooked: Option<Instant> = None;
     // `serve --sign-in-by-code`: the sign-in open, or the last one, done.
     let mut sign_in: Option<SignInSession> = None;
     // A sign-in by code succeeded: Harness's daemon is started, and when a
@@ -953,6 +1018,30 @@ fn owner<C: Clock>(
             targets_due = Instant::now() + later.every;
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
             look_at_names(&mut engine, &later.targets, &mut names_said);
+            if engines_on {
+                look_at_engines(&mut engine, &later.targets, &mut engines_read_said);
+            }
+        }
+        // Each computer's engines, as each look comes back: kept, then the
+        // targets written from the machines and the engines file again.
+        let looked = probes.tend();
+        if let (false, Some(later)) = (looked.is_empty(), set_up_later.as_ref()) {
+            for (machine, rows, took) in looked {
+                eprintln!("tasks: {}", probe_line(&rows, took));
+                if let Ok(rows) = rows {
+                    known.probed(&machine, &rows, unix_ms());
+                }
+            }
+            if let (Some(wanted), Some(listed)) = (later.from_machines, last_listed.as_ref()) {
+                let chosen = known.choices(listed, wanted, unix_ms());
+                let said =
+                    machines_written(&later.targets, listed, wanted, &chosen, &mut targets_due);
+                if said != machines_said {
+                    eprintln!("tasks: {said}");
+                    machines_said = said;
+                }
+            }
+            keep_engines(&later.targets, &known, &mut engines_said, &mut targets_due);
         }
         // Something that may have changed which tasks are watched.
         let mut moved = false;
@@ -975,24 +1064,49 @@ fn owner<C: Clock>(
                 }
                 Outcome::Machines(read) => {
                     if let Some(later) = set_up_later.as_ref()
-                        && let Some(engine) = later.from_machines
+                        && let Some(wanted) = later.from_machines
                     {
                         let said = match read {
                             Ok(listed) => {
-                                match write_targets_from_machines(&later.targets, &listed, engine) {
-                                    Ok(written) => {
-                                        if written.changed {
-                                            // Read at once, not a minute later.
-                                            targets_due = Instant::now();
-                                        }
-                                        written.said
-                                    }
-                                    Err(error) => {
-                                        format!(
-                                            "task targets not written from the machines: {error}"
-                                        )
-                                    }
+                                let chosen = if engines_on {
+                                    known.listed(&listed, unix_ms());
+                                    known.choices(&listed, wanted, unix_ms())
+                                } else {
+                                    BTreeMap::new()
+                                };
+                                let said = machines_written(
+                                    &later.targets,
+                                    &listed,
+                                    wanted,
+                                    &chosen,
+                                    &mut targets_due,
+                                );
+                                if engines_on {
+                                    // Each computer listed and each a
+                                    // target names, the lamp left out.
+                                    let mut looked: BTreeSet<String> = listed
+                                        .iter()
+                                        .filter(|machine| !machine.current)
+                                        .take(8)
+                                        .map(|machine| machine.machine_id.clone())
+                                        .collect();
+                                    looked.extend(
+                                        read_targets(&later.targets)
+                                            .unwrap_or_default()
+                                            .into_values()
+                                            .map(|target| target.machine_id),
+                                    );
+                                    known.keep_only(&looked);
+                                    probes.ask(looked);
+                                    keep_engines(
+                                        &later.targets,
+                                        &known,
+                                        &mut engines_said,
+                                        &mut targets_due,
+                                    );
+                                    last_listed = Some(listed);
                                 }
+                                said
                             }
                             Err(code) => format!("Harness's machines not read: {code}"),
                         };
@@ -1205,6 +1319,20 @@ fn owner<C: Clock>(
                         (&work.request, &answer, tasks_now.as_mut())
                     {
                         record.told(*id, unix_ms());
+                    }
+                    // Refused early from what is known (#5199): the machines
+                    // and their engines are looked at again at once, so a
+                    // computer woken or an agent signed in since is known
+                    // by the next ask; at most once in [`RELOOK_AFTER`].
+                    if engines_on
+                        && matches!(work.request, Request::Prepare { .. })
+                        && answer
+                            .as_ref()
+                            .is_err_and(|error| EARLY_REFUSALS.contains(&error.code))
+                        && relooked.is_none_or(|at| at.elapsed() >= RELOOK_AFTER)
+                    {
+                        relooked = Some(Instant::now());
+                        machines_due = Instant::now();
                     }
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
@@ -1670,7 +1798,7 @@ pub fn targets_from_machines(
     machines: &[AccountMachine],
     engine: EngineKind,
 ) -> BTreeMap<String, Target> {
-    from_machines(machines, engine).0
+    from_machines(machines, engine, &BTreeMap::new()).0
 }
 
 /// Each computer's own name by its alias, as [`targets_from_machines`]
@@ -1678,7 +1806,7 @@ pub fn targets_from_machines(
 /// [`MOST_NAME_BYTES`] with no control characters; none where nothing is
 /// left (#1676).
 pub fn names_from_machines(machines: &[AccountMachine]) -> BTreeMap<String, String> {
-    from_machines(machines, EngineKind::Claude).1
+    from_machines(machines, EngineKind::Claude, &BTreeMap::new()).1
 }
 
 /// A machine's name as said to the person: control characters out, spaces
@@ -1696,9 +1824,13 @@ fn label_of(label: &str) -> Option<String> {
     (!name.is_empty()).then_some(name)
 }
 
+/// `chosen` gives a machine, by id, another engine than `engine`: the one
+/// that computer is known to have (`serve --engines-from-machines`, #5199,
+/// [`crate::readiness::Known::chosen`]). Empty without it.
 fn from_machines(
     machines: &[AccountMachine],
     engine: EngineKind,
+    chosen: &BTreeMap<String, EngineKind>,
 ) -> (BTreeMap<String, Target>, BTreeMap<String, String>) {
     let mut targets = BTreeMap::new();
     let mut names = BTreeMap::new();
@@ -1722,7 +1854,7 @@ fn from_machines(
             Target {
                 machine_id: machine.machine_id.clone(),
                 project: MACHINES_PROJECT.into(),
-                engine,
+                engine: chosen.get(&machine.machine_id).copied().unwrap_or(engine),
             },
         );
     }
@@ -1903,7 +2035,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 /// Written beside and renamed over, 0600, synced: a reader sees the old
 /// file or the new one, never half of one.
-fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
+pub(crate) fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut name = path.as_os_str().to_owned();
     name.push(format!(".next-{}", std::process::id()));
     let next = PathBuf::from(name);
@@ -1926,10 +2058,12 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// removed: there is no computer any more. The mark is written before the
 /// file, naming both the file there and the new one, so a stop between
 /// the two never leaves a file of its own looking like someone else's.
+/// `chosen` gives a machine another engine than `engine` ([`from_machines`]).
 pub fn write_targets_from_machines(
     path: &Path,
     machines: &[AccountMachine],
     engine: EngineKind,
+    chosen: &BTreeMap<String, EngineKind>,
 ) -> io::Result<Written> {
     let said = |changed: bool, said: String| Ok(Written { changed, said });
     let mark = written_mark(path);
@@ -1951,7 +2085,7 @@ pub fn write_targets_from_machines(
             "the targets file was not written from the machines; it is left as it is".into(),
         );
     }
-    let (targets, names) = from_machines(machines, engine);
+    let (targets, names) = from_machines(machines, engine, chosen);
     let names_file = names_path(path);
     if targets.is_empty() {
         if present.is_some() {
@@ -2016,6 +2150,153 @@ fn keep_names(path: &Path, names: &BTreeMap<String, String>) -> io::Result<bool>
     }
     write_atomically(path, &bytes)?;
     Ok(true)
+}
+
+/// The targets written from the machines ([`write_targets_from_machines`]),
+/// and what the journal says of it: a change reads the file at once.
+fn machines_written(
+    path: &Path,
+    listed: &[AccountMachine],
+    wanted: EngineKind,
+    chosen: &BTreeMap<String, EngineKind>,
+    targets_due: &mut Instant,
+) -> String {
+    match write_targets_from_machines(path, listed, wanted, chosen) {
+        Ok(written) => {
+            if written.changed {
+                // Read at once, not a minute later.
+                *targets_due = Instant::now();
+            }
+            written.said
+        }
+        Err(error) => format!("task targets not written from the machines: {error}"),
+    }
+}
+
+/// How soon after one early refusal another may make the part look at the
+/// machines again (`serve --engines-from-machines`, #5199).
+pub const RELOOK_AFTER: Duration = Duration::from_secs(30);
+
+/// The engines file written again from what is known, for the targets the
+/// file names now ([`write_engines`]): a change reads it at once. One
+/// journal line a change.
+fn keep_engines(targets: &Path, known: &Known, said: &mut String, targets_due: &mut Instant) {
+    let now = match read_targets(targets) {
+        Ok(current) => match write_engines(targets, &current, known, unix_ms()) {
+            Ok(written) => {
+                if written.changed {
+                    *targets_due = Instant::now();
+                }
+                written.said
+            }
+            Err(error) => format!("the engines file not written: {error}"),
+        },
+        // No targets, or not valid: nothing is said of their computers.
+        Err(_) => match write_engines(targets, &BTreeMap::new(), known, unix_ms()) {
+            Ok(written) => written.said,
+            Err(error) => format!("the engines file not written: {error}"),
+        },
+    };
+    if now != *said {
+        eprintln!("tasks: {now}");
+        *said = now;
+    }
+}
+
+/// The engines file read again (`serve --engines-from-machines`, #5199):
+/// what is known of each target's computer, fresh now. A missing or bad
+/// file is nothing known, and nothing is refused from it.
+fn look_at_engines(engine: &mut Engine<Store>, targets: &Path, said: &mut String) {
+    let (known, now) = match read_engines(&engines_path(targets)) {
+        Ok(read) => {
+            let at = unix_ms();
+            let count = read.len();
+            let fresh = read
+                .into_iter()
+                .map(|(alias, computer)| (alias, computer.fresh(at)))
+                .collect();
+            (fresh, format!("engines known for {count} computers read"))
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            (BTreeMap::new(), "no engines file".to_owned())
+        }
+        Err(error) => (
+            BTreeMap::new(),
+            format!("the engines file is not valid ({error}); nothing is refused from it"),
+        ),
+    };
+    engine.set_readiness(known);
+    if now != *said {
+        eprintln!("tasks: {now}");
+        *said = now;
+    }
+}
+
+/// The looks at the computers' engines (`serve --engines-from-machines`):
+/// one at a time, on a thread of their own over the engines lane, so a
+/// computer that takes its 30 s never holds up a hand-over or a read.
+struct Probes {
+    lane: Option<Arc<dyn EnginesLane>>,
+    queue: std::collections::VecDeque<String>,
+    busy: bool,
+    done: (mpsc::Sender<Probed>, Receiver<Probed>),
+}
+/// One look: the machine, what it said or why not, and how long it took.
+type Probed = (String, Result<Vec<EngineRow>, String>, u128);
+/// The most machines waiting for a look: the targets' and the listed ones.
+const MOST_PROBES_QUEUED: usize = 16;
+
+impl Probes {
+    fn new(lane: Option<Arc<dyn EnginesLane>>) -> Self {
+        Self {
+            lane,
+            queue: Default::default(),
+            busy: false,
+            done: mpsc::channel(),
+        }
+    }
+
+    /// Each of `machines` is looked at once more, in turn; one already
+    /// waiting isn't added twice.
+    fn ask(&mut self, machines: impl IntoIterator<Item = String>) {
+        if self.lane.is_none() {
+            return;
+        }
+        for machine in machines {
+            if !self.queue.contains(&machine) && self.queue.len() < MOST_PROBES_QUEUED {
+                self.queue.push_back(machine);
+            }
+        }
+    }
+
+    /// The looks that came back; and the next one started, if none is out.
+    fn tend(&mut self) -> Vec<Probed> {
+        let mut back = Vec::new();
+        while let Ok(one) = self.done.1.try_recv() {
+            self.busy = false;
+            back.push(one);
+        }
+        if self.busy {
+            return back;
+        }
+        let (Some(lane), Some(machine)) = (self.lane.clone(), self.queue.pop_front()) else {
+            return back;
+        };
+        let sender = self.done.0.clone();
+        let on = machine.clone();
+        let started = thread::Builder::new()
+            .name("tasks-engines".into())
+            .spawn(move || {
+                let began = Instant::now();
+                let rows = lane.engines(&on);
+                let _ = sender.send((on, rows, began.elapsed().as_millis()));
+            });
+        match started {
+            Ok(_) => self.busy = true,
+            Err(_) => back.push((machine, Err("spawn_failed".into()), 0)),
+        }
+        back
+    }
 }
 
 /// The computers' names read again (`serve --set-up-later`): a missing
@@ -2652,6 +2933,21 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     } else {
         None
     };
+    let engines_lane = if config
+        .set_up_later
+        .as_ref()
+        .is_some_and(|later| later.engines && later.from_machines.is_some())
+    {
+        let lane = adapter.engines_lane();
+        if lane.is_none() {
+            eprintln!(
+                "tasks: --engines-from-machines asked, but this adapter has no engines lane; nothing is refused early"
+            );
+        }
+        lane
+    } else {
+        None
+    };
     let current = Arc::new(Mutex::new(Report {
         updated: Instant::now(),
         summary: engine.summary(),
@@ -2754,6 +3050,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     set_up_later,
                     sign_in_starter,
                     daemon_retry_after,
+                    engines_lane,
                 ),
             )
         })?;
@@ -3749,6 +4046,7 @@ mod tests {
             machine_id: id.to_string().repeat(32),
             label: label.into(),
             current,
+            status: None,
         }
     }
 
@@ -3804,6 +4102,35 @@ mod tests {
     /// there, or one it wrote. What it writes is read back as strictly as a
     /// file a person wrote. A file someone else wrote is left as it is, and
     /// with no machine but the lamp, its own file is removed.
+    /// #5199: a machine's target gets the engine chosen for it, and the
+    /// targets file stays what a build one release back reads: version 1,
+    /// with nothing of the engines in it (they go in their own file).
+    #[test]
+    fn targets_from_machines_take_the_engine_each_computer_has() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("targets.json");
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+            machine('c', "MacBook Air", false),
+        ];
+        let chosen = BTreeMap::from([("b".repeat(32), EngineKind::Codex)]);
+        assert!(
+            write_targets_from_machines(&path, &listed, EngineKind::Claude, &chosen)
+                .unwrap()
+                .changed
+        );
+        let read = read_targets(&path).unwrap();
+        assert_eq!(read["office"].engine, EngineKind::Codex);
+        assert_eq!(read["macbook-air"].engine, EngineKind::Claude);
+        let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(
+            written["targets"]["office"],
+            json!({"machine_id":"b".repeat(32),"project":MACHINES_PROJECT,"engine":"codex"})
+        );
+        assert_eq!(written.as_object().unwrap().len(), 2, "{written}");
+    }
+
     #[test]
     fn targets_are_written_from_machines_only_where_the_file_is_the_parts_own() {
         let dir = tempfile::tempdir().unwrap();
@@ -3818,7 +4145,8 @@ mod tests {
             machine('c', "MacBook Air", false),
         ];
         let write = |listed: &[AccountMachine]| {
-            write_targets_from_machines(&path, listed, EngineKind::Claude).unwrap()
+            write_targets_from_machines(&path, listed, EngineKind::Claude, &BTreeMap::new())
+                .unwrap()
         };
         assert!(write(&one).changed);
         let read = read_targets(&path).unwrap();
@@ -3918,7 +4246,8 @@ mod tests {
         let path = dir.path().join("targets.json");
         let names = names_path(&path);
         let write = |listed: &[AccountMachine]| {
-            write_targets_from_machines(&path, listed, EngineKind::Claude).unwrap()
+            write_targets_from_machines(&path, listed, EngineKind::Claude, &BTreeMap::new())
+                .unwrap()
         };
         assert!(
             write(&[

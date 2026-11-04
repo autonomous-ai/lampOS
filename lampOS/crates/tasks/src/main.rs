@@ -67,6 +67,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut engines_ready = false;
     let mut absolute_folder = false;
     let mut from_machines = None;
+    let mut engines_from_machines = false;
     let mut seen = std::collections::BTreeSet::new();
     while let Some(arg) = args.next() {
         if !seen.insert(arg.clone()) {
@@ -87,6 +88,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--new-folder" => new_folder = true,
             "--engines-ready" => engines_ready = true,
             "--absolute-folder" => absolute_folder = true,
+            "--engines-from-machines" => engines_from_machines = true,
             "--targets-from-machines" => {
                 let engine = args
                     .next()
@@ -140,6 +142,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if app_socket.is_some() && !sign_in_by_code {
         return Err("--app-socket takes the app's sign-in, only with --sign-in-by-code".into());
     }
+    if engines_from_machines && from_machines.is_none() {
+        return Err(
+            "--engines-from-machines asks the computers --targets-from-machines finds; it needs that too"
+                .into(),
+        );
+    }
     if push_wait && !watch {
         return Err("--push-wait reads with the watch; it cannot go with --no-watch".into());
     }
@@ -187,6 +195,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             targets: targets_path,
             every: SET_UP_LOOK_EVERY,
             from_machines,
+            engines: engines_from_machines,
         }),
         sign_in_by_code,
         app_socket,

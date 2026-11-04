@@ -120,7 +120,7 @@ pub enum EngineKind {
 }
 
 impl EngineKind {
-    fn argument(self) -> &'static str {
+    pub(crate) fn argument(self) -> &'static str {
         match self {
             Self::Codex => "codex",
             Self::Claude => "claude",
@@ -267,6 +267,11 @@ pub const MOST_WAITED: usize = 64;
 /// the computer's Harness reads the one engine in its login shell, 5 s at
 /// most there (openharness `engineProbe.ts`), over the machine link.
 pub const ENGINES_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
+/// How long one look at a computer's engines may take (`serve
+/// --engines-from-machines`, #5199): Harness's own probe waits 30 s over
+/// the machine link (`engines_probe`), and the CLI a little more. Asked on
+/// a lane of its own, never the one hand-overs take.
+pub const ENGINES_LOOK_TIMEOUT: Duration = Duration::from_secs(35);
 /// How long one computer's answer for one engine is kept when it refuses
 /// nothing: a second hand-over within it asks nothing. A refusal is never
 /// kept: the person may sign in at once and ask again.
@@ -1176,6 +1181,40 @@ impl Cli {
         refused
     }
 
+    /// Every engine on `machine`, as that computer says now (`harness
+    /// machines engines <machine> --json`, openharness#1888; `serve
+    /// --engines-from-machines`, #5199), within [`ENGINES_LOOK_TIMEOUT`].
+    /// Never takes the operation lock: it is asked on a lane of its own
+    /// ([`Cli::lane`]), so a hand-over never waits behind it. Exit 1 is
+    /// `unreachable` (the computer, or the probe), 2 `usage` (an older
+    /// Harness); a reply that isn't one is [`parse_engines`]'s code. A read
+    /// only: it installs and signs in nothing.
+    pub fn engines(&self, machine: &str) -> Result<Vec<EngineRow>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let reply = self
+            .run(
+                &[
+                    "machines".into(),
+                    "engines".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                ENGINES_LOOK_TIMEOUT.min(self.config.launch_timeout),
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err(match reply.code {
+                Some(1) => "unreachable",
+                Some(2) => "usage",
+                _ => "engines_failed",
+            }
+            .into());
+        }
+        parse_engines(&reply.stdout, machine).map_err(str::to_string)
+    }
+
     /// The agent's last turn, read on the machine it was started on.
     pub fn observe(&self, machine: &str, agent_id: &str) -> Result<Observation, String> {
         self.observe_within(machine, agent_id, self.config.read_timeout)
@@ -1899,7 +1938,15 @@ struct Machine {
     name: Option<String>,
     #[serde(default)]
     hostname: Option<String>,
+    /// From relay presence (openharness#1888 era): `running`, `offline`,
+    /// `unknown` or `payment_pending`. Anything else, or none, is unknown.
+    #[serde(default)]
+    status: Option<Value>,
 }
+
+/// The presence words `harness machines --json` gives a machine, as kept
+/// ([`AccountMachine::status`]): any other is unknown.
+pub const MACHINE_STATUSES: [&str; 4] = ["running", "offline", "unknown", "payment_pending"];
 
 /// One machine on the person's account, as `harness machines --json` lists
 /// it (openharness `cli.ts` `machinesListCommand`).
@@ -1911,6 +1958,10 @@ pub struct AccountMachine {
     pub label: String,
     /// The machine this CLI runs as: the lamp itself.
     pub current: bool,
+    /// Its presence, one of [`MACHINE_STATUSES`], as Harness's relay saw
+    /// it; `None` when Harness gave none or another word. Read only with
+    /// `serve --engines-from-machines` (#5199).
+    pub status: Option<String>,
 }
 
 /// What `harness machines --json` says: one object a line, newest first,
@@ -1940,10 +1991,17 @@ pub fn parse_machines(bytes: &[u8]) -> Result<Vec<AccountMachine>, &'static str>
             .map(|value| value.trim().to_owned())
             .find(|value| !value.is_empty())
             .unwrap_or_default();
+        let status = machine
+            .status
+            .as_ref()
+            .and_then(Value::as_str)
+            .filter(|word| MACHINE_STATUSES.contains(word))
+            .map(str::to_owned);
         listed.push(AccountMachine {
             machine_id: machine.machine_id,
             label,
             current: machine.current,
+            status,
         });
     }
     Ok(listed)
@@ -2065,6 +2123,80 @@ fn engine_refused(bytes: &[u8], machine: &str, engine: &str) -> Option<&'static 
         (_, Some(false)) => Some("engine_signed_out"),
         _ => None,
     }
+}
+
+/// What one computer says of one engine (`harness machines engines --json`,
+/// openharness#1888; `serve --engines-from-machines`, #5199). `None` is
+/// unknown, never missing: a login shell that timed out reads `null` too.
+/// Harness reads `signedIn` for Claude Code and Codex only.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EngineRow {
+    pub engine: String,
+    /// Harness's CLI gives `true` or `null`: the computer's `false` comes
+    /// out as `null` (openharness `machineEngines.ts`).
+    pub installed: Option<bool>,
+    /// The computer's own `!installed && command && recipe`, passed
+    /// through: with `installed` null, `true` is an engine not found there.
+    pub installable: Option<bool>,
+    pub signed_in: Option<bool>,
+}
+
+/// The most rows one look at a computer's engines may give.
+pub const MOST_ENGINE_ROWS: usize = 64;
+
+/// What `harness machines engines <machine> --json` says of `machine`: one
+/// object a line, `{machineId, engine, installed, signedIn, …}`, each
+/// readiness field `true`, `false` or `null`. Rows of another machine are
+/// passed over (the id compared without case, as Harness may print it);
+/// other fields are too. A line that isn't such a row, an engine twice, more
+/// than [`MOST_ENGINE_ROWS`] rows, or no row of this machine at all is no
+/// answer: an older Harness's machine list included.
+pub fn parse_engines(bytes: &[u8], machine: &str) -> Result<Vec<EngineRow>, &'static str> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Row {
+        machine_id: String,
+        engine: String,
+        #[serde(default)]
+        installed: Option<bool>,
+        #[serde(default)]
+        installable: Option<bool>,
+        #[serde(default)]
+        signed_in: Option<bool>,
+    }
+    let invalid = "engines_invalid_reply";
+    let text = std::str::from_utf8(bytes).map_err(|_| invalid)?;
+    let mut rows: Vec<EngineRow> = Vec::new();
+    let mut count = 0usize;
+    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+        count += 1;
+        if count > MOST_ENGINE_ROWS {
+            return Err(invalid);
+        }
+        let row: Row = serde_json::from_str(line).map_err(|_| invalid)?;
+        if !row.machine_id.eq_ignore_ascii_case(machine) {
+            continue;
+        }
+        let plain = !row.engine.is_empty()
+            && row.engine.len() <= 32
+            && row
+                .engine
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+        if !plain || rows.iter().any(|kept| kept.engine == row.engine) {
+            return Err(invalid);
+        }
+        rows.push(EngineRow {
+            engine: row.engine,
+            installed: row.installed,
+            installable: row.installable,
+            signed_in: row.signed_in,
+        });
+    }
+    if rows.is_empty() {
+        return Err("engines_none");
+    }
+    Ok(rows)
 }
 
 /// Whether a failed `new` says the target's folder isn't on the computer
