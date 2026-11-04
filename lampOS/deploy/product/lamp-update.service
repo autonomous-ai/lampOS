@@ -46,6 +46,11 @@ Environment=LAMP_UPDATE_SELF=on
 # The signed product carrier writes only the existing allowlisted settings;
 # explicit off keeps a lamp's settings untouched (docs/updates.md).
 Environment=LAMP_UPDATE_APPLY=on
+# The models a build carries (deploy/product/models.json) are fetched, checked by size and SHA-256 and
+# placed with their parts (docs/updates.md, "Models in the manifest"): the same-voice check's CAM++
+# reaches a lamp so (docs/same-voice.md, step 2). No round switches this unit: a lamp in a home gets
+# this line only from an image or `lamp-update install` made from here on.
+Environment=LAMP_UPDATE_MODELS=on
 
 [Install]
 WantedBy=multi-user.target

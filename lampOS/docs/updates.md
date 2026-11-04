@@ -28,8 +28,9 @@ The separate `LAMP_UPDATE_SELF`, `LAMP_UPDATE_MODELS` and `LAMP_UPDATE_IMAGE`
 switches remain off unless set to `on`. Explicit `LAMP_UPDATE_APPLY=off`
 also stays off; an absent apply switch can inherit the authenticated
 managed-product default described below. The product unit sets
-`LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` since 25 Oct; models and image
-files remain separate. The lamp trials below do not enable them elsewhere.
+`LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` since 25 Oct, and
+`LAMP_UPDATE_MODELS` since 4 Nov (same-voice step 2, below); image files
+remain separate. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
@@ -1691,7 +1692,17 @@ mtime. Otherwise nothing is guessed: the file is renamed the same way with a
 hand is refused while the file waits. Only a lamp-update-back installed from
 this build on does its part.
 
-### Models in the manifest (`LAMP_UPDATE_MODELS`, off)
+### Models in the manifest (`LAMP_UPDATE_MODELS`, on in the product)
+
+Since 4 November the product's `deploy/product/lamp-update.service` sets
+`LAMP_UPDATE_MODELS=on` (same-voice step 2, [same-voice.md](same-voice.md)),
+so a round fetches the models `deploy/product/models.json` pins that the lamp
+lacks: the same-voice check's CAM++ beside the voice. The switch is in the
+updater's own unit, never in a part's. No round switches that unit
+(`round::OWN_UNIT`, above), so a lamp already in a home gets the line only
+from an image or a `lamp-update install` made from then on; on any other
+lamp it stays off, as below. The development unit
+(`deploy/units/lamp-update.service`) doesn't set it.
 
 A build can carry the models its parts read (`models.rs`, #1680): a
 `models` list in the signed manifest, each entry in
@@ -2384,7 +2395,11 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   back at the next start; only a model changing restarts the eyes, and
   after three builds the store keeps the last two builds' models; 50 MB of
   models on a disk with 10 MB to spare is refused before any model URL is
-  read, the number in `log.jsonl`; with the switch off a build with another
+  read, the number in `log.jsonl`; a model new beside a part whose folder
+  already holds its pinned one, as CAM++ beside the voice, is the only one
+  fetched, a copy that doesn't match refusing the build with the lamp byte
+  for byte the same and the next build placing it beside the kept one
+  (`a_model_new_beside_a_part_is_the_only_one_fetched_and_a_bad_copy_switches_nothing`); with the switch off a build with another
   model is refused and one with the lamp's models is taken as today. From
   the review of #1879: a model path that can't be put back leaves the
   others put back and the journal kept, a store entry still linked kept
@@ -2892,9 +2907,10 @@ test does (#1512):
   substitute for independent signature verification or an attended install.
 - A power cut during a switch, on the lamp's storage: the journal is
   tested with the files a cut would leave, on the Mac.
-- Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only
-  (`tests/round.rs`). A download cut short starts again from nothing; it
-  isn't resumed. No published build carries models yet.
+- Models in the manifest (`LAMP_UPDATE_MODELS`, on in the product since 4
+  Nov): tested on the Mac only (`tests/round.rs`). A download cut short
+  starts again from nothing; it isn't resumed. No published build carries
+  models yet.
 - The image's own files (`LAMP_UPDATE_IMAGE`): tested on the Mac only
   (`image.rs`, `apply.rs`, `tests/round.rs`), with lamp-update-apply called
   in the round's place of systemd and every command recorded, not run.
