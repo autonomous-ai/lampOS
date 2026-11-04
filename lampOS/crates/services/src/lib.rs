@@ -7,7 +7,8 @@
 //!
 //! Two sockets: the admin one, which only `lamp-cloud.service` may ask
 //! (`set`, `remove`, `wipe`, `list`), and a tools folder for the voice
-//! (`tools.json` and `call.sock`), which only `lamp-voice.service` may call.
+//! (`tools.json` and `call.sock`), which only `lamp-voice.service` may call
+//! (and, with `LAMP_SKILL_READS=on`, `lamp-skills.service`, for reads alone).
 //! Reads go through an allow-list per service; writes are behind their own
 //! switch (`LAMP_SERVICES_WRITE=on`) and two phases: a full read-back first,
 //! then the one send it names. Off unless `LAMP_SERVICES=on` (or `--enable`).
@@ -18,6 +19,7 @@ pub mod net;
 pub mod reads;
 pub mod refresh;
 pub mod serve;
+pub mod spoken;
 pub mod store;
 pub mod tools;
 pub mod writes;
@@ -27,6 +29,11 @@ pub mod writes;
 pub const ENVIRONMENT: &str = "LAMP_SERVICES";
 /// The switch for writes, read by this program: off unless `on`.
 pub const WRITE_ENVIRONMENT: &str = "LAMP_SERVICES_WRITE";
+/// The switch for a made skill's reads (#5288), read by this program,
+/// `lamp-skills`, its manage helper and the voice: off unless `on`. On,
+/// `lamp-skills.service` may call the tools' socket too, for `service_read`
+/// alone.
+pub const SKILL_READS_ENVIRONMENT: &str = "LAMP_SKILL_READS";
 
 /// Whether a switch is on, as `var` gives it.
 pub fn on(var: Option<&str>) -> bool {

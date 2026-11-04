@@ -5,8 +5,8 @@
 //! voice's) or `--enable`: off, it opens no socket and exits at once, so its
 //! unit stays inactive.
 use lamp_services::{
-    ENVIRONMENT, WRITE_ENVIRONMENT, mail::Gmail, net::Https, on, refresh::Backend, serve, store,
-    tools,
+    ENVIRONMENT, SKILL_READS_ENVIRONMENT, WRITE_ENVIRONMENT, mail::Gmail, net::Https, on,
+    refresh::Backend, serve, store, tools,
 };
 use std::{
     fs, io,
@@ -78,13 +78,15 @@ fn main() -> ExitCode {
     } else {
         "writes off: reads only"
     });
-    let services = Arc::new(serve::Services::new(
-        store::Store(store),
-        Https,
-        Gmail,
-        backend,
-        write_on,
-    ));
+    // A made skill's reads (#5288): lamp-skills may call, for service_read.
+    let skill_reads = on(std::env::var(SKILL_READS_ENVIRONMENT).ok().as_deref());
+    if skill_reads {
+        say("a made skill's reads on: lamp-skills may read, never write");
+    }
+    let services = Arc::new(
+        serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
+            .with_skill_reads(skill_reads),
+    );
     let tools_dir = run.join("tools");
     let opened = (|| -> io::Result<(UnixListener, UnixListener)> {
         fs::create_dir_all(&tools_dir)?;
