@@ -1442,10 +1442,15 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   build. Every model, the name part's own `name.onnx` among them
   (`1d238ca7…`, the model lamp-4ace and lamp-52e6 run), is in one release of
   ours, `models-2026-10-16`, with each model's licence beside it (the first
-  builder on #811, 2026-10-16 13:58; the fifth made it). The voice's four
+  builder on #811, 2026-10-16 13:58; the fifth made it). The same-voice
+  check's CAM++ (`3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`,
+  `357a834f…`, 29,596,978 bytes, Apache-2.0) is in `models-2026-11-04`
+  with its licence beside it, placed beside the voice through `current/`;
+  the voice reads it only where `LAMP_SAME_VOICE_MODEL` names it, which no
+  product unit sets ([same-voice.md](same-voice.md)). The voice's four
   recorded lines and their manifest are in `notices-2026-10-20`, placed in
-  `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). Both releases
-  are published (`models-2026-10-16` since 26 Oct). A model that cannot be
+  `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). Those two
+  releases are published (`models-2026-10-16` since 26 Oct). A model that cannot be
   had is said and the install goes on. What
   install placed is recorded by SHA-256 as the settings are, so when
   `models.json` moves a pin, the earlier model it placed is replaced (its
