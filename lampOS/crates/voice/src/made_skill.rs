@@ -92,10 +92,12 @@ const REQUEST_MARK: &str = "Request: ";
 
 /// What a request for a skill that uses one of the person's services (mail,
 /// a calendar, Slack, ...) is told: a made skill never reaches a linked
-/// service, but the person can ask the lamp itself, and where the link is
-/// made.
-pub const NOT_A_SERVICE: &str = "A skill can't use your mail, calendar or other services, but \
-     you can just ask me once the service is linked in the app: Skills, then Connectors.";
+/// service yet, linked or not, but the person can ask the lamp itself. It
+/// names no place to link one: on lamp-9adf, 4 Nov, the model told the
+/// owner to link a calendar already linked (the first builder on #5288).
+pub const NOT_A_SERVICE: &str = "Not possible yet: a skill can't use your mail, calendar or \
+     other services, even ones already linked. Say so plainly, in a few words, and that they \
+     can ask you for it themselves any time.";
 /// Words that name a linked service ([`crate::services`]) in a request, as
 /// a whole word: mail and a calendar, and the services' own names.
 const SERVICE_WORDS: [&str; 17] = [
@@ -2037,7 +2039,9 @@ light = { dim = 1 }
         ] {
             assert_eq!(brief(request), Err(NOT_A_SERVICE), "{request}");
         }
-        assert!(NOT_A_SERVICE.contains("Connectors"));
+        // Not possible yet, linked or not: no place to link it is named.
+        assert!(NOT_A_SERVICE.contains("yet") && NOT_A_SERVICE.contains("already linked"));
+        assert!(!NOT_A_SERVICE.contains("Connectors"));
         for request in [
             "glow warm when the mailman comes",
             "dim the light at 10 pm",
