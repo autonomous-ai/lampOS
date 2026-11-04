@@ -2871,6 +2871,9 @@ pub fn serve(
                         note.as_ref().map(|(_, count)| *count),
                         started.elapsed().as_millis(),
                         path,
+                        person.as_deref(),
+                        now_unix_ms,
+                        crate::local_time::system(),
                     )
                 );
                 note.map(|(note, _)| note)

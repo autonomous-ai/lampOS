@@ -688,7 +688,15 @@ trên #3371): khi mặt một người quen là mặt duy nhất trong khung hì
 người ấy đã lưu. Câu đang được mang theo như cuộc trò chuyện của một người
 (`LAMP_CONVERSATION_CARRIES`) vẫn không có gợi ý. Nhật ký mỗi lượt ghi
 `hits_path=` và số lượt theo từng đường (`hits_turns_speaking=`,
-`hits_turns_face=`, `hits_turns_room=`), chỉ là số đếm, không tên, id hay lời.
+`hits_turns_face=`, `hits_turns_room=`), rồi `hits_whose=` (`room`, hoặc
+số thứ tự của người trong ngày, `person-1`, `person-2`, … theo thứ tự mỗi người
+xuất hiện lần đầu trong ngày; không bao giờ là tên hay id của người, vì id là
+hash không muối của tên; bảng id sang số thứ tự chỉ ở trong bộ nhớ, không bao
+giờ được ghi ra) cùng tổng trong ngày của ký ức ấy: số điều đã lưu
+(`hits_today_told=`) và số byte (`bytes_today_told=`) đã kể qua gợi ý hôm nay,
+chỉ giữ trong bộ nhớ của voice, số thứ tự và tổng cùng đặt lại lúc nửa đêm giờ địa phương và khi khởi
+động lại (`remember::HitsDay`, C4), để đo ngân sách tiết lộ (C9) từ nhật ký.
+Chỉ là số đếm và số thứ tự, không tên, id hay lời.
 
 ## Lượt ban đêm B (kế hoạch trích xuất C, bước B, của người phụ trách trí nhớ, 3/11)
 

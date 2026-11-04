@@ -6815,16 +6815,102 @@ impl HitsPath {
 /// started: counts only, for the journal ([`hits_journal_line`]).
 static HITS_BY_PATH: [AtomicU64; 3] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
 
+/// What each person's memory has told in hits on one local day, for the
+/// journal's running total (C9's disclosure budget): kept in memory only,
+/// counts only, and begun again at local midnight. The journal never says a
+/// person id (an unsalted hash of the name, `known::person_id`, so a list of
+/// names finds it): each person is a slot, `person-1`, `person-2`, …, in the
+/// order they first appear that day, and the room's is `room`. The id-to-slot
+/// map lives here only, is never written, and is forgotten at midnight with
+/// the totals.
+#[derive(Debug, Default)]
+pub struct HitsDay {
+    /// The local day the totals are for, as days since 1970-01-01.
+    day: i64,
+    /// Each person seen today, in the order first seen (slot = place + 1),
+    /// with what their memory has told today.
+    people: Vec<(String, HitsCount)>,
+    /// What the room's memory has told today.
+    room: HitsCount,
+}
+
+impl HitsDay {
+    /// Adds what a turn told of `person`'s memory on local `day` (nothing
+    /// for a turn told nothing) and gives the journal's word for whose it
+    /// was (`person-N` or `room`) with that memory's total for the day so
+    /// far. A new day forgets every earlier day's slots and totals first.
+    pub fn add(
+        &mut self,
+        day: i64,
+        person: Option<&str>,
+        told: Option<HitsCount>,
+    ) -> (String, HitsCount) {
+        if day != self.day {
+            self.day = day;
+            self.people.clear();
+            self.room = HitsCount::default();
+        }
+        let (whose, total) = match person {
+            None => ("room".to_owned(), &mut self.room),
+            Some(id) => {
+                let place = match self.people.iter().position(|(seen, _)| seen == id) {
+                    Some(place) => place,
+                    None => {
+                        self.people.push((id.to_owned(), HitsCount::default()));
+                        self.people.len() - 1
+                    }
+                };
+                (format!("person-{}", place + 1), &mut self.people[place].1)
+            }
+        };
+        if let Some(told) = told {
+            total.told += told.told;
+            total.bytes += told.bytes;
+        }
+        (whose, *total)
+    }
+}
+
+/// Today's hits totals for the voice's journal ([`hits_journal_line`]).
+static HITS_DAY: Mutex<HitsDay> = Mutex::new(HitsDay {
+    day: 0,
+    people: Vec::new(),
+    room: HitsCount { told: 0, bytes: 0 },
+});
+
 /// A turn's hits journal line: whether memory told anything, how long it
 /// took, whose, by which rule ([`HitsPath`]), and what it told as counts
 /// ([`HitsCount`], #2510 take 1 c), so a day's disclosure can be added up
-/// from the journal, with the turns told so far by each rule. No names, ids
-/// or words.
+/// from the journal, with the turns told so far by each rule. Then whose
+/// memory it was (the person's slot for the day, `person-N`, or `room`;
+/// never a name or person id) and that memory's total told in hits today,
+/// local time, begun again at midnight ([`HitsDay`]). No names, ids or
+/// words.
 pub fn hits_journal_line(
     request: u64,
     told: Option<HitsCount>,
     millis: u128,
     path: HitsPath,
+    person: Option<&str>,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+) -> String {
+    let (whose, today) = HITS_DAY
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .add(local_day(now_unix_ms, zone), person, told);
+    hits_line(request, told, millis, path, &whose, today)
+}
+
+/// [`hits_journal_line`] with whose memory it was (`person-N` or `room`)
+/// and its total today given.
+fn hits_line(
+    request: u64,
+    told: Option<HitsCount>,
+    millis: u128,
+    path: HitsPath,
+    whose: &str,
+    today: HitsCount,
 ) -> String {
     let count = told.unwrap_or_default();
     if told.is_some() {
@@ -6832,7 +6918,7 @@ pub fn hits_journal_line(
     }
     let so_far = |path: HitsPath| HITS_BY_PATH[path as usize].load(Ordering::Relaxed);
     format!(
-        "request {request}: memory {} in {millis} ms ({}) hits_told={} bytes_told={} hits_path={} hits_turns_speaking={} hits_turns_face={} hits_turns_room={}",
+        "request {request}: memory {} in {millis} ms ({}) hits_told={} bytes_told={} hits_path={} hits_turns_speaking={} hits_turns_face={} hits_turns_room={} hits_whose={} hits_today_told={} bytes_today_told={}",
         if told.is_some() {
             "told"
         } else {
@@ -6849,6 +6935,9 @@ pub fn hits_journal_line(
         so_far(HitsPath::Speaking),
         so_far(HitsPath::Face),
         so_far(HitsPath::Room),
+        whose,
+        today.told,
+        today.bytes,
     )
 }
 
@@ -19804,7 +19893,7 @@ mod tests {
 
     /// The memory owner's order of 4 Nov: each hits line says which rule
     /// chose its scope (speaking, the face in view, the room's) and counts
-    /// the turns told by each so far, as counts only: no name, id or word.
+    /// the turns told by each so far, as counts only: no name or word.
     /// A turn told nothing is not counted.
     #[test]
     fn the_hits_line_says_its_path_and_counts_each_path() {
@@ -19817,19 +19906,19 @@ mod tests {
                 .unwrap()
         };
         let told = Some(HitsCount { told: 2, bytes: 40 });
-        let before = hits_journal_line(1, None, 1, HitsPath::Face);
+        let before = hits_journal_line(1, None, 1, HitsPath::Face, None, 0, None);
         assert!(before.contains("hits_path=face"), "{before}");
         assert!(before.contains("(theirs)"), "{before}");
-        let face = hits_journal_line(2, told, 4, HitsPath::Face);
+        let face = hits_journal_line(2, told, 4, HitsPath::Face, None, 0, None);
         assert!(face.contains(" hits_path=face "), "{face}");
         // Other tests may count too: never fewer, and this one at least.
         assert!(count(&face, "face") > count(&before, "face"), "{face}");
-        let room = hits_journal_line(3, told, 4, HitsPath::Room);
+        let room = hits_journal_line(3, told, 4, HitsPath::Room, None, 0, None);
         assert!(room.contains("(the room's)") && room.contains(" hits_path=room "));
         assert!(count(&room, "room") >= 1 && count(&room, "face") >= 1);
-        let speaking = hits_journal_line(4, told, 4, HitsPath::Speaking);
-        assert!(speaking.ends_with(&format!(
-            "hits_path=speaking hits_turns_speaking={} hits_turns_face={} hits_turns_room={}",
+        let speaking = hits_journal_line(4, told, 4, HitsPath::Speaking, None, 0, None);
+        assert!(speaking.contains(&format!(
+            "hits_path=speaking hits_turns_speaking={} hits_turns_face={} hits_turns_room={} hits_whose=room ",
             count(&speaking, "speaking"),
             count(&speaking, "face"),
             count(&speaking, "room")
@@ -19845,6 +19934,122 @@ mod tests {
                 "counts and paths only: {line}"
             );
         }
+    }
+
+    /// C4: each person's hits are added up for the local day under their
+    /// slot for the day, the room's apart, and a turn told nothing adds
+    /// nothing; the line ends with the slot and that memory's total today.
+    #[test]
+    fn the_hits_line_totals_each_persons_disclosure_for_the_day() {
+        let mut day = HitsDay::default();
+        let a = person_id("A");
+        let b = person_id("B");
+        let two = Some(HitsCount { told: 2, bytes: 40 });
+        let one = Some(HitsCount { told: 1, bytes: 15 });
+        let slot = |n: &str, told, bytes| (n.to_owned(), HitsCount { told, bytes });
+        assert_eq!(day.add(20_500, Some(&a), two), slot("person-1", 2, 40));
+        assert_eq!(day.add(20_500, Some(&b), one), slot("person-2", 1, 15));
+        assert_eq!(day.add(20_500, Some(&a), one), slot("person-1", 3, 55));
+        assert_eq!(
+            day.add(20_500, Some(&a), None),
+            slot("person-1", 3, 55),
+            "told nothing: the total so far, unchanged"
+        );
+        assert_eq!(day.add(20_500, None, two), slot("room", 2, 40));
+        assert_eq!(day.add(20_500, Some(&b), None), slot("person-2", 1, 15));
+        let (whose, today) = day.add(20_500, Some(&a), one);
+        let line = hits_line(9, one, 2, HitsPath::Face, &whose, today);
+        assert!(
+            line.ends_with(" hits_whose=person-1 hits_today_told=4 bytes_today_told=70"),
+            "{line}"
+        );
+        let (whose, today) = day.add(20_500, None, None);
+        let room = hits_line(10, None, 1, HitsPath::Room, &whose, today);
+        assert!(
+            room.ends_with(" hits_whose=room hits_today_told=2 bytes_today_told=40"),
+            "{room}"
+        );
+    }
+
+    /// The first builder's P2 on #5315: a person id is an unsalted hash of
+    /// the name, so the journal never says one. Two people are `person-1`
+    /// and `person-2` in the order first seen, and after local midnight the
+    /// slots begin again, the first seen that day `person-1`.
+    #[test]
+    fn the_hits_line_says_a_days_slot_never_a_person_id() {
+        let mut day = HitsDay::default();
+        let (a, b) = (person_id("A"), person_id("B"));
+        assert!(a.starts_with("p-") && b.starts_with("p-") && a != b);
+        let told = Some(HitsCount { told: 1, bytes: 10 });
+        let line = |day: &mut HitsDay, d: i64, who: &str| {
+            let (whose, today) = day.add(d, Some(who), told);
+            hits_line(1, told, 1, HitsPath::Speaking, &whose, today)
+        };
+        let (first_a, first_b) = (line(&mut day, 20_500, &a), line(&mut day, 20_500, &b));
+        for l in [&first_a, &first_b] {
+            assert!(
+                !l.contains("p-") && !l.contains(&a[2..]) && !l.contains(&b[2..]),
+                "{l}"
+            );
+        }
+        assert!(
+            first_a.contains(" hits_whose=person-1 hits_today_told=1 "),
+            "{first_a}"
+        );
+        assert!(
+            first_b.contains(" hits_whose=person-2 hits_today_told=1 "),
+            "{first_b}"
+        );
+        let again_a = line(&mut day, 20_500, &a);
+        assert!(
+            again_a.contains(" hits_whose=person-1 hits_today_told=2 "),
+            "{again_a}"
+        );
+        // After midnight: B first seen, so B is person-1, A person-2.
+        let next_b = line(&mut day, 20_501, &b);
+        assert!(
+            next_b.contains(" hits_whose=person-1 hits_today_told=1 "),
+            "{next_b}"
+        );
+        let next_a = line(&mut day, 20_501, &a);
+        assert!(
+            next_a.contains(" hits_whose=person-2 hits_today_told=1 "),
+            "{next_a}"
+        );
+        assert!(!next_a.contains("p-") && !next_b.contains("p-"));
+    }
+
+    /// C4: the day's totals begin again at local midnight, by the lamp's
+    /// zone, not UTC's: 23:59 and 00:01 Saigon time are two days.
+    #[test]
+    fn the_hits_days_totals_begin_again_at_local_midnight() {
+        let saigon = LocalTime::zone("Asia/Ho_Chi_Minh").unwrap();
+        // 2026-11-04 16:59 UTC = 23:59 in Saigon; two minutes on is the 5th.
+        let before = 1_793_811_540_000;
+        let after = before + 120_000;
+        assert_eq!(
+            local_day(after, None),
+            local_day(before, None),
+            "one UTC day"
+        );
+        let (before_day, after_day) = (
+            local_day(before, Some(&saigon)),
+            local_day(after, Some(&saigon)),
+        );
+        assert_eq!(after_day, before_day + 1, "two local days");
+        let mut day = HitsDay::default();
+        let a = person_id("A");
+        let told = Some(HitsCount { told: 2, bytes: 40 });
+        let count = |told, bytes| HitsCount { told, bytes };
+        assert_eq!(day.add(before_day, Some(&a), told).1, count(2, 40));
+        assert_eq!(day.add(before_day, None, told).1, count(2, 40));
+        assert_eq!(
+            day.add(after_day, Some(&a), None).1,
+            HitsCount::default(),
+            "a new day: nothing told yet"
+        );
+        assert_eq!(day.add(after_day, None, None).1, HitsCount::default());
+        assert_eq!(day.add(after_day, Some(&a), told).1, count(2, 40));
     }
 
     /// #2510 take 1 (c): a turn's journal line counts what its hits told,
@@ -19868,18 +20073,40 @@ mod tests {
                 bytes: "Màu yêu thích là xanh.".len()
             }
         );
-        let line = hits_journal_line(7, Some(count), 3, HitsPath::Speaking);
+        // Whose: a slot for the day, never the name or the person id (C4,
+        // the first builder's P2 on #5315).
+        let ossa = person_id("Ossa");
+        let line = hits_journal_line(
+            7,
+            Some(count),
+            3,
+            HitsPath::Speaking,
+            Some(&ossa),
+            NOW,
+            None,
+        );
         assert!(
             line.starts_with(
                 "request 7: memory told in 3 ms (theirs) hits_told=1 bytes_told=26 hits_path=speaking hits_turns_speaking="
             ),
             "{line}"
         );
-        for word in ["xanh", "Màu", "mau", "Ossa", "p-1"] {
+        assert!(line.contains(" hits_whose=person-"), "{line}");
+        for word in [
+            "xanh",
+            "Màu",
+            "mau",
+            "Ossa",
+            "ossa",
+            "thích",
+            "name",
+            "p-",
+            &ossa[2..],
+        ] {
             assert!(!line.contains(word), "{line}");
         }
         assert!(
-            hits_journal_line(8, None, 1, HitsPath::Room).starts_with(
+            hits_journal_line(8, None, 1, HitsPath::Room, None, NOW, None).starts_with(
                 "request 8: memory had nothing told in 1 ms (the room's) hits_told=0 bytes_told=0 hits_path=room "
             )
         );
