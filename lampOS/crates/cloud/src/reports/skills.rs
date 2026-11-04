@@ -325,6 +325,9 @@ pub struct Days {
     /// only with that day, so two reports never tell a skill put on or
     /// off between them.
     shown: BTreeMap<u64, Shown>,
+    /// The latest day acknowledged: a day at or before it is never counted
+    /// on again, so a zone moved west across midnight can't send it twice.
+    acked_through: Option<u64>,
 }
 
 /// The skills on and kept off at a day's last reading, by source key, as
@@ -466,7 +469,10 @@ impl Days {
     /// the zone the reading was taken in.
     pub fn add(&mut self, now_s: u64, reading: &Reading) {
         self.offset_minutes = reading.offset_minutes;
-        let today = local_day(now_s, self.offset_minutes);
+        // El's P3 on #5096: a day already acknowledged stays sent; what
+        // comes on it goes on the day after.
+        let today = local_day(now_s, self.offset_minutes)
+            .max(self.acked_through.map_or(0, |day| day.saturating_add(1)));
         // Every day read is sent once over, its counts 0 or not.
         self.days.entry(today).or_default();
         self.shown.insert(today, Shown::of(reading));
@@ -562,6 +568,7 @@ impl Days {
     pub fn acked(&mut self, day: u64) {
         self.days.remove(&day);
         self.shown.remove(&day);
+        self.acked_through = self.acked_through.max(Some(day));
     }
 }
 
@@ -675,6 +682,34 @@ mod tests {
         kept["shown"]["20745"]["on"]["uploaded"] = json!(1);
         let read: Days = serde_json::from_value(kept).unwrap();
         assert_eq!(read.oldest(NOW + 2 * DAY_S).unwrap().0.on, quiet.on);
+    }
+
+    /// El's P3 on #5096: a zone moved west across midnight after an ack
+    /// brings back the acknowledged date; it is never sent again, and what
+    /// was counted on it goes on the next date.
+    #[test]
+    fn an_acknowledged_day_is_never_counted_on_again() {
+        let at = |offset_minutes, core| Reading {
+            offset_minutes,
+            ..reading(core, &[], 0)
+        };
+        // 2026-10-18T20:00Z: the 19th at +7.
+        let evening = NOW + 16 * 3_600;
+        let mut days = Days::default();
+        days.add(evening - 3_600, &at(420, 100));
+        days.add(evening, &at(420, 104));
+        // 18:00Z the 19th, 01:00 the 20th at +7: the 19th is over.
+        let next = evening + 22 * 3_600;
+        let (day, over) = days.oldest(next).unwrap();
+        assert_eq!(day.date, "2026-10-19");
+        days.acked(over);
+        // The zone goes to -5: 13:00 the 19th again.
+        days.add(next, &at(-300, 110));
+        assert_eq!(days.oldest(next), None);
+        // The 20th at -5, over: the runs since are there, the 19th never.
+        let (later, _) = days.oldest(next + 2 * DAY_S).unwrap();
+        assert_eq!(later.date, "2026-10-20");
+        assert_eq!(later.runs, BTreeMap::from([(Source::Core, 6)]));
     }
 
     /// The zone is the system's; a lamp whose zone can't be read counts
