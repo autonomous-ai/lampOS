@@ -1718,13 +1718,13 @@ pub fn write_file(path: &Path, text: &str) -> std::io::Result<()> {
 /// Close the conversation of the voice's own thread ([`THREAD`]) now: a
 /// computer's `turn.end` or the person's stop ([`Thread::close_conversation`]),
 /// or, with `request`, the person's stop answered as that request
-/// ([`Thread::close_conversation_with`]). In tests it closes only while a
-/// test asks for it ([`closes_for_test`]): `THREAD` is the whole process's,
-/// and a session in one test closing it would end the conversation another
-/// test is judging.
+/// ([`Thread::close_conversation_with`]). In tests it closes only on the
+/// test thread that asks for it ([`closes_for_test`]): `THREAD` is the whole
+/// process's, and a session in one test closing it would end the
+/// conversation another test is judging.
 pub fn close_now(request: Option<u64>) {
     #[cfg(test)]
-    if !test_closes::ON.load(std::sync::atomic::Ordering::Acquire) {
+    if !test_closes::ON.with(std::cell::Cell::get) {
         return;
     }
     if let Ok(mut thread) = THREAD.lock() {
@@ -1737,29 +1737,55 @@ pub fn close_now(request: Option<u64>) {
 
 #[cfg(test)]
 mod test_closes {
-    pub(super) static ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    std::thread_local! {
+        pub(super) static ON: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
 }
 
-/// While held, [`close_now`] closes [`THREAD`]'s conversation in tests. Hold
-/// it with `provider_worker::tests::one_thread()`, so no other test reading
-/// the thread runs meanwhile. The switch is the whole process's: while one
-/// test holds it, another test running at the same time without
-/// `one_thread()` could still close [`THREAD`] through [`close_now`], so
-/// every test that reads the thread must hold `one_thread()`.
+/// While held, [`close_now`] closes [`THREAD`]'s conversation in tests, for
+/// closes made on this test's own thread only (each `#[tokio::test]` drives
+/// its engine and its sessions there). Hold it with
+/// `provider_worker::tests::one_thread()`, so no other test reading the
+/// thread runs meanwhile. Another test's session, which runs on its own
+/// thread, closes nothing while this one holds it: with a process-wide
+/// switch such a session closed the conversation
+/// `a_stop_said_over_the_lamps_answer_closes_the_conversation` was judging
+/// (failing 3 of 3 full runs on lamp-voice `0b984d554`).
 #[cfg(test)]
-pub(crate) struct ClosesForTest;
+pub(crate) struct ClosesForTest(std::marker::PhantomData<*const ()>);
 
 #[cfg(test)]
 pub(crate) fn closes_for_test() -> ClosesForTest {
-    test_closes::ON.store(true, std::sync::atomic::Ordering::Release);
-    ClosesForTest
+    test_closes::ON.with(|on| on.set(true));
+    ClosesForTest(std::marker::PhantomData)
 }
 
 #[cfg(test)]
 impl Drop for ClosesForTest {
     fn drop(&mut self) {
-        test_closes::ON.store(false, std::sync::atomic::Ordering::Release);
+        test_closes::ON.with(|on| on.set(false));
     }
+}
+
+/// Another thread's close, while a test holds [`closes_for_test`] on its own,
+/// closes nothing: only that test's own thread may close [`THREAD`].
+#[cfg(test)]
+#[test]
+fn a_close_on_another_thread_while_a_test_holds_closes_is_ignored() {
+    let _thread = crate::provider_worker::tests::one_thread();
+    let _closes = closes_for_test();
+    *THREAD.lock().unwrap() = Thread::new();
+    std::thread::spawn(|| close_now(None)).join().unwrap();
+    assert!(
+        THREAD.lock().unwrap().closed_at().is_none(),
+        "another thread's"
+    );
+    close_now(None);
+    assert!(
+        THREAD.lock().unwrap().closed_at().is_some(),
+        "this test's own"
+    );
+    *THREAD.lock().unwrap() = Thread::new();
 }
 
 /// `told` on the thread as it stands now, for a voice route about to tell
