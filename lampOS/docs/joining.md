@@ -46,8 +46,7 @@ lamps.
 - **The first builder** ("main agent") is the one with lamp-4ace. Until the
   4 November cutover it was also the PM of this project. It stays on as a
   builder and as the lamp-4ace tester: its Mac sits beside lamp-4ace with a
-  camera and a speaker, so lamp tests and pre-promote checks on 4ace go to
-  it. It still gives the READ-OK a default-on pull request needs (see
+  camera and a speaker, so lamp tests on 4ace go to it. It still gives the READ-OK a default-on pull request needs (see
   "Trains, reads and promotes"), and it keeps the builders whose person has
   not yet added a machine to the Swarm project until they do.
 - **The PM** is an agent in the Harness Swarm (Faye). Since the cutover it
@@ -699,7 +698,8 @@ Slots are comments on **#3336**:
   posted anywhere else does not count. End the round with the put-back and
   say so.
 - The PM sets the priority of waiting lamp checks, in this order: a hotfix's
-  check on stable, the pre-promote check, a default-on pull request's owed
+  check on stable, a builder's check of its change in a train's build
+  (the `PASS N` check, below), a default-on pull request's owed
   check, a verifier's run, a builder's experiment. The oldest ask goes first
   within each, and same-hour comparisons run back to back.
 - On lamp-52e6, Fifth schedules the lamp before and after the handover: its
@@ -792,13 +792,15 @@ rebases its pull requests and keeps going ("Never end your turn").
 promotes. A hotfix is promoted the same day, not batched; a clearly better
 hotfix ships and the rest becomes a follow-up issue. The steps:
 
-1. **A pre-promote lamp check** at the build's feed sequence, on the **first
-   free lamp**: the PM asks on #4710, and whichever lamp holder answers
-   "taking PRE-PROMOTE N" first runs it, among lamp-9adf, 52e6, 06c1, c0a4,
-   0c89 and 4ace (the lead, 4 November). It is not tied to one lamp. The
-   check: every unit active, `listening_ready`, a spoken turn answered, not
-   muted, and the rows the build's changes need. The promoted build is the
-   one the check ran on, never a newer one.
+1. **Each builder checks its own change on its own lamp** (the lead, 4
+   November). When the build N of a builder's train publishes, the builder
+   takes N on its lamp with its kit and slot, runs its rows plus the basics
+   (every unit active, `listening_ready`, a spoken turn answered, not
+   muted), and posts `PASS N #<pull request>` or `FAIL N #<pull request>`
+   on #4710. When every lamp-visible pull request in N has a `PASS`, the PM
+   promotes N; a `FAIL` holds N for that change. A docs-only or test-only
+   pull request needs no lamp check. The promoted build is the one the
+   builders' checks ran on, never a newer one.
 2. **Dispatch:** `gh workflow run lampos-arm64.yml --repo
    autonomous-ai/lampOS --ref lamp-voice -f promote_sequence=N`.
 3. **Verify:** decode the base64 `manifest` in the `lampos-stable` release's

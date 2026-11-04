@@ -73,8 +73,9 @@ It replaces the three-agent `harness send` route of 12 October.
   for when a ready pull request is waiting. A change that turns a default on
   needs the first builder's own `READ-OK`, or a reader the PM names; a
   privacy change needs TWO READS. A promote to stable goes between 07:00 and
-  21:00 GMT+7, after a pre-promote lamp check, and a hotfix is promoted the
-  same day. Joining.md, "Trains, reads and promotes", has the rules.
+  21:00 GMT+7, once each builder has posted `PASS N #<pull request>` from
+  its own lamp for every lamp-visible change in build N, and a hotfix is
+  promoted the same day. Joining.md, "Trains, reads and promotes", has the rules.
 - **Before asking for a review, read your own diff for the faults reviews
   found most on 22 October**, and say in the PR body which you checked:
   1. **Wrong person:** can one person's words, name, face or memory reach
