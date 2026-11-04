@@ -147,45 +147,9 @@ systemctl cat lamp-update | grep -q lampos-stable && rec "UPDATE_CHANNEL_4F=PASS
 r=""; for u in bootstrap os-server hal; do systemctl is-active -q $u && r="$r $u"; done
 [[ -z $r ]] && rec "V1_UNITS_4G=PASS none running" || fail "V1 units running:$r (4g)"
 
-if ! grep -q ^BODY_POSES= "$ENV_FILE" 2>/dev/null; then
-  status "RUNNING head rest"
-  rest_read() { setpriv --reuid lampos --regid lampos --init-groups -- /opt/lampOS/body/current/lamp-body-measure \
-    --device /dev/ttyACM0 --unit-id "$ID" --lock-directory /run/lampos-locks/motor 2>&1 | grep -v ^BODY_POSES; }
-  out=$(rest_read); echo "$out"
-  if grep -q 'a head off its stop' <<<"$out"; then
-    say "the head is off its stop: nudging it toward $NUDGE_TARGET"
-    python3 "$HOME_DIR/head-nudge.py" --target "$NUDGE_TARGET"
-    out=$(rest_read); echo "$out"
-    grep -q 'a head off its stop' <<<"$out" && { speak factory_head_off; fail "the head rests off its stop after the nudge: press it down by hand"; }
-  fi
-  grep -q '^lamp-body-measure: ' <<<"$out" && fail "the rest read refused: $(grep '^lamp-body-measure:' <<<"$out" | head -1)"
-  rec "HEAD_REST=$(grep -o 'pitch [0-9]*;' <<<"$out" | head -1 | tr -d ';')"
-
-  status "RUNNING 4c1 arm stand"
-  steps -- ./steps.sh --unit-id "$ID" --write --to 1 || fail "step 1 (the arm stand) stopped"
-fi
-grep -q ^BODY_POSES= "$ENV_FILE" || fail "step 1 wrote no lamp.env"
-rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4C1=PASS"
-
-status "RUNNING 4c2 inputs"
-out=$(python3 "$HOME_DIR/input-check.py" 2>&1); rc=$?; echo "$out"
-mapfile -t inputs < <(sed -n 's/^RECORD //p' <<<"$out")
-rec "${inputs[@]}"
-[[ $rc == 0 ]] || fail "inputs: $(sed -n 's/^RECORD INPUTS=//p' <<<"$out")"
-rec "FACTORY_4C2=PASS"
-
-status "RUNNING 4c3 update key"
-steps -- ./steps.sh --unit-id "$ID" --write --from 3 --to 3 || fail "step 3 (the update key) stopped"
-rec "FACTORY_4C3=PASS"
-
-status "RUNNING 4d gaze"
-grep -q -- --gaze "$ENV_FILE" || { cp -p "$ENV_FILE" "$ENV_FILE.before-4d" && sed -i "s/^\(BODY_POSES=\".*\)\"\$/\1 --gaze $GAZE\"/" "$ENV_FILE"; }
-grep -q -- "--gaze $GAZE" "$ENV_FILE" || fail "4d: --gaze $GAZE is not in lamp.env"
-jq -e '(.head_pads | length) >= 2 and (.head_rest | length) == (.head_pads | length)' "$PINS" >/dev/null || fail "the pins file has no head pads"
-rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4D=PASS $GAZE"
-
-# The speaker's hardware level, kept across boots (75%, kyle-aus 3 Nov):
-# lamp-cmedia-speaker pins the C-Media "Speaker" at step 9 at every boot, so
+# The speaker's hardware level, kept across boots (75%, kyle-aus 3 Nov), and
+# set first, before the inputs (4 Nov), so a run that fails on an input still
+# leaves the level set. lamp-cmedia-speaker pins the C-Media "Speaker" at step 9 at every boot, so
 # alsactl store cannot hold a level. A drop-in replaces that pin with
 # SPEAKER_LEVEL and keeps the unit's other ExecStart lines (the first PCM
 # open that makes the softvol control). Delete the drop-in for the default.
@@ -209,7 +173,68 @@ systemctl daemon-reload
 systemctl restart "$SPK_UNIT" || fail "$SPK_UNIT failed with the speaker at $SPEAKER_LEVEL"
 spk=$(amixer -c device_cmedia sget Speaker | grep -o '\[[0-9]*%\]' | head -1 | tr -d '[]')
 [[ -n $spk ]] || fail "the speaker level cannot be read after setting $SPEAKER_LEVEL"
-rec "SPEAKER_LEVEL=$spk (asked $SPEAKER_LEVEL, $SPK_DROPIN)" \
-    "RESULT_UNSET=PASS" "RESULT_UNSET_AT=$(date '+%F %T %z')"
+rec "SPEAKER_LEVEL=$spk (asked $SPEAKER_LEVEL, $SPK_DROPIN)"
+
+# 4c2 beside 4c1 (kyle-aus 4 Nov, ~70 s a lamp): the inputs are read while
+# the arm stands, so the person touches the pads and presses the buttons
+# during the stand. input-check.py's touch window opens at the first touch
+# (it waits up to 300 s), so nobody races the arm. INPUTS_WITH_STAND=no reads
+# them after the stand, as before. A run that fails first stops it with
+# SIGINT, so its finally starts lamp-controls and the voice again.
+INPUT_OUT=$DIR/input-check.out; input_pid=""
+if [[ ${INPUTS_WITH_STAND:-yes} == yes ]]; then
+  python3 "$HOME_DIR/input-check.py" >"$INPUT_OUT" 2>&1 & input_pid=$!
+  # waited for: the unit ending kills what is left, its finally included
+  trap '[[ -n $input_pid ]] && { kill -INT $input_pid 2>/dev/null; wait $input_pid 2>/dev/null; }' EXIT
+  say "4c2 inputs read beside the arm stand: touch the pads and press the buttons now"
+fi
+
+if ! grep -q ^BODY_POSES= "$ENV_FILE" 2>/dev/null; then
+  # The speaker step's daemon-reload has systemd try lamp-body again, which
+  # then waits to restart ("activating", lamp-dbd1 4 Nov) and holds step 1
+  # off the servo port: stopped again here.
+  systemctl stop lamp-body 2>/dev/null; systemctl reset-failed lamp-body 2>/dev/null
+  status "RUNNING head rest"
+  rest_read() { setpriv --reuid lampos --regid lampos --init-groups -- /opt/lampOS/body/current/lamp-body-measure \
+    --device /dev/ttyACM0 --unit-id "$ID" --lock-directory /run/lampos-locks/motor 2>&1 | grep -v ^BODY_POSES; }
+  out=$(rest_read); echo "$out"
+  if grep -q 'a head off its stop' <<<"$out"; then
+    say "the head is off its stop: nudging it toward $NUDGE_TARGET"
+    python3 "$HOME_DIR/head-nudge.py" --target "$NUDGE_TARGET"
+    out=$(rest_read); echo "$out"
+    grep -q 'a head off its stop' <<<"$out" && { speak factory_head_off; fail "the head rests off its stop after the nudge: press it down by hand"; }
+  fi
+  grep -q '^lamp-body-measure: ' <<<"$out" && fail "the rest read refused: $(grep '^lamp-body-measure:' <<<"$out" | head -1)"
+  rec "HEAD_REST=$(grep -o 'pitch [0-9]*;' <<<"$out" | head -1 | tr -d ';')"
+
+  status "RUNNING 4c1 arm stand"
+  steps -- ./steps.sh --unit-id "$ID" --write --to 1 || fail "step 1 (the arm stand) stopped"
+fi
+grep -q ^BODY_POSES= "$ENV_FILE" || fail "step 1 wrote no lamp.env"
+rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4C1=PASS"
+
+status "RUNNING 4c2 inputs"
+if [[ -n $input_pid ]]; then
+  wait "$input_pid"; rc=$?; input_pid=""; out=$(cat "$INPUT_OUT")
+else
+  out=$(python3 "$HOME_DIR/input-check.py" 2>&1); rc=$?
+fi
+echo "$out"
+mapfile -t inputs < <(sed -n 's/^RECORD //p' <<<"$out")
+rec "${inputs[@]}"
+[[ $rc == 0 ]] || fail "inputs: $(sed -n 's/^RECORD INPUTS=//p' <<<"$out")"
+rec "FACTORY_4C2=PASS"
+
+status "RUNNING 4c3 update key"
+steps -- ./steps.sh --unit-id "$ID" --write --from 3 --to 3 || fail "step 3 (the update key) stopped"
+rec "FACTORY_4C3=PASS"
+
+status "RUNNING 4d gaze"
+grep -q -- --gaze "$ENV_FILE" || { cp -p "$ENV_FILE" "$ENV_FILE.before-4d" && sed -i "s/^\(BODY_POSES=\".*\)\"\$/\1 --gaze $GAZE\"/" "$ENV_FILE"; }
+grep -q -- "--gaze $GAZE" "$ENV_FILE" || fail "4d: --gaze $GAZE is not in lamp.env"
+jq -e '(.head_pads | length) >= 2 and (.head_rest | length) == (.head_pads | length)' "$PINS" >/dev/null || fail "the pins file has no head pads"
+rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4D=PASS $GAZE"
+
+rec "RESULT_UNSET=PASS" "RESULT_UNSET_AT=$(date '+%F %T %z')"
 status "PASS unset"
 speak factory_all_done
