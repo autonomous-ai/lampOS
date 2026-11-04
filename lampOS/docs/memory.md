@@ -1076,7 +1076,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   journal: the kept list is the record of that.
 - **What is kept is what was said** (#2176, row 10;
   `LAMP_MEMORY_KEEP_HEARD=on`, both voice routes and both clients; off
-  unless set). The model writes the sentence `remember {text}` keeps, and
+  unless set, on in the product by the memory owner's call on 5 Nov). The model writes the sentence `remember {text}` keeps, and
   nothing checked it: on lamp-06c1 on 20 Oct "please remember that my
   favourite tea is jasmine" and, later, "... my favourite fruit is mango"
   were both kept as "My favorite food is jasmine." With the switch, a

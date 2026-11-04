@@ -193,6 +193,16 @@ hạn (`closed=N`), lệnh kết thúc bị memory từ chối vì vượt giớ
 32 KiB của lượt quan sát (`why=too_large too_large=N`), và job bị đóng không
 gửi vì hàng đợi quan sát đã đầy (`busy=N`).
 
+## Điều được giữ là điều đã nói (`LAMP_MEMORY_KEEP_HEARD`)
+
+`LAMP_MEMORY_KEEP_HEARD=on` (#2176; tắt nếu không đặt, cả hai đường voice)
+bật trong bản sản phẩm từ 5/11, theo quyết định của người phụ trách trí nhớ.
+Khi câu `remember` của mô hình có một từ khóa mà câu nghe được không có, lamp
+giữ chính câu nghe được, dạng "They said: …" (tối đa 300 byte). Một câu chỉ là
+"có", "không" hay "okay" không bao giờ được giữ như vậy; một lời "có" sau lời
+đề nghị giữ lần hai giữ câu mà lời đề nghị đầu nói đến (#5276, N6). Chi tiết:
+[memory.md](../memory.md), "What is kept is what was said".
+
 ## Truy xuất theo khoảng ngày
 
 Khi `recall_v2` hỏi một ngày hay một khoảng ngày mà không có từ khóa, các ghi
