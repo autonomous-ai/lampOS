@@ -2280,6 +2280,28 @@ pub fn serve(
         .filter(|_| files.health_facts)
         .and_then(|root| lamp_bus::Bus::new(root).ok())
         .map(|bus| crate::health_told::watch(bus, crate::health_told::READ_EVERY));
+    // With `LAMP_LIGHT_TOLD=on`, the light as the ring says it shows it on
+    // `light/state`, read from the bus's kept latest value as each turn's
+    // message is made, never waited on (lamp-52e6 at 9928, 4 Nov: "what
+    // colour is the light?" guessed "White" while it was warm).
+    let light_bus = crate::light_told::on_from_environment()
+        .then(|| {
+            let bus = files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok());
+            eprintln!(
+                "lamp-voice second: {} ({})",
+                if bus.is_some() {
+                    "each turn is told the light as light/state says it now"
+                } else {
+                    "there is no bus to read the light from, so it is never told"
+                },
+                crate::light_told::ENVIRONMENT
+            );
+            bus
+        })
+        .flatten();
     // What the texts' task is built from, kept before the spoken turns take
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
@@ -2531,6 +2553,7 @@ pub fn serve(
             let facts = facts(session_fact && !going_on, room)
                 + &named_by_default
                 + &health_fact(health.as_deref())
+                + &crate::light_told::fact(light_bus.as_ref())
                 // A line narrowed to the room whose person's face was alone
                 // in view is told their name only (`ScopeLease::named_for_reply`,
                 // lamp-3e83): its `line`, never its `person`, the thread's.
@@ -19410,6 +19433,55 @@ mod tests {
         );
         assert!(history(None, true).is_empty(), "never the room's");
         crate::thread::THREAD.lock().unwrap().forget();
+    }
+
+    /// lamp-52e6 at 9928 (4 Nov): a later "set a timer to one minute" was
+    /// answered "Timer set." with no call, the earlier timer turn told in
+    /// words alone. A thread with an earlier `set_timer` kept (as
+    /// `second_provider::kept_args` keeps it) tells the model that call
+    /// with its own arguments, before the lamp's words.
+    #[test]
+    fn a_kept_timer_reaches_the_next_turns_history_with_its_arguments() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let now = Instant::now();
+        let asked = serde_json::json!({"text": "Timer", "seconds": 60});
+        let kept =
+            crate::second_provider::kept_args("set_timer", &asked).expect("a timer's call is kept");
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person("set a timer for one minute", true, now);
+            thread.called(7, "set_timer", &kept);
+            thread.lamp_for(7, "Timer set. It rings at 9:34 am.", now, None);
+        }
+        let recent = crate::thread::THREAD.lock().unwrap().recent_for(
+            None,
+            now,
+            HISTORY_WITHIN,
+            HISTORY_EXCHANGES,
+        );
+        let told: Vec<Message> = recent
+            .into_iter()
+            .flat_map(|exchange| messages_told(exchange, true))
+            .collect();
+        crate::thread::THREAD.lock().unwrap().forget();
+        assert_eq!(
+            told,
+            [
+                Message::user("set a timer for one minute"),
+                Message::assistant_calls(
+                    None,
+                    &[crate::second_provider::net::ToolCall {
+                        id: "kept-7-0".into(),
+                        name: "set_timer".into(),
+                        args: asked,
+                        extra: None,
+                    }]
+                ),
+                Message::tool("kept-7-0", KEPT_CALL_RESULT),
+                Message::assistant("Timer set. It rings at 9:34 am."),
+            ]
+        );
     }
 
     /// The reviewer-lead on #2675: an add-on's quoted line, and the lamp's

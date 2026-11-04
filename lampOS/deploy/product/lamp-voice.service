@@ -186,6 +186,9 @@ Environment=LAMP_SECOND_SAY_WITH_CALL=on
 # An earlier turn that ran a light or volume step is told to the model as the call, then its words, so an ask
 # is not learned as words alone (#5018): on lamp-9adf at 9730, 10 of 10 device lines called, 0 talk-only (4 of 14 off).
 Environment=LAMP_HISTORY_KEEPS_CALLS=on
+# Each turn is told the light as light/state says it now: on lamp-52e6 at 9928 (4 Nov), "what colour is the light?"
+# was answered "White" three times while the light was warm at level 1, as the voice could not read it.
+Environment=LAMP_LIGHT_TOLD=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # Talk over the lamp's own line (a say, a reminder, news) in a busy room is let go and the line goes on; its name,

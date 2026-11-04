@@ -1451,6 +1451,24 @@ fn the_product_answers_a_stop_and_leaves_the_wordless_question_off() {
     );
 }
 
+/// Each second-route turn is told the light as `light/state` says it now
+/// (`LAMP_LIGHT_TOLD`): on lamp-52e6 at 9928 (4 Nov), "what colour is the
+/// light?" was answered "White" three times while the light was warm at
+/// level 1, the voice having no way to read it.
+#[test]
+fn the_product_tells_each_turn_the_light() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_LIGHT_TOLD=on"),
+        "the voice lacks LAMP_LIGHT_TOLD"
+    );
+}
+
 /// A thing the person already keeps, said again, is that kept thing, not a
 /// second one (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): on lamp-06c1 on 28 Oct
 /// the product unit, without it, kept "the meeting room is called orange"

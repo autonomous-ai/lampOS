@@ -79,6 +79,7 @@ pub mod health_told;
 pub(crate) mod holding_answer;
 pub mod known_faces;
 pub mod language;
+pub mod light_told;
 pub mod listen_gaps;
 pub mod local_time;
 pub mod made_skill;

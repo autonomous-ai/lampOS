@@ -321,19 +321,25 @@ pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, u
 /// The arguments a call of `name` made with `args` is kept with for a
 /// later turn's history (`LAMP_HISTORY_KEEPS_CALLS`), or `None`: not kept.
 /// A call made with none is kept bare, whatever its function. A light's or
-/// volume's call ([`crate::tools::is_light_or_volume`]) is kept with its
-/// own arguments, at most [`crate::thread::KEPT_ARGS_BYTES`] of compact
-/// JSON (#5045(a)); past that, bare if its function takes none
-/// ([`crate::tools::LIGHT_OR_VOLUME_BARE`]), else not kept. Any other
-/// call made with arguments (a keep's, a reminder's) is never kept: its
-/// arguments are the person's own words, and told bare it would teach
-/// calling it bare (Fourteen's P3 on #5018).
+/// volume's call ([`crate::tools::is_light_or_volume`]), or a Schedule's
+/// ([`crate::tools::SCHEDULE_NAMES`]), is kept with its own arguments, at
+/// most [`crate::thread::KEPT_ARGS_BYTES`] of compact JSON (#5045(a));
+/// past that, bare if its function takes none
+/// ([`crate::tools::LIGHT_OR_VOLUME_BARE`]), else not kept (every
+/// Schedule function takes some). Any other call made with arguments (a
+/// keep's, a skill's) is never kept: its arguments are the person's own
+/// words, and told bare it would teach calling it bare (Fourteen's P3 on
+/// #5018). A Schedule call's arguments (a reminder's text) are the same
+/// thread's words, kept in RAM only and never journalled: without them, on
+/// lamp-52e6 at 9928 (4 Nov 09:30), a timer set earlier was told in words
+/// alone, and "Lamp, set a timer to one minute." was answered "Timer set.
+/// It rings at 9:39 am." with no call, and no timer existed.
 pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_json::Value> {
     let bare = || serde_json::Value::Object(serde_json::Map::new());
     if args.as_object().is_none_or(serde_json::Map::is_empty) {
         return Some(bare());
     }
-    if !crate::tools::is_light_or_volume(name) {
+    if !crate::tools::is_light_or_volume(name) && !crate::tools::SCHEDULE_NAMES.contains(&name) {
         return None;
     }
     if args.to_string().len() <= crate::thread::KEPT_ARGS_BYTES {
@@ -11591,9 +11597,10 @@ async fn answer(
                 // (`LAMP_HISTORY_KEEPS_CALLS`): never the call for the rest
                 // of the functions, which would give a later turn all of
                 // them (`worker::few_tools`), and only as [`kept_args`]
-                // keeps it: bare, or a light's or volume's call with its
-                // own arguments (#5045(a): colour turns told as words alone
-                // were copied as "Done." with no call).
+                // keeps it: bare, or a light's, volume's or Schedule's call
+                // with its own arguments (#5045(a): colour turns told as
+                // words alone were copied as "Done." with no call, and a
+                // timer turn as "Timer set." with none).
                 if did
                     && call.name != worker::MORE
                     && let Some(keep) = &shared.keeps_calls
