@@ -7,7 +7,7 @@ use lamp_bus::logging::{Log, LogLevel, keep::Kept};
 use lamp_bus::{Bus, Declaration, Header, Kind, Message, Notice, Publisher, Subscriber};
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     env, fs,
     io::{self, BufRead, Write},
     path::{Path, PathBuf},
@@ -27,6 +27,11 @@ usage: lamp-bus [--root PATH] COMMAND ...
       What the topic was declared to carry, who publishes it now, who
       listens, and how old its kept value is. Status 1 if nobody has
       published, subscribed to or declared it.
+  drops [TOPIC]
+      Each subscriber of each topic, or of TOPIC, with how many messages the
+      live publishers could not give it (its queue was full) since each
+      found it, as their entries said at their last refresh. Status 1 if TOPIC
+      is not on the bus.
   hz TOPIC [--seconds S]
       Listen for S seconds (5) and print how many messages came, how often,
       the mean and the largest gap between two, their mean age on arrival,
@@ -211,6 +216,10 @@ fn run(given: impl Iterator<Item = String>) -> Result<ExitCode, Failure> {
         "info" => {
             let words = arguments.words(1, 1)?;
             info(&bus, &words[0])
+        }
+        "drops" => {
+            let words = arguments.words(0, 1)?;
+            drops(&bus, words.first().map(String::as_str))
         }
         "hz" => {
             let seconds = arguments.amount("seconds")?.unwrap_or(5.0);
@@ -492,6 +501,39 @@ fn info(bus: &Bus, topic: &str) -> Result<ExitCode, Failure> {
         Ok(None) => "latest none".into(),
         Err(error) => format!("latest unreadable: {error}"),
     });
+    Ok(ExitCode::SUCCESS)
+}
+
+/// One line a subscriber: `<topic> <subscriber> dropped=<n>`, the sum over
+/// the topic's live publishers. A subscriber that has gone is listed while
+/// a publisher's entry still names it.
+fn drops(bus: &Bus, topic: Option<&str>) -> Result<ExitCode, Failure> {
+    let topics = match topic {
+        Some(topic) => {
+            // A name the bus refuses is the caller's to fix: status 2.
+            bus.subscribers(topic)?;
+            if !bus.root().join(topic).is_dir() {
+                return Err(Failure::Failed(format!(
+                    "{topic} is not on the bus: nobody has published, subscribed to or declared it"
+                )));
+            }
+            vec![topic.to_string()]
+        }
+        None => bus.topics()?.into_iter().map(|topic| topic.name).collect(),
+    };
+    for topic in topics {
+        let mut totals: BTreeMap<String, u64> = bus
+            .subscribers(&topic)?
+            .into_iter()
+            .map(|subscriber| (subscriber.socket, 0))
+            .collect();
+        for dropped in bus.drops(&topic)? {
+            *totals.entry(dropped.subscriber).or_default() += dropped.dropped;
+        }
+        for (subscriber, dropped) in totals {
+            say(&format!("{topic} {subscriber} dropped={dropped}"));
+        }
+    }
     Ok(ExitCode::SUCCESS)
 }
 
