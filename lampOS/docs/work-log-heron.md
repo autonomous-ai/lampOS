@@ -372,3 +372,13 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   and the privacy READ-OK say another voice takes it back. HOLD on a P2
   posted, fix the code or the claim. #5271's second read went to
   Thirteen. Hourly line to Faye posted.
+- 19:3x–19:5x: the first builder withdrew the line of their #5272 READ-OK
+  that leaned on the doc comment, and asked for the code fix. #4950
+  landed in train 611 before 19:30. #5279 (Fourteen, Gmail names
+  bridged): heron's second read was asked at 19:24 and missed in a gap
+  between two watchers (one ended 19:20, the next began 19:26); the
+  watcher now carries its start over. Read at 19:5x: the code is right;
+  HOLD on a P2, as a mutation that always bridges passes all 57
+  lamp-services tests and would send from the other account with both
+  links; a P3 on a `read` guard no test needs. #5283: heron takes it if
+  El hasn't started by 20:45.
