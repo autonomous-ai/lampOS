@@ -1,0 +1,102 @@
+# lamp-voice journal, filtered: request numbers, calls, held-back lines, errors, restarts.
+# 08:24-08:25 probe (product), 08:26-08:44 before (product 7973f309), 08:45 install, 08:46-09:03 after (P2 745d1ebb), 09:03 restore.
+08:24:52.254 second: request 1 heard 17 words, the last 247 ms after the line ended
+08:24:53.505 second: request 1 chat round 1 called start_agent_task
+08:24:53.631 second: request 1 asked for start_agent_task; the tasks part answered in 125 ms; the answer was sent
+08:25:11.249 second: request 2 heard 6 words, the last 210 ms after the line ended
+08:26:27.177 second: request 3 heard 15 words, the last 323 ms after the line ended
+08:27:45.594 second: request 4 heard 24 words, the last 232 ms after the line ended
+08:28:16.008 second: request 5 heard 6 words, the last 273 ms after the line ended
+08:29:27.763 second: request 6 heard 12 words, the last 243 ms after the line ended
+08:29:57.856 second: request 7 heard 6 words, the last 210 ms after the line ended
+08:31:09.483 second: request 8 heard 21 words, the last 224 ms after the line ended
+08:31:40.735 second: request 9 heard 6 words, the last 290 ms after the line ended
+08:32:50.315 second: request 10 heard 17 words, the last 305 ms after the line ended
+08:32:50.315 second: request 10: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+08:33:54.185 second: request 11 heard 6 words, the last 262 ms after the line ended
+08:35:10.616 second: request 12 heard 27 words, the last 319 ms after the line ended
+08:35:42.305 second: request 13 heard 6 words, the last 242 ms after the line ended
+08:36:55.141 second: request 14 heard 16 words, the last 325 ms after the line ended
+08:37:25.909 second: request 15 heard 6 words, the last 235 ms after the line ended
+08:38:40.935 second: request 16 heard 25 words, the last 264 ms after the line ended
+08:39:10.951 second: request 17 heard 6 words, the last 270 ms after the line ended
+08:40:23.332 second: request 18 heard 13 words, the last 275 ms after the line ended
+08:40:54.206 second: request 19 heard 6 words, the last 270 ms after the line ended
+08:42:03.395 second: request 20 heard 18 words, the last 246 ms after the line ended
+08:42:33.106 second: request 21 heard 6 words, the last 214 ms after the line ended
+08:44:14.867 second: request 22 heard 19 words, the last 316 ms after the line ended
+08:44:44.075 second: request 23 heard 6 words, the last 306 ms after the line ended
+08:45:37.193 {"seconds":null,"status":"listening_ready"}
+08:46:15.804 second: request 1 heard 15 words, the last 239 ms after the line ended
+08:46:17.324 second: request 1 chat round 1 called start_agent_task
+08:46:17.378 second: request 1 asked for start_agent_task; the tasks part answered in 52 ms; the answer was sent
+08:46:45.786 second: request 2 heard 6 words, the last 288 ms after the line ended
+08:48:00.052 second: request 3 heard 23 words, the last 308 ms after the line ended
+08:48:29.283 second: request 4 heard 6 words, the last 292 ms after the line ended
+08:49:37.111 second: request 5 heard 12 words, the last 248 ms after the line ended
+08:50:06.685 second: request 6 heard 6 words, the last 216 ms after the line ended
+08:51:18.033 second: request 7 heard 21 words, the last 281 ms after the line ended
+08:51:43.279 second: request 8 heard 6 words, the last 222 ms after the line ended
+08:52:17.384 second: request 9 heard 0 words, the last 282 ms after the line ended
+08:52:48.442 second: request 10 heard 17 words, the last 270 ms after the line ended
+08:54:03.048 second: request 11 heard 25 words, the last 263 ms after the line ended
+08:54:33.919 second: request 12 heard 6 words, the last 298 ms after the line ended
+08:55:41.422 second: request 13 heard 16 words, the last 297 ms after the line ended
+08:56:11.275 second: request 14 heard 6 words, the last 257 ms after the line ended
+08:57:17.411 second: request 15 heard 25 words, the last 228 ms after the line ended
+08:57:48.044 second: request 16 heard 6 words, the last 233 ms after the line ended
+08:58:58.045 second: request 17 heard 12 words, the last 261 ms after the line ended
+08:59:27.954 second: request 18 heard 6 words, the last 294 ms after the line ended
+08:59:45.750 second: request 19 heard 4 words, the last 208 ms after the line ended
+08:59:45.751 second: request 19: its answer is held back: a short sound, and nothing shows it was said to the lamp: not heard as a short word (this route has no ears or eyes)
+09:00:38.635 second: request 20 heard 19 words, the last 260 ms after the line ended
+09:00:50.245 second: request 21 heard 3 words, the last 229 ms after the line ended
+09:00:58.773 second: request 22 heard 9 words, the last 246 ms after the line ended
+09:02:06.037 second: request 23 heard 0 words, the last 260 ms after the line ended
+09:02:14.542 second: request 24 heard 0 words, the last 259 ms after the line ended
+09:02:20.653 second: request 25 heard 15 words, the last 256 ms after the line ended
+09:02:20.653 second: request 25: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+09:02:45.921 second: request 26 heard 17 words, the last 271 ms after the line ended
+09:03:25.212 second: request 27 heard 9 words, the last 276 ms after the line ended
+09:03:26.241 second: request 27 chat round 1 called take_a_look
+09:03:26.241 second: request 27 called take_a_look: the look is asked of the coordinator
+09:03:34.037 {"seconds":null,"status":"listening_ready"}
+
+# With a yes (product voice 7973f309), 09:05-09:14: calls, confirms, dispatch, errors.
+09:04:14.855 second: request 1 heard 1 words, the last 546 ms after the line ended
+09:04:17.652 second: request 2 heard 0 words, the last 366 ms after the line ended
+09:05:13.884 second: request 3 heard 5 words, the last 288 ms after the line ended
+09:05:17.633 second: request 4 heard 0 words, the last 243 ms after the line ended
+09:06:10.085 second: request 5 heard 17 words, the last 306 ms after the line ended
+09:06:11.632 second: request 5 chat round 1 called start_agent_task
+09:06:11.677 second: request 5 asked for start_agent_task; the tasks part answered in 44 ms; the answer was sent
+09:06:27.885 second: request 6 heard 5 words, the last 285 ms after the line ended
+09:06:29.113 second: request 6 chat round 1 called confirm_agent_task
+09:06:29.153 second: request 6 asked for confirm_agent_task; the tasks part answered in 39 ms; the answer was sent
+09:06:48.072 second: request 7 heard 3 words, the last 348 ms after the line ended
+09:06:50.601 second: request 8 heard 0 words, the last 284 ms after the line ended
+09:06:51.974 second: request 9 heard 0 words, the last 728 ms after the line ended
+09:06:59.656 tasks: lamp-<task>: dispatch accepted (exit 0, 30.5 s)
+09:07:39.629 second: request 11 heard 0 words, the last 224 ms after the line ended
+09:08:42.597 second: request 12 heard 4 words, the last 281 ms after the line ended
+09:08:43.607 second: request 12 chat round 1 called not_for_me
+09:08:47.559 second: request 13 heard 0 words, the last 269 ms after the line ended
+09:09:17.615 second: request 14 heard 0 words, the last 212 ms after the line ended
+09:09:23.083 second: request 15 heard 9 words, the last 316 ms after the line ended
+09:09:45.512 second: request 17 heard 2 words, the last 261 ms after the line ended
+09:09:48.076 second: request 18 heard 6 words, the last 236 ms after the line ended
+09:09:55.270 second: request 19 heard 16 words, the last 239 ms after the line ended
+09:10:12.352 second: request 20 heard 5 words, the last 216 ms after the line ended
+09:10:13.823 second: request 20 chat round 1 called start_agent_task
+09:10:13.878 second: request 20 asked for start_agent_task; the tasks part answered in 54 ms; the answer was sent
+09:10:14.913 second: request 20 chat round 2 called confirm_agent_task
+09:10:14.915 second: request 20 asked for confirm_agent_task; the tasks part answered in 0 ms; the answer was sent
+09:11:23.879 second: request 21 heard 0 words, the last 350 ms after the line ended
+09:13:29.810 second: request 22 heard 16 words, the last 244 ms after the line ended
+09:13:47.213 second: request 23 heard 5 words, the last 235 ms after the line ended
+09:13:48.422 second: request 23 chat round 1 called confirm_agent_task
+09:13:48.429 second: request 23 asked for confirm_agent_task; the tasks part answered in 0 ms; the answer was sent
+09:14:03.357 second: request 24 heard 0 words, the last 486 ms after the line ended
+09:14:47.508 second: request 25 heard 6 words, the last 266 ms after the line ended
+09:15:02.228 second: request 26 heard 1 words, the last 246 ms after the line ended
+09:15:40.547 second: request 27 heard 0 words, the last 325 ms after the line ended
