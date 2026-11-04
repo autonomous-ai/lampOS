@@ -426,7 +426,27 @@ pub struct Progress {
     /// step's short `reoffer` line. An older build reads past it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub opened: bool,
+    /// "Who you are" ended done with the name only on a lamp that keeps
+    /// faces (#5139, a tester's lamp-0c4e on 3 Nov: no face saved, so every
+    /// later conversation kept nothing): the face is asked for once more,
+    /// [`skill::Definition::later_after_s`] after the walk, with someone
+    /// there. Cleared when that ask is made, by a face saved, or by a redo.
+    /// An older build reads past it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub face_again: bool,
+    /// The name told at "who you are", for [`Self::face_again`]'s ask only:
+    /// its `person_id`s ([`told_ids`]), never its words. The face that ask
+    /// saves becomes the owner only under one of them; any other name keeps
+    /// it as an ordinary known face (Thirteen's P2 on #5328: the ask goes to
+    /// whoever is in front half an hour on). Taken when the ask is made. At
+    /// most [`MOST_TOLD_IDS`]; an older build reads past it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub face_again_names: Vec<String>,
 }
+
+/// [`Progress::face_again_names`]' bound: a name whole and its first word,
+/// as [`told_ids`] gives them.
+const MOST_TOLD_IDS: usize = 2;
 
 fn is_zero(value: &u8) -> bool {
     *value == 0
@@ -559,6 +579,14 @@ impl Progress {
         if self.privacy_invitation_tries > 2 || self.giving_way_tries > giving_way::MOST_TRIES {
             return Err(invalid());
         }
+        if self.face_again_names.len() > MOST_TOLD_IDS
+            || !self
+                .face_again_names
+                .iter()
+                .all(|id| lamp_msgs::known::is_person_id(id))
+        {
+            return Err(invalid());
+        }
         // A step this build doesn't know (a later build's, rolled back) is
         // read past and kept as it is, never a refused file: the walk goes
         // on with the steps it knows (#2110). The file's 16 KiB bound holds
@@ -657,6 +685,31 @@ struct Led {
     /// A `later` re-offer: the step's count before this offer was counted,
     /// given back if the offer is dropped with nothing tried ([`Onboarding::drop_led`]).
     counted_from: Option<u8>,
+    /// When the lamp last said something while this step was asked
+    /// ([`Onboarding::lamp_said`]): "who you are"'s face wait runs from it
+    /// too, so the lamp's own "Shall I?" is never cut off (#5139).
+    lamp_said_us: Option<u64>,
+    /// "Who you are" asked again for the face only ([`Progress::face_again`]):
+    /// the name is known, and an end with the name only is not offered again.
+    face_only: bool,
+    /// "Who you are": the latest name told, as [`told_ids`], never words.
+    name_ids: Vec<String>,
+    /// The face asked for once more: the ids of the name told at setup
+    /// ([`Progress::face_again_names`]), the only names its save makes the
+    /// owner under. Never changed by what is said in the ask.
+    owner_ids: Vec<String>,
+}
+
+impl Led {
+    /// The name told in this step, as ids: what `heard` read, else the
+    /// nudge's name heard alone.
+    fn told(&self) -> Vec<String> {
+        if self.name_ids.is_empty() {
+            self.name.as_deref().map(told_ids).unwrap_or_default()
+        } else {
+            self.name_ids.clone()
+        }
+    }
 }
 
 /// "Who you are"'s fallback: the name heard, asked back once.
@@ -859,6 +912,10 @@ pub struct Onboarding {
     /// The owner's language (#4473 (b)): the walk hears and says its lines
     /// in it ([`in_language`]); none is English, as the walk always was.
     language: Option<crate::language::Language>,
+    /// How many faces the eyes saw at the last look ([`Self::face_now`]);
+    /// `None` when none was read fresh. The face asked for once more waits
+    /// for exactly one (Thirteen's P3 on #5328).
+    faces_in_view: Option<usize>,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -1056,6 +1113,7 @@ impl Onboarding {
             face_saved_unasked: false,
             face_saved_name: None,
             language: None,
+            faces_in_view: None,
             looked: None,
             felt: None,
             goals: None,
@@ -2167,6 +2225,13 @@ impl Onboarding {
             return;
         };
         let read = reading(language, text);
+        // The name told, as ids only (#5328): English words, as the name
+        // read alone is ([`Self::heard_line`]).
+        let told = if language.is_none() && !led.face_only {
+            name_told(text).as_deref().map(told_ids).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         let mut ask_hello = false;
         let mut face_answer = None;
         let done = match led.step {
@@ -2177,7 +2242,18 @@ impl Onboarding {
                 // face is saved (`face_saved`), or by the model's report, not
                 // here. On lamp-29e7 (28 Oct, 8001) a name and a yes ended it
                 // at 08:50:29 and no face was kept.
-                if led.heard.name && read.agrees {
+                //
+                // A yes is only a short, firm answer that asks nothing, as
+                // the hello's (`answers_hello`): on a tester's lamp-0c4e (3
+                // Nov, #5139) a question with "okay" in it was taken as the
+                // yes to the face, the wait ran out, and no face was kept.
+                // Such a line is the model's to answer; the yes comes after.
+                let yes = read.agrees
+                    && read.answers_hello
+                    && !read.asks
+                    && !read.again
+                    && !read.puts_off;
+                if led.heard.name && yes {
                     // Every yes restarts the wait, so it runs from the
                     // latest: the first is often the name's ("Marie,
                     // right?"), and the face question, its yes, the model's
@@ -2199,6 +2275,9 @@ impl Onboarding {
                         );
                     }
                     led.heard.name = true;
+                    if !told.is_empty() {
+                        led.name_ids = told;
+                    }
                     false
                 } else if face_kept && led.heard.name && read.refuses {
                     // With a face to keep, a no after a name neither ends the
@@ -2333,8 +2412,9 @@ impl Onboarding {
         match self.looked {
             Some((at, face)) if now_us.saturating_sub(at) < READ_EVERY_US / 2 => face,
             _ => {
-                let face = self.look();
+                let (face, faces) = self.look();
                 self.looked = Some((now_us, face));
+                self.faces_in_view = faces;
                 face
             }
         }
@@ -2401,20 +2481,31 @@ impl Onboarding {
         head && released
     }
 
-    fn look(&self) -> Option<Framing> {
-        let message = self
+    /// The near face on the eyes' topic now, and how many faces they see
+    /// (none read fresh: `None`).
+    fn look(&self) -> (Option<Framing>, Option<usize>) {
+        let Some(message) = self
             .eyes
-            .as_ref()?
-            .latest(lamp_msgs::Faces::TOPIC)
-            .ok()
-            .flatten()?;
+            .as_ref()
+            .and_then(|eyes| eyes.latest(lamp_msgs::Faces::TOPIC).ok().flatten())
+        else {
+            return (None, None);
+        };
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_millis() as u64);
         if message.expired || now_ms.saturating_sub(message.header.at_unix_ms) > FRESH_MS {
-            return None;
+            return (None, None);
         }
-        nearest(&message.parse::<lamp_msgs::Faces>().ok()?)
+        let Ok(faces) = message.parse::<lamp_msgs::Faces>() else {
+            return (None, None);
+        };
+        let count = faces
+            .faces
+            .iter()
+            .filter(|face| face.check().is_ok())
+            .count();
+        (nearest(&faces), Some(count))
     }
 
     /// A line the person finished saying: with the nudge on, an answer to
@@ -2444,12 +2535,14 @@ impl Onboarding {
         }
     }
 
-    /// The lamp's own words, as they come: after a step's ask, its
-    /// question has been spoken.
-    pub fn lamp_said(&mut self) {
+    /// The lamp's own words, as they come, at `now_us`: after a step's ask,
+    /// its question has been spoken, and "who you are"'s face wait runs from
+    /// its latest words ([`FACE_SAVE_WAIT_US`]).
+    pub fn lamp_said(&mut self, now_us: u64) {
         self.lamp_spoke_last = true;
         if let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) {
             led.spoke = true;
+            led.lamp_said_us = Some(now_us);
         }
     }
 
@@ -2604,7 +2697,7 @@ impl Onboarding {
                 self.records
                     .push(json!({"kind":"onboarding_finished","at_us":now_us}));
             }
-            return None;
+            return self.ask_face_again(now_us, quiet_us, can_speak, face);
         };
         if !self.step_available(step) {
             self.finish(step, Outcome::NotAvailable, None, now_us);
@@ -2758,22 +2851,26 @@ impl Onboarding {
         // left silent until the give-up (the Reviewer-lead's P2 on #3992).
         // Like the give-up it waits for quiet, but the short bar a step
         // starts on ([`START_QUIET_US`]): a lamp mid-sentence, or the save
-        // still being talked through, is not cut off.
+        // still being talked through, is not cut off. The wait runs from the
+        // lamp's latest words too, not only the person's yes: on a tester's
+        // lamp-0c4e (3 Nov, #5139) it ran out while the lamp's own "Shall
+        // I?" was still waiting for its answer.
         if step == Step::WhoYouAre
             && quiet_us >= START_QUIET_US
-            && led
-                .heard
-                .face_answered_us
-                .is_some_and(|at| now_us.saturating_sub(at) >= FACE_SAVE_WAIT_US)
+            && led.heard.face_answered_us.is_some_and(|at| {
+                now_us.saturating_sub(at.max(led.lamp_said_us.unwrap_or(0))) >= FACE_SAVE_WAIT_US
+            })
         {
             eprintln!(
                 "lamp-voice: onboarding: who_you_are: no face saved after the yes: done, the name only"
             );
+            let (face_only, told) = (led.face_only, led.told());
             self.nudge_record(false, now_us);
             self.records
                 .push(json!({"kind":"onboarding_heard","step":step.name(),
                 "name_kept":false,"at_us":now_us}));
             self.finish(step, Outcome::Done, None, now_us);
+            self.name_only(face_only, told);
             return None;
         }
         if step != Step::WhereYouSit {
@@ -2782,6 +2879,7 @@ impl Onboarding {
                 // A name heard and never taken back is known, call or not.
                 // The name's words are not kept: the record says so.
                 let named = step == Step::WhoYouAre && led.heard.name;
+                let (face_only, told) = (led.face_only, led.told());
                 let asked_again = led.asked_again;
                 if led.answers > 0 {
                     self.mark_tried(step);
@@ -2792,6 +2890,7 @@ impl Onboarding {
                         .push(json!({"kind":"onboarding_heard","step":step.name(),
                         "name_kept":false,"at_us":now_us}));
                     self.finish(step, Outcome::Done, None, now_us);
+                    self.name_only(face_only, told);
                     return None;
                 }
                 // Timed out only after `TIMED_OUT_QUIET_US` of quiet, past
@@ -3022,7 +3121,8 @@ impl Onboarding {
         if let Some(step) = self
             .led
             .as_ref()
-            .filter(|led| led.asked_us.is_some())
+            // The face asked for once more is no try of a step already done.
+            .filter(|led| led.asked_us.is_some() && !led.face_only)
             .map(|led| led.step)
             .filter(|step| matches!(step, Step::WhoYouAre | Step::Preferences))
             && text.chars().any(char::is_alphanumeric)
@@ -3222,6 +3322,85 @@ impl Onboarding {
         self.dirty = self.desired != self.committed || self.erase_on_commit;
     }
 
+    /// "Who you are" just ended done with no face saved, on a lamp that
+    /// keeps faces (#5139): a conversation with nobody known in view keeps
+    /// nothing, so the walk says that what it remembers waits for a face,
+    /// and asks for the face once more later ([`Progress::face_again`]).
+    /// Not after that ask itself (`face_only`): it is asked once more, not
+    /// again and again.
+    fn name_only(&mut self, face_only: bool, told: Vec<String>) {
+        if !self.face_kept || face_only {
+            return;
+        }
+        self.desired.face_again_names = told.into_iter().take(MOST_TOLD_IDS).collect();
+        eprintln!(
+            "lamp-voice: onboarding: who_you_are done with the name only: memory waits for a face, asked for once more later"
+        );
+        self.desired.face_again = true;
+        self.owed = Some(skill::NAME_ONLY.to_owned());
+        self.save();
+    }
+
+    /// The face asked for once more ([`Progress::face_again`]), once the
+    /// walk is over: [`skill::Definition::later_after_s`] after its end, as
+    /// a `later` step is, with someone there and the room quiet. "Who you
+    /// are" is led again, its name known, for the face only: the save ends
+    /// it and keeps the owner as the walk's own save does; a no or silence
+    /// ends it as before, with nothing more said.
+    fn ask_face_again(
+        &mut self,
+        now_us: u64,
+        quiet_us: u64,
+        can_speak: bool,
+        face: Option<Framing>,
+    ) -> Option<String> {
+        // One face in view: with two, "may I remember your face" is no
+        // one's in particular, nor is the face a save takes.
+        let due = self.desired.face_again
+            && self.face_kept
+            && can_speak
+            && face.is_some()
+            && self.faces_in_view.is_none_or(|faces| faces == 1)
+            && quiet_us >= START_QUIET_US;
+        if !due {
+            return None;
+        }
+        let ended = self
+            .desired
+            .steps
+            .values()
+            .map(|kept| kept.at_unix_s)
+            .max()
+            .unwrap_or(0);
+        if (unix_ms() / 1_000).saturating_sub(ended) < self.definition.later_after_s {
+            return None;
+        }
+        // Spent once asked: a pause, nobody there or a restart never asks it
+        // a third time.
+        self.desired.face_again = false;
+        let owner_ids = std::mem::take(&mut self.desired.face_again_names);
+        self.save();
+        self.led = Some(Led {
+            step: Step::WhoYouAre,
+            asked_us: Some(now_us),
+            heard: Answers {
+                name: true,
+                ..Answers::default()
+            },
+            // The nudge's name read and ask-back are for a name not yet known.
+            name_heard: true,
+            face_only: true,
+            owner_ids,
+            ..Led::default()
+        });
+        self.records.push(
+            json!({"kind":"onboarding_step","step":Step::WhoYouAre.name(),"state":"asked",
+                "face_only":true,"at_us":now_us}),
+        );
+        eprintln!("lamp-voice: onboarding: who_you_are: the face asked for once more");
+        Some(skill::FACE_AGAIN.to_owned())
+    }
+
     /// One step asked for again: its outcome and its own counts go, and
     /// every other step keeps what it ended with.
     fn redo_step(&mut self, step: Step, now_us: u64) {
@@ -3246,6 +3425,8 @@ impl Onboarding {
             Step::WhoYouAre => {
                 self.face_saved_unasked = false;
                 self.face_saved_name = None;
+                self.desired.face_again = false;
+                self.desired.face_again_names.clear();
             }
             _ => {}
         }
@@ -3384,13 +3565,51 @@ impl Onboarding {
                 .map(str::trim)
                 .filter(|name| !name.is_empty() && name.len() <= 64)
                 .map(|name| crate::language::without_vocative(name, self.language).to_owned());
+            // The face asked for once more (#5139): only a save ends it as
+            // the step's own end. The model's own report (a no, a skip)
+            // ends the ask and leaves the step as it was kept, done.
+            if led && !by_face && self.led.as_ref().is_some_and(|led| led.face_only) {
+                self.led = None;
+                self.records
+                    .push(json!({"kind":"onboarding_heard","step":step.name(),
+                    "face_only":true,"name_kept":false,"at_us":now_us}));
+                continue;
+            }
+            // The model's done after the name, with no face saved, on a lamp
+            // that keeps faces: done with the name only (#5139).
+            let name_only = led && !by_face && step == Step::WhoYouAre && outcome == Outcome::Done;
+            let told = self.led.as_ref().map(Led::told).unwrap_or_default();
             if led && step.reportable(outcome) {
                 self.nudge_record(!by_face, now_us);
                 if by_face {
                     self.records.push(
                         json!({"kind":"onboarding_face_saved","step":step.name(),"at_us":now_us}),
                     );
-                    if step == Step::WhoYouAre && outcome == Outcome::Done && saved_name.is_some() {
+                    // The face asked for once more (#5139) keeps the face, never
+                    // the owner: it is asked of whoever is in front half an
+                    // hour on, and nothing ties them to the setup's person
+                    // (Thirteen's P2 on #5328).
+                    if let Some(again) = self.led.as_ref().filter(|led| led.face_only) {
+                        // Only under the name told at setup: anyone else in
+                        // front keeps their face as an ordinary known face.
+                        let same = saved_name.as_deref().is_some_and(|name| {
+                            told_ids(name).iter().any(|id| again.owner_ids.contains(id))
+                        });
+                        if same {
+                            self.desired.owner = saved_name.clone();
+                        }
+                        eprintln!(
+                            "lamp-voice: onboarding: who_you_are: the face asked for once more was saved: {}",
+                            if same {
+                                "under the name told at setup: the owner"
+                            } else {
+                                "not under the name told at setup: a known face, not the owner"
+                            }
+                        );
+                    } else if step == Step::WhoYouAre
+                        && outcome == Outcome::Done
+                        && saved_name.is_some()
+                    {
                         self.desired.owner = saved_name.clone();
                     }
                 }
@@ -3409,6 +3628,9 @@ impl Onboarding {
                 } else {
                     self.finish(step, outcome, None, now_us);
                 }
+                if name_only {
+                    self.name_only(false, told);
+                }
                 // The step said is the step the record skipped (#3769).
                 if outcome == Outcome::Skipped
                     && let Some(line) = self.definition.skipped(step)
@@ -3421,6 +3643,13 @@ impl Onboarding {
                 // "where you sit" was asked): kept for when it comes up.
                 self.face_saved_unasked = true;
                 self.face_saved_name = saved_name.clone();
+                // A face saved on their own ask after a name-only end: it
+                // is not asked for again.
+                if self.desired.face_again {
+                    self.desired.face_again = false;
+                    self.desired.face_again_names.clear();
+                    self.save();
+                }
                 eprintln!(
                     "lamp-voice: onboarding: a face saved before \"who you are\" was asked: kept for it"
                 );
@@ -3569,6 +3798,43 @@ fn names_someone(text: &str, words: &[String]) -> bool {
                     .any(|word| not_a_name(word) || NOT_A_NAME_ALONE.contains(&word.as_str()))
         }
     }
+}
+
+/// The name a line tells, as [`names_someone`] finds it: the words after
+/// "call me", "name is", "I am", "I'm" or "it's" (two at most), or a line
+/// of one or two words. English words only; none when it tells none.
+fn name_told(text: &str) -> Option<String> {
+    let words = words_of(text);
+    if !names_someone(text, &words) {
+        return None;
+    }
+    let at = |i: usize| words.get(i).map(String::as_str);
+    let after = (0..words.len()).find_map(|i| match (at(i), at(i + 1)) {
+        (Some("call"), Some("me")) | (Some("name"), Some("is")) | (Some("i"), Some("am")) => {
+            Some(i + 2)
+        }
+        (Some("i'm" | "it's"), _) => Some(i + 1),
+        _ => None,
+    });
+    let name: Vec<String> = match after {
+        Some(i) => words[i..].iter().take(2).cloned().collect(),
+        None => words,
+    };
+    (!name.is_empty()).then(|| name.join(" "))
+}
+
+/// A name's ids, never its words: the whole name and its first word
+/// (`lamp_msgs::known::person_id`, as the eyes key a name), so "Marie" told
+/// and "Marie Curie" saved, or the other way round, are one name.
+fn told_ids(name: &str) -> Vec<String> {
+    let name = name.trim();
+    let mut ids = vec![lamp_msgs::known::person_id(name)];
+    if let Some(first) = name.split_whitespace().next()
+        && first != name
+    {
+        ids.push(lamp_msgs::known::person_id(first));
+    }
+    ids
 }
 
 /// A yes beside "hello" in a line ([`Onboarding::heard`]'s `preferences`):
@@ -5395,7 +5661,7 @@ mod tests {
     fn a_name_said_alone_is_asked_back_and_kept_on_a_yes() {
         let asked = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Tovi?\" Nothing more.)";
         let mut room = at_who("yes", true);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         room.walk.heard_line("I'm Tovi.");
         assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
         // Not while an answer on the face may still be coming.
@@ -5410,7 +5676,7 @@ mod tests {
         assert_eq!(counted[0]["reported"], false);
         // No: asked once more, then never asked back again.
         let mut room = at_who("no", true);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         room.walk.heard_line("Tovi");
         assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
         assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), [asked]);
@@ -5421,7 +5687,7 @@ mod tests {
         assert_eq!(room.outcome(Step::WhoYouAre), None);
         // A question is not a name.
         let mut room = at_who("question", true);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         room.walk.heard_line("Why do you ask?");
         assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), [WHO_NUDGE]);
         assert_eq!(room.wait(15 * S, Some(NEAR_MIDDLE)), NONE);
@@ -6189,6 +6455,309 @@ mod tests {
         );
     }
 
+    /// A room at "who you are" on a lamp that keeps faces, its name heard.
+    fn named_with_a_face(name: &str) -> Room {
+        let mut room = Room::new(name);
+        room.walk.face_kept = true;
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room
+    }
+
+    /// #5139 fix 1 (a tester's lamp-0c4e, 3 Nov): a question with "okay" in
+    /// it was the yes to "May I remember your face?", the wait ran out and
+    /// no face was kept. Only a short, firm answer that asks nothing is the
+    /// yes, as the hello's is; a real yes after the question still is.
+    #[test]
+    fn with_a_face_to_keep_a_question_is_no_yes_to_the_face() {
+        for question in [
+            "Okay, but what will you do with my face?",
+            "Okay?",
+            "Sure, but where is it kept?",
+            "Okay, so I guess you could do that then",
+        ] {
+            let mut room = named_with_a_face("face-question");
+            room.walk.heard(question, room.at);
+            room.wait(
+                FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+                Some(NEAR_MIDDLE),
+            );
+            assert_eq!(room.outcome(Step::WhoYouAre), None, "{question}");
+            assert!(
+                room.walk
+                    .led
+                    .as_ref()
+                    .is_some_and(|led| led.heard.face_answered_us.is_none()),
+                "{question}"
+            );
+            room.walk.heard("Yes, go ahead.", room.at);
+            room.wait(5 * S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), None, "{question}");
+            face_saved(&room.walk.file, Some("Marie"));
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::WhoYouAre),
+                Some(Outcome::Done),
+                "{question}"
+            );
+            assert_eq!(room.walk.kept().owner.as_deref(), Some("Marie"));
+        }
+        // Without a face to keep, a question is no yes to the name either.
+        let mut room = Room::new("name-question");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.walk.heard("You can call me, Marie.", room.at);
+        room.walk.heard("Okay, is that how you say it?", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        room.walk.heard("Yes.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// #5139 fix 2 (a tester's lamp-0c4e, 3 Nov): the face wait ran from
+    /// the name's yes and closed the step while the lamp's own "Shall I?"
+    /// was still waiting for its answer. It runs from the lamp's latest
+    /// words too.
+    #[test]
+    fn with_a_face_to_keep_the_wait_runs_from_the_lamps_latest_words() {
+        let mut room = named_with_a_face("face-lamp-last");
+        // "Marie, right?" "Yes."
+        room.walk.heard("Yes.", room.at);
+        room.wait(10 * S, Some(NEAR_MIDDLE));
+        // "May I remember your face, so I know you next time? Shall I?"
+        room.walk.lamp_said(room.at);
+        room.wait(FACE_SAVE_WAIT_US - S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        room.walk.heard("Yes.", room.at);
+        room.wait(5 * S, Some(NEAR_MIDDLE));
+        face_saved(&room.walk.file, Some("Marie"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.kept().owner.as_deref(), Some("Marie"));
+        assert!(!room.walk.kept().face_again);
+
+        // Unanswered, it still ends with the name only, from the lamp's
+        // last words, once quiet.
+        let mut room = named_with_a_face("face-lamp-unanswered");
+        room.walk.heard("Yes.", room.at);
+        room.wait(10 * S, Some(NEAR_MIDDLE));
+        room.walk.lamp_said(room.at);
+        room.wait(FACE_SAVE_WAIT_US - S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), None);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// #5139 fix 3 (a tester's lamp-0c4e, 3 Nov): "who you are" done with
+    /// the name only, by the wait, the give-up or the model's report, says
+    /// that what the lamp remembers waits for a face; on a lamp that keeps
+    /// none, nothing is said.
+    #[test]
+    fn a_name_only_end_says_memory_waits_for_a_face() {
+        let mut room = named_with_a_face("name-only-wait");
+        room.walk.heard("No thanks, I'd rather not.", room.at);
+        let notes = room.wait(
+            FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+            Some(NEAR_MIDDLE),
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        // Said at the step's end, before the next step is asked.
+        assert_eq!(notes, [skill::NAME_ONLY, PREFERENCES_NOTE]);
+        assert!(room.walk.kept().face_again);
+
+        let mut room = named_with_a_face("name-only-report");
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::NAME_ONLY]);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert!(room.walk.kept().face_again);
+
+        let mut room = named_with_a_face("name-only-give-up");
+        let notes = room.wait(STEP_GIVE_UP_US + S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(notes.first().map(String::as_str), Some(skill::NAME_ONLY));
+        assert!(room.walk.kept().face_again);
+
+        // A face saved says none of it.
+        let mut room = named_with_a_face("name-only-saved");
+        face_saved(&room.walk.file, Some("Marie"));
+        assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), NONE);
+        assert!(!room.walk.kept().face_again);
+
+        // No face to keep: the name is all there is, and nothing is said.
+        let mut room = Room::new("name-only-no-eyes");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert!(!room.walk.kept().face_again);
+    }
+
+    /// A walk on a lamp that keeps faces, "who you are" done with the name
+    /// only and the rest to its end, `later_after_s` on.
+    fn walked_name_only(name: &str) -> Room {
+        let mut room = named_with_a_face(name);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(
+            room.wait(4 * S, Some(NEAR_MIDDLE)),
+            [skill::NAME_ONLY, PREFERENCES_NOTE]
+        );
+        report(&room.walk, "preferences", "done");
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
+        back_date(&mut room, 1_801);
+        room
+    }
+
+    /// #5139 fix 3: after a name-only end the face is asked for once more,
+    /// `later_after_s` after the walk, with one face there (Thirteen's P3 on
+    /// #5328): a save under the name told at setup ends it and keeps the
+    /// owner, and it is never asked again.
+    #[test]
+    fn the_face_is_asked_for_once_more_after_a_name_only_walk() {
+        let mut room = named_with_a_face("face-again-early");
+        report(&room.walk, "who_you_are", "done");
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        report(&room.walk, "preferences", "done");
+        // Not before `later_after_s`, nor with nobody there.
+        assert_eq!(
+            room.wait(60 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
+        back_date(&mut room, 1_801);
+        assert_eq!(room.wait(10 * S, None), NONE);
+        // Two faces in view: whose face is no one's to say.
+        room.walk.faces_in_view = Some(2);
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(room.walk.kept().face_again);
+        room.walk.faces_in_view = Some(1);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+
+        let mut room = walked_name_only("face-again");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+        assert!(!room.walk.kept().face_again);
+        assert!(room.walk.leading());
+        room.walk.heard("Sure.", room.at);
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        face_saved(&room.walk.file, Some("Marie"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert!(!room.walk.leading());
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.kept().owner.as_deref(), Some("Marie"));
+        assert!(room.walk.kept().face_again_names.is_empty());
+        let records = room.walk.take_records();
+        assert!(
+            records
+                .iter()
+                .any(|line| line["kind"] == "onboarding_face_saved"),
+            "{records:?}"
+        );
+        back_date(&mut room, 2 * 86_401);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+    }
+
+    /// Thirteen's P2 on #5328: the face asked for once more goes to whoever
+    /// is in front half an hour on. Saved under another name than the one
+    /// told at setup, it is an ordinary known face, never the owner; under
+    /// that name, the whole or its first word, it is the owner. Only ids of
+    /// the name are kept, never its words.
+    #[test]
+    fn the_face_asked_for_once_more_is_the_owner_only_under_the_name_told() {
+        let mut room = named_with_a_face("face-again-names");
+        report(&room.walk, "who_you_are", "done");
+        room.wait(S, Some(NEAR_MIDDLE));
+        let kept = room.walk.kept().face_again_names.clone();
+        assert_eq!(kept, [lamp_msgs::known::person_id("marie")]);
+        let file = std::fs::read_to_string(&room.walk.file).unwrap();
+        assert!(!file.to_lowercase().contains("marie"), "{file}");
+
+        for (saved, owner) in [
+            ("Tom", None),
+            ("Mary", None),
+            ("Marie Curie", Some("Marie Curie")),
+            ("marie", Some("marie")),
+        ] {
+            let mut room = walked_name_only("face-again-name");
+            assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+            // A name said in the ask changes nothing of who may be the owner.
+            room.walk.heard("I'm Tom.", room.at);
+            face_saved(&room.walk.file, Some(saved));
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::WhoYouAre),
+                Some(Outcome::Done),
+                "{saved}"
+            );
+            assert_eq!(room.walk.kept().owner.as_deref(), owner, "{saved}");
+            assert!(!room.walk.leading(), "{saved}");
+        }
+
+        // The name a line tells, as `heard` reads it at setup.
+        assert_eq!(
+            name_told("Call me Marie Curie please."),
+            Some("marie curie".into())
+        );
+        assert_eq!(name_told("Marie."), Some("marie".into()));
+        assert_eq!(name_told("Okay, what do you mean?"), None);
+    }
+
+    /// #5139 fix 3: the face asked for once more and refused, or left, ends
+    /// with nothing more said, the step kept done, and is never asked again.
+    #[test]
+    fn the_face_asked_for_once_more_is_never_asked_a_third_time() {
+        // A no: done after the wait, no line again.
+        let mut room = walked_name_only("face-again-no");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+        room.walk.heard("No thanks.", room.at);
+        assert_eq!(
+            room.wait(
+                FACE_SAVE_WAIT_US + START_QUIET_US + 2 * S,
+                Some(NEAR_MIDDLE)
+            ),
+            NONE
+        );
+        assert!(!room.walk.leading());
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert!(!room.walk.kept().face_again);
+        assert_eq!(room.walk.kept().owner, None);
+        back_date(&mut room, 2 * 86_401);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+
+        // The model's skip ends the ask and keeps the step done.
+        let mut room = walked_name_only("face-again-skip");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+        report(&room.walk, "who_you_are", "skipped");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(!room.walk.leading());
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+
+        // Nobody there after the ask: dropped, and spent.
+        let mut room = walked_name_only("face-again-gone");
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [skill::FACE_AGAIN]);
+        assert_eq!(room.wait(GONE_US + S, None), NONE);
+        assert!(!room.walk.leading());
+        back_date(&mut room, 2 * 86_401);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+
+        // A redo of "who you are" asks the whole step, never the face alone.
+        let mut room = named_with_a_face("face-again-redo");
+        report(&room.walk, "who_you_are", "done");
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert!(room.walk.kept().face_again);
+        let call = ToolCall {
+            id: "r".into(),
+            name: REDO.into(),
+            args: json!({"step": "who_you_are"}),
+        };
+        assert!(run(&room.walk.file, &call).1);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert!(!room.walk.kept().face_again);
+    }
+
     /// The first builder on #2526: with the nudge on, both of the
     /// coordinator's readers hear each line, and "who you are" ends once,
     /// through `heard_line`'s asked-back name and yes, with the name kept;
@@ -6197,7 +6766,7 @@ mod tests {
     fn with_the_nudge_a_heard_name_ends_who_you_are_once_and_is_kept() {
         let asked = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, Marie?\" Nothing more.)";
         let mut room = at_who("one-path", true);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         let say = |room: &mut Room, line: &str| {
             room.walk.heard_line(line);
             room.walk.heard(line, room.at);
@@ -6354,7 +6923,7 @@ mod tests {
         room.walk.heard("Quiet from 10PM, please.", room.at);
         // The model's "Already set" answer is its own turn; the hello is
         // asked once it is over, and only once.
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
         assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
         assert_eq!(room.outcome(Step::Preferences), None);
@@ -6388,7 +6957,7 @@ mod tests {
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard(answer, room.at);
             // The model's short reply came: the hello follows it.
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(
                 room.wait(S, Some(NEAR_MIDDLE)),
                 [skill::PREFERENCES_HELLO],
@@ -6417,7 +6986,7 @@ mod tests {
             .heard("After ten at night, you're falling", room.at);
         room.walk
             .heard("Please stay quiet after 10PM each day.", room.at);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
         assert_eq!(room.outcome(Step::Preferences), None);
         // Said again after the hello question: still not its answer.
@@ -6441,7 +7010,7 @@ mod tests {
         report(&room.walk, "who_you_are", "done");
         assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         room.walk.heard("Hmm.", room.at);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
         assert!(room.wait(10 * S, Some(NEAR_MIDDLE)).is_empty());
         assert_eq!(room.outcome(Step::Preferences), None);
@@ -6466,7 +7035,7 @@ mod tests {
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk
                 .heard("Quiet from ten until I wake up again.", room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
             room.walk.heard(yes, room.at);
             assert_eq!(
@@ -6505,7 +7074,7 @@ mod tests {
             report(&room.walk, "who_you_are", "done");
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard(line, room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(
                 room.wait(S, Some(NEAR_MIDDLE)),
                 [skill::PREFERENCES_HELLO],
@@ -6542,7 +7111,7 @@ mod tests {
             report(&room.walk, "who_you_are", "done");
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard("After ten at night.", room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
             room.walk.heard(reply, room.at);
             assert_eq!(
@@ -6574,7 +7143,7 @@ mod tests {
             report(&room.walk, "who_you_are", "done");
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard(answer, room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(
                 room.wait(S, Some(NEAR_MIDDLE)),
                 [skill::PREFERENCES_HELLO],
@@ -6629,10 +7198,10 @@ mod tests {
             report(&room.walk, "who_you_are", "done");
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard(question, room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert!(room.wait(7 * S, Some(NEAR_MIDDLE)).is_empty(), "{question}");
             room.walk.heard("After ten at night.", room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(
                 room.wait(S, Some(NEAR_MIDDLE)),
                 [skill::PREFERENCES_HELLO],
@@ -6658,10 +7227,10 @@ mod tests {
         report(&room.walk, "who_you_are", "done");
         assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         room.walk.heard("Sorry, can you repeat that", room.at);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         assert!(room.wait(6 * S, Some(NEAR_MIDDLE)).is_empty());
         room.walk.heard("After ten at night.", room.at);
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
     }
 
@@ -6707,10 +7276,10 @@ mod tests {
             report(&room.walk, "who_you_are", "done");
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard("After ten at night.", room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
             room.walk.heard(line, room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             room.wait(S, Some(NEAR_MIDDLE));
             assert_eq!(room.outcome(Step::Preferences), None, "{line}");
             room.walk.heard("Yes, that's fine.", room.at);
@@ -6753,7 +7322,7 @@ mod tests {
             report(&room.walk, "who_you_are", "done");
             assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
             room.walk.heard("After ten at night.", room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(room.wait(S, Some(NEAR_MIDDLE)), [skill::PREFERENCES_HELLO]);
             room.walk.heard(line, room.at);
             room.wait(S, Some(NEAR_MIDDLE));
@@ -6779,7 +7348,7 @@ mod tests {
         assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         room.walk.heard("Quiet after ten at night.", room.at);
         // The model's reply, still playing: the lamp may not speak.
-        room.walk.lamp_said();
+        room.walk.lamp_said(room.at);
         for _ in 0..8 {
             room.at += S / 4;
             room.walk.drain_storage_for_test(room.at);
@@ -8155,10 +8724,10 @@ mod tests {
                 [said(PREFERENCES_NOTE)]
             );
             room.walk.heard(question, room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert!(room.wait(7 * S, Some(NEAR_MIDDLE)).is_empty(), "{code}");
             room.walk.heard(quiet, room.at);
-            room.walk.lamp_said();
+            room.walk.lamp_said(room.at);
             assert_eq!(
                 room.wait(S, Some(NEAR_MIDDLE)),
                 [said(skill::PREFERENCES_HELLO)],

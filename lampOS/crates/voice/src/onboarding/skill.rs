@@ -38,6 +38,17 @@ pub(crate) const FACE_EXPRESSIONS_NO: &str =
 /// guide is (#1711 item 1).
 pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures.\")";
 
+/// "Who you are" ended with the name only on a lamp that keeps faces
+/// (#5139): what is remembered waits for a face, so the person is told, and
+/// the face is asked for once more later ([`FACE_AGAIN`]). In code, not the
+/// file: an older build refuses a new key.
+pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: \"Got your name. I'll remember things for you once I've seen your face.\")";
+
+/// The face asked for once more, after the walk, when "who you are" ended
+/// with the name only (#5139). The name is known by then; a yes and the
+/// save end it, a no or silence leaves it, and it is never asked again.
+pub(crate) const FACE_AGAIN: &str = "(Nobody has spoken. Ask exactly this: \"One more thing: may I remember your face now, so I can remember things for you?\" Only after a clear yes call remember_my_face with the name they told you; if you don't know it, ask it first. Never use remember for this. If they would rather not, say only: \"That's fine.\")";
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Definition {
