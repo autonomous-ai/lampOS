@@ -222,7 +222,9 @@ kept", below). Off by default; not on any lamp.
 configuration: the words said in a yield are heard, and a stop phrase
 commits it ([stop-word.md](stop-word.md#a-stop-word-heard-in-a-yield-828-step-2-16-october)).
 Off by default; on in the product unit since #5032 (b), where a short
-"Stop." over the answer was lost 9 of 9 on lamp-06c1.
+"Stop." over the answer was lost 9 of 9 on lamp-06c1; it also stops the
+answer for #5111's "Stop, Lamp" on lamp-9adf, whose yield came late and
+ended in the lamp's own tail, and which sound alone resumed.
 
 `LAMP_STOP_WORDS=heard-always`, with the same: everything heard while the
 lamp speaks is heard, and a short stop command (at most three words, a whole
