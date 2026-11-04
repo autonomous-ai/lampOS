@@ -336,6 +336,22 @@ impl Retelling {
     }
 }
 
+/// Where a turn's news not heard whole goes ([`TaskNews::not_heard`]):
+/// kept on the turn, so a turn cancelled anywhere tells it (#5198).
+#[derive(Debug, Clone)]
+pub struct NotHeard(pub(crate) Sender<Wake>);
+
+impl NotHeard {
+    /// [`TaskNews::not_heard`]. Never waits.
+    pub fn not_heard(&self, keys: Vec<String>) {
+        for key in keys {
+            if crate::sign_in::asked_of(&key).is_some() {
+                let _ = self.0.send(Wake::Cut(key));
+            }
+        }
+    }
+}
+
 pub struct TaskNews {
     offered: Receiver<News>,
     told: Sender<Wake>,
@@ -888,9 +904,7 @@ impl TaskNews {
         let (asked, keys): (Vec<String>, Vec<String>) = keys
             .into_iter()
             .partition(|key| crate::sign_in::asked_of(key).is_some());
-        for key in asked {
-            let _ = self.told.send(Wake::Cut(key));
-        }
+        self.not_heard_by().not_heard(asked);
         if !self.retell {
             return;
         }
@@ -915,6 +929,13 @@ impl TaskNews {
                 }
             }
         }
+    }
+
+    /// [`Self::not_heard`] for a sign-in's question, to be called where
+    /// only the turn is at hand: put on the turn that tells the news, for
+    /// when it is cancelled (#5198).
+    pub fn not_heard_by(&self) -> NotHeard {
+        NotHeard(self.told.clone())
     }
 
     /// Whether the news first in line is news told once more
@@ -1211,7 +1232,10 @@ fn read_forever(
                     offered.remove(&key);
                     retelling.insert(key);
                 }
-                Wake::Settled | Wake::Cut(_) => {}
+                Wake::Cut(key) => {
+                    again.cut(&key);
+                }
+                Wake::Settled => {}
             }
         }
         // Read again each time: the provider worker keeps there what the
@@ -1301,7 +1325,13 @@ fn read_forever(
                     retelling.insert(key);
                     next = next.min(read_at + woken_gap);
                 }
-                Ok(Wake::Cut(_)) => {}
+                // A question talked over (#5198): read now, so it is
+                // offered again by the next pause.
+                Ok(Wake::Cut(key)) => {
+                    if again.cut(&key) {
+                        next = next.min(read_at + woken_gap);
+                    }
+                }
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
             }
