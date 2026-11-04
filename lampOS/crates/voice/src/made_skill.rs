@@ -170,6 +170,40 @@ const WRITE_WORDS: [&str; 21] = [
     "schedule", "put",
 ];
 
+/// Words before "schedule" that make it the thing read ("my schedule"),
+/// not a write ("schedule a meeting").
+const SCHEDULE_AS_A_THING: [&str; 7] = ["my", "the", "tomorrow", "today", "s", "day", "calendar"];
+
+/// Words that only ask for the skill itself, before "skill" at a request's
+/// start: "create a skill that reads my calendar" asks for a skill that
+/// reads, and its "create" is no write (on lamp-9adf on 4 Nov, 23:51, a
+/// calendar read skill asked for by voice was refused so).
+const ASKING_FOR_A_SKILL: [&str; 20] = [
+    "create", "make", "add", "build", "write", "set", "up", "me", "a", "an", "new", "please",
+    "lampy", "lamp", "can", "you", "could", "i", "want", "like",
+];
+
+/// `words` without the asking for the skill itself ("create me a new
+/// skill that ...", "add a skill to ..."): only when every word before
+/// "skill" is such asking, so a write said elsewhere still counts.
+fn asked_of_the_skill<'a>(words: &[&'a str]) -> Vec<&'a str> {
+    let Some(at) = words.iter().position(|word| *word == "skill") else {
+        return words.to_vec();
+    };
+    if !words[..at]
+        .iter()
+        .all(|word| ASKING_FOR_A_SKILL.contains(word))
+    {
+        return words.to_vec();
+    }
+    let rest = &words[at + 1..];
+    let skip = usize::from(
+        rest.first()
+            .is_some_and(|word| ["that", "which", "to"].contains(word)),
+    );
+    rest[skip..].to_vec()
+}
+
 /// What a request to be read a linked service asks for: the service's
 /// code, and for a calendar or mail the one step `lamp-skills` takes (a
 /// calendar's events of a day, tomorrow when it says so, else today; the
@@ -182,7 +216,12 @@ fn read_of(request: &str) -> Option<(&'static str, Option<&'static str>)> {
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())
         .collect();
-    if words.iter().any(|word| WRITE_WORDS.contains(word)) {
+    let words = asked_of_the_skill(&words);
+    let writes = words.iter().enumerate().any(|(at, word)| {
+        WRITE_WORDS.contains(word)
+            && !(*word == "schedule" && at > 0 && SCHEDULE_AS_A_THING.contains(&words[at - 1]))
+    });
+    if writes {
         return None;
     }
     let joined = format!(" {} ", words.join(" "));
@@ -2326,8 +2365,22 @@ light = { dim = 1 }
             "read my calendar and my mail",
             "read my Notion page and my GitHub issues",
             "post my Notion page to Slack",
+            // Asking for the skill is no write, but a write after it still is.
+            "create a skill that adds a meeting to my calendar",
+            "write me a skill to send my mail",
+            "schedule a meeting on my calendar",
         ] {
             assert_eq!(brief_with(request, true), Err(NOT_A_SERVICE), "{request}");
+        }
+        // How people ask for one (lamp-9adf, 4 Nov 23:51): "create a skill
+        // that ..." and "my schedule" are no writes.
+        for request in [
+            "Create a skill that reads my calendar for tomorrow when I come back to my desk",
+            "Add a new skill to read me my mail each morning",
+            "Lampy, make me a skill: read my calendar schedule for tomorrow at my desk",
+            "when I sit down, read me tomorrow's schedule from my calendar",
+        ] {
+            assert!(brief_with(request, true).is_ok(), "{request}");
         }
         for request in [
             calendar,

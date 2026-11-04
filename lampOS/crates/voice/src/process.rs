@@ -1201,6 +1201,10 @@ fn worker_command(
             role,
             var(crate::worker_scheduling::ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_reads_worker_environment(
+            role,
+            var(crate::made_skill::READS_ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1227,6 +1231,19 @@ fn scheduling_worker_environment(
     (lamp_voice_processes::WorkerRole::parse(role).is_some()
         && value == Some(std::ffi::OsStr::new("on")))
     .then_some((crate::worker_scheduling::ENVIRONMENT, "on"))
+}
+
+// A made skill's reads (#5288, #5303), passed the same narrow way: the
+// exact `on`, to the two routes whose `make_skill` briefs and checks the
+// skill (`made_skill::reads_on`). Without it the routes' cleared environment
+// had it off whatever the unit said: on lamp-9adf on 4 Nov, 23:51, a
+// calendar read skill was "not possible yet" with the switch on.
+fn skill_reads_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::READS_ENVIRONMENT, "on"))
 }
 
 // The second route's scoped context (#1675, #1839), passed the same narrow
@@ -2160,6 +2177,12 @@ mod tests {
                         scheduling_worker_environment,
                         "LAMP_WORKER_SCHEDULING",
                         ["provider", "second", "capture", "speaker"].as_slice(),
+                    ),
+                    // A made skill's reads reach both routes (#5303).
+                    (
+                        skill_reads_worker_environment,
+                        "LAMP_SKILL_READS",
+                        ["provider", "second"].as_slice(),
                     ),
                     // The second route's scoped context reaches it alone.
                     (

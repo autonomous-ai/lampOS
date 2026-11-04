@@ -883,10 +883,18 @@ later."; nếu cổng đóng vì lý do khác (riêng tư, tạm dừng, giờ y
 someone came in, 2 of 5 read", "not read: <lỗi rõ ràng của dịch vụ>", không
 bao giờ một tiêu đề, người gửi hay chủ đề.
 
-**Tạo bằng giọng nói.** Khi bật công tắc trong `lamp-voice`,
+**Tạo bằng giọng nói.** Khi bật công tắc trong `lamp-voice` (nó truyền đúng
+`on` cho các worker của hai route, `provider` và `second`, nơi `make_skill`
+soạn và kiểm tra skill: môi trường của chúng vốn bị xoá sạch, và thiếu nó thì
+công tắc ở đó là tắt trên lamp-9adf ngày 4/11),
 `made_skill::brief` cho qua một yêu cầu nêu đúng một dịch vụ liên kết có việc
 đọc cố định và không có từ ghi nào ("send", "reply", "add", "post", "schedule", ...);
-hai dịch vụ, hoặc một lần ghi, vẫn là `NOT_A_SERVICE`. Bước của lịch được cho
+hai dịch vụ, hoặc một lần ghi, vẫn là `NOT_A_SERVICE`. Việc xin chính skill
+không phải là ghi: các từ trước "skill" chỉ để xin nó ("create me a new skill
+that ...", "add a skill to ...") được bỏ ra trước, và "schedule" đứng sau "my",
+"the", "tomorrow's", "today's", "day" hay "calendar" là thứ được đọc (lamp-9adf,
+4/11 23:51: "create a skill that reads my calendar" đã bị từ chối vì thế). Một
+lần ghi đứng sau chúng vẫn tính. Bước của lịch được cho
 trọn (hôm nay, hoặc ngày mai khi yêu cầu nói "tomorrow"), bước của thư cũng vậy
 (`recent`); với dịch vụ khác, brief liệt kê các việc đọc của nó trừ việc đọc
 toàn văn và dạng tự do (`spoken::whats`) và mô hình chọn một. Thời điểm trong
