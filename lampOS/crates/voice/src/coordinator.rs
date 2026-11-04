@@ -7177,9 +7177,15 @@ fn conversation_with_gate_inner(
                             }
                             PrivacyState::Muted => {
                                 let observed_at_us = monotonic_us();
-                                // The camera is told no first, before any
+                                // Revoked and published before anything
+                                // else, so no held turn's clipped lease
+                                // lapses at a worker (#4332).
+                                let revoked =
+                                    revoke_for_mute(owner, reply, |snapshot| rig.publish(snapshot));
+                                // The camera is told no next, before any
                                 // record (#1802).
                                 tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy event)");
+                                record_mute_revocation(trace, revoked);
                                 gap_ended(&gap_ride, trace, "read closed")?;
                                 record(
                                     trace,
@@ -7226,7 +7232,10 @@ fn conversation_with_gate_inner(
             match privacy_state {
                 PrivacyState::Muted => {
                     let at_us = monotonic_us();
+                    // As at a privacy event's mute (#4332).
+                    let revoked = revoke_for_mute(owner, reply, |snapshot| rig.publish(snapshot));
                     tell_eyes_no(eyes_link.as_mut(), "physical mute (privacy gate)");
+                    record_mute_revocation(trace, revoked);
                     gap_ended(&gap_ride, trace, "read closed")?;
                     record(
                         trace,
@@ -16026,6 +16035,66 @@ fn cancel_reply(
     Ok(())
 }
 
+/// What a physical mute revoked ([`revoke_for_mute`]): the reply it
+/// cancelled and when, and the publish's error, if any.
+struct MuteRevocation {
+    cancelled: Option<(Reply, u64)>,
+    unpublished: Option<String>,
+}
+
+/// A physical mute's revocation, first at the mute (#4332, lamp-e82d 4 Nov
+/// 11:44): the reply's turn is cancelled, the microphones and the camera
+/// are Denied, and a turnless snapshot that grants nothing is published,
+/// before the camera is told no, before any record and before any teardown
+/// step that can fail. A held turn's lease is clipped to its last kept
+/// frame + 100 ms and lapsed at the workers before the cleanup's own
+/// revocation came, and the privacy and second workers end on a lapsed lease
+/// that grants. This one is a full lease with no turn, which they ride
+/// (`DeniedLapse`). Nothing here can end the run: the controller is Denied
+/// whatever the publish does, a failed publish is reported by
+/// [`record_mute_revocation`], and the run stays the mute.
+fn revoke_for_mute(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> MuteRevocation {
+    // Taken, so the cleanup's `cancel_reply` after it finds none.
+    let cancelled = reply.take().map(|current| {
+        // A turn its lease already revoked is stale here; Denied below
+        // revokes any turn in any case.
+        let _ = owner.cancel_turn(now(), current.owner);
+        (current, monotonic_us())
+    });
+    let _ = owner.set_camera_permission(now(), Permission::Denied);
+    let _ = owner.set_microphone_permission(now(), Permission::Denied);
+    let unpublished = match owner.snapshot(now()) {
+        Ok(snapshot) => publish(snapshot).err().map(|error| error.to_string()),
+        Err(error) => Some(error.to_string()),
+    };
+    MuteRevocation {
+        cancelled,
+        unpublished,
+    }
+}
+
+/// Records what [`revoke_for_mute`] did: the reply it cancelled, finished as
+/// `privacy_muted`, and a publish that failed. A failed record cannot end
+/// the run either: it stays the mute.
+fn record_mute_revocation(trace: &mut SessionState, revoked: MuteRevocation) {
+    if let Some(error) = revoked.unpublished {
+        eprintln!(
+            "lamp-voice: the mute's Denied authority was not published ({error}); the microphones stay closed and the cleanup revokes again"
+        );
+        let _ = record(
+            trace,
+            json!({"kind":"mute_revocation_unpublished","at_us":monotonic_us(),"error":error}),
+        );
+    }
+    if let Some((current, cancelled_at_us)) = revoked.cancelled {
+        let _ = record_cancelled_reply(current, trace, "privacy_muted", cancelled_at_us);
+    }
+}
+
 fn record_cancelled_reply(
     current: Reply,
     trace: &mut SessionState,
@@ -16298,6 +16367,87 @@ mod tests {
         let lapsed = owner.snapshot(until).unwrap();
         assert!(lapsed.owner().is_none());
         assert!(!super::held_turn_lease_ending(lapsed));
+    }
+
+    /// #4332, lamp-e82d 4 Nov 11:44: a mute during a held turn publishes,
+    /// before anything is recorded, a snapshot with no turn that grants
+    /// nothing, and takes the reply, so the cleanup's cancel and publish
+    /// after it are harmless. Its lease is the full 250 ms, not the held
+    /// turn's clipped one.
+    #[test]
+    fn mute_publishes_a_denied_turnless_snapshot() {
+        use lamp_turn_owner::MAX_AUTHORITY_LEASE_US;
+        let (mut owner, current, _) = active_reply();
+        let turn = current.owner;
+        let held = owner.snapshot(super::now()).unwrap();
+        assert_eq!(held.owner(), Some(turn), "a turn is held");
+        let mut reply = Some(current);
+        let mut trace = super::SessionState::default();
+        let mut published = Vec::new();
+        let revoked = super::revoke_for_mute(&mut owner, &mut reply, |snapshot| {
+            published.push(snapshot);
+            Ok(())
+        });
+        // Published first: nothing was recorded yet.
+        assert_eq!(trace.iter().count(), 0);
+        assert_eq!(published.len(), 1, "one publish");
+        let denied = published[0];
+        assert!(denied.owner().is_none(), "no turn");
+        assert!(crate::privacy_bus::denied_only(denied), "grants nothing");
+        assert_eq!(
+            denied.expires_at().as_micros() - denied.issued_at().as_micros(),
+            MAX_AUTHORITY_LEASE_US,
+            "a full lease, not the held turn's"
+        );
+        assert!(reply.is_none(), "the reply is taken");
+        super::record_mute_revocation(&mut trace, revoked);
+        let finished: Vec<_> = trace
+            .iter()
+            .filter(|event| event["kind"] == "turn_finished")
+            .map(|event| event["outcome"].clone())
+            .collect();
+        assert_eq!(finished, ["privacy_muted"]);
+        // The cleanup's cancel after it finds no reply, records nothing,
+        // and its publish is still turnless and Denied.
+        super::cancel_reply(&mut owner, &mut reply, &mut trace, "privacy_muted").unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|event| event["kind"] == "turn_finished")
+                .count(),
+            1
+        );
+        assert!(crate::privacy_bus::denied_only(
+            owner.snapshot(super::now()).unwrap()
+        ));
+    }
+
+    /// The same mute when its publish fails: the controller is Denied with
+    /// no turn all the same, the reply is still finished as `privacy_muted`,
+    /// and the failure is recorded, not returned: the run stays the mute.
+    #[test]
+    fn a_mute_whose_publish_fails_stays_denied_and_is_recorded() {
+        let (mut owner, current, _) = active_reply();
+        let mut reply = Some(current);
+        let mut trace = super::SessionState::default();
+        let revoked = super::revoke_for_mute(&mut owner, &mut reply, |_| {
+            Err(std::io::Error::other("speaker authority refused"))
+        });
+        assert_eq!(
+            revoked.unpublished.as_deref(),
+            Some("speaker authority refused")
+        );
+        assert!(reply.is_none());
+        assert!(crate::privacy_bus::denied_only(
+            owner.snapshot(super::now()).unwrap()
+        ));
+        super::record_mute_revocation(&mut trace, revoked);
+        let kinds: Vec<_> = trace.iter().map(|event| event["kind"].clone()).collect();
+        assert!(
+            kinds.contains(&"mute_revocation_unpublished".into()),
+            "{kinds:?}"
+        );
+        assert!(kinds.contains(&"turn_finished".into()), "{kinds:?}");
     }
 
     /// The soft start's lead is read from when its blocks were read, held
