@@ -2939,7 +2939,27 @@ then use that person's scope:
   named ask and a face ask. A question of what the lamp knows, a reminder
   ("remember to …"), a face ask, the phrase further in and a refusal
   before it are not forced. What the lamp then says follows what the
-  memory did: kept, or, below, not kept and said so.
+  memory did: kept, or, below, not kept and said so. With the same switch
+  a face said saved with nothing saved is the same miss (#5141 row 8:
+  lamp-0c4e, 3 Nov, "hold still while I take your face in" with no
+  `remember_my_face` call). A reply that says the lamp is saving or saved
+  their face, or renamed it, with no `remember_my_face` the eyes answered
+  ok, in that round or earlier in the same request, is not said: the
+  model is told so once (`remember::FACE_CLAIMED_UNSAVED`) and asked
+  again, and a second such reply is said as "I haven't saved your face
+  yet. Ask me again and I'll take it in." It shares the keep claim's one
+  ask again and journal line, and keeps nothing. A refused call (not
+  theirs, not heard, not agreed, the eyes down) saves no face, so a later
+  "I've saved your face" is held too. Only a save said done or under way
+  counts ("I've saved your face, Lauren.", "Let me take your face in.",
+  "Đã lưu khuôn mặt của bạn rồi."): never recognition ("I remember your
+  face, Sam!", "Mình nhớ khuôn mặt của bạn."), an offer that waits for a
+  name ("I'll remember your face once you tell me your name."), a forget
+  ("I'm taking your face off my list now.") or the record told to a known
+  person ("Your face is known as Loren, so say that name to forget it.");
+  a record counts only when it says "now" or that the old name is gone
+  ("Your face is known as Sam now, and the old name is gone."). The full
+  matcher is in second-voice.md.
 
 - **Nothing personal kept while nobody is known** (the owner's question 1,
   option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
