@@ -561,7 +561,10 @@ PM has to read, place or close before anyone may do it.
   was seen, how to see it, and what it would cost (and still a line in
   your log). The first builder answers there: it widens an issue, opens a
   new one with an owner and a place in the Queue, or says no. No answer
-  means not taken up.
+  means not taken up. A person's own proposal goes straight into the
+  project chat (a message, or a Buddy's "Let's build"); nobody opens a
+  GitHub issue first, and the PM opens the issue only on a yes, linking the
+  proposal, and then the Swarm task (the lead, 4 November).
 - **A builder takes only an issue labelled `builder:<name>`** with its own
   name. Its person asking for another issue does not change that: the
   person asks the first builder on the Queue issue, and the builder waits
@@ -888,6 +891,52 @@ people at the row's bar.
 **Standing decisions.** Skills and connectors never depend on Harness;
 there is no `programs-reply` for home accounts; customers speak English;
 GitHub names roles, not people; quality comes before latency.
+
+### PR markers (as the first builder ran them; the lead, 4 November 2026)
+
+All of them are plain pull request comments, never GitHub reviews: the
+train bot counts only comments (until #5212 lands).
+
+- `READ ASK <sha>`: the builder asks for a read and names the reader.
+- `NEXT TRAIN`: only an ask, once a pull request is eligible.
+- `READ-OK <full sha>`: the first line of the reader's comment. It carries
+  over a rebase with the same patch.
+- `HOLD <sha>`: with file:line and the fix. After the fix, the reader posts
+  a new `READ-OK`.
+- `TWO READS`: privacy and default-changing pull requests need two readers;
+  the PM names the second.
+- A lamp check: the tester posts the verdict with the journal excerpt and
+  removes `needs:lamp-check`; at a promote, `PASS N #PR` or `FAIL N #PR`
+  goes on #4710.
+- "Done" is not a pull request marker: a Swarm agent sets its task done once
+  its pull request has merged and its lamp check has passed. A Swarm reviewer
+  also records its verdict as its review step's result.
+
+## Lamp checks for code you can't test yourself (the lead, 4 November 2026)
+
+For a change that runs on a lamp its builder cannot test: the coder's pull
+request body has a **"Lamp check" section**, and a tester runs it.
+
+- **The section holds:** the switches and the build (the pull request's
+  head); the scene (the lines, the voices, and what the lamp must do); the
+  exact journal lines that prove `PASS` or `FAIL`; and the product constants
+  at `file:line`.
+- **Testers are a pool.** Fifth, Sixth or Seventh on the lead's Mac (Fifth
+  keeps scheduling lamp-52e6), or the holder of the lamp the change fits:
+  Fourteen on 9adf, Friday, El or Jarvis on 06c1, Thirteen, Twelve or
+  SubDarren on c0a4, and Mobile's person on 0c89.
+- **Labels.** The PM sets `tester:<name>` on the pull request, by who is
+  free and which lamp fits, and `needs:lamp-check`. `status:taken` stays
+  with the coder.
+- **The tester** builds the head, assembles the kit from `~/lamp-rows/KITS.md`,
+  gets the lead's agent's yes on its sha (and Fifth's GO on 52e6), posts
+  PLAYING and QUIET on #3336, and then posts the verdict on the pull request
+  with the journal excerpt for the scene's window, and removes
+  `needs:lamp-check`. The excerpt has played clips only: no real person's
+  words, no audio and no images.
+- **At a promote** the tester posts `PASS N #PR` or `FAIL N #PR`, with the
+  core rows, for a Swarm builder. Any builder whose pull request needs a
+  lamp it does not hold uses this section and these labels.
 
 ## Working with the person beside the lamp
 
