@@ -27,3 +27,6 @@ wellbeing skills, which a case of one skill cannot show, is
 | `a-sip-when-the-eyes-say-the-same-sitting` | As `a-sip-after-90-minutes`, with the eyes' `room/activity` 100 ms before each face, its `sitting_s` the sitting's | Pass: At 90 minutes, as there |
 | `not-when-someone-else-sat-down` | 10:00, a face at the desk 100 minutes, but `room/activity`'s `sitting_s` begins again at 60 minutes: someone else sat down | Pass: Nothing: that sitter has sat 30 minutes at 90 |
 | `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, 100 minutes | Pass: Nothing (`[stop]`) |
+| `present-every-50-minutes` | `present = true` (`LAMP_NUDGES_PRESENT=on`, #5207): 10:00, four hours without getting up | Pass: At 50, 100, 150 and 200 minutes (no rearm, `cooldown` 50 minutes) |
+| `present-quiet-at-night` | `present = true`: 21:20, 100 minutes | Pass: Nothing: due at 22:10, in its quiet hours |
+| `present-quiet-when-45-minutes` | `present = true`: 10:00, 45 minutes, then away | Pass: Nothing |

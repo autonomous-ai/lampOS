@@ -281,6 +281,12 @@ struct SkillFile {
 struct BudgetFile {
     group: String,
     per_hour: u32,
+    /// The least time between two runs of the group (#5207).
+    gap: Option<String>,
+    /// A run that said nothing gives its place in the group's hour back
+    /// (#5207, Fourteen's finding on #5208).
+    #[serde(default)]
+    give_back_unsaid: bool,
 }
 
 /// `[rest]`: after `after_ignored` runs in a row that nobody noticed within
@@ -303,6 +309,8 @@ pub struct Rest {
 pub const MOST_A_DAY_AT_MOST: u32 = 24;
 /// The most runs an hour a group may share.
 pub const PER_HOUR_AT_MOST: u32 = 6;
+/// The least `[budget] gap` a skill may name.
+const BUDGET_GAP_LEAST_US: u64 = 60_000_000;
 /// How long after a run a look or a movement counts as noticing it, when
 /// `[rest]` names no `within`.
 pub const NOTICED_WITHIN_US: u64 = 60_000_000;
@@ -628,6 +636,9 @@ struct TriggerFile {
     /// Holds only within a while after another of the skill's triggers
     /// ran, once for each of its runs: a word after a nudge (#3504).
     follows: Option<FollowsFile>,
+    /// A daily trigger whose run stands in for another of the skill's
+    /// triggers, named, at the same moment (#5207: the day's first hello).
+    instead_of: Option<String>,
 }
 
 /// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
@@ -1766,6 +1777,12 @@ pub struct Skill {
     active: Option<(u16, u16)>,
     /// Its group and that group's runs an hour, as this skill names them.
     pub budget: Option<(String, u32)>,
+    /// The least time between two of its group's runs, as this skill names
+    /// it; 0 without a `[budget] gap` (#5207).
+    pub budget_gap_us: u64,
+    /// With `[budget] give_back_unsaid = true`: a run of its group that
+    /// said nothing gives its place in the hour back ([`Engine::unsaid`]).
+    pub budget_gives_back: bool,
     /// When it rests after runs nobody noticed.
     pub rest: Option<Rest>,
     /// The function that snoozes it or turns it off (#1685).
@@ -2232,6 +2249,9 @@ pub struct Trigger {
     /// Another trigger of the skill, by name, and how long after its run
     /// this one may hold (#3504, `follows`): once for each of its runs.
     pub follows: Option<(String, u64)>,
+    /// Another trigger of the skill, by name, whose chance this one's run
+    /// takes (#5207, `instead_of`): that trigger's cooldown begins with it.
+    pub instead_of: Option<String>,
 }
 
 /// A trigger's `sooner` (#3709): while `test` holds on `topic`'s newest
@@ -2917,6 +2937,20 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             Some((follows.trigger, within_us))
         }
     };
+    // The day's run in place of another trigger's (#5207): a daily trigger
+    // only, so the other is the one every other time.
+    let instead_of = match file.instead_of {
+        None => None,
+        Some(_) if !file.once_per_day || file.each.is_some() => {
+            return Err("instead_of goes with once_per_day, on the whole topic".into());
+        }
+        Some(other) => {
+            if !plain_name(&other) || other.contains('-') {
+                return Err(format!("instead_of {other:?} is not a trigger's name"));
+            }
+            Some(other)
+        }
+    };
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -3065,6 +3099,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         yields_to,
         sooner,
         follows,
+        instead_of,
     })
 }
 
@@ -3073,8 +3108,43 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
 const FOLLOWS_LEAST_US: u64 = 10_000_000;
 const FOLLOWS_MOST_US: u64 = HOUR_US;
 
-/// One skill folder, or why it cannot be loaded.
+/// `LAMP_NUDGES_PRESENT=on`: a skill's `[present]` values stand in for its
+/// own (#5207: the wellbeing nudges often enough to feel present, and the
+/// day's first hello). Off unless set: `[present]` is read, checked and
+/// ignored.
+pub const PRESENT_ENVIRONMENT: &str = "LAMP_NUDGES_PRESENT";
+
+/// The keys a `[present]` table may give: when and how often a skill starts
+/// itself and what it does then, never what it may read or use.
+pub const PRESENT_KEYS: [&str; 10] = [
+    "enabled",
+    "trigger",
+    "while",
+    "most_a_day",
+    "active",
+    "quiet",
+    "budget",
+    "rest",
+    "ask",
+    "do",
+];
+
+/// Whether this process runs with [`PRESENT_ENVIRONMENT`] on.
+pub fn present_on() -> bool {
+    std::env::var(PRESENT_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// One skill folder, or why it cannot be loaded: with its `[present]`
+/// values when [`PRESENT_ENVIRONMENT`] is on ([`load_with`]).
 pub fn load(dir: &Path) -> Result<Skill, String> {
+    load_with(dir, present_on())
+}
+
+/// One skill folder, with its `[present]` values standing in for its own
+/// when `present`. Each key of `[present]` replaces the same key of the file
+/// whole. Both the file as written and the file with them are checked
+/// either way, so a `[present]` that would not load refuses the skill.
+pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let read =
         |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
     let description_text = read("SKILL.md")?;
@@ -3093,8 +3163,50 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         return Err("run.py is not run yet: a skill with one is not loaded".into());
     }
     let manifest_text = read("skill.toml")?;
-    let mut file: SkillFile =
+    let mut table: toml::Table =
         toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+    let texts = (description_text.as_str(), manifest_text.as_str());
+    let Some(overlay) = table.remove("present") else {
+        let file =
+            toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+        return manifest(dir, name, description, texts, file);
+    };
+    let toml::Value::Table(overlay) = overlay else {
+        return Err("skill.toml: [present] is a table".into());
+    };
+    if let Some(key) = overlay
+        .keys()
+        .find(|key| !PRESENT_KEYS.contains(&key.as_str()))
+    {
+        return Err(format!(
+            "skill.toml: [present] gives only {PRESENT_KEYS:?}, not {key:?}"
+        ));
+    }
+    let read_file = |table: toml::Table| {
+        toml::Value::Table(table)
+            .try_into::<SkillFile>()
+            .map_err(|error| format!("skill.toml: {error}"))
+    };
+    let own = read_file(table.clone())?;
+    table.extend(overlay);
+    let with = read_file(table).map_err(|why| format!("[present]: {why}"))?;
+    let own = manifest(dir, name.clone(), description.clone(), texts, own)?;
+    let with =
+        manifest(dir, name, description, texts, with).map_err(|why| format!("[present]: {why}"))?;
+    Ok(if present { with } else { own })
+}
+
+/// A skill's `skill.toml`, as [`load_with`] has it, loaded; `texts` are
+/// its `SKILL.md` and `skill.toml` as read.
+fn manifest(
+    dir: &Path,
+    name: String,
+    description: String,
+    (description_text, manifest_text): (&str, &str),
+    mut file: SkillFile,
+) -> Result<Skill, String> {
+    let read =
+        |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
     match file.format {
         None | Some(1) => {}
         Some(2) => file.permissions.format_2 = true,
@@ -3614,7 +3726,22 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             if !(1..=PER_HOUR_AT_MOST).contains(&budget.per_hour) {
                 return Err(format!("[budget] per_hour is 1 to {PER_HOUR_AT_MOST}"));
             }
-            Some((budget.group, budget.per_hour))
+            Some((
+                budget.group,
+                budget.per_hour,
+                budget.gap,
+                budget.give_back_unsaid,
+            ))
+        }
+    };
+    let (budget, budget_gap_us, budget_gives_back) = match budget {
+        None => (None, 0, false),
+        Some((group, per_hour, gap, gives_back)) => {
+            let gap_us = gap.as_deref().map(duration_us).transpose()?.unwrap_or(0);
+            if gap.is_some() && !(BUDGET_GAP_LEAST_US..=HOUR_US).contains(&gap_us) {
+                return Err("[budget] gap is 1m to 1h".into());
+            }
+            (Some((group, per_hour)), gap_us, gives_back)
         }
     };
     let rest = match file.rest {
@@ -3684,6 +3811,20 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         {
             return Err(format!(
                 "follows.trigger {other:?} names none of the skill's other triggers"
+            ));
+        }
+    }
+    // Before the trigger it stands in for, so at one message it is judged
+    // first, and on the same topic, so they hold at one message.
+    for (at, trigger) in triggers.iter().enumerate() {
+        if let Some(other) = &trigger.instead_of
+            && !triggers[at + 1..]
+                .iter()
+                .any(|later| later.name.as_ref() == Some(other) && later.topic == trigger.topic)
+        {
+            return Err(format!(
+                "instead_of {other:?} names none of the skill's later triggers on {}",
+                trigger.topic
             ));
         }
     }
@@ -4028,7 +4169,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         }
         if let Some(relative) = step.requested_audio {
             let asset = requested_audio::Asset::load(dir, &relative)?;
-            if !asset.matches_definition(&description_text, &manifest_text) {
+            if !asset.matches_definition(description_text, manifest_text) {
                 return Err("requested audio definition changed while loading".into());
             }
             steps.push(Step::Call(Call::RequestedAudio(asset)));
@@ -4356,6 +4497,8 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         most_a_day: file.most_a_day,
         active,
         budget,
+        budget_gap_us,
+        budget_gives_back,
         rest,
         stop,
         steps,
@@ -5292,6 +5435,12 @@ pub struct Engine {
     /// skills sharing a `[stop]`, the latest is what a call without `all`
     /// stops.
     group_ran: HashMap<String, u64>,
+    /// By skill, when its latest run began, while that run is a nudge that
+    /// spent its group's hour: what [`Engine::unsaid`] may give back. A
+    /// later run of the skill that spends nothing (a `follows` word, a
+    /// tool's run) clears it, so its unsaid say gives nothing back (#5207,
+    /// Fourteen's and Thirteen's P2 on #5237).
+    unsaid_from: HashMap<String, u64>,
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
     /// Until when each snoozed skill starts nothing itself, by skill: in
@@ -5515,6 +5664,7 @@ impl Engine {
             group_runs: HashMap::new(),
             budget_waits: HashMap::new(),
             group_ran: HashMap::new(),
+            unsaid_from: HashMap::new(),
             nudges: HashMap::new(),
             snoozed: HashMap::new(),
             off: BTreeSet::new(),
@@ -5924,6 +6074,46 @@ impl Engine {
         if let Some(skill) = self.skills.iter().find(|known| known.name == skill) {
             nudged(&mut self.nudges, &self.latest, skill, now_us);
         }
+    }
+
+    /// `skill`'s last run said nothing (its say never begun: expired,
+    /// refused or not reached): with `[budget] give_back_unsaid` named by
+    /// any member of its group, that run's place in the group's hour, and
+    /// its gap, are given back, so a nudge the person never heard does not
+    /// hold back the next (#5207, Fourteen's finding on #5208). The day's
+    /// `most_a_day` and `[rest]` count it as before. The group's name when
+    /// given back.
+    pub fn unsaid(&mut self, skill: &str, now_us: u64) -> Option<String> {
+        let group = self
+            .skills
+            .iter()
+            .find(|known| known.name == skill)?
+            .budget
+            .as_ref()?
+            .0
+            .clone();
+        let gives_back = self.skills.iter().any(|other| {
+            other.budget_gives_back
+                && other
+                    .budget
+                    .as_ref()
+                    .is_some_and(|(named, _)| *named == group)
+        });
+        if !gives_back {
+            return None;
+        }
+        // Only while the run that spent the hour is the skill's latest.
+        let ran = self.unsaid_from.remove(skill)?;
+        if now_us.saturating_sub(ran) >= HOUR_US {
+            return None;
+        }
+        let began = self.group_runs.get_mut(&group)?;
+        let at = began.iter().position(|at| *at == ran)?;
+        began.remove(at);
+        if self.group_ran.get(skill) == Some(&ran) {
+            self.group_ran.remove(skill);
+        }
+        Some(group)
     }
 
     /// Until when `skill` rests after runs nobody noticed, if it does.
@@ -6693,7 +6883,22 @@ impl Engine {
             // out in the items' order: task 9 done and task 10 failed in one
             // message are 9's run, then 10's (the reviewer on #1042).
             let mut item_runs: Vec<(String, Run)> = Vec::new();
+            // A daily trigger that just ran in place of a later one
+            // (`instead_of`, #5207): that one's cooldown begins now, before
+            // it is judged at this message.
+            let mut instead: Option<&String> = None;
             for (index, trigger) in skill.triggers.iter().enumerate() {
+                if let Some(other) = instead.take()
+                    && let Some(at) = skill
+                        .triggers
+                        .iter()
+                        .position(|named| named.name.as_ref() == Some(other))
+                {
+                    self.watches
+                        .entry((skill.name.clone(), at))
+                        .or_default()
+                        .ran_us = Some(now_us);
+                }
                 if trigger.topic != topic {
                     continue;
                 }
@@ -7149,6 +7354,31 @@ impl Engine {
                                     >= u64::from(limit)
                             })
                         });
+                // Within the group's gap of its last run, by the largest
+                // gap any member names (#5207: never two nudges close
+                // together): held back as a spent hour is.
+                let gap_left = skill
+                    .budget
+                    .as_ref()
+                    .filter(|_| nudge)
+                    .and_then(|(group, _)| {
+                        let gap_us = self
+                            .skills
+                            .iter()
+                            .filter(|other| {
+                                other
+                                    .budget
+                                    .as_ref()
+                                    .is_some_and(|(named, _)| named == group)
+                            })
+                            .map(|other| other.budget_gap_us)
+                            .max()
+                            .unwrap_or(0);
+                        let last = self.group_runs.get(group)?.back()?;
+                        let since = now_us.saturating_sub(*last);
+                        (since < gap_us).then(|| gap_us - since)
+                    });
+                let hour_spent = hour_spent || gap_left.is_some();
                 // First come, first served: with the hour free, a member
                 // that has waited for it longer, and still waits, goes first,
                 // so the first of the group in folder order never takes
@@ -7193,6 +7423,11 @@ impl Engine {
                     // one within 60 s is still said.
                     let (gate, why) = if outside {
                         ("active", "outside its active hours".to_owned())
+                    } else if let Some(rest) = gap_left {
+                        (
+                            "budget-gap",
+                            format!("its {group} group ran lately, {} left", left(rest)),
+                        )
                     } else if hour_spent {
                         ("budget-hour", format!("its {group} group's hour is spent"))
                     } else {
@@ -7460,6 +7695,7 @@ impl Engine {
                 if acts {
                     watch.ran_us = Some(now_us);
                     watch.said.clear();
+                    instead = trigger.instead_of.as_ref();
                     // Counted as the cooldown is: when the run is started,
                     // or asked of the Policy (#1685).
                     if nudge && skill.most_a_day.is_some() {
@@ -7469,11 +7705,16 @@ impl Engine {
                         }
                         count.1 += 1;
                     }
+                    if !nudge {
+                        // A word after a nudge: its say is not the nudge's.
+                        self.unsaid_from.remove(&skill.name);
+                    }
                     if let Some((group, _)) = skill.budget.as_ref().filter(|_| nudge) {
                         let began = self.group_runs.entry(group.clone()).or_default();
                         began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
                         began.push_back(now_us);
                         self.group_ran.insert(skill.name.clone(), now_us);
+                        self.unsaid_from.insert(skill.name.clone(), now_us);
                         if let Some(waits) = self.budget_waits.get_mut(group) {
                             waits.remove(&skill.name);
                             waits.retain(|_, (_, last)| {
@@ -7576,6 +7817,8 @@ impl Engine {
             .iter()
             .find(|skill| skill.tool.as_deref() == Some(name))
             .ok_or("No skill of mine does that just now.")?;
+        // A tool's run is not the nudge an unsaid say gives back (#5207).
+        self.unsaid_from.remove(&skill.name);
         if skill.requested_audio().is_some() && !permitted {
             return Err("Requested audio is disabled or has no spoken context.".into());
         }
@@ -8259,7 +8502,20 @@ pub fn replay_with(
     tools: &[ToolCall],
     clock: Option<&str>,
 ) -> Result<Vec<Made>, String> {
-    let skill = load(dir)?;
+    replay_skill(load_with(dir, false)?, recording, tools, clock)
+}
+
+/// [`replay_with`] of a skill already loaded: a case with `present = true`
+/// replays the skill with its `[present]` values ([`PRESENT_ENVIRONMENT`]).
+/// A case is what the skill does when on, so one shipped `enabled = false`
+/// (Comfort break off until its switch, #5207) is replayed on.
+fn replay_skill(
+    mut skill: Skill,
+    recording: &Path,
+    tools: &[ToolCall],
+    clock: Option<&str>,
+) -> Result<Vec<Made>, String> {
+    skill.enabled = true;
     // A name the skill's tool is not, nor its `[stop]` function's, would
     // make nothing and pass as a quiet case: it is refused.
     let stop = skill.stop.as_ref().map(|stop| stop.tool.clone());
@@ -8505,6 +8761,10 @@ struct ExpectFile {
     /// A watch's: the face the eyes know at the lamp, as time goes.
     #[serde(default)]
     known: Vec<KnownAt>,
+    /// The skill with its `[present]` values, as with
+    /// [`PRESENT_ENVIRONMENT`] on (#5207).
+    #[serde(default)]
+    present: bool,
 }
 
 #[derive(Deserialize)]
@@ -8555,7 +8815,7 @@ fn matches(expected: &ExpectedCall, made: &Made) -> Result<bool, String> {
 /// says `none = true`. How many passed and how many have no recording yet,
 /// or the first that did not pass.
 pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
-    let watches = load(dir)?.watch.is_some();
+    let watches = load_with(dir, false)?.watch.is_some();
     let mut cases: Vec<PathBuf> = fs::read_dir(dir.join("tests"))
         .map_err(|error| format!("tests/: {error}"))?
         .flatten()
@@ -8594,7 +8854,12 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
                 "[[known]] is a watch's: this skill has no [watch]".into(),
             ));
         } else {
-            replay_with(dir, case, &expect.call_tool, expect.clock.as_deref())?
+            replay_skill(
+                load_with(dir, expect.present)?,
+                case,
+                &expect.call_tool,
+                expect.clock.as_deref(),
+            )?
         };
         let names: Vec<_> = made
             .iter()

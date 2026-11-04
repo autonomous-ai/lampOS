@@ -946,6 +946,14 @@ fn serve(
         );
         engine = engine.sooner();
     }
+    // A skill's [present] values stand in for its own, only with
+    // LAMP_NUDGES_PRESENT=on (#5207); read at each load (`lamp_skills::load`).
+    if lamp_skills::present_on() {
+        eprintln!(
+            "lamp-skills: a skill's [present] values stand in for its own ({})",
+            lamp_skills::PRESENT_ENVIRONMENT
+        );
+    }
     // Who was here's mark of someone the lamp knows, never a name, only
     // with LAMP_WHO_WAS_HERE_KNOWN=on and the eyes' known file (#1685).
     if lamp_skills::known::marking() {
@@ -1127,6 +1135,15 @@ fn serve(
         while let Ok(event) = done.try_recv() {
             let skill = event.skill.clone();
             publish(&mut out, event);
+            // A trigger's run that said nothing gives its place in its
+            // group's hour back, where the group says so (#5207).
+            if runs.unsaid(&skill)
+                && let Some(group) = engine.unsaid(&skill, clock::now_us())
+            {
+                eprintln!(
+                    "lamp-skills: {skill} said nothing: its place in the {group} group's hour is given back"
+                );
+            }
             runs.done(&skill, &engine, &mut out, &runner);
         }
         take_skips(
@@ -1591,9 +1608,22 @@ type Queued = HashMap<String, VecDeque<lamp_skills::Run>>;
 struct Runs {
     busy: HashSet<String>,
     queued: Queued,
+    /// By skill, what its run under way tells once its body and light are
+    /// made: with a say, once the voice began it.
+    begun: HashMap<String, mpsc::Receiver<()>>,
 }
 
 impl Runs {
+    /// `skill`'s run, now done, never told it began: its say expired, was
+    /// refused or never reached the voice, or it was stopped before any
+    /// step (#5207). A run with no say tells once its body and light are
+    /// made, so it is never unsaid.
+    fn unsaid(&mut self, skill: &str) -> bool {
+        self.begun
+            .remove(skill)
+            .is_some_and(|begun| begun.try_recv().is_err())
+    }
+
     /// `skill`'s run is done: the next of its queued runs whose item still
     /// holds starts, its calls made again now, a look at where the face is
     /// now (the reviewer on #1042: the second of two runs starts 10 to 20 s
@@ -1604,7 +1634,9 @@ impl Runs {
         while let Some(run) = self.queued.get_mut(skill).and_then(VecDeque::pop_front) {
             match engine.still(&run, clock::now_us()) {
                 Some(calls) if !calls.is_empty() => {
-                    let _ = start(run.skill, calls, &mut self.busy, out, runner);
+                    let skill = run.skill.clone();
+                    let begun = start(run.skill, calls, &mut self.busy, out, runner);
+                    self.begun.insert(skill, begun);
                     return;
                 }
                 _ => publish(
@@ -1633,8 +1665,14 @@ fn start_or_queue(
     runner: &Runner,
 ) {
     if !(run.queue && runs.busy.contains(&run.skill)) {
-        // A trigger's run: nobody waits for its body and light.
-        let _ = start(run.skill, calls, &mut runs.busy, out, runner);
+        // A trigger's run: nobody waits for its body and light. Whether its
+        // say began is kept for when it is done ([`Runs::unsaid`]).
+        let starts = !runs.busy.contains(&run.skill);
+        let skill = run.skill.clone();
+        let begun = start(run.skill, calls, &mut runs.busy, out, runner);
+        if starts {
+            runs.begun.insert(skill, begun);
+        }
         return;
     }
     let waiting = runs.queued.entry(run.skill.clone()).or_default();
@@ -4537,6 +4575,24 @@ fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #5207: a run whose say began (or that had none, told once its body
+    /// and light were made) is said; one done without ever telling it began
+    /// (its say expired, refused or never reached the voice) is unsaid, once.
+    #[test]
+    fn a_run_done_without_its_say_begun_is_unsaid_once() {
+        let mut runs = Runs::default();
+        let (began, begun) = mpsc::channel();
+        began.send(()).unwrap();
+        runs.begun.insert("spoken".into(), begun);
+        let (expired, never) = mpsc::channel::<()>();
+        drop(expired);
+        runs.begun.insert("expired".into(), never);
+        assert!(!runs.unsaid("spoken"));
+        assert!(runs.unsaid("expired"));
+        assert!(!runs.unsaid("expired"), "told once");
+        assert!(!runs.unsaid("never-started"));
+    }
 
     /// The known file and the daily journal come by their flag, or else by
     /// the unit's `Environment=` line, which an older binary ignores where

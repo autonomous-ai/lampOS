@@ -1518,3 +1518,70 @@ fn a_claimed_day_and_a_spoken_window_say_why_not_run() {
         ["daily-check not run: spoken to since 06:00"]
     );
 }
+
+/// The real welcome-back folder, as installed, with its `[present]` values
+/// (`LAMP_NUDGES_PRESENT=on`, #5207).
+fn welcome_back_present(root: &Path) -> Skill {
+    welcome_back(root);
+    lamp_skills::load_with(&root.join("welcome-back"), true).unwrap()
+}
+
+/// From `from` to `to` (minutes), the voice resting and a face from
+/// `face_at`: the words of each hello said, in order.
+fn hellos(engine: &mut Engine, (from, to): (u64, u64), face_at: u64) -> Vec<String> {
+    let mut words = Vec::new();
+    for minute in from..to {
+        for second in 0..60 {
+            let now = us(minute, second);
+            clock(engine, now, 0, minute);
+            engine.observe("voice/state", now, resting(second), None);
+            let face = if minute >= face_at { FACE } else { EMPTY };
+            for run in engine.observe(Faces::TOPIC, now, face, None) {
+                words.extend(run.calls.into_iter().filter_map(|call| match call {
+                    Call::Words(words) => Some(words.words),
+                    _ => None,
+                }));
+            }
+        }
+    }
+    words
+}
+
+const FIRST_TODAY: &str = "They are at their desk for the first time today. Say a hello and their name if you know it, then ask what's first today, in one short line: nothing else.";
+const BACK: &str = "They are back at their desk. Say only a hello and their name if you know it, in one short line: nothing else.";
+
+/// With the switch, the day's first arrival before noon is one hello with
+/// "what's first today?", never a second hello beside it; the next arrival
+/// is the plain hello, and so is the next day's first after noon.
+#[test]
+fn with_the_switch_the_days_first_arrival_asks_whats_first_once() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![welcome_back_present(root.path())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    let said = hellos(&mut engine, (MORNING - 6, MORNING + 3), MORNING);
+    assert_eq!(said, vec![FIRST_TODAY]);
+    // Away past the five minutes and back at 08:00: the day's chance is
+    // spent, so the hello is the plain one.
+    let said = hellos(&mut engine, (MORNING + 3, 8 * 60 + 1), 8 * 60);
+    assert_eq!(said, vec![BACK]);
+}
+
+/// The first arrival after noon is no morning: the plain hello.
+#[test]
+fn with_the_switch_a_first_arrival_after_noon_is_the_plain_hello() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![welcome_back_present(root.path())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    let said = hellos(&mut engine, (13 * 60 - 6, 13 * 60 + 3), 13 * 60);
+    assert_eq!(said, vec![BACK]);
+}
+
+/// Without the switch, the first arrival of the day is greeted as always.
+#[test]
+fn without_the_switch_the_first_arrival_is_the_plain_hello() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![welcome_back(root.path())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    let said = hellos(&mut engine, (MORNING - 6, MORNING + 3), MORNING);
+    assert_eq!(said, vec![BACK]);
+}

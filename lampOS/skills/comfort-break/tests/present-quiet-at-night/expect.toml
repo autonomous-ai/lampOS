@@ -1,0 +1,5 @@
+# LAMP_NUDGES_PRESENT=on (#5207): 21:00, 130 minutes: due at 22:30, in its
+# [quiet] 22:00 to 08:00: nothing.
+clock = "21:00"
+present = true
+none = true
