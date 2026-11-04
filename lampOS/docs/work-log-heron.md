@@ -474,3 +474,6 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   closed and a restart counts as a voice; P3 the HEARD_ALWAYS latch
   test can't tell 0 ms from now. Before the train: Fourteen's lamp row,
   a 2+ item read with the owner alone, all said.
+- 02:0x — #5317 READ-OK restated at 970f07cacc after the rebase over
+  #5308 (`&notion` out of two loops); its first commit landed as
+  85efa8bbb ahead of this test; the `.envs` mutation still fails.
