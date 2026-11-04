@@ -490,3 +490,10 @@ Ready for lamp-voice: landed (#4919, train 518, lamp-voice `6601324d1`)
   alone) was played; it's off behind LAMP_SKILL_READS, so the row is now a
   condition for turning the switch on (asked of Faye). Fourteen plays it
   at 07:00 when lamp-9adf's backend allowance returns.
+- 03:3x — #5333 HOLD at 4f192b117a (memory read), on El's P2, confirmed
+  at nightly.rs:885: the night reads every active exchange of the day with
+  no forget check, so a topic forget of a line never kept comes back with a
+  quote; the switch-on is right (install 133, functions 6, nightly 28; the
+  dropped-line mutation fails). #5335 READ-OK at 81005804ed (release hashes
+  checked by download), with a two-voices call left to Faye (Kore Wi-Fi pair
+  vs the Rachel lamp voice). #5337 left to Friday.
