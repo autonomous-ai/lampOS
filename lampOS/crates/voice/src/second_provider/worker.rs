@@ -2467,6 +2467,7 @@ pub fn serve(
     }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
+    let no_owner = NoOwnerTold::default();
     let told_for = memory_context_carried(
         sessions,
         socket,
@@ -2511,10 +2512,14 @@ pub fn serve(
                     // app is named from the next (Reviewer-three's P3 on
                     // #4476). The owner who_you_are kept is the other name
                     // they may go by, and a forget clears it at once.
-                    let (name, owners) = crate::person::by_default_owner(
+                    let owner = crate::person::by_default_owner(
                         crate::person::now(),
                         crate::known_faces::owner_now(),
-                    )?;
+                    );
+                    if let Some(line) = no_owner.line(owner.is_some()) {
+                        eprintln!("{line}");
+                    }
+                    let (name, owners) = owner?;
                     Some((name, owners, bus))
                 })
                 .map(|(name, owners, bus)| {
@@ -10239,6 +10244,27 @@ fn memory_context(
     )
 }
 
+/// The by-default name's missing owner, told once (#5139): a lamp whose
+/// setup kept no face, and no typed name, has nobody to name, and every
+/// reply skipped the name with no word in the journal (a tester's lamp-0c4e,
+/// 3 Nov). Said at the first reply with no owner, and again only after one
+/// came back and went (a forget).
+const NO_OWNER: &str =
+    "lamp-voice second: no owner: nobody to name by default (LAMP_PERSON_NAME_BY_DEFAULT)";
+
+/// Whether [`NO_OWNER`] was said for the owner's absence now.
+#[derive(Default)]
+struct NoOwnerTold(std::sync::atomic::AtomicBool);
+
+impl NoOwnerTold {
+    /// The line to log for a reply with an owner (`owner`) or none:
+    /// [`NO_OWNER`] at the first reply of an absence, else nothing.
+    fn line(&self, owner: bool) -> Option<&'static str> {
+        let told = self.0.swap(!owner, std::sync::atomic::Ordering::AcqRel);
+        (!owner && !told).then_some(NO_OWNER)
+    }
+}
+
 /// [`memory_context`] with `tell` also given the person the line is
 /// carried for as their conversation going on (`ScopeLease::carried_for`,
 /// #4339), for the by-default name alone (`person::someone_else_now`).
@@ -11972,6 +11998,24 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// #5139 (a tester's lamp-0c4e, 3 Nov): with no owner the by-default
+    /// name was skipped with no word. Told once, at the first reply with no
+    /// owner; not on the next, nor with an owner; once more after an owner
+    /// came back and went.
+    #[test]
+    fn no_owner_is_logged_once_per_absence() {
+        let told = super::NoOwnerTold::default();
+        assert_eq!(told.line(false), Some(super::NO_OWNER));
+        assert!(super::NO_OWNER.contains("no owner: nobody to name by default"));
+        assert_eq!(told.line(false), None);
+        assert_eq!(told.line(true), None);
+        assert_eq!(told.line(true), None);
+        assert_eq!(told.line(false), Some(super::NO_OWNER));
+        assert_eq!(told.line(false), None);
+        let owned = super::NoOwnerTold::default();
+        assert_eq!(owned.line(true), None);
+    }
+
     /// These synchronous fixtures backdate events by up to 400 seconds.
     /// Heeding and its inputs share this epoch, independent of host uptime.
     fn clock_with_history() -> crate::scenario_clock::Scope {
