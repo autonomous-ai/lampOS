@@ -799,8 +799,14 @@ hotfix ships and the rest becomes a follow-up issue. The steps:
    muted), and posts `PASS N #<pull request>` or `FAIL N #<pull request>`
    on #4710. When every lamp-visible pull request in N has a `PASS`, the PM
    promotes N; a `FAIL` holds N for that change. A docs-only or test-only
-   pull request needs no lamp check. The promoted build is the one the
-   builders' checks ran on, never a newer one.
+   pull request needs no lamp check. **Every `PASS` also covers the core
+   rows:** a light colour change, a one-minute timer set and rung, "what
+   reminders do I have?", "Stop" over the lamp's talk, and one ordinary
+   question. A `FAIL` on a core row holds N for everyone. The promoted
+   build is the one the builders' checks ran on, never a newer one.
+   **A bug that reaches stable is rolled back within the hour:** the
+   previous build is promoted back, and the fix ships the same day (the
+   lead: a promoted build has no bug).
 2. **Dispatch:** `gh workflow run lampos-arm64.yml --repo
    autonomous-ai/lampOS --ref lamp-voice -f promote_sequence=N`.
 3. **Verify:** decode the base64 `manifest` in the `lampos-stable` release's
