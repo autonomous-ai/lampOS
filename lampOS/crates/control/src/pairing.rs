@@ -142,6 +142,13 @@ impl Codes {
         digits
     }
 
+    /// Drops the code out, so nobody can pair with it: whether there was
+    /// one. The owner's app asks this when the lamp's spoken pin check
+    /// doesn't match the app's (#5299).
+    pub fn cancel(&mut self) -> bool {
+        self.out.take().is_some()
+    }
+
     /// Whether `proof` holds for the code out, the lamp's `pin`, `key` and
     /// `nonce`: the code is spent if it does. One try each
     /// [`TRY_EVERY_US`], whatever its outcome.

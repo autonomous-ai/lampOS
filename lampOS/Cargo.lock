@@ -1868,6 +1868,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "curve25519-dalek",
  "jiff-tzdb",
  "lamp-actions",
  "lamp-bus",

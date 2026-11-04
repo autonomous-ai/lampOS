@@ -38,6 +38,9 @@ lamp-keeper = { path = "../keeper", default-features = false }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 # Own the query's process group and drain stdout without a waiting reader thread.
 rustix = { version = "=1.1.5", features = ["fs", "process"] }
+# The developer door's code sealed to the app's one-time key (`crate::seal`,
+# HPKE): the ring the TLS above already builds, no crate of its own.
+ring = "0.17"
 
 [dev-dependencies]
 tempfile = "3"
@@ -46,7 +49,6 @@ jiff-tzdb = "0.1"
 # The Skills Store's tests (src/skills.rs): a package signed with a key of
 # their own, fetched from a local server through lamp-update's HTTP code.
 lamp-update = { path = "../update" }
-ring = "0.17"
 base64 = "0.22"
 # Setup's own settings and writer, so the account is read where and as setup
 # writes it (tests/it/setup.rs).
@@ -59,6 +61,10 @@ lamp-ipc = { path = "../ipc" }
 lamp-schedule = { path = "../schedule" }
 # The tests' broker reads and writes with rumqttc's own codec.
 bytes = "1"
+# The app's side of a sealed code, opened in the tests (`crate::seal`): the
+# X25519 ring can't do with a fixed key. Already in the lock, through
+# ed25519-dalek.
+curve25519-dalek = "=4.1.3"
 tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util"] }
 
 [lints]

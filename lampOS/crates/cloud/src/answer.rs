@@ -249,6 +249,13 @@ pub trait Lamp {
     fn shuts_down(&self) -> bool {
         false
     }
+
+    /// lamp-control's admin socket and this lamp's device id, for the
+    /// developer door from the owner's app (`--control-admin-socket`,
+    /// #5299, `crate::control`).
+    fn control(&self) -> Option<crate::control::Door> {
+        None
+    }
 }
 
 /// Whether a kind is answered on `lamp` now: its switch, read without
@@ -259,7 +266,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 54] = [
+pub const KINDS: [(&str, Switch); 58] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -324,6 +331,12 @@ pub const KINDS: [(&str, Switch); 54] = [
     (crate::harness_sign_in::KINDS[0], HARNESS_SIGN_IN),
     (crate::harness_sign_in::KINDS[1], HARNESS_SIGN_IN),
     (crate::harness_sign_in::KINDS[2], HARNESS_SIGN_IN),
+    // The developer door (#5299): named only while lamp-control's admin
+    // socket is there, so the app never offers a door the lamp can't open.
+    (crate::control::KINDS[0], CONTROL),
+    (crate::control::KINDS[1], CONTROL),
+    (crate::control::KINDS[2], CONTROL),
+    (crate::control::KINDS[3], CONTROL),
 ];
 
 const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
@@ -343,6 +356,8 @@ const SETTINGS: Switch = |lamp| lamp.changes().is_some();
 const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
 /// The switch, and lamp-services there to ask.
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
+/// The socket given, and lamp-control there to ask.
+const CONTROL: Switch = |lamp| lamp.control().is_some_and(|door| door.here());
 
 /// Whether this lamp answers `kind` now, by its row in [`KINDS`]: the one
 /// rule [`answer`] and `system.info`'s `can` both read (#2864), so the app
@@ -666,6 +681,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let place = lamp.harness_sign_in().ok_or_else(|| not_here(kind))?;
             crate::harness_sign_in::ask(&place, kind, data)
         }
+        // The developer door from the owner's app (#5299): taken with the
+        // socket given, so an app that asks while lamp-control is off is told
+        // so; a code goes back only sealed to the app's own key.
+        kind if crate::control::KINDS.contains(&kind) && lamp.control().is_some() => {
+            let door = lamp.control().ok_or_else(|| not_here(kind))?;
+            crate::control::answer(&door, kind, data)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -732,6 +754,8 @@ pub mod tests {
         pub reset: Option<&'static str>,
         /// The person's own services (Queue #4710), with their switch.
         pub services: Option<std::sync::Arc<crate::services::Services>>,
+        /// lamp-control's admin socket (#5299).
+        pub control: Option<crate::control::Door>,
     }
 
     impl Lamp for Fake {
@@ -841,6 +865,9 @@ pub mod tests {
         }
         fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
             self.services.clone()
+        }
+        fn control(&self) -> Option<crate::control::Door> {
+            self.control.clone()
         }
         fn update_status(&self) -> Option<lamp_bus::Message> {
             self.update_bus
@@ -1440,6 +1467,17 @@ pub mod tests {
                     ))
                 },
                 &["services", "services.list"],
+            ),
+            (
+                // lamp-control's admin socket there: a path that is.
+                "developer door",
+                |f| {
+                    f.control = Some(crate::control::Door {
+                        socket: std::env::temp_dir(),
+                        device_id: "d-42".into(),
+                    })
+                },
+                &crate::control::KINDS,
             ),
         ];
         let always = [
