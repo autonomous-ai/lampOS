@@ -53,7 +53,32 @@ sau:
    - không có hàm cho mô hình (`tool`);
    - `[ask] policy` chỉ là `nudge`, không bao giờ là lời chào, tin tức hay lời nhắc;
    - nói, tin nhắn, cái nhìn và mọi chủ đề khác đều bị từ chối.
-   Mở rộng giới hạn này là quyết định của trưởng nhóm.
+   Mở rộng giới hạn này là quyết định của trưởng nhóm. Lần mở rộng duy nhất
+   (nửa "đọc" của đề xuất #5288, `LAMP_SKILL_READS=on` trong `lamp-voice` và
+   `lamp-skills-manage@`, tắt trừ khi được bật): `services` nêu một dịch vụ
+   liên kết có việc đọc là `"read"`, cùng `speak` để nói nó. Một yêu cầu nêu
+   đúng một dịch vụ như vậy và không có từ ghi nào được đưa vào brief với
+   bước đọc duy nhất của dịch vụ đó (bước của lịch hay thư được cho trọn; với
+   dịch vụ khác, các việc đọc của nó được liệt kê trừ những việc trả về toàn
+   văn), và câu "có" nói ra của nó nêu dịch vụ, thứ nó đọc và điều kiện, "when
+   you're alone with the lamp, it reads you tomorrow's Google Calendar: how
+   many events, then each time and title." Khi tắt, mọi yêu cầu nêu một dịch
+   vụ là `NOT_A_SERVICE`, như trước.
+
+   Bước `read = { service, what, ... }` (`lamp-skills`, `service_read`): mọi
+   dịch vụ có việc đọc trừ `gmail-app` chỉ gửi, mọi việc đọc của nó trừ việc
+   trả về toàn văn, `events` của lịch với `day = "today"` hoặc `"tomorrow"`;
+   là bước duy nhất, đứng một mình, trong kỹ năng do trigger khởi động, không
+   có tool hay `each`, với `[permissions] services = { <service> = "read" }`
+   và `speak = true`. `lamp-skills` tự đọc qua socket tools của
+   `lamp-services`, một lần mỗi ngày địa phương, khi khuôn mặt quen của chủ
+   đèn ở một mình trong tầm nhìn và liên tục 5 s, không nghe giọng nào trong
+   một phút qua và đèn không riêng tư, tạm dừng hay trong giờ yên lặng (chờ
+   tối đa 60 phút, rồi bỏ qua ngày đó mà không nói), rồi nói số đếm và từng
+   dòng ngắn của mỗi mục như văn bản chính xác, xét lại cổng trước mỗi dòng;
+   có người đến thì dừng với "I'll tell you the rest later." Journal chỉ giữ
+   số đếm và kết quả của cổng ([services_vi.md](services_vi.md), "Một kỹ năng
+   tự tạo đọc dịch vụ").
 5. **Kiểm tra.** Thẻ được đánh dấu `made: here` (nhóm "Tạo trên đèn này"
    của `lamp-cloud`). Sau đó `lamp-skills pack` (#1698) kiểm tra thư mục:
    mọi kiểm tra của một lần nạp, kể cả quyền, và gói được đọc lại như khi

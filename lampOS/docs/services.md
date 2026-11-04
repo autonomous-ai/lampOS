@@ -24,8 +24,10 @@ at 14:11 on 3 Nov 2026):
   anything else cancels it.
 - **The guards**: only the owner's own heard line reaches a service
   ("Who can use them", below); a token goes only to its own service's hosts,
-  over HTTPS, no redirect followed; scheduled runs and made skills reach no
-  service; words from a mail, a page or another voice never become a write
+  over HTTPS, no redirect followed; scheduled runs reach no service, and
+  made skills reach none unless `LAMP_SKILL_READS` lets one read a linked
+  service to you when you are alone with the lamp ("A made skill's read",
+  below); words from a mail, a page or another voice never become a write
   or any other action; one-time codes and security text are never said,
   forwarded or kept, whatever the service; what a service gives is quoted
   data, never instructions, and none of it is kept in the conversation
@@ -99,6 +101,7 @@ connected apps.
 |---|---|---|
 | `LAMP_SERVICES=on` | `lamp-cloud` (with `LAMP_CLOUD=on`), `lamp-voice` and `lamp-services` | `lamp-cloud` answers the app's `connector.*` and `services.list` with V1's "not on this lamp: <kind>" and puts nothing in `can`; the voice declares none of the three functions and routes none; `lamp-services` opens no socket and exits |
 | `LAMP_SERVICES_WRITE=on` | `lamp-services` | `service_write` answers "writing to services is off on this lamp", and nothing is prepared or sent; reads are as before |
+| `LAMP_SKILL_READS=on` | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and a request to make a skill naming a service is answered `NOT_A_SERVICE` ("A made skill's read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -156,6 +159,10 @@ socket's group can't tell `lamp-cloud` from another `lampos` process:
   in one line under 8 KB (a longer one is "the answer was too long to give").
   Only a process at `/lampos.slice/lampos-voice.slice/lamp-voice.service`
   may call; any other gets "only the voice may use the lamp's services".
+  With `LAMP_SKILL_READS=on`, a process at
+  `/lampos.slice/lampos-parts.slice/lamp-skills.service` may call too, but
+  only `service_read`: any other name gets "a skill may only read a linked
+  service" (`serve::Services::skill_tool`).
 
 Each door answers at most 8 connections at once ("busy" past it), and a peer
 has 5 s to send its line and take the answer. The unit is a plain service,
@@ -702,7 +709,8 @@ or the model says (`gate`, `answered`, `says_send`, `read_back_said`):
 
 One waiting write is shared by both voice routes. A services call is held
 for the Policy's decision as the executive's are, with
-`LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). Made skills reach no
+`LAMP_POLICY_HOLDS_ACTIONS=on` (`policy_holds::holds`). With
+`LAMP_SKILL_READS` off (the default), made skills reach no
 service at all: a made skill's step that names a services function is never
 said plainly, and a made skill's own function of that name is refused
 (`made_skill::plainly`, `made_skill::capped`). A request to make a skill
@@ -716,12 +724,132 @@ skill can't use your mail, calendar or other services, even ones already
 linked. You can ask me for it yourself any time.", words to the person, as the
 app shows them as they are. It names no place to link a service: on lamp-9adf on 4
 Nov the model told the owner to link a calendar that was already linked
-(#5288, where skills that read a service are planned).
+(#5288, where skills that read a service are planned). With it on, see the next
+section.
 
 A call to a service that isn't linked fails with "<Service> isn't linked to
 this lamp yet. It can be linked in the app: Skills, then Connectors."
 (`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
 isn't.
+
+## A made skill's read (proposal #5288, `LAMP_SKILL_READS`, off unless set)
+
+The read half of proposal #5288: a made skill may read one of the owner's
+linked services, any that has something to read, when the owner is alone
+with the lamp. It never writes. All of it is off unless
+`LAMP_SKILL_READS=on` (exactly `on`) is in the environment of
+`lamp-services`, `lamp-skills`, `lamp-skills-manage@` and `lamp-voice`; no
+product unit sets it.
+
+**Who reads.** `lamp-skills` itself, as its own caller of `lamp-services`'
+tools socket (`/run/lampos-services/tools/call.sock`, or
+`LAMP_SKILLS_SERVICES_SOCKET`): `lamp-services` tells it by its cgroup and
+takes only `service_read` from it ("The three parts and their sockets",
+above). What the service gives goes to no model: `lamp-skills` says it as
+exact text through the voice's say socket (never a model turn, held while
+someone talks with the lamp, refused while it is paused or muted), so it
+stays quoted data and nothing can act on it, as `AFTER_READ` asks. The
+voice's own send gate is not in this path; the skill's gate below stands in
+for it.
+
+**Which services.** Every service in the catalogue with reads (an
+allow-list of paths, or an MCP server's read tools), and none that only
+sends (`lamp_services::spoken::not_readable`): `gmail`, `google_calendar`,
+`google_drive`, `notion`, `figma`, `figma-api`, `github`, `linear`,
+`asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot` and
+`amplitude`. `gmail-app` reads nothing ("\"gmail-app\" only sends mail, so
+it has nothing to read"). Whether the service is linked is `lamp-services`'
+own answer at the run (`NOT_LINKED`), kept in the journal as "not read:
+...". A read that gives one item's whole text is never a skill's
+(`spoken::WHOLE_TEXTS`): `gmail`'s `message`, `google_drive`'s `text`,
+`notion`'s `page`, and `figma`'s and `figma-api`'s `comments`.
+
+**The step.** In `skill.toml` ([skills.md](skills.md)):
+
+```toml
+[permissions]
+speak = true
+services = { google_calendar = "read" }   # any one service with reads; never anything but "read"
+
+[[do]]
+read = { service = "google_calendar", what = "events", day = "tomorrow" }  # or "today"
+# read = { service = "gmail", what = "recent", count = 5 }               # count 1..10, 5 if left out
+# read = { service = "notion", what = "search", query = "plans" }
+# read = { service = "google_drive", what = "files", count = 3 }
+```
+
+`read` is its skill's only step, alone in it (no `on`, `after` or
+`if_choice`), in a skill a trigger starts, with no `each` and no tool, and
+it needs `[permissions] services` to list its service as `"read"` and
+`speak = true`. `what` is one of the service's reads as `service_read`
+lists them (`reads::WHATS`; an MCP service's `tools` or `call`), but a
+whole text. Its other keys are `service_read`'s own: `count` (1 to 10),
+`query`, `id`, `repo`, `calendar`, `project`, `workspace`, `path`,
+`graphql`, `variables`, `tool`, `arguments` (each 1 to 1,000 bytes) and
+`params` (a table of text); never `from` or `to`. A calendar's `events`
+take `day = "today"` or `"tomorrow"` (the local day, at most 10 events) and
+no `count`; `day` is for nothing else. `lamp-services` holds the read to its
+allow-list as it does the voice's.
+
+**The gate** (`service_read::judge`), read from what the lamp already
+publishes, every 250 ms:
+
+| Holds when | Read from | Otherwise |
+|---|---|---|
+| An owner face is enrolled | The owner's typed setup name (`LAMP_SKILLS_OWNER_FILE`, meant as `LoadCredential=owner:/etc/lampOS/person/name`) and the eyes' known file | "no owner's face enrolled": skipped at once |
+| Not private: the microphones known open, the lamp not asleep or muted | `routine::kept_asleep`, `voice/privacy` (`permitted`) | "private" |
+| Not paused (the lamp's stand-in for do-not-disturb) | `lamp/pause` | "paused" |
+| Not quiet hours: 22:00–07:00 local, or the skill's `[quiet]`; an unknown local time counts as quiet | `lamp_local_time::quiet_hours` | "quiet hours" |
+| One face in view, at most (`faces_at_most = 1`) | `humans/faces/tracked`, fresh within 3 s | "not alone" |
+| That face is the owner's known face | The eyes' known file (fresh within 2 s), its name the owner's, case aside | "not the owner" / "the owner not in view" |
+| No voice heard in the last minute | `voice/heard`'s latest message | "a voice heard" |
+
+All must hold steadily for 5 s. Until then the run waits, at most 60
+minutes, and then skips the day with nothing said ("skipped: <why>"). A
+read runs once a local day per skill (kept in `lamp-skills`' memory, so a
+restart forgets it).
+
+**What is said**: one rule, keyed by service (`lamp_services::spoken`,
+`SPOKEN`, so a later ruling for a service changes one table), each line its
+own exact say:
+
+| Service (and read) | Said |
+|---|---|
+| `google_calendar`'s `events` (the first builder's ruling) | "Nothing is on your calendar tomorrow." / "You have one event today." / "You have 3 events tomorrow.", then each "At 9:30, Title." or "All day, Title." |
+| `gmail` (the ruling) | "You have no recent mail." / "You have one recent mail." / "You have 5 recent mails.", then each "From Name: Subject." or "From Name, with no subject." |
+| `notion` | "Nothing from Notion." / "One item from Notion." / "3 items from Notion.", then each item's plain text, which for a search is its title |
+| Every other service and read (the default) | "Nothing from Google Drive." / "One item from GitHub." / "3 items from Asana.", then each item's title or name, the first of `title`, `name`, `subject` and `full_name` it has (as text, or as an object's own `title` or `name`); an item with none is counted and not said |
+
+Never a body, a message's text, a file's content or a comment. Security
+mail and one-time codes are left out by `lamp-services` before the answer
+leaves it ("Security mails and codes", above) and are neither said nor
+counted. A title, sender or subject is cut to 100 characters. The gate is
+judged again before every line. If someone comes (a second face, another
+face, a voice), the lamp stops after the line it is on and says only "I'll
+tell you the rest later."; if the gate closes for another reason (privacy,
+a pause, quiet hours, the owner gone), it stops with nothing said.
+
+**The journal** keeps only the outcome: "read 4", "skipped: not alone",
+"stopped: someone came in, 2 of 5 read", "not read: <the service's plain
+error>", never a title, sender or subject.
+
+**Making one by voice.** With the switch on in `lamp-voice`,
+`made_skill::brief` lets a request through that names one linked service
+with reads and no write word ("send", "reply", "add", "post", "schedule",
+...); two services, or a write, are still `NOT_A_SERVICE`. A calendar's
+step is given whole (today, or tomorrow when it says "tomorrow"), as is
+mail's (`recent`); for any other service the brief lists its reads but the
+whole texts (`spoken::whats`) and the model picks one. The made skill is
+held to `services = { <service> = "read" }` (`made_skill::capped`: any
+other services entry is refused, "it asks to use linked services other
+than by reading one that has something to read, which a made skill
+can't"), and its spoken yes names the service, what it reads and the
+condition: "When the lamp goes quiet, between 21:00 and 21:30, when you're
+alone with the lamp, it reads you tomorrow's Google Calendar: how many
+events, then each time and title." (for Drive: "it reads you Google Drive's
+files: how many, then each name, never the text."). A read step the yes
+can't say (a whole text, a read the service doesn't list) refuses the
+skill. Its uses add "reading your <service>".
 
 ## Refresh
 
@@ -820,9 +948,14 @@ sound, as a slow chat does.
 
 ## What is not done yet
 
-- **A made skill reading a service.** Approved (a made skill only reads, its
-  spoken yes naming the service and what it reads), not built: `skill.toml`
-  has no step for it, so today a made skill can't reach a service at all.
+- **A made skill's read is not on, nor run on a lamp.** Built behind
+  `LAMP_SKILL_READS` (off): only mail and the calendar have their own
+  spoken words, and every other service says titles or names, by keys an
+  item may not have (a Linear or GitHub GraphQL answer is one item with
+  none, so only its count is said); the owner is only the name typed at setup, so a face saved under
+  another name by `who_you_are` never counts; once a day is kept in memory
+  and lost on a restart; no product unit sets the switch or the owner's
+  name file. Writes from a made skill are not built.
 - **Scheduled reads** of a service (a morning mail summary) are left out
   until they have a design of their own: a request not heard live reaches
   no service.
@@ -901,6 +1034,19 @@ heard line reaching a service (a guest, the room, a held or narrowed line,
 no scope and a scheduled run refused, read and write), nothing else run
 after a read in the same request, a read cut to who and what about with
 others maybe here, a read's words kept nowhere in the thread or the
-summary, a made skill never reaching a service. `-p lamp-update` (the unit installed with `LAMP_SERVICES=on` in it, as in
+summary, a made skill never reaching a service with `LAMP_SKILL_READS`
+off, and with it on a calendar, mail, Notion or Drive read briefed (a
+whole text never listed), held to one service read and said with its
+condition. `-p lamp-services` also: a skill told by its own cgroup and
+given `service_read` alone; `spoken` (every service with reads readable and
+`gmail-app` not, each whole text one the service lists, mail and the
+calendar by the ruling and Drive, Notion, GitHub, a Facebook Page and
+Asana by title or name, never a body). `-p lamp-skills`
+(`service_read`, `tests/it/skills.rs`, `tests/it/format.rs`): the read
+step loaded only with its permission, alone and in a triggered skill, for
+any service with reads (Notion, Drive) and not `gmail-app` or a whole text,
+the schema and the loader agreeing; a Drive read said by name; the gate waiting for 5 s steady, skipping
+after 60 minutes, stopping before a word, stopping with "I'll tell you the
+rest later." when someone comes, and the lines said. `-p lamp-update` (the unit installed with `LAMP_SERVICES=on` in it, as in
 `lamp-cloud.service` and `lamp-voice.service`, no `LAMP_SERVICES_WRITE` and
 no `--enable`, the reset plan's hash) and `-p lamp-setup` (`tests/it/reset.rs`).
