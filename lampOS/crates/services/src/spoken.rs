@@ -4,18 +4,23 @@
 //! and the spoken yes). A later ruling for a service changes [`SPOKEN`]
 //! alone.
 //!
-//! - **Which services**: every one in [`catalog::SERVICES`] with reads (an
-//!   allow-list of paths, or an MCP server's read tools), and none that
-//!   [`reads::never_read`] refuses (`gmail-app`, which only sends).
+//! - **Which services**: every one in [`catalog::SERVICES`] with a read of
+//!   a fixed shape, and none that [`reads::never_read`] refuses
+//!   (`gmail-app`, which only sends). The MCP services and Ahrefs have only
+//!   free-form reads, so none yet.
 //! - **Never a whole text**: a read that gives one item's whole text (a
 //!   mail, a file's text, a page's blocks, comments) is never a skill's
 //!   ([`WHOLE_TEXTS`]).
+//! - **Never a free-form read** (Thirteen's P2 on #5303): a GraphQL query,
+//!   any API path or an MCP tool's call can put any text where a title
+//!   goes, so a skill reads only fixed lists ([`FREE_FORM`]).
+//!   `lamp-services` holds both at its door ([`skill_read_refused`]).
 //! - **What is said**: the count, then one short line for each item: a
 //!   mail's sender and subject, an event's time and title, and for every
 //!   other service the item's title or name ([`TITLE_KEYS`]), never a body,
 //!   a message's text, a file's content or a comment.
 use crate::{catalog, reads};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 /// How a read's items are said.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,13 +41,17 @@ pub enum Spoken {
 pub const TITLE_KEYS: &[&str] = &["title", "name", "subject", "full_name"];
 
 /// Every rule but the default, by service and, when it names one, what is
-/// read. Notion's items come as their plain text (`reads::items`), which
-/// for a search is each page's title.
+/// read. Notion's items come to a skill as their title property alone
+/// ([`items`]), so the default says them.
 pub const SPOKEN: &[(&str, Option<&str>, Spoken)] = &[
     ("gmail", None, Spoken::Mail),
     ("google_calendar", Some("events"), Spoken::Calendar),
-    ("notion", None, Spoken::Titles(&["text"])),
 ];
+
+/// Reads whose shape the asker writes, never a made skill's: a GraphQL
+/// query (GitHub, Linear), any path on the allow-list (`get`, Ahrefs) and
+/// an MCP tool's call.
+pub const FREE_FORM: &[&str] = &["query", "get", "call"];
 
 /// Reads that give an item's whole text, never a made skill's: a mail, a
 /// Drive file's text, a Notion page's blocks, Figma's comments.
@@ -67,8 +76,13 @@ pub fn whole_text(code: &str, what: &str) -> bool {
     WHOLE_TEXTS.contains(&(code, what))
 }
 
+/// Whether `what` is a read whose shape the asker writes ([`FREE_FORM`]).
+pub fn free_form(what: &str) -> bool {
+    FREE_FORM.contains(&what)
+}
+
 /// Why a made skill can't read `code`, or None when it can: a service the
-/// lamp knows, with reads, and not one that only sends.
+/// lamp knows, not one that only sends, with a read of a fixed shape.
 pub fn not_readable(code: &str) -> Option<String> {
     let Some(service) = catalog::service(code) else {
         return Some(format!("{code:?} is not a service the lamp knows"));
@@ -78,8 +92,96 @@ pub fn not_readable(code: &str) -> Option<String> {
             "{code:?} only sends mail, so it has nothing to read"
         ));
     }
-    (service.reads.is_empty() && service.mcp.is_none())
-        .then(|| format!("{code:?} has nothing to read"))
+    if service.mcp.is_some() {
+        return Some(format!(
+            "{code:?} is read only through its own tools, which a made skill can't read yet"
+        ));
+    }
+    if service.reads.is_empty() {
+        return Some(format!("{code:?} has nothing to read"));
+    }
+    whats(code)
+        .is_empty()
+        .then(|| format!("{code:?} has only free-form reads, which a made skill can't read yet"))
+}
+
+/// Why a made skill may not read `what` of `code`, or None when it may: a
+/// readable service, one of its fixed reads, never a whole text or a
+/// free-form read. `lamp-skills` and the voice hold a skill to it, and
+/// `lamp-services` holds every call from `lamp-skills` to it.
+pub fn skill_read_refused(code: &str, what: &str) -> Option<String> {
+    if let Some(why) = not_readable(code) {
+        return Some(why);
+    }
+    if whole_text(code, what) {
+        return Some(format!(
+            "{code}'s {what} gives a whole text, which a made skill never reads"
+        ));
+    }
+    if free_form(what) {
+        return Some(format!(
+            "{code}'s {what} is free-form, which a made skill never reads"
+        ));
+    }
+    let fixed: Vec<String> = whats(code)
+        .iter()
+        .filter_map(|what| what.split_whitespace().next().map(str::to_owned))
+        .collect();
+    (!fixed.iter().any(|listed| listed == what))
+        .then(|| format!("{code} reads {}, not {what:?}", fixed.join(", ")))
+}
+
+/// The items of a service's answer body as a made skill gets them: as
+/// [`reads::items`] gives them, but a Notion page or database as its id,
+/// kind and title property alone, never its other properties' text.
+pub fn items(code: &str, body: &str) -> Vec<Value> {
+    if code != "notion" {
+        return reads::items(code, body);
+    }
+    let Ok(value) = serde_json::from_str::<Value>(body) else {
+        return Vec::new();
+    };
+    let list = match &value {
+        Value::Array(items) => items.clone(),
+        Value::Object(object) => object
+            .get("results")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_else(|| vec![value.clone()]),
+        _ => Vec::new(),
+    };
+    list.iter()
+        .map(|item| {
+            json!({
+                "id": item.get("id"),
+                "type": item.get("object"),
+                "title": notion_title(item),
+            })
+        })
+        .collect()
+}
+
+/// A Notion page's title property (the one property of type `title`), or
+/// a database's own title, as plain text.
+fn notion_title(item: &Value) -> String {
+    let rich = item
+        .get("properties")
+        .and_then(Value::as_object)
+        .and_then(|properties| {
+            properties
+                .values()
+                .find(|property| property.get("type").and_then(Value::as_str) == Some("title"))
+        })
+        .and_then(|property| property.get("title"))
+        .or_else(|| item.get("title"));
+    rich.and_then(Value::as_array)
+        .map(|parts| {
+            parts
+                .iter()
+                .filter_map(|part| part.get("plain_text").and_then(Value::as_str))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Every service a made skill may read, in the catalogue's order.
@@ -97,19 +199,17 @@ pub fn name(code: &str) -> &str {
 }
 
 /// What a skill may read of `code`, as the voice's brief lists it: the
-/// service's reads but its whole texts, each with the keys it takes.
+/// service's reads but its whole texts and free-form reads, each with the
+/// keys it takes. None for an MCP service, whose reads are all calls.
 pub fn whats(code: &str) -> Vec<String> {
     let mut whats: Vec<String> = reads::WHATS
         .iter()
         .find(|(service, _)| *service == code)
         .map(|(_, whats)| split_whats(whats))
         .unwrap_or_default();
-    if catalog::service(code).is_some_and(|service| service.mcp.is_some()) {
-        whats.extend(["tools".to_owned(), "call {tool, arguments}".to_owned()]);
-    }
     whats.retain(|what| {
         let word = what.split_whitespace().next().unwrap_or_default();
-        !whole_text(code, word)
+        !whole_text(code, word) && !free_form(word)
     });
     whats
 }
@@ -285,9 +385,10 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Every service with reads, and not the send-only Gmail link.
+    /// Every service with a fixed read, and not the send-only Gmail link,
+    /// the MCP services or Ahrefs, whose reads are all free-form.
     #[test]
-    fn every_service_with_reads_is_readable() {
+    fn every_service_with_a_fixed_read_is_readable() {
         assert_eq!(
             readable(),
             [
@@ -300,16 +401,18 @@ mod tests {
                 "github",
                 "linear",
                 "asana",
-                "ahrefs",
-                "facebook",
-                "slack",
-                "mondaydotcom",
-                "hubspot",
-                "amplitude"
+                "facebook"
             ]
         );
         assert!(not_readable("gmail-app").unwrap().contains("only sends"));
         assert!(not_readable("dropbox").is_some());
+        for mcp in ["slack", "mondaydotcom", "hubspot", "amplitude"] {
+            assert!(
+                not_readable(mcp).unwrap().contains("can't read yet"),
+                "{mcp}"
+            );
+        }
+        assert!(not_readable("ahrefs").unwrap().contains("free-form"));
         // Every whole text names a read the service has.
         for (code, what) in WHOLE_TEXTS {
             let line = reads::WHATS.iter().find(|(c, _)| c == code).unwrap().1;
@@ -324,7 +427,12 @@ mod tests {
         }
         assert_eq!(whats("google_drive"), ["files {query, count}", "file {id}"]);
         assert_eq!(whats("notion"), ["search {query, count}"]);
-        assert_eq!(whats("slack"), ["tools", "call {tool, arguments}"]);
+        assert!(whats("slack").is_empty());
+        assert_eq!(
+            whats("github"),
+            ["notifications", "issues {repo}", "pulls {repo}", "repos"]
+        );
+        assert_eq!(whats("linear"), ["my_issues"]);
         assert_eq!(
             whats("asana"),
             [
@@ -354,7 +462,7 @@ mod tests {
         ]});
         let lines = lines("google_drive", "files", None, &drive);
         assert_eq!(lines, ["2 items from Google Drive.", "Tax 2026."]);
-        let notion = json!({"quoted": [{"id": "p", "type": "page", "text": "Launch\nplan"}]});
+        let notion = json!({"quoted": [{"id": "p", "type": "page", "title": "Launch\nplan"}]});
         assert_eq!(
             super::lines("notion", "search", None, &notion),
             ["One item from Notion.", "Launch plan."]
@@ -398,6 +506,54 @@ mod tests {
         assert_eq!(
             plainly("google_drive", "files", None),
             "reads you Google Drive's files: how many, then each name, never the text"
+        );
+    }
+
+    /// Thirteen's P2 on #5303: a query, any path or an MCP call is never a
+    /// skill's read, nor a whole text, nor a read the service doesn't list.
+    #[test]
+    fn a_skill_reads_only_fixed_lists() {
+        assert_eq!(skill_read_refused("github", "issues"), None);
+        assert_eq!(skill_read_refused("linear", "my_issues"), None);
+        for (code, what, why) in [
+            ("github", "query", "free-form"),
+            ("linear", "query", "free-form"),
+            ("ahrefs", "get", "free-form"),
+            ("slack", "call", "can't read yet"),
+            ("hubspot", "tools", "can't read yet"),
+            ("gmail", "message", "whole text"),
+            ("notion", "page", "whole text"),
+            ("google_drive", "nothing", "reads files, file"),
+            ("gmail-app", "recent", "only sends"),
+        ] {
+            let refused = skill_read_refused(code, what).unwrap_or_default();
+            assert!(refused.contains(why), "{code} {what}: {refused}");
+        }
+    }
+
+    /// Thirteen's P3.2: a Notion page is said by its title property alone,
+    /// never its other properties' text; a database by its own title.
+    #[test]
+    fn notion_is_said_by_its_title_alone() {
+        let body = json!({"results": [
+            {"object": "page", "id": "p1", "properties": {
+                "Notes": {"type": "rich_text", "rich_text": [{"plain_text": "call the bank at 5"}]},
+                "Name": {"type": "title", "title": [{"plain_text": "Launch "}, {"plain_text": "plan"}]},
+            }},
+            {"object": "database", "id": "d1", "title": [{"plain_text": "Tasks"}],
+             "description": [{"plain_text": "private"}]},
+        ]})
+        .to_string();
+        let items = items("notion", &body);
+        assert_eq!(items[0]["title"], "Launch plan");
+        assert!(!items[0].to_string().contains("bank"));
+        let said = lines("notion", "search", None, &reads::quoted("Notion", items));
+        assert_eq!(said, ["2 items from Notion.", "Launch plan.", "Tasks."]);
+        // Every other service's items are the voice's own.
+        let drive = json!({"files": [{"name": "Tax"}]}).to_string();
+        assert_eq!(
+            super::items("google_drive", &drive),
+            reads::items("google_drive", &drive)
         );
     }
 }

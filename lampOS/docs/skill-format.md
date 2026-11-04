@@ -220,23 +220,24 @@ services = { google_calendar = "read" }
 read = { service = "google_calendar", what = "events", day = "tomorrow" }
 ```
 
-- `service`: any linked service with reads: `gmail`, `google_calendar`,
-  `google_drive`, `notion`, `figma`, `figma-api`, `github`, `linear`,
-  `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`,
-  `amplitude`; never `gmail-app`, which only sends.
+- `service`: any linked service with a fixed read: `gmail`,
+  `google_calendar`, `google_drive`, `notion`, `figma`, `figma-api`,
+  `github`, `linear`, `asana`, `facebook`; never `gmail-app`, which only
+  sends, nor the MCP services or `ahrefs`, whose reads are all free-form.
 - `what`: one of the service's reads as `service_read` lists them, but one
   that gives a whole text (`gmail`'s `message`, `google_drive`'s `text`,
-  `notion`'s `page`, `figma`'s and `figma-api`'s `comments`).
+  `notion`'s `page`, `figma`'s and `figma-api`'s `comments`) or a
+  free-form one (`query`, `get`, `call`).
 - `day = "today"` or `"tomorrow"`: a calendar's `events` only, and needed
   there; `count` 1 to 10 for anything else (mail's `recent` 5 if left out);
-  `query`, `id`, `repo`, `calendar`, `project`, `workspace`, `path`,
-  `graphql`, `variables`, `tool`, `arguments` (1 to 1,000 bytes each) and
-  `params` (a table of text), as `service_read` takes them.
+  `query`, `id`, `repo`, `calendar`, `project` and `workspace` (1 to 1,000
+  bytes each), as `service_read` takes them.
 - `[permissions] services` lists its service as `"read"`, and only
   `"read"`: a skill never writes.
 
 The schema says every key but two rules, which `lamp-skills` alone holds:
-a whole text, and a calendar's `events` with no `day`. What is said is the
+a whole text or a free-form `what`, and a calendar's `events` with no
+`day`. What is said is the
 count, then each event's time and title, each mail's sender and subject,
 or any other item's title or name; never a body.
 

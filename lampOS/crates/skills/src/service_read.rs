@@ -7,9 +7,10 @@
 //! - **The step**: `read = { service = "<code>", what = "<what>", ... }`, a
 //!   skill's only step, with a trigger and no tool, and `[permissions]
 //!   services = { <code> = "read" }` and `speak = true`. Any service in
-//!   `lamp-services`' catalogue with reads, and none that only sends
-//!   (`lamp_services::spoken::not_readable`); any of its reads but one that
-//!   gives a whole text (`lamp_services::spoken::WHOLE_TEXTS`). A calendar's
+//!   `lamp-services`' catalogue with a fixed read, and none that only sends
+//!   (`lamp_services::spoken::not_readable`); any of its fixed reads, never
+//!   a whole text or a free-form read (a query, a path, an MCP call;
+//!   `lamp_services::spoken::skill_read_refused`). A calendar's
 //!   events take `day = "today" | "tomorrow"`. Reads only: no skill writes
 //!   to a service.
 //! - **Who reads**: this program, as its own caller of `lamp-services`'
@@ -36,7 +37,7 @@
 use lamp_services::spoken;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use std::{collections::BTreeMap, time::Duration};
+use std::time::Duration;
 
 /// The switch, here and in `lamp-services` (`LAMP_SKILL_READS`), its
 /// manage helper and the voice. `on` only.
@@ -64,14 +65,15 @@ pub const MOST_ITEMS: i64 = 10;
 pub const MAILS: i64 = 5;
 /// The most events a day's read gives.
 pub const MOST_EVENTS: i64 = 10;
-/// The longest of a read's own words (a query, an id, a path...), in bytes.
+/// The longest of a read's own words (search words, an id...), in bytes.
 pub const MOST_ARG_BYTES: usize = 1_000;
 
 const DAY_MS: i64 = 86_400_000;
 
 /// `read = { … }`, as the folder writes it: `service` and `what`, and the
-/// keys `lamp-services`' `service_read` takes, but `from` and `to` (a
-/// calendar's day is `day`).
+/// keys `lamp-services`' `service_read` takes for a fixed read, but `from`
+/// and `to` (a calendar's day is `day`); never a free-form read's
+/// `graphql`, `variables`, `path`, `params`, `tool` or `arguments`.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReadFile {
@@ -85,12 +87,6 @@ pub struct ReadFile {
     calendar: Option<String>,
     project: Option<String>,
     workspace: Option<String>,
-    path: Option<String>,
-    graphql: Option<String>,
-    variables: Option<String>,
-    tool: Option<String>,
-    arguments: Option<String>,
-    params: Option<BTreeMap<String, String>>,
 }
 
 /// A read step as loaded.
@@ -113,25 +109,10 @@ impl ReadFile {
     /// The step, or why the folder's words are not one.
     pub fn step(self, quiet: Option<(u16, u16)>) -> Result<ReadStep, String> {
         let (service, what) = (self.service, self.what);
-        if let Some(why) = spoken::not_readable(&service) {
-            return Err(format!(
-                "read: {why}; a skill reads only a service with reads"
-            ));
-        }
-        let whats: Vec<String> = spoken::whats(&service)
-            .iter()
-            .filter_map(|what| what.split_whitespace().next().map(str::to_owned))
-            .collect();
-        if spoken::whole_text(&service, &what) {
-            return Err(format!(
-                "read: {service}'s {what} gives a whole text, which a skill never reads"
-            ));
-        }
-        if !whats.contains(&what) {
-            return Err(format!(
-                "read: {service} reads {}, not {what:?}",
-                whats.join(", ")
-            ));
+        // A fixed list of a service with one, never a whole text or a
+        // free-form read (Thirteen's P2 on #5303).
+        if let Some(why) = spoken::skill_read_refused(&service, &what) {
+            return Err(format!("read: {why}"));
         }
         let events = service == "google_calendar" && what == "events";
         let day = match (events, self.day.as_deref()) {
@@ -164,11 +145,6 @@ impl ReadFile {
             ("calendar", self.calendar),
             ("project", self.project),
             ("workspace", self.workspace),
-            ("path", self.path),
-            ("graphql", self.graphql),
-            ("variables", self.variables),
-            ("tool", self.tool),
-            ("arguments", self.arguments),
         ] {
             if let Some(value) = value {
                 if value.trim().is_empty() || value.len() > MOST_ARG_BYTES {
@@ -176,12 +152,6 @@ impl ReadFile {
                 }
                 args.insert(key.into(), json!(value));
             }
-        }
-        if let Some(params) = self.params {
-            if params.values().map(String::len).sum::<usize>() > MOST_ARG_BYTES {
-                return Err(format!("read: params are at most {MOST_ARG_BYTES} bytes"));
-            }
-            args.insert("params".into(), json!(params));
         }
         Ok(ReadStep {
             service,
@@ -593,11 +563,34 @@ mod tests {
         for good in [
             r#"service = "notion", what = "search", query = "plans", count = 5"#,
             r#"service = "github", what = "issues", repo = "o/r""#,
-            r#"service = "slack", what = "call", tool = "search", arguments = "{}""#,
-            r#"service = "ahrefs", what = "get", path = "/v3/x", params = { target = "a.com" }"#,
+            r#"service = "github", what = "notifications""#,
+            r#"service = "linear", what = "my_issues""#,
             r#"service = "google_calendar", what = "calendars""#,
         ] {
             assert!(step(good).is_ok(), "{good}: {:?}", step(good));
+        }
+        // Thirteen's P2 on #5303: never a free-form read, whose shape the
+        // asker writes, and no key for one.
+        for (free, why) in [
+            (r#"service = "github", what = "query""#, "free-form"),
+            (r#"service = "linear", what = "query""#, "free-form"),
+            (r#"service = "ahrefs", what = "get""#, "free-form"),
+            (r#"service = "slack", what = "call""#, "can't read yet"),
+            (
+                r#"service = "github", what = "query", graphql = "{ viewer { name: bio } }""#,
+                "unknown field",
+            ),
+            (
+                r#"service = "slack", what = "call", tool = "search""#,
+                "unknown field",
+            ),
+            (
+                r#"service = "ahrefs", what = "get", path = "/v3/x""#,
+                "unknown field",
+            ),
+        ] {
+            let refused = step(free).unwrap_err();
+            assert!(refused.contains(why), "{free}: {refused}");
         }
         let no_reads = step(r#"service = "gmail-app", what = "recent""#).unwrap_err();
         assert!(no_reads.contains("only sends"), "{no_reads}");

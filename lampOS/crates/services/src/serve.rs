@@ -10,8 +10,8 @@ use crate::net::{self, Call, Http};
 use crate::reads::{self, ANSWER_MOST, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
-use crate::tools;
 use crate::writes::{self, Action, Desk};
+use crate::{spoken, tools};
 use serde_json::{Value, json};
 use std::{
     fmt,
@@ -304,11 +304,17 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// or `{"ok":false,"error"}`, at most [`ANSWER_MOST`] bytes with its
     /// line break.
     pub async fn tool(&self, line: &str) -> Value {
+        self.tool_for(line, false).await
+    }
+
+    /// [`Self::tool`], for the voice or, with `skill`, a made skill, whose
+    /// Notion items are their titles alone (`spoken::items`).
+    async fn tool_for(&self, line: &str, skill: bool) -> Value {
         let answer = match parse_tool(line.trim_end_matches(['\r', '\n'])) {
             Err(why) => Err(why),
             Ok((name, args)) => match name.as_str() {
                 tools::CONNECTED => Ok(self.connected()),
-                tools::READ => self.read(&args).await,
+                tools::READ => self.read(&args, skill).await,
                 _ => self.write(&args).await,
             },
         };
@@ -326,10 +332,19 @@ impl<H: Http, M: Mail> Services<H, M> {
     /// A made skill's call (`lamp-skills`, #5288): `service_read` alone,
     /// answered as the voice's read is, with the same allow-lists, quoting
     /// and security filter. Anything else, the list of what is linked too,
-    /// is refused and nothing is called.
+    /// is refused and nothing is called; so is a read a skill never makes
+    /// (`spoken::skill_read_refused`: a whole text, a free-form read, a
+    /// service with no fixed read), here at the door whatever the asker
+    /// checked (Thirteen's P3 on #5303).
     pub async fn skill_tool(&self, line: &str) -> Value {
         match parse_tool(line.trim_end_matches(['\r', '\n'])) {
-            Ok((name, _)) if name == tools::READ => self.tool(line).await,
+            Ok((name, args)) if name == tools::READ => {
+                let text = |key: &str| args.get(key).and_then(Value::as_str).unwrap_or_default();
+                match spoken::skill_read_refused(text("service"), text("what")) {
+                    Some(why) => json!({"ok": false, "error": why}),
+                    None => self.tool_for(line, true).await,
+                }
+            }
             Ok(_) => json!({"ok": false, "error": SKILL_READS_ONLY}),
             Err(why) => json!({"ok": false, "error": why}),
         }
@@ -644,7 +659,7 @@ impl<H: Http, M: Mail> Services<H, M> {
         .await
     }
 
-    async fn read(&self, args: &Value) -> Result<Value, String> {
+    async fn read(&self, args: &Value, skill: bool) -> Result<Value, String> {
         // A send-only link is answered so whether or not it is linked, and
         // so is `gmail` when the lamp's one Gmail link is send-only.
         let asked = args.get("service").and_then(Value::as_str);
@@ -676,10 +691,12 @@ impl<H: Http, M: Mail> Services<H, M> {
             }
             Plan::Http { method, url, body } => {
                 let text = self.call(service, &entry, method, url, body, false).await?;
-                Ok(reads::quoted(
-                    service.name,
-                    reads::items(service.code, &text),
-                ))
+                let items = if skill {
+                    spoken::items(service.code, &text)
+                } else {
+                    reads::items(service.code, &text)
+                };
+                Ok(reads::quoted(service.name, items))
             }
         }
     }
@@ -1077,6 +1094,42 @@ mod tests {
         }
         assert!(services.mail.sent.lock().unwrap().is_empty());
         assert_eq!(run(services.skill_tool("not json"))["ok"], false);
+        // Thirteen's P2/P3 on #5303: at the door, whatever lamp-skills
+        // checked, a free-form read or a whole text is refused unread.
+        for (args, why) in [
+            (
+                json!({"service":"github","what":"query","graphql":"{ viewer { name: bio } }"}),
+                "free-form",
+            ),
+            (
+                json!({"service":"linear","what":"query","graphql":"{ viewer { name } }"}),
+                "free-form",
+            ),
+            (
+                json!({"service":"ahrefs","what":"get","path":"/v3/site-explorer/overview"}),
+                "free-form",
+            ),
+            (
+                json!({"service":"slack","what":"call","tool":"read","arguments":"{}"}),
+                "can't read yet",
+            ),
+            (
+                json!({"service":"gmail","what":"message","id":"18a1"}),
+                "whole text",
+            ),
+        ] {
+            let refused = run(services.skill_tool(&read_line(args.clone())));
+            assert_eq!(refused["ok"], false, "{args}");
+            assert!(
+                refused["error"].as_str().unwrap().contains(why),
+                "{args}: {refused}"
+            );
+        }
+        // The voice's own read still takes them as before.
+        assert_eq!(
+            run(services.tool(&read_line(json!({"service":"gmail","what":"recent"}))))["ok"],
+            true
+        );
     }
 
     #[test]

@@ -398,8 +398,8 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
             "{ service = \"google_drive\", what = \"files\", count = 2 }",
         ),
         read(
-            "services = { ahrefs = \"read\" }",
-            "{ service = \"ahrefs\", what = \"get\", path = \"/v3/x\", params = { target = \"a.com\" } }",
+            "services = { github = \"read\" }",
+            "{ service = \"github\", what = \"issues\", repo = \"o/r\" }",
         ),
     ] {
         assert_eq!(loads(&good), Ok(()), "{good}");
@@ -434,6 +434,20 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
             notion,
             "{ service = \"notion\", what = \"search\", from = \"2026-11-04\" }",
         ),
+        // Free-form reads (Thirteen's P2 on #5303): no service for them, no
+        // key for their shape.
+        read(
+            "services = { ahrefs = \"read\" }",
+            "{ service = \"ahrefs\", what = \"get\", path = \"/v3/x\" }",
+        ),
+        read(
+            "services = { slack = \"read\" }",
+            "{ service = \"slack\", what = \"call\", tool = \"search\" }",
+        ),
+        read(
+            "services = { github = \"read\" }",
+            "{ service = \"github\", what = \"query\", graphql = \"{ viewer { name: bio } }\" }",
+        ),
     ] {
         assert!(!check(&as_json(&bad)).is_empty(), "the schema took {bad}");
         assert!(loads(&bad).is_err(), "lamp-skills loaded {bad}");
@@ -450,6 +464,10 @@ fn a_read_step_is_the_same_in_the_schema_and_the_loader() {
         read(
             calendar,
             "{ service = \"google_calendar\", what = \"events\" }",
+        ),
+        read(
+            "services = { github = \"read\" }",
+            "{ service = \"github\", what = \"query\" }",
         ),
     ] {
         assert!(
