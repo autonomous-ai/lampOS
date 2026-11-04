@@ -180,8 +180,9 @@ pub const VOICE_REALTIME_PRIORITY: u8 = 20;
 const _: () = assert!(RING_REALTIME_PRIORITY < VOICE_REALTIME_PRIORITY);
 
 /// Programs the voice starts that are not itself, by file name: they run in
-/// the voice's service too.
-pub const HELPERS: [&str; 1] = ["lamp-turn-end"];
+/// the voice's service too: the end-of-turn worker and the same-voice
+/// child the provider worker starts (`same_voice::EXECUTABLE`).
+pub const HELPERS: [&str; 2] = ["lamp-turn-end", "lamp-same-voice"];
 
 #[cfg(test)]
 mod tests {

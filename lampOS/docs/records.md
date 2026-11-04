@@ -806,7 +806,8 @@ run by hand, `short-turns`, `stt-check`, `marked`, `turn-times`, `stalls`,
 `probe-cascade`, `probe-cache`, `probe-tools`, `probe-reminders`), its worker
 roles
 (`capture`, `speaker`, `provider`, `second`, `camera`, `ring`, `privacy`,
-`probe`) and its helpers (`lamp-turn-end`). Both crates use that list:
+`probe`) and its helpers (`lamp-turn-end`, and `lamp-same-voice`, the
+same-voice child the provider worker starts). Both crates use that list:
 
 - **The voice** runs only as a listed command: `lamp-voice WORD` refuses
   any other first word before anything runs, and a test reads `main.rs`'s
@@ -833,6 +834,13 @@ roles
   refused cleanup can be a worker caught as it starts; it keeps the usual
   "the last cleanup failed for one or more roots". The unit's failure stays
   in `systemctl --failed` as before.
+
+`lamp-same-voice` went on the helpers' list on 2026-11-04, before it ran on
+a lamp: once the provider worker starts it, the guard would have refused it
+as an unrecognised process sharing the voice's ownership, as it did
+`lamp-turn-end`. The guard knows it by name and still checks its open files
+and any path in its arguments
+(`the_voices_same_voice_child_is_known_and_an_unknown_one_still_refused`).
 
 The reporter is still one of the templates beside the crate, not a product
 unit. Where it is not running, lamp-health shows nothing of this, and the
