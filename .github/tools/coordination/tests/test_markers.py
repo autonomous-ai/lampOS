@@ -239,3 +239,26 @@ class HoldsLifted(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)
+
+
+class BodyAsks(unittest.TestCase):
+    # 4 Nov 22:1x (the PM, #5212): a PR body asks for two reads only on a line that asks it, never by quoting the rule.
+    def ask(self, body):
+        return two_reads([{"login": "", "body": body, "pr_body": True},
+                          c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 15:00")], HEAD, W)
+
+    def test_lines_that_ask(self):
+        for body in ("TWO READS: Reviewer-lead, Tests.",
+                     "Privacy.\n\nTWO READS: Fourth (coordinator) and the first builder (privacy).",
+                     "Privacy. TWO READS: Reviewer-lead, Tests.",
+                     "## Lamp check\n\nok\n\n## TWO READS\n\nSixth and the first builder.",
+                     "**TWO READS**: Fourth and the first builder.",
+                     "TWO READS"):
+            self.assertEqual(self.ask(body), "short 1", body)
+
+    def test_bodies_that_only_name_the_rule(self):
+        for body in ("Turning it on in homes is a separate default-on PR (TWO READS), later.",
+                     "Per joining.md, privacy pull requests need TWO READS.",
+                     "## Tests\n\n- TWO READS across a comment and a review;",
+                     "Today it is left out as TWO READS short, because its body names the phrase."):
+            self.assertEqual(self.ask(body), "none", body)
