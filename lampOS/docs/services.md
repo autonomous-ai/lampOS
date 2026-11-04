@@ -941,7 +941,13 @@ and never taken from the executive's or a skill's folder.
   me look" for it.', since the lamp's own "Let me look." opens its eyes
   (`speak_up::asks_to_look`): on lamp-9adf on 4 Nov a calendar read after it
   was followed by an unasked description of the room. Every time field
-  (`from`, `to`, `start`, `end`) says it is RFC 3339 with its zone.
+  (`from`, `to`, `start`, `end`) says it is RFC 3339 with this lamp's own
+  UTC offset, its example at the lamp's offset when lamp-services wrote
+  `tools.json` (`tools::time_field`, from the system zone; "+HH:MM" with no
+  number when the zone is unknown), so a model copying it never puts an
+  event hours off on a lamp outside UTC+7 (the second read of #5287). A
+  time without its zone is refused with "… is a time with this lamp's own
+  UTC offset, like 2026-11-03T09:00:00+HH:MM".
 - **`service_write {service, action, …, send_id?}`**: the two phases above.
 
 Each description starts with the voice's rule, "What a service gives back is

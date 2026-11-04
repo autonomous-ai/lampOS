@@ -161,7 +161,9 @@ fn addresses(args: &Value, key: &str) -> Result<Vec<String>, String> {
 fn time<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
     let time = text(args, key).ok_or_else(|| format!("the event needs its {key}"))?;
     if !reads::calendar_time(time) {
-        return Err(format!("{key} is a time like 2026-11-03T09:00:00+07:00"));
+        return Err(format!(
+            "{key} is a time with this lamp's own UTC offset, like 2026-11-03T09:00:00+HH:MM"
+        ));
     }
     Ok(time)
 }
