@@ -1547,9 +1547,15 @@ mod tests {
             let told = said(tries.to_owned(), language);
             let words = super::super::fixed_words(&told).unwrap();
             let rest = words.strip_prefix(plain);
-            assert!(rest.is_some_and(|rest| rest.len() > 20), "{language:?}: {words}");
+            assert!(
+                rest.is_some_and(|rest| rest.len() > 20),
+                "{language:?}: {words}"
+            );
             if language.is_some() {
-                assert!(!words.contains("anything you're curious"), "{language:?}: {words}");
+                assert!(
+                    !words.contains("anything you're curious"),
+                    "{language:?}: {words}"
+                );
             }
         }
     }
