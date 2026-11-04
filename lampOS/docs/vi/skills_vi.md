@@ -333,7 +333,12 @@ hay tệp nào khác ngoài `skill.toml` và `SKILL.md`, và tên đã có trên
 Sau đó, qua socket app-make (`{"upload": {"skill_md", "skill_toml"?}}`, một
 dòng tối đa 64 KiB, chỉ nhận khi `lamp-voice` bật công tắc và có dịch vụ
 say để hỏi; và `{"added": {"sha256"}}`, trạng thái `kept`, `asked`, `on`,
-`left_off` hay `none`, mà `lamp-cloud` hỏi mỗi 5 giây, tối đa 2 giờ):
+`left_off` hay `none`, mà `lamp-cloud` hỏi mỗi 5 giây, tối đa 2 giờ). Cùng
+một lần tải lên gửi lại khi nó còn đang xử lý sẽ nhập vào lần đang chạy
+(trả lời `starting`, một kết quả cho cả hai), không bao giờ là `BUSY`; và
+những lần đang xử lý được giữ trong thư mục trạng thái của `lamp-cloud`
+(chỉ id, kind, SHA-256 và trạng thái, không bao giờ tên hay lời của kỹ
+năng), nên sau khi khởi động lại nó được hỏi tiếp và ứng dụng vẫn được báo:
 
 1. **Tên đèn đang giữ bị từ chối, không bao giờ bị thay**: kỹ năng có tên
    đó trên đèn (lõi, từ Store, tự tạo), được đẩy từ máy tính, hay đang giữ

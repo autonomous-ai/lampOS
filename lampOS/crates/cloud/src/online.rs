@@ -236,6 +236,8 @@ struct Handed {
     /// The results of skills added from a file the connection took before
     /// their ack, to go again (`crate::upload`).
     uploads_lost: Vec<crate::settings::Outcome>,
+    /// Those the broker acknowledged, for `Uploads::acked`.
+    uploads_acked: Vec<crate::settings::Outcome>,
     /// Journal lines, one per step of a change's result (Mobile on #1959,
     /// 21:0x): handed, sent as a packet, acked or lost. Never its data.
     journal: Vec<String>,
@@ -337,6 +339,10 @@ impl Handed {
                     outcome.journal()
                 ));
                 self.changes_acked.push(outcome);
+                None
+            }
+            Some(Tagged::Upload(outcome)) => {
+                self.uploads_acked.push(outcome);
                 None
             }
             _ => None,
@@ -729,6 +735,12 @@ async fn session(
                 for outcome in std::mem::take(&mut handed.changes_acked) {
                     if let Some(changes) = &changes {
                         changes.acked(&outcome);
+                    }
+                }
+                // A skill from a file's result acked: no longer in flight.
+                for outcome in std::mem::take(&mut handed.uploads_acked) {
+                    if let Some(uploads) = lamp.upload() {
+                        uploads.acked(&outcome);
                     }
                 }
                 for line in std::mem::take(&mut handed.journal) {
